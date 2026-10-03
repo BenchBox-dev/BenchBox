@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""One-off migration: rewrite the OLD action marker in existing GitHub replies.
-
-Run AFTER the rename PR lands. The PR-review-followup routine previously posted
-replies carrying the marker
-
-    benchbox-codex-review-followup-actioned
-
-The rename moved the marker to
-
-    benchbox-pr-review-followup-actioned
-
-Existing replies on GitHub still carry the OLD marker, so the new routine
-would re-action threads that were already actioned. This script walks merged
-PRs, finds review-comment replies whose body contains the OLD marker, and
-PATCHes each one in place to use the NEW marker. Body content otherwise
-unchanged.
-
-Dry-run by default (lists matches, no writes). Pass --apply to mutate.
-
-After this lands successfully, delete this script in a follow-up PR — it is
-intentionally one-off and not part of the routine surface.
-
-Usage:
-  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py
-  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py --apply
-  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py \
-      --repo joeharris76/BenchBox --since 2026-01-01 --apply
-"""
 
 from __future__ import annotations
 
@@ -111,7 +83,6 @@ def list_merged_prs(repo: str, since: str | None, limit: int) -> list[int]:
         if since and merged_at and merged_at < since:
             continue
         numbers.append(int(item["number"]))
-    # Also check open PRs — markers can land on those too.
     open_args = [
         "gh",
         "pr",

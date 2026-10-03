@@ -1,13 +1,8 @@
-"""Transaction Primitives benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests database transaction semantics and overhead using TPC-H schema.
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import datetime
 import shutil
@@ -53,15 +48,6 @@ from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 
 def _pk_lock_bypass_required(dialect: str) -> bool:
-    """Return True if PK-based lock DDL should be bypassed for this platform.
-
-    Consults the sql_compat registry (REGISTRY.resolve) for the platform decision.
-    Every transaction_primitives-capable platform must have a registered rule in
-    benchbox/sql_compat/rules/schema_emit/pk_capability_txn.py.
-
-    Args:
-        dialect: Platform dialect string (e.g. "starrocks", "snowflake").
-    """
     import benchbox.sql_compat.rules.schema_emit.pk_capability_txn  # noqa: F401
     from benchbox.sql_compat.actions import CompatAction
     from benchbox.sql_compat.context import CompatibilityContext, Phase
@@ -80,32 +66,11 @@ def _pk_lock_bypass_required(dialect: str) -> bool:
 
     if registry_decision is not None:
         return registry_decision.action != CompatAction.NATIVE
-    # No rule registered → platform enforces PK natively (e.g., duckdb, sqlite, postgres).
     return False
 
 
 @dataclass
 class OperationResult:
-    """Result of executing a transaction operation.
-
-    Attributes:
-        operation_id: ID of the operation
-        success: Whether operation succeeded
-        write_duration_ms: Time to execute transaction SQL
-        rows_affected: Number of rows affected by transaction
-        validation_duration_ms: Time to execute validation queries
-        validation_passed: Whether all validations passed
-        validation_results: Details of each validation
-        cleanup_duration_ms: Time to execute cleanup
-        cleanup_success: Whether cleanup succeeded
-        error: Error message if operation failed
-        cleanup_warning: Warning message for cleanup failures
-        status: Explicit status string ("SUCCESS", "FAILED", "SKIPPED"); derived from success if None
-        skip_reason: Human-readable explanation when status is "SKIPPED"; distinct from error
-        executed_sql: The final transaction SQL actually executed (after platform
-            overrides, dialect rewrites, and placeholder replacement); used for plan capture.
-    """
-
     operation_id: str
     success: bool
     write_duration_ms: float
@@ -123,22 +88,6 @@ class OperationResult:
 
 
 class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
-    """Transaction Primitives benchmark implementation.
-
-    Tests database transaction semantics and overhead (COMMIT, ROLLBACK, savepoints,
-    isolation levels, multi-statement transactions, advanced features) using TPC-H
-    schema as foundation.
-
-    Implements OperationExecutor interface to support operation-based execution
-    through the platform adapter.
-
-    Attributes:
-        scale_factor: Scale factor (1.0 = standard size)
-        output_dir: Data output directory
-        operations_manager: Operation manager
-        data_generator: Data generator
-    """
-
     _benchmark_label = "Transaction Primitives"
     _staging_tables = STAGING_TABLES
 
@@ -148,14 +97,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         output_dir: Optional[Union[str, Path]] = None,
         **config: Any,
     ):
-        """Initialize Transaction Primitives benchmark.
-
-        Args:
-            scale_factor: Scale factor (1.0 = standard size)
-            output_dir: Data output directory
-            **config: Additional configuration
-        """
-        # Extract quiet from config to prevent duplicate kwarg error
         config = dict(config)
         quiet = config.pop("quiet", False)
 
@@ -165,47 +106,24 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         self._version = "1.0"
         self._description = "Transaction Primitives benchmark - Testing fundamental write operations using TPC-H schema"
 
-        # Setup directories. normalize_output_dir keeps an orchestrator-resolved
-        # CloudStagingPath/DatabricksPath handler intact instead of leaving a
-        # raw cloud URI string for downstream Path(...) calls to stringify.
         if output_dir is None:
-            # Reuse the canonical TPC-H datagen directory
             output_dir = get_benchmark_runs_datagen_path("tpch", scale_factor)
 
         self.output_dir = normalize_output_dir(output_dir)
 
-        # Initialize components
         self.operations_manager = TransactionOperationsManager()
         self.data_generator = TransactionPrimitivesDataGenerator(scale_factor, self.output_dir, **config)
 
-        # Data files mapping
         self.tables: dict[str, Path] = {}
 
     def _acquire_setup_lock(
         self, connection: DatabaseConnection, timeout_seconds: int = 300, dialect: str = "standard"
     ) -> bool:
-        """Acquire an exclusive lock for staging table setup to prevent concurrent populations.
-
-        Uses a dedicated lock table to prevent multiple processes from simultaneously
-        populating staging tables, which could waste resources and cause conflicts.
-
-        Args:
-            connection: Database connection
-            timeout_seconds: Maximum seconds to wait for lock (default: 300)
-
-        Returns:
-            True if lock acquired, False if timeout
-
-        Note:
-            Caller must call _release_setup_lock() when done, preferably in a finally block.
-            Lock is automatically released on connection close/crash.
-        """
         import time
 
         if _pk_lock_bypass_required(dialect):
             return True
 
-        # Create lock table if it doesn't exist (atomic operation)
         try:
             lock_res = connection.execute("""
                 CREATE TABLE IF NOT EXISTS transaction_primitives_setup_lock (
@@ -221,18 +139,15 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             self.log_verbose(f"Warning: Could not create lock table: {e}")
             return False
 
-        # Try to acquire lock with timeout
         lock_name = "staging_table_setup"
         start_time = mono_time()
 
         while elapsed_seconds(start_time) < timeout_seconds:
             try:
-                # Attempt to insert lock row (fails if already exists)
                 import os
 
                 holder_info = f"pid:{os.getpid()},time:{time.time()}"
 
-                # Escape single quotes in values to prevent SQL injection
                 escaped_lock_name = lock_name.replace("'", "''")
                 escaped_holder_info = holder_info.replace("'", "''")
 
@@ -243,7 +158,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 if (err := failed_platform_error(ins_res)) is not None:
                     error_msg = err.lower()
                     if "unique" in error_msg or "duplicate" in error_msg or "constraint" in error_msg:
-                        # Lock held by another process - wait and retry
                         time.sleep(0.5)
                         continue
                     else:
@@ -254,16 +168,12 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             except Exception as e:
                 error_msg = str(e).lower()
                 if "unique" in error_msg or "duplicate" in error_msg or "constraint" in error_msg:
-                    # Lock held by another process - wait and retry
                     time.sleep(0.5)
                 else:
-                    # Unexpected error
                     self.log_verbose(f"Unexpected error acquiring lock: {e}")
                     return False
 
-        # Timeout - check if lock is stale
         try:
-            # Escape lock name for SELECT query
             escaped_lock_name = lock_name.replace("'", "''")
             result = connection.execute(
                 f"SELECT acquired_at FROM transaction_primitives_setup_lock WHERE lock_name = '{escaped_lock_name}'"
@@ -276,17 +186,10 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return False
 
     def _release_setup_lock(self, connection: DatabaseConnection, dialect: str = "standard") -> None:
-        """Release the staging table setup lock.
-
-        Args:
-            connection: Database connection
-            dialect: SQL dialect (e.g. 'datafusion', 'clickhouse', 'standard')
-        """
         if _pk_lock_bypass_required(dialect):
             return
         try:
             lock_name = "staging_table_setup"
-            # Escape lock name for DELETE query
             escaped_lock_name = lock_name.replace("'", "''")
             connection.execute(f"DELETE FROM transaction_primitives_setup_lock WHERE lock_name = '{escaped_lock_name}'")
             self.log_verbose("Released setup lock")
@@ -294,41 +197,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             self.log_verbose(f"Warning: Could not release setup lock: {e}")
 
     def _quote_identifier(self, identifier: str) -> str:
-        """Quote SQL identifier to prevent SQL injection.
-
-        Uses double quotes (SQL standard) which work in DuckDB, PostgreSQL, SQLite.
-        Uses backticks for BigQuery, where double quotes denote string literals.
-        For compatibility, validates identifier first. Uppercases for dialects
-        whose catalogs are uppercase (Snowflake, BigQuery) so setup probes
-        resolve the adapter-created tables.
-
-        Args:
-            identifier: Table, column, or schema name
-
-        Returns:
-            Quoted identifier safe for SQL
-
-        Raises:
-            ValueError: If identifier contains dangerous characters
-
-        Security:
-            - Validates identifier contains only safe characters
-            - Quotes with double quotes (SQL standard for identifiers)
-            - Escapes any existing double quotes by doubling them
-        """
         return quote_identifier_for_dialect(identifier, self._setup_dialect)
 
     def _populate_staging_table(self, connection: DatabaseConnection, staging_table: str, source_table: str) -> None:
-        """Populate staging table from TPC-H source table.
-
-        Args:
-            connection: Database connection
-            staging_table: Name of staging table to populate
-            source_table: Name of source TPC-H table
-        """
         self.log_verbose(f"Populating {staging_table} from {source_table}...")
 
-        # Use INSERT...SELECT to copy data
         populate_sql = f"""
         INSERT INTO {staging_table}
         SELECT * FROM {source_table}
@@ -344,7 +217,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         connection: DatabaseConnection,
         table_name: str,
     ) -> int:
-        """Ensure a staging table is populated and return its row count."""
         if table_name not in ["txn_orders", "txn_lineitem", "txn_customer"]:
             try:
                 quoted_empty = self._quote_identifier(table_name)
@@ -364,7 +236,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             self.log_verbose(f"Table {table_name} already populated ({current_count} rows)")
             return current_count
 
-        # Validate source table has data before copying
         try:
             quoted_source = self._quote_identifier(source_table)
             source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
@@ -392,31 +263,10 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return final_count
 
     def setup(self, connection: DatabaseConnection, force: bool = False, dialect: str = "standard") -> dict[str, Any]:
-        """Setup benchmark for execution.
-
-        Creates and populates staging tables from TPC-H base tables.
-
-        Uses an exclusive database lock to prevent concurrent setup operations
-        that could waste resources or cause conflicts.
-
-        Args:
-            connection: Database connection
-            force: If True, drop existing staging tables first
-            dialect: SQL dialect (e.g. 'clickhouse', 'standard')
-
-        Returns:
-            Dictionary with setup status and details
-
-        Raises:
-            RuntimeError: If required tables don't exist or setup fails
-        """
         self.log_verbose("Setting up Transaction Primitives benchmark...")
 
-        # Set dialect first so any downstream call to _quote_identifier()
-        # matches the catalog's identifier case.
         self._setup_dialect = dialect
 
-        # Validate TPC-H base tables exist
         required_tables = ["orders", "lineitem", "customer"]
         for table in required_tables:
             try:
@@ -430,8 +280,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     f"Error: {e}"
                 ) from e
 
-        # Acquire exclusive lock to prevent concurrent setup operations
-        # This eliminates race conditions during staging table population
         if not self._acquire_setup_lock(connection, timeout_seconds=300, dialect=dialect):
             raise RuntimeError(
                 "Could not acquire setup lock after 5 minutes. "
@@ -440,17 +288,8 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             )
 
         try:
-            # A staging set whose manifest does not match this run is stale, not
-            # reusable. Without this the population loop below takes its "already
-            # populated" branch on the leftover rows, nothing is rebuilt, and the
-            # unconditional _write_staging_manifest() at the end then certifies
-            # the stale data as this run's -- the exact silent wrong-results bug
-            # the manifest exists to close. Reuse the force drop path rather than
-            # adding a second one; a dropped table re-enters the loop empty and
-            # repopulates through the already-audited branch.
             rebuild = force or not self._staging_manifest_matches(connection, required_tables)
 
-            # Drop existing staging tables when rebuilding (done once before loop)
             replace_in_place = rebuild and replaces_tables_in_place(dialect)
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
@@ -464,16 +303,12 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     except Exception as e:
                         self.log_verbose(f"Warning: Could not drop {table_name}: {e}")
 
-            # Create staging tables and populate from TPC-H base tables
-            # Lock is held - no concurrent setup can interfere
             created_tables = []
             status = {}
 
             for table_name, table_def in STAGING_TABLES.items():
-                # Check if table exists before creating
                 table_existed = self._table_exists(connection, table_name)
 
-                # Create table if not exists (atomic operation)
                 create_sql = (
                     replace_table_sql(get_create_table_sql(table_name, dialect=dialect))
                     if replace_in_place
@@ -484,7 +319,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     if (err := failed_platform_error(create_res)) is not None:
                         raise RuntimeError(f"Failed to create {table_name}: {err}")
 
-                    # Track newly created tables (didn't exist before)
                     if not table_existed:
                         created_tables.append(table_name)
                         self.log_verbose(f"✅ Created {table_name}")
@@ -495,10 +329,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
                 status[table_name] = self._ensure_staging_table_populated(connection, table_name)
 
-            # Record this setup()'s provenance (benchmark, scale, spec version,
-            # source digest) so is_setup() can require an exact match rather
-            # than trusting a bare COUNT(*) that a stale staging set from a
-            # different scale/seed would also satisfy.
             self._write_staging_manifest(connection, required_tables)
 
             self.log_verbose(f"Setup complete: {status}")
@@ -509,15 +339,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 "table_row_counts": status,
             }
         finally:
-            # Always release lock, even if setup fails
             self._release_setup_lock(connection, dialect=dialect)
 
     def teardown(self, connection: DatabaseConnection) -> None:
-        """Clean up all staging tables.
-
-        Args:
-            connection: Database connection
-        """
         self.log_verbose("Tearing down Transaction Primitives benchmark...")
 
         for table_name in STAGING_TABLES:
@@ -530,14 +354,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         self.log_verbose("Teardown complete")
 
     def cleanup_auxiliary_files(self) -> None:
-        """Remove auxiliary data files (bulk load test files).
-
-        This removes the transaction_primitives_auxiliary subdirectory containing
-        bulk load test files. Useful for cleanup or before regeneration.
-
-        Note:
-            This does not remove TPC-H base data, only auxiliary test files.
-        """
         import shutil
 
         aux_dir = self.data_generator.files_dir
@@ -549,35 +365,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 self.log_verbose(f"Warning: Could not remove auxiliary files: {e}")
 
     def load_data(self, connection: DatabaseConnection, **kwargs: Any) -> dict[str, Any]:
-        """Load data into database (standard benchmark interface).
-
-        For Transaction Primitives, data loading is handled by the platform adapter
-        loading .tbl files for both base TPC-H tables and staging tables.
-        This method just verifies that data was loaded correctly.
-
-        Args:
-            connection: Database connection
-            **kwargs: ``dialect`` (str, default "standard") propagates to setup() so
-                the PK lock-bypass registry lookup matches the adapter's dialect.
-
-        Returns:
-            Dictionary with loading results
-        """
-        # Verify that tables exist and have data. Propagate dialect so cloud platforms
-        # (Snowflake, BigQuery, etc.) hit their registered PK lock-bypass rule.
         return self.setup(connection, force=False, dialect=kwargs.get("dialect", "standard"))
 
     def reset(self, connection: DatabaseConnection) -> None:
-        """Reset staging tables to initial state.
-
-        Truncates and repopulates staging tables.
-
-        Args:
-            connection: Database connection
-        """
         self.log_verbose("Resetting Transaction Primitives staging tables...")
 
-        # Truncate populated staging tables
         for table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
             try:
                 connection.execute(f"TRUNCATE TABLE {table_name}")
@@ -585,7 +377,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             except Exception as e:
                 self.log_verbose(f"Warning: Could not truncate {table_name}: {e}")
 
-        # Repopulate
         self._populate_staging_table(connection, "txn_orders", "orders")
         self._populate_staging_table(connection, "txn_lineitem", "lineitem")
         self._populate_staging_table(connection, "txn_customer", "customer")
@@ -593,26 +384,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         self.log_verbose("Reset complete")
 
     def is_setup(self, connection: DatabaseConnection) -> bool:
-        """Check if staging tables are ready for THIS run.
-
-        Requires both that the key staging tables exist and have data, AND
-        that the staging provenance manifest (see
-        ``TransactionalBenchmarkBase._staging_manifest_matches``) matches
-        this benchmark's scale/spec/source. A staging set left over from a
-        different scale factor (or a legacy database with no manifest at
-        all) fails this check and forces one rebuild, rather than silently
-        benchmarking the wrong data volume.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            True if all staging tables exist, have data, and their manifest
-            matches this run's provenance.
-        """
         try:
-            # Check that key staging tables exist and have data. Quoted for
-            # the dialect so uppercase catalogs (Snowflake, BigQuery) resolve.
             for table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
                 quoted = self._quote_identifier(table_name)
                 count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
@@ -623,68 +395,26 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             return False
 
     def _replace_placeholders(self, sql: str) -> str:
-        """Replace placeholders in SQL with actual values.
-
-        Args:
-            sql: SQL string potentially containing placeholders
-
-        Returns:
-            SQL with placeholders replaced
-
-        Supported placeholders:
-            {file_path}: Replaced with auxiliary files directory path for bulk load operations
-
-        Note:
-            File paths are sanitized by escaping single quotes to prevent SQL injection.
-            Uses transaction_primitives_auxiliary subdirectory to isolate auxiliary files.
-        """
         if "{file_path}" in sql:
-            # Replace with the auxiliary files directory path
-            # This uses a subdirectory to keep bulk load files separate from TPC-H data
             if self.output_dir:
                 file_path = str(self.output_dir / "transaction_primitives_auxiliary")
             else:
                 file_path = ""
 
-            # Escape single quotes in path to prevent SQL injection
-            # SQL standard: '' (two single quotes) escapes a single quote
             file_path = file_path.replace("'", "''")
 
-            # Validate path doesn't contain other dangerous characters
-            # Allow common path characters: alphanumeric, /, \, ., -, _, :, space
             import re
 
             if re.search(r"[^\w\s/\\\.\-:]", file_path.replace("''", "'")):
-                # Contains unusual characters - log warning
                 self.log_verbose(f"Warning: File path contains unusual characters: {file_path}")
 
             sql = sql.replace("{file_path}", file_path)
         return sql
 
     def get_schema(self, dialect: str = "standard") -> dict[str, dict]:
-        """Get the Transaction Primitives schema definitions.
-
-        Args:
-            dialect: SQL dialect to use for data types
-
-        Returns:
-            Dictionary mapping table names to their schema definitions
-        """
         return STAGING_TABLES
 
     def get_create_tables_sql(self, dialect: str = "standard", tuning_config=None) -> str:
-        """Get CREATE TABLE SQL for all required tables.
-
-        Includes both TPC-H base tables and Transaction Primitives staging tables.
-        TPC-H base tables must exist before staging tables can be populated.
-
-        Args:
-            dialect: SQL dialect to use
-            tuning_config: Unified tuning configuration for constraint settings
-
-        Returns:
-            Complete SQL schema creation script
-        """
         return build_tpch_staging_tables_sql(
             dialect=dialect,
             tuning_config=tuning_config,
@@ -698,25 +428,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         connection: DatabaseConnection,
         **kwargs: Any,
     ) -> OperationResult:
-        """Execute a transaction operation and validate results.
-
-        Note: Transaction operations contain their own BEGIN/COMMIT/ROLLBACK logic,
-        so no transaction wrapping is performed by this method.
-
-        Args:
-            operation_id: ID of operation to execute
-            connection: Database connection
-            **kwargs: Optional keyword arguments:
-                platform_key: Platform dialect key (e.g. 'datafusion', 'duckdb')
-                sql_override: Pre-processed SQL from adapter preprocessing
-
-        Returns:
-            OperationResult with execution metrics
-
-        Raises:
-            ValueError: If connection is invalid
-            RuntimeError: If staging tables not initialized
-        """
         operation, platform_key, fallback_key, sql_override = self._prepare_operation(
             operation_id, connection, **kwargs
         )
@@ -749,8 +460,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     skip_reason=skip_reason,
                 )
 
-            # Resolve effective SQL respecting platform overrides (engine key
-            # first, shared-dialect fallback second - see _lookup_platform_override).
             found_override, override = self._lookup_platform_override(
                 getattr(operation, "platform_overrides", None), platform_key, fallback_key
             )
@@ -777,30 +486,22 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             else:
                 write_sql_raw = operation.write_sql
 
-            # Execute transaction SQL (operations already contain BEGIN/COMMIT/ROLLBACK)
             self.log_verbose(f"Executing transaction operation: {operation_id}")
             write_sql_raw = self._rewrite_transactional_sql_for_platform(write_sql_raw, platform_key)
             write_sql = self._replace_placeholders(write_sql_raw)
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
             write_duration_ms = (time.perf_counter() - write_start) * 1000
-            # Adapters that report failures as a FAILED result payload do
-            # not raise here: surface the failure instead of letting a
-            # no-op write flow into validation (see the write_primitives
-            # guard for the live Snowflake case that motivated this).
             if (write_error := failed_platform_error(write_result)) is not None:
                 raise RuntimeError(f"Transaction SQL failed on platform: {write_error}")
 
-            # Get rows affected (platform-specific)
             rows_affected = getattr(write_result, "rowcount", None)
             if rows_affected is None:
                 self.log_verbose(f"Warning: Platform doesn't support rowcount for {operation_id}")
-                rows_affected = -1  # Sentinel value indicating "unknown"
+                rows_affected = -1
             elif rows_affected == -1:
-                # Some platforms return -1 for "not applicable"
                 self.log_verbose(f"Note: rowcount not applicable for {operation_id}")
 
-            # Execute validation queries
             self.log_verbose(f"Validating operation: {operation_id}")
             validation_start = time.perf_counter()
             validation_results = []
@@ -809,9 +510,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             for val_query in operation.validation_queries:
                 val_sql = self._replace_placeholders(val_query.sql)
                 val_cursor = connection.execute(val_sql)
-                # A failed validation SELECT surfaces as an empty row set,
-                # which vacuous COUNT(*) checks would accept. Fail with the
-                # adapter-reported error instead.
                 if (val_error := failed_platform_error(val_cursor)) is not None:
                     validation_passed = False
                     validation_results.append(
@@ -830,19 +528,15 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 actual_rows = len(val_result)
                 expected_rows = val_query.expected_rows
 
-                # Validation logic: exact match > range check > no validation
                 if expected_rows is not None:
-                    # Exact row count expected
                     passed = actual_rows == expected_rows
                     validation_passed = validation_passed and passed
                 elif val_query.expected_rows_min is not None or val_query.expected_rows_max is not None:
-                    # Range validation
                     min_val = val_query.expected_rows_min if val_query.expected_rows_min is not None else 0
                     max_val = val_query.expected_rows_max if val_query.expected_rows_max is not None else float("inf")
                     passed = min_val <= actual_rows <= max_val
                     validation_passed = validation_passed and passed
                 else:
-                    # No validation criteria - just verify query runs
                     passed = True
 
                 validation_results.append(
@@ -852,20 +546,18 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                         "expected_rows": expected_rows,
                         "actual_rows": actual_rows,
                         "passed": passed,
-                        "sample": val_result[:5] if val_result else [],  # Only store first 5 rows for debugging
+                        "sample": val_result[:5] if val_result else [],
                     }
                 )
 
             validation_duration_ms = (time.perf_counter() - validation_start) * 1000
 
-            # Execute cleanup if specified
             self.log_verbose(f"Cleaning up operation: {operation_id}")
             cleanup_start = time.perf_counter()
             cleanup_success = True
             cleanup_warning = None
 
             if operation.cleanup_sql:
-                # Execute cleanup SQL
                 try:
                     cleanup_res = connection.execute(operation.cleanup_sql)
                     if (cleanup_err := failed_platform_error(cleanup_res)) is not None:
@@ -883,10 +575,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
             cleanup_duration_ms = (time.perf_counter() - cleanup_start) * 1000
 
-            # A failed post-condition validation means the operation did not do
-            # what it claims even though the write SQL did not raise. Report it as
-            # VALIDATION_FAILED (distinct from an execution FAILED), mirroring
-            # write_primitives, so it cannot render as a passing operation.
             return OperationResult(
                 operation_id=operation_id,
                 success=validation_passed,
@@ -897,9 +585,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
-                # Preserve this benchmark's "status None on normal success"
-                # idiom (derived to SUCCESS downstream); only stamp an explicit
-                # status when a post-condition validation fails.
                 status=None if validation_passed else "VALIDATION_FAILED",
                 error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
@@ -911,7 +596,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             error_msg = f"Operation {operation_id} failed: {str(e)}"
             self.log_verbose(error_msg)
 
-            # Warn for operations that fail - partial changes may exist
             cleanup_warning = (
                 "Transaction operation failed during execution. "
                 "Partial changes may exist in database. Run reset() to ensure clean state."
@@ -932,22 +616,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 cleanup_warning=cleanup_warning,
             )
 
-    # =========================================================================
-    # DataFrame Support
-    # =========================================================================
-
     def supports_dataframe_mode(self, platform_name: str) -> bool:
-        """Check if a platform supports DataFrame mode for Transaction Primitives.
-
-        Transaction Primitives requires ACID transaction support, which is only
-        available on certain DataFrame platforms with Delta Lake or Iceberg.
-
-        Args:
-            platform_name: Platform name to check
-
-        Returns:
-            True if platform supports DataFrame mode for transactions
-        """
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -956,27 +625,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return is_valid
 
     def get_dataframe_operations(self, platform_name: str, spark_session: Any = None) -> Any:
-        """Get DataFrame transaction operations manager for a platform.
-
-        This returns a DataFrameTransactionOperationsManager configured for
-        the specified platform, enabling ACID transaction benchmarking.
-
-        Args:
-            platform_name: Platform name (e.g., "pyspark-df", "delta-lake")
-            spark_session: SparkSession instance (required for pyspark-df)
-
-        Returns:
-            DataFrameTransactionOperationsManager instance
-
-        Raises:
-            ValueError: If platform does not support transactions
-        """
         from benchbox.core.transaction_primitives.dataframe_operations import (
             get_dataframe_transaction_manager,
             validate_transaction_primitives_platform,
         )
 
-        # Validate platform first
         is_valid, error_msg = validate_transaction_primitives_platform(platform_name)
         if not is_valid:
             raise ValueError(error_msg)
@@ -989,29 +642,14 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return manager
 
     def validate_dataframe_configuration(self, platform_name: str, spark_session: Any = None) -> tuple[bool, str]:
-        """Validate DataFrame configuration for Transaction Primitives.
-
-        This should be called during benchmark initialization to provide
-        early feedback when users attempt to run Transaction Primitives
-        on unsupported platforms.
-
-        Args:
-            platform_name: Platform name to validate
-            spark_session: SparkSession instance (for pyspark-df)
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
 
-        # First check if platform is potentially valid
         is_valid, error_msg = validate_transaction_primitives_platform(platform_name)
         if not is_valid:
             return False, error_msg
 
-        # For PySpark, check that SparkSession is provided
         if "pyspark" in platform_name.lower() or "spark" in platform_name.lower():
             if spark_session is None:
                 return False, (
@@ -1022,23 +660,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return True, ""
 
     def skip_dataframe_data_loading(self) -> bool:
-        """Transaction Primitives DataFrame execution manages its own Delta/Iceberg table lifecycle."""
         return True
 
     def _create_test_orders_df(self, spark_session: Any, start_key: int, count: int) -> Any:
-        """Create a small synthetic TPC-H ORDERS DataFrame for test operations.
-
-        Uses PySpark createDataFrame when a SparkSession is available, otherwise
-        falls back to a pandas DataFrame for delta-rs paths.
-
-        Args:
-            spark_session: SparkSession instance, or None for pandas fallback
-            start_key: Starting o_orderkey value (use range 8000001-9000000)
-            count: Number of rows to generate
-
-        Returns:
-            DataFrame compatible with the platform's write operations
-        """
         rows = [
             {
                 "o_orderkey": start_key + i,
@@ -1060,15 +684,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         return pd.DataFrame(rows)
 
     def _setup_transaction_table(self, spark_session: Any, table_path: Path) -> None:
-        """Create (or recreate) the initial Delta table with synthetic TPC-H ORDERS data.
-
-        Writes 100 rows with o_orderkey in the 1-100 range as a stable baseline.
-        Any prior table at table_path is removed first so each iteration starts clean.
-
-        Args:
-            spark_session: SparkSession instance, or None for delta-rs path
-            table_path: Directory path for the Delta table
-        """
         if table_path.exists():
             shutil.rmtree(str(table_path))
 
@@ -1121,25 +736,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         monitor: Any | None = None,  # noqa: ARG002
         run_options: Any | None = None,  # noqa: ARG002
     ) -> list[dict[str, Any]]:
-        """Execute Transaction Primitives in DataFrame mode.
-
-        This hook is called by the DataFrame adapter to execute ACID transaction
-        operations on supported platforms (e.g., PySpark + Delta Lake).
-
-        Implements Pattern B (native DataFrame execution): calls
-        get_dataframe_operations() to obtain a DataFrameTransactionOperationsManager,
-        creates a temporary Delta table, then executes 12 operation types in three
-        dependency-ordered phases:
-          Phase A - Write operations (atomic_insert/update/delete/merge)
-          Phase B - Version operations (rollback_to_version/timestamp, time_travel, version_compare)
-          Phase C - Concurrency/isolation (concurrent_write, conflict_resolution,
-                     snapshot_isolation, read_your_writes)
-
-        CRITICAL: Every SUCCESS result row has execution_time_seconds > 0 because each
-        row comes from a real manager.execute_*() call with measured timing.
-        A zero-time SUCCESS would indicate the phantom-data anti-pattern from the
-        prior defect - guarded against in w3 behavioral tests.
-        """
         from benchbox.core.transaction_primitives.dataframe_operations import (
             TransactionOperationType,
         )
@@ -1160,23 +756,14 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
         try:
             for _iteration in range(1, iterations + 1):
-                # Reset table to clean baseline for each iteration
                 self._setup_transaction_table(
                     spark_session=spark_session,
                     table_path=table_path,
                 )
 
-                # Capture pre-phase timestamp before any writes (used by rollback_to_timestamp)
                 pre_phase_timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
-                # Ordered dispatch: each tuple is (operation_type, zero-arg callable).
-                # Lambdas close over stable per-iteration values (self, spark_session,
-                # table_path, manager). pre_phase_timestamp uses a default-arg to make the
-                # capture explicit. DataFrames are constructed inside lambdas so operations
-                # skipped by query_filter never trigger _create_test_orders_df calls.
-                # Phase A must run before Phase B (version ops need history created by writes).
                 dispatch: list[tuple[Any, Any]] = [
-                    # --- Phase A: Write operations (each creates a new Delta version) ---
                     (
                         TransactionOperationType.ATOMIC_INSERT,
                         lambda: manager.execute_atomic_insert(
@@ -1206,7 +793,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                             when_not_matched=None,
                         ),
                     ),
-                    # --- Phase B: Version operations (depend on history from Phase A) ---
                     (
                         TransactionOperationType.ROLLBACK_TO_VERSION,
                         lambda: manager.execute_rollback_to_version(table_path, version=0),
@@ -1223,7 +809,6 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                         TransactionOperationType.VERSION_COMPARE,
                         lambda: manager.execute_version_compare(table_path, version1=0, version2=1),
                     ),
-                    # --- Phase C: Concurrency/isolation operations ---
                     (
                         TransactionOperationType.CONCURRENT_WRITE,
                         lambda: manager.execute_concurrent_write(

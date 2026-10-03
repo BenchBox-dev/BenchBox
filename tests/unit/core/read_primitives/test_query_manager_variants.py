@@ -1,8 +1,5 @@
-"""Test Read Primitives query manager variant retrieval functionality.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -16,11 +13,8 @@ pytestmark = [
 
 
 class TestQueryManagerVariantRetrieval:
-    """Test query manager get_query() with dialect-specific variants."""
-
     @pytest.fixture
     def mock_catalog_with_variants(self, monkeypatch, tmp_path):
-        """Create a mock catalog with variant queries."""
         catalog_yaml = """
 version: 1
 queries:
@@ -72,7 +66,6 @@ queries:
         monkeypatch.setattr(importlib.resources, "files", lambda pkg: MockPath(tmp_path))
 
     def test_get_query_without_dialect_returns_base(self, mock_catalog_with_variants):
-        """Test get_query() without dialect returns base SQL."""
         manager = ReadPrimitivesQueryManager()
 
         query = manager.get_query("query_with_duckdb_variant")
@@ -80,23 +73,19 @@ queries:
         assert "USING SAMPLE" not in query
 
     def test_get_query_with_matching_variant_returns_variant(self, mock_catalog_with_variants):
-        """Test get_query() with matching dialect returns variant SQL."""
         manager = ReadPrimitivesQueryManager()
 
         query = manager.get_query("query_with_duckdb_variant", dialect="duckdb")
         assert "USING SAMPLE 10%" in query
 
     def test_get_query_with_non_matching_variant_returns_base(self, mock_catalog_with_variants):
-        """Test get_query() with non-matching dialect returns base SQL."""
         manager = ReadPrimitivesQueryManager()
 
-        # Query has duckdb variant but request bigquery
         query = manager.get_query("query_with_duckdb_variant", dialect="bigquery")
         assert query == "SELECT * FROM orders"
         assert "USING SAMPLE" not in query
 
     def test_get_query_with_multiple_variants_returns_correct_one(self, mock_catalog_with_variants):
-        """Test get_query() returns correct variant when multiple exist."""
         manager = ReadPrimitivesQueryManager()
 
         duckdb_query = manager.get_query("query_with_multiple_variants", dialect="duckdb")
@@ -109,7 +98,6 @@ queries:
         assert "SAMPLE (10)" in snowflake_query
 
     def test_get_query_skip_on_raises_query_skipped_error(self, mock_catalog_with_variants):
-        """Test get_query() raises QuerySkippedError for skip_on dialects."""
         manager = ReadPrimitivesQueryManager()
 
         with pytest.raises(QuerySkippedError) as exc_info:
@@ -119,18 +107,14 @@ queries:
         assert "duckdb" in str(exc_info.value).lower()
 
     def test_get_query_skip_on_with_different_dialect_works(self, mock_catalog_with_variants):
-        """Test get_query() works if dialect not in skip_on list."""
         manager = ReadPrimitivesQueryManager()
 
-        # Query skips duckdb and sqlite, but bigquery should work
         query = manager.get_query("query_skip_on_duckdb", dialect="bigquery")
         assert "JSON_EXTRACT" in query
 
     def test_get_query_dialect_case_insensitive(self, mock_catalog_with_variants):
-        """Test get_query() dialect matching is case-insensitive."""
         manager = ReadPrimitivesQueryManager()
 
-        # All these should return the DuckDB variant
         query1 = manager.get_query("query_with_duckdb_variant", dialect="duckdb")
         query2 = manager.get_query("query_with_duckdb_variant", dialect="DuckDB")
         query3 = manager.get_query("query_with_duckdb_variant", dialect="DUCKDB")
@@ -142,7 +126,6 @@ queries:
 
         manager = ReadPrimitivesQueryManager()
 
-        # All these should raise ValueError
         with pytest.raises(ValueError):
             manager.get_query("query_skip_on_duckdb", dialect="duckdb")
 
@@ -153,14 +136,12 @@ queries:
             manager.get_query("query_skip_on_duckdb", dialect="DUCKDB")
 
     def test_get_query_base_only_query_with_dialect(self, mock_catalog_with_variants):
-        """Test get_query() with dialect on query with no variants returns base."""
         manager = ReadPrimitivesQueryManager()
 
         query = manager.get_query("query_base_only", dialect="duckdb")
         assert query == "SELECT * FROM orders"
 
     def test_get_query_invalid_query_id_raises_valueerror(self, mock_catalog_with_variants):
-        """Test get_query() with invalid query ID raises ValueError."""
         manager = ReadPrimitivesQueryManager()
 
         with pytest.raises(ValueError) as exc_info:
@@ -172,22 +153,17 @@ queries:
 
         manager = ReadPrimitivesQueryManager()
 
-        # Should raise ValueError for sqlite (in skip_on)
         with pytest.raises(ValueError):
             manager.get_query("query_with_variant_and_skip", dialect="sqlite")
 
-        # Should return variant for bigquery
         query = manager.get_query("query_with_variant_and_skip", dialect="bigquery")
         assert "`orders`" in query
 
-        # Should return base for other dialects
         query = manager.get_query("query_with_variant_and_skip", dialect="duckdb")
         assert query == "SELECT * FROM orders"
 
 
 class TestQueryManagerVariantIntegration:
-    """Integration tests for query manager with actual catalog."""
-
     def test_actual_catalog_variant_lookup_works(self):
 
         manager = ReadPrimitivesQueryManager()
@@ -201,7 +177,6 @@ class TestQueryManagerVariantIntegration:
             manager.get_query("array_distinct", dialect="datafusion")
 
     def test_actual_catalog_datafusion_rewrites_for_known_failures(self):
-        """DataFusion should use variants for known unsupported base functions."""
         manager = ReadPrimitivesQueryManager()
 
         intrinsic = manager.get_query("intrinsic_to_date", dialect="datafusion")
@@ -212,7 +187,6 @@ class TestQueryManagerVariantIntegration:
         assert "MAX_BY" not in max_by.upper()
 
     def test_actual_catalog_datafusion_skips_unsupported_json_queries(self):
-        """DataFusion should explicitly skip JSON queries with no SQL-function support."""
         manager = ReadPrimitivesQueryManager()
 
         for query_id in ["json_extract_simple", "json_extract_nested", "json_aggregates"]:
@@ -220,7 +194,6 @@ class TestQueryManagerVariantIntegration:
                 manager.get_query(query_id, dialect="datafusion")
 
     def test_actual_catalog_databricks_skips_unsupported_queries(self):
-        """Databricks skips queries whose functions it does not implement."""
         manager = ReadPrimitivesQueryManager()
 
         for query_id in [
@@ -233,7 +206,6 @@ class TestQueryManagerVariantIntegration:
                 manager.get_query(query_id, dialect="databricks")
 
     def test_actual_catalog_clickhouse_uses_lowercase_window_functions(self):
-        """ClickHouse receives its case-sensitive LAG/LEAD spelling."""
         manager = ReadPrimitivesQueryManager()
 
         query = manager.get_query("window_lead_lag_same_frame", dialect="clickhouse")
@@ -245,7 +217,6 @@ class TestQueryManagerVariantIntegration:
         assert "toDate('1995-01-01')" in query
 
     def test_actual_catalog_clickhouse_lowercases_timeseries_lag(self):
-        """ClickHouse receives lowercase LAG in the time-series variant."""
         manager = ReadPrimitivesQueryManager()
 
         query = manager.get_query("timeseries_trend_analysis", dialect="clickhouse")
@@ -254,7 +225,6 @@ class TestQueryManagerVariantIntegration:
         assert "LAG(monthly_revenue, 1)" not in query
 
     def test_actual_catalog_clickhouse_skips_missing_cume_dist(self):
-        """Unsupported ClickHouse cume_dist cells are explicit skips."""
         manager = ReadPrimitivesQueryManager()
 
         for query_id in ("window_multiple_orderings", "qualify_cume_dist"):
@@ -265,15 +235,12 @@ class TestQueryManagerVariantIntegration:
 
         manager = ReadPrimitivesQueryManager()
 
-        # Should have loaded catalog successfully
         assert manager.catalog_version >= 1
 
-        # Should have entries
         all_queries = manager.get_all_queries()
-        assert len(all_queries) > 100  # Should have 109 queries
+        assert len(all_queries) > 100
 
     def test_get_query_with_none_dialect_returns_base(self):
-        """Test get_query() with dialect=None returns base query."""
         manager = ReadPrimitivesQueryManager()
 
         all_queries = manager.get_all_queries()
@@ -282,5 +249,4 @@ class TestQueryManagerVariantIntegration:
         query1 = manager.get_query(first_query_id, dialect=None)
         query2 = manager.get_query(first_query_id)
 
-        # Both should return the same base query
         assert query1 == query2

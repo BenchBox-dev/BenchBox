@@ -68,19 +68,25 @@ config.save_config()
 `benchbox.utils.ExecutionConfigHelper` wraps common tuning operations. It works with or without an existing config file.
 
 ```python
+from benchbox.cli.config import ConfigManager
 from benchbox.utils import ExecutionConfigHelper
 
-helper = ExecutionConfigHelper()
+config = ConfigManager()
+helper = ExecutionConfigHelper(config_manager=config)
 
-# Enable a quick power run profile
 helper.enable_power_run_iterations(iterations=3, warm_up_iterations=1)
 
-# Turn on concurrent streams and optimise for hardware
 helper.enable_concurrent_queries(max_concurrent=4)
 helper.optimize_for_system(cpu_cores=16, memory_gb=64)
+config.save_config()
 ```
 
-The helper updates the active configuration provider, so CLI runs pick up the changes once you call `config.save_config()` or invoke the helper with an explicit `ConfigManager` instance.
+The helper updates the configuration object it captured at construction. This
+example passes the same `ConfigManager` that saves the changes. In standalone
+code without a registered provider, `ExecutionConfigHelper()` captures a fresh
+in-memory provider; its changes stay local to that helper and are not persisted.
+Later provider registrations do not replace an existing helper's captured
+provider. Pass a `ConfigManager` explicitly when you intend to save the settings.
 
 ## Environment Overrides
 

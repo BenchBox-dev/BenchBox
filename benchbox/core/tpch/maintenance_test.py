@@ -1,16 +1,9 @@
-"""TPC-H Maintenance Test Implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module implements the TPC-H Maintenance Test according to the official
-TPC-H specification, including RF1 (Refresh Function 1) and RF2 (Refresh Function 2)
-operations that simulate new sales processing and old sales deletion.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import time
@@ -24,8 +17,6 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 @dataclass
 class TPCHMaintenanceTestConfig:
-    """Configuration for TPC-H Maintenance Test."""
-
     scale_factor: float = 1.0
     maintenance_pairs: int = 1
     rf1_interval: float = 30.0
@@ -38,9 +29,7 @@ class TPCHMaintenanceTestConfig:
 
 @dataclass
 class TPCHMaintenanceOperation:
-    """Single maintenance operation result."""
-
-    operation_type: str  # 'RF1' or 'RF2'
+    operation_type: str
     start_time: float
     end_time: float
     duration: float
@@ -51,8 +40,6 @@ class TPCHMaintenanceOperation:
 
 @dataclass
 class TPCHMaintenanceTestResult:
-    """Result of TPC-H Maintenance Test."""
-
     config: TPCHMaintenanceTestConfig
     start_time: str
     end_time: str
@@ -69,13 +56,10 @@ class TPCHMaintenanceTestResult:
 
     @property
     def scale_factor(self) -> float:
-        """Get scale factor from config."""
         return self.config.scale_factor
 
 
 class TPCHMaintenanceTest:
-    """TPC-H Maintenance Test implementation."""
-
     def __init__(
         self,
         connection_factory: Callable[[], Any],
@@ -83,14 +67,6 @@ class TPCHMaintenanceTest:
         output_dir: Optional[Path] = None,
         verbose: bool = False,
     ) -> None:
-        """Initialize TPC-H Maintenance Test.
-
-        Args:
-            connection_factory: Factory function to create database connections
-            scale_factor: Scale factor for the benchmark
-            output_dir: Directory for maintenance test outputs
-            verbose: Enable verbose logging
-        """
         self.connection_factory = connection_factory
         self.scale_factor = scale_factor
         self.output_dir = output_dir or Path.cwd() / "maintenance_test"
@@ -109,22 +85,6 @@ class TPCHMaintenanceTest:
         rf2_interval: float = 30.0,
         validate_integrity: bool = True,
     ) -> TPCHMaintenanceTestResult:
-        """Run the TPC-H Maintenance Test.
-
-        Args:
-            maintenance_pairs: Number of RF1/RF2 pairs to execute
-            concurrent_with_queries: Whether to run concurrently with query streams
-            query_stream_duration: Duration to run query streams (seconds)
-            rf1_interval: Interval between RF1 executions (seconds)
-            rf2_interval: Interval between RF2 executions (seconds)
-            validate_integrity: Whether to validate data integrity after operations
-
-        Returns:
-            Maintenance Test results
-
-        Raises:
-            RuntimeError: If maintenance test execution fails
-        """
         config = TPCHMaintenanceTestConfig(
             scale_factor=self.scale_factor,
             maintenance_pairs=maintenance_pairs,
@@ -157,12 +117,10 @@ class TPCHMaintenanceTest:
                 self.logger.info(f"Maintenance pairs: {maintenance_pairs}")
                 self.logger.info(f"Scale factor: {self.scale_factor}")
 
-            # Execute maintenance pairs
             for pair_id in range(maintenance_pairs):
                 if self.verbose:
                     self.logger.info(f"Executing maintenance pair {pair_id + 1}")
 
-                # Execute RF1 (Insert new sales)
                 rf1_result = self._execute_rf1(pair_id)
                 result.operations.append(rf1_result)
                 result.total_operations += 1
@@ -174,11 +132,9 @@ class TPCHMaintenanceTest:
                     result.failed_operations += 1
                     result.errors.append(f"RF1 pair {pair_id + 1} failed: {rf1_result.error}")
 
-                # Wait for RF1 interval
                 if rf1_interval > 0:
                     time.sleep(rf1_interval)
 
-                # Execute RF2 (Delete old sales)
                 rf2_result = self._execute_rf2(pair_id)
                 result.operations.append(rf2_result)
                 result.total_operations += 1
@@ -190,11 +146,9 @@ class TPCHMaintenanceTest:
                     result.failed_operations += 1
                     result.errors.append(f"RF2 pair {pair_id + 1} failed: {rf2_result.error}")
 
-                # Wait for RF2 interval
                 if rf2_interval > 0 and pair_id < maintenance_pairs - 1:
                     time.sleep(rf2_interval)
 
-            # Calculate metrics
             total_time = elapsed_seconds(start_time)
             result.total_time = total_time
             result.end_time = datetime.now().isoformat()
@@ -227,35 +181,20 @@ class TPCHMaintenanceTest:
         pair_id: int = 0,
         placeholder: str = "?",
     ) -> dict[str, list[str]]:
-        """Generate maintenance operation SQL for dry-run preview.
-
-        Uses the same data generation and SQL construction logic as actual execution,
-        but skips FK validation and database queries.
-
-        Args:
-            pair_id: Maintenance pair identifier (affects generated keys)
-            placeholder: SQL parameter placeholder style ('?' for DuckDB/SQLite, '%s' for PostgreSQL)
-
-        Returns:
-            Dict mapping operation IDs ('RF1', 'RF2') to lists of SQL statements
-        """
         import random
 
         rf1_statements = []
         rf2_statements = []
 
-        # RF1: Generate INSERT statements using same logic as _execute_rf1
         num_orders = max(1, int(self.scale_factor * 1500 * 0.001))
         orders = self._generate_rf1_orders_data(pair_id, num_orders)
 
-        # Generate lineitems for all orders
         all_lineitems = []
         for order in orders:
             num_items = random.randint(1, 7)
             lineitems = self._generate_rf1_lineitems_data(order["O_ORDERKEY"], num_items)
             all_lineitems.extend(lineitems)
 
-        # Build INSERT SQL for orders (same logic as _execute_rf1 lines 538-557)
         if orders:
             columns = ", ".join(orders[0].keys())
             batch_size = 100
@@ -266,11 +205,9 @@ class TPCHMaintenanceTest:
                     row_placeholders = ", ".join([placeholder for _ in order])
                     values_placeholders.append(f"({row_placeholders})")
                 insert_sql = f"INSERT INTO ORDERS ({columns}) VALUES {', '.join(values_placeholders)}"
-                # Add comment showing sample values for first few rows
                 sample_values = list(batch_orders[0].values())[:3] if batch_orders else []
                 rf1_statements.append(f"-- Sample values: {sample_values}...\n{insert_sql}")
 
-        # Build INSERT SQL for lineitems (same logic as _execute_rf1 lines 559-578)
         if all_lineitems:
             columns = ", ".join(all_lineitems[0].keys())
             batch_size = 100
@@ -284,52 +221,34 @@ class TPCHMaintenanceTest:
                 sample_values = list(batch_lineitems[0].values())[:3] if batch_lineitems else []
                 rf1_statements.append(f"-- Sample values: {sample_values}...\n{insert_sql}")
 
-        # RF2: Generate DELETE statements
-        # In actual execution, order keys are retrieved from database.
-        # For dry-run, use sample order key range based on scale factor.
         num_to_delete = max(1, int(self.scale_factor * 1500 * 0.001))
-        # Generate plausible order keys (1 to max based on SF)
         max_order_key = int(6000000 * self.scale_factor)
         sample_order_keys = list(range(1, min(num_to_delete + 1, max_order_key + 1)))
 
-        # SELECT statement to identify orders (same as _identify_old_orders)
         rf2_statements.append(
             f"-- Identify {num_to_delete} oldest orders to delete\n"
             f"SELECT O_ORDERKEY FROM ORDERS ORDER BY O_ORDERDATE ASC LIMIT {num_to_delete}"
         )
 
-        # DELETE lineitems first (same logic as _execute_rf2 lines 661-667)
         placeholders_str = ", ".join([placeholder for _ in sample_order_keys])
         rf2_statements.append(
             f"-- Delete lineitems for identified orders\nDELETE FROM LINEITEM WHERE L_ORDERKEY IN ({placeholders_str})"
         )
 
-        # DELETE orders (same logic as _execute_rf2 lines 669-673)
         rf2_statements.append(f"-- Delete the orders\nDELETE FROM ORDERS WHERE O_ORDERKEY IN ({placeholders_str})")
 
         return {"RF1": rf1_statements, "RF2": rf2_statements}
 
     def _generate_rf1_orders_data(self, pair_id: int, num_orders: int) -> list[dict[str, Any]]:
-        """Generate new orders data for RF1.
-
-        Args:
-            pair_id: Maintenance pair identifier
-            num_orders: Number of orders to generate
-
-        Returns:
-            List of order dictionaries with TPC-H compliant data
-        """
         import random
         from datetime import datetime, timedelta
 
         orders = []
-        # Base order key: avoid conflicts with existing data using high values + timestamp
         base_order_key = 6000000 * int(self.scale_factor) + (pair_id * 10000) + int(time.time() % 10000)
 
         for i in range(num_orders):
             order_key = base_order_key + i
 
-            # Generate realistic TPC-H order data
             order_date = datetime.now() - timedelta(days=random.randint(1, 365))
 
             orders.append(
@@ -349,15 +268,6 @@ class TPCHMaintenanceTest:
         return orders
 
     def _generate_rf1_lineitems_data(self, order_key: int, num_items: int) -> list[dict[str, Any]]:
-        """Generate lineitem records for an order.
-
-        Args:
-            order_key: Order key to associate lineitems with
-            num_items: Number of lineitem records to generate
-
-        Returns:
-            List of lineitem dictionaries with TPC-H compliant data
-        """
         import random
         from datetime import datetime, timedelta
 
@@ -398,37 +308,17 @@ class TPCHMaintenanceTest:
         return lineitems
 
     def _get_parameter_placeholder(self, connection: Any) -> str:
-        """Detect SQL parameter placeholder style for platform.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            Parameter placeholder string ("?" or "%s" or numbered)
-        """
         connection_type = type(connection).__name__.lower()
 
         if "sqlite" in connection_type or "duckdb" in connection_type:
             return "?"
-        elif "psycopg" in connection_type or "postgres" in connection_type:
-            return "%s"  # psycopg2 style
-        elif "mysql" in connection_type:
+        elif "psycopg" in connection_type or "postgres" in connection_type or "mysql" in connection_type:
             return "%s"
         else:
-            return "?"  # Default to DB-API 2.0 qmark style
+            return "?"
 
     def _identify_old_orders(self, connection: Any, num_to_delete: int) -> list[int]:
-        """Identify old orders to delete for RF2.
-
-        Args:
-            connection: Database connection
-            num_to_delete: Number of orders to identify
-
-        Returns:
-            List of order keys to delete
-        """
         try:
-            # Query oldest orders by date
             query = f"""
                 SELECT O_ORDERKEY
                 FROM ORDERS
@@ -446,15 +336,6 @@ class TPCHMaintenanceTest:
             return []
 
     def _validate_customer_keys(self, connection: Any, custkeys: list[int]) -> tuple[bool, list[int]]:
-        """Validate that customer keys exist in CUSTOMER table.
-
-        Args:
-            connection: Database connection
-            custkeys: List of customer keys to validate
-
-        Returns:
-            Tuple of (all_valid: bool, invalid_keys: list)
-        """
         if not custkeys:
             return True, []
 
@@ -462,7 +343,6 @@ class TPCHMaintenanceTest:
         placeholder = self._get_parameter_placeholder(connection)
         placeholders = ", ".join([placeholder for _ in unique_keys])
 
-        # Query for existing customer keys
         query = f"SELECT C_CUSTKEY FROM CUSTOMER WHERE C_CUSTKEY IN ({placeholders})"
 
         try:
@@ -478,19 +358,8 @@ class TPCHMaintenanceTest:
     def _validate_part_supplier_keys(
         self, connection: Any, partkeys: list[int], suppkeys: list[int]
     ) -> tuple[bool, list[int], list[int]]:
-        """Validate that part and supplier keys exist in their respective tables.
-
-        Args:
-            connection: Database connection
-            partkeys: List of part keys to validate
-            suppkeys: List of supplier keys to validate
-
-        Returns:
-            Tuple of (all_valid: bool, invalid_partkeys: list, invalid_suppkeys: list)
-        """
         placeholder = self._get_parameter_placeholder(connection)
 
-        # Validate part keys
         invalid_partkeys = []
         if partkeys:
             unique_partkeys = list(set(partkeys))
@@ -505,7 +374,6 @@ class TPCHMaintenanceTest:
                 self.logger.error(f"Error validating part keys: {e}")
                 raise
 
-        # Validate supplier keys
         invalid_suppkeys = []
         if suppkeys:
             unique_suppkeys = list(set(suppkeys))
@@ -526,25 +394,13 @@ class TPCHMaintenanceTest:
     def _validate_rf1_data(
         self, connection: Any, orders: list[dict[str, Any]], lineitems: list[dict[str, Any]]
     ) -> None:
-        """Validate foreign key constraints for RF1 data before insertion.
-
-        Args:
-            connection: Database connection
-            orders: List of order dictionaries
-            lineitems: List of lineitem dictionaries
-
-        Raises:
-            ValueError: If any foreign key constraints are violated
-        """
         if self.verbose:
             self.logger.info("Validating foreign key constraints for RF1 data...")
 
-        # Extract all foreign keys
         custkeys = [order["O_CUSTKEY"] for order in orders]
         partkeys = [item["L_PARTKEY"] for item in lineitems]
         suppkeys = [item["L_SUPPKEY"] for item in lineitems]
 
-        # Validate customer keys
         valid_cust, invalid_custkeys = self._validate_customer_keys(connection, custkeys)
         if not valid_cust:
             raise ValueError(
@@ -552,7 +408,6 @@ class TPCHMaintenanceTest:
                 f"({len(invalid_custkeys)} total invalid keys)"
             )
 
-        # Validate part and supplier keys
         valid_parts, invalid_partkeys, invalid_suppkeys = self._validate_part_supplier_keys(
             connection, partkeys, suppkeys
         )
@@ -572,14 +427,6 @@ class TPCHMaintenanceTest:
             self.logger.info("All foreign key constraints validated successfully")
 
     def _execute_rf1(self, pair_id: int) -> TPCHMaintenanceOperation:
-        """Execute RF1 (Refresh Function 1) - Insert new sales.
-
-        Args:
-            pair_id: Maintenance pair identifier
-
-        Returns:
-            RF1 operation result
-        """
         start_time = mono_time()
 
         operation = TPCHMaintenanceOperation(
@@ -598,16 +445,13 @@ class TPCHMaintenanceTest:
 
             connection = self.connection_factory()
 
-            # Calculate data volume according to TPC-H spec: ~0.1% of scale factor
-            num_orders = max(1, int(self.scale_factor * 1500 * 0.001))  # ~1500 for SF=1
+            num_orders = max(1, int(self.scale_factor * 1500 * 0.001))
 
             if self.verbose:
                 self.logger.info(f"Generating {num_orders} orders for RF1")
 
-            # Generate orders data
             orders = self._generate_rf1_orders_data(pair_id, num_orders)
 
-            # Generate all lineitems data for validation
             import random
 
             all_lineitems = []
@@ -616,23 +460,19 @@ class TPCHMaintenanceTest:
                 lineitems = self._generate_rf1_lineitems_data(order["O_ORDERKEY"], num_items)
                 all_lineitems.extend(lineitems)
 
-            # Validate foreign key constraints BEFORE inserting
             self._validate_rf1_data(connection, orders, all_lineitems)
 
-            # Get SQL parameter placeholder for this platform
             placeholder = self._get_parameter_placeholder(connection)
 
             rows_affected = 0
 
-            # INSERT orders using batched multi-row INSERT
             if orders:
                 columns = ", ".join(orders[0].keys())
-                batch_size = 100  # Insert 100 rows at a time to avoid SQL length limits
+                batch_size = 100
 
                 for batch_start in range(0, len(orders), batch_size):
                     batch_orders = orders[batch_start : batch_start + batch_size]
 
-                    # Build multi-row VALUES clause
                     values_placeholders = []
                     params = []
                     for order in batch_orders:
@@ -645,15 +485,13 @@ class TPCHMaintenanceTest:
                     rowcount = getattr(cursor, "rowcount", len(batch_orders))
                     rows_affected += max(len(batch_orders), rowcount)
 
-            # INSERT lineitems using batched multi-row INSERT
             if all_lineitems:
                 columns = ", ".join(all_lineitems[0].keys())
-                batch_size = 100  # Insert 100 rows at a time
+                batch_size = 100
 
                 for batch_start in range(0, len(all_lineitems), batch_size):
                     batch_lineitems = all_lineitems[batch_start : batch_start + batch_size]
 
-                    # Build multi-row VALUES clause
                     values_placeholders = []
                     params = []
                     for lineitem in batch_lineitems:
@@ -666,7 +504,6 @@ class TPCHMaintenanceTest:
                     rowcount = getattr(cursor, "rowcount", len(batch_lineitems))
                     rows_affected += max(len(batch_lineitems), rowcount)
 
-            # Commit transaction
             if hasattr(connection, "commit"):
                 connection.commit()
 
@@ -681,7 +518,6 @@ class TPCHMaintenanceTest:
             if self.verbose:
                 self.logger.error(f"RF1 pair {pair_id + 1} failed: {e}")
 
-            # Rollback on error
             if connection and hasattr(connection, "rollback"):
                 try:
                     connection.rollback()
@@ -700,14 +536,6 @@ class TPCHMaintenanceTest:
         return operation
 
     def _execute_rf2(self, pair_id: int) -> TPCHMaintenanceOperation:
-        """Execute RF2 (Refresh Function 2) - Delete old sales.
-
-        Args:
-            pair_id: Maintenance pair identifier
-
-        Returns:
-            RF2 operation result
-        """
         start_time = mono_time()
 
         operation = TPCHMaintenanceOperation(
@@ -726,13 +554,11 @@ class TPCHMaintenanceTest:
 
             connection = self.connection_factory()
 
-            # Calculate data volume according to TPC-H spec: ~0.1% of scale factor
             num_to_delete = max(1, int(self.scale_factor * 1500 * 0.001))
 
             if self.verbose:
                 self.logger.info(f"Identifying {num_to_delete} old orders to delete for RF2")
 
-            # Identify orders to delete (oldest orders by date)
             order_keys = self._identify_old_orders(connection, num_to_delete)
 
             if not order_keys:
@@ -742,26 +568,21 @@ class TPCHMaintenanceTest:
                 operation.success = True
                 return operation
 
-            # Get SQL parameter placeholder for this platform
             placeholder = self._get_parameter_placeholder(connection)
 
             rows_affected = 0
 
-            # CRITICAL: Delete lineitems FIRST (referential integrity)
-            # Use batched DELETE with IN clause for efficiency
             placeholders_str = ", ".join([placeholder for _ in order_keys])
             delete_sql = f"DELETE FROM LINEITEM WHERE L_ORDERKEY IN ({placeholders_str})"
             cursor = connection.execute(delete_sql, tuple(order_keys))
             rowcount = getattr(cursor, "rowcount", 0)
-            rows_affected += max(0, rowcount)  # Ensure non-negative
+            rows_affected += max(0, rowcount)
 
-            # Then delete orders (batched)
             delete_sql = f"DELETE FROM ORDERS WHERE O_ORDERKEY IN ({placeholders_str})"
             cursor = connection.execute(delete_sql, tuple(order_keys))
             rowcount = getattr(cursor, "rowcount", 0)
-            rows_affected += max(0, rowcount)  # Ensure non-negative
+            rows_affected += max(0, rowcount)
 
-            # Commit transaction
             if hasattr(connection, "commit"):
                 connection.commit()
 
@@ -776,7 +597,6 @@ class TPCHMaintenanceTest:
             if self.verbose:
                 self.logger.error(f"RF2 pair {pair_id + 1} failed: {e}")
 
-            # Rollback on error
             if connection and hasattr(connection, "rollback"):
                 try:
                     connection.rollback()
@@ -795,7 +615,6 @@ class TPCHMaintenanceTest:
         return operation
 
     def _execute_count_query(self, connection: Any, sql: str) -> int:
-        """Execute a COUNT(*) validation query and return the first value."""
         cursor = connection.execute(sql)
         result = cursor.fetchone()
         return result[0] if result else 0
@@ -810,7 +629,6 @@ class TPCHMaintenanceTest:
         success_message: str | None,
         critical_violation: bool,
     ) -> bool:
-        """Run one integrity check and report whether a critical violation occurred."""
         try:
             count = self._execute_count_query(connection, sql)
         except Exception as e:
@@ -829,16 +647,6 @@ class TPCHMaintenanceTest:
         return False
 
     def validate_data_integrity(self) -> bool:
-        """Validate database integrity after maintenance operations.
-
-        Performs comprehensive validation checks including:
-        - Referential integrity: No orphaned foreign key references
-        - Data consistency: Calculated fields match detail records
-        - Business rules: Date constraints and logical relationships
-
-        Returns:
-            True if all integrity checks pass, False if any violations found
-        """
         orphaned_lineitems_sql = """
             SELECT COUNT(*) as orphan_count
             FROM LINEITEM l

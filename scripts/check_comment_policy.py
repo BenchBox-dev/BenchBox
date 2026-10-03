@@ -14,103 +14,27 @@ import tokenize
 from collections import Counter
 from dataclasses import asdict
 from datetime import date
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from check_comment_cleanup_scope import immutable_external_ownership
+from check_comment_cleanup_scope import (
+    COMMENT_POLICY_DIRECTIVES,
+    COMMENT_POLICY_ENFORCEMENT_MODES,
+    comment_policy_matches as matches,
+    immutable_external_ownership,
+    load_comment_policy as load_policy,
+    validate_comment_policy_path as validate_path,
+)
 from comment_syntax import Finding, javascript_requests, language, scan, source_language
 
+DIRECTIVES = COMMENT_POLICY_DIRECTIVES
+ENFORCEMENT_MODES = COMMENT_POLICY_ENFORCEMENT_MODES
+
 POLICY_PATH = "quality/comment-policy.json"
-ENFORCEMENT_MODES = {"advisory", "blocking"}
 BOOTSTRAP_BASE = "ed5c263c513ba65499f4918d3a7de607f280c65b"
-DIRECTIVES = (
-    r"# noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
-    r"# type: ignore\[[a-z0-9_-]+(?:, ?[a-z0-9_-]+)*\]",
-    r"# pragma: no (?:cover|branch)",
-    r"# fmt: (?:off|on|skip)",
-    r"# (?:ruff|flake8): noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
-    r"# shellcheck (?:disable=SC[0-9]+(?:,SC[0-9]+)*|shell=(?:bash|sh|dash|ksh))",
-    r"/// <reference (?:types|path)=\"[^\"\n]+\" ?/>",
-    r"// @ts-(?:expect-error|ignore|check|nocheck)",
-    r"/\*\* @vitest-environment (?:jsdom|node|happy-dom) \*/",
-    r"// @vitest-environment (?:jsdom|node|happy-dom)",
-    r"/\*\+ [A-Z_]+\([A-Za-z0-9_., ]+\) \*/",
-)
 
 
 def git(root: Path, *args: str) -> bytes:
     return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
-
-
-def validate_path(path: str) -> None:
-    if not path or PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts or "\\" in path:
-        raise ValueError(f"invalid policy path: {path!r}")
-    if any(char in path for char in "*?[]"):
-        raise ValueError("policy paths must be exact files or directory prefixes")
-
-
-def load_policy(raw: bytes) -> dict:
-    policy = json.loads(raw)
-    if set(policy) - {"enforcement"} != {"version", "external", "completed", "exceptions"} or policy["version"] != 1:
-        raise ValueError("invalid comment-policy schema")
-    enforcement = policy.get("enforcement", "blocking")
-    if not isinstance(enforcement, str) or enforcement not in ENFORCEMENT_MODES:
-        raise ValueError("enforcement must be advisory or blocking")
-    for key in ("external", "completed", "exceptions"):
-        if not isinstance(policy[key], list):
-            raise ValueError(f"{key} must be a list")
-    for entry in policy["external"]:
-        if set(entry) != {"path", "owner", "provenance"} or not all(
-            isinstance(v, str) and v.strip() for v in entry.values()
-        ):
-            raise ValueError("external scope requires path, owner and provenance")
-        validate_path(entry["path"])
-    for path in policy["completed"]:
-        validate_path(path)
-        if any(matches(path, entry["path"]) or matches(entry["path"], path) for entry in policy["external"]):
-            raise ValueError("completed and external scopes cannot overlap")
-    identities = set()
-    for entry in policy["exceptions"]:
-        required = {"path", "symbol", "text", "kind", "consumer", "necessity", "alternative", "owner", "removal"}
-        fixture_fields = {"payload", "finding_kind"} if entry.get("kind") == "fixture" else set()
-        required |= fixture_fields
-        if (
-            set(entry) - {"expires", "count"} != required
-            or not all(isinstance(v, str) for k, v in entry.items() if k != "count")
-            or type(entry.get("count", 1)) is not int
-            or entry.get("count", 1) < 1
-        ):
-            raise ValueError(
-                "exception requires an exact identity, consumer, necessity, alternative, owner and removal"
-            )
-        if any(not entry[key].strip() for key in required - {"symbol"}):
-            raise ValueError("exception evidence must not be empty")
-        validate_path(entry["path"])
-        validate_path(entry["consumer"])
-        if entry["kind"] not in {"directive", "notice", "fixture"}:
-            raise ValueError("explanatory comment and docstring exceptions are prohibited")
-        if entry["kind"] == "fixture" and entry["finding_kind"] not in {"comment", "payload-error"}:
-            raise ValueError("fixture must identify an actual comment or malformed parser input")
-        if entry["kind"] == "directive":
-            if not any(re.fullmatch(pattern, entry["text"]) for pattern in DIRECTIVES):
-                raise ValueError("directive must match an exact registered grammar without explanatory suffixes")
-            suppression = re.search(
-                r"noqa|type: ignore|pragma: no|fmt: (?:off|skip)|disable=|@ts-(?:expect-error|ignore|nocheck)",
-                entry["text"],
-            )
-            if suppression and "expires" not in entry:
-                raise ValueError("directive exception needs an unexpired review date")
-        identity = (
-            entry["path"],
-            entry["symbol"],
-            entry["text"],
-            entry["kind"],
-            entry.get("payload", ""),
-            entry.get("finding_kind", "comment"),
-        )
-        if identity in identities:
-            raise ValueError("duplicate exception identity")
-        identities.add(identity)
-    return policy
 
 
 def exception_identity(entry: dict) -> tuple[str, str, str, str, str, str]:
@@ -153,10 +77,6 @@ def check_ratchet(policy: dict, baseline: dict) -> None:
         raise ValueError("completed scopes cannot be removed")
     if any(entry not in baseline["external"] for entry in policy["external"]):
         raise ValueError("candidate policy cannot add or expand external exclusions")
-
-
-def matches(path: str, scope: str) -> bool:
-    return path.startswith(scope) if scope.endswith("/") else path == scope
 
 
 def bootstrap_base_allowed(root: Path, base: str) -> bool:
@@ -267,7 +187,7 @@ def ownership_exclusions(root: Path, base: str | None, staged: bool) -> set[str]
     git(root, "cat-file", "-e", f"{base}^{{commit}}")
     git(root, "merge-base", "--is-ancestor", base, "HEAD")
     trusted_external = load_policy(git(root, "show", f"{base}:{POLICY_PATH}"))["external"]
-    snapshot = immutable_external_ownership(root, base, trusted_external)
+    snapshot = immutable_external_ownership(root, base, trusted_external, staged)
     if snapshot is None:
         return None
     excluded, notices = snapshot

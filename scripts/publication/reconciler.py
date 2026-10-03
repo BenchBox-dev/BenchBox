@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Corpus promotion reconciler — published-results gate and shadow promotion (A8).
-
-Processes JSONL event log entries (merge_sha, base_sha, ts) and validates each
-candidate against the current ledger head via set-preserving union.
-
-Usage:
-  uv run python scripts/publication/reconciler.py --events-file /tmp/events.jsonl --ledger-head-sha <sha>
-  uv run python scripts/publication/reconciler.py --events-file /tmp/events.jsonl --ledger-head-sha <sha> --limit 10 --dry-run
-"""
 
 from __future__ import annotations
 
@@ -24,11 +15,10 @@ DEFAULT_LIMIT = 100
 
 
 class ReconcilerError(Exception):
-    """Raised when the reconciler encounters a fatal condition."""
+    pass
 
 
 def run_git(*args: str) -> subprocess.CompletedProcess[str]:
-    """Run a git command in the repo root."""
     return subprocess.run(
         ["git", *args],
         cwd=REPO_ROOT,
@@ -39,7 +29,6 @@ def run_git(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def get_corpus_paths(ref: str) -> set[str]:
-    """List all primary JSON bundle paths under results-data/bundles/ at *ref*."""
     result = run_git("ls-tree", "-r", "--name-only", ref, "--", CORPUS_PREFIX)
     if result.returncode != 0:
         return set()
@@ -55,10 +44,6 @@ def get_corpus_paths(ref: str) -> set[str]:
 
 
 def verify_merge_commit(merge_sha: str) -> tuple[bool, int, str]:
-    """Verify that merge_sha is a real merge commit (2+ parents).
-
-    Returns (is_merge, parent_count, error_message).
-    """
     result = run_git("cat-file", "-p", merge_sha)
     if result.returncode != 0:
         return False, 0, f"git cat-file failed for {merge_sha}: {result.stderr.strip()}"
@@ -74,7 +59,6 @@ def verify_merge_commit(merge_sha: str) -> tuple[bool, int, str]:
 
 
 def verify_base_ancestor(base_sha: str, merge_sha: str) -> tuple[bool, str]:
-    """Verify that base_sha is an ancestor of merge_sha."""
     result = run_git("merge-base", "--is-ancestor", base_sha, merge_sha)
     if result.returncode != 0:
         return False, f"{base_sha} is not an ancestor of {merge_sha}"
@@ -82,7 +66,6 @@ def verify_base_ancestor(base_sha: str, merge_sha: str) -> tuple[bool, str]:
 
 
 def read_event_file(events_path: Path, limit: int) -> list[dict[str, str]]:
-    """Read up to *limit* events from a JSONL file."""
     events: list[dict[str, str]] = []
     if not events_path.exists():
         return events
@@ -102,22 +85,16 @@ def reconcile_event(
     ledger_head_sha: str,
     generation: int,
 ) -> tuple[bool, int, str]:
-    """Reconcile a single event against the ledger head.
-
-    Returns (accepted, new_generation, reason).
-    """
     merge_sha = event.get("merge_sha", "")
     base_sha = event.get("base_sha", "")
 
     if not merge_sha or len(merge_sha) < 40:
         return False, generation, f"invalid merge_sha: {merge_sha!r}"
 
-    # CRITICAL 3 — Revalidate merge SHA, don't trust dispatch verbatim
     is_merge, parent_count, merge_err = verify_merge_commit(merge_sha)
     if not is_merge:
         return False, generation, f"merge validation failed: {merge_err}"
 
-    # Verify base_sha ancestry
     if not base_sha or len(base_sha) < 40:
         return False, generation, f"invalid base_sha: {base_sha!r}"
 
@@ -125,11 +102,9 @@ def reconcile_event(
     if not is_ancestor:
         return False, generation, f"ancestry check failed: {ancestor_err}"
 
-    # CRITICAL 1 — Coalesce against ledger head, not candidate parent
     ledger_paths = get_corpus_paths(ledger_head_sha)
     candidate_paths = get_corpus_paths(merge_sha)
 
-    # Every path in the ledger head must exist in the candidate (set-preserving union)
     missing = ledger_paths - candidate_paths
     if missing:
         sorted_missing = sorted(missing)
@@ -173,20 +148,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # CRITICAL 2 — Reject if --ledger-head-sha is None / empty
     if not args.ledger_head_sha or not args.ledger_head_sha.strip():
         print(json.dumps({"error": "--ledger-head-sha is required and must not be empty"}))
         return 1
 
     ledger_head_sha = args.ledger_head_sha.strip()
 
-    # Verify ledger_head_sha exists
     result = run_git("cat-file", "-e", ledger_head_sha)
     if result.returncode != 0:
         print(json.dumps({"error": f"ledger_head_sha {ledger_head_sha} does not exist in git"}))
         return 1
 
-    # Read events from file
     events = read_event_file(args.events_file, args.limit)
     if not events:
         print(json.dumps({"status": "no_events", "processed": 0}))

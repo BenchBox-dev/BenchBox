@@ -1,5 +1,3 @@
-"""Queries authored independently from the TPC-H schema without access to generator templates or outcomes."""
-
 QUERIES = [
     {
         "id": "q01_integer_date_filter",

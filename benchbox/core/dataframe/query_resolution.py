@@ -1,5 +1,3 @@
-"""Shared DataFrame benchmark query resolution helpers."""
-
 from __future__ import annotations
 
 import importlib
@@ -15,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def benchmark_defines_dataframe_hook(benchmark: Any | None, hook_name: str) -> bool:
-    """Return True when a benchmark explicitly defines a DataFrame hook."""
+
     if benchmark is None:
         return False
 
@@ -43,12 +41,12 @@ def benchmark_defines_dataframe_hook(benchmark: Any | None, hook_name: str) -> b
 
 
 def benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
-    """Return True when a benchmark defines a DataFrame query provider hook."""
+
     return benchmark_defines_dataframe_hook(benchmark, "get_dataframe_queries")
 
 
 def build_dataframe_query_filter(query_subset: Any) -> set[str] | None:
-    """Normalize query subset into a bidirectional filter set (Q1 <-> 1)."""
+
     if not query_subset:
         return None
 
@@ -65,7 +63,7 @@ def build_dataframe_query_filter(query_subset: Any) -> set[str] | None:
 
 
 def build_dataframe_query_filter_from_config(benchmark_config: Any) -> set[str] | None:
-    """Build the DataFrame query filter from a BenchmarkConfig-like object."""
+
     return build_dataframe_query_filter(getattr(benchmark_config, "queries", None))
 
 
@@ -74,7 +72,7 @@ def get_dataframe_queries_for_benchmark(
     benchmark_instance: Any | None,
     stream_id: int | None = None,
 ) -> list[Any]:
-    """Get DataFrame queries for a benchmark in proper execution order."""
+
     benchmark_id = normalize_benchmark_id(benchmark_config.name)
     if stream_id is None:
         stream_id = getattr(benchmark_config, "stream_id", 0)
@@ -101,23 +99,7 @@ def get_dataframe_queries_for_benchmark(
 
 
 def registry_dataframe_queries(benchmark_id: str) -> list[Any]:
-    """Resolve DataFrame queries from the benchmark's own query registry.
 
-    Benchmarks may expose a ``dataframe_queries`` module or package with a
-    ``QueryRegistry`` under a benchmark-specific constant name. Query resolution
-    historically reached none of those registries: it named only tpch, tpcds and
-    clickbench, and the ``get_dataframe_queries`` instance hook is defined by
-    almost no benchmark class.
-
-    So seven families -- amplab, coffeeshop, h2odb, nyctaxi, ssb, tpch_skew,
-    tsbs_devops -- resolved to zero queries and emitted bundles reporting 0/0
-    with exit 0, while their queries sat registered and gate-tested. Sixty such
-    bundles are in the public corpus.
-
-    Only the three named benchmarks need bespoke resolvers, because their
-    queries are permuted per stream for TPC compliance. Everything else is a
-    plain ordered list.
-    """
     target = f"benchbox.core.{benchmark_id}.dataframe_queries"
     try:
         module = importlib.import_module(target)
@@ -135,7 +117,7 @@ def registry_dataframe_queries(benchmark_id: str) -> list[Any]:
 
 
 def get_tpch_dataframe_queries(stream_id: int) -> list[Any]:
-    """Get TPC-H DataFrame queries in stream-permuted order."""
+
     from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
     from benchbox.core.tpch.streams import TPCHStreams
 
@@ -153,7 +135,7 @@ def get_tpch_dataframe_queries(stream_id: int) -> list[Any]:
 
 
 def resolve_tpcds_query_manager(benchmark_instance: Any | None) -> Any | None:
-    """Resolve a TPC-DS query manager from wrapper or core benchmark instances."""
+
     if benchmark_instance and hasattr(benchmark_instance, "query_manager"):
         return benchmark_instance.query_manager
     if (
@@ -166,7 +148,7 @@ def resolve_tpcds_query_manager(benchmark_instance: Any | None) -> Any | None:
 
 
 def get_tpcds_legacy_queries(available_query_ids: list[int], stream_id: int) -> list[Any]:
-    """Get TPC-DS queries using legacy 99-query ordering when no query manager exists."""
+
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
     from benchbox.core.tpcds.streams import PermutationMode, TPCDSPermutationGenerator
 
@@ -184,7 +166,7 @@ def get_tpcds_legacy_queries(available_query_ids: list[int], stream_id: int) -> 
 
 
 def resolve_tpcds_stream_queries(stream_queries: list[Any], allow_variant_fallback: bool) -> list[Any]:
-    """Resolve TPC-DS stream query variants to DataFrame query implementations."""
+
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
 
     queries: list[Any] = []
@@ -230,7 +212,7 @@ def get_tpcds_dataframe_queries(
     benchmark_instance: Any | None,
     stream_id: int,
 ) -> list[Any]:
-    """Get TPC-DS DataFrame queries in stream-permuted order with variant resolution."""
+
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
     from benchbox.core.tpcds.streams import create_standard_streams
 
@@ -263,7 +245,7 @@ def get_clickbench_dataframe_queries(
     benchmark_instance: Any | None,
     stream_id: int,
 ) -> list[Any]:
-    """Get ClickBench DataFrame queries."""
+
     from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
 
     return CLICKBENCH_DATAFRAME_QUERIES.get_all_queries()

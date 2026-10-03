@@ -1,9 +1,3 @@
-"""Data loading module for BenchBox platform adapters.
-
-This module provides a modular framework for loading benchmark data from various sources
-and file formats, with support for compression and batch processing.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -40,32 +34,20 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_table_paths(table_paths: Any) -> list[Path]:
-    """Normalize a benchmark ``tables`` value to a list of Paths.
-
-    Benchmark generators may emit a single path (single-file tables) or a list
-    of paths (multi-chunk tables like TPC-H ``lineitem``/``orders``). Adapters
-    that iterate per-chunk should funnel through this helper rather than
-    calling ``Path(value)`` directly - which raises ``TypeError`` on lists.
-    """
     normalized = table_paths if isinstance(table_paths, list) else [table_paths]
     return [Path(path_like) for path_like in normalized]
 
 
-# Regex pattern for valid SQL identifiers (table/column names)
-# Allows letters, digits, underscores; must start with letter or underscore
 _VALID_IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
-# Maximum length for SQL identifiers (most databases support at least 128)
 _MAX_IDENTIFIER_LENGTH = 128
 
 
 class DataLoadingError(Exception):
-    """Exception raised during data loading operations."""
+    pass
 
 
 class ClickHouseServerLoadError(DataLoadingError):
-    """Terminal failure while streaming a table into ClickHouse server mode."""
-
     def __init__(
         self,
         table_name: str,
@@ -85,21 +67,6 @@ class ClickHouseServerLoadError(DataLoadingError):
 
 
 def validate_sql_identifier(name: str, context: str = "identifier") -> str:
-    """Validate that a string is a safe SQL identifier.
-
-    This prevents SQL injection by ensuring table/column names contain only
-    safe characters and follow SQL identifier rules.
-
-    Args:
-        name: The identifier to validate
-        context: Description of the identifier for error messages (e.g., "table name")
-
-    Returns:
-        The validated identifier (unchanged if valid)
-
-    Raises:
-        DataLoadingError: If the identifier is invalid
-    """
     if not name:
         raise DataLoadingError(f"Empty {context} is not allowed")
 
@@ -118,30 +85,14 @@ def validate_sql_identifier(name: str, context: str = "identifier") -> str:
 
 
 def escape_sql_string_literal(value: str) -> str:
-    """Escape a string for use as a SQL string literal.
-
-    This escapes single quotes by doubling them, which is the standard SQL
-    escape mechanism. The returned value should be wrapped in single quotes.
-
-    Args:
-        value: The string to escape
-
-    Returns:
-        The escaped string (without surrounding quotes)
-    """
     return value.replace("'", "''")
 
 
 @dataclass
 class DataSource:
-    """Represents a data source with table-to-file mappings."""
-
-    source_type: str  # 'benchmark_tables', 'benchmark_impl_tables', 'manifest'
-    tables: dict[str, Any]  # table_name -> file_path or data
-    table_formats: dict[str, str] = None  # table_name -> format ("tbl", "csv", "parquet"); from manifest
-    # Standardized CSV dialect keys per table from manifest metadata:
-    #   csv_delimiter: str, csv_has_header: bool, csv_null_marker: str|None,
-    #   csv_normalize_booleans: bool, csv_quote: str|None
+    source_type: str
+    tables: dict[str, Any]
+    table_formats: dict[str, str] = None
     table_metadata: dict[str, dict[str, Any]] = None
 
     def __post_init__(self) -> None:
@@ -153,38 +104,13 @@ class DataSource:
 
 @dataclass
 class CsvDialect:
-    """Resolved CSV dialect for a single data file.
-
-    Produced by resolve_csv_dialect() from manifest metadata, benchmark attributes,
-    or format-derived defaults — in that precedence order.
-
-    ``null_marker`` gates empty-field→NULL conversion only (e.g. NULL DEFINED BY
-    in SingleStore's LOAD DATA, NULL in PostgreSQL COPY).  It does NOT gate
-    trailing-delimiter stripping.
-
-    Trailing-delimiter stripping is controlled by file extension and loader
-    semantics, not by ``null_marker``.  TPC-H dbgen ``.tbl`` emits a spurious
-    trailing pipe after every record; some TPC-DS ``.dat`` rows use trailing
-    pipes to represent nullable final columns and must keep them when a fixed
-    column-count loader such as PostgreSQL COPY is used.  Adapters must use
-    ``get_data_extension(data_file)`` to make that decision — never derive it
-    from ``null_marker is not None``, and never use ``data_file.suffix.lower()``
-    which breaks for compressed inputs like ``lineitem.tbl.zst``.  A .csv file
-    with null_marker="" (e.g. JoinOrder) has meaningful trailing commas that
-    represent NULL fields and must not be stripped.
-    """
-
     delimiter: str
     has_header: bool
-    null_marker: str | None  # '' = empty→NULL; None = no NULL conversion
-    normalize_booleans: bool  # True/False → 1/0
-    quote: str | None  # None → default '"' for LOAD DATA callers
+    null_marker: str | None
+    normalize_booleans: bool
+    quote: str | None
 
 
-# Sentinel passed to resolve_csv_dialect() by callers that have no benchmark
-# instance available (e.g. external scan helpers exercised from unit tests).
-# Keeps the dialect resolver's "(b) Benchmark instance attributes" branch from
-# tripping on attribute lookups against a freshly created object().
 NO_BENCHMARK: Any = object()
 
 
@@ -194,16 +120,6 @@ def resolve_csv_dialect(
     file_path: Path,
     benchmark: Any,
 ) -> CsvDialect:
-    """Return the CSV dialect for one data file.
-
-    Precedence (highest to lowest):
-      a) Manifest metadata in data_source.table_metadata[table_name]
-      b) Benchmark instance attributes (csv_delimiter, csv_has_header, csv_normalize_booleans)
-      c) Format-derived defaults from the file extension
-
-    Emits logger.warning when falling back to (b) or (c) so unannotated benchmarks
-    are surfaced without breaking them.
-    """
     name_lower = table_name.lower()
 
     benchmark_delimiter = _get_optional_str_attr(benchmark, "csv_delimiter")
@@ -215,9 +131,6 @@ def resolve_csv_dialect(
     format_delimiter = "|" if is_tpc else get_delimiter_for_file(file_path)
     format_null_marker = "" if is_tpc else None
 
-    # (a) Manifest metadata wins per field. A partial manifest falls through
-    # to (b) and (c) only for fields it does not define. Explicit None remains
-    # meaningful for csv_null_marker, so use key membership for that field.
     meta = data_source.table_metadata.get(name_lower)
     if meta is not None:
         return CsvDialect(
@@ -239,7 +152,6 @@ def resolve_csv_dialect(
             quote=meta.get("csv_quote", None),
         )
 
-    # (b) Benchmark instance attributes
     if any(v is not None for v in (benchmark_delimiter, benchmark_header, benchmark_booleans, benchmark_null_marker)):
         logger.warning(
             "table '%s': CSV dialect from benchmark attributes (no manifest metadata). "
@@ -254,7 +166,6 @@ def resolve_csv_dialect(
             quote=None,
         )
 
-    # (c) Format-derived defaults
     logger.warning(
         "table '%s': CSV dialect from file extension heuristic (no manifest metadata or benchmark attributes). "
         "Annotate the generator with manifest metadata to suppress this warning.",
@@ -268,7 +179,6 @@ def resolve_csv_dialect(
             normalize_booleans=False,
             quote=None,
         )
-    # .csv and everything else
     return CsvDialect(
         delimiter=get_delimiter_for_file(file_path),
         has_header=False,
@@ -279,56 +189,23 @@ def resolve_csv_dialect(
 
 
 def _get_optional_str_attr(obj: Any, name: str) -> str | None:
-    """Return a string CSV dialect attr, ignoring Mock-created child attrs.
-
-    Empty strings are preserved as-is (``isinstance("", str)`` is True), so
-    ``csv_null_marker=""`` on a benchmark class correctly returns ``""`` rather
-    than ``None``.  Only non-string values (None, int, Mock child attrs) become
-    None.
-    """
     value = getattr(obj, name, None)
     return value if isinstance(value, str) else None
 
 
 def _get_optional_bool_attr(obj: Any, name: str) -> bool | None:
-    """Return a bool CSV dialect attr, ignoring Mock-created child attrs."""
     value = getattr(obj, name, None)
     return value if isinstance(value, bool) else None
 
 
 class DataSourceProvider(Protocol):
-    """Protocol for data source providers."""
+    def can_provide(self, benchmark: Any, data_dir: Path) -> bool: ...
 
-    def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
-        """Check if this provider can supply data.
-
-        Args:
-            benchmark: Benchmark instance
-            data_dir: Data directory path
-
-        Returns:
-            True if this provider can supply data
-        """
-        ...
-
-    def get_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Get data source from this provider.
-
-        Args:
-            benchmark: Benchmark instance
-            data_dir: Data directory path
-
-        Returns:
-            DataSource if available, None otherwise
-        """
-        ...
+    def get_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None: ...
 
 
 class BenchmarkTablesSource:
-    """Data source provider from benchmark.tables attribute."""
-
     def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
-        """Check if benchmark has tables attribute."""
         if not hasattr(benchmark, "tables"):
             return False
 
@@ -344,12 +221,9 @@ class BenchmarkTablesSource:
         return True
 
     def get_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Get data from benchmark.tables."""
         if self.can_provide(benchmark, data_dir):
-            # Normalize to list format for consistency with multi-chunk support
             normalized_tables = {}
             for table_name, table_path in benchmark.tables.items():
-                # Check if already a list, otherwise wrap single path
                 if isinstance(table_path, list):
                     normalized_tables[table_name] = table_path
                 else:
@@ -359,18 +233,7 @@ class BenchmarkTablesSource:
 
 
 class BenchmarkImplTablesSource:
-    """Data source provider from benchmark._impl.tables attribute.
-
-    This provider is kept alongside :class:`BenchmarkTablesSource` because
-    ``BenchmarkTablesSource`` reads ``benchmark.tables``, which only delegates
-    to ``_impl.tables`` for :class:`~benchbox.base.BaseBenchmark` subclasses.
-    Benchmark objects that carry a ``_impl`` attribute without extending
-    ``BaseBenchmark`` (e.g. plain dataclasses or third-party wrappers) are
-    handled exclusively by this provider.
-    """
-
     def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
-        """Check if benchmark._impl has tables attribute."""
         if not hasattr(benchmark, "_impl") or not hasattr(benchmark._impl, "tables"):
             return False
 
@@ -386,12 +249,9 @@ class BenchmarkImplTablesSource:
         return True
 
     def get_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Get data from benchmark._impl.tables."""
         if self.can_provide(benchmark, data_dir):
-            # Normalize to list format for consistency with multi-chunk support
             normalized_tables = {}
             for table_name, table_path in benchmark._impl.tables.items():
-                # Check if already a list, otherwise wrap single path
                 if isinstance(table_path, list):
                     normalized_tables[table_name] = table_path
                 else:
@@ -401,8 +261,6 @@ class BenchmarkImplTablesSource:
 
 
 class ManifestFileSource:
-    """Data source provider from _datagen_manifest.json (supports v1 and v2)."""
-
     def __init__(
         self,
         platform_name: str = "duckdb",
@@ -418,46 +276,30 @@ class ManifestFileSource:
         )
 
     def can_provide(self, benchmark: Any, data_dir: Path) -> bool:
-        """Check if manifest file exists."""
         manifest_path = Path(data_dir) / "_datagen_manifest.json"
         return manifest_path.exists()
 
     def get_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Get data from manifest file (supports v1 and v2 formats).
-
-        For v2 manifests, uses format preference system to select best format
-        for the platform.
-        """
         try:
             manifest_path = Path(data_dir) / "_datagen_manifest.json"
 
-            # Try to use manifest v2 API first
             v2_source = self._try_manifest_v2(manifest_path, benchmark, data_dir)
             if v2_source is not None:
                 return v2_source
 
-            # v1 fallback: Use original logic
             return self._try_manifest_v1(manifest_path, data_dir)
 
         except Exception as e:
-            # Log the exception for debugging but continue to try next provider
             logger.debug(f"Failed to load manifest file: {e}")
 
         return None
 
     @staticmethod
     def _prefer_platform_defaults(platform_name: str, table_mode: str) -> bool:
-        """Return True when a native loader must override manifest order.
-
-        All native-mode platforms use PLATFORM_FORMAT_PREFERENCES as their
-        default format ordering. Manifest format_preference records conversion
-        history but does not drive default selection.
-        """
         normalized_mode = (table_mode or "native").strip().lower()
         return normalized_mode == "native"
 
     def _resolve_format_for_table(self, manifest: Any, table_name: str, get_preferred_format: Any) -> str | None:
-        """Resolve the best format for a table, honoring explicit --table-format overrides."""
         if self._requested_format:
             table_formats_obj = manifest.tables.get(table_name)
             available = list((table_formats_obj.formats or {}).keys()) if table_formats_obj else []
@@ -473,7 +315,6 @@ class ManifestFileSource:
         )
 
     def _try_manifest_v2(self, manifest_path: Path, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Attempt to load data source using manifest v2 format."""
         try:
             from benchbox.core.manifest import ManifestV2, get_files_for_format, get_preferred_format, load_manifest
 
@@ -496,12 +337,10 @@ class ManifestFileSource:
                     if files:
                         mapping[table_name] = [Path(data_dir) / f for f in files]
                         formats_mapping[table_name.lower()] = preferred_format.lower()
-                    # Extract metadata from the first entry of the preferred format.
                     format_entries = table_formats_obj.formats.get(preferred_format, [])
                     if format_entries and format_entries[0].metadata:
                         table_metadata[table_name.lower()] = dict(format_entries[0].metadata)
                 else:
-                    # Fallback: try first available format
                     for _format_name, format_files in table_formats_obj.formats.items():
                         if format_files:
                             mapping[table_name] = [Path(data_dir) / f.path for f in format_files]
@@ -530,7 +369,6 @@ class ManifestFileSource:
 
     @staticmethod
     def _try_manifest_v1(manifest_path: Path, data_dir: Path) -> DataSource | None:
-        """Attempt to load data source using manifest v1 format."""
         with open(manifest_path, encoding="utf-8") as f:
             manifest_dict = json.load(f)
 
@@ -558,14 +396,6 @@ class ManifestFileSource:
         benchmark: Any,
         table_names: list[str],
     ) -> dict[str, str]:
-        """Read format hints for the given tables from a v2 manifest.
-
-        Used by DataSourceResolver to inject format metadata after a non-manifest
-        provider (BenchmarkTablesSource, BenchmarkImplTablesSource) wins the chain.
-        Uses the same platform-aware get_preferred_format() as _try_manifest_v2().
-
-        Returns an empty dict if the manifest is absent, not v2, or on any error.
-        """
         if not manifest_path.exists():
             return {}
         try:
@@ -588,13 +418,6 @@ class ManifestFileSource:
         manifest_path: Path,
         table_names: list[str],
     ) -> dict[str, dict[str, Any]]:
-        """Read CSV dialect metadata for the given tables from a v2 manifest.
-
-        Used by DataSourceResolver to inject table_metadata after a non-manifest
-        provider wins the chain — mirrors how read_format_hints() injects table_formats.
-
-        Returns an empty dict if the manifest is absent, not v2, or on any error.
-        """
         if not manifest_path.exists():
             return {}
         try:
@@ -611,7 +434,6 @@ class ManifestFileSource:
                     continue
                 entries = table_formats_obj.formats.get(fmt or "", []) if fmt else []
                 if not entries:
-                    # Fallback: first available format
                     for format_files in table_formats_obj.formats.values():
                         if format_files:
                             entries = format_files
@@ -624,8 +446,6 @@ class ManifestFileSource:
 
 
 class DataSourceResolver:
-    """Resolves data source using chain of responsibility pattern."""
-
     def __init__(
         self,
         platform_name: str | None = None,
@@ -633,14 +453,6 @@ class DataSourceResolver:
         platform_config: dict[str, Any] | None = None,
         requested_format: str | None = None,
     ):
-        """Initialize resolver with ordered list of providers.
-
-        Args:
-            platform_name: Platform name for format preference resolution.
-                If not provided, defaults to "duckdb".
-            requested_format: Explicit --table-format from CLI; overrides
-                platform defaults for this run only.
-        """
         self._manifest_source = ManifestFileSource(
             platform_name=platform_name or "duckdb",
             table_mode=table_mode or "native",
@@ -655,32 +467,18 @@ class DataSourceResolver:
         ]
 
     def get_manifest_data_source(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Return a DataSource built solely from the manifest file.
-
-        Callers that need to fall back to manifest-selected files (e.g. Athena
-        external-table mode) should prefer this over accessing ``_manifest_source``
-        directly.
-        """
         return self._manifest_source.get_data_source(benchmark, data_dir)
 
     @staticmethod
     def _normalize_paths(table_paths: Any) -> list[Path]:
-        """Normalize a table-path payload to a list of Paths."""
         return normalize_table_paths(table_paths)
 
     @staticmethod
     def _get_case_insensitive(mapping: dict[str, Any], key: str) -> Any:
-        """Return a mapping value using exact or lower-case key lookup."""
         return mapping.get(key, mapping.get(key.lower()))
 
     @staticmethod
     def _infer_format_from_paths(paths: set[Path]) -> str | None:
-        """Infer the data format from file extensions.
-
-        v1 manifests carry no table_formats entry, so derive the format
-        (e.g. "tbl") from the replacement paths, transparent to compression
-        suffixes. Returns None when no path carries a recognized extension.
-        """
         inferred = [get_data_extension(path) for path in sorted(paths)]
         inferred = [ext[1:] for ext in inferred if ext]
         return inferred[0] if inferred else None
@@ -691,7 +489,6 @@ class DataSourceResolver:
         benchmark: Any,
         data_dir: Path,
     ) -> None:
-        """Apply platform-specific manifest-selected file overrides centrally."""
         if source.source_type not in {"benchmark_tables", "benchmark_impl_tables"}:
             return
 
@@ -726,8 +523,6 @@ class DataSourceResolver:
                 replacement_paths = set(self._normalize_paths(replacement))
                 replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
                 if replacement_format is None:
-                    # v1 manifests carry no table_formats; infer from the
-                    # replacement paths so legacy manifests keep working.
                     replacement_format = self._infer_format_from_paths(replacement_paths)
                 if replacement_format != "tbl" or not current_paths < replacement_paths:
                     continue
@@ -740,15 +535,6 @@ class DataSourceResolver:
                 source.table_formats[table_name.lower()] = str(replacement_format).lower()
 
     def resolve(self, benchmark: Any, data_dir: Path) -> DataSource | None:
-        """Resolve data source from benchmark and data directory.
-
-        Args:
-            benchmark: Benchmark instance
-            data_dir: Data directory path
-
-        Returns:
-            DataSource if found, None otherwise
-        """
         source = None
         for provider in self.providers:
             source = provider.get_data_source(benchmark, data_dir)
@@ -758,10 +544,6 @@ class DataSourceResolver:
         if source is None:
             return None
 
-        # Providers that supply file paths directly (BenchmarkTablesSource,
-        # BenchmarkImplTablesSource) short-circuit ManifestFileSource and return
-        # empty table_formats and table_metadata. Inject both from the manifest
-        # here — centrally, once — so all providers get platform-aware resolution.
         manifest_path = Path(data_dir) / "_datagen_manifest.json"
         table_names = list(source.tables.keys())
         if not source.table_formats:
@@ -775,7 +557,6 @@ class DataSourceResolver:
 
 
 def resolve_adapter_data_source(adapter: Any, benchmark: Any, data_dir: Path) -> DataSource:
-    """Resolve data files for adapters that use standard DataSourceResolver state."""
     resolver = DataSourceResolver(
         platform_name=adapter.platform_name,
         table_mode=adapter.table_mode,
@@ -789,66 +570,32 @@ def resolve_adapter_data_source(adapter: Any, benchmark: Any, data_dir: Path) ->
 
 
 class CompressionHandler(ABC):
-    """Abstract base class for compression handlers."""
-
     @abstractmethod
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
-        """Open compressed file for reading.
-
-        Args:
-            file_path: Path to compressed file
-
-        Yields:
-            File-like object for reading
-        """
+        pass
 
 
 class GzipHandler(CompressionHandler):
-    """Handler for gzip-compressed files."""
-
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
-        """Open gzip file for reading."""
         with gzip.open(file_path, "rt") as f:
             yield f
 
 
 class ZstdHandler(CompressionHandler):
-    """Handler for zstd-compressed files using system command."""
-
     def __init__(self, adapter: Any = None):
-        """Initialize zstd handler with optional adapter for verbosity-aware logging.
-
-        Args:
-            adapter: Optional platform adapter with log_verbose/log_very_verbose methods
-        """
         self.adapter = adapter
 
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
-        """Open zstd file by decompressing to temp file.
-
-        Args:
-            file_path: Path to .zst file
-
-        Yields:
-            File object for reading decompressed content
-
-        Raises:
-            subprocess.CalledProcessError: If zstd decompression fails
-            FileNotFoundError: If zstd command not found
-        """
-        # Log decompression start if adapter supports verbosity
         if self.adapter and hasattr(self.adapter, "log_verbose"):
             self.adapter.log_verbose(f"Decompressing {file_path.name} using system zstd command...")
 
-        # Create temporary uncompressed file
         temp_fd, temp_file_path = tempfile.mkstemp(suffix=".csv")
-        os.close(temp_fd)  # Close the file descriptor
+        os.close(temp_fd)
 
         try:
-            # Decompress using system command
             with open(temp_file_path, "w", encoding="utf-8") as temp_file:
                 subprocess.run(
                     ["zstd", "-d", str(file_path), "-c"],
@@ -857,46 +604,31 @@ class ZstdHandler(CompressionHandler):
                     text=True,
                 )
 
-            # Log decompression completion if adapter supports verbosity
             if self.adapter and hasattr(self.adapter, "log_very_verbose"):
                 self.adapter.log_very_verbose(f"Decompressed to temporary file: {temp_file_path}")
 
-            # Yield the decompressed file
             with open(temp_file_path, encoding="utf-8") as f:
                 yield f
 
         finally:
-            # Clean up temporary file
             with contextlib.suppress(Exception):
                 os.unlink(temp_file_path)
 
 
 class NoCompressionHandler(CompressionHandler):
-    """Handler for uncompressed files (pass-through)."""
-
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
-        """Open uncompressed file for reading."""
         with open(file_path, encoding="utf-8") as f:
             yield f
 
 
 def _resolve_table_schema(schema: Any, table_name: str) -> Any:
-    """Look up one table's schema, tolerant of case and non-dict schemas."""
     if not isinstance(schema, dict):
         return {}
     return schema.get(table_name, schema.get(table_name.lower(), {}))
 
 
 def _schema_table_columns(table_schema: Any) -> list[Any] | None:
-    """Return a table schema's column list, or None if it has no column list.
-
-    Accepts either a dict shape (``{"columns": [...]}``) or a
-    ``BaseSchemaTable``-like object exposing a ``.columns`` attribute (e.g. the
-    Data Vault / TPC-H / TPC-DS ``Table`` classes). A plain ``"columns" in
-    table_schema`` test raises ``argument of type 'Table' is not iterable`` for
-    the object form, which previously aborted DataVault server-mode loads.
-    """
     if isinstance(table_schema, dict):
         columns = table_schema.get("columns")
     else:
@@ -905,22 +637,8 @@ def _schema_table_columns(table_schema: Any) -> list[Any] | None:
 
 
 class SchemaInspector:
-    """Inspector for determining table schema information."""
-
     @staticmethod
     def get_column_count(benchmark: Any, table_name: str, file_handle: Any, delimiter: str) -> int | None:
-        """Determine column count for a table.
-
-        Args:
-            benchmark: Benchmark instance
-            table_name: Name of table
-            file_handle: File handle to read from if needed
-            delimiter: Delimiter to use for parsing
-
-        Returns:
-            Number of columns, or None if cannot be determined
-        """
-        # Try to get from schema first
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
         table_schema = _resolve_table_schema(schema, table_name)
 
@@ -928,38 +646,20 @@ class SchemaInspector:
         if columns is not None:
             return len(columns)
 
-        # Fallback: read first line to determine column count
         first_line = file_handle.readline().strip()
         if first_line:
             column_count = len(first_line.split(delimiter))
-            file_handle.seek(0)  # Reset file pointer
+            file_handle.seek(0)
             return column_count
 
         return None
 
 
 class RowBatchProcessor:
-    """Processor for batching and normalizing rows."""
-
     def __init__(self, batch_size: int = 1000):
-        """Initialize processor.
-
-        Args:
-            batch_size: Number of rows per batch
-        """
         self.batch_size = batch_size
 
     def process_file(self, file_handle: Any, delimiter: str, column_count: int) -> Iterator[tuple[list[tuple], int]]:
-        """Process file line by line, yielding batches.
-
-        Args:
-            file_handle: File to read from
-            delimiter: Field delimiter
-            column_count: Expected number of columns
-
-        Yields:
-            Tuples of (batch_data, row_count) for each batch
-        """
         batch_data = []
         row_count = 0
 
@@ -968,50 +668,32 @@ class RowBatchProcessor:
             if not line:
                 continue
 
-            # Split by delimiter and normalize fields
             fields = line.split(delimiter)
 
-            # Pad with empty strings if needed
             while len(fields) < column_count:
                 fields.append("")
 
-            # Truncate if too many fields
             fields = fields[:column_count]
 
             batch_data.append(tuple(fields))
             row_count += 1
 
-            # Yield batch when full
             if len(batch_data) >= self.batch_size:
                 yield (batch_data, row_count)
                 batch_data = []
 
-        # Yield remaining data
         if batch_data:
             yield (batch_data, row_count)
 
 
 class FileFormatHandler(ABC):
-    """Abstract base class for file format handlers."""
-
     @abstractmethod
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format."""
+        pass
 
     @abstractmethod
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table data from file.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to data file
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
+        pass
 
     def load_table_bulk(
         self,
@@ -1021,22 +703,6 @@ class FileFormatHandler(ABC):
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Load table data from multiple shard files.
-
-        Default implementation calls load_table() sequentially.
-        Override to use platform-native multi-file ingestion (e.g., DuckDB
-        read_csv([list]) or ClickHouse file() glob) for better performance.
-
-        Args:
-            table_name: Name of table to load
-            file_paths: List of shard file paths (all shards for this table)
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Total number of rows loaded across all files
-        """
         total = 0
         for file_path in file_paths:
             total += self.load_table(table_name, file_path, connection, benchmark, logger)
@@ -1044,42 +710,27 @@ class FileFormatHandler(ABC):
 
 
 class DelimitedFileHandler(FileFormatHandler):
-    """Handler for delimited text files (CSV, TBL, DAT)."""
-
     def __init__(self, delimiter: str):
-        """Initialize handler.
-
-        Args:
-            delimiter: Field delimiter character
-        """
         self.delimiter_char = delimiter
 
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format."""
         return self.delimiter_char
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load delimited file into table."""
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
-        # Get compression handler
         compression_handler = FileFormatRegistry.get_compression_handler(file_path)
 
-        # Open file (with or without compression)
         with compression_handler.open(file_path) as f:
-            # Determine column count
             column_count = SchemaInspector.get_column_count(benchmark, validated_table, f, self.delimiter_char)
 
             if column_count is None:
                 logger.debug(f"Could not determine column count for {validated_table}")
                 return 0
 
-            # Prepare insert statement
             placeholders = ",".join(["?" for _ in range(column_count)])
             insert_sql = f"INSERT INTO {validated_table} VALUES ({placeholders})"
 
-            # Process file in batches
             processor = RowBatchProcessor()
             total_rows = 0
 
@@ -1094,92 +745,48 @@ DUCKDB_NO_NULL_CONVERSION_SENTINEL = "__NULL__"
 
 
 class DuckDBNativeHandler(FileFormatHandler):
-    """Handler for DuckDB's native read_csv() function.
-
-    This handler leverages DuckDB's optimized CSV reading capabilities
-    instead of loading row-by-row.
-    """
-
     def __init__(self, delimiter: str, adapter: Any, benchmark: Any, null_marker: str | None = ""):
-        """Initialize handler.
-
-        Args:
-            delimiter: Field delimiter character
-            adapter: Platform adapter (for config and dry-run support)
-            benchmark: Benchmark instance (for CSV loading config)
-            null_marker: Resolved CSV null marker; ``None`` preserves empty strings.
-        """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
         self.null_marker = null_marker
 
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format."""
         return self.delimiter_char
 
     def _get_csv_config(self, table_name: str) -> str:
-        """Get CSV loading configuration for DuckDB read_csv().
-
-        Args:
-            table_name: Name of the table being loaded
-
-        Returns:
-            CSV configuration string for DuckDB read_csv() function
-        """
-        # Default configuration for DuckDB
         config_parts = ["header=false", "auto_detect=true", "ignore_errors=true"]
 
-        # Check if benchmark provides CSV loading configuration
         if hasattr(self.benchmark, "get_csv_loading_config"):
             try:
                 benchmark_config = self.benchmark.get_csv_loading_config(table_name)
                 if benchmark_config:
                     config_parts = list(benchmark_config)
             except Exception:
-                pass  # Use defaults
+                pass
 
         return ",\n                                ".join(config_parts)
 
     def _pipe_nullstr_config(self) -> str:
-        """Return DuckDB nullstr config for pipe-delimited native loads."""
         null_marker = self.null_marker
         if null_marker is None:
             null_marker = DUCKDB_NO_NULL_CONVERSION_SENTINEL
         return f"nullstr='{escape_sql_string_literal(null_marker)}'"
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using DuckDB's native read_csv() function.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to data file
-            connection: DuckDB connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name and escape file path to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_path = escape_sql_string_literal(str(file_path))
 
-        # Build appropriate read_csv configuration
         if self.delimiter_char == "|":
-            # TPC-H .tbl and TPC-DS .dat files may or may not have trailing pipe
-            # delimiters. Detect per-file and only add a dummy column when needed.
             result = connection.execute(
                 f"SELECT name FROM pragma_table_info('{validated_table}') ORDER BY cid"
             ).fetchall()
             col_names = [row[0] for row in result] if result else []
 
             if col_names:
-                # Detect whether this file has a trailing delimiter by sampling the first shard.
                 trailing = has_trailing_delimiter(file_path, "|", col_names)
                 all_names = get_column_names_with_trailing(col_names, trailing)
                 names_param = ", ".join([f"'{col}'" for col in all_names])
-                # Project explicit schema columns to avoid fragile SELECT * EXCLUDE.
                 select_cols = ", ".join([f'"{col}"' for col in col_names])
                 insert_sql = f"""
                     INSERT INTO {validated_table}
@@ -1193,7 +800,6 @@ class DuckDBNativeHandler(FileFormatHandler):
                     )
                 """
             else:
-                # Fallback if we can't determine columns
                 insert_sql = f"""
                     INSERT INTO {validated_table}
                     SELECT * FROM read_csv('{escaped_path}',
@@ -1205,7 +811,6 @@ class DuckDBNativeHandler(FileFormatHandler):
                     )
                 """
         else:
-            # Standard CSV files - get loading configuration from benchmark
             csv_config = self._get_csv_config(validated_table)
             insert_sql = f"""
                 INSERT INTO {validated_table}
@@ -1214,10 +819,9 @@ class DuckDBNativeHandler(FileFormatHandler):
                 )
             """
 
-        # Execute or capture based on dry-run mode
         if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
             self.adapter.capture_sql(insert_sql, "load_data", validated_table)
-            return 1000  # Placeholder for dry-run
+            return 1000
         else:
             before = connection.execute(f"SELECT COUNT(*) FROM {validated_table}").fetchone()[0]
             connection.execute(insert_sql)
@@ -1232,12 +836,6 @@ class DuckDBNativeHandler(FileFormatHandler):
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Load all CSV/TBL shards in a single INSERT ... SELECT * FROM read_csv([array]).
-
-        Uses DuckDB's native multi-file read_csv() to process all shards in one
-        query plan, avoiding N separate INSERT statements. Schema and trailing-
-        delimiter detection are performed once against the first shard only.
-        """
         if len(file_paths) == 1:
             return self.load_table(table_name, file_paths[0], connection, benchmark, logger)
 
@@ -1298,28 +896,12 @@ class DuckDBNativeHandler(FileFormatHandler):
 
 
 class ParquetFileHandler(FileFormatHandler):
-    """Handler for Parquet files using bounded PyArrow record batches."""
-
     _LOAD_SAVEPOINT = "benchbox_parquet_load"
 
     def get_delimiter(self) -> str:
-        """Parquet is columnar format, not delimited."""
-        return ""  # Not applicable for Parquet
+        return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load Parquet file into table using PyArrow.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Parquet file
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -1327,10 +909,6 @@ class ParquetFileHandler(FileFormatHandler):
         except ImportError as e:
             raise RuntimeError("pyarrow is required for Parquet loading") from e
 
-        # Keep all inserts for this file isolated from the caller's larger load
-        # transaction. DataLoader commits after every table; without a savepoint,
-        # a later batch/read failure would leave earlier batches committed as a
-        # silently truncated table when DataLoader handles the exception.
         connection.execute(f"SAVEPOINT {self._LOAD_SAVEPOINT}")
         savepoint_active = True
         try:
@@ -1340,10 +918,8 @@ class ParquetFileHandler(FileFormatHandler):
             placeholders = ",".join(["?" for _ in validated_columns])
             columns_str = ",".join(validated_columns)
 
-            # Prepare INSERT statement
             insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-            # Keep only one bounded record batch and its Python conversion in memory.
             batch_size = 1000
             row_count = 0
             for batch in parquet_file.iter_batches(batch_size=batch_size):
@@ -1363,51 +939,24 @@ class ParquetFileHandler(FileFormatHandler):
 
 
 class DuckDBParquetHandler(FileFormatHandler):
-    """Handler for DuckDB's native read_parquet() function.
-
-    This handler leverages DuckDB's optimized Parquet reading capabilities
-    instead of loading via PyArrow and INSERT statements.
-    """
-
     def __init__(self, adapter: Any):
-        """Initialize handler.
-
-        Args:
-            adapter: Platform adapter (for dry-run support)
-        """
         self.adapter = adapter
 
     def get_delimiter(self) -> str:
-        """Parquet is columnar format, not delimited."""
         return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using DuckDB's native read_parquet() function.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Parquet file
-            connection: DuckDB connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name and escape file path to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_path = escape_sql_string_literal(str(file_path))
 
-        # Build INSERT SELECT from read_parquet()
         insert_sql = f"""
             INSERT INTO {validated_table}
             SELECT * FROM read_parquet('{escaped_path}')
         """
 
-        # Execute or capture based on dry-run mode
         if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
             self.adapter.capture_sql(insert_sql, "load_data", validated_table)
-            return 1000  # Placeholder for dry-run
+            return 1000
         else:
             before = connection.execute(f"SELECT COUNT(*) FROM {validated_table}").fetchone()[0]
             connection.execute(insert_sql)
@@ -1422,7 +971,6 @@ class DuckDBParquetHandler(FileFormatHandler):
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Load all Parquet shards in a single INSERT ... SELECT * FROM read_parquet([array])."""
         if len(file_paths) == 1:
             return self.load_table(table_name, file_paths[0], connection, benchmark, logger)
 
@@ -1442,30 +990,10 @@ class DuckDBParquetHandler(FileFormatHandler):
 
 
 class DeltaFileHandler(FileFormatHandler):
-    """Handler for Delta Lake tables using deltalake Python library.
-
-    This is a generic handler that works across platforms by reading
-    Delta Lake tables and loading via INSERT statements.
-    """
-
     def get_delimiter(self) -> str:
-        """Delta Lake is a table format, not delimited."""
-        return ""  # Not applicable for Delta Lake
+        return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load Delta Lake table into database table.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Delta Lake table directory
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -1476,7 +1004,6 @@ class DeltaFileHandler(FileFormatHandler):
                 "Install it with: uv add deltalake --optional table-formats"
             ) from e
 
-        # Read Delta Lake table
         delta_table = DeltaTable(str(file_path))
         arrow_table = delta_table.to_pyarrow_table()
         row_count = arrow_table.num_rows
@@ -1484,22 +1011,17 @@ class DeltaFileHandler(FileFormatHandler):
         if row_count == 0:
             return 0
 
-        # Convert to Python data for insertion
         data = arrow_table.to_pylist()
 
-        # Get column names from schema and validate each one
         column_names = arrow_table.schema.names
         validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
         placeholders = ",".join(["?" for _ in validated_columns])
         columns_str = ",".join(validated_columns)
 
-        # Prepare INSERT statement
         insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-        # Convert dicts to tuples in correct column order
         data_tuples = [tuple(row[col] for col in column_names) for row in data]
 
-        # Insert in batches for better performance
         batch_size = 1000
         for i in range(0, len(data_tuples), batch_size):
             batch = data_tuples[i : i + batch_size]
@@ -1509,91 +1031,41 @@ class DeltaFileHandler(FileFormatHandler):
 
 
 class DuckDBDeltaHandler(FileFormatHandler):
-    """Handler for DuckDB's native Delta Lake support.
-
-    This handler leverages DuckDB's delta extension for optimized
-    Delta Lake reading instead of using the Python deltalake library.
-    """
-
     def __init__(self, adapter: Any):
-        """Initialize handler.
-
-        Args:
-            adapter: Platform adapter (for dry-run support)
-        """
         self.adapter = adapter
 
     def get_delimiter(self) -> str:
-        """Delta Lake is a table format, not delimited."""
         return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using DuckDB's delta_scan() function.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Delta Lake table directory
-            connection: DuckDB connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name and escape file path to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_path = escape_sql_string_literal(str(file_path))
 
-        # Ensure delta extension is installed and loaded
         try:
-            # Install delta extension if not already installed
             connection.execute("INSTALL delta")
             connection.execute("LOAD delta")
         except Exception:
-            # Extension might already be installed/loaded
             pass
 
-        # Build INSERT SELECT from delta_scan()
         insert_sql = f"""
             INSERT INTO {validated_table}
             SELECT * FROM delta_scan('{escaped_path}')
         """
 
-        # Execute or capture based on dry-run mode
         if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
             self.adapter.capture_sql(insert_sql, "load_data", validated_table)
-            return 1000  # Placeholder for dry-run
+            return 1000
         else:
             connection.execute(insert_sql)
-            # Get actual row count
             row_count = connection.execute(f"SELECT COUNT(*) FROM {validated_table}").fetchone()[0]
             return row_count
 
 
 class DuckLakeFileHandler(FileFormatHandler):
-    """Handler for DuckLake tables using DuckDB's ducklake extension.
-
-    This handler reads DuckLake tables and loads data via INSERT statements.
-    """
-
     def get_delimiter(self) -> str:
-        """DuckLake is a table format, not delimited."""
-        return ""  # Not applicable for DuckLake
+        return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load DuckLake table into database table.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to DuckLake table directory
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -1601,24 +1073,19 @@ class DuckLakeFileHandler(FileFormatHandler):
         except ImportError as e:
             raise RuntimeError("DuckLake support requires DuckDB. Install it with: uv add duckdb") from e
 
-        # DuckLake tables have a metadata.ducklake file and data directory
         metadata_path = file_path / "metadata.ducklake"
         data_path = file_path / "data"
 
         if not metadata_path.exists():
             raise RuntimeError(f"DuckLake catalog not found at {metadata_path}")
 
-        # Create a temporary connection to read the DuckLake table
         temp_conn = duckdb.connect(":memory:")
         try:
-            # Load ducklake extension
             temp_conn.execute("INSTALL ducklake")
             temp_conn.execute("LOAD ducklake")
 
-            # Attach the DuckLake catalog (use DATA_PATH option, not query string)
             temp_conn.execute(f"ATTACH 'ducklake:{metadata_path}' AS ducklake_db (DATA_PATH '{data_path}')")
 
-            # Read data from DuckLake table
             arrow_table = temp_conn.execute(f"SELECT * FROM ducklake_db.main.{validated_table}").fetch_arrow_table()
 
             row_count = arrow_table.num_rows
@@ -1626,22 +1093,17 @@ class DuckLakeFileHandler(FileFormatHandler):
             if row_count == 0:
                 return 0
 
-            # Convert to Python data for insertion
             data = arrow_table.to_pylist()
 
-            # Get column names from schema and validate each one
             column_names = arrow_table.schema.names
             validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
             placeholders = ",".join(["?" for _ in validated_columns])
             columns_str = ",".join(validated_columns)
 
-            # Prepare INSERT statement
             insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-            # Convert dicts to tuples in correct column order
             data_tuples = [tuple(row[col] for col in column_names) for row in data]
 
-            # Insert in batches for better performance
             batch_size = 1000
             for i in range(0, len(data_tuples), batch_size):
                 batch = data_tuples[i : i + batch_size]
@@ -1654,61 +1116,31 @@ class DuckLakeFileHandler(FileFormatHandler):
 
 
 class DuckDBDuckLakeHandler(FileFormatHandler):
-    """Handler for DuckDB's native DuckLake support.
-
-    This handler leverages DuckDB's ducklake extension for optimized
-    DuckLake reading directly within DuckDB.
-    """
-
     def __init__(self, adapter: Any):
-        """Initialize handler.
-
-        Args:
-            adapter: Platform adapter (for dry-run support)
-        """
         self.adapter = adapter
 
     def get_delimiter(self) -> str:
-        """DuckLake is a table format, not delimited."""
         return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using DuckDB's ducklake extension.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to DuckLake table directory
-            connection: DuckDB connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
-        # DuckLake tables have a metadata.ducklake file and data directory
         metadata_path = file_path / "metadata.ducklake"
         data_path = file_path / "data"
 
         if not metadata_path.exists():
             raise RuntimeError(f"DuckLake catalog not found at {metadata_path}")
 
-        # Ensure ducklake extension is installed and loaded
         try:
             connection.execute("INSTALL ducklake")
             connection.execute("LOAD ducklake")
         except Exception:
-            # Extension might already be installed/loaded
             pass
 
-        # Generate a unique alias for the catalog
         import uuid
 
         catalog_alias = f"ducklake_{uuid.uuid4().hex[:8]}"
 
-        # Attach the DuckLake catalog (use DATA_PATH option, not query string)
         escaped_metadata = escape_sql_string_literal(str(metadata_path))
         escaped_data_path = escape_sql_string_literal(str(data_path))
 
@@ -1717,24 +1149,20 @@ class DuckDBDuckLakeHandler(FileFormatHandler):
                 f"ATTACH 'ducklake:{escaped_metadata}' AS {catalog_alias} (DATA_PATH '{escaped_data_path}')"
             )
 
-            # Build INSERT SELECT from the DuckLake table
             insert_sql = f"""
                 INSERT INTO {validated_table}
                 SELECT * FROM {catalog_alias}.main.{validated_table}
             """
 
-            # Execute or capture based on dry-run mode
             if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
                 self.adapter.capture_sql(insert_sql, "load_data", validated_table)
-                return 1000  # Placeholder for dry-run
+                return 1000
             else:
                 connection.execute(insert_sql)
-                # Get actual row count
                 row_count = connection.execute(f"SELECT COUNT(*) FROM {validated_table}").fetchone()[0]
                 return row_count
 
         finally:
-            # Detach the catalog
             try:
                 connection.execute(f"DETACH {catalog_alias}")
             except Exception:
@@ -1742,30 +1170,10 @@ class DuckDBDuckLakeHandler(FileFormatHandler):
 
 
 class IcebergFileHandler(FileFormatHandler):
-    """Handler for Apache Iceberg tables using pyiceberg library.
-
-    This is a generic handler that works across platforms by reading
-    Iceberg tables and loading via INSERT statements.
-    """
-
     def get_delimiter(self) -> str:
-        """Iceberg is a table format, not delimited."""
-        return ""  # Not applicable for Iceberg
+        return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load Iceberg table into database table.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Iceberg table directory
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -1778,15 +1186,13 @@ class IcebergFileHandler(FileFormatHandler):
 
         import tempfile
 
-        # Create temporary SQL catalog to read the Iceberg table
-        # Use mkstemp() instead of deprecated mktemp() to avoid race condition vulnerability
         warehouse_path = str(file_path.parent)
         catalog_fd = None
         catalog_db = None
 
         try:
             catalog_fd, catalog_db = tempfile.mkstemp(suffix=".db", prefix="benchbox_iceberg_")
-            os.close(catalog_fd)  # Close the file descriptor, we just need the path
+            os.close(catalog_fd)
             catalog_fd = None
 
             catalog = SqlCatalog(
@@ -1795,38 +1201,30 @@ class IcebergFileHandler(FileFormatHandler):
                 warehouse=warehouse_path,
             )
 
-            # Load the Iceberg table
             table_identifier = ("benchbox", validated_table)
             try:
                 iceberg_table = catalog.load_table(table_identifier)
             except Exception:
-                # Table might not exist in catalog, try to register it
                 catalog.register_table(table_identifier, str(file_path))
                 iceberg_table = catalog.load_table(table_identifier)
 
-            # Read table data as PyArrow
             arrow_table = iceberg_table.scan().to_arrow()
             row_count = arrow_table.num_rows
 
             if row_count == 0:
                 return 0
 
-            # Convert to Python data for insertion
             data = arrow_table.to_pylist()
 
-            # Get column names from schema and validate each one
             column_names = arrow_table.schema.names
             validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
             placeholders = ",".join(["?" for _ in validated_columns])
             columns_str = ",".join(validated_columns)
 
-            # Prepare INSERT statement
             insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-            # Convert dicts to tuples in correct column order
             data_tuples = [tuple(row[col] for col in column_names) for row in data]
 
-            # Insert in batches for better performance
             batch_size = 1000
             for i in range(0, len(data_tuples), batch_size):
                 batch = data_tuples[i : i + batch_size]
@@ -1835,7 +1233,6 @@ class IcebergFileHandler(FileFormatHandler):
             return row_count
 
         finally:
-            # Clean up temporary catalog database
             if catalog_fd is not None:
                 try:
                     os.close(catalog_fd)
@@ -1845,35 +1242,14 @@ class IcebergFileHandler(FileFormatHandler):
                 try:
                     os.unlink(catalog_db)
                 except Exception:
-                    # Log but don't fail if cleanup fails
                     pass
 
 
 class VortexFileHandler(FileFormatHandler):
-    """Handler for Vortex columnar files using the vortex Python library.
-
-    This is a generic handler that works across platforms by reading
-    Vortex files and loading via INSERT statements.
-    """
-
     def get_delimiter(self) -> str:
-        """Vortex is a columnar format, not delimited."""
-        return ""  # Not applicable for Vortex
+        return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load Vortex file into table.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Vortex file
-            connection: Database connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -1900,7 +1276,6 @@ class VortexFileHandler(FileFormatHandler):
                 f"{provider_text}"
             )
 
-        # Read Vortex file and convert to PyArrow table
         vortex_array = read_vortex(str(file_path))
         arrow_table = vortex_array.to_arrow()
         row_count = arrow_table.num_rows
@@ -1908,22 +1283,17 @@ class VortexFileHandler(FileFormatHandler):
         if row_count == 0:
             return 0
 
-        # Convert to Python data for insertion
         data = arrow_table.to_pylist()
 
-        # Get column names from schema and validate each one
         column_names = arrow_table.schema.names
         validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
         placeholders = ",".join(["?" for _ in validated_columns])
         columns_str = ",".join(validated_columns)
 
-        # Prepare INSERT statement
         insert_sql = f"INSERT INTO {validated_table} ({columns_str}) VALUES ({placeholders})"
 
-        # Convert dicts to tuples in correct column order
         data_tuples = [tuple(row[col] for col in column_names) for row in data]
 
-        # Insert in batches for better performance
         batch_size = 1000
         for i in range(0, len(data_tuples), batch_size):
             batch = data_tuples[i : i + batch_size]
@@ -1933,148 +1303,72 @@ class VortexFileHandler(FileFormatHandler):
 
 
 class DuckDBVortexHandler(FileFormatHandler):
-    """Handler for DuckDB's native Vortex support via extension.
-
-    This handler leverages DuckDB's vortex extension for optimized
-    Vortex reading instead of using the Python vortex library.
-    """
-
     def __init__(self, adapter: Any):
-        """Initialize handler.
-
-        Args:
-            adapter: Platform adapter (for dry-run support)
-        """
         self.adapter = adapter
 
     def get_delimiter(self) -> str:
-        """Vortex is a columnar format, not delimited."""
         return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using DuckDB's vortex extension.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to Vortex file
-            connection: DuckDB connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name and escape file path to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_path = escape_sql_string_literal(str(file_path))
 
-        # Ensure vortex extension is installed and loaded
         try:
-            # Install vortex extension if not already installed
             connection.execute("INSTALL vortex")
             connection.execute("LOAD vortex")
         except Exception:
-            # Extension might already be installed/loaded, or not available
-            # Fall back to generic handler
             logger.debug("DuckDB vortex extension not available, falling back to generic handler")
             return VortexFileHandler().load_table(table_name, file_path, connection, benchmark, logger)
 
-        # Build INSERT SELECT from read_vortex()
         insert_sql = f"""
             INSERT INTO {validated_table}
             SELECT * FROM read_vortex('{escaped_path}')
         """
 
-        # Execute or capture based on dry-run mode
         if hasattr(self.adapter, "dry_run_mode") and self.adapter.dry_run_mode:
             self.adapter.capture_sql(insert_sql, "load_data", validated_table)
-            return 1000  # Placeholder for dry-run
+            return 1000
         else:
             connection.execute(insert_sql)
-            # Get actual row count
             row_count = connection.execute(f"SELECT COUNT(*) FROM {validated_table}").fetchone()[0]
             return row_count
 
 
-# Matches DuckDB bracketed vector/list type suffixes, e.g. "FLOAT[128]",
-# "DOUBLE[3]", or "INTEGER[]" — used to route these to array parsing rather
-# than scalar numeric conversion during ClickHouse client-side inserts.
-# NOTE: the DDL side rewrites the same fixed-size forms to ClickHouse arrays
-# (workload.py: FLOAT[N] -> Array(Float32), DOUBLE[N] -> Array(Float64)); this
-# value-level detector is the insert-time counterpart and additionally covers
-# bracketless-size lists like "INTEGER[]". Keep the two in sync if a new
-# bracketed vector form is added to either surface.
 _CLICKHOUSE_VECTOR_TYPE_RE = re.compile(r"\[\s*\d*\s*\]")
 
 
 class ClickHouseNativeHandler(FileFormatHandler):
-    """Handler for ClickHouse's native file() function.
-
-    This handler leverages ClickHouse's optimized CSV reading capabilities
-    with support for both server and local modes.
-    """
-
     def __init__(self, delimiter: str, adapter: Any, benchmark: Any, *, has_header: bool = False):
-        """Initialize handler.
-
-        Args:
-            delimiter: Field delimiter character
-            adapter: Platform adapter (for mode and config)
-            benchmark: Benchmark instance (for CSV loading config)
-            has_header: Whether CSV input files include a header row.
-        """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
         self.has_header = has_header
 
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format."""
         return self.delimiter_char
 
     def _uses_server_mode(self) -> bool:
-        """Return whether this handler targets a self-hosted ClickHouse server."""
         return getattr(self.adapter, "deployment_mode", None) == "server"
 
     def _server_insert_block_size(self) -> int:
-        """Return the bounded clickhouse-driver transport block size.
-
-        The generic :class:`RowBatchProcessor` intentionally remains a 1,000-row
-        helper for other platforms. Server-mode ClickHouse never routes through
-        it: the native driver receives a real generator and owns transport
-        buffering at this explicitly configured size.
-        """
         value = getattr(self.adapter, "insert_block_size", 65536)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value == 1000:
             raise DataLoadingError("ClickHouse server insert_block_size must be a positive integer other than 1000")
         return value
 
     def _server_insert_settings(self) -> dict[str, int]:
-        """Return per-execute settings for a bounded native-driver insert."""
         return {"insert_block_size": self._server_insert_block_size()}
 
     def _get_csv_loading_config(self, table_name: str) -> dict[str, str]:
-        """Get CSV loading configuration for ClickHouse.
-
-        Args:
-            table_name: Name of the table being loaded
-
-        Returns:
-            Dictionary with CSV loading configuration (delimiter, format, etc.)
-        """
-        # Default configuration for ClickHouse
         config = {"delimiter": self.delimiter_char, "format": "CSVWithNames" if self.has_header else "CSV"}
 
-        # Check if benchmark provides CSV loading configuration
         if hasattr(self.benchmark, "get_csv_loading_config"):
             try:
                 benchmark_config_list = self.benchmark.get_csv_loading_config(table_name)
                 if benchmark_config_list:
-                    # Parse DuckDB-style config list into ClickHouse config
                     for config_item in benchmark_config_list:
                         normalized_item = config_item.lower()
                         if "delim=" in normalized_item:
-                            # Extract delimiter: delim='|' -> delimiter = '|'
                             delim_part = config_item.split("delim=")[1].strip("'\"")
                             config["delimiter"] = delim_part
                         elif "header=true" in normalized_item:
@@ -2082,24 +1376,11 @@ class ClickHouseNativeHandler(FileFormatHandler):
                         elif "header=false" in normalized_item:
                             config["format"] = "CSV"
             except Exception:
-                pass  # Use defaults
+                pass
 
         return config
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load table using ClickHouse's native file() function.
-
-        Args:
-            table_name: Name of table to load
-            file_path: Path to data file
-            connection: ClickHouse connection
-            benchmark: Benchmark instance
-            logger: Logger instance
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         try:
@@ -2113,8 +1394,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
             escaped_path = escape_sql_string_literal(str(file_path))
 
-            # ClickHouse natively supports Parquet via file().  Use that path
-            # for parquet files, including compressed/sharded names.
             base_ext = FileFormatRegistry.get_base_data_extension(file_path)
             if base_ext == ".parquet":
                 load_query = f"""
@@ -2122,8 +1401,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
                     SELECT * FROM file('{escaped_path}', 'Parquet')
                 """
             else:
-                # ClickHouse (both server and chDB) natively handles zstd-compressed
-                # files via auto-detection of .zst file extensions in file().
                 csv_config = self._get_csv_loading_config(validated_table)
                 delimiter = csv_config["delimiter"]
                 csv_format = csv_config["format"]
@@ -2141,7 +1418,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
                         SETTINGS format_csv_delimiter='{escaped_delimiter}'
                     """
 
-            # Execute the load query with before/after COUNT for accurate per-shard delta
             before_result = connection.execute(f"SELECT COUNT(*) FROM {validated_table}")
             before = before_result[0][0] if before_result and before_result[0] else 0
             connection.execute(load_query)
@@ -2162,7 +1438,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Stream host-local delimited files through one native-driver insert."""
         row_count = 0
         row_generator: Any | None = None
         try:
@@ -2220,12 +1495,8 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 row_generator.close()
 
     def _get_column_type_names(self, benchmark: Any, table_name: str) -> list[str | None]:
-        """Return schema type strings for a benchmark table when available."""
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
         table_schema = _resolve_table_schema(schema, table_name)
-        # Handles both dict schemas and BaseSchemaTable objects (e.g. DataVault),
-        # so object-schema benchmarks get real column types instead of an empty
-        # list (which silently skipped type conversion for those loads).
         columns = _schema_table_columns(table_schema) or []
 
         type_names: list[str | None] = []
@@ -2243,7 +1514,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
         rows: list[tuple[Any, ...]],
         column_types: list[str | None],
     ) -> list[tuple[Any, ...]]:
-        """Convert text fields to Python values accepted by clickhouse-driver."""
         if not column_types:
             return rows
         return [
@@ -2263,11 +1533,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         type_upper = type_name.upper()
 
-        # Array/vector types: "Array(...)" or DuckDB bracketed vector/list syntax
-        # such as "FLOAT[128]" (fixed-size vector) or "INTEGER[]" (list). Parse
-        # the bracketed CSV string into a Python list so clickhouse-driver
-        # receives a sequence; otherwise "FLOAT[128]" matches the FLOAT branch
-        # below and float("[0.02,...]") raises (Bucket C).
         if "ARRAY" in type_upper or _CLICKHOUSE_VECTOR_TYPE_RE.search(type_upper):
             if not value or value.upper() in ("\\N", "NULL"):
                 return None
@@ -2279,11 +1544,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 pass
             return value
 
-        # DateTime/DateTime64/TIMESTAMP must be classified BEFORE the DATE prefix:
-        # "DATETIME".startswith("DATE") is True, so a bare DATE check misroutes
-        # timestamps into date.fromisoformat() (raises on the time component),
-        # and plain "TIMESTAMP" otherwise falls through as a str, which the
-        # driver rejects with "'str' object has no attribute 'tzinfo'" (Bucket B).
         is_datetime = "DATETIME" in type_upper or "TIMESTAMP" in type_upper
         is_date = not is_datetime and type_upper.startswith("DATE")
 
@@ -2303,19 +1563,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
         if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
             return float(value)
         if is_datetime:
-            # datetime.fromisoformat() only accepts a trailing "Z" (RFC 3339
-            # UTC shorthand) starting in Python 3.11; on the supported 3.10
-            # runtime (requires-python >=3.10) it raises ValueError.
-            # Normalize to the explicit "+00:00" offset fromisoformat has
-            # always accepted, matching the pattern used elsewhere in this
-            # codebase (e.g. core/tpc_validation.py, mcp/tools/analytics.py).
             return datetime.fromisoformat(value.replace("Z", "+00:00"))
         if is_date:
             return date.fromisoformat(value)
         return value
 
     def _load_parquet_via_client_insert(self, validated_table: str, file_paths: list[Path], connection: Any) -> int:
-        """Stream host-local Parquet files through one native-driver insert."""
         row_count = 0
         row_generator: Any | None = None
         try:
@@ -2371,14 +1624,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
         benchmark: Any,
         logger: Any,
     ) -> int:
-        """Load all CSV shards in a single INSERT ... SELECT * FROM file(glob).
-
-        ClickHouse (both server and chDB) natively supports zstd via auto-detection
-        of .zst file extensions in file(), so compressed shards are handled identically
-        to uncompressed ones - no manual decompression needed.
-
-        Falls back to the default per-shard loop only when shards span multiple directories.
-        """
         if self._uses_server_mode():
             if not file_paths:
                 return 0
@@ -2408,12 +1653,10 @@ class ClickHouseNativeHandler(FileFormatHandler):
         if len(file_paths) == 1:
             return self.load_table(table_name, file_paths[0], connection, benchmark, logger)
 
-        # All shards must share the same parent directory for glob to work
         parents = {p.parent for p in file_paths}
         if len(parents) != 1:
             return super().load_table_bulk(table_name, file_paths, connection, benchmark, logger)
 
-        # Derive common prefix → glob pattern
         names = [p.name for p in file_paths]
         common_prefix = os.path.commonprefix(names)
         if not common_prefix:
@@ -2425,7 +1668,6 @@ class ClickHouseNativeHandler(FileFormatHandler):
         validated_table = validate_sql_identifier(table_name, "table name")
         escaped_glob = escape_sql_string_literal(glob_pattern)
 
-        # Use Parquet format for .parquet files; CSV (with optional delimiter) otherwise.
         base_ext = FileFormatRegistry.get_base_data_extension(file_paths[0])
         if base_ext == ".parquet":
             insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'Parquet')"
@@ -2456,21 +1698,8 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
 
 class InMemoryDataHandler:
-    """Handler for loading in-memory data (dict/tuple rows)."""
-
     @staticmethod
     def load_table(table_name: str, table_data: Any, connection: Any) -> int:
-        """Load in-memory data into table.
-
-        Args:
-            table_name: Name of table
-            table_data: Iterable of rows (dicts or tuples)
-            connection: Database connection
-
-        Returns:
-            Number of rows loaded
-        """
-        # Validate table name to prevent SQL injection
         validated_table = validate_sql_identifier(table_name, "table name")
 
         if not (hasattr(table_data, "__iter__") and not isinstance(table_data, str)):
@@ -2480,17 +1709,14 @@ class InMemoryDataHandler:
         if not rows:
             return 0
 
-        # Prepare insert statement based on row type
         columns = rows[0].keys() if hasattr(rows[0], "keys") else range(len(rows[0]))
         placeholders = ",".join(["?" for _ in columns])
 
         if hasattr(rows[0], "keys"):
-            # Dictionary-like rows - validate column names
             validated_columns = [validate_sql_identifier(col, "column name") for col in columns]
             insert_sql = f"INSERT INTO {validated_table} ({','.join(validated_columns)}) VALUES ({placeholders})"
             data_rows = [tuple(row.values()) for row in rows]
         else:
-            # Tuple-like rows
             insert_sql = f"INSERT INTO {validated_table} VALUES ({placeholders})"
             data_rows = rows
 
@@ -2499,13 +1725,6 @@ class InMemoryDataHandler:
 
 
 def is_delta_table_dir(path: Path | str) -> bool:
-    """True when *path* is a Delta Lake table directory (contains ``_delta_log``).
-
-    Directory-based table formats must dispatch as one table unit: expanding
-    them with the ``*.parquet*`` shard glob would shred the table into raw
-    part-files, silently dropping Delta semantics (deletion vectors, schema
-    mapping, versioning).
-    """
     candidate = Path(path)
     try:
         return candidate.is_dir() and (candidate / "_delta_log").is_dir()
@@ -2514,9 +1733,6 @@ def is_delta_table_dir(path: Path | str) -> bool:
 
 
 class FileFormatRegistry:
-    """Registry for file format and compression handlers."""
-
-    # Map file extensions to handlers
     _format_handlers = {
         ".csv": lambda: DelimitedFileHandler(","),
         ".tbl": lambda: DelimitedFileHandler("|"),
@@ -2525,7 +1741,6 @@ class FileFormatRegistry:
         ".vortex": lambda: VortexFileHandler(),
     }
 
-    # Map compression extensions to handlers
     _compression_handlers = {
         ".gz": GzipHandler,
         ".zst": ZstdHandler,
@@ -2533,62 +1748,28 @@ class FileFormatRegistry:
 
     @staticmethod
     def get_base_data_extension(file_path: Path) -> str | None:
-        """Determine the base (uncompressed) data file extension.
-
-        Delegates to get_data_extension() for consistent behaviour with the
-        rest of the file-format utilities (full compression-extension set,
-        uniform skip-unknown logic).
-
-        Args:
-            file_path: Path to the data file (possibly compressed and/or sharded)
-
-        Returns:
-            The base extension including leading dot (e.g., '.tbl', '.csv', '.dat'),
-            or None if no known data extension is found.
-        """
         return get_data_extension(file_path)
 
     @classmethod
     def get_handler(cls, file_path: Path) -> FileFormatHandler | None:
-        """Get appropriate file format handler for file or directory.
-
-        Args:
-            file_path: Path to file or directory
-
-        Returns:
-            FileFormatHandler instance or None if format unknown
-        """
-        # Check if this is a directory-based table format
         if file_path.is_dir():
-            # Check for DuckLake (metadata.ducklake file)
             ducklake_metadata = file_path / "metadata.ducklake"
             if ducklake_metadata.exists():
                 return DuckLakeFileHandler()
 
-            # Check for Delta Lake (_delta_log directory)
             if is_delta_table_dir(file_path):
                 return DeltaFileHandler()
 
-            # Check for Iceberg (metadata directory)
             metadata_dir = file_path / "metadata"
             if metadata_dir.exists() and metadata_dir.is_dir():
                 return IcebergFileHandler()
 
-        # Determine the true base extension (handles multi-suffix names)
         base_ext = cls.get_base_data_extension(file_path)
         handler_factory = cls._format_handlers.get(base_ext) if base_ext else None
         return handler_factory() if handler_factory else None
 
     @classmethod
     def get_compression_handler(cls, file_path: Path) -> CompressionHandler:
-        """Get appropriate compression handler for file.
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            CompressionHandler instance (NoCompressionHandler if not compressed)
-        """
         suffix = file_path.suffix
         handler_class = cls._compression_handlers.get(suffix, NoCompressionHandler)
         return handler_class()
@@ -2601,20 +1782,6 @@ def prepare_local_load_file(
     dialect: CsvDialect,
     strip_trailing_delim: bool,
 ) -> Iterator[Path]:
-    """Yield a plain, uncompressed, ready-to-load file path.
-
-    Applies up to three transformations — decompression, trailing-delimiter strip,
-    boolean rewrite — in a single pass. Writes a temp file only when at least one
-    transformation is required; yields the original path otherwise (no spurious copy).
-
-    The temp file is written to file_path.parent so that LOAD DATA LOCAL INFILE
-    permissions match the source directory.
-
-    Args:
-        file_path: Path to the source data file (may be compressed or raw).
-        dialect: CSV dialect (for delimiter and normalize_booleans).
-        strip_trailing_delim: If True, strip one trailing dialect.delimiter per line.
-    """
     compression_handler = FileFormatRegistry.get_compression_handler(file_path)
     is_compressed = not isinstance(compression_handler, NoCompressionHandler)
     needs_transform = is_compressed or strip_trailing_delim or dialect.normalize_booleans
@@ -2651,8 +1818,6 @@ def prepare_local_load_file(
 
 
 class DataLoader:
-    """Main orchestrator for data loading operations."""
-
     def __init__(
         self,
         adapter: Any,
@@ -2662,24 +1827,6 @@ class DataLoader:
         handler_factory: Any | None = None,
         tuning_config: Any | None = None,
     ):
-        """Initialize data loader.
-
-        Args:
-            adapter: Platform adapter instance
-            benchmark: Benchmark instance
-            connection: Database connection
-            data_dir: Data directory path
-            handler_factory: Optional factory function for creating custom file format handlers.
-                           Should accept either (file_path, adapter, benchmark) or
-                           (file_path, adapter, benchmark, table_name, data_source)
-                           and return FileFormatHandler or None.
-            tuning_config: Optional unified tuning configuration. When provided,
-                           DataLoader calls PlatformAdapter.apply_ctas_sort() after each
-                           table load. Adapters opt in by overriding
-                           _build_ctas_sort_sql(); returning None keeps CTAS sorting disabled.
-                           Default INSERT INTO loading behavior is unchanged for tables without
-                           sort configuration.
-        """
         self.adapter = adapter
         self.benchmark = benchmark
         self.connection = connection
@@ -2694,18 +1841,12 @@ class DataLoader:
         self.tuning_config = tuning_config
 
     def load(self) -> tuple[dict[str, int], float]:
-        """Load all benchmark data.
-
-        Returns:
-            Tuple of (table_stats, duration) where table_stats maps table names to row counts
-        """
         start_time = mono_time()
         self.adapter.log_operation_start("Data loading", f"benchmark: {self.benchmark.__class__.__name__}")
         self.adapter.log_very_verbose(f"Data directory: {self.data_dir}")
 
         table_stats = {}
 
-        # Resolve data source
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
         if not data_source:
             self.adapter.log_very_verbose("No data source found")
@@ -2725,14 +1866,6 @@ class DataLoader:
         return table_stats, duration
 
     def _load_in_memory_data(self, tables: dict[str, Any]) -> dict[str, int]:
-        """Load in-memory data from dictionary.
-
-        Args:
-            tables: Dictionary mapping table names to row data
-
-        Returns:
-            Dictionary mapping table names to row counts
-        """
         table_stats = {}
 
         for table_name, table_data in tables.items():
@@ -2746,29 +1879,18 @@ class DataLoader:
         return table_stats
 
     def _load_file_based_data(self, data_source: DataSource | dict[str, Any]) -> dict[str, int]:
-        """Load data from files.
-
-        Args:
-            data_source: Resolved data source with table paths and metadata
-
-        Returns:
-            Dictionary mapping table names to row counts
-        """
         table_stats = {}
         if not isinstance(data_source, DataSource):
             data_source = DataSource(source_type="legacy_mapping", tables=data_source)
         data_files = data_source.tables
 
-        # Get table loading order (if benchmark supports it)
         if hasattr(self.benchmark, "get_table_loading_order"):
             table_load_order = self.benchmark.get_table_loading_order(list(data_files.keys()))
             self.adapter.log_very_verbose(f"Using benchmark-specified loading order: {table_load_order}")
         else:
-            # For benchmarks without specified order, use alphabetical order
             table_load_order = sorted(data_files.keys())
             self.adapter.log_very_verbose(f"Using alphabetical loading order: {table_load_order}")
 
-        # Load tables in the correct order
         for table_name in table_load_order:
             file_path_or_paths = data_files[table_name]
             table_start = mono_time()
@@ -2785,15 +1907,12 @@ class DataLoader:
             if row_count > 0:
                 self._log_table_loaded(table_name, row_count, table_start, source_desc)
 
-            # Apply CTAS-based sorting after loading when tuning config is present.
-            # PlatformAdapter guarantees apply_ctas_sort; unsupported platforms no-op.
             if self.tuning_config:
                 self.adapter.apply_ctas_sort(table_name, self.tuning_config, self.connection)
 
         return table_stats
 
     def _log_table_loaded(self, table_name: str, row_count: int, start_time: float, source: str) -> None:
-        """Log a table loading completion message."""
         if self.adapter.verbose_enabled:
             table_time = elapsed_seconds(start_time)
             quiet_console.print(f"  ✅ Loaded {row_count:,} rows into {table_name} in {table_time:.2f}s from {source}")
@@ -2803,21 +1922,6 @@ class DataLoader:
     def _load_sharded_table(
         self, table_name: str, file_path_or_paths: list, data_source: DataSource | None = None
     ) -> int:
-        """Load a sharded table from multiple files.
-
-        Categorizes shard paths into files, directories, and missing, raising
-        on any contamination. Delegates to the handler's bulk-load method.
-
-        Args:
-            table_name: Name of the table to load into
-            file_path_or_paths: List of shard paths
-
-        Returns:
-            Number of rows loaded
-
-        Raises:
-            DataLoadingError: If any shard is a directory or missing
-        """
         if data_source is None:
             data_source = DataSource(source_type="legacy_mapping", tables={table_name: file_path_or_paths})
 
@@ -2829,12 +1933,8 @@ class DataLoader:
                 shard_paths.append(pp)
             elif pp.is_dir():
                 if is_delta_table_dir(pp):
-                    # A Delta Lake table directory loads as one table unit
-                    # (platform Delta handler or DeltaFileHandler), never
-                    # shredded into raw part-files by the shard glob below.
                     shard_paths.append(pp)
                     continue
-                # dbgen at SF>=1 creates a directory of chunk files per table
                 data_globs = ["*.tbl*", "*.csv*", "*.parquet*", "*.tsv*", "*.dat*"]
                 dir_files: list[Path] = []
                 for pattern in data_globs:
@@ -2876,18 +1976,6 @@ class DataLoader:
             return 0
 
     def _load_single_file(self, table_name: str, file_path: Path, data_source: DataSource | None = None) -> int:
-        """Load data from a single file into a table.
-
-        Args:
-            table_name: Name of the table to load into
-            file_path: Path to the data file
-
-        Returns:
-            Number of rows loaded
-
-        Raises:
-            DataLoadingError: If path is a directory or does not exist
-        """
         if data_source is None:
             data_source = DataSource(source_type="legacy_mapping", tables={table_name: file_path})
 
@@ -2903,13 +1991,10 @@ class DataLoader:
             )
 
         try:
-            # Get appropriate file format handler
-            # Try custom handler factory first (for platform-specific optimization)
             handler = None
             if self.handler_factory:
                 handler = self._create_custom_handler(file_path, table_name, data_source)
 
-            # Fall back to generic registry if no custom handler
             if not handler:
                 handler = FileFormatRegistry.get_handler(file_path)
 
@@ -2917,7 +2002,6 @@ class DataLoader:
                 quiet_console.print(f"⚠️  Skipping {table_name} - unsupported file format: {file_path.suffix}")
                 return 0
 
-            # Load table data
             row_count = handler.load_table(table_name, file_path, self.connection, self.benchmark, self.adapter.logger)
 
             return row_count
@@ -2932,7 +2016,6 @@ class DataLoader:
             return 0
 
     def _create_custom_handler(self, file_path: Path, table_name: str, data_source: DataSource) -> Any | None:
-        """Call a platform handler factory, preserving backward-compatible arity."""
         if not self.handler_factory:
             return None
 
@@ -2967,58 +2050,6 @@ def run_staged_table_loads(
     describe_start: Callable[[str, str], str] | None = None,
     phase_start: float | None = None,
 ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-    """Drive the shared staged-load orchestration loop for cloud adapters.
-
-    Redshift and Snowflake independently implemented the same per-table loop:
-    skip tables with no valid files, run the platform load command, record
-    per-table row counts keyed by engine-case-folded names, and log success
-    or failure. The copies drifted in diagnostic fidelity (truncated versus
-    full error text) while sharing the mechanics, so this template owns the
-    mechanics and each caller supplies its platform hooks.
-
-    Deliberately caller-owned behavior, preserved exactly per platform:
-
-    - ``stat_key`` folds the stats key (``str.lower`` for Redshift,
-      ``str.upper`` for Snowflake) to match each engine's DDL case.
-      Downstream consumers only aggregate the values, but published payloads
-      carry the folded keys, so the template never normalizes them itself.
-    - ``fail_fast`` re-raises a table failure after recording zeros
-      (Snowflake full-refresh semantics); otherwise the loop continues.
-    - ``record_timings`` returns per-table ``{"total_ms": ...}`` timings or
-      ``None`` for adapters that do not report them yet (Redshift).
-    - ``on_table_loaded`` runs caller post-load work such as CTAS sorting
-      inside the measured per-table window, so timings and success lines
-      cover it.
-
-    Error reporting always logs the full error text: truncation hid the
-    cause class on the adopting call sites with no consumer depending on it.
-
-    Args:
-        adapter: Platform adapter used for ``logger`` and ``log_verbose``.
-        tables: Mapping of table name to resolved file paths.
-        stat_key: Fold a table name to its stats-dict key.
-        filter_files: Keep the valid files for one table's paths.
-        load_one: Load one table's files, returning its row count.
-        on_table_loaded: Optional hook called with
-            ``(table_name, stats_key, row_count)`` after a successful load.
-        record_timings: Record per-table wall-clock timings.
-        fail_fast: Re-raise table failures instead of continuing.
-        success_log: Sink for per-table success lines (defaults to
-            ``adapter.logger.info``; Snowflake keeps its verbose-gated form).
-        summary_log: Sink for the total-rows summary (same defaulting).
-        describe_start: Build the per-table start line from
-            ``(table_name, chunk_info)``. Defaults to
-            ``"Loading data for table: {table}{chunk}"``; Redshift's direct
-            INSERT branch keeps its distinct wording through this hook.
-        phase_start: Caller-owned phase clock captured before caller-side
-            setup (cursor creation, query-tag/file-format setup, file
-            resolution, S3 client creation). Each adapter previously timed
-            from ``load_data`` entry, so the template defaults to its own
-            loop entry only when the caller passes nothing.
-
-    Returns:
-        Tuple of (table_stats, total_seconds, per_table_timings or None).
-    """
     table_stats: dict[str, int] = {}
     per_table_timings: dict[str, Any] = {}
     start_time = mono_time() if phase_start is None else phase_start
@@ -3069,33 +2100,14 @@ def run_staged_table_loads(
 
 
 class SchemaHelpersMixin:
-    """Mixin providing schema creation and platform metadata helpers.
-
-    Extracted from PlatformAdapter (slice w9). Expects host class to expose:
-    - ``platform_name`` property, ``logger``
-    - ``get_effective_tuning_configuration()`` (TuningConfigMixin)
-    - ``get_target_dialect()`` (DialectTranslationMixin)
-    - ``translate_sql()`` (DialectTranslationMixin)
-    - ``log_verbose()``, ``log_very_verbose()``, ``log_operation_start()``,
-      ``log_operation_complete()`` (VerbosityMixin)
-    """
-
     def _calculate_data_size(self, data_dir: Path) -> float:
-        """Calculate total size of data files in MB.
-
-        Note: Returns 0.0 for cloud storage paths (S3, Azure, GCS, DBFS) as they
-        require authentication and don't support local file operations. Data size
-        calculation is optional for metrics and skipped for cloud paths.
-        """
         from benchbox.utils.cloud_storage import is_cloud_path
 
         total_size = 0
         try:
-            # Skip cloud paths - they require authentication and listing can fail
             if is_cloud_path(str(data_dir)):
                 return 0.0
 
-            # rglob() not supported on some special paths
             if not hasattr(data_dir, "rglob"):
                 return 0.0
 
@@ -3103,24 +2115,19 @@ class SchemaHelpersMixin:
                 if file_path.is_file() and file_path.suffix in [".csv", ".tbl"]:
                     total_size += file_path.stat().st_size
         except (AttributeError, NotImplementedError, OSError):
-            # Cloud paths may not support rglob(), stat(), or is_file()
             return 0.0
         except Exception:
-            # Catch all other errors (e.g., authentication errors from cloud providers)
-            # Data size calculation is optional, so gracefully skip on any error
             return 0.0
 
         return total_size / (1024 * 1024)
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
-        """Get platform-specific metadata (to be overridden by subclasses)."""
         metadata = {
             "platform": self.platform_name,
             "connection_type": type(connection).__name__,
             "tuning_enabled": self.tuning_enabled,
         }
 
-        # Include tuning configuration metadata if available
         effective_config = self.get_effective_tuning_configuration()
         if self.tuning_enabled and effective_config:
             metadata["tuning_configuration_hash"] = effective_config.get_configuration_hash()
@@ -3130,8 +2137,6 @@ class SchemaHelpersMixin:
         return metadata
 
     def _hash_connection_config(self, connection_config: dict[str, Any]) -> str:
-        """Generate a hash of connection configuration (excluding sensitive data)."""
-        # Create a sanitized version of config for hashing
         sanitized_config = {}
         for key, value in connection_config.items():
             if key not in ["password", "token", "service_account_path"]:
@@ -3141,31 +2146,16 @@ class SchemaHelpersMixin:
         return hashlib.md5(config_str.encode()).hexdigest()[:16]
 
     def _create_schema_with_tuning(self, benchmark, source_dialect: str = "standard") -> str:
-        """Common schema creation logic with tuning support.
-
-        Args:
-            benchmark: Benchmark instance to get schema from
-            source_dialect: Source SQL dialect to translate from (default: "standard",
-                since benchmark schema generators emit ANSI standard SQL)
-
-        Returns:
-            SQL schema string ready for execution
-
-        Raises:
-            Exception: If schema creation fails
-        """
         self.log_operation_start(
             "Schema SQL generation", f"benchmark: {benchmark.__class__.__name__}, target: {self.get_target_dialect()}"
         )
 
-        # Get effective tuning configuration
         effective_config = self.get_effective_tuning_configuration()
 
         tuning_status = "with tuning" if effective_config else "no tuning"
         self.log_verbose(f"Schema generation {tuning_status} - target dialect: {self.get_target_dialect()}")
         self.log_very_verbose(f"Effective tuning config type: {type(effective_config)}")
 
-        # Use standardized signature with dialect and tuning configuration
         try:
             schema_sql = benchmark.get_create_tables_sql(
                 dialect=self.get_target_dialect(), tuning_config=effective_config
@@ -3173,7 +2163,6 @@ class SchemaHelpersMixin:
             self.log_very_verbose("Using standardized schema generation with tuning configuration")
             self.log_verbose(f"Schema SQL from benchmark: {len(schema_sql)} characters")
         except TypeError as e:
-            # Fallback for benchmarks that don't support the new signature yet
             self.logger.warning(
                 f"TypeError calling get_create_tables_sql with new signature: {e}. Falling back to legacy."
             )
@@ -3184,7 +2173,6 @@ class SchemaHelpersMixin:
             self.logger.error(f"Unexpected exception in schema generation: {type(e).__name__}: {e}")
             raise
 
-        # Translate to target dialect if needed
         translation_needed = source_dialect != self.get_target_dialect()
         if translation_needed:
             original_len = len(schema_sql)
@@ -3206,29 +2194,6 @@ class SchemaHelpersMixin:
         return schema_sql
 
     def _execute_schema_statements(self, statements: list[str], cursor: Any) -> tuple[int, list[tuple[str, str]]]:
-        """Execute schema statements with comprehensive error handling and logging.
-
-        This method provides robust error handling for schema creation across all platforms.
-        It attempts to create all tables even if some fail, and provides detailed error
-        reporting showing exactly which tables failed and why.
-
-        Args:
-            statements: List of SQL CREATE TABLE statements to execute
-            cursor: Database cursor for executing statements
-
-        Returns:
-            Tuple of (tables_created_count, failed_tables_list)
-            where failed_tables_list contains (table_name, error_message) tuples
-
-        Example:
-            statements = ["CREATE TABLE region (...)", "CREATE TABLE nation (...)"]
-            created, failed = self._execute_schema_statements(statements, cursor)
-            if failed:
-                self.logger.error(f"Failed to create {len(failed)} tables: {failed}")
-
-        Raises:
-            RuntimeError: If any table creation fails (after attempting all statements)
-        """
         tables_created = 0
         failed_tables: list[tuple[str, str]] = []
 
@@ -3236,7 +2201,6 @@ class SchemaHelpersMixin:
             if not statement.strip():
                 continue
 
-            # Extract table name for better error reporting
             table_name = "unknown"
             match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", statement, re.IGNORECASE)
             if match:
@@ -3246,7 +2210,6 @@ class SchemaHelpersMixin:
                 self.log_very_verbose(f"Creating table {table_name} ({i}/{len(statements)})")
                 self.log_very_verbose(f"SQL: {statement[:150]}...")
 
-                # Execute the statement
                 cursor.execute(statement)
                 tables_created += 1
                 self.log_very_verbose(f"✅ Created table {table_name}")
@@ -3256,12 +2219,9 @@ class SchemaHelpersMixin:
                 self.logger.error(f"❌ Failed to create table {table_name}: {error_msg}")
                 self.log_very_verbose(f"Failed SQL: {statement[:200]}...")
                 failed_tables.append((table_name, error_msg))
-                # Continue to next table instead of failing immediately
 
-        # Report summary
         self.log_verbose(f"Schema creation: {tables_created} tables created, {len(failed_tables)} failed")
 
-        # If any tables failed, raise error with details
         if failed_tables:
             failure_details = "\n".join([f"  - {table}: {error[:100]}" for table, error in failed_tables])
             raise RuntimeError(
@@ -3271,11 +2231,6 @@ class SchemaHelpersMixin:
         return tables_created, failed_tables
 
     def _get_constraint_configuration(self) -> tuple[bool, bool]:
-        """Extract constraint configuration settings from tuning config.
-
-        Returns:
-            Tuple of (enable_primary_keys, enable_foreign_keys)
-        """
         effective_config = self.get_effective_tuning_configuration()
         enable_primary_keys = effective_config.primary_keys.enabled if effective_config else False
         enable_foreign_keys = effective_config.foreign_keys.enabled if effective_config else False
@@ -3283,12 +2238,6 @@ class SchemaHelpersMixin:
         return enable_primary_keys, enable_foreign_keys
 
     def _log_constraint_configuration(self, enable_primary_keys: bool, enable_foreign_keys: bool) -> None:
-        """Log constraint configuration settings.
-
-        Args:
-            enable_primary_keys: Whether primary key constraints are enabled
-            enable_foreign_keys: Whether foreign key constraints are enabled
-        """
         if enable_primary_keys:
             self.logger.info(f"Primary key constraints enabled for {self.platform_name}")
 

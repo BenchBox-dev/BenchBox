@@ -1,17 +1,6 @@
-"""ParadeDB (pg_analytics) platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extends PostgreSQL adapter with ParadeDB-specific functionality:
-- pg_analytics extension verification (Elasticsearch-compatible BM25 search
-  plus analytics over PostgreSQL heap tables)
-
-ParadeDB is a PostgreSQL extension for hybrid search and analytics workloads.
-Benchmark tables stay ordinary heap tables loaded through the inherited COPY
-path; no storage promotion or session GUCs are required.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -41,15 +30,6 @@ PARADEDB_EXTENSION = "pg_analytics"
 
 
 class ParadeDBAdapter(PostgreSQLAdapter):
-    """ParadeDB platform adapter with pg_analytics extension verification.
-
-    Extends PostgreSQLAdapter with ParadeDB-specific features:
-    - pg_analytics extension presence check with create-or-install guidance
-    - Version reporting in platform info for result provenance
-
-    Requires PostgreSQL 14+ with pg_analytics installed on the server.
-    """
-
     plan_capture_phase_eligible = True
 
     @property
@@ -57,16 +37,13 @@ class ParadeDBAdapter(PostgreSQLAdapter):
         return "paradedb"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for ParadeDB (PostgreSQL-compatible)."""
         return POSTGRES_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add ParadeDB-specific CLI arguments."""
         if not hasattr(parser, "add_argument"):
             return
         try:
-            # Inherit PostgreSQL connection arguments
             parser.add_argument(
                 "--paradedb-host",
                 dest="host",
@@ -107,7 +84,6 @@ class ParadeDBAdapter(PostgreSQLAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> ParadeDBAdapter:
-        """Create ParadeDB adapter from unified configuration."""
         adapter_config = _build_postgres_connection_kwargs(config)
         return cls(**adapter_config)
 
@@ -115,28 +91,16 @@ class ParadeDBAdapter(PostgreSQLAdapter):
         super().__init__(**config)
 
     def create_connection(self, **connection_config) -> Any:
-        """Create PostgreSQL connection and verify the pg_analytics extension."""
         conn = super().create_connection(**connection_config)
         ensure_postgres_extension(conn, self.logger, PARADEDB_EXTENSION, "https://github.com/paradedb/paradedb")
         return conn
 
     def _apply_stream_session_state(self, connection: Any) -> None:
-        """Delegate per-stream session state to the PostgreSQL parent path.
-
-        ``create_connection`` adds only extension verification/creation above
-        the parent implementation - one-time database setup that must NOT be
-        repeated per stream - and no additional session-scoped GUCs, so there
-        is no ParadeDB-specific state to reapply. The explicit delegation
-        (rather than an inherited silent no-op) records that equivalence was
-        checked for this subclass.
-        """
         super()._apply_stream_session_state(connection)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get ParadeDB platform information."""
         platform_info = super().get_platform_info(connection)
 
-        # Override platform type and name
         platform_info["platform_type"] = "paradedb"
         platform_info["platform_name"] = "paradedb"
 
@@ -144,7 +108,6 @@ class ParadeDBAdapter(PostgreSQLAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get pg_analytics version
                 cursor.execute(f"SELECT extversion FROM pg_extension WHERE extname = '{PARADEDB_EXTENSION}'")
                 result = cursor.fetchone()
                 if result:

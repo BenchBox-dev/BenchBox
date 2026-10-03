@@ -1,42 +1,4 @@
 #!/usr/bin/env python3
-"""Nightly auto-ratchet signal for the fast-lane test-count ceiling.
-
-Companion to `_project/scripts/fast_lane_ceiling_check.py` and
-`_project/config/fast_lane_ceiling_log.md`'s +500 quantum / >=250 headroom
-bump convention (see `fast-lane-decouple-ceiling-contention-2` and
-docs/operations/fast-lane-budget.md for the full history/rationale). This
-script does NOT bump the ceiling, open a PR, or push a branch -- GITHUB_TOKEN-
-authored PRs get no required checks (see green_unmerged_sweep.py's own note
-on that constraint), so a ceiling bump stays a deliberate human/agent-
-authored PR. The only mutation this script ever performs (and only under
-`--apply`) is creating/updating ONE marker-tagged tracking issue (title
-"Fast-lane ceiling needs a quantum bump"), mirroring
-`_project/scripts/green_unmerged_sweep.py`'s pinned-issue upsert pattern --
-read that script first if extending this one.
-
-What it checks: collects the fast lane (`pytest -m fast --collect-only`,
-same mechanism `fast_lane_ceiling_check.py` uses) and compares it against the
-current `max_fast_tests` ceiling in `_project/config/fast_test_lane_policy.json`.
-An optional named `reservation` in that policy raises the nightly action
-threshold above `WARN_THRESHOLD` (100), so consuming reserved headroom files
-the same actionable issue before the absolute ceiling is close. The hard
-ceiling and PR-time warning remain unchanged. When headroom recovers (a bump
-landed, the lane contracted, or a completed reservation is explicitly
-cleared), the issue is patched to the clear state exactly once, then left
-alone -- never repeatedly updated for a state that hasn't changed (same
-"silent when clear" contract as green_unmerged_sweep.py).
-
-Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the
-REST API). If neither is set but the `gh` CLI is on PATH, its token
-(`gh auth token`) is used instead. No long-lived PAT is required or read
-from anywhere else.
-
-Usage:
-    uv run -- python _project/scripts/fast_lane_ratchet_check.py
-    uv run -- python _project/scripts/fast_lane_ratchet_check.py --json
-    uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply
-    uv run -- python _project/scripts/fast_lane_ratchet_check.py --self-test
-"""
 
 from __future__ import annotations
 
@@ -63,25 +25,16 @@ CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 API_ROOT = "https://api.github.com"
 
-# Same threshold fast_lane_ceiling_check.py's FAST_LANE_WARNING uses -- this
-# script is the nightly, always-runs echo of that PR-time warning, not an
-# independent policy.
 WARN_THRESHOLD = 100
 BUMP_QUANTUM = 500
 MIN_HEADROOM_AFTER_BUMP = 250
 
 PINNED_ISSUE_TITLE = "Fast-lane ceiling needs a quantum bump"
-# Body marker: proves the digest issue was written by this script, so
-# find_pinned_issue never adopts (and later clobbers) a human issue that
-# happens to reuse the title.
 DIGEST_BODY_MARKER = "<!-- fast-lane-ratchet-check -->"
 
 _COLLECT_COUNT_PATTERN = re.compile(r"(\d+)/(\d+) tests collected(?: \((\d+) deselected\))?")
 
 
-# ---------------------------------------------------------------------------
-# Pure logic (unit-/self-tested; no git/network)
-# ---------------------------------------------------------------------------
 CLI_DESCRIPTION = (
     "Nightly auto-ratchet signal for the fast-lane test-count ceiling.\n"
     "\n"
@@ -138,7 +91,6 @@ def load_ceiling(policy_path: Path = POLICY_PATH) -> int:
 
 
 def load_reservation(policy_path: Path = POLICY_PATH) -> tuple[str, int] | None:
-    """Return an active ``(program, headroom_floor)`` reservation, if any."""
     data = json.loads(policy_path.read_text(encoding="utf-8"))
     reservation = data.get("reservation")
     if reservation is None:
@@ -155,7 +107,6 @@ def load_reservation(policy_path: Path = POLICY_PATH) -> tuple[str, int] | None:
 
 
 def headroom_status(collected: int, ceiling: int, warn_threshold: int = WARN_THRESHOLD) -> tuple[int, bool]:
-    """Return (headroom, needs_ratchet). headroom can be negative (over ceiling)."""
     headroom = ceiling - collected
     return headroom, headroom < warn_threshold
 
@@ -167,12 +118,6 @@ def suggested_next_ceiling(
     quantum: int = BUMP_QUANTUM,
     min_headroom: int = MIN_HEADROOM_AFTER_BUMP,
 ) -> int:
-    """The next ceiling per the +500 quantum / >=250 headroom convention.
-
-    Bumps by one quantum at a time from the CURRENT ceiling (never from the
-    collected count directly -- a bump is always a multiple of the quantum
-    above the last ceiling) until the resulting headroom clears the floor.
-    """
     candidate = ceiling
     while candidate - collected < min_headroom:
         candidate += quantum
@@ -192,7 +137,6 @@ def build_digest(
     now: dt.datetime,
     reservation: tuple[str, int] | None = None,
 ) -> str:
-    """Digest for the non-empty (needs-ratchet) state."""
     target_headroom = max(MIN_HEADROOM_AFTER_BUMP, reservation[1] if reservation else 0)
     next_ceiling = suggested_next_ceiling(collected, ceiling, min_headroom=target_headroom)
     bump = next_ceiling - ceiling
@@ -235,7 +179,6 @@ def build_digest(
 
 
 def build_clear_digest(*, collected: int, ceiling: int, headroom: int, repo: str, now: dt.datetime) -> str:
-    """Digest for the empty (clear) state -- used only to patch a stale issue once."""
     stamp = _fmt_stamp(now)
     lines = [
         DIGEST_BODY_MARKER,
@@ -248,9 +191,6 @@ def build_clear_digest(*, collected: int, ceiling: int, headroom: int, repo: str
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# I/O: pytest collect (subprocess)
-# ---------------------------------------------------------------------------
 def collect_fast_count(repo_root: Path) -> int:
     env = dict(os.environ)
     env["BENCHBOX_SKIP_TEST_LOCK"] = "1"
@@ -271,10 +211,6 @@ def collect_fast_count(repo_root: Path) -> int:
     return count
 
 
-# ---------------------------------------------------------------------------
-# I/O: GitHub REST (token-source chain: GITHUB_TOKEN/GH_TOKEN env, else the
-# `gh` CLI's own token if on PATH). Mirrors green_unmerged_sweep.py.
-# ---------------------------------------------------------------------------
 def resolve_token() -> str | None:
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if token:
@@ -298,11 +234,6 @@ def resolve_token() -> str | None:
 
 
 class GitHubClient:
-    """Thin REST client. GET pagination via Link-style `page` params;
-    single-page mutations otherwise. Mirrors green_unmerged_sweep.py's
-    retry/urllib conventions.
-    """
-
     def __init__(self, token: str) -> None:
         self.token = token
 
@@ -359,8 +290,6 @@ class GitHubClient:
 
 
 def find_pinned_issue(client: GitHubClient, owner: str, repo: str) -> dict[str, Any] | None:
-    """Locate the digest issue: exact title AND the body marker (see
-    green_unmerged_sweep.py's identical adoption-safety rationale)."""
     issues = client.get_all(f"repos/{owner}/{repo}/issues", {"state": "all"})
     for item in issues:
         if "pull_request" in item:
@@ -382,9 +311,6 @@ def upsert_pinned_issue(client: GitHubClient, owner: str, repo: str, body: str) 
     return f"updated issue #{existing['number']}"
 
 
-# ---------------------------------------------------------------------------
-# Self-test (fixture-driven, no network/subprocess)
-# ---------------------------------------------------------------------------
 def run_self_test() -> int:
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     now = dt.datetime.fromisoformat(fixture["as_of"].replace("Z", "+00:00"))
@@ -442,9 +368,6 @@ def run_self_test() -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(

@@ -1,16 +1,6 @@
-"""Tests for Read Primitives DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Validates that expression-family (Polars) and pandas-family implementations:
-1. Execute without errors on real data
-2. Produce non-empty results with expected schemas
-3. Return equivalent results across families for representative queries
-
-Uses Polars and Pandas as reference platforms with small TPC-H fixture datasets.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -37,13 +27,7 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
-
 def _to_pandas(result: Any) -> pd.DataFrame:
-    """Normalize any result to a pandas DataFrame for comparison."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
     from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
@@ -61,24 +45,16 @@ def _to_pandas(result: Any) -> pd.DataFrame:
 
 
 def _create_polars_context():
-    """Create a Polars expression-family context."""
     adapter = PolarsDataFrameAdapter()
     return adapter.create_context()
 
 
 def _create_pandas_context():
-    """Create a Pandas family context."""
     adapter = PandasDataFrameAdapter()
     return adapter.create_context()
 
 
-# =============================================================================
-# TPC-H Fixture Data (small tables for read primitives)
-# =============================================================================
-
-
 def _tpch_nation_polars() -> pl.LazyFrame:
-    """Small TPC-H nation table (5 rows, 2 regions)."""
     return pl.DataFrame(
         {
             "n_nationkey": [0, 1, 2, 3, 4],
@@ -90,7 +66,6 @@ def _tpch_nation_polars() -> pl.LazyFrame:
 
 
 def _tpch_region_polars() -> pl.LazyFrame:
-    """Small TPC-H region table (2 rows)."""
     return pl.DataFrame(
         {
             "r_regionkey": [0, 1],
@@ -101,7 +76,6 @@ def _tpch_region_polars() -> pl.LazyFrame:
 
 
 def _tpch_customer_polars() -> pl.LazyFrame:
-    """Small TPC-H customer table (5 rows)."""
     return pl.DataFrame(
         {
             "c_custkey": [1, 2, 3, 4, 5],
@@ -123,7 +97,6 @@ def _tpch_customer_polars() -> pl.LazyFrame:
 
 
 def _tpch_orders_polars() -> pl.LazyFrame:
-    """Small TPC-H orders table (8 rows)."""
     return pl.DataFrame(
         {
             "o_orderkey": [1, 2, 3, 4, 5, 6, 7, 32],
@@ -176,7 +149,6 @@ def _tpch_orders_polars() -> pl.LazyFrame:
 
 
 def _tpch_lineitem_polars() -> pl.LazyFrame:
-    """Small TPC-H lineitem table (10 rows)."""
     return pl.DataFrame(
         {
             "l_orderkey": [1, 1, 1, 2, 3, 3, 4, 5, 6, 7],
@@ -266,7 +238,6 @@ def _tpch_lineitem_polars() -> pl.LazyFrame:
 
 
 def _tpch_part_polars() -> pl.LazyFrame:
-    """Small TPC-H part table (5 rows)."""
     return pl.DataFrame(
         {
             "p_partkey": [101, 102, 103, 104, 105],
@@ -295,7 +266,6 @@ def _tpch_part_polars() -> pl.LazyFrame:
 
 
 def _tpch_supplier_polars() -> pl.LazyFrame:
-    """Small TPC-H supplier table (5 rows)."""
     return pl.DataFrame(
         {
             "s_suppkey": [1, 2, 3, 4, 5],
@@ -310,7 +280,6 @@ def _tpch_supplier_polars() -> pl.LazyFrame:
 
 
 def _tpch_partsupp_polars() -> pl.LazyFrame:
-    """Small TPC-H partsupp table (5 rows)."""
     return pl.DataFrame(
         {
             "ps_partkey": [101, 102, 103, 104, 105],
@@ -320,11 +289,6 @@ def _tpch_partsupp_polars() -> pl.LazyFrame:
             "ps_comment": ["psc1", "psc2", "psc3", "psc4", "psc5"],
         }
     ).lazy()
-
-
-# Pandas equivalents - built directly to preserve date types for pandas_impl comparisons.
-# Using _to_pandas() would convert date columns to datetime64, breaking comparisons
-# with Python date() objects used in the pandas query implementations.
 
 
 def _tpch_nation_pandas() -> pd.DataFrame:
@@ -565,7 +529,6 @@ def _tpch_partsupp_pandas() -> pd.DataFrame:
 
 
 def _register_all_polars(ctx):
-    """Register all TPC-H tables in a Polars context."""
     ctx.register_table("nation", _tpch_nation_polars())
     ctx.register_table("region", _tpch_region_polars())
     ctx.register_table("customer", _tpch_customer_polars())
@@ -577,7 +540,6 @@ def _register_all_polars(ctx):
 
 
 def _register_all_pandas(ctx):
-    """Register all TPC-H tables in a Pandas context."""
     ctx.register_table("nation", _tpch_nation_pandas())
     ctx.register_table("region", _tpch_region_pandas())
     ctx.register_table("customer", _tpch_customer_pandas())
@@ -589,7 +551,6 @@ def _register_all_pandas(ctx):
 
 
 def _compare_results(expr_result: pd.DataFrame, pandas_result: pd.DataFrame, *, rtol: float = 1e-5) -> None:
-    """Assert that expression and pandas results are equivalent."""
     expr_cols = sorted(expr_result.columns.tolist())
     pandas_cols = sorted(pandas_result.columns.tolist())
     assert expr_cols == pandas_cols, f"Column mismatch: expr={expr_cols}, pandas={pandas_cols}"
@@ -627,16 +588,8 @@ def _compare_results(expr_result: pd.DataFrame, pandas_result: pd.DataFrame, *, 
             )
 
 
-# =============================================================================
-# Registry and Query Access Tests
-# =============================================================================
-
-
 class TestReadPrimitivesRegistry:
-    """Tests for the Read Primitives DataFrame query registry."""
-
     def test_registry_loads(self):
-        """Registry can be imported and contains queries."""
         from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
@@ -644,19 +597,16 @@ class TestReadPrimitivesRegistry:
         assert len(registry.get_all_queries()) > 0
 
     def test_registry_has_expected_categories(self):
-        """Registry contains queries across multiple categories."""
         from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
         queries = registry.get_all_queries()
 
-        # Collect unique categories used
         all_categories = set()
         for q in queries:
             for cat in q.categories:
                 all_categories.add(cat)
 
-        # Should have at least aggregation, filter, join, and window
         from benchbox.core.dataframe.query import QueryCategory
 
         assert QueryCategory.AGGREGATE in all_categories
@@ -665,7 +615,6 @@ class TestReadPrimitivesRegistry:
         assert QueryCategory.WINDOW in all_categories
 
     def test_all_queries_have_both_impls(self):
-        """All registered queries have both expression and pandas implementations."""
         from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
@@ -674,7 +623,6 @@ class TestReadPrimitivesRegistry:
             assert query.has_pandas_impl(), f"{query.query_id} missing pandas_impl"
 
     def test_skip_lists_are_valid(self):
-        """Skip lists reference actual query IDs in the registry."""
         from benchbox.core.read_primitives.dataframe_queries import (
             get_dataframe_queries,
             get_skip_for_dataframe,
@@ -687,17 +635,12 @@ class TestReadPrimitivesRegistry:
         registry = get_dataframe_queries()
         all_ids = {q.query_id for q in registry.get_all_queries()}
 
-        # Skip-for-dataframe queries should NOT be in the registry
-        # (they are SQL-only and not registered as DataFrame queries)
         for skip_id in get_skip_for_dataframe():
             assert skip_id not in all_ids, f"{skip_id} is in skip_for_dataframe but also registered"
 
-        # Expression-family skips should reference registered queries
         for skip_id in get_skip_for_expression_family():
-            # Currently empty, but check if we add anything later
             assert skip_id in all_ids, f"{skip_id} is in skip_for_expression_family but not registered"
 
-        # Platform-specific skips should reference registered queries
         for skip_id in get_skip_for_datafusion():
             assert skip_id in all_ids, f"{skip_id} is in skip_for_datafusion but not registered"
 
@@ -708,7 +651,6 @@ class TestReadPrimitivesRegistry:
             assert skip_id in all_ids, f"{skip_id} is in skip_for_pyspark but not registered"
 
     def test_query_ids_are_unique(self):
-        """Each query_id is unique (no duplicates)."""
         from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
@@ -716,14 +658,7 @@ class TestReadPrimitivesRegistry:
         assert len(ids) == len(set(ids)), "Duplicate query IDs found"
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - Aggregation
-# =============================================================================
-
-
 class TestExpressionAggregation:
-    """Execute aggregation queries against Polars and verify results."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -738,61 +673,46 @@ class TestExpressionAggregation:
         return _to_pandas(result)
 
     def test_aggregation_simple(self):
-        """Simple aggregation: count and sum over all orders."""
         result = self._execute("aggregation_simple")
         assert "total_orders" in result.columns
         assert "total_revenue" in result.columns
         assert result["total_orders"].iloc[0] == 8
 
     def test_aggregation_distinct(self):
-        """Distinct count with date filter."""
         result = self._execute("aggregation_distinct")
         assert "unique_customers" in result.columns
         assert result["unique_customers"].iloc[0] > 0
 
     def test_aggregation_groupby_small(self):
-        """Group by on low-cardinality column (nation by region)."""
         result = self._execute("aggregation_groupby_small")
         assert "n_regionkey" in result.columns
         assert "nation_count" in result.columns
-        # 2 distinct regionkeys in fixture data
         assert len(result) == 2
 
     def test_aggregation_groupby_large(self):
-        """Group by on high-cardinality columns."""
         result = self._execute("aggregation_groupby_large")
         assert "l_orderkey" in result.columns
         assert "total_qty" in result.columns
         assert len(result) > 0
 
     def test_aggregation_materialize(self):
-        """Nested aggregation (CTE materialization pattern)."""
         result = self._execute("aggregation_materialize")
         assert "avg_customer_spending" in result.columns
         assert len(result) == 1
         assert result["avg_customer_spending"].iloc[0] > 0
 
     def test_aggregation_selective(self):
-        """Aggregate on a small filtered subset."""
         result = self._execute("aggregation_selective")
         assert "total_discount_amount" in result.columns
         assert len(result) == 1
 
     def test_count_star(self):
-        """COUNT(*) on lineitem."""
         result = self._execute("count_star")
         assert "total_lineitems" in result.columns
         assert result["total_lineitems"].iloc[0] == 10
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - Filter
-# =============================================================================
-
-
 class TestExpressionFilter:
-    """Execute filter queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -806,45 +726,31 @@ class TestExpressionFilter:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_filter_selective(self):
-        """High selectivity filter (few matches)."""
         result = self._execute("filter_selective")
         assert "l_orderkey" in result.columns
         assert "l_quantity" in result.columns
 
     def test_filter_non_selective(self):
-        """Low selectivity filter (most rows match)."""
         result = self._execute("filter_non_selective")
         assert "l_orderkey" in result.columns
-        # Nearly all rows have l_quantity > 1
         assert len(result) >= 8
 
     def test_filter_bigint_in_list(self):
-        """IN-list predicate on integer column."""
         result = self._execute("filter_bigint_in_list_selective")
         assert "o_orderkey" in result.columns
-        # Only orderkey=1 matches from [1, 100, 1000, 10000, 100000]
         assert len(result) >= 1
 
     def test_filter_string_selective(self):
-        """Exact string equality filter."""
         result = self._execute("filter_string_selective")
         assert "c_custkey" in result.columns
 
     def test_filter_string_non_selective(self):
-        """Low selectivity string comparison."""
         result = self._execute("filter_string_non_selective")
         assert "count" in result.columns
         assert result["count"].iloc[0] > 0
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - String Operations
-# =============================================================================
-
-
 class TestExpressionString:
-    """Execute string operation queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -858,53 +764,36 @@ class TestExpressionString:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_string_like(self):
-        """String LIKE (contains) pattern matching."""
         result = self._execute("string_like")
         assert "p_partkey" in result.columns
         assert "p_name" in result.columns
-        # "goldenrod blue lemon" and "blush thistle blue" contain "blue"
         assert len(result) == 2
 
     def test_string_starts_with(self):
-        """String starts_with pattern matching."""
         result = self._execute("string_starts_with")
         assert "p_partkey" in result.columns
-        # "STANDARD POLISHED TIN" matches starts_with("STANDARD")
         assert len(result) >= 1
 
     def test_string_ends_with(self):
-        """String ends_with pattern matching."""
         result = self._execute("string_ends_with")
         assert "p_partkey" in result.columns
-        # "LARGE BRUSHED BRASS" ends with "BRASS"
         assert len(result) >= 1
 
     def test_string_concat(self):
-        """String concatenation."""
         result = self._execute("string_concat")
         assert "customer_info" in result.columns
         assert len(result) > 0
-        # Verify the concatenation pattern works
         first_value = result["customer_info"].iloc[0]
         assert " - " in str(first_value)
 
     def test_string_substring(self):
-        """String substring extraction."""
         result = self._execute("string_substring")
         assert "country_code" in result.columns
-        # Country codes should be 3 chars from phone
         for code in result["country_code"]:
             assert len(str(code)) == 3
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - OrderBy / Sort
-# =============================================================================
-
-
 class TestExpressionOrderBy:
-    """Execute order-by queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -918,37 +807,30 @@ class TestExpressionOrderBy:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_orderby_simple(self):
-        """Simple single-column sort."""
         result = self._execute("orderby_simple")
         assert "o_orderdate" in result.columns
         dates = result["o_orderdate"].tolist()
         assert dates == sorted(dates)
 
     def test_orderby_desc(self):
-        """Descending sort."""
         result = self._execute("orderby_desc")
         assert "o_totalprice" in result.columns
         prices = result["o_totalprice"].tolist()
         assert prices == sorted(prices, reverse=True)
 
     def test_topn(self):
-        """Top-N query (ORDER BY DESC + LIMIT)."""
         result = self._execute("topn")
         assert "l_extendedprice" in result.columns
-        # Limit is 10, we have 10 rows
         assert len(result) == 10
         prices = result["l_extendedprice"].tolist()
         assert prices == sorted(prices, reverse=True)
 
     def test_limit(self):
-        """Simple LIMIT without order."""
         result = self._execute("limit")
         assert "l_orderkey" in result.columns
-        # Limit is 1000, we have 10 rows
         assert len(result) == 10
 
     def test_orderby_shortstrings_distinct_precedes_sort(self):
-        """DISTINCT must run before ORDER BY for expression-family generated queries."""
         from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
 
         class TrackingFrame:
@@ -990,14 +872,7 @@ class TestExpressionOrderBy:
         ]
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - Window Functions
-# =============================================================================
-
-
 class TestExpressionWindow:
-    """Execute window function queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -1011,39 +886,26 @@ class TestExpressionWindow:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_window_row_number(self):
-        """ROW_NUMBER() OVER (PARTITION BY o_custkey ORDER BY o_totalprice DESC) as order_rank."""
         result = self._execute("window_row_number")
         assert "order_rank" in result.columns
-        # ROW_NUMBER per o_custkey partition: every partition starts at 1 and its
-        # ranks form a contiguous 1..n sequence.
         assert result["order_rank"].min() == 1
         for _, group in result.groupby("o_custkey"):
             ranks = sorted(int(rank) for rank in group["order_rank"].tolist())
             assert ranks == list(range(1, len(ranks) + 1))
 
     def test_window_rank(self):
-        """RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC)."""
         result = self._execute("window_rank")
         assert "qty_rank" in result.columns
         assert result["qty_rank"].max() <= 5
 
     def test_window_sum(self):
-        """SUM() OVER (PARTITION BY l_orderkey)."""
         result = self._execute("window_sum")
         assert "order_total" in result.columns
         assert "l_extendedprice" in result.columns
-        # order_total should be >= l_extendedprice for every row
         assert (result["order_total"] >= result["l_extendedprice"] - 0.01).all()
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - Join Operations
-# =============================================================================
-
-
 class TestExpressionJoin:
-    """Execute join queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -1057,47 +919,34 @@ class TestExpressionJoin:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_broadcast_join_two_tables(self):
-        """Small table broadcast join (supplier x nation)."""
         result = self._execute("broadcast_join_two_tables")
         assert "supplier_count" in result.columns
         assert result["supplier_count"].iloc[0] == 5
 
     def test_broadcast_join_three_tables(self):
-        """Three-table broadcast join (supplier x nation x region)."""
         result = self._execute("broadcast_join_three_tables")
         assert "supplier_count" in result.columns
         assert len(result) > 0
 
     def test_shuffle_join(self):
-        """Shuffle join (orders x lineitem)."""
         result = self._execute("shuffle_join")
         assert "o_orderkey" in result.columns
         assert "total_qty" in result.columns
         assert len(result) > 0
 
     def test_empty_build_join(self):
-        """Join with empty build side."""
         result = self._execute("empty_build_join")
         assert "l_orderkey" in result.columns
-        # Left join with empty right: all lineitem rows preserved
         assert len(result) == 10
 
     def test_shuffle_inner_join_groupby(self):
-        """Inner join with group by."""
         result = self._execute("shuffle_inner_join_one_to_many_string_with_groupby")
         assert "c_mktsegment" in result.columns
         assert "order_count" in result.columns
         assert len(result) > 0
 
 
-# =============================================================================
-# Expression-Family (Polars) Execution Tests - Decimal Arithmetic
-# =============================================================================
-
-
 class TestExpressionDecimalArithmetic:
-    """Execute decimal/arithmetic queries against Polars."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -1111,65 +960,47 @@ class TestExpressionDecimalArithmetic:
         return _to_pandas(query.expression_impl(self.ctx))
 
     def test_decimal_arithmetic(self):
-        """Complex decimal expressions (final_price, unit_price)."""
         result = self._execute("decimal_arithmetic")
         assert "final_price" in result.columns
         assert "unit_price" in result.columns
-        # final_price = extendedprice * (1 - discount) * (1 + tax)
         assert (result["final_price"] > 0).all()
         assert (result["unit_price"] > 0).all()
 
 
-# =============================================================================
-# Parametrized Expression Execution - Core Operations
-# =============================================================================
-
-# Representative queries for each category
 CORE_EXPRESSION_QUERIES = [
-    # Aggregation
     "aggregation_simple",
     "aggregation_distinct",
     "aggregation_groupby_small",
     "aggregation_materialize",
     "aggregation_selective",
     "count_star",
-    # Filter
     "filter_selective",
     "filter_non_selective",
     "filter_bigint_in_list_selective",
     "filter_string_selective",
-    # String
     "string_like",
     "string_starts_with",
     "string_ends_with",
     "string_concat",
     "string_substring",
-    # OrderBy
     "orderby_simple",
     "orderby_desc",
     "orderby_multi",
     "topn",
     "limit",
-    # Window
     "window_row_number",
     "window_rank",
     "window_sum",
-    # Join
     "broadcast_join_two_tables",
     "broadcast_join_three_tables",
     "shuffle_join",
     "empty_build_join",
-    # Arithmetic
     "decimal_arithmetic",
-    # GroupBy
     "groupby_bigint_lowndv",
     "groupby_bigint_highndv",
-    # Predicate
     "predicate_ordering_aggregation",
-    # Additional aggregation
     "aggregation_materialize_subquery",
     "aggregation_partition",
-    # Additional filters
     "filter_bigint_selective",
     "filter_bigint_non_selective",
     "filter_bigint_in_list_selective",
@@ -1177,40 +1008,33 @@ CORE_EXPRESSION_QUERIES = [
     "filter_decimal_non_selective",
     "filter_string_non_selective",
     "filter_in_predicate_selective",
-    # Additional group-by
     "groupby_bigint_pk",
     "groupby_decimal_highndv",
     "groupby_decimal_lowndv",
-    # Additional order-by
     "orderby_all",
     "orderby_bigint",
     "orderby_bigint_expression",
     "orderby_multicol",
     "orderby_shortstrings",
-    # Additional window
     "window_running_sum",
     "window_growing_frame",
     "window_lead_lag_same_frame",
     "window_moving_frame",
     "window_multiple_orderings",
     "window_unbounded_frame",
-    # Additional joins
     "broadcast_join_four_tables",
     "shuffle_inner_join_one_to_many_string_with_groupby",
     "shuffle_left_join_one_to_many_string_with_groupby",
     "shuffle_full_join_one_to_many_string_with_groupby",
     "shuffle_inner_join_union_all_with_groupby",
-    # Additional string operations
     "string_equal_predicate",
     "string_equal_predicate_lower",
     "string_in_predicate",
     "string_like_predicate_center",
     "string_like_predicate_end",
     "string_like_predicate_start",
-    # Additional predicate ordering
     "predicate_ordering_aggregation_groupby",
     "predicate_ordering_costs",
-    # Advanced sweeps that execute cleanly across both families
     "aggregation_distinct_groupby",
     "aggregation_groupby_large",
     "approx_count_distinct_simple",
@@ -1307,8 +1131,6 @@ PANDAS_ONLY_QUERIES = [
 
 
 class TestParametrizedExpressionExecution:
-    """Parametrized test that verifies all core expression queries execute without error."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -1319,21 +1141,13 @@ class TestParametrizedExpressionExecution:
 
     @pytest.mark.parametrize("query_id", CORE_EXPRESSION_QUERIES)
     def test_expression_query_executes(self, query_id: str):
-        """Expression implementation executes without error and returns data."""
         query = self.registry.get(query_id)
         result = _to_pandas(query.expression_impl(self.ctx))
         assert isinstance(result, pd.DataFrame)
         assert len(result.columns) > 0
 
 
-# =============================================================================
-# Parametrized Pandas Execution - Core Operations
-# =============================================================================
-
-
 class TestParametrizedPandasExecution:
-    """Parametrized test that verifies all core pandas queries execute without error."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_pandas_context()
@@ -1344,7 +1158,6 @@ class TestParametrizedPandasExecution:
 
     @pytest.mark.parametrize("query_id", CORE_EXPRESSION_QUERIES)
     def test_pandas_query_executes(self, query_id: str):
-        """Pandas implementation executes without error and returns data."""
         query = self.registry.get(query_id)
         result = _to_pandas(query.pandas_impl(self.ctx))
         assert isinstance(result, pd.DataFrame)
@@ -1352,8 +1165,6 @@ class TestParametrizedPandasExecution:
 
 
 class TestExpressionOnlyAdvancedExecution:
-    """Queries that currently execute only on the expression family fixture."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_polars_context()
@@ -1364,7 +1175,6 @@ class TestExpressionOnlyAdvancedExecution:
 
     @pytest.mark.parametrize("query_id", EXPRESSION_ONLY_QUERIES)
     def test_expression_only_query_executes(self, query_id: str):
-        """Expression implementation executes for advanced queries that pandas does not yet support."""
         query = self.registry.get(query_id)
         result = _to_pandas(query.expression_impl(self.ctx))
         assert isinstance(result, pd.DataFrame)
@@ -1372,8 +1182,6 @@ class TestExpressionOnlyAdvancedExecution:
 
 
 class TestPandasOnlyAdvancedExecution:
-    """Queries that currently execute only on the pandas family fixture."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_pandas_context()
@@ -1384,19 +1192,12 @@ class TestPandasOnlyAdvancedExecution:
 
     @pytest.mark.parametrize("query_id", PANDAS_ONLY_QUERIES)
     def test_pandas_only_query_executes(self, query_id: str):
-        """Pandas implementations execute for map-oriented queries that Polars does not yet support."""
         query = self.registry.get(query_id)
         result = _to_pandas(query.pandas_impl(self.ctx))
         assert isinstance(result, pd.DataFrame)
         assert len(result.columns) > 0
 
 
-# =============================================================================
-# Cross-Family Comparison - Expression vs Pandas
-# =============================================================================
-
-# Subset of queries suitable for cross-family comparison
-# (queries where both families should produce identical results)
 CROSS_FAMILY_QUERIES = [
     "aggregation_simple",
     "aggregation_groupby_small",
@@ -1410,8 +1211,6 @@ CROSS_FAMILY_QUERIES = [
 
 
 class TestCrossFamilyComparison:
-    """Verify Expression and Pandas implementations produce equivalent results."""
-
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
         self.expr_ctx = _create_polars_context()
@@ -1426,7 +1225,6 @@ class TestCrossFamilyComparison:
 
     @pytest.mark.parametrize("query_id", CROSS_FAMILY_QUERIES)
     def test_expression_vs_pandas(self, query_id: str):
-        """Expression and pandas produce equivalent results."""
         query = self.registry.get(query_id)
 
         expr_result = _to_pandas(query.expression_impl(self.expr_ctx))
@@ -1435,16 +1233,8 @@ class TestCrossFamilyComparison:
         _compare_results(expr_result, pandas_result)
 
 
-# =============================================================================
-# Transaction Primitives DataFrame Operations Tests
-# =============================================================================
-
-
 class TestTransactionCapabilitiesSupportsOperation:
-    """Test DataFrameTransactionCapabilities.supports_operation() mapping."""
-
     def test_delta_lake_supports_all_operations(self):
-        """Delta Lake capability profile supports all operation types."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DELTA_LAKE_TRANSACTION_CAPABILITIES,
             TransactionOperationType,
@@ -1455,7 +1245,6 @@ class TestTransactionCapabilitiesSupportsOperation:
             assert caps.supports_operation(op) is True, f"Delta Lake should support {op}"
 
     def test_polars_supports_no_operations(self):
-        """Polars has no transaction support."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             POLARS_TRANSACTION_CAPABILITIES,
             TransactionOperationType,
@@ -1466,7 +1255,6 @@ class TestTransactionCapabilitiesSupportsOperation:
             assert caps.supports_operation(op) is False, f"Polars should not support {op}"
 
     def test_pandas_supports_no_operations(self):
-        """Pandas has no transaction support."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             PANDAS_TRANSACTION_CAPABILITIES,
             TransactionOperationType,
@@ -1477,7 +1265,6 @@ class TestTransactionCapabilitiesSupportsOperation:
             assert caps.supports_operation(op) is False, f"Pandas should not support {op}"
 
     def test_get_unsupported_operations(self):
-        """get_unsupported_operations returns correct list for Polars."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             POLARS_TRANSACTION_CAPABILITIES,
             TransactionOperationType,
@@ -1485,15 +1272,11 @@ class TestTransactionCapabilitiesSupportsOperation:
 
         caps = POLARS_TRANSACTION_CAPABILITIES
         unsupported = caps.get_unsupported_operations()
-        # All operations should be unsupported
         assert len(unsupported) == len(TransactionOperationType)
 
 
 class TestTransactionResultFailure:
-    """Test DataFrameTransactionResult.failure() factory method."""
-
     def test_failure_result_fields(self):
-        """Failure result has correct fields set."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionResult,
             TransactionOperationType,
@@ -1511,7 +1294,6 @@ class TestTransactionResultFailure:
         assert result.duration_ms == 0.0
 
     def test_failure_with_start_time(self):
-        """Failure result with explicit start_time computes duration."""
         import time
 
         from benchbox.core.transaction_primitives.dataframe_operations import (
@@ -1519,7 +1301,7 @@ class TestTransactionResultFailure:
             TransactionOperationType,
         )
 
-        start = time.time() - 0.1  # 100ms ago
+        start = time.time() - 0.1
         result = DataFrameTransactionResult.failure(
             TransactionOperationType.ATOMIC_DELETE,
             "timed failure",
@@ -1530,10 +1312,7 @@ class TestTransactionResultFailure:
 
 
 class TestTransactionManagerPolars:
-    """Test DataFrameTransactionOperationsManager with Polars (no transaction support)."""
-
     def test_polars_manager_no_transactions(self):
-        """Polars manager correctly reports no transaction support."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1542,7 +1321,6 @@ class TestTransactionManagerPolars:
         assert manager.supports_transactions() is False
 
     def test_polars_unsupported_message(self):
-        """Polars manager provides helpful error message."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1553,7 +1331,6 @@ class TestTransactionManagerPolars:
         assert "Delta Lake" in msg or "pyspark" in msg.lower()
 
     def test_polars_atomic_insert_fails(self):
-        """Atomic INSERT on Polars returns failure result."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1566,7 +1343,6 @@ class TestTransactionManagerPolars:
         assert result.success is False
 
     def test_polars_atomic_update_fails(self):
-        """Atomic UPDATE on Polars returns failure result."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1580,7 +1356,6 @@ class TestTransactionManagerPolars:
         assert result.success is False
 
     def test_polars_atomic_delete_fails(self):
-        """Atomic DELETE on Polars returns failure result."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1593,7 +1368,6 @@ class TestTransactionManagerPolars:
         assert result.success is False
 
     def test_polars_atomic_merge_fails(self):
-        """Atomic MERGE on Polars returns failure result."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1608,10 +1382,7 @@ class TestTransactionManagerPolars:
 
 
 class TestTransactionManagerPandas:
-    """Test DataFrameTransactionOperationsManager with Pandas (no transaction support)."""
-
     def test_pandas_manager_no_transactions(self):
-        """Pandas manager correctly reports no transaction support."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1620,7 +1391,6 @@ class TestTransactionManagerPandas:
         assert manager.supports_transactions() is False
 
     def test_pandas_all_operations_unsupported(self):
-        """All transaction operations are unsupported for Pandas."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
             TransactionOperationType,
@@ -1632,10 +1402,7 @@ class TestTransactionManagerPandas:
 
 
 class TestTransactionValidation:
-    """Test validate_transaction_primitives_platform() function."""
-
     def test_pyspark_is_valid(self):
-        """PySpark is a valid transaction platform."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -1645,7 +1412,6 @@ class TestTransactionValidation:
         assert msg == ""
 
     def test_delta_is_valid(self):
-        """Delta Lake is a valid transaction platform."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -1654,7 +1420,6 @@ class TestTransactionValidation:
         assert is_valid is True
 
     def test_polars_is_invalid(self):
-        """Polars is not a valid transaction platform."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -1664,7 +1429,6 @@ class TestTransactionValidation:
         assert "transaction" in msg.lower() or "ACID" in msg
 
     def test_duckdb_is_invalid(self):
-        """DuckDB is not a valid transaction platform."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -1673,7 +1437,6 @@ class TestTransactionValidation:
         assert is_valid is False
 
     def test_unknown_platform_is_valid(self):
-        """Unknown platforms are allowed (but warned)."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             validate_transaction_primitives_platform,
         )
@@ -1683,10 +1446,7 @@ class TestTransactionValidation:
 
 
 class TestTransactionManagerFactory:
-    """Test get_dataframe_transaction_manager() factory function."""
-
     def test_polars_returns_manager(self):
-        """Factory returns a manager for polars-df."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             get_dataframe_transaction_manager,
         )
@@ -1695,7 +1455,6 @@ class TestTransactionManagerFactory:
         assert manager is not None
 
     def test_pandas_returns_manager(self):
-        """Factory returns a manager for pandas-df."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             get_dataframe_transaction_manager,
         )
@@ -1704,7 +1463,6 @@ class TestTransactionManagerFactory:
         assert manager is not None
 
     def test_non_df_platform_returns_none(self):
-        """Factory returns None for non-DataFrame platforms."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             get_dataframe_transaction_manager,
         )
@@ -1713,7 +1471,6 @@ class TestTransactionManagerFactory:
         assert manager is None
 
     def test_pyspark_returns_manager(self):
-        """Factory returns a manager for pyspark-df (even without SparkSession)."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             get_dataframe_transaction_manager,
         )
@@ -1723,23 +1480,17 @@ class TestTransactionManagerFactory:
 
 
 class TestTransactionManagerPathValidation:
-    """Test path validation in DataFrameTransactionOperationsManager."""
-
     def test_path_traversal_rejected(self):
-        """Path traversal attempts are rejected."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
 
-        # Use a platform with transaction support to actually reach path validation
-        # Delta-lake claims transaction support, so it will validate paths
         manager = DataFrameTransactionOperationsManager("delta-lake")
         is_valid, msg = manager.validate_table_format("../../etc/passwd")
         assert is_valid is False
         assert "traversal" in msg.lower() or "does not exist" in msg.lower()
 
     def test_nonexistent_path_rejected(self):
-        """Non-existent paths are rejected."""
         from benchbox.core.transaction_primitives.dataframe_operations import (
             DataFrameTransactionOperationsManager,
         )
@@ -1749,10 +1500,6 @@ class TestTransactionManagerPathValidation:
         assert is_valid is False
         assert "does not exist" in msg
 
-
-# =============================================================================
-# DataFusion Expression Path Coverage
-# =============================================================================
 
 try:
     import pyarrow as pa
@@ -1767,11 +1514,9 @@ except ImportError:
 
 
 def _create_datafusion_context():
-    """Create a DataFusion expression-family context with TPC-H fixture tables."""
     adapter = DataFusionDataFrameAdapter()
     ctx = adapter.create_context()
 
-    # Build PyArrow tables from the same fixture data used for Polars
     nation = pa.table(
         {
             "n_nationkey": pa.array([0, 1, 2, 3, 4], type=pa.int64()),
@@ -2026,7 +1771,6 @@ def _create_datafusion_context():
     return ctx
 
 
-# Subset of queries that work reliably on DataFusion with small fixtures
 DATAFUSION_QUERY_SUBSET = [
     "aggregation_simple",
     "aggregation_distinct",
@@ -2049,8 +1793,6 @@ DATAFUSION_QUERY_SUBSET = [
 
 @pytest.mark.skipif(not DATAFUSION_AVAILABLE, reason="datafusion or pyarrow not installed")
 class TestDataFusionExpressionPathCoverage:
-    """Runs read_primitives expression queries on DataFusion to cover DataFusion-specific paths."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
         self.ctx = _create_datafusion_context()
@@ -2063,12 +1805,10 @@ class TestDataFusionExpressionPathCoverage:
 
     @pytest.mark.parametrize("query_id", DATAFUSION_QUERY_SUBSET)
     def test_datafusion_expression_query_executes(self, query_id: str):
-        """Expression query runs without error on DataFusion."""
         if query_id in self.skip_ids:
             pytest.skip(f"{query_id} is in DataFusion skip list")
         query = self.registry.get(query_id)
         result = query.expression_impl(self.ctx)
-        # Collect the result
         if hasattr(result, "collect"):
             df = result.collect()
         else:

@@ -20,9 +20,7 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_SUBQUERY_SORT, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q2_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -33,9 +31,7 @@ def q2_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter part and region tables before joining
-# ---------------------------------------------------------------------------
 
 
 def q2_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -124,9 +120,7 @@ def q2_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - project subquery to only needed columns early
-# ---------------------------------------------------------------------------
 
 
 def q3_v3_expression_impl_q2(ctx: DataFrameContext) -> Any:
@@ -212,9 +206,7 @@ def q2_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - build each join as named step
-# ---------------------------------------------------------------------------
 
 
 def q2_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -288,9 +280,7 @@ def q2_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - compute value column in partsupp before groupby
-# ---------------------------------------------------------------------------
 
 
 def q2_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -333,9 +323,7 @@ def q2_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q2_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -375,9 +363,7 @@ def q2_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - start subquery from nation→partsupp instead of partsupp→supplier
-# ---------------------------------------------------------------------------
 
 
 def q2_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -454,9 +440,7 @@ def q2_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - combined region+type filter in single predicate
-# ---------------------------------------------------------------------------
 
 
 def q2_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -467,9 +451,7 @@ def q2_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return q2_v7_pandas_impl(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort - pass descending flags and nulls_last explicitly
-# ---------------------------------------------------------------------------
 
 
 def q2_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -480,9 +462,7 @@ def q2_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q2_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - same logic, different subquery build order
-# ---------------------------------------------------------------------------
 
 
 def q2_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -520,8 +500,7 @@ def q2_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q2_VARIANTS = build_yaml_variants(__file__, globals(), 2, JOIN_SUBQUERY_SORT)

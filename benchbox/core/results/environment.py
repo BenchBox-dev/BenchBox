@@ -1,5 +1,3 @@
-"""Normalized execution-environment result metadata contract."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -72,7 +70,6 @@ def _metadata_dict(value: Any) -> dict[str, Any]:
 
 
 def system_profile_snapshot(system_profile: Any | None) -> dict[str, Any]:
-    """Serialize a caller-supplied profile without recollecting the current host."""
     if isinstance(system_profile, Mapping):
         return dict(system_profile)
     if hasattr(system_profile, "model_dump"):
@@ -83,8 +80,6 @@ def system_profile_snapshot(system_profile: Any | None) -> dict[str, Any]:
 
 @dataclass
 class ClientHostEnvironment:
-    """BenchBox client process host profile."""
-
     os: str | None = None
     arch: str | None = None
     cpu_count: int | None = None
@@ -106,21 +101,6 @@ class ClientHostEnvironment:
         cpu_vendor = profile.get("cpu_vendor")
         cpu_identity_provenance = profile.get("cpu_identity_provenance")
         if system_profile is None and (not cpu_model or not cpu_vendor):
-            # DELIBERATELY gated on a wholly absent profile.
-            #
-            # It is tempting to widen this to "fill whenever the value is
-            # missing", because every production caller passes a dict and this
-            # branch therefore almost never runs. That would be wrong: this
-            # constructor also runs on the LOAD path, where
-            # `_extract_system_profile` rebuilds a profile from a stored
-            # bundle. Detecting there would stamp the CPU of whatever machine
-            # happens to re-derive an old result onto that result's history --
-            # inventing hardware provenance for a run that executed elsewhere.
-            #
-            # The capture-time gap this was meant to close is fixed at its
-            # source instead: `benchbox.utils.system_info.get_system_info`
-            # now detects the real CPU and emits cpu_model/cpu_vendor, so the
-            # profile handed in already carries them.
             from benchbox.utils.environment import detect_cpu_info
 
             detected_model, detected_vendor = detect_cpu_info()
@@ -149,8 +129,6 @@ class ClientHostEnvironment:
 
 @dataclass
 class PlatformRuntimeEnvironment:
-    """Runtime that executed the measured benchmark engine."""
-
     runtime_type: RuntimeType = "unknown"
     collection_status: CollectionStatus = "unavailable"
     source: MetadataSource = "unavailable"
@@ -167,8 +145,6 @@ class PlatformRuntimeEnvironment:
 
 @dataclass
 class ContainerEnvironment:
-    """Docker/container metadata for container-backed local runtimes."""
-
     collection_status: CollectionStatus = "unavailable"
     source: MetadataSource = "unavailable"
     docker_engine_version: str | None = None
@@ -192,8 +168,6 @@ class ContainerEnvironment:
 
 @dataclass
 class ClientLinkEnvironment:
-    """Normalized client-to-platform link and locality metadata."""
-
     collection_status: CollectionStatus = "unavailable"
     source: MetadataSource = "unavailable"
     client_region: str | None = None
@@ -208,8 +182,6 @@ class ClientLinkEnvironment:
 
 @dataclass
 class NormalizedExecutionEnvironment:
-    """Normalized top-level result ``environment`` contract."""
-
     client_host: ClientHostEnvironment | dict[str, Any] | None = None
     platform_runtime: PlatformRuntimeEnvironment | dict[str, Any] = field(default_factory=PlatformRuntimeEnvironment)
     container: ContainerEnvironment | dict[str, Any] | None = None
@@ -229,8 +201,6 @@ class NormalizedExecutionEnvironment:
 
 @dataclass
 class PlatformDeploymentMetadata:
-    """Normalized platform deployment and connection shape."""
-
     deployment_type: str = "unknown"
     connection_mode: str | None = None
     endpoint_class: EndpointClass = "unknown"
@@ -243,8 +213,6 @@ class PlatformDeploymentMetadata:
 
 @dataclass
 class PlatformCloudMetadata:
-    """Normalized cloud-provider location and identity facets."""
-
     provider: str | None = None
     region: str | None = None
     location: str | None = None
@@ -260,8 +228,6 @@ class PlatformCloudMetadata:
 
 @dataclass
 class PlatformComputeMetadata:
-    """Normalized compute-shape facets for benchmark comparison."""
-
     warehouse: str | None = None
     warehouse_size: str | None = None
     warehouse_type: str | None = None
@@ -284,8 +250,6 @@ class PlatformComputeMetadata:
 
 @dataclass
 class PlatformStorageMetadata:
-    """Normalized storage and staging facets."""
-
     table_format: str | None = None
     staging_location: str | None = None
     bucket: str | None = None
@@ -305,7 +269,6 @@ def build_environment_payload(
     system_profile: Any | None,
     execution_environment: NormalizedExecutionEnvironment | Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    """Build the result ``environment`` payload with legacy flat keys plus normalized blocks."""
     explicit = _metadata_dict(execution_environment)
     profile_client_host = ClientHostEnvironment.from_system_profile(system_profile).to_dict()
     explicit_client_host = _metadata_dict(explicit.get("client_host"))
@@ -331,12 +294,6 @@ def _sanitize_metadata_block(
     *,
     default: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Convert a metadata mapping (or dataclass) and filter credential-shaped keys.
-
-    Shared export boundary for raw_config, raw_metadata, and the normalized
-    deployment/cloud/compute/storage blocks. Non-secret tuning fields pass
-    through unchanged.
-    """
     converted = _metadata_dict(value)
     if not converted and default is not None:
         converted = dict(default)
@@ -357,14 +314,7 @@ def build_platform_metadata_payload(
     raw_metadata: Mapping[str, Any] | None,
     sanitize_raw_config: bool = True,
 ) -> dict[str, Any]:
-    """Build normalized ``platform`` metadata blocks with conservative defaults.
-
-    Credential redaction is unconditional for every mapping this function
-    emits (raw_config, raw_metadata, and the normalized deployment/cloud/
-    compute/storage blocks). ``sanitize_raw_config`` remains a compatibility
-    argument for callers that supplied it, but never opts out of filtering.
-    """
-    _ = sanitize_raw_config  # compatibility only; boundary filtering is mandatory
+    _ = sanitize_raw_config
     default_deployment = _default_deployment_metadata(platform_info or {}, platform_config or {})
     payload: dict[str, Any] = {
         "deployment": _sanitize_metadata_block(deployment, default=default_deployment.to_dict()),
@@ -372,9 +322,6 @@ def build_platform_metadata_payload(
         "compute": _sanitize_metadata_block(compute, default=PlatformComputeMetadata().to_dict()),
         "storage": _sanitize_metadata_block(storage, default=PlatformStorageMetadata().to_dict()),
     }
-    # ``raw_config`` may come from an adapter-specific hook rather than the
-    # normalized platform config fallback. Keep this as the public export
-    # boundary so every selected source receives the same structural filtering.
     raw_config_payload = _sanitize_metadata_block(raw_config)
     if raw_config_payload:
         payload["raw_config"] = raw_config_payload

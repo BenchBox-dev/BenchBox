@@ -1,27 +1,6 @@
-"""Applied-tuning ledger: what the execution path actually ran.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Per tuning-ADR-001 (``docs/development/tuning-adr-001-trust-and-hash-semantics.md``)
-and TODO ``tuning-applied-ledger-and-validation-status-20260712``.
-
-Today the bundle records *intent as fact*: ``tunings_applied`` is the requested
-config's ``to_dict()`` and ``validation_status="APPLIED"`` certifies only that a
-metadata-table INSERT succeeded. This module records what the adapter *actually
-executed* -- each tuning-relevant statement (DDL clauses, post-load statements,
-session SETs) appended as it runs -- and derives an honest ``validation_status``
-from that observation.
-
-Two invariants (must-preserve from the TODO):
-
-* **Produced by the execution path, never reconstructed from config.** The
-  ledger is populated as statements execute; there is no path that rebuilds it
-  from the requested ``UnifiedTuningConfiguration``.
-* **Capture never breaks a run.** Every record/derive call degrades to a no-op
-  on error (the degradation is logged, the benchmark continues).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,40 +14,14 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# validation_status vocabulary (ADR-001, honest semantics)
-#
-# Execution-derived, all-lowercase. Replaces the metadata-write proxy where
-# "APPLIED" meant only "a metadata INSERT succeeded". Documented mapping:
-#
-#   not_applicable      tuning disabled, or no effective configuration
-#   noop                tuning requested but the execution path ran no
-#                       statement (deliberate base no-op adapter, or a config
-#                       that renders to nothing on this platform)
-#   applied_unverified  >= 1 tuning statement executed successfully;
-#                       self-attested, NOT yet corroborated by introspection
-#   applied_verified    executed AND corroborated by a post-load
-#                       schema-introspection receipt. RESERVED: only
-#                       tuning-introspection-receipts-20260716 may emit it,
-#                       via corroboration -- never the ledger alone.
-#   failed              tuning was attempted but every statement failed / the
-#                       apply path raised
-#
-# Metadata-persistence failure is NO LONGER a tuning status: the old
-# FAILED_TO_SAVE is downgraded to the separate ``tuning_metadata_saved`` flag,
-# a non-alarming persistence note (benign for read-only / in-memory runs).
 NOT_APPLICABLE = "not_applicable"
 NOOP = "noop"
 APPLIED_UNVERIFIED = "applied_unverified"
 APPLIED_VERIFIED = "applied_verified"
 FAILED = "failed"
 
-# BenchmarkResults dataclass default (pre-run, before any derivation).
 NOT_VALIDATED = "not_validated"
 
-#: The full reviewed vocabulary. Pinned by
-#: ``tests/unit/core/tuning/test_validation_status_vocabulary.py`` -- adding or
-#: renaming a status must be a conscious edit there.
 TUNING_STATUS_VOCABULARY = frozenset(
     {
         NOT_APPLICABLE,
@@ -80,10 +33,6 @@ TUNING_STATUS_VOCABULARY = frozenset(
     }
 )
 
-#: Legacy (pre-ledger) -> new status, for bundle back-compat readers. Note the
-#: metadata-write proxy collapses: both old "APPLIED" and old "FAILED_TO_SAVE"
-#: mean "a statement was executed" under the new model, so both map to
-#: ``applied_unverified`` (the metadata outcome moves to ``tuning_metadata_saved``).
 LEGACY_STATUS_MAP = {
     "NOT_APPLICABLE": NOT_APPLICABLE,
     "APPLIED": APPLIED_UNVERIFIED,
@@ -91,23 +40,13 @@ LEGACY_STATUS_MAP = {
     "NOT_VALIDATED": NOT_VALIDATED,
 }
 
-# Statement outcome tokens.
 EXECUTED = "executed"
 STATEMENT_FAILED = "failed"
 
-# Statement phases (ordered chronology in the run).
 PHASE_DDL = "ddl"
 PHASE_POST_LOAD = "post_load"
 PHASE_SESSION = "session"
 
-# Read-only statement prefixes the recorder must NOT log: adapters run readbacks
-# through the same wrapped connection (e.g. ClickHouse's
-# validate_session_cache_control issues `SELECT ... FROM system.settings` to
-# confirm a SET took effect). Those are verification queries, not applied
-# tuning, so recording them would pollute the ledger and the physical hash.
-# Conservative allowlist-by-exclusion: only skip unambiguous readbacks. NOTE
-# `PRAGMA` is deliberately absent -- DuckDB tuning uses `PRAGMA threads=4` etc.,
-# which ARE applied statements.
 _READBACK_PREFIXES = ("select", "show", "describe", "desc ", "explain", "values ")
 
 _SQL_COMMENT_RE = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
@@ -124,21 +63,12 @@ _SCHEMA_TUNING_FOOTPRINT_RE = re.compile(
 
 
 def _sql_shape(statement: Any) -> str:
-    """Return SQL with comments and quoted text blanked for shape matching."""
     text = str(statement)
     text = _SQL_COMMENT_RE.sub(" ", text)
     return _SQL_QUOTED_TEXT_RE.sub(" ", text)
 
 
 def is_schema_tuning_statement(statement: Any) -> bool:
-    """Whether a schema statement contains a recognizable tuning footprint.
-
-    Fresh-database schema creation runs through the same connection as tuning
-    DDL, but ordinary ``CREATE TABLE`` and catalog identity statements are not
-    tuning evidence. Keep only layout/index/constraint-bearing schema shapes;
-    platform-specific recorders remain responsible for dialects whose tuning
-    cannot be recognized generically.
-    """
     shape = _sql_shape(statement)
     if not _SCHEMA_TUNING_STATEMENT_RE.match(shape):
         return False
@@ -148,7 +78,6 @@ def is_schema_tuning_statement(statement: Any) -> bool:
 
 
 def _split_sql_script(script: Any) -> list[str]:
-    """Split a SQLite ``executescript`` payload without changing execution."""
     text = str(script)
     if not text.strip():
         return []
@@ -173,13 +102,6 @@ def _split_sql_script(script: Any) -> list[str]:
 
 
 def _is_recordable_statement(statement: Any) -> bool:
-    """Whether *statement* is an applied tuning statement worth recording.
-
-    Returns ``False`` for read-only verification queries (SELECT/SHOW/...), which
-    adapters issue through the same connection to confirm applied settings.
-    Defaults to ``True`` on any uncertainty so a real tuning statement is never
-    silently dropped.
-    """
     try:
         text = str(statement).lstrip().lstrip("(").lstrip().lower()
     except Exception:  # pragma: no cover - defensive; never drop on uncertainty
@@ -189,11 +111,9 @@ def _is_recordable_statement(statement: Any) -> bool:
 
 @dataclass
 class AppliedStatement:
-    """One tuning-relevant statement the adapter actually executed."""
-
     statement: str
     phase: str
-    status: str = EXECUTED  # EXECUTED | STATEMENT_FAILED
+    status: str = EXECUTED
     mechanism: str | None = None
     table: str | None = None
     error: str | None = None
@@ -215,13 +135,6 @@ class AppliedStatement:
 
 @dataclass
 class DroppedIntent:
-    """A requested tuning intent that was NOT rendered to a statement.
-
-    Capability-filtered, unmapped, or log-only intents (review finding R4): the
-    ledger knows what was requested but not executed, so we surface it rather
-    than silently dropping it.
-    """
-
     intent: str
     reason: str
 
@@ -231,17 +144,9 @@ class DroppedIntent:
 
 @dataclass
 class AppliedTuningLedger:
-    """Ordered record of executed tuning statements + dropped intents.
-
-    Mutated in place by the execution path via :meth:`record` /
-    :meth:`record_dropped`; read back once at result-construction time for the
-    honest status, the applied-ledger hash, and the bundle companion.
-    """
-
     statements: list[AppliedStatement] = field(default_factory=list)
     dropped: list[DroppedIntent] = field(default_factory=list)
 
-    # -- population (execution path) ---------------------------------------
     def record(
         self,
         statement: str,
@@ -252,7 +157,6 @@ class AppliedTuningLedger:
         table: str | None = None,
         error: Any | None = None,
     ) -> None:
-        """Append one executed/failed statement. Never raises."""
         try:
             self.statements.append(
                 AppliedStatement(
@@ -264,28 +168,20 @@ class AppliedTuningLedger:
                     error=(str(error) if error is not None else None),
                 )
             )
-        except Exception as exc:  # capture must never break a run
+        except Exception as exc:
             logger.debug("applied-ledger record degraded: %s", exc)
 
     def record_dropped(self, intent: str, reason: str) -> None:
-        """Append one requested-but-not-rendered intent. Never raises."""
         try:
             self.dropped.append(DroppedIntent(intent=str(intent), reason=str(reason)))
         except Exception as exc:
             logger.debug("applied-ledger dropped-record degraded: %s", exc)
 
-    # -- read back (result construction) -----------------------------------
     @property
     def executed_statements(self) -> list[AppliedStatement]:
         return [s for s in self.statements if s.status == EXECUTED]
 
     def overall_status(self, *, tuning_enabled: bool, has_config: bool) -> str:
-        """Derive the honest ``validation_status`` from what actually ran.
-
-        Note this never returns ``applied_verified`` -- verification requires a
-        corroborating introspection receipt supplied by a separate code path
-        (tuning-introspection-receipts-20260716), never the ledger alone.
-        """
         if not tuning_enabled or not has_config:
             return NOT_APPLICABLE
         physical_statements = [s for s in self.statements if s.phase in {PHASE_DDL, PHASE_POST_LOAD}]
@@ -293,19 +189,11 @@ class AppliedTuningLedger:
             return FAILED
         if any(s.status == EXECUTED for s in self.statements):
             return APPLIED_UNVERIFIED
-        if self.statements:  # statements attempted, all failed
+        if self.statements:
             return FAILED
         return NOOP
 
     def applied_ledger_hash(self) -> str | None:
-        """SHA-256 over the ORDERED executed statements (physical identity).
-
-        Mirrors ``UnifiedTuningConfiguration.get_configuration_hash`` canonical
-        form (``sort_keys`` + compact separators), but over an ordered *list*:
-        list order is preserved (``sort_keys`` only orders each record's keys),
-        so statement chronology is part of the identity. ``None`` when nothing
-        executed (there is no physical layout to identify).
-        """
         executed = [s.to_dict() for s in self.executed_statements]
         if not executed:
             return None
@@ -319,23 +207,6 @@ class AppliedTuningLedger:
         receipt: dict[str, Any] | None = None,
         drift_check: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """The ``.applied.json`` companion payload.
-
-        ``receipt`` (when supplied) is the post-load introspection receipt
-        (``benchbox.core.tuning.introspection.IntrospectionReceipt.to_payload``)
-        that corroborated the ledger against the live catalog. It rides inside
-        this companion rather than in a separate file. A ``receipt`` is present
-        only when the run status was ``applied_unverified`` and introspection was
-        attempted; the ``applied_verified`` status it may carry is derived solely
-        from that receipt's corroboration, never from the ledger alone.
-
-        ``drift_check`` (when supplied) is the rerun tuning drift-validation
-        result (``MetadataValidationResult.to_payload``) computed when a reused
-        database's persisted tuning metadata is validated against the expected
-        configuration. It rides in this same companion per the ADR-001 addendum
-        (drift-validation bundle routing); it is descriptive, never a source of
-        ``applied_verified``.
-        """
         payload: dict[str, Any] = {
             "status": status,
             "applied_ledger_hash": self.applied_ledger_hash(),
@@ -353,8 +224,6 @@ class AppliedTuningLedger:
 
 
 class _RecordingProxy:
-    """Shared state and filtering for connection/cursor recording proxies."""
-
     __slots__ = ("_ledger", "_phase", "_statement_filter")
 
     def __init__(
@@ -374,24 +243,12 @@ class _RecordingProxy:
             return True
         try:
             return bool(self._statement_filter(statement))
-        except Exception as exc:  # capture must never break a run
+        except Exception as exc:
             logger.debug("applied-ledger statement filter degraded: %s", exc)
             return True
 
 
 class RecordingConnection(_RecordingProxy):
-    """Transparent proxy that records executed statements into a ledger.
-
-    Wraps a real DB connection: ``execute``, ``cursor().execute``, and
-    ``executescript`` are recorded (SQL text + phase + executed/failed),
-    everything else delegates unchanged. An optional statement filter can
-    narrow capture for lifecycle seams such as schema creation, where ordinary
-    DDL shares a connection with tuning DDL.
-
-    Only ever wraps the connection handed to the tuning-apply /
-    session-configuration path, so it sees only tuning-relevant statements.
-    """
-
     __slots__ = ("_conn",)
 
     def __init__(
@@ -404,7 +261,6 @@ class RecordingConnection(_RecordingProxy):
         super().__init__(ledger, phase, statement_filter)
         object.__setattr__(self, "_conn", connection)
 
-    # -- recorded surface ---------------------------------------------------
     def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Any:
         return self._run(self._conn.execute, statement, args, kwargs)
 
@@ -430,7 +286,6 @@ class RecordingConnection(_RecordingProxy):
             self._ledger.record(statement, self._phase, status=EXECUTED)
         return result
 
-    # -- transparency -------------------------------------------------------
     def __getattr__(self, name: str) -> Any:
         return getattr(self._conn, name)
 
@@ -446,13 +301,10 @@ class RecordingConnection(_RecordingProxy):
 
     @property
     def raw_connection(self) -> Any:
-        """The underlying real connection (for callers that need the C object)."""
         return self._conn
 
 
 class _RecordingCursor(_RecordingProxy):
-    """Cursor proxy mirroring :class:`RecordingConnection` for ``cursor.execute``."""
-
     __slots__ = ("_cur",)
 
     def __init__(
@@ -500,11 +352,6 @@ def recording_connection(
     phase: str,
     statement_filter: Callable[[Any], bool] | None = None,
 ) -> Any:
-    """Wrap *connection* for capture, degrading to the raw connection on error.
-
-    Returns the unwrapped connection when *ledger* is ``None`` or wrapping is
-    not possible, so a capture failure can never break statement execution.
-    """
     if ledger is None:
         return connection
     try:

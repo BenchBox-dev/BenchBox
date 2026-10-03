@@ -1,14 +1,3 @@
-"""QuestDB DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-QuestDB 9.3.4 rejects both FOREIGN KEY and PRIMARY KEY constraint syntax in
-CREATE TABLE statements. The shared strip_foreign_keys() helper handles FK
-and inline REFERENCES stripping; QuestDBAdapter._strip_pk_constraints() handles
-PRIMARY KEY stripping.
-
-This rule registers the REWRITE_DDL intent for governance - compat_lint enforcement
-only; transformer_id is not resolved at runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

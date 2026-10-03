@@ -1,13 +1,6 @@
-"""Tests for tuning provenance/requested-config export (ADR-1).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the tuning-bundle-provenance-and-config-export-20260712 TODO: the
-platform.tuning summary block and the requested-tuning payload built by
-build_tuning_payload()/_build_tuning_summary() in benchbox/core/results/schema.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -67,7 +60,6 @@ def _make_result(**overrides) -> BenchmarkResults:
 
 
 def _applied_ledger_payload(status: str = "applied_unverified") -> dict:
-    """A representative AppliedTuningLedger.to_payload() dict for a tuned run."""
     return {
         "status": status,
         "applied_ledger_hash": "f" * 64,
@@ -100,16 +92,11 @@ def test_template_run_bundle_carries_source_enum_template_ref_and_hash():
 
     assert summary["tuning_source"] == "auto_discovered"
     assert summary["requested_config_hash"] == config.get_configuration_hash()
-    # Legacy bridge keys (one generation) must keep the explorer pipeline working.
     assert summary["source"] == "yaml"
     assert summary["hash"] == config.get_configuration_hash()
     assert summary["counts"]["tables_tuned"] == 1
     assert "sorting" in summary["counts"]["tuning_types"]
-    # applied_ledger_hash (physical identity) rides alongside requested_config_hash.
     assert summary["applied_ledger_hash"] == applied["applied_ledger_hash"]
-    # ADR-1 verified-state is surfaced in the MAIN-bundle summary (not just the
-    # .tuning.json companion) so the explorer, which reads only the main bundle,
-    # can display it.
     assert summary["validation_status"] == "applied_unverified"
 
     companion = build_tuning_payload(result)
@@ -150,7 +137,6 @@ def test_no_applied_ledger_returns_no_applied_companion():
         tuning_config_hash=_tuned_config().get_configuration_hash(),
     )
     assert build_applied_ledger_payload(result) is None
-    # And the .tuning.json companion must not invent an applied_ledger_hash.
     assert "applied_ledger_hash" not in build_tuning_payload(result)
 
 
@@ -222,14 +208,10 @@ def test_requested_config_hash_distinct_across_differing_configs():
 
 
 def test_no_absolute_paths_anywhere_in_emitted_bundle_or_companion():
-    """must_preserve: no raw local filesystem paths in exported bundles."""
     config = _tuned_config()
     result = _make_result(
         tunings_applied=config.to_dict(),
         tuning_source="explicit_file",
-        # A raw absolute path must never be handed to the exporter in the first
-        # place (run.py's resolve_template_reference() is the enforcement
-        # point) - this asserts the export layer doesn't introduce one either.
         tuning_source_file="custom_tuning.yaml:ab12cd34ef56ab12",
         tuning_config_hash=config.get_configuration_hash(),
     )
@@ -297,7 +279,6 @@ def test_requested_block_reports_platform_optimizations_non_defaults_only():
     platform_optimizations = companion["requested"]["platform_optimizations"]
     assert platform_optimizations["z_ordering_enabled"] is True
     assert platform_optimizations["z_ordering_columns"] == ["l_shipdate"]
-    # Default (unset) fields must be omitted from the diffed block.
     assert "auto_optimize_enabled" not in platform_optimizations
     assert "sorted_ingestion_mode" not in platform_optimizations
 
@@ -310,9 +291,6 @@ def test_no_tuning_returns_no_platform_tuning_block_or_companion():
 
 
 def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
-    """ADR-3 seam: a new-generation tuned bundle stamps the explicit generation
-    marker in both the platform.tuning summary and the .tuning.json companion,
-    next to the requested/applied hashes (never derived from benchbox_version)."""
     config = _tuned_config()
     result = _make_result(
         tunings_applied=config.to_dict(),
@@ -328,8 +306,6 @@ def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
 
 
 def test_no_tuning_omits_tuning_policy_generation_marker():
-    """The generation marker rides with tuning: a run with no tuning emits no
-    platform.tuning block at all, so no marker leaks onto untuned bundles."""
     result = _make_result(tunings_applied=None)
 
     assert build_result_payload(result)["platform"].get("tuning") is None
@@ -337,9 +313,6 @@ def test_no_tuning_omits_tuning_policy_generation_marker():
 
 
 def test_packaged_resource_source_maps_to_yaml_legacy_bridge():
-    """A packaged-template run loads a real YAML template; the one-generation
-    legacy `source` key must say "yaml", not "auto" (cross-branch composition
-    with feat/tuning-template-packaging's PACKAGED_RESOURCE tuning source)."""
     from benchbox.core.results.schema import _legacy_tuning_source_bridge
 
     assert _legacy_tuning_source_bridge("packaged_resource", "tpch_tuned.yaml:abc123") == "yaml"

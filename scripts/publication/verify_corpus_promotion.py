@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Verify corpus promotion gate and shadow promotion (A8).
-
-Verifies the published-results corpus invariants: exact accepted-path
-inventory, zero skips, and Explorer compatibility.
-
-Usage:
-  uv run python scripts/publication/verify_corpus_promotion.py            # live mode
-  uv run python scripts/publication/verify_corpus_promotion.py --shadow   # shadow mode
-"""
 
 from __future__ import annotations
 
@@ -35,7 +26,6 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def get_accepted_bundles(ref: str) -> list[str]:
-    """List all primary JSON bundle paths in the git tree at *ref*."""
     result = run("git", "ls-tree", "-r", "--name-only", ref, "--", CORPUS_PREFIX)
     if result.returncode != 0:
         return []
@@ -51,7 +41,6 @@ def get_accepted_bundles(ref: str) -> list[str]:
 
 
 def get_local_bundles(bundles_dir: Path) -> list[str]:
-    """List all primary JSON bundle paths from a local directory (recursive)."""
     if not bundles_dir.exists():
         return []
     paths = []
@@ -64,7 +53,6 @@ def get_local_bundles(bundles_dir: Path) -> list[str]:
 
 
 def get_inventory_paths() -> list[str]:
-    """List accepted bundle paths recorded in corpus-inventory.json."""
     if not INVENTORY_FILE.exists():
         return []
     data = json.loads(INVENTORY_FILE.read_text(encoding="utf-8"))
@@ -80,7 +68,6 @@ def verify_exact_inventory(
     accepted: list[str],
     inventory_expected: list[str],
 ) -> list[str]:
-    """Verify the accepted-path inventory exactly matches expected."""
     if accepted == inventory_expected:
         return []
     missing = sorted(set(inventory_expected) - set(accepted))

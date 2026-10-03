@@ -1,5 +1,3 @@
-"""Unit tests for cli/commands/submit.py."""
-
 from __future__ import annotations
 
 import hashlib
@@ -23,7 +21,6 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def _community_publish_salt(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Community submit requires a deployment salt; tests use a private test value."""
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
 
 
@@ -49,8 +46,6 @@ def _valid_submission_bundle() -> dict:
         "platform": {"name": "duckdb", "version": "1.3.0"},
         "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "phases": {"validation": {"status": "PASSED"}},
-        # Full canonical TPC-H coverage: submit runs the bundle validator
-        # on every path, and short query sets are refused.
         "queries": [{"id": f"Q{i}", "ms": 123, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
@@ -92,13 +87,7 @@ def _canonical_file_bytes(path: Path) -> bytes:
     return canonical_json_bytes(json.loads(path.read_text(encoding="utf-8")))
 
 
-# ---------------------------------------------------------------------------
-# 1. No args - explains usage, exit 1
-# ---------------------------------------------------------------------------
-
-
 def test_submit_refuses_without_public_pseudonym_salt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Community submit hard-refuses when BENCHBOX_MACHINE_ID_SALT is unset."""
     monkeypatch.delenv("BENCHBOX_MACHINE_ID_SALT", raising=False)
     src = tmp_path / "ok.json"
     _write_valid_submission_bundle(src)
@@ -115,21 +104,11 @@ def test_submit_requires_file_or_last(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.exit_code == 1
 
 
-# ---------------------------------------------------------------------------
-# 2. --last with no results → "No results found", exit 1
-# ---------------------------------------------------------------------------
-
-
 def test_submit_last_no_results(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sub, "find_latest_result", lambda *_a, **_k: None)
     result = CliRunner().invoke(sub.submit, ["--last"])
     assert result.exit_code == 1
     assert "No results found" in result.output
-
-
-# ---------------------------------------------------------------------------
-# 3. --dry-run with mock result → prints preview, no files written
-# ---------------------------------------------------------------------------
 
 
 def test_submit_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -146,13 +125,7 @@ def test_submit_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
 
     assert result.exit_code == 0
     assert "Dry-run" in result.output or "dry-run" in result.output.lower()
-    # Nothing should have been written
     assert not out_dir.exists()
-
-
-# ---------------------------------------------------------------------------
-# 4. Normal run → output dir created with expected files
-# ---------------------------------------------------------------------------
 
 
 def test_submit_creates_output_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -210,12 +183,6 @@ def test_submit_refuses_unvalidated_with_distinct_message(monkeypatch: pytest.Mo
     assert not out_dir.exists()
 
 
-# ---------------------------------------------------------------------------
-# 4b. Packaged CONTRIBUTING.md aligns with canonical docs/contributing-results.md
-#     (regression for dry-run-followup-package-canonical-contributing)
-# ---------------------------------------------------------------------------
-
-
 def test_submit_contributing_md_includes_canonical_required_items(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -240,12 +207,6 @@ def test_submit_contributing_md_includes_canonical_required_items(
     assert "submission-manifest.json" not in contributing
 
 
-# ---------------------------------------------------------------------------
-# 4c. Next-steps block is printed inline after a real submit
-#     (regression for dry-run-followup-cli-ux-and-doc-polish-2026-04-29 W2)
-# ---------------------------------------------------------------------------
-
-
 def test_submit_prints_next_steps_with_pr_target_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
@@ -267,8 +228,6 @@ def test_submit_prints_next_steps_with_pr_target_branch(monkeypatch: pytest.Monk
 
 
 def test_submit_dry_run_matches_real_run_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """W6: dry-run output prints the same file/manifest/next-steps shape
-    as a real submit, plus a "(dry run; no files written)" footer."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
 
@@ -305,11 +264,6 @@ def test_submit_dry_run_validation_rejects_pr_package_errors(monkeypatch: pytest
 
 
 def _write_flat_plateau_bundle(path: Path) -> None:
-    """Bundle whose per-query means form a slow tight band (timing-plateau).
-
-    Scale factor 1.0 keeps small-scale-floor out of scope so the test pins the
-    plateau rule; a single bundle keeps the cross-bundle rules unevaluable.
-    """
     queries = [{"id": f"Q{i}", "ms": 4400.0 + (i % 5) * 15.0, "status": "SUCCESS"} for i in range(1, 23)]
     bundle = {
         "version": "2.1",
@@ -339,12 +293,6 @@ def _write_sibling_override_artifact(bundle_path: Path) -> None:
 
 
 def test_submit_dry_run_refuses_unsatisfied_overrides(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """P1: dry-run must refuse a bundle the validator CLI would reject.
-
-    The plateau finding leaves ValidationResult.ok true, so without the
-    pending-overrides check the preview prints submission instructions for a
-    bundle CI rejects through unsatisfied_override_rules.
-    """
     src = tmp_path / "tpch_duckdb_plateau.json"
     _write_flat_plateau_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -361,7 +309,6 @@ def test_submit_dry_run_refuses_unsatisfied_overrides(monkeypatch: pytest.Monkey
 
 
 def test_submit_dry_run_accepts_satisfied_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """A committed sibling override artifact satisfies the dry-run gate."""
     src = tmp_path / "tpch_duckdb_plateau.json"
     _write_flat_plateau_bundle(src)
     _write_sibling_override_artifact(src)
@@ -375,12 +322,6 @@ def test_submit_dry_run_accepts_satisfied_override(monkeypatch: pytest.MonkeyPat
 
 
 def test_submit_real_run_refuses_short_coverage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Every submit path runs the bundle validator, not just --dry-run.
-
-    A clean-classified single-query result must be refused before the real
-    PR-package path writes anything, since published-results CI would
-    reject the artifact.
-    """
     src = tmp_path / "tpch_duckdb.json"
     bundle = _valid_submission_bundle()
     bundle["queries"] = [{"id": "Q1", "ms": 123, "status": "SUCCESS"}]
@@ -395,11 +336,6 @@ def test_submit_real_run_refuses_short_coverage(monkeypatch: pytest.MonkeyPatch,
     assert "Submission validation failed" in result.output
     assert "canonical queries" in result.output
     assert not out_dir.exists()
-
-
-# ---------------------------------------------------------------------------
-# 4d. Dry-run validation uses the packaged library, not a cwd-loadable script.
-# ---------------------------------------------------------------------------
 
 
 def test_submit_dry_run_validator_is_packaged_library() -> None:
@@ -421,11 +357,6 @@ def test_submit_dry_run_validator_is_packaged_library() -> None:
         assert not re.search(pattern, source), f"validator loader regressed — matched /{pattern}/"
 
 
-# ---------------------------------------------------------------------------
-# 5. Manifest contains bundle_hash
-# ---------------------------------------------------------------------------
-
-
 def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
@@ -437,8 +368,8 @@ def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, t
 
     manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
     assert "bundle_hash" in manifest
-    assert len(manifest["bundle_hash"]) == 64  # SHA-256 hex
-    assert "submitted_by" in manifest  # Phase 2: optional, may be empty string
+    assert len(manifest["bundle_hash"]) == 64
+    assert "submitted_by" in manifest
 
 
 def test_submit_manifest_provenance_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -453,7 +384,6 @@ def test_submit_manifest_provenance_fields(monkeypatch: pytest.MonkeyPatch, tmp_
     )
 
     manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
-    # The public submit CLI is the community path and never self-asserts vendor.
     assert manifest["result_source"] == "community"
     assert manifest["funding"] == "free-trial"
     assert manifest["submission_notes"] == "ran on a laptop"
@@ -469,12 +399,7 @@ def test_submit_manifest_funding_defaults_to_unspecified(monkeypatch: pytest.Mon
 
     manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
     assert manifest["funding"] == "unspecified"
-    assert "submission_notes" not in manifest  # omitted when not provided
-
-
-# ---------------------------------------------------------------------------
-# 6. Bad file → user-friendly error, exit 1
-# ---------------------------------------------------------------------------
+    assert "submission_notes" not in manifest
 
 
 def test_submit_load_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -490,11 +415,6 @@ def test_submit_load_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     result = CliRunner().invoke(sub.submit, [str(src)])
     assert result.exit_code == 1
     assert "Error loading result file" in result.output
-
-
-# ---------------------------------------------------------------------------
-# 7. Companion files (.plans.json, .tuning.json) are copied when present
-# ---------------------------------------------------------------------------
 
 
 def test_submit_copies_companion_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -555,18 +475,13 @@ def test_submit_canonical_manifest_hashes_primary_and_companions(
     assert manifest["companion_hashes"][tuning.name] == _sha256(packaged_tuning.read_bytes())
 
 
-# ---------------------------------------------------------------------------
-# 8. --last with --benchmark/--platform passes filters to find_latest_result
-# ---------------------------------------------------------------------------
-
-
 def test_submit_last_passes_filters(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     captured: dict = {}
 
     def fake_find(results_dir, *, benchmark=None, platform=None):
         captured["benchmark"] = benchmark
         captured["platform"] = platform
-        return None  # no result found is fine for this test
+        return None
 
     monkeypatch.setattr(sub, "find_latest_result", fake_find)
 
@@ -574,11 +489,6 @@ def test_submit_last_passes_filters(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
     assert captured["benchmark"] == "tpch"
     assert captured["platform"] == "duckdb"
-
-
-# ---------------------------------------------------------------------------
-# 9. UnsupportedSchemaError → schema version error message
-# ---------------------------------------------------------------------------
 
 
 def test_submit_unsupported_schema_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -596,11 +506,6 @@ def test_submit_unsupported_schema_error(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert "schema version 2.0" in result.output
 
 
-# ---------------------------------------------------------------------------
-# 10. FileNotFoundError → file not found error message
-# ---------------------------------------------------------------------------
-
-
 def test_submit_file_not_found_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "missing.json"
     src.write_text("{}", encoding="utf-8")
@@ -613,11 +518,6 @@ def test_submit_file_not_found_error(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     result = CliRunner().invoke(sub.submit, [str(src)])
     assert result.exit_code == 1
     assert "Result file not found" in result.output
-
-
-# ---------------------------------------------------------------------------
-# 11. Generic Exception catch-all → unexpected error message
-# ---------------------------------------------------------------------------
 
 
 def test_submit_generic_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -634,13 +534,7 @@ def test_submit_generic_exception(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert "Unexpected error" in result.output
 
 
-# ---------------------------------------------------------------------------
-# Service mode (--service / Phase 3 hosted ingest)
-# ---------------------------------------------------------------------------
-
-
 def test_submit_service_dry_run_no_creds_required(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service --dry-run must work without any auth setup."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -680,7 +574,6 @@ def test_submit_service_dry_run_validation_rejects_bundle_errors(
 
 
 def test_submit_service_default_url(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service without an explicit URL must use the documented default."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -691,7 +584,6 @@ def test_submit_service_default_url(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 
 def test_submit_service_custom_url_passed_through(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Explicit --service URL flows into the dry-run output unchanged."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -703,7 +595,6 @@ def test_submit_service_custom_url_passed_through(monkeypatch: pytest.MonkeyPatc
 
 
 def test_submit_service_visibility_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--visibility unlisted is reflected in the dry-run output."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -714,7 +605,6 @@ def test_submit_service_visibility_flag(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
 
 def test_submit_service_visibility_rejects_unknown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """An unknown visibility value is rejected by Click before any work runs."""
     src = tmp_path / "tpch_duckdb.json"
     src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -725,7 +615,6 @@ def test_submit_service_visibility_rejects_unknown(monkeypatch: pytest.MonkeyPat
 
 
 def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Caller-supplied --idempotency-key surfaces in the dry-run output."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -737,7 +626,6 @@ def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPa
 
 
 def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service without --dry-run resolves auth and calls the hosted transport."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -813,7 +701,6 @@ def test_submit_service_upload_uses_canonical_manifest_hashes(monkeypatch: pytes
 
 
 def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--service without --dry-run stops before upload when auth is missing."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -830,7 +717,6 @@ def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatc
 
 
 def test_submit_service_reauthenticates_once_on_401(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """A 401 from the hosted service prompts refresh, then retries once."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -862,7 +748,6 @@ def test_submit_service_reauthenticates_once_on_401(monkeypatch: pytest.MonkeyPa
 
 
 def test_submit_service_no_wait_reports_accepted_not_complete(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """--no-wait accepted submissions are not reported as completed publications."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -886,7 +771,6 @@ def test_submit_service_no_wait_reports_accepted_not_complete(monkeypatch: pytes
 
 
 def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Default behavior (no --service) is unchanged: PR-package mode."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -898,13 +782,7 @@ def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert (out_dir / "tpch_duckdb.manifest.json").is_file()
 
 
-# ---------------------------------------------------------------------------
-# Per-bundle manifest filename (dry-run-followup-manifest-filename-convention)
-# ---------------------------------------------------------------------------
-
-
 def test_submit_manifest_filename_inherits_bundle_stem(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Manifest is named `<bundle_stem>.manifest.json`, not the legacy literal."""
     src = tmp_path / "tpch_sf001_duckdb_20260403_093653_9c0925d1.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -914,12 +792,10 @@ def test_submit_manifest_filename_inherits_bundle_stem(monkeypatch: pytest.Monke
 
     assert result.exit_code == 0
     assert (out_dir / "tpch_sf001_duckdb_20260403_093653_9c0925d1.manifest.json").is_file()
-    # Legacy singleton filename must NOT be written.
     assert not (out_dir / "submission-manifest.json").exists()
 
 
 def test_submit_two_consecutive_submits_do_not_collide(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Two submits to the same output dir produce two distinct manifest files."""
     src_a = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src_a)
     src_b = tmp_path / "tpch_clickhouse.json"
@@ -937,13 +813,7 @@ def test_submit_two_consecutive_submits_do_not_collide(monkeypatch: pytest.Monke
     assert (out_dir / "tpch_clickhouse.manifest.json").is_file()
 
 
-# ---------------------------------------------------------------------------
-# --submitted-by precedence (dry-run-followup-submitted-by-flag)
-# ---------------------------------------------------------------------------
-
-
 def test_submit_submitted_by_flag_overrides_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Explicit --submitted-by wins over git config user.name."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -961,7 +831,6 @@ def test_submit_submitted_by_flag_overrides_git(monkeypatch: pytest.MonkeyPatch,
 
 
 def test_submit_submitted_by_falls_back_to_git_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Without --submitted-by, git config user.name is used."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -976,7 +845,6 @@ def test_submit_submitted_by_falls_back_to_git_config(monkeypatch: pytest.Monkey
 
 
 def test_submit_submitted_by_warns_when_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """When both flag and git config are empty, warn but do not fail."""
     src = tmp_path / "tpch_duckdb.json"
     _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
@@ -993,14 +861,12 @@ def test_submit_submitted_by_warns_when_empty(monkeypatch: pytest.MonkeyPatch, t
 
 
 def test_submit_submitted_by_in_help_output() -> None:
-    """The --submitted-by option appears in the help."""
     result = CliRunner().invoke(sub.submit, ["--help"])
     assert result.exit_code == 0
     assert "--submitted-by" in result.output
 
 
 def test_submit_help_mentions_results_paths_affordance() -> None:
-    """Submit help points contributors to exact result path discovery."""
     result = CliRunner().invoke(sub.submit, ["--help"])
     assert result.exit_code == 0
     assert "benchbox results --paths" in result.output

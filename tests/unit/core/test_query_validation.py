@@ -14,7 +14,7 @@ from benchbox.core.expected_results.models import (
     ExpectedQueryResult,
     ValidationMode,
 )
-from benchbox.core.expected_results.registry import get_registry
+from benchbox.core.expected_results.registry import ExpectedResultsRegistry, get_registry
 from benchbox.core.validation.query_validation import (
     QueryValidator,
 )
@@ -32,24 +32,49 @@ class TestQueryValidatorExactModeSafeguards:
     that prevents false failures when EXACT mode is enabled but expected_count is None.
     """
 
-    def test_exact_safeguard_exists_in_code(self):
-        """
-        Verify the EXACT override safeguard code exists in query_validation.py.
-
-        This is a meta-test that ensures the critical safeguard hasn't been accidentally removed.
-        """
-        from pathlib import Path
-
-        validation_file = (
-            Path(__file__).parent.parent.parent.parent / "benchbox" / "core" / "validation" / "query_validation.py"
+    @pytest.mark.parametrize(
+        ("expected_count", "actual_count", "mode", "valid"),
+        [
+            (None, 123, ValidationMode.SKIP, True),
+            (7, 7, ValidationMode.EXACT, True),
+            (7, 8, ValidationMode.EXACT, False),
+        ],
+        ids=["missing-count-skips-with-warning", "known-count-matches", "known-count-mismatch-fails"],
+    )
+    def test_exact_count_lookup_verdict(self, monkeypatch, expected_count, actual_count, mode, valid):
+        expected = ExpectedQueryResult(query_id="14a", expected_row_count=7, validation_mode=ValidationMode.EXACT)
+        if expected_count is None:
+            monkeypatch.setattr(expected, "get_expected_count", lambda scale_factor: None)
+        answers = BenchmarkExpectedResults(
+            benchmark_name="missing_count_fixture",
+            scale_factor=1.0,
+            query_results={"14a": expected},
         )
-        content = validation_file.read_text()
+        registry = ExpectedResultsRegistry()
+        registry.register_provider("missing_count_fixture", lambda scale_factor: answers)
+        validator = QueryValidator()
+        validator.registry = registry
 
-        # Check for the safeguard comment and logic
-        assert "CRITICAL SAFEGUARD" in content, "Safeguard comment should be present"
-        assert "expected_result.validation_mode == ValidationMode.EXACT and expected_count is None" in content
-        assert "downgrade to SKIP" in content or "Downgrade to SKIP" in content
-        assert "no expected count available" in content
+        result = validator.validate_query_result(
+            benchmark_type="missing_count_fixture",
+            query_id="14a",
+            actual_row_count=actual_count,
+            scale_factor=1.0,
+        )
+
+        assert result.is_valid is valid
+        assert result.validation_mode == mode
+        assert result.query_id == "14a"
+        assert result.expected_row_count == expected_count
+        assert result.actual_row_count == actual_count
+        if expected_count is None:
+            assert result.warning_message is not None
+            assert "EXACT validation mode but no expected count available" in result.warning_message
+            assert "Validation skipped" in result.warning_message
+            assert result.error_message is None
+        else:
+            assert result.warning_message is None
+            assert (result.error_message is None) is valid
 
     def test_integration_with_real_tpcds_variants(self):
         """

@@ -1,14 +1,3 @@
-"""LakeSail DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-LakeSail (Sail) uses Spark Connect and requires an explicit USING clause
-declaring the table storage format (ORC or PARQUET). DuckDB DDL output omits
-this clause.
-
-LakeSailAdapter._optimize_table_definition() is the runtime implementation for
-this transformation. This rule registers the REWRITE_DDL intent for governance -
-compat_lint enforcement only; transformer_id is not resolved at runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

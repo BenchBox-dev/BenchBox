@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Deterministic replay of recorded refresh events through the classifier.
-
-Evidence generation only. This module never skips a CI job and never
-publishes a required status. Callers inject recorded PR, check-run, and
-Actions-run data so unit tests do not touch the network.
-"""
 
 import argparse
 import json
@@ -31,22 +25,10 @@ CLI_DESCRIPTION = (
     "Actions-run data so unit tests do not touch the network.\n"
 )
 
-# GitHub check-run conclusions that represent a settled outcome. A lane whose
-# recorded value is absent, null, empty, "pending", or an unrecognized string has
-# no terminal result yet, so completeness must reject it rather than accept the
-# key's mere presence - `_failed_lanes` reads such a value as "not failed", which
-# would report a shadow-eligible record as having no full-only failure before the
-# lane actually finished.
 TERMINAL_LANE_CONCLUSIONS = frozenset(
     {"success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped", "stale"}
 )
 
-# Synthetic fixtures (the eligible template and the negative controls) exist to
-# pin classifier behaviour, and carry placeholder durations - 100 seconds, 20
-# runner-minutes. They are legitimate classification records but are not
-# measurements, so performance aggregates must exclude them or the published p50
-# / p95 / runner-minute totals describe the fixtures rather than the historical
-# window. Records without an explicit kind are treated as observations.
 RECORD_KIND_CONTROL = "control"
 RECORD_KIND_OBSERVATION = "observation"
 
@@ -99,7 +81,6 @@ def _as_float(value: object) -> float | None:
 
 
 def _record_kind(raw: Mapping[str, Any]) -> str:
-    """Classify a record as a synthetic control or a real observation."""
     kind = str(raw.get("kind") or "").strip().lower()
     return RECORD_KIND_CONTROL if kind == RECORD_KIND_CONTROL else RECORD_KIND_OBSERVATION
 
@@ -117,7 +98,6 @@ def _failed_lanes(raw: Mapping[str, Any]) -> list[str]:
 
 
 def normalize_record(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Copy a recorded event into the classifier request shape."""
 
     request = raw.get("request") if isinstance(raw.get("request"), Mapping) else raw
     if not isinstance(request, Mapping):
@@ -154,15 +134,6 @@ def replay_record(raw: Mapping[str, Any]) -> ReplayResult:
 
 
 def _percentile(values: list[float], pct: float) -> float | None:
-    """Percentile via the repo-wide nearest-rank definition.
-
-    The previous index arithmetic - `ordered[int(n * pct / 100)]` - degenerated
-    to `max()` for any sample of 20 or fewer values, which is every realistic
-    replay history, so `required_gate_p95` tracked a single outlier. Delegating
-    to `percentile_ms` also keeps one percentile definition across the repo; note
-    it takes `p` as a fraction, and passing 95 instead of 0.95 is exactly the
-    silent max() this replaced.
-    """
     if not values:
         return None
     return percentile_ms(sorted(values), pct / 100)
@@ -175,9 +146,6 @@ def summarize(results: list[ReplayResult]) -> ReplaySummary:
     for item in results:
         for reason in item.reasons or ["(none)"]:
             reasons[reason] = reasons.get(reason, 0) + 1
-    # Classification counts cover every record; timing aggregates cover only
-    # observations. Both counts are reported so an excluded control is visible
-    # rather than silently dropped.
     observed = [item for item in results if item.kind != RECORD_KIND_CONTROL]
     gate = [item.required_gate_seconds for item in observed if item.required_gate_seconds is not None]
     whole = [item.all_workflow_seconds for item in observed if item.all_workflow_seconds is not None]

@@ -60,8 +60,6 @@ def test_queries_reference_only_obt_table() -> None:
 
     assert len(queries) == len(CONVERTIBLE_QUERY_IDS)
     for sql in queries.values():
-        # Check that no fact tables appear in FROM clauses (but allow as column aliases)
-        # Pattern: FROM <table> or JOIN <table> - avoid matching " AS store_sales" aliases
         assert not re.search(r"\bFROM\s+store_sales\b", sql, re.IGNORECASE)
         assert not re.search(r"\bFROM\s+web_sales\b", sql, re.IGNORECASE)
         assert not re.search(r"\bFROM\s+catalog_sales\b", sql, re.IGNORECASE)
@@ -72,33 +70,19 @@ def test_queries_reference_only_obt_table() -> None:
 
 
 def _extract_column_references(sql: str, valid_columns: set[str]) -> set[str]:
-    """Extract identifiers from SQL that match known OBT column patterns.
-
-    Excludes output aliases (identifiers after AS keyword).
-    """
     sql_lower = sql.lower()
 
-    # Remove output aliases (everything after AS) to avoid false positives
-    # Pattern: word AS alias - we want to remove the alias part
     sql_no_aliases = re.sub(r"\bAS\s+[a-z_][a-z0-9_]*", "AS _alias_", sql_lower, flags=re.IGNORECASE)
 
-    # Find all identifiers (word characters with underscores)
     identifiers = set(re.findall(r"\b([a-z][a-z0-9_]*)\b", sql_no_aliases))
 
-    # Filter to those that look like OBT column references
-    # Dimension columns follow a double-prefix pattern: role_prefix_dim_col
-    # e.g., sold_date_d_year (sold_date_ + d_year from DATE_DIM)
-    # e.g., item_i_category (item_ + i_category from ITEM)
-    # e.g., promo_p_promo_id (promo_ + p_promo_id from PROMOTION)
     dimension_column_prefixes = (
-        # Date/time dimension roles
         "sold_date_d_",
         "sold_date_t_",
         "sold_time_t_",
         "ship_date_d_",
         "return_date_d_",
         "return_time_t_",
-        # Entity dimension roles
         "item_i_",
         "promo_p_",
         "reason_r_",
@@ -109,12 +93,10 @@ def _extract_column_references(sql: str, valid_columns: set[str]) -> set[str]:
         "catalog_page_cp_",
         "ship_mode_sm_",
         "warehouse_w_",
-        # Customer dimension roles
         "bill_customer_c_",
         "ship_customer_c_",
         "returning_customer_c_",
         "refunded_customer_c_",
-        # Demographics dimension roles
         "bill_cdemo_cd_",
         "ship_cdemo_cd_",
         "returning_cdemo_cd_",
@@ -123,7 +105,6 @@ def _extract_column_references(sql: str, valid_columns: set[str]) -> set[str]:
         "ship_hdemo_hd_",
         "returning_hdemo_hd_",
         "refunded_hdemo_hd_",
-        # Address dimension roles
         "bill_addr_ca_",
         "ship_addr_ca_",
         "returning_addr_ca_",
@@ -132,7 +113,6 @@ def _extract_column_references(sql: str, valid_columns: set[str]) -> set[str]:
 
     column_refs = set()
     for ident in identifiers:
-        # Check if it's a known column or looks like a dimension column pattern
         if ident in valid_columns or any(ident.startswith(prefix) for prefix in dimension_column_prefixes):
             column_refs.add(ident)
 
@@ -167,13 +147,9 @@ def test_queries_parse_in_duckdb() -> None:
     conn = duckdb.connect(":memory:")
     columns = get_obt_columns("full")
 
-    # Create a dummy table with the OBT schema
     col_defs = ", ".join(f"{col.name} {col.sql_type()}" for col in columns)
     conn.execute(f"CREATE TABLE {OBT_TABLE_NAME} ({col_defs})")
 
-    # Create dimension tables needed by Q46/Q68 which compare current vs purchase address
-    # These queries need external dimension joins because the OBT doesn't have
-    # the customer's current address inlined (only the purchase address)
     conn.execute("""
         CREATE TABLE customer (
             c_customer_sk INTEGER PRIMARY KEY,
@@ -212,7 +188,6 @@ def test_queries_parse_in_duckdb() -> None:
             ca_location_type VARCHAR(20)
         )
     """)
-    # Create household_demographics for Q84 which filters by income band
     conn.execute("""
         CREATE TABLE household_demographics (
             hd_demo_sk INTEGER PRIMARY KEY,
@@ -222,7 +197,6 @@ def test_queries_parse_in_duckdb() -> None:
             hd_vehicle_count INTEGER
         )
     """)
-    # Create income_band for Q84 which filters customers by income range
     conn.execute("""
         CREATE TABLE income_band (
             ib_income_band_sk INTEGER PRIMARY KEY,
@@ -230,7 +204,6 @@ def test_queries_parse_in_duckdb() -> None:
             ib_upper_bound INTEGER
         )
     """)
-    # Create customer_demographics for Q64 which compares transaction-time vs current demographics
     conn.execute("""
         CREATE TABLE customer_demographics (
             cd_demo_sk INTEGER PRIMARY KEY,
@@ -244,7 +217,6 @@ def test_queries_parse_in_duckdb() -> None:
             cd_dep_college_count INTEGER
         )
     """)
-    # Create date_dim for Q64 which looks up customer's first_sales_date and first_shipto_date
     conn.execute("""
         CREATE TABLE date_dim (
             d_date_sk INTEGER PRIMARY KEY,
@@ -281,7 +253,6 @@ def test_queries_parse_in_duckdb() -> None:
     parse_errors: dict[str, str] = {}
     for query_id, sql in queries.items():
         try:
-            # Use EXPLAIN to validate syntax without execution
             conn.execute(f"EXPLAIN {sql}")
         except Exception as e:
             parse_errors[query_id] = str(e)
@@ -292,16 +263,13 @@ def test_queries_parse_in_duckdb() -> None:
 
 
 def test_q8_has_diverse_zip_codes() -> None:
-    """Q8 ulist(random(10000,99999,uniform),400) should produce 400 diverse values."""
     converter = QueryConverter()
     result = converter.convert(8)
-    # Count distinct 5-digit numbers in the IN clause
     numbers = re.findall(r"'(\d{5})'", result.default_sql)
-    assert len(set(numbers)) > 100  # Should have many distinct values, not all '10000'
+    assert len(set(numbers)) > 100
 
 
 def test_ulist_expansion_is_deterministic() -> None:
-    """Same query_id should always produce the same ulist values."""
     c1 = QueryConverter().convert(8)
     c2 = QueryConverter().convert(8)
     assert c1.default_sql == c2.default_sql

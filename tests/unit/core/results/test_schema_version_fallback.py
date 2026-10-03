@@ -1,11 +1,3 @@
-"""Fallback-matrix contract tests for the bundle schema version key.
-
-Covers the post-#2199 shape: producers emit matching
-``result_schema_version`` and legacy ``version`` aliases, while readers accept
-``result_schema_version`` -> ``version`` -> ``schema_version`` through the
-single ``result_schema_version_value()`` read path and reject conflicts.
-"""
-
 from __future__ import annotations
 
 import json

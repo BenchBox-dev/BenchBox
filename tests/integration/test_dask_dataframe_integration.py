@@ -1,20 +1,6 @@
-"""Dask DataFrame Integration Tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains integration tests for the Dask DataFrame platform adapter,
-validating that Dask can successfully execute TPC-H queries using the
-UnifiedPandasFrame wrapper and pandas-compatible query implementations.
-
-The tests verify:
-- Adapter initialization and configuration
-- Data loading (Parquet format)
-- TPC-H query execution via Pandas-family implementations
-- Lazy evaluation and compute behavior
-- GroupBy with nunique aggregation (Dask-specific handling)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,7 +15,6 @@ pytestmark = [
 ]
 
 
-# Skip all tests if Dask is not available
 try:
     import dask.dataframe as dd  # noqa: F401
 
@@ -43,31 +28,26 @@ from benchbox.platforms import DASK_AVAILABLE
 @pytest.mark.integration
 @pytest.mark.skipif(not dask_available, reason="Dask not installed")
 class TestDaskDataFrameIntegration:
-    """Integration tests for Dask DataFrame adapter."""
-
     @pytest.fixture
     def temp_working_dir(self):
-        """Create a temporary working directory for Dask."""
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
     @pytest.fixture
     def dask_adapter(self, temp_working_dir):
-        """Create a Dask adapter with test configuration."""
         from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
 
         adapter = DaskDataFrameAdapter(
             working_dir=str(temp_working_dir),
             n_workers=2,
             threads_per_worker=1,
-            use_distributed=False,  # Use synchronous scheduler for tests
+            use_distributed=False,
         )
         yield adapter
         adapter.close()
 
     @pytest.fixture
     def sample_parquet_data(self, temp_working_dir):
-        """Create sample Parquet data for TPC-H style testing."""
         from datetime import date
 
         import pandas as pd
@@ -75,7 +55,6 @@ class TestDaskDataFrameIntegration:
         data_dir = temp_working_dir / "data"
         data_dir.mkdir()
 
-        # Create lineitem table (simplified TPC-H schema)
         lineitem_df = pd.DataFrame(
             {
                 "l_orderkey": [1, 1, 2, 2, 3],
@@ -179,11 +158,9 @@ class TestDaskDataFrameIntegration:
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
-        # Should be a Dask DataFrame (lazy)
         assert hasattr(df, "compute")
         assert hasattr(df, "npartitions")
 
-        # Compute to verify data
         result = df.compute()
         assert len(result) == 5
         assert "l_quantity" in result.columns
@@ -206,15 +183,9 @@ class TestDaskDataFrameIntegration:
         assert row_count == 5
 
     def test_groupby_with_nunique(self, dask_adapter, sample_parquet_data):
-        """Test groupby with nunique aggregation (Dask-specific handling).
-
-        Dask does not support 'nunique' in .agg() like Pandas does.
-        The adapter's groupby_agg method should handle this separately.
-        """
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
-        # Use groupby_agg with nunique
         result = dask_adapter.groupby_agg(
             df,
             by="l_returnflag",
@@ -222,23 +193,16 @@ class TestDaskDataFrameIntegration:
             as_index=False,
         )
 
-        # Compute and verify
         result_pd = result.compute()
 
         assert "unique_parts" in result_pd.columns
         assert "total_qty" in result_pd.columns
-        assert len(result_pd) == 2  # N and R flags
+        assert len(result_pd) == 2
 
     def test_groupby_without_as_index(self, dask_adapter, sample_parquet_data):
-        """Test groupby behavior with as_index=False (Dask workaround).
-
-        Dask doesn't support as_index=False in groupby().
-        The adapter should use reset_index() to achieve the same result.
-        """
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
-        # Use groupby_agg with as_index=False
         result = dask_adapter.groupby_agg(
             df,
             by=["l_returnflag", "l_linestatus"],
@@ -248,7 +212,6 @@ class TestDaskDataFrameIntegration:
 
         result_pd = result.compute()
 
-        # Group columns should be regular columns, not index
         assert "l_returnflag" in result_pd.columns
         assert "l_linestatus" in result_pd.columns
         assert "count" in result_pd.columns
@@ -262,15 +225,12 @@ class TestDaskDataFrameIntegration:
 
         wrapper = UnifiedPandasFrame(df, dask_adapter)
 
-        # Test basic operations preserve wrapper type
         filtered = wrapper[wrapper["l_quantity"] > 5]
         assert hasattr(filtered, "native")
 
-        # Test copy (should use shallow copy for Dask)
         copied = wrapper.copy()
         assert hasattr(copied, "native")
 
-        # Test compute
         result = wrapper.compute()
         assert len(result) == 5
 
@@ -279,13 +239,10 @@ class TestDaskDataFrameIntegration:
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
-        # Chain operations - should not compute yet
         result = df[df["l_quantity"] > 3].groupby("l_returnflag").agg({"l_quantity": "sum"})
 
-        # Should still be lazy
         assert hasattr(result, "compute")
 
-        # Now compute
         computed = result.compute()
         assert len(computed) == 2
 
@@ -293,17 +250,13 @@ class TestDaskDataFrameIntegration:
 @pytest.mark.integration
 @pytest.mark.skipif(not dask_available, reason="Dask not installed")
 class TestDaskTPCHQueryExecution:
-    """Integration tests for TPC-H query execution on Dask."""
-
     @pytest.fixture
     def temp_working_dir(self):
-        """Create a temporary working directory for Dask."""
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
     @pytest.fixture
     def dask_adapter(self, temp_working_dir):
-        """Create a Dask adapter."""
         from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
 
         adapter = DaskDataFrameAdapter(
@@ -315,7 +268,6 @@ class TestDaskTPCHQueryExecution:
 
     @pytest.fixture
     def tpch_data(self, temp_working_dir):
-        """Create minimal TPC-H data for query testing."""
         from datetime import date
 
         import pandas as pd
@@ -323,7 +275,6 @@ class TestDaskTPCHQueryExecution:
         data_dir = temp_working_dir / "data"
         data_dir.mkdir()
 
-        # Lineitem with Q1-compatible data
         lineitem = pd.DataFrame(
             {
                 "l_orderkey": range(1, 11),
@@ -336,7 +287,7 @@ class TestDaskTPCHQueryExecution:
                 "l_tax": [0.02] * 10,
                 "l_returnflag": ["A", "N", "R", "A", "N", "R", "A", "N", "R", "A"],
                 "l_linestatus": ["F", "O", "F", "O", "F", "O", "F", "O", "F", "O"],
-                "l_shipdate": [date(1998, 8, 1)] * 10,  # Before Q1 cutoff
+                "l_shipdate": [date(1998, 8, 1)] * 10,
                 "l_commitdate": [date(1998, 8, 10)] * 10,
                 "l_receiptdate": [date(1998, 8, 15)] * 10,
                 "l_shipinstruct": ["NONE"] * 10,
@@ -349,20 +300,13 @@ class TestDaskTPCHQueryExecution:
         return data_dir
 
     def test_q1_pricing_summary_pandas_impl(self, dask_adapter, tpch_data):
-        """Test TPC-H Q1 execution using pandas implementation on Dask.
-
-        Q1 tests groupby with multiple aggregations - a good test for
-        Dask's groupby_agg handling.
-        """
         from benchbox.core.tpch.dataframe_queries import q1_pandas_impl
 
         ctx = dask_adapter.create_context()
         dask_adapter.load_table(ctx, "lineitem", [tpch_data / "lineitem.parquet"])
 
-        # Execute Q1 pandas implementation
         result = q1_pandas_impl(ctx)
 
-        # For Dask, result may be a Dask DataFrame - compute if needed
         if hasattr(result, "compute"):
             result = result.compute()
 
@@ -372,20 +316,13 @@ class TestDaskTPCHQueryExecution:
         assert len(result) > 0
 
     def test_q6_forecasting_revenue_pandas_impl(self, dask_adapter, tpch_data):
-        """Test TPC-H Q6 execution using pandas implementation on Dask.
-
-        Q6 tests scalar aggregation with .compute() handling for lazy
-        values in Dask.
-        """
         from benchbox.core.tpch.dataframe_queries import q6_pandas_impl
 
         ctx = dask_adapter.create_context()
         dask_adapter.load_table(ctx, "lineitem", [tpch_data / "lineitem.parquet"])
 
-        # Execute Q6 pandas implementation
         result = q6_pandas_impl(ctx)
 
-        # Result should be a DataFrame with revenue column
         if hasattr(result, "compute"):
             result = result.compute()
 

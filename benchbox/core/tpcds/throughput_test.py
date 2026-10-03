@@ -1,16 +1,9 @@
-"""TPC-DS Throughput Test Implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module implements the TPC-DS Throughput Test according to the official TPC-DS
-specification. The Throughput Test executes multiple concurrent query streams
-to calculate the Throughput@Size metric.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import sqlite3
@@ -30,67 +23,22 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 @dataclass
 class TPCDSThroughputTestConfig:
-    """Configuration for TPC-DS Throughput Test."""
-
     scale_factor: float = 1.0
     num_streams: int = 4
     base_seed: int = 42
-    stream_timeout: int = 7200  # Timeout per stream in seconds (0 = no timeout)
+    stream_timeout: int = 7200
     max_workers: Optional[int] = None
     verbose: bool = False
-    # Opt-in cooperative cancellation (default OFF, behavior-preserving): when
-    # True, a timed-out stream (see StreamRunner.execute()) gets a
-    # threading.Event signalled so its query loop can notice and stop between
-    # queries instead of continuing to run in the background indefinitely.
-    # Python cannot forcibly cancel a running thread, so this is opt-in and
-    # never hard-kills anything -- see benchbox/core/throughput/runner.py's
-    # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
-    # Number of queries to execute per stream (None = all queries, ~99 for TPC-DS)
-    # NOTE: Per TPC-DS spec, full query set should be executed. Use subset only for testing.
-    queries_per_stream: Optional[int] = None  # Default: execute all queries
-    # Enable preflight validation (validates query generation before execution)
+    queries_per_stream: Optional[int] = None
     enable_preflight: bool = True
-    # Legacy per-stream reporting threshold retained for configuration
-    # compatibility. Product scoring is stricter: StreamRunner emits
-    # Throughput@Size only when every requested stream and query succeeds.
-    #
-    # Spec citation: NOT derived from a TPC-DS "acceptable failure rate"
-    # clause -- no such partial-success allowance exists in the TPC-DS
-    # specification v4.0.0. A compliant/audited run requires every stream and
-    # query to complete successfully (mirroring TPC-H specification 5.1.1.6's
-    # "A failed run is defined as a run that did not complete successfully
-    # due to unforeseen system failures"). 0.70 is a BenchBox-internal
-    # tolerance for treating a run as "usable" for iterative development/CI
-    # despite some stream/query failures; it is NOT an official TPC-DS
-    # compliance gate, and results below 100% success are not eligible for
-    # TPC-DS-compliant/audited reporting regardless of this setting.
-    #
-    # The threshold still drives _finalize_stream_success() so historical
-    # per-stream status remains visible, but it cannot make a partial run
-    # scoreable at the shared metric boundary.
     min_success_rate: float = 0.70
 
 
-# Backward-compatibility alias - ThroughputStreamResult is the canonical type.
 TPCDSThroughputStreamResult = ThroughputStreamResult
 
 
 def _count_cursor_rows(cursor: Any) -> int:
-    """Return a row count without importing benchbox.platforms from core.
-
-    The layering convention `utils < core < platforms < cli` forbids `core`
-    importing from `platforms`, so this duck-types on the `row_count()`
-    method `PlatformAdapterCursor` exposes (see
-    `benchbox.platforms.base.connection_wrappers`) instead of importing
-    `count_query_rows` directly. On the real throughput path the cursor IS
-    a `PlatformAdapterCursor`, so this always resolves there and the
-    "never materialize rows just to count them" behavior is preserved.
-
-    The fallback below only serves raw DB-API cursors / test doubles that
-    lack `row_count()`, and mirrors `count_query_rows`'s truthfulness rule:
-    a `-1` (unknown) rowcount must never be reported as a count.
-    """
     counter = getattr(cursor, "row_count", None)
     if callable(counter):
         return counter()
@@ -103,19 +51,14 @@ def _count_cursor_rows(cursor: Any) -> int:
 
 @dataclass
 class TPCDSThroughputTestResult(ThroughputResult):
-    """Result of TPC-DS Throughput Test."""
-
     config: TPCDSThroughputTestConfig = field(kw_only=True)
 
     @property
     def scale_factor(self) -> float:
-        """Get scale factor from config."""
         return self.config.scale_factor
 
 
 class TPCDSThroughputTest:
-    """TPC-DS Throughput Test implementation."""
-
     def __init__(
         self,
         benchmark: Any,
@@ -126,55 +69,30 @@ class TPCDSThroughputTest:
         connection_string: Optional[str] = None,
         dialect: Optional[str] = None,
     ) -> None:
-        """Initialize TPC-DS Throughput Test.
-
-        Args:
-            benchmark: TPCDSBenchmark instance
-            connection_factory: Factory function to create database connections
-            scale_factor: Scale factor for the benchmark
-            num_streams: Number of concurrent streams
-            verbose: Enable verbose logging
-            connection_string: Database connection string (legacy parameter)
-            dialect: SQL dialect (legacy parameter)
-        """
         self.benchmark = benchmark
 
-        # Handle legacy connection_string parameter
         if connection_string is not None:
-            conn_str = connection_string  # Type narrowing for lambda
+            conn_str = connection_string
             self.connection_factory = lambda: self._create_connection_from_string(conn_str)
         elif connection_factory is not None:
             self.connection_factory = connection_factory
         else:
-            # Default to local in-memory SQLite when no explicit connection source is provided.
             self.connection_factory = lambda: DatabaseConnection(sqlite3.connect(":memory:"), dialect="sqlite")
 
         self.config = TPCDSThroughputTestConfig(scale_factor=scale_factor, num_streams=num_streams, verbose=verbose)
 
-        # Store target dialect for query translation
         self.target_dialect = dialect
 
         self.logger = logging.getLogger(__name__)
         if verbose:
             self.logger.setLevel(logging.INFO)
-        # Captured SQL items for dry-run preview: (label, sql)
         self.captured_items: list[tuple[str, str]] = []
 
-        # Populated by run() via _pregenerate_stream_queries() before the
-        # timed concurrent window starts: {stream_id: [(stream_query, sql_or_
-        # exception), ...]} aligned by position. When set, _execute_single_
-        # query() consumes the cached SQL instead of regenerating inline.
-        # Left as None when _execute_stream()/_execute_single_query() are
-        # invoked directly (bypassing run()), preserving the historical
-        # inline-generation behavior for direct/unit callers.
         self._pregenerated_queries: Optional[dict[int, list[tuple[Any, Any]]]] = None
-
-        # Lock for concurrent stream capture
 
         self._capture_lock = threading.Lock()
 
     def _create_connection_from_string(self, connection_string: str) -> DatabaseConnection:
-        """Create a connection wrapper from a supported connection string."""
         if connection_string in {"sqlite::memory:", ":memory:", "sqlite://:memory:"}:
             return DatabaseConnection(sqlite3.connect(":memory:"), dialect="sqlite")
 
@@ -187,24 +105,9 @@ class TPCDSThroughputTest:
         )
 
     def run(self, config: Optional[TPCDSThroughputTestConfig] = None) -> TPCDSThroughputTestResult:
-        """Execute the TPC-DS Throughput Test.
-
-        Args:
-            config: Optional test configuration (uses default if not provided)
-
-        Returns:
-            Throughput Test results with Throughput@Size metric
-
-        Raises:
-            RuntimeError: If Throughput Test execution fails
-        """
         if config is None:
             config = self.config
 
-        # NOTE: start_time here is for test metadata only, not for TTT calculation.
-        # Per TPC-DS specification, Total Test Time (TTT) must be measured from when
-        # the first stream begins execution until the last stream completes execution.
-        # This excludes setup overhead (executor creation, future submission, preflight, etc.).
         start_time = mono_time()
         start_time_str = datetime.now().isoformat()
 
@@ -222,36 +125,22 @@ class TPCDSThroughputTest:
             errors=[],
         )
 
-        # Logging
         try:
             if config.verbose:
                 self.logger.info("Starting TPC-DS Throughput Test")
                 self.logger.info(f"Number of streams: {config.num_streams}")
                 self.logger.info(f"Scale factor: {config.scale_factor}")
 
-            # Preflight: validate that selected query subsets in all streams can be generated
         except Exception:
-            # Reraise any logging/prep errors
             raise
 
-        # Pre-generate every stream's ordered SQL before the timed concurrent
-        # window starts (outside try, so failures raise -- matching the
-        # historical fail-fast preflight contract). This removes dsqgen
-        # subprocess cost from execution_time_seconds and TTT. Left disabled
-        # (falls back to inline per-query generation in _execute_single_query)
-        # when enable_preflight=False, matching today's behavior for callers
-        # that explicitly opt out of upfront validation/generation.
         self._pregenerated_queries = None
         if config.enable_preflight:
             self._pregenerated_queries = self._pregenerate_stream_queries(config)
 
         try:
-            # Execute concurrent streams
             StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
-            # A throughput metric is valid only when every requested stream
-            # completed successfully. Partial success remains visible in the
-            # result details but is never published as a scored measurement.
             result.success = StreamRunner.compute_metrics(result, config, start_time)
 
             success_rate = result.streams_successful / max(config.num_streams, 1)
@@ -277,17 +166,8 @@ class TPCDSThroughputTest:
             return result
 
     def _preflight_validate_generation(self, config: TPCDSThroughputTestConfig) -> None:
-        """Validate that queries can be generated for all streams.
-
-        This validates all 99 TPC-DS queries for each stream to ensure no runtime
-        generation failures. This is conservative but guarantees safety regardless
-        of which queries the stream permutation algorithm selects.
-
-        Raises RuntimeError with details if any generation fails.
-        """
         failures = []
 
-        # Log the preflight strategy
         if config.verbose:
             self.logger.info(
                 f"Preflight validation: checking all 99 queries × {config.num_streams} streams "
@@ -295,7 +175,6 @@ class TPCDSThroughputTest:
             )
 
         try:
-            # Use standard TPC-DS query id range: 1-99
             available_query_ids = list(range(1, 100))
 
             for stream_id in range(config.num_streams):
@@ -318,35 +197,6 @@ class TPCDSThroughputTest:
             raise RuntimeError(msg)
 
     def _pregenerate_stream_queries(self, config: TPCDSThroughputTestConfig) -> dict[int, list[tuple[Any, str]]]:
-        """Pre-generate every stream's ordered (StreamQuery, SQL) pairs before
-        the timed concurrent window starts.
-
-        This is the real generation cache that ``_execute_single_query``
-        consumes, keyed by (stream_id, position). All streams for the run are
-        generated in ONE official ``dsqgen -STREAMS <num_streams>`` pass
-        (``benchbox.core.tpcds.streams.generate_dsqgen_streams``), which
-        yields both the official per-stream query ORDERING and the official
-        per-stream substitution PARAMETERS -- the TPC-DS compliance-relevant
-        inputs to QphDS. This is the throughput-test default and retires the
-        home-grown ``TPCDSPermutationGenerator`` ordering / RNG-jitter
-        parameter path for this (the timed, scored) path; that Python path
-        remains available, unchanged, via ``_build_stream_queries`` for
-        direct/unit callers that bypass ``run()`` (see its docstring), and
-        for non-throughput callers (power test, dry-run, dataframe query
-        resolution) which are out of scope for this change.
-
-        dsqgen emits SQL in a base template dialect (netezza); each
-        statement is translated to the target platform dialect via
-        ``_translate_stream_query_sql``, mirroring the
-        ``TPCDSBenchmark.get_query()`` translate + override pipeline used by
-        the single-query path, so the resulting SQL is platform-executable
-        exactly like before -- only *how* the base SQL + ordering is sourced
-        changes (dsqgen batch instead of per-template dsqgen calls).
-
-        Only called when ``config.enable_preflight`` is True; any generation
-        or translation failure raises immediately (matching the historical
-        fail-fast preflight contract) before the timed window starts.
-        """
         from benchbox.core.tpcds.streams import DSQGenStreamsError, generate_dsqgen_streams
 
         try:
@@ -386,24 +236,9 @@ class TPCDSThroughputTest:
         return stream_queries
 
     def _translate_stream_query_sql(self, stream_query: Any) -> str:
-        """Translate a dsqgen -STREAMS-generated raw SQL statement to the
-        target platform dialect.
-
-        Mirrors ``TPCDSBenchmark.get_query()``'s
-        ``translate_query_text`` + ``_apply_target_dialect_overrides``
-        pipeline, without re-invoking dsqgen per query: the batch
-        ``-STREAMS`` call already produced the official ordering and
-        substitution parameters baked into ``stream_query.sql``. Falls back
-        to the raw SQL untranslated if ``self.benchmark`` doesn't expose
-        these methods (e.g. minimal test doubles), matching the target
-        dialect used by ``_get_stream_query_text`` elsewhere in this class.
-        """
         raw_sql = stream_query.sql
         target = (self.target_dialect or "netezza").lower()
 
-        # NOTE: the `else raw_sql` branch is a test-double tolerance only --
-        # the real TPC-DS benchmark always provides translate_query_text, so
-        # untranslated netezza SQL must never reach this path in production.
         implementation = getattr(self.benchmark, "_impl", None)
         translate_fn = getattr(self.benchmark, "translate_query_text", None)
         if not callable(translate_fn) and implementation is not None:
@@ -434,26 +269,6 @@ class TPCDSThroughputTest:
         raise RuntimeError("No query_manager found - ThroughputTest requires a TPCDSBenchmark instance")
 
     def _build_stream_queries(self, stream_id: int, seed: int, config: TPCDSThroughputTestConfig) -> list:
-        """Resolve one stream's ordered query subset via the home-grown
-        TPC-DS permutation (streams.py's ``create_standard_streams``).
-
-        This is the historical inline-generation fallback used only when no
-        pregeneration cache exists (``enable_preflight=False``, or
-        ``_execute_stream``/``_execute_single_query`` invoked directly,
-        bypassing ``run()``) -- the throughput-test *default* path now uses
-        ``dsqgen -STREAMS`` via ``_pregenerate_stream_queries`` instead (see
-        its docstring). ``must_preserve`` keeps this fallback's existing
-        per-template behavior working for those direct/unit callers.
-
-        Generates the FULL matrix for the run's actual ``config.num_streams``
-        and ``config.base_seed`` exactly once per call, then indexes by
-        ``stream_id`` -- mirroring TPC-H's single ``PERMUTATION_MATRIX``
-        indexed by ``stream_id % 41`` (benchbox/core/tpch/streams.py). The
-        previous ``num_streams=stream_id + 1, base_seed=seed + stream_id``
-        formula regenerated a differently-sized matrix per stream and
-        double-counted ``stream_id`` in the seed, so a stream's ordering
-        depended on its own index rather than the run's stream count.
-        """
         from benchbox.core.tpcds.streams import create_standard_streams
 
         available_query_ids = self._resolve_available_query_ids()
@@ -485,13 +300,6 @@ class TPCDSThroughputTest:
         return all_queries
 
     def _cached_query_text(self, stream_id: int, position: int) -> Optional[str]:
-        """Return pre-generated SQL for (stream_id, position), if available.
-
-        Returns None when no pre-generation cache exists (enable_preflight is
-        False, or _execute_stream/_execute_single_query were invoked directly
-        without going through run()), signalling the caller should generate
-        the query text inline instead -- exactly as it always has.
-        """
         if self._pregenerated_queries is None:
             return None
         entries = self._pregenerated_queries.get(stream_id)
@@ -518,12 +326,6 @@ class TPCDSThroughputTest:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
         cursor = connection.execute(query_text)
-        # _count_cursor_rows() reads the adapter-reported count directly (when
-        # available) instead of materializing the result set via fetchall() -
-        # see PlatformAdapterCursor.row_count() in connection_wrappers.py.
-        # Previously this called cursor.fetchall() and discarded the return
-        # value entirely, so TPC-DS result_count was hardcoded to 0 below
-        # regardless of the true result size.
         row_count = _count_cursor_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
@@ -570,10 +372,6 @@ class TPCDSThroughputTest:
                     self.captured_items.append((label, query_text))
 
             if platform_result is not None:
-                # Propagate captured plan metadata (including the internal
-                # _plan_capture_key) so a combined power+throughput run can match
-                # this row by its exact key rather than the ambiguous public-id
-                # fallback in _attach_captured_plans.
                 propagate_query_execution_metadata(platform_result, query_result)
 
             query_result.update(
@@ -607,10 +405,6 @@ class TPCDSThroughputTest:
         cancelled: bool = False,
     ) -> None:
         if cancelled:
-            # Cooperative cancellation (config.cancel_on_timeout) stopped this
-            # stream before it finished its query subset -- never count a
-            # truncated stream as successful regardless of the per-stream
-            # success-rate gate below.
             stream_result.success = False
             stream_result.error = stream_result.error or (
                 f"Stream cancelled cooperatively after timeout ({stream_result.queries_executed} queries completed)"
@@ -625,9 +419,6 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Stream {stream_id} completed: no queries executed")
             return
 
-        # Preserve the configurable per-stream reporting threshold. The shared
-        # metric boundary independently requires every query and stream to
-        # succeed before the run can produce a score.
         success_rate = stream_result.queries_successful / stream_result.queries_executed
         stream_result.success = success_rate >= config.min_success_rate
         if config.verbose:
@@ -649,7 +440,6 @@ class TPCDSThroughputTest:
     def _execute_stream(
         self, stream_id: int, seed: int, config: TPCDSThroughputTestConfig
     ) -> TPCDSThroughputStreamResult:
-        """Execute a single TPC-DS throughput test stream."""
         start_time = mono_time()
         stream_result = TPCDSThroughputStreamResult(
             stream_id=stream_id,
@@ -668,11 +458,6 @@ class TPCDSThroughputTest:
 
             connection = self.connection_factory()
 
-            # When run() pre-generated this stream (the normal path with
-            # enable_preflight=True), reuse its already-resolved ordering
-            # instead of calling _build_stream_queries() again inside the
-            # timed window -- that call also (re-)invokes stream permutation
-            # generation, which this avoids repeating here entirely.
             cached_entries = (
                 self._pregenerated_queries.get(stream_id) if self._pregenerated_queries is not None else None
             )
@@ -681,26 +466,6 @@ class TPCDSThroughputTest:
             else:
                 query_subset = self._build_stream_queries(stream_id, seed, config)
 
-            # Opt-in cooperative cancellation (config.cancel_on_timeout,
-            # default OFF): StreamRunner.execute() sets this stream's event
-            # when its per-stream timeout elapses. Checked once per query so
-            # a timed-out stream can stop soon instead of running unbounded
-            # in the background. See runner.py's module docstring.
-            #
-            # Gated directly on config.cancel_on_timeout being the literal
-            # True (not just presence of _stream_cancel_events, and not
-            # merely truthy) so a stale/leftover dict from a prior run that
-            # reused this config object (e.g. run 1 with
-            # cancel_on_timeout=True where a stream timed out and its Event
-            # was set(), then run 2 reusing the same config with
-            # cancel_on_timeout=False) can never take effect here -- belt and
-            # suspenders alongside StreamRunner.execute() resetting
-            # _stream_cancel_events to {} whenever cooperative cancel is
-            # disabled. Also requires _stream_cancel_events to be a genuine
-            # dict and the resolved entry to be a genuine threading.Event --
-            # not merely truthy -- so a malformed config (e.g. a MagicMock in
-            # a test double, where every attribute access is truthy by
-            # default) can never be mistaken for a real cancellation signal.
             cancel_event = None
             if getattr(config, "cancel_on_timeout", False) is True:
                 cancel_events = getattr(config, "_stream_cancel_events", None)
@@ -735,14 +500,6 @@ class TPCDSThroughputTest:
         return stream_result
 
     def validate_results(self, result: TPCDSThroughputTestResult) -> bool:
-        """Validate Throughput Test results against TPC-DS specification.
-
-        Args:
-            result: Throughput Test results to validate
-
-        Returns:
-            True if results are valid, False otherwise
-        """
         if not result.success:
             return False
 

@@ -1,5 +1,3 @@
-"""Unit tests for the VeloxAdapter (Apache Gluten + Velox)."""
-
 from __future__ import annotations
 
 import argparse
@@ -15,11 +13,9 @@ pytestmark = [
 
 
 class TestVeloxAdapterInit:
-    """Initialization and default values."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark so tests run without the real library."""
+
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.master.return_value = mock_builder
@@ -104,7 +100,7 @@ class TestVeloxAdapterInit:
         assert adapter.disable_cache is False
 
     def test_deployment_mode_alias(self, mock_pyspark):
-        """deployment_mode key (from platform factory) maps to deployment."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         adapter = VeloxAdapter(deployment_mode="remote")
@@ -112,14 +108,14 @@ class TestVeloxAdapterInit:
 
     @pytest.mark.parametrize("key", ["deployment", "deployment_mode"])
     def test_constructor_rejects_docker_through_either_spelling(self, mock_pyspark, key):
-        """The factory, not just the validator, must fail closed."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         with pytest.raises(ValueError, match="Unsupported Velox deployment 'docker'"):
             VeloxAdapter(**{key: "docker"})
 
     def test_supported_deployments_still_select_their_own_endpoints(self, mock_pyspark):
-        """Enumerating must not disturb the modes the adapter does implement."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         local = VeloxAdapter(deployment="local")
@@ -138,8 +134,6 @@ class TestVeloxAdapterInit:
 
 
 class TestVeloxSparkConf:
-    """_get_spark_conf() correctness."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -167,11 +161,7 @@ class TestVeloxSparkConf:
         assert conf["spark.memory.offHeap.size"] == "12g"
         assert conf["spark.shuffle.manager"] == "org.apache.spark.shuffle.sort.ColumnarShuffleManager"
         assert conf["spark.jars"] == "/opt/gluten.jar"
-        # extraClassPath entries are required for plugin-class loading: the
-        # GlutenPlugin is instantiated by SparkContext.initializeSparkContext
-        # *before* spark.jars promotions reach the executor classpath, so the
-        # plugin silently no-ops without these entries.  Mirrors the docker
-        # entrypoint server-side config.
+
         assert conf["spark.driver.extraClassPath"] == "/opt/gluten.jar"
         assert conf["spark.executor.extraClassPath"] == "/opt/gluten.jar"
 
@@ -196,8 +186,7 @@ class TestVeloxSparkConf:
         from benchbox.platforms.velox import VeloxAdapter
 
         conf = VeloxAdapter(adaptive_enabled=False)._get_spark_conf()
-        # Spark enables AQE by default since 3.2.0, so disabling must set the
-        # keys to "false" explicitly rather than omitting them.
+
         assert conf["spark.sql.adaptive.enabled"] == "false"
         assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
         assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
@@ -235,8 +224,6 @@ class TestVeloxSparkConf:
 
 
 class TestVeloxTableFormatConf:
-    """Per-format read-acceleration Spark conf (delta/iceberg/hudi)."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -347,8 +334,6 @@ class TestVeloxTableFormatConf:
 
 
 class TestVeloxConfigureForBenchmark:
-    """configure_for_benchmark() must not clobber explicit spark_config entries."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -377,15 +362,12 @@ class TestVeloxConfigureForBenchmark:
         adapter = VeloxAdapter(spark_config={"spark.sql.cbo.enabled": "false"})
         adapter.configure_for_benchmark(mock_session, "olap")
 
-        # The explicit spark_config entry must not be clobbered at run time.
         mock_session.conf.set.assert_any_call("spark.sql.cbo.enabled", "false")
-        # Keys without an override still default to true.
+
         mock_session.conf.set.assert_any_call("spark.sql.cbo.joinReorder.enabled", "true")
 
 
 class TestVeloxLocalModeValidation:
-    """Local mode validates jar path before session creation."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -437,8 +419,6 @@ class TestVeloxLocalModeValidation:
 
 
 class TestVeloxRemoteMode:
-    """Remote mode parses endpoints and probes server reachability."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -482,12 +462,10 @@ class TestVeloxRemoteMode:
 
         adapter = VeloxAdapter(deployment="remote")
         with patch("benchbox.platforms.velox.is_spark_connect_reachable", return_value=True):
-            adapter._ensure_server_ready()  # should not raise
+            adapter._ensure_server_ready()
 
 
 class TestVeloxPlatformInfo:
-    """get_platform_info() returns expected fields."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -530,7 +508,7 @@ class TestVeloxPlatformInfo:
 
         assert info["deployment"] == "local"
         assert "gluten-velox-1.6.0.jar" in info["gluten_jar"]
-        assert "/opt/" not in info["gluten_jar"]  # path redacted
+        assert "/opt/" not in info["gluten_jar"]
 
     def test_velox_active_probe_detects_velox_nodes(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
@@ -562,8 +540,6 @@ class TestVeloxPlatformInfo:
 
 
 class TestVeloxQueryPlan:
-    """get_query_plan() annotates Velox vs JVM-fallback nodes."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -588,8 +564,7 @@ class TestVeloxQueryPlan:
         plan = adapter.get_query_plan(mock_spark, "SELECT count(*) FROM t")
 
         assert "Velox native execution: YES" in plan
-        # VeloxColumnarToRow is the native materialization node, NOT a fallback -
-        # annotation must not false-positive when only Velox nodes are present.
+
         assert "JVM fallback: DETECTED" not in plan
 
     def test_fallback_annotation(self, mock_pyspark):
@@ -597,8 +572,7 @@ class TestVeloxQueryPlan:
 
         mock_spark = MagicMock()
         mock_df = MagicMock()
-        # A real fallback plan has a bare ColumnarToRow (without Velox prefix)
-        # sitting between a JVM-side operator and a Velox transformer.
+
         mock_df.collect.return_value = [("VeloxColumnarHashAggregate\nColumnarToRow\nHashAgg",)]
         mock_spark.sql.return_value = mock_df
 
@@ -634,7 +608,7 @@ class TestVeloxQueryPlan:
         assert "NOT DETECTED" in plan
 
     def test_explain_failure_returns_none(self, mock_pyspark):
-        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         mock_spark = MagicMock()
@@ -644,7 +618,7 @@ class TestVeloxQueryPlan:
         assert adapter.get_query_plan(mock_spark, "SELECT count(*) FROM t") is None
 
     def test_empty_plan_rows_return_none(self, mock_pyspark):
-        """Empty EXPLAIN rows return None, not an annotation-only header (qpc-13)."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         mock_df = MagicMock()
@@ -657,8 +631,6 @@ class TestVeloxQueryPlan:
 
 
 class TestVeloxFromConfig:
-    """from_config() builds the adapter correctly."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -712,20 +684,12 @@ class TestVeloxFromConfig:
 
 
 class TestVeloxCLIArguments:
-    """Velox configuration flows through PlatformHookRegistry option specs.
-
-    The adapter's add_cli_arguments() is intentionally a no-op (the abstract
-    method is satisfied with an empty body). Argparse-level flags would be a
-    second source of truth that drifts from the option-spec registry, so we
-    just verify the no-op contract here.
-    """
-
     def test_add_cli_arguments_is_noop(self):
         from benchbox.platforms.velox import VeloxAdapter
 
         parser = argparse.ArgumentParser()
         VeloxAdapter.add_cli_arguments(parser)
-        # The parser should have no velox-specific args registered.
+
         actions = [a for a in parser._actions if a.dest != "help"]
         assert actions == []
 
@@ -733,8 +697,7 @@ class TestVeloxCLIArguments:
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         specs = PlatformHookRegistry.list_option_specs("velox")
-        # Sanity: the option-spec registry is the single source of truth and
-        # carries the flags Velox cares about.
+
         for name in (
             "deployment",
             "endpoint",
@@ -749,11 +712,6 @@ class TestVeloxCLIArguments:
 
 
 class TestVeloxIdentifierValidation:
-    """Identifier validation lives in benchbox.platforms._spark_helpers and is
-    shared with the Spark and LakeSail adapters. This test pins the contract
-    Velox depends on - dedicated coverage of the helper itself lives alongside
-    the helper module."""
-
     def test_valid_identifiers(self):
         from benchbox.platforms._spark_helpers import validate_spark_identifier
 
@@ -771,8 +729,6 @@ class TestVeloxIdentifierValidation:
 
 
 class TestVeloxTuning:
-    """Tuning support mirrors LakeSail (partitioning + sorting only)."""
-
     @pytest.fixture
     def mock_pyspark(self):
         with patch.dict(
@@ -786,7 +742,7 @@ class TestVeloxTuning:
             yield
 
     def test_supports_partitioning_only(self, mock_pyspark):
-        """Plain Parquet/ORC tables have no DDL sort key - only PARTITIONING is supported."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         adapter = VeloxAdapter()
@@ -801,14 +757,6 @@ class TestVeloxTuning:
 
 
 class TestVeloxTableOptimization:
-    """Velox uses the shared optimize_spark_table_definition helper.
-
-    Comprehensive tests for the helper itself (V1 constraint stripping,
-    SMALLINT upcast, V2 preservation) live in test_spark_helpers.py.
-    These tests pin the contract Velox depends on - parquet/orc V1 mode,
-    no overrides.
-    """
-
     def test_parquet_format(self):
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
@@ -828,7 +776,7 @@ class TestVeloxTableOptimization:
         assert optimize_spark_table_definition(sql, table_format="parquet") == sql
 
     def test_delta_preserves_v2_schema(self):
-        """Delta create_schema keeps constraints and SMALLINT (V2 table)."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.velox import VeloxAdapter
@@ -851,7 +799,7 @@ class TestVeloxTableOptimization:
         assert "SMALLINT" in result
 
     def test_parquet_strips_v1_schema(self):
-        """Parquet create_schema strips constraints and upcasts SMALLINT (V1 table)."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.velox import VeloxAdapter
@@ -872,10 +820,8 @@ class TestVeloxTableOptimization:
 
 
 class TestVeloxRegistration:
-    """Adapter is reachable via the platform registry."""
-
     def test_module_imports_without_pyspark(self):
-        """Module should load cleanly even if pyspark is missing."""
+
         with patch.dict("sys.modules", {"pyspark": None, "pyspark.sql": None, "pyspark.sql.types": None}):
             import importlib
 
@@ -900,8 +846,6 @@ class TestVeloxRegistration:
 
 
 class TestDeploymentContractIsEnumerated:
-    """Any non-'local' value used to mean 'remote'. It must mean 'rejected'."""
-
     def test_docker_is_rejected_rather_than_silently_becoming_remote(self):
         from benchbox.platforms.velox import VeloxAdapter
 
@@ -909,7 +853,7 @@ class TestDeploymentContractIsEnumerated:
             VeloxAdapter._validate_deployment("docker")
 
     def test_the_docker_rejection_points_at_the_real_workflow(self):
-        """Docker is packaging infrastructure, not a deployment mode."""
+
         from benchbox.platforms.velox import VeloxAdapter
 
         with pytest.raises(ValueError, match="packaging infrastructure"):
@@ -932,20 +876,17 @@ class TestDeploymentContractIsEnumerated:
         assert VeloxAdapter._validate_deployment(deployment) == expected
 
     def test_the_supported_set_matches_the_mcp_contract(self):
-        """Velox deployment is deliberately not in the MCP allow-list (security boundary)."""
+
         import pytest
 
         from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, MCPValidationError, validate_platform_options
         from benchbox.platforms.velox import SUPPORTED_VELOX_DEPLOYMENTS, VeloxAdapter
 
-        # Direct Velox adapter deployment validation remains supported
         assert VeloxAdapter._validate_deployment("local") == "local"
         assert VeloxAdapter._validate_deployment("remote") == "remote"
         assert set(SUPPORTED_VELOX_DEPLOYMENTS) == {"local", "remote"}
 
-        # MCP has no velox.deployment option (security boundary: remote would need server-owned endpoint)
         assert "deployment" not in MCP_PLATFORM_OPTION_ALLOWLIST.get("velox", {})
 
-        # MCP fails closed for any velox.deployment value
         with pytest.raises(MCPValidationError, match="not authorized"):
             validate_platform_options("velox", {"deployment": "remote"})

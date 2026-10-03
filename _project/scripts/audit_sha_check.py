@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate tree and measurement SHA provenance on audit Markdown files."""
 
 from __future__ import annotations
 
@@ -23,13 +22,11 @@ CLI_DESCRIPTION = "Validate tree and measurement SHA provenance on audit Markdow
 
 
 class AuditShaError(Exception):
-    """Raised when an audit SHA check fails."""
+    pass
 
 
 @dataclass(frozen=True)
 class Frontmatter:
-    """Parsed YAML-frontmatter envelope."""
-
     start_line: int
     end_line: int
     fields: dict[str, str]
@@ -37,8 +34,6 @@ class Frontmatter:
 
 @dataclass(frozen=True)
 class AuditValidation:
-    """Validated provenance returned to the CLI."""
-
     develop_sha: str
     distance: int | None
     measured_at_sha: str | None
@@ -46,7 +41,6 @@ class AuditValidation:
 
 
 def run_git(args: list[str]) -> str:
-    """Run a git command and return stripped stdout."""
     result = subprocess.run(
         ["git", *args],
         check=False,
@@ -61,7 +55,6 @@ def run_git(args: list[str]) -> str:
 
 
 def git_ok(args: list[str]) -> bool:
-    """Return whether a git command exits successfully."""
     return (
         subprocess.run(
             ["git", *args],
@@ -75,7 +68,6 @@ def git_ok(args: list[str]) -> bool:
 
 
 def _strip_scalar(value: str) -> str:
-    """Extract a simple YAML scalar value from a frontmatter line."""
     value = value.split("#", 1)[0].strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         value = value[1:-1]
@@ -83,11 +75,6 @@ def _strip_scalar(value: str) -> str:
 
 
 def parse_frontmatter(path: Path) -> Frontmatter | None:
-    """Parse the leading frontmatter block, if present.
-
-    The audit contract only needs a simple `develop_sha: <sha>` scalar, so this
-    intentionally avoids full Markdown/YAML linting.
-    """
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":
         return None
@@ -112,13 +99,6 @@ def parse_frontmatter(path: Path) -> Frontmatter | None:
 
 
 def numeric_evidence_lines(path: Path, frontmatter: Frontmatter) -> list[int]:
-    """Return body line numbers containing conservative empirical-count signals.
-
-    Dates, issue/PR references (``#123``), versions, and prose ordinals are not
-    evidence signals. The intentionally narrow detector covers explicit result
-    counts and counted audit entities; expanding content lint belongs in a
-    separate policy change.
-    """
     lines = path.read_text(encoding="utf-8").splitlines()
     return [
         line_number
@@ -144,15 +124,6 @@ def validate_audit(
     require_current: int | None = None,
     ancestry_ref: str = "HEAD",
 ) -> AuditValidation:
-    """Validate one audit file and return its bound provenance.
-
-    `distance` is the number of commits between the stamped SHA and the target
-    ref when freshness checking is requested; otherwise it is omitted.
-    `ancestry_ref` is the ref the stamped measurement/replay SHAs must descend
-    from. It defaults to HEAD, but merge-queue runs check out a squashed
-    preview commit whose single-parent history never contains the PR's branch
-    commits, so those runs pass the PR head instead.
-    """
     if not path.exists():
         raise AuditShaError(f"{path}: file does not exist")
     if not path.is_file():
@@ -216,7 +187,6 @@ def validate_audit(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI parser."""
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("files", nargs="+", type=Path, help="Audit Markdown file(s) to validate")
     parser.add_argument(
@@ -244,7 +214,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint."""
     args = build_parser().parse_args(argv)
     try:
         for file_path in args.files:

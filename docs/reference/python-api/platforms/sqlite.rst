@@ -70,29 +70,143 @@ API Reference
 SQLiteAdapter Class
 ~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.sqlite.SQLiteAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.sqlite.SQLiteAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   SQLite adapter for an in-memory or file-backed database.  ``database_path``
+   defaults to ``":memory:"``; ``timeout`` defaults to ``30.0`` seconds; and
+   ``check_same_thread`` defaults to ``False``.  Construction raises
+   ``ImportError`` when Python's SQLite support is unavailable.
 
-.. code-block:: python
+   Example::
 
-    SQLiteAdapter(
-        database_path: str = ":memory:",
-        timeout: float = 30.0,
-        check_same_thread: bool = False
-    )
+      adapter = SQLiteAdapter(database_path="benchmark.db", timeout=60.0)
 
-Parameters:
+   See :doc:`common` for the shared lifecycle.
 
-**Database Configuration**:
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.get_database_path(**connection_config) -> str | None
 
-- **database_path** (str): Database file path or ":memory:" for in-memory mode. Default: ":memory:"
-- **timeout** (float): Connection timeout in seconds. Default: 30.0
-- **check_same_thread** (bool): Enable thread safety checks. Default: False
+   Get the database file path for SQLite.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.create_connection(**connection_config) -> Any
+
+   Create SQLite connection.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.create_schema(benchmark, connection: Any) -> float
+
+   Create schema using benchmark's SQL definitions.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
+
+   Load benchmark data into SQLite.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
+
+   Execute a single query and return detailed results.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.get_query_plan(connection: Any, query: str) -> str | None
+
+   Get SQLite query execution plan using EXPLAIN QUERY PLAN.
+
+   Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
+   from the raw (id, parent, notused, detail) rows SQLite returns.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.apply_table_tunings(table_tuning: TableTuning, connection: Any) -> None
+
+   Apply tuning configurations to SQLite (limited support).
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.run_power_test(benchmark, **kwargs) -> dict[str, Any]
+
+   Run TPC power test (not implemented for SQLite).
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.run_throughput_test(benchmark, **kwargs) -> dict[str, Any]
+
+   Run TPC throughput test (not implemented for SQLite).
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.run_maintenance_test(benchmark, **kwargs) -> dict[str, Any]
+
+   Run TPC maintenance test (not implemented for SQLite).
+
+Static member inventory
+-----------------------
+
+.. py:property:: benchbox.platforms.sqlite.SQLiteAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:staticmethod:: benchbox.platforms.sqlite.SQLiteAdapter.add_cli_arguments(parser) -> None
+
+   Add SQLite-specific CLI arguments.
+
+   Kept minimal for testing; provides database path and basic options.
+
+   NOTE: These flags (``--sqlite-database``, etc.) are legacy and are NOT
+   exposed by ``benchbox run``.  Use ``--platform-option database_path=<path>``
+   instead, which is registered in PlatformHookRegistry and appears in
+   ``benchbox run --help``.
+
+.. py:classmethod:: benchbox.platforms.sqlite.SQLiteAdapter.from_config(config: dict[str, Any])
+
+   Create SQLite adapter from unified configuration.
+
+   Handles configuration from multiple sources:
+   connection_string: Path to database file (from DatabaseConfig)
+   database_path: Direct path specification (from options or CLI)
+   Auto-generation: Creates path in benchmark_runs/databases if needed
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get SQLite platform information.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.get_target_dialect(self) -> str
+
+   Return the target SQL dialect for SQLite.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.generate_tuning_clause(self, table_tuning: TableTuning) -> str
+
+   Generate SQLite-specific tuning clauses (none supported).
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None
+
+   Apply unified tuning configuration (limited support in SQLite).
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None
+
+   Apply SQLite-specific optimizations.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.apply_constraint_configuration(self, primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None
+
+   Apply constraint configurations to SQLite.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply SQLite optimizations for benchmark type.
+
+.. py:method:: benchbox.platforms.sqlite.SQLiteAdapter.get_query_plan_parser(self)
+
+   Get SQLite query plan parser.
+
+.. py:attribute:: benchbox.platforms.sqlite.SQLiteAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.sqlite.SQLiteAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:attribute:: benchbox.platforms.sqlite.SQLiteAdapter.stream_connection_capability
+
+   Declares whether concurrent benchmark streams use a shared cursor or require independent connections.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``SQLiteAdapter(**config)``.
+
+- ``database_path`` defaults to ``":memory:"``.
+- ``timeout`` defaults to 30.0 seconds.
+- ``check_same_thread`` defaults to ``False``.
+
+These defaults apply when the respective key is absent.
 
 Configuration Examples
 ----------------------

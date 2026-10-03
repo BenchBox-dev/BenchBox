@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Single state authority and Git journal CAS on the publication metadata ref.
-
-Manages reading, preparing, and fast-forward compare-and-set updates on the
-`publication` Git ref under the `publication/transaction-state/` subtree.
-"""
 
 from __future__ import annotations
 
@@ -66,15 +61,15 @@ KIND_STATES = {
 
 
 class JournalError(Exception):
-    """Base exception for journal operations."""
+    pass
 
 
 class CasConflictError(JournalError):
-    """Raised when an atomic CAS update fails due to a competing commit."""
+    pass
 
 
 class CorruptJournalError(JournalError):
-    """Raised when journal state is missing or malformed."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -108,7 +103,6 @@ def _run_git(args: list[str], cwd: Path, env: dict[str, str] | None = None) -> s
 
 
 def read_journal_state(repo_path: Path, ref: str = DEFAULT_REF) -> JournalState:
-    """Read the current journal state.json directly from the given Git ref."""
     try:
         tip_oid = _run_git(["rev-parse", f"refs/heads/{ref}"], cwd=repo_path)
     except JournalError as e:
@@ -148,7 +142,6 @@ def read_journal_state(repo_path: Path, ref: str = DEFAULT_REF) -> JournalState:
 
 
 def read_transaction(repo_path: Path, tx_id: str, ref: str = DEFAULT_REF) -> Transaction:
-    """Read a canonical transaction object directly from the journal ref."""
     tx_path = f"{ref}:{SUBTREE_PATH}/transactions/{tx_id}.json"
     try:
         content = _run_git(["cat-file", "-p", tx_path], cwd=repo_path)
@@ -212,7 +205,6 @@ def write_journal_update(
     ref: str = DEFAULT_REF,
     commit_message: str | None = None,
 ) -> tuple[JournalState, str]:
-    """Atomically commit and fast-forward CAS a journal state update."""
     with tempfile.NamedTemporaryFile(delete=False) as tmp_idx:
         index_file = tmp_idx.name
 
@@ -222,10 +214,8 @@ def write_journal_update(
     env.setdefault("GIT_COMMITTER_NAME", "BenchBox Publication Controller")
     env.setdefault("GIT_COMMITTER_EMAIL", "publication-controller@benchbox.dev")
     try:
-        # 1. Initialize temporary index from parent commit tree
         _run_git(["read-tree", expected_parent_oid], cwd=repo_path, env=env)
 
-        # 2. Write state.json blob
         state_data = new_state.to_dict()
         state_data.pop("tip_commit_oid", None)
         state_bytes = canonical_json(state_data).encode("utf-8")
@@ -245,7 +235,6 @@ def write_journal_update(
             env=env,
         )
 
-        # 3. Write transaction blob if provided
         if transaction is not None:
             tx_bytes = canonical_json(transaction.to_dict()).encode("utf-8")
             p_tx = subprocess.run(
@@ -269,10 +258,8 @@ def write_journal_update(
                 env=env,
             )
 
-        # 4. Write new tree
         tree_oid = _run_git(["write-tree"], cwd=repo_path, env=env)
 
-        # 5. Create commit pointing to expected_parent_oid
         msg = commit_message or f"journal: advance state to gen {new_state.next_generation}"
         commit_oid = _run_git(
             ["commit-tree", tree_oid, "-p", expected_parent_oid, "-m", msg],
@@ -280,7 +267,6 @@ def write_journal_update(
             env=env,
         )
 
-        # 6. Atomically reserve the shared ref on the remote authority.
         p_update = subprocess.run(
             [
                 "git",
@@ -335,7 +321,6 @@ def init_genesis_journal(
     base_commit_oid: str,
     ref: str = DEFAULT_REF,
 ) -> tuple[JournalState, str]:
-    """Initialize a fresh publication journal at genesis referencing an attested known-good transaction."""
     if genesis_transaction.state not in (STATE_DURABLE, STATE_ROLLBACK_DURABLE):
         raise CorruptJournalError("Genesis transaction must be durable")
     if genesis_transaction.target != target:
@@ -382,7 +367,6 @@ def init_genesis_journal(
 
 
 def resolve_timeout_or_recheck(repo_path: Path, proposed_commit_oid: str, ref: str = DEFAULT_REF) -> bool:
-    """Resolve an ambiguous network or API timeout by re-checking whether the proposed commit won."""
     try:
         _run_git(["fetch", "--no-tags", "origin", f"refs/heads/{ref}"], cwd=repo_path)
         current_oid = _run_git(["rev-parse", "FETCH_HEAD"], cwd=repo_path)

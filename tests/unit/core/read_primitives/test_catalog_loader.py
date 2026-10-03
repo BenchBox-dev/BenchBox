@@ -1,8 +1,5 @@
-"""Test Read Primitives catalog loader variant and skip_on functionality.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import importlib.resources
 
@@ -24,7 +21,6 @@ pytestmark = [
 
 @pytest.fixture
 def mock_catalog_yaml(monkeypatch, tmp_path):
-    """Patch importlib.resources.files() to return a temp query catalog."""
 
     class MockPath:
         def __init__(self, path):
@@ -43,10 +39,7 @@ def mock_catalog_yaml(monkeypatch, tmp_path):
 
 
 class TestPrimitiveQueryDataclass:
-    """Test the PrimitiveQuery dataclass structure."""
-
     def test_primitive_query_basic_fields(self):
-        """Test PrimitiveQuery with only required fields."""
         query = PrimitiveQuery(
             id="test_query",
             category="test",
@@ -100,10 +93,7 @@ class TestPrimitiveQueryDataclass:
 
 
 class TestCatalogLoaderResultContractParsing:
-    """Test result_contract parsing from YAML."""
-
     def test_load_query_with_result_contract(self, mock_catalog_yaml):
-        """Test loading a query with typed result contract metadata."""
         catalog_yaml = """
 version: 1
 queries:
@@ -150,7 +140,6 @@ queries:
             load_primitives_catalog()
 
     def test_result_contract_rejects_unknown_row_identity_column(self, mock_catalog_yaml):
-        """Test row_identity must reference declared columns."""
         catalog_yaml = """
 version: 1
 queries:
@@ -186,8 +175,6 @@ queries:
 
 
 class TestCatalogLoaderVariantParsing:
-    """Test catalog loader parsing of variants from YAML."""
-
     def test_load_query_with_single_variant(self, monkeypatch, tmp_path):
 
         catalog_yaml = """
@@ -201,11 +188,9 @@ queries:
       duckdb: |
         SELECT * FROM orders USING SAMPLE 10%
 """
-        # Mock the catalog file
         catalog_file = tmp_path / "queries.yaml"
         catalog_file.write_text(catalog_yaml)
 
-        # Monkey-patch the resources.files to return our test file
         import importlib.resources
 
         class MockPath:
@@ -305,7 +290,6 @@ queries:
         assert "BIGQUERY" not in query.variants
 
     def test_variant_sql_must_be_non_empty(self, monkeypatch, tmp_path):
-        """Test that variant SQL must be non-empty."""
         catalog_yaml = """
 version: 1
 queries:
@@ -338,7 +322,6 @@ queries:
         assert "variant SQL for dialect 'duckdb' must be non-empty" in str(exc_info.value)
 
     def test_variant_dialect_must_be_non_empty_string(self, monkeypatch, tmp_path):
-        """Test that variant dialect name must be non-empty string."""
         catalog_yaml = """
 version: 1
 queries:
@@ -371,7 +354,6 @@ queries:
         assert "variant dialect must be a non-empty string" in str(exc_info.value)
 
     def test_variants_must_be_dict(self, monkeypatch, tmp_path):
-        """Test that variants field must be a dictionary."""
         catalog_yaml = """
 version: 1
 queries:
@@ -405,8 +387,6 @@ queries:
 
 
 class TestCatalogLoaderSkipOnParsing:
-    """Test catalog loader parsing of skip_on from YAML."""
-
     def test_load_query_with_single_skip_on(self, monkeypatch, tmp_path):
 
         catalog_yaml = """
@@ -512,7 +492,6 @@ queries:
         assert "SQLITE" not in query.skip_on
 
     def test_skip_on_dialect_must_be_non_empty_string(self, monkeypatch, tmp_path):
-        """Test that skip_on dialects must be non-empty strings."""
         catalog_yaml = """
 version: 1
 queries:
@@ -544,7 +523,6 @@ queries:
         assert "skip_on dialect must be a non-empty string" in str(exc_info.value)
 
     def test_skip_on_must_be_list(self, monkeypatch, tmp_path):
-        """Test that skip_on field must be a list."""
         catalog_yaml = """
 version: 1
 queries:
@@ -578,8 +556,6 @@ queries:
 
 
 class TestCatalogLoaderCombinedFeatures:
-    """Test catalog loader with both variants and skip_on."""
-
     def test_query_with_both_variants_and_skip_on(self, monkeypatch, tmp_path):
 
         catalog_yaml = """

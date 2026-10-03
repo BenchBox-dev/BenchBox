@@ -1,5 +1,3 @@
-"""TPC-H platform-adapter power-test harness."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -22,7 +20,6 @@ def _power_query_result(
     iteration: int,
     run_type: str,
 ) -> dict[str, Any]:
-    """Convert a TPC power query result to the adapter result shape."""
     platform_result = {
         "query_id": query_result["query_id"],
         "execution_time_seconds": query_result["execution_time_seconds"],
@@ -34,15 +31,10 @@ def _power_query_result(
         "iteration": iteration,
         "run_type": run_type,
     }
-    # Gate-only value-digest oracle: forward the full-result digest when the power
-    # driver emitted one (behind BENCHBOX_EMIT_RESULT_DIGEST). Additive - absent on
-    # a normal run, so the payload shape is unchanged.
     if query_result.get("result_digest") is not None:
         platform_result["result_digest"] = query_result["result_digest"]
     if not query_result["success"]:
         platform_result["error"] = query_result.get("error", "Unknown error")
-    # Carry query execution metadata (plan capture fields and resource usage) through
-    # to the row _attach_captured_plans and summary/cost calculation see.
     propagate_query_execution_metadata(query_result, platform_result)
     return platform_result
 
@@ -53,7 +45,6 @@ def _power_test_error_result(
     iteration: int | None = None,
     run_type: str | None = None,
 ) -> dict[str, Any]:
-    """Build a failed power-test sentinel result."""
     result: dict[str, Any] = {
         "query_id": "power_test_error",
         "execution_time_seconds": 0.0,
@@ -78,7 +69,6 @@ def execute_tpch_power_test(
     make_connection_adapter: PowerConnectionAdapterFactory,
     console: Any,
 ) -> list[dict[str, Any]]:
-    """Execute TPC-H Power Test using the production TPCHPowerTest implementation."""
     from benchbox.core.tpch.power_test import TPCHPowerTest
 
     try:

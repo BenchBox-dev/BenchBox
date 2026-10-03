@@ -1,9 +1,6 @@
-"""Unit tests for DataFrame tuning validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -28,8 +25,6 @@ pytestmark = [
 
 
 class TestValidationIssue:
-    """Tests for ValidationIssue dataclass."""
-
     def test_str_representation(self):
 
         issue = ValidationIssue(
@@ -56,10 +51,7 @@ class TestValidationIssue:
 
 
 class TestValidationHelpers:
-    """Tests for validation helper functions."""
-
     def test_has_errors_true(self):
-        """Test has_errors() returns True when errors present."""
         issues = [
             ValidationIssue(ValidationLevel.ERROR, "Error"),
             ValidationIssue(ValidationLevel.WARNING, "Warning"),
@@ -67,7 +59,6 @@ class TestValidationHelpers:
         assert has_errors(issues) is True
 
     def test_has_errors_false(self):
-        """Test has_errors() returns False when no errors."""
         issues = [
             ValidationIssue(ValidationLevel.WARNING, "Warning"),
             ValidationIssue(ValidationLevel.INFO, "Info"),
@@ -75,26 +66,22 @@ class TestValidationHelpers:
         assert has_errors(issues) is False
 
     def test_has_warnings_true(self):
-        """Test has_warnings() returns True when warnings present."""
         issues = [
             ValidationIssue(ValidationLevel.WARNING, "Warning"),
         ]
         assert has_warnings(issues) is True
 
     def test_has_warnings_false(self):
-        """Test has_warnings() returns False when no warnings."""
         issues = [
             ValidationIssue(ValidationLevel.INFO, "Info"),
         ]
         assert has_warnings(issues) is False
 
     def test_format_issues_empty(self):
-        """Test format_issues() with empty list."""
         result = format_issues([])
         assert "No validation issues found" in result
 
     def test_format_issues_with_content(self):
-        """Test format_issues() with issues."""
         issues = [
             ValidationIssue(ValidationLevel.WARNING, "Test warning"),
         ]
@@ -104,27 +91,22 @@ class TestValidationHelpers:
 
 
 class TestValidateDataFrameTuning:
-    """Tests for validate_dataframe_tuning() function."""
-
     def test_default_config_no_issues(self):
 
         config = DataFrameTuningConfiguration()
         issues = validate_dataframe_tuning(config, "polars")
-        # Default config should have no issues
         assert not any(i.level == ValidationLevel.ERROR for i in issues)
 
     def test_incompatible_setting_warning(self):
 
         config = DataFrameTuningConfiguration(
-            parallelism=ParallelismConfiguration(worker_count=4),  # Not compatible with Polars
+            parallelism=ParallelismConfiguration(worker_count=4),
         )
         issues = validate_dataframe_tuning(config, "polars")
         assert any(i.level == ValidationLevel.WARNING and "worker_count" in str(i) for i in issues)
 
 
 class TestPolarsValidation:
-    """Tests for Polars-specific validation."""
-
     def test_streaming_without_chunk_size_info(self):
 
         config = DataFrameTuningConfiguration(
@@ -154,8 +136,6 @@ class TestPolarsValidation:
 
 
 class TestDaskValidation:
-    """Tests for Dask-specific validation."""
-
     def test_high_threads_per_worker_warning(self):
 
         config = DataFrameTuningConfiguration(
@@ -185,8 +165,6 @@ class TestDataFusionValidation:
 
 
 class TestCuDFValidation:
-    """Tests for cuDF-specific validation."""
-
     def test_gpu_disabled_warning(self):
 
         config = DataFrameTuningConfiguration(
@@ -197,12 +175,9 @@ class TestCuDFValidation:
 
     def test_invalid_pool_type_error(self):
 
-        # This should be caught by dataclass validation, not this function
-        # But we test the function logic anyway
         config = DataFrameTuningConfiguration(
             gpu=GPUConfiguration(enabled=True),
         )
-        # Default pool_type is valid, so no errors expected
         issues = validate_dataframe_tuning(config, "cudf")
         assert not any(i.level == ValidationLevel.ERROR and "pool_type" in str(i) for i in issues)
 
@@ -216,8 +191,6 @@ class TestCuDFValidation:
 
 
 class TestPlatformNormalization:
-    """Tests for platform name normalization in validation."""
-
     def test_validates_with_df_suffix(self):
 
         config = DataFrameTuningConfiguration()

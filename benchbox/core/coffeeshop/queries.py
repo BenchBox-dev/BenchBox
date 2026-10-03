@@ -226,7 +226,7 @@ ORDER BY dl.region, season;
             defaults.update(params)
         try:
             return entry["sql"].format(**defaults)
-        except KeyError as exc:  # pragma: no cover - defensive
+        except KeyError as exc:
             missing = exc.args[0]
             raise ValueError(f"Missing parameter '{missing}' for query '{query_id}'") from exc
 

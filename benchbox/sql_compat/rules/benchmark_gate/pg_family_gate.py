@@ -1,10 +1,3 @@
-"""Benchmark-gate rules for PostgreSQL-family local platforms.
-
-These rules cover current pg_duckdb, pg_mooncake, and TimescaleDB UAT
-incompatibilities where the benchmark contract requires a feature outside the
-platform's exposed SQL surface.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

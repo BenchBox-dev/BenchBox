@@ -1,9 +1,6 @@
-"""Unit tests for DataFrame tuning loader.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 import yaml
@@ -25,8 +22,6 @@ pytestmark = [
 
 
 class TestDataFrameTuningLoader:
-    """Tests for DataFrameTuningLoader class."""
-
     def test_load_config_yaml(self, tmp_path):
 
         config_path = tmp_path / "config.yaml"
@@ -108,7 +103,6 @@ class TestDataFrameTuningLoader:
         assert data["execution"]["streaming_mode"] is True
 
     def test_get_template(self):
-        """Test get_template() returns valid config."""
         loader = DataFrameTuningLoader()
         config = loader.get_template("polars")
 
@@ -117,15 +111,12 @@ class TestDataFrameTuningLoader:
         assert config.metadata.platform == "polars"
 
     def test_get_optimized_template(self):
-        """Test get_optimized_template() returns config with settings."""
         loader = DataFrameTuningLoader()
         config = loader.get_optimized_template("polars")
 
-        # Should have some non-default settings
         assert not config.is_default() or config.metadata is not None
 
     def test_merge_configs(self):
-        """Test merge_configs() merges two configurations."""
         loader = DataFrameTuningLoader()
 
         base = DataFrameTuningConfiguration(
@@ -138,16 +129,12 @@ class TestDataFrameTuningLoader:
 
         merged = loader.merge_configs(base, override)
 
-        # Override values should take precedence
         assert merged.parallelism.thread_count == 8
         assert merged.execution.streaming_mode is True
 
 
 class TestModuleFunctions:
-    """Tests for module-level convenience functions."""
-
     def test_load_dataframe_tuning(self, tmp_path):
-        """Test load_dataframe_tuning() function."""
         config_path = tmp_path / "config.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump({"parallelism": {"thread_count": 16}}, f)
@@ -156,7 +143,6 @@ class TestModuleFunctions:
         assert config.parallelism.thread_count == 16
 
     def test_save_dataframe_tuning(self, tmp_path):
-        """Test save_dataframe_tuning() function."""
         config_path = tmp_path / "config.yaml"
         config = DataFrameTuningConfiguration(
             execution=ExecutionConfiguration(lazy_evaluation=False),
@@ -170,8 +156,6 @@ class TestModuleFunctions:
 
 
 class TestConfigWithMetadata:
-    """Tests for configuration with metadata."""
-
     def test_load_config_with_metadata(self, tmp_path):
 
         config_path = tmp_path / "config.yaml"

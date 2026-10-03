@@ -1,11 +1,3 @@
-"""Blocking plan-capture CI gate.
-
-This is the small, credential-free gate wired into PR CI. It drives the production
-``run_plan_capture_phase`` path against in-process engines and pins the release
-contracts that have regressed after merge: parsed plans land, structural
-fingerprints are stable, and write statements are not double-executed by capture.
-"""
-
 from __future__ import annotations
 
 import os
@@ -141,27 +133,11 @@ def test_plan_capture_gate_dml_is_not_double_executed(engine_case) -> None:
 
 
 def test_plan_capture_gate_catches_planted_defect() -> None:
-    """Standing negative test: the gate goes RED on a planted plan-capture defect.
-
-    #900 shipped the ``BENCHBOX_PLANT_PLAN_CAPTURE_GATE_DEFECT=drop_fingerprint``
-    planting switch but nothing in CI ever set it, so the "gate catches a dropped
-    fingerprint" proof was a one-time manual demo with no standing guard. This runs
-    the gate's positive node in a subprocess with the defect planted and asserts the
-    gate FAILS on the dropped fingerprint -- regression-protecting the catch
-    capability itself, not just the happy path.
-
-    The subprocess targets only the positive node (not this test), so it cannot
-    recurse. This test is ``fast``-marked (module-level), so it runs in the required
-    plan-capture-gate job, which executes the whole file.
-    """
     repo_root = Path(__file__).resolve().parents[2]
     node = (
         "tests/integration/test_plan_capture_gate.py::"
         "test_plan_capture_gate_parses_plans_and_stabilizes_fingerprints[duckdb]"
     )
-    # Strip xdist/coverage coordination vars so this nested run (which executes
-    # under the fast lane's own xdist workers + coverage) does not try to attach to
-    # the parent controller or double-count coverage.
     env = {
         key: value
         for key, value in os.environ.items()

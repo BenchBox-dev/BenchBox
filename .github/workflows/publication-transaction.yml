@@ -366,10 +366,12 @@ jobs:
       - name: Deploy to GitHub Pages via Pages adapter
         id: pages_deploy
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          DEPLOYED_ARTIFACT_ID: ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }}
         with:
           script: |
             const { createDeployment, getDeploymentStatus, classifyDeploymentStatus } = require('./scripts/publication/pages.cjs');
-            const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }};
+            const deployedArtifactId = process.env.DEPLOYED_ARTIFACT_ID;
             const result = await createDeployment({
               github,
               core,

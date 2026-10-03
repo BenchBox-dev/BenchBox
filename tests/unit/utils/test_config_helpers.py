@@ -1,9 +1,3 @@
-"""Tests for benchbox.utils.config_helpers module.
-
-Tests for PowerRunSettings, ConcurrentQueriesSettings dataclasses and
-ExecutionConfigHelper class.
-"""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,13 +15,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helper: mock config manager
-# ---------------------------------------------------------------------------
-
-
 def _make_config_manager(overrides: dict | None = None):
-    """Build a mock config manager with sensible defaults."""
     defaults = {
         "execution.power_run.iterations": 4,
         "execution.power_run.warm_up_iterations": 0,
@@ -54,11 +42,6 @@ def _make_config_manager(overrides: dict | None = None):
     cm.save_config.return_value = None
     cm.validate_config.return_value = True
     return cm
-
-
-# ---------------------------------------------------------------------------
-# PowerRunSettings
-# ---------------------------------------------------------------------------
 
 
 class TestPowerRunSettings:
@@ -91,18 +74,12 @@ class TestPowerRunSettings:
         )
         s.apply_to_config_manager(cm)
 
-        # Verify set calls
         assert cm.set.call_count == 5
         cm.set.assert_any_call("execution.power_run.iterations", 5)
         cm.set.assert_any_call("execution.power_run.warm_up_iterations", 2)
         cm.set.assert_any_call("execution.power_run.timeout_per_iteration_minutes", 120)
         cm.set.assert_any_call("execution.power_run.fail_fast", True)
         cm.set.assert_any_call("execution.power_run.collect_metrics", True)
-
-
-# ---------------------------------------------------------------------------
-# ConcurrentQueriesSettings
-# ---------------------------------------------------------------------------
 
 
 class TestConcurrentQueriesSettings:
@@ -144,11 +121,6 @@ class TestConcurrentQueriesSettings:
         assert cm.set.call_count == 6
         cm.set.assert_any_call("execution.concurrent_queries.enabled", True)
         cm.set.assert_any_call("execution.concurrent_queries.max_concurrent", 4)
-
-
-# ---------------------------------------------------------------------------
-# ExecutionConfigHelper
-# ---------------------------------------------------------------------------
 
 
 class TestExecutionConfigHelper:
@@ -218,7 +190,6 @@ class TestExecutionConfigHelper:
         cm = _make_config_manager()
         helper = ExecutionConfigHelper(config_manager=cm)
         helper.optimize_for_system(cpu_cores=4, memory_gb=4.0)
-        # Low memory: longer timeouts
         cm.set.assert_any_call("execution.power_run.timeout_per_iteration_minutes", 120)
         cm.set.assert_any_call("execution.concurrent_queries.query_timeout_seconds", 600)
         cm.set.assert_any_call("execution.concurrent_queries.stream_timeout_seconds", 7200)
@@ -227,17 +198,14 @@ class TestExecutionConfigHelper:
         cm = _make_config_manager()
         helper = ExecutionConfigHelper(config_manager=cm)
         helper.optimize_for_system(cpu_cores=32, memory_gb=64.0)
-        # High memory: shorter timeouts
         cm.set.assert_any_call("execution.power_run.timeout_per_iteration_minutes", 45)
         cm.set.assert_any_call("execution.concurrent_queries.query_timeout_seconds", 180)
-        # cpu_cores=32, max_concurrent = min(8, max(2, 32//4)) = 8
         cm.set.assert_any_call("execution.concurrent_queries.max_concurrent", 8)
 
     def test_optimize_for_system_mid_memory(self):
         cm = _make_config_manager()
         helper = ExecutionConfigHelper(config_manager=cm)
         helper.optimize_for_system(cpu_cores=8, memory_gb=12.0)
-        # Mid memory: default timeouts (no override), cpu_cores=8 -> max_concurrent=2
         cm.set.assert_any_call("execution.concurrent_queries.max_concurrent", 2)
 
     def test_create_performance_profile_quick(self):
@@ -283,7 +251,6 @@ class TestExecutionConfigHelper:
         cm = _make_config_manager()
         helper = ExecutionConfigHelper(config_manager=cm)
         helper.apply_performance_profile("quick")
-        # Should have applied power_run and concurrent_queries settings
         cm.set.assert_any_call("execution.power_run.iterations", 1)
         cm.set.assert_any_call("execution.concurrent_queries.enabled", False)
 
@@ -308,7 +275,6 @@ class TestExecutionConfigHelper:
         assert "concurrent_queries" in summary
         assert "general" in summary
 
-        # Power run: iterations=4, warm_up=0 => enabled = True (4 > 1)
         assert summary["power_run"]["enabled"] is True
         assert summary["power_run"]["total_iterations"] == 4
         assert summary["power_run"]["estimated_duration_minutes"] == 4 * 60
@@ -327,13 +293,7 @@ class TestExecutionConfigHelper:
         )
         helper = ExecutionConfigHelper(config_manager=cm)
         summary = helper.get_execution_summary()
-        # iterations=1, warm_up=0 => enabled = False
         assert summary["power_run"]["enabled"] is False
-
-
-# ---------------------------------------------------------------------------
-# create_sample_execution_config
-# ---------------------------------------------------------------------------
 
 
 class TestCreateSampleExecutionConfig:

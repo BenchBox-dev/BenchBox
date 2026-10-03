@@ -1,9 +1,6 @@
-"""Tests for CLI compression options.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 import sys as _sys
@@ -15,12 +12,6 @@ from click.testing import CliRunner
 from benchbox.cli.benchmarks import BenchmarkConfig
 from benchbox.cli.main import cli
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -31,10 +22,7 @@ pytestmark = [
 
 
 class TestCompressionCLI:
-    """Test CLI compression options."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.runner = CliRunner()
 
     @patch("benchbox.cli.main.get_config_manager")
@@ -46,14 +34,12 @@ class TestCompressionCLI:
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
 
-        # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
         cfg.config_path = "test.toml"
         cfg.validate_config.return_value = True
         mock_get_cfg.return_value = cfg
 
-        # Mock the managers
         mock_db_instance = MagicMock()
         mock_db_manager.return_value = mock_db_instance
         mock_db_instance.create_config.return_value = MagicMock()
@@ -81,7 +67,6 @@ class TestCompressionCLI:
         mock_result.execution_id = "test-123"
         mock_orchestrator_instance.execute_benchmark.return_value = mock_result
 
-        # Test CLI with compression options
         with patch.object(_run_module, "ResultExporter") as mock_exporter:
             mock_exporter.return_value.export_result.return_value = {"json": "test.json"}
             result = self.runner.invoke(
@@ -99,16 +84,13 @@ class TestCompressionCLI:
                 ],
             )
 
-        # Check that command executed without errors
         assert result.exit_code == 0
 
         mock_orchestrator_instance.execute_benchmark.assert_called_once()
 
-        # Get the benchmark config that was passed
         call_args = mock_orchestrator_instance.execute_benchmark.call_args
-        benchmark_config = call_args[0][0]  # First positional argument
+        benchmark_config = call_args[0][0]
 
-        # Verify compression settings were passed through
         assert isinstance(benchmark_config, BenchmarkConfig)
         assert benchmark_config.compress_data is True
         assert benchmark_config.compression_type == "zstd"
@@ -123,14 +105,12 @@ class TestCompressionCLI:
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
 
-        # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
         cfg.config_path = "test.toml"
         cfg.validate_config.return_value = True
         mock_get_cfg.return_value = cfg
 
-        # Mock the managers (same setup as above)
         mock_db_instance = MagicMock()
         mock_db_manager.return_value = mock_db_instance
         mock_db_instance.create_config.return_value = MagicMock()
@@ -158,7 +138,6 @@ class TestCompressionCLI:
         mock_result.execution_id = "test-123"
         mock_orchestrator_instance.execute_benchmark.return_value = mock_result
 
-        # Test CLI without compression options
         with patch.object(_run_module, "ResultExporter") as mock_exporter:
             mock_exporter.return_value.export_result.return_value = {"json": "test.json"}
             result = self.runner.invoke(
@@ -166,14 +145,11 @@ class TestCompressionCLI:
                 ["run", "--platform", "duckdb", "--benchmark", "ssb", "--scale", "0.01"],
             )
 
-        # Check that command executed without errors
         assert result.exit_code == 0
 
-        # Get the benchmark config that was passed
         call_args = mock_orchestrator_instance.execute_benchmark.call_args
         benchmark_config = call_args[0][0]
 
-        # Verify current default compression settings.
         assert benchmark_config.compress_data is False
         assert benchmark_config.compression_type == "none"
         assert benchmark_config.compression_level is None
@@ -183,7 +159,6 @@ class TestCompressionCLI:
         result = self.runner.invoke(cli, ["run", "--help-topic", "all"])
 
         assert result.exit_code == 0
-        # New consolidated --compression option in advanced options
         assert "--compression" in result.output
 
     def test_cli_compression_examples_in_help(self):
@@ -191,7 +166,6 @@ class TestCompressionCLI:
         result = self.runner.invoke(cli, ["run", "--help-topic", "all"])
 
         assert result.exit_code == 0
-        # The new --compression option should be visible
         assert "--compression" in result.output
 
     def test_invalid_compression_type_validation(self):
@@ -209,7 +183,6 @@ class TestCompressionCLI:
             ],
         )
 
-        # Should fail with invalid compression format
         assert result.exit_code != 0
         assert "Invalid compression" in result.output or "error" in result.output.lower()
 
@@ -222,14 +195,12 @@ class TestCompressionCLI:
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_dry_run, mock_get_cfg
     ):
 
-        # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
         cfg.config_path = "test.toml"
         cfg.validate_config.return_value = True
         mock_get_cfg.return_value = cfg
 
-        # Mock the managers
         mock_db_instance = MagicMock()
         mock_db_manager.return_value = mock_db_instance
         mock_db_instance.create_config.return_value = MagicMock()
@@ -253,7 +224,6 @@ class TestCompressionCLI:
         mock_dry_run.return_value = mock_dry_run_instance
         mock_dry_run_instance.execute_dry_run.return_value = MagicMock()
 
-        # Test dry run with compression options
         result = self.runner.invoke(
             cli,
             [
@@ -271,17 +241,13 @@ class TestCompressionCLI:
             ],
         )
 
-        # Check that command executed
         assert result.exit_code == 0
 
-        # Verify dry run executor was called
         mock_dry_run_instance.execute_dry_run.assert_called_once()
 
-        # Get the benchmark config passed to dry run
         call_args = mock_dry_run_instance.execute_dry_run.call_args
-        benchmark_config = call_args[0][0]  # First positional argument
+        benchmark_config = call_args[0][0]
 
-        # Verify compression settings in dry run.
         assert isinstance(benchmark_config, BenchmarkConfig)
         assert benchmark_config.compress_data is True
         assert benchmark_config.compression_type == "gzip"
@@ -289,14 +255,10 @@ class TestCompressionCLI:
 
 
 class TestBenchmarkConfig:
-    """Test BenchmarkConfig with compression parameters."""
-
     def test_benchmark_config_defaults(self):
 
         config = BenchmarkConfig(name="test", display_name="Test")
 
-        # BenchmarkConfig may not set compression defaults - that's handled by the mixin
-        # Just verify the fields exist and can be set
         assert hasattr(config, "compress_data")
         assert hasattr(config, "compression_type")
         assert hasattr(config, "compression_level")
@@ -319,5 +281,4 @@ class TestBenchmarkConfig:
 
         config = BenchmarkConfig(name="test", display_name="Test")
 
-        # Options should be initialized as empty dict
         assert config.options == {}

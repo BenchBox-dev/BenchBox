@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""Aggregate one merge unit's job results into a single pass/fail.
-
-Used by the always-reporting unit result jobs in ``ci.yml``. Feed it the
-``toJson(needs)`` of the result job and one ``--expect NAME=true|false`` per
-gated job:
-
-* ``NAME=true``: the job was required; its result must be ``success``.
-* ``NAME=false``: the job was not required; its result must be ``skipped``
-  (or ``success`` when it ran anyway).
-
-A skipped required job is a failure, not a pass, so a path filter or a broken
-``if:`` can never silently green a tier. ``--always NAME`` marks jobs that
-must succeed on every run. ``--must-succeed`` is a synonym kept for
-readability. Any ``failure`` or ``cancelled`` result always fails.
-"""
 
 from __future__ import annotations
 
@@ -42,7 +27,6 @@ OK_WHEN_NOT_REQUIRED = {"skipped", "success"}
 
 
 def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list[str]) -> list[str]:
-    """Return human-readable problems; empty means the unit passes."""
     problems: list[str] = []
 
     for name, info in sorted(needs.items()):

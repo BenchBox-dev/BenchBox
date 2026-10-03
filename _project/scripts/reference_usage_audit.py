@@ -1,10 +1,3 @@
-"""Classify reference-file mentions in Claude transcript JSONL files.
-
-This script makes instruction-pruning evidence reproducible. It separates
-literal mentions from transcript tool-result filename lists, because a filename
-list is not the same evidence as a file content read.
-"""
-
 from __future__ import annotations
 
 import argparse

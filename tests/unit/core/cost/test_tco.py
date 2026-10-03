@@ -1,9 +1,6 @@
-"""Tests for the TCO (Total Cost of Ownership) calculator module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -28,8 +25,6 @@ pytestmark = [
 
 
 class TestGrowthModel:
-    """Tests for GrowthModel enum."""
-
     def test_growth_model_values(self):
 
         assert GrowthModel.NONE.value == "none"
@@ -38,8 +33,6 @@ class TestGrowthModel:
 
 
 class TestGrowthConfig:
-    """Tests for GrowthConfig dataclass."""
-
     def test_default_config(self):
 
         config = GrowthConfig()
@@ -74,14 +67,11 @@ class TestGrowthConfig:
 
         config = GrowthConfig(model=GrowthModel.NONE, annual_rate=0.10)
 
-        # All years should return 1.0
         assert config.calculate_multiplier(1) == 1.0
         assert config.calculate_multiplier(2) == 1.0
         assert config.calculate_multiplier(5) == 1.0
 
     def test_calculate_multiplier_first_year(self):
-        """Test multiplier for first year is always 1.0."""
-        # Even with growth, year 1 starts at base cost
         config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
         assert config.calculate_multiplier(1) == 1.0
 
@@ -89,10 +79,6 @@ class TestGrowthConfig:
 
         config = GrowthConfig(model=GrowthModel.LINEAR, annual_rate=0.10)
 
-        # Year 1: base (1.0)
-        # Year 2: base + 10% = 1.1
-        # Year 3: base + 20% = 1.2
-        # Year 5: base + 40% = 1.4
         assert config.calculate_multiplier(1) == 1.0
         assert config.calculate_multiplier(2) == pytest.approx(1.1, rel=0.001)
         assert config.calculate_multiplier(3) == pytest.approx(1.2, rel=0.001)
@@ -102,10 +88,6 @@ class TestGrowthConfig:
 
         config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
 
-        # Year 1: base (1.0)
-        # Year 2: base * 1.1 = 1.1
-        # Year 3: base * 1.1^2 = 1.21
-        # Year 5: base * 1.1^4 = 1.4641
         assert config.calculate_multiplier(1) == 1.0
         assert config.calculate_multiplier(2) == pytest.approx(1.1, rel=0.001)
         assert config.calculate_multiplier(3) == pytest.approx(1.21, rel=0.001)
@@ -113,8 +95,6 @@ class TestGrowthConfig:
 
 
 class TestDiscountType:
-    """Tests for DiscountType enum."""
-
     def test_discount_type_values(self):
 
         assert DiscountType.NONE.value == "none"
@@ -125,8 +105,6 @@ class TestDiscountType:
 
 
 class TestDiscountConfig:
-    """Tests for DiscountConfig dataclass."""
-
     def test_default_config(self):
 
         config = DiscountConfig()
@@ -154,7 +132,6 @@ class TestDiscountConfig:
 
         config = DiscountConfig(discount_type=DiscountType.NONE)
 
-        # All years should return 1.0
         assert config.get_discount_multiplier(1) == 1.0
         assert config.get_discount_multiplier(5) == 1.0
 
@@ -165,7 +142,6 @@ class TestDiscountConfig:
             discount_percent=0.20,
         )
 
-        # 20% discount means pay 80%
         assert config.get_discount_multiplier(1) == 0.80
         assert config.get_discount_multiplier(5) == 0.80
 
@@ -177,18 +153,13 @@ class TestDiscountConfig:
             effective_start_year=2,
         )
 
-        # Year 1: no discount (before effective)
         assert config.get_discount_multiplier(1) == 1.0
-        # Year 2+: 25% discount
         assert config.get_discount_multiplier(2) == 0.75
         assert config.get_discount_multiplier(5) == 0.75
 
 
 class TestBudgetThreshold:
-    """Tests for BudgetThreshold dataclass."""
-
     def test_create_threshold(self):
-        """Test creating a budget threshold."""
         threshold = BudgetThreshold(
             name="warning",
             amount=100000.0,
@@ -209,33 +180,26 @@ class TestBudgetThreshold:
         threshold = BudgetThreshold(name="test", amount=10000.0, period="annual")
 
         assert threshold.is_exceeded(5000.0, "annual") is False
-        assert threshold.is_exceeded(10000.0, "annual") is False  # Equal is not exceeded
+        assert threshold.is_exceeded(10000.0, "annual") is False
         assert threshold.is_exceeded(10001.0, "annual") is True
 
     def test_is_exceeded_monthly_to_annual(self):
 
         threshold = BudgetThreshold(name="test", amount=12000.0, period="annual")
 
-        # $1000/month = $12000/year (at threshold)
         assert threshold.is_exceeded(1000.0, "monthly") is False
-        # $1001/month = $12012/year (exceeds)
         assert threshold.is_exceeded(1001.0, "monthly") is True
 
     def test_is_exceeded_annual_to_monthly(self):
 
         threshold = BudgetThreshold(name="test", amount=1000.0, period="monthly")
 
-        # $12000/year = $1000/month (at threshold)
         assert threshold.is_exceeded(12000.0, "annual") is False
-        # $12012/year = $1001/month (exceeds)
         assert threshold.is_exceeded(12012.0, "annual") is True
 
 
 class TestBudgetAlert:
-    """Tests for BudgetAlert dataclass."""
-
     def test_create_alert(self):
-        """Test creating a budget alert."""
         threshold = BudgetThreshold(name="critical", amount=50000.0)
         alert = BudgetAlert(
             threshold=threshold,
@@ -253,8 +217,6 @@ class TestBudgetAlert:
 
 
 class TestYearlyProjection:
-    """Tests for YearlyProjection dataclass."""
-
     def test_create_projection(self):
 
         projection = YearlyProjection(
@@ -297,8 +259,6 @@ class TestYearlyProjection:
 
 
 class TestTCOProjection:
-    """Tests for TCOProjection dataclass."""
-
     def test_default_projection(self):
 
         projection = TCOProjection(
@@ -338,11 +298,8 @@ class TestTCOProjection:
 
 
 class TestTCOCalculator:
-    """Tests for TCOCalculator class."""
-
     @pytest.fixture
     def sample_benchmark_cost(self) -> BenchmarkCost:
-        """Create a sample benchmark cost for testing."""
         return BenchmarkCost(
             total_cost=1000.0,
             currency="USD",
@@ -351,24 +308,21 @@ class TestTCOCalculator:
 
     @pytest.fixture
     def calculator(self) -> TCOCalculator:
-        """Create a TCO calculator instance."""
         return TCOCalculator()
 
     def test_calculate_tco_basic(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
 
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
-            annual_runs=12,  # Monthly runs
+            annual_runs=12,
             projection_years=5,
         )
 
-        # 12 runs * $1000 = $12000/year base
         assert projection.base_annual_cost == 12000.0
         assert projection.projection_years == 5
         assert projection.platform == "snowflake"
         assert len(projection.yearly_projections) == 5
 
-        # No growth, no discount: 5 * $12000 = $60000
         assert projection.total_tco == pytest.approx(60000.0, rel=0.001)
 
     def test_calculate_tco_with_growth(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
@@ -382,17 +336,9 @@ class TestTCOCalculator:
             growth_config=growth_config,
         )
 
-        # Base: $12000/year
-        # Year 1: $12000 * 1.0 = $12000
-        # Year 2: $12000 * 1.1 = $13200
-        # Year 3: $12000 * 1.21 = $14520
-        # Year 4: $12000 * 1.331 = $15972
-        # Year 5: $12000 * 1.4641 = $17569.20
-        # Total: ~$73261.20
-
         assert projection.yearly_projections[0].growth_multiplier == 1.0
         assert projection.yearly_projections[1].growth_multiplier == pytest.approx(1.1, rel=0.001)
-        assert projection.total_tco > 60000.0  # More than flat projection
+        assert projection.total_tco > 60000.0
 
     def test_calculate_tco_with_discount(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
 
@@ -408,15 +354,10 @@ class TestTCOCalculator:
             discount_config=discount_config,
         )
 
-        # Base: $12000/year
-        # 20% discount: $12000 * 0.8 = $9600/year
-        # 5 years: $48000
-
         assert projection.yearly_projections[0].discount_multiplier == 0.80
         assert projection.total_tco == pytest.approx(48000.0, rel=0.001)
 
     def test_calculate_tco_with_delayed_discount(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test TCO calculation with discount that starts in year 2."""
         discount_config = DiscountConfig(
             discount_type=DiscountType.COMMITTED_USE,
             discount_percent=0.25,
@@ -429,10 +370,6 @@ class TestTCOCalculator:
             projection_years=5,
             discount_config=discount_config,
         )
-
-        # Year 1: $12000 (no discount)
-        # Years 2-5: $12000 * 0.75 = $9000/year
-        # Total: $12000 + 4 * $9000 = $48000
 
         assert projection.yearly_projections[0].discount_multiplier == 1.0
         assert projection.yearly_projections[1].discount_multiplier == 0.75
@@ -455,11 +392,6 @@ class TestTCOCalculator:
             growth_config=growth_config,
             discount_config=discount_config,
         )
-
-        # Year 1: $12000 * 1.0 * 0.8 = $9600
-        # Year 2: $12000 * 1.1 * 0.8 = $10560
-        # Year 3: $12000 * 1.21 * 0.8 = $11616
-        # Total: $31776
 
         assert projection.yearly_projections[0].projected_cost == pytest.approx(9600.0, rel=0.001)
         assert projection.yearly_projections[1].projected_cost == pytest.approx(10560.0, rel=0.001)
@@ -524,10 +456,6 @@ class TestTCOCalculator:
             growth_config=growth_config,
         )
 
-        # Year 1: $1000, cumulative: $1000
-        # Year 2: $1200, cumulative: $2200
-        # Year 3: $1400, cumulative: $3600
-
         assert projection.yearly_projections[0].cumulative_cost == pytest.approx(1000.0, rel=0.001)
         assert projection.yearly_projections[1].cumulative_cost == pytest.approx(2200.0, rel=0.001)
         assert projection.yearly_projections[2].cumulative_cost == pytest.approx(3600.0, rel=0.001)
@@ -541,7 +469,6 @@ class TestTCOCalculator:
             projection_years=1,
         )
 
-        # $12000/year / 12 = $1000/month
         assert projection.yearly_projections[0].monthly_cost == pytest.approx(1000.0, rel=0.001)
 
     def test_calculate_tco_average_annual_cost(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
@@ -560,16 +487,12 @@ class TestTCOCalculator:
 
 
 class TestTCOCalculatorBudgetAlerts:
-    """Tests for TCO Calculator budget alert functionality."""
-
     @pytest.fixture
     def calculator(self) -> TCOCalculator:
-        """Create a TCO calculator instance."""
         return TCOCalculator()
 
     @pytest.fixture
     def sample_benchmark_cost(self) -> BenchmarkCost:
-        """Create a sample benchmark cost for testing."""
         return BenchmarkCost(
             total_cost=10000.0,
             currency="USD",
@@ -577,16 +500,13 @@ class TestTCOCalculatorBudgetAlerts:
         )
 
     def test_add_budget_threshold(self, calculator: TCOCalculator):
-        """Test adding budget thresholds."""
         threshold = BudgetThreshold(name="warning", amount=100000.0)
         calculator.add_budget_threshold(threshold)
 
-        # Access private attribute for testing
         assert len(calculator._budget_thresholds) == 1
         assert calculator._budget_thresholds[0].name == "warning"
 
     def test_clear_budget_thresholds(self, calculator: TCOCalculator):
-        """Test clearing budget thresholds."""
         calculator.add_budget_threshold(BudgetThreshold(name="test1", amount=100.0))
         calculator.add_budget_threshold(BudgetThreshold(name="test2", amount=200.0))
 
@@ -597,11 +517,8 @@ class TestTCOCalculatorBudgetAlerts:
         assert len(calculator._budget_thresholds) == 0
 
     def test_annual_budget_alert_triggered(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that annual budget alert is triggered when exceeded."""
-        # Set threshold at $15000/year
         calculator.add_budget_threshold(BudgetThreshold(name="annual_limit", amount=15000.0, period="annual"))
 
-        # With 10% growth, year 2+ will exceed $15000
         growth_config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.60)
 
         projection = calculator.calculate_tco(
@@ -611,15 +528,11 @@ class TestTCOCalculatorBudgetAlerts:
             growth_config=growth_config,
         )
 
-        # Year 1: $10000
-        # Year 2: $16000 (exceeds $15000)
         assert len(projection.budget_alerts) == 1
         assert projection.budget_alerts[0].threshold.name == "annual_limit"
         assert projection.budget_alerts[0].year == 2
 
     def test_monthly_budget_alert_triggered(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that monthly budget alert is triggered when exceeded."""
-        # Set threshold at $1000/month
         calculator.add_budget_threshold(BudgetThreshold(name="monthly_limit", amount=800.0, period="monthly"))
 
         projection = calculator.calculate_tco(
@@ -628,14 +541,11 @@ class TestTCOCalculatorBudgetAlerts:
             projection_years=1,
         )
 
-        # $10000/year = $833.33/month > $800
         assert len(projection.budget_alerts) == 1
         assert projection.budget_alerts[0].threshold.name == "monthly_limit"
         assert projection.budget_alerts[0].period == "monthly"
 
     def test_total_budget_alert_triggered(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that total TCO budget alert is triggered."""
-        # Set threshold at $25000 total
         calculator.add_budget_threshold(BudgetThreshold(name="total_limit", amount=25000.0, period="total"))
 
         projection = calculator.calculate_tco(
@@ -644,14 +554,11 @@ class TestTCOCalculatorBudgetAlerts:
             projection_years=3,
         )
 
-        # 3 years * $10000 = $30000 > $25000
         assert len(projection.budget_alerts) == 1
         assert projection.budget_alerts[0].threshold.name == "total_limit"
         assert projection.budget_alerts[0].period == "total"
 
     def test_no_alert_when_under_budget(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that no alert is triggered when under budget."""
-        # Set high threshold
         calculator.add_budget_threshold(BudgetThreshold(name="high_limit", amount=1000000.0, period="annual"))
 
         projection = calculator.calculate_tco(
@@ -663,7 +570,6 @@ class TestTCOCalculatorBudgetAlerts:
         assert len(projection.budget_alerts) == 0
 
     def test_multiple_thresholds(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test multiple budget thresholds."""
         calculator.add_budget_threshold(BudgetThreshold(name="warning", amount=5000.0, period="annual"))
         calculator.add_budget_threshold(BudgetThreshold(name="critical", amount=8000.0, period="annual"))
 
@@ -673,18 +579,14 @@ class TestTCOCalculatorBudgetAlerts:
             projection_years=1,
         )
 
-        # $10000 exceeds both $5000 and $8000
         assert len(projection.budget_alerts) == 2
 
 
 class TestTCOCalculatorPlatformComparison:
-    """Tests for TCO Calculator platform comparison functionality."""
-
     def test_compare_platforms_basic(self):
 
         calculator = TCOCalculator()
 
-        # Create projections for different platforms
         projections = [
             TCOProjection(platform="snowflake", base_annual_cost=100000.0, total_tco=500000.0, projection_years=5),
             TCOProjection(platform="bigquery", base_annual_cost=80000.0, total_tco=400000.0, projection_years=5),
@@ -711,12 +613,10 @@ class TestTCOCalculatorPlatformComparison:
 
         comparison = calculator.compare_platforms(projections)
 
-        # Platform B is cheaper
         assert comparison["rankings"][0]["platform"] == "platform_b"
         assert comparison["rankings"][0]["savings_vs_max"] == 20.0
         assert comparison["rankings"][0]["savings_percent"] == 20.0
 
-        # Platform A is most expensive
         assert comparison["rankings"][1]["platform"] == "platform_a"
         assert comparison["rankings"][1]["savings_vs_max"] == 0.0
 
@@ -742,11 +642,8 @@ class TestTCOCalculatorPlatformComparison:
 
 
 class TestCreateStandardTCOScenarios:
-    """Tests for the create_standard_tco_scenarios utility function."""
-
     @pytest.fixture
     def sample_benchmark_cost(self) -> BenchmarkCost:
-        """Create a sample benchmark cost for testing."""
         return BenchmarkCost(
             total_cost=1000.0,
             currency="USD",
@@ -770,7 +667,6 @@ class TestCreateStandardTCOScenarios:
 
         assert conservative.growth_config.model == GrowthModel.NONE
         assert conservative.discount_config.discount_type == DiscountType.NONE
-        # 12 runs * $1000 * 5 years = $60000
         assert conservative.total_tco == pytest.approx(60000.0, rel=0.001)
 
     def test_moderate_scenario(self, sample_benchmark_cost: BenchmarkCost):
@@ -794,12 +690,10 @@ class TestCreateStandardTCOScenarios:
         assert aggressive.growth_config.annual_rate == 0.25
         assert aggressive.discount_config.discount_type == DiscountType.NONE
 
-        # Should be highest TCO due to high growth
         conservative = scenarios["conservative"]
         assert aggressive.total_tco > conservative.total_tco
 
     def test_all_scenarios_have_5_year_projection(self, sample_benchmark_cost: BenchmarkCost):
-        """Test all scenarios project 5 years."""
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost)
 
         for scenario in scenarios.values():
@@ -808,7 +702,6 @@ class TestCreateStandardTCOScenarios:
 
     def test_custom_annual_runs(self, sample_benchmark_cost: BenchmarkCost):
 
-        scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=52)  # Weekly
+        scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=52)
 
-        # Base should be 52 * $1000 = $52000/year
         assert scenarios["conservative"].base_annual_cost == 52000.0

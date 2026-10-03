@@ -1,13 +1,6 @@
-"""Input validation schemas for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Pydantic models for validating and sanitizing tool inputs
-to ensure type safety, prevent invalid inputs, and protect against
-malicious payloads.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,55 +17,39 @@ from benchbox.core.constants import MCP_DATA_ONLY_ALIASES, MCP_MODE_CHOICES, VAL
 
 logger = logging.getLogger(__name__)
 
-# Validation constants
-MAX_QUERY_IDS = 100  # Maximum number of query IDs per request (DoS protection)
-MAX_QUERY_ID_LENGTH = 64  # Maximum length of a single query ID
-QUERY_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric with dash/underscore
-PLATFORM_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric platform names
-BENCHMARK_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric benchmark names
-FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")  # Safe filename characters
+MAX_QUERY_IDS = 100
+MAX_QUERY_ID_LENGTH = 64
+QUERY_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+PLATFORM_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+BENCHMARK_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")
 PLATFORM_OPTION_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 MEMORY_LIMIT_PATTERN = re.compile(r"^(?:[1-9]\d{0,5}(?:\.\d{1,2})?)(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
 IDENTIFIER_LIST_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(?:,[a-zA-Z_][a-zA-Z0-9_]*)*$")
-# Intentionally the same pattern as PLATFORM_OPTION_NAME_PATTERN: both are lowercase
-# snake_case with the same length bound, but they are different domains that may
-# diverge. Aliased rather than duplicated to make the shared origin explicit.
 CLICKHOUSE_PROFILE_NAME_PATTERN = PLATFORM_OPTION_NAME_PATTERN
 
-# Server-owned ClickHouse connection profiles, as JSON:
-#   {"analytics": {"port": 9440, "secure": true}}
-# Only the operator sets this; MCP callers may name a profile but never describe
-# a destination or a transport policy.
 MCP_CLICKHOUSE_PROFILE_ENV = "BENCHBOX_MCP_CLICKHOUSE_PROFILES"
 
 MAX_PLATFORM_OPTIONS = 16
 MAX_PLATFORM_OPTION_VALUE_LENGTH = 256
 MAX_MEMORY_LIMIT_BYTES = 1 << 40
 
-# Scale factor limits
 MIN_SCALE_FACTOR = 0.001
-MAX_SCALE_FACTOR = 10000  # 10TB scale factor is extreme but possible
+MAX_SCALE_FACTOR = 10000
 
 
 class MCPValidationError(ValueError):
-    """Raised when MCP input validation fails.
-
-    This is distinct from pydantic.ValidationError to avoid confusion
-    and provide clearer error handling in MCP tool implementations.
-    """
+    pass
 
 
 @dataclass(frozen=True, slots=True)
 class MCPPlatformOptionSpec:
-    """Bounded, non-secret option accepted by the MCP benchmark surface."""
-
     kind: Literal["bool", "int", "float", "string"]
     choices: tuple[str, ...] = ()
     minimum: int | float | None = None
     maximum: int | float | None = None
 
     def parse(self, name: str, value: object) -> bool | int | float | str:
-        """Validate and normalize one JSON option value without echoing it."""
         if self.kind == "bool":
             if not isinstance(value, bool):
                 raise MCPValidationError(f"Platform option '{name}' must be a boolean")
@@ -108,24 +85,12 @@ _MCP_OPTION = MCPPlatformOptionSpec
 
 @dataclass(frozen=True, slots=True)
 class MCPPlatformOptionContract:
-    """Review metadata for one accepted MCP option.
-
-    The contract is deliberately separate from the Pydantic-like value spec:
-    bounds validate syntax, while this record documents the effective consumer,
-    security class, compatibility aliases, and rejected alternatives.  The
-    validator requires both records to agree so a new allow-listed option
-    cannot bypass the review matrix accidentally.
-    """
-
     consumer: str
     security_class: Literal["execution", "resource", "device", "layout", "connection"]
     aliases: tuple[str, ...] = ()
     rejected_alternatives: tuple[str, ...] = ()
 
 
-# This is deliberately narrower than the CLI registry.  MCP callers cannot
-# change credentials, destinations, filesystem locations, package installation,
-# or other tenant-owned connection state through request arguments.
 MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
     "clickhouse": {
         "connection_profile": _MCP_OPTION("string"),
@@ -212,9 +177,6 @@ _CLICKHOUSE_PROFILE_CONTRACT = _contract(
 )
 
 
-# Canonical option-to-consumer matrix.  Keep this map explicit instead of
-# deriving it from the allow-list: an accepted option must have a reviewed
-# consumer and security classification before it can cross the MCP boundary.
 MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = {
     "clickhouse": {
         "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,
@@ -285,22 +247,11 @@ _CACHED_CLICKHOUSE_RAW: str | None = None
 
 
 def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
-    """Return the operator-defined ClickHouse connection profiles.
-
-    Profiles are the only supported way to reach a non-default ClickHouse port
-    or a non-default TLS setting from MCP.  The mapping is read from server
-    process configuration, never from request arguments, so a caller can name a
-    reviewed destination but can never describe one.  A malformed registry
-    yields no profiles rather than a partially trusted one.
-    """
     global _CACHED_CLICKHOUSE_RAW
     raw = os.environ.get(MCP_CLICKHOUSE_PROFILE_ENV, "").strip()
     if not raw:
         _CACHED_CLICKHOUSE_RAW = raw
         return {}
-    # Cache keyed on raw env string so a repeated malformed value logs once.
-    # Resolution is still per-request (via resolve_clickhouse_connection_profile)
-    # so a withdrawn profile fails closed on durable replay.
     if raw == _CACHED_CLICKHOUSE_RAW and raw in _CLICKHOUSE_PROFILES_CACHE:
         return dict(_CLICKHOUSE_PROFILES_CACHE[raw])
     try:
@@ -326,8 +277,6 @@ def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
             continue
         unknown = set(entry) - {"port", "secure"}
         if unknown:
-            # Fail closed rather than silently dropping operator intent: a
-            # profile carrying hosts, credentials, or paths is a policy error.
             logger.error(
                 "Ignoring %s profile '%s': only 'port' and 'secure' are supported", MCP_CLICKHOUSE_PROFILE_ENV, name
             )
@@ -349,39 +298,24 @@ def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
 
 
 def resolve_clickhouse_connection_profile(name: str) -> dict[str, object]:
-    """Resolve a named profile to its server-owned connection settings.
-
-    Raises:
-        MCPValidationError: If no such profile is configured on this server.
-    """
     profile = _load_clickhouse_connection_profiles().get(name)
     if profile is None:
-        # Deliberately does not echo the requested name or list configured
-        # profiles: that would turn a validation error into a probe oracle.
         raise MCPValidationError("Platform option 'connection_profile' is not configured on this server")
     return dict(profile)
 
 
 def _validate_clickhouse_options(platform: str, normalized: Mapping[str, object]) -> None:
-    """Fail closed on ClickHouse connection intent that MCP must not grant."""
     profile = normalized.get("connection_profile")
     if profile is None:
         return
     if not CLICKHOUSE_PROFILE_NAME_PATTERN.fullmatch(str(profile)):
         raise MCPValidationError("Platform option 'connection_profile' must be a lowercase snake_case profile name")
     if platform == "clickhouse" and normalized.get("deployment_mode") != "server":
-        # Local mode runs chDB in-process.  Accepting a connection profile there
-        # would hand local runs a network path they do not otherwise have.
         raise MCPValidationError("Platform option 'connection_profile' requires deployment_mode='server'")
-    # Existence is checked at admission so an unknown profile is rejected before
-    # a durable job is persisted.  The resolved port/TLS values are deliberately
-    # NOT merged into the normalized request: only the profile name is persisted,
-    # so a retry re-resolves from current server configuration.
     resolve_clickhouse_connection_profile(str(profile))
 
 
 def _memory_size_bytes(value: str) -> float | None:
-    """Return a bounded memory-size string in bytes, or None if it is not one."""
     if not MEMORY_LIMIT_PATTERN.fullmatch(value):
         return None
     number, unit = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z]+)", value).groups()  # type: ignore[union-attr]
@@ -390,7 +324,6 @@ def _memory_size_bytes(value: str) -> float | None:
 
 
 def _validate_memory_limit(name: str, value: str) -> str:
-    """Validate a bounded memory-size option without accepting paths or expressions."""
     size = _memory_size_bytes(value)
     if size is None:
         raise MCPValidationError(f"Platform option '{name}' must use a bounded memory size")
@@ -401,46 +334,25 @@ def _validate_memory_limit(name: str, value: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class DaskResourceEnvelope:
-    """Server-owned aggregate ceiling for one MCP-requested Dask cluster.
-
-    Dask's per-field maxima bound each knob in isolation, but the pressure a
-    request actually puts on the host is the *product* of the worker count and
-    the per-worker thread and memory limits.  This record is the aggregate
-    budget that product must fit inside.
-    """
-
     max_workers: int
     max_total_threads: int
     max_total_memory_bytes: float
 
 
-# Effective adapter defaults for fields the request leaves unset.  These mirror
-# the conservative local caps in benchbox/platforms/dataframe/dask_df.py, so an
-# omitted field can never contribute more than the adapter would actually apply.
 _DASK_DEFAULT_WORKERS = 2
 _DASK_DEFAULT_THREADS_PER_WORKER = 2
 _DASK_DEFAULT_MEMORY_PER_WORKER_BYTES = float(2 << 30)
 
-# Server-owned aggregate budget.  Deliberately far below the per-field maxima:
-# Defaults are static for determinism; host-derived clamping is available via
-# operator env overrides, not implicit psutil. See docs/operations/mcp-remote-security.md
-# Envelope tradeoffs. Envelope is enforced even when use_distributed=false (fail-closed).
-# n_workers=256 x threads_per_worker=256 would otherwise admit a 65,536-thread
-# cluster advertising 256 TB of memory from a single request.
 MCP_DASK_MAX_WORKERS_ENV = "BENCHBOX_MCP_DASK_MAX_WORKERS"
 MCP_DASK_MAX_TOTAL_THREADS_ENV = "BENCHBOX_MCP_DASK_MAX_TOTAL_THREADS"
 MCP_DASK_MAX_TOTAL_MEMORY_ENV = "BENCHBOX_MCP_DASK_MAX_TOTAL_MEMORY"
 _DASK_DEFAULT_MAX_WORKERS = 16
 _DASK_DEFAULT_MAX_TOTAL_THREADS = 64
 _DASK_DEFAULT_MAX_TOTAL_MEMORY = "64GB"
-# A units slip or an extra digit ("999999TB") is syntactically valid, so the
-# memory override needs the same out-of-range guard the integer budgets have --
-# otherwise a typo silently disables the aggregate memory ceiling entirely.
 _DASK_MAX_TOTAL_MEMORY_CEILING_BYTES = float(16 << 40)
 
 
 def _envelope_int(env_name: str, default: int, *, maximum: int) -> int:
-    """Read one operator-supplied integer budget, falling back when unusable."""
     raw = os.environ.get(env_name, "").strip()
     if not raw:
         return default
@@ -456,7 +368,6 @@ def _envelope_int(env_name: str, default: int, *, maximum: int) -> int:
 
 
 def load_dask_resource_envelope() -> DaskResourceEnvelope:
-    """Return the server-owned aggregate Dask budget for this process."""
     raw_memory = os.environ.get(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "").strip()
     memory_bytes = _memory_size_bytes(raw_memory) if raw_memory else None
     if raw_memory and memory_bytes is None:
@@ -481,12 +392,6 @@ def load_dask_resource_envelope() -> DaskResourceEnvelope:
 
 
 def _validate_dask_options(normalized: Mapping[str, object]) -> None:
-    """Reject a Dask request whose aggregate footprint exceeds the host budget.
-
-    Runs before adapter construction: ``DaskDataFrameAdapter.__init__`` builds
-    the ``LocalCluster`` itself, so a guard placed any later would have to start
-    the oversized cluster to discover it was oversized.
-    """
     envelope = load_dask_resource_envelope()
 
     workers = normalized.get("n_workers", _DASK_DEFAULT_WORKERS)
@@ -499,7 +404,6 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
 
     total_threads = workers * threads_per_worker
     if total_threads > envelope.max_total_threads:
-        # The product, not either field alone, is the CPU pressure on the host.
         raise MCPValidationError("Dask 'n_workers' x 'threads_per_worker' exceeds the server's total thread budget")
 
     memory_limit = normalized.get("memory_limit")
@@ -509,18 +413,10 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
     if per_worker_bytes is None:
         raise MCPValidationError("Platform option 'memory_limit' must use a bounded memory size")
     if workers * per_worker_bytes > envelope.max_total_memory_bytes:
-        # memory_limit is per worker, so the advertised total scales with n_workers.
         raise MCPValidationError("Dask 'n_workers' x 'memory_limit' exceeds the server's total memory budget")
 
 
 def resolve_platform_policy_key(platform: str) -> str:
-    """Return the allow-list key whose policy governs a platform name.
-
-    A "-df" request falls back to its base platform only when the full name
-    is absent from the allow-list. This keeps the value specs, contract matrix,
-    and cross-field rules on the same platform and ensures a future "foo-df"
-    allow-list entry can carry its own policy.
-    """
     name = validate_platform_name(platform)
     if name not in MCP_PLATFORM_OPTION_ALLOWLIST and name.endswith("-df"):
         return name[:-3]
@@ -528,16 +424,10 @@ def resolve_platform_policy_key(platform: str) -> str:
 
 
 def is_dataframe_alias(platform: str) -> bool:
-    """Return True if the normalized name ends with the dataframe suffix."""
     return validate_platform_name(platform).endswith("-df")
 
 
 def validate_platform_options(platform: str, options: Mapping[str, object] | None) -> dict[str, object]:
-    """Return canonical, bounded MCP platform options or fail closed."""
-    # An omitted request and an empty one must validate identically.  Returning
-    # early for None would skip the cross-field policy, so a request that names
-    # no options at all would escape the server's resource envelope and run on
-    # adapter defaults that may exceed it.
     if options is None:
         options = {}
     if not isinstance(options, Mapping):
@@ -564,60 +454,29 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
             raise MCPValidationError(f"Platform option '{name}' contains invalid identifiers")
         normalized[name] = parsed
 
-    # Cross-field policy runs after every value is bounded, so it sees the whole
-    # request.  Every admission path (synchronous run_benchmark, durable
-    # start_benchmark, and durable worker replay) reaches this one function, so a
-    # rejected combination can never be persisted or reintroduced by a retry.
     _validate_cross_field_policy(policy_name, normalized)
     return normalized
 
 
 def _validate_cross_field_policy(platform_name: str, normalized: Mapping[str, object]) -> None:
-    """Apply per-platform rules that individual value bounds cannot express."""
     if platform_name in {"clickhouse", "clickhouse-server"}:
         _validate_clickhouse_options(platform_name, normalized)
     elif platform_name == "dask":
         _validate_dask_options(normalized)
     elif platform_name == "databricks":
-        # Building the intent is the validation: contradictory layout requests
-        # only reveal themselves once both fields are resolved together.
         build_databricks_clustering_intent(normalized)
 
 
 def build_databricks_clustering_intent(normalized: Mapping[str, object]):
-    """Translate normalized MCP clustering options into effective tuning.
-
-    Returns ``None`` when the request carries no clustering intent.  Both the
-    admission gate and adapter preparation call this, so a combination that is
-    rejected at admission cannot be reconstructed later by a durable replay, and
-    the object the resolver consumes is the one that was validated.
-
-    Raises:
-        MCPValidationError: If the requested layout fields contradict each other.
-    """
     from benchbox.core.run_service import build_databricks_clustering_intent as build_core_intent
 
     try:
         return build_core_intent(dict(normalized))
     except ValueError as exc:
-        # Surface layout conflicts as a structured validation error at admission
-        # instead of an execution failure discovered by a worker.  The message
-        # is generated from allow-listed option names, not from caller text.
         raise MCPValidationError(f"Databricks clustering options conflict: {exc}") from exc
 
 
 def validate_query_id(query_id: str) -> str:
-    """Validate a single query ID.
-
-    Args:
-        query_id: Query ID to validate
-
-    Returns:
-        Sanitized query ID
-
-    Raises:
-        MCPValidationError: If query ID is invalid
-    """
     query_id = query_id.strip()
 
     if not query_id:
@@ -633,17 +492,6 @@ def validate_query_id(query_id: str) -> str:
 
 
 def validate_query_list(queries: str | None) -> list[str] | None:
-    """Validate and parse a comma-separated query list.
-
-    Args:
-        queries: Comma-separated query IDs (e.g., "1,3,6")
-
-    Returns:
-        List of validated query IDs, or None if input is None/empty
-
-    Raises:
-        MCPValidationError: If any query ID is invalid or list is too long
-    """
     if not queries:
         return None
 
@@ -659,17 +507,6 @@ def validate_query_list(queries: str | None) -> list[str] | None:
 
 
 def validate_platform_name(platform: str) -> str:
-    """Validate a platform name.
-
-    Args:
-        platform: Platform name to validate
-
-    Returns:
-        Lowercased, sanitized platform name
-
-    Raises:
-        MCPValidationError: If platform name is invalid
-    """
     platform = platform.strip().lower()
 
     if not platform:
@@ -685,17 +522,6 @@ def validate_platform_name(platform: str) -> str:
 
 
 def validate_benchmark_name(benchmark: str) -> str:
-    """Validate a benchmark name.
-
-    Args:
-        benchmark: Benchmark name to validate
-
-    Returns:
-        Lowercased, sanitized benchmark name
-
-    Raises:
-        MCPValidationError: If benchmark name is invalid
-    """
     benchmark = benchmark.strip().lower()
 
     if not benchmark:
@@ -711,19 +537,6 @@ def validate_benchmark_name(benchmark: str) -> str:
 
 
 def validate_filename(filename: str) -> str:
-    """Validate a result filename.
-
-    Prevents path traversal attacks and other malicious filenames.
-
-    Args:
-        filename: Filename to validate
-
-    Returns:
-        Sanitized filename
-
-    Raises:
-        MCPValidationError: If filename is invalid or potentially malicious
-    """
     filename = filename.strip()
 
     if not filename:
@@ -732,38 +545,22 @@ def validate_filename(filename: str) -> str:
     if len(filename) > 255:
         raise MCPValidationError(f"Filename too long (max 255 chars): {filename[:20]}...")
 
-    # Check for path traversal attempts
     if ".." in filename or "/" in filename or "\\" in filename:
         raise MCPValidationError(f"Filename cannot contain path components: {filename}")
 
-    # Only allow safe characters
     if not FILENAME_PATTERN.match(filename):
         raise MCPValidationError(f"Filename contains invalid characters: {filename}")
 
     return filename
 
 
-# MCP's mode parameter is RUN_MODES plus the data_only execution-type
-# shortcut; see benchbox.core.constants.MCP_MODE_CHOICES.
 MODE_CHOICES = MCP_MODE_CHOICES
 
 
 def validate_mode(mode: str | None) -> str | None:
-    """Validate execution mode value.
-
-    Args:
-        mode: Execution mode to validate ('sql', 'dataframe', or 'data_only')
-
-    Returns:
-        Lowercased, validated mode or None if input is None
-
-    Raises:
-        MCPValidationError: If mode is invalid
-    """
     if mode is None:
         return None
     mode_lower = mode.strip().lower()
-    # Normalize aliases
     if mode_lower in MCP_DATA_ONLY_ALIASES:
         mode_lower = "data_only"
     if mode_lower not in MODE_CHOICES:
@@ -772,22 +569,6 @@ def validate_mode(mode: str | None) -> str | None:
 
 
 def validate_phases(phases: str | None) -> str | None:
-    """Validate a comma-separated phase list against the shared phase vocabulary.
-
-    MCP accepted any string here and passed it through to
-    ``BaseBenchmark.run_with_platform()``, so a typo such as ``"lodad"`` was
-    silently dropped rather than reported. The CLI has always rejected unknown
-    phases; this closes that gap against the same list.
-
-    Args:
-        phases: Comma-separated phase names, or None.
-
-    Returns:
-        The normalized comma-separated phase list, or None if input is None.
-
-    Raises:
-        MCPValidationError: If any phase is not in VALID_PHASES.
-    """
     if phases is None:
         return None
 
@@ -805,17 +586,6 @@ def validate_phases(phases: str | None) -> str | None:
 
 
 def validate_scale_factor(scale_factor: float) -> float:
-    """Validate a scale factor.
-
-    Args:
-        scale_factor: Scale factor to validate
-
-    Returns:
-        Validated scale factor
-
-    Raises:
-        MCPValidationError: If scale factor is out of valid range
-    """
     if scale_factor <= 0:
         raise MCPValidationError(f"Scale factor must be positive: {scale_factor}")
 

@@ -1,5 +1,3 @@
-"""Integration tests for single-target read-only worktree finish preview."""
-
 from __future__ import annotations
 
 import json
@@ -89,11 +87,6 @@ def write_canned_evidence(path: Path, pr_records: list[dict]) -> Path:
     return path
 
 
-# ---------------------------------------------------------------------------
-# Argument validation
-# ---------------------------------------------------------------------------
-
-
 def test_validate_inputs_valid():
     p, oid = validate_inputs("/tmp/some-wt", "a" * 40)
     assert p == Path("/tmp/some-wt").resolve()
@@ -128,11 +121,6 @@ def test_validate_inputs_comma_separated_list():
 
 def test_branch_ref_argument_quotes_shell_metacharacters():
     assert _branch_ref_argument("feat/foo;id") == "'refs/heads/feat/foo;id'"
-
-
-# ---------------------------------------------------------------------------
-# Structural hold states
-# ---------------------------------------------------------------------------
 
 
 def test_refuse_primary_clone(tmp_path: Path):
@@ -233,17 +221,11 @@ def test_structural_hold_oid_mismatch(tmp_path: Path):
     assert "does not match expected" in res.hold_reason.lower()
 
 
-# ---------------------------------------------------------------------------
-# Provenance and controller hold states
-# ---------------------------------------------------------------------------
-
-
 def test_provenance_hold_legacy(tmp_path: Path):
     repo = init_repo_with_origin(tmp_path / "repo")
     wt = add_linked_worktree(repo, "feat/legacy", tmp_path / "wt_legacy")
     head_oid = _git(["rev-parse", "HEAD"], wt)
 
-    # Legacy worktree without metadata init
     res = evaluate_finish_preview(
         target_path=wt,
         expected_head_oid=head_oid,
@@ -259,10 +241,8 @@ def test_provenance_hold_malformed_metadata(tmp_path: Path):
     wt = add_linked_worktree(repo, "feat/malformed", tmp_path / "wt_malformed")
     head_oid = _git(["rev-parse", "HEAD"], wt)
 
-    # Enable worktree config so git config --worktree succeeds
     _git(["config", "extensions.worktreeConfig", "true"], repo)
 
-    # Incomplete metadata missing base-ref and base-oid
     _git(["config", "--worktree", "benchbox.worktree.lifecycle-id", "00000000000000000000000000000000"], wt)
     _git(["config", "--worktree", "benchbox.worktree.created-at", "2026-09-06T12:00:00Z"], wt)
 
@@ -299,11 +279,6 @@ def test_controller_hold_external_binding(tmp_path: Path):
     assert res.owner_state == "controller"
     assert "controller" in res.hold_reason.lower()
     assert "bossmode" in res.hold_reason
-
-
-# ---------------------------------------------------------------------------
-# GitHub PR integration hold states
-# ---------------------------------------------------------------------------
 
 
 def test_pr_hold_no_prs_found(tmp_path: Path):
@@ -432,16 +407,10 @@ def test_pr_hold_pr_head_sha_mismatch(tmp_path: Path):
     assert "does not match current or historical branch commits" in res.hold_reason.lower()
 
 
-# ---------------------------------------------------------------------------
-# Actionable preview & strict no-mutation proof
-# ---------------------------------------------------------------------------
-
-
 def test_actionable_preview_and_no_mutation(tmp_path: Path):
     repo = init_repo_with_origin(tmp_path / "repo")
     wt = add_linked_worktree(repo, "feat/ready-to-finish", tmp_path / "wt_ready")
 
-    # Make a commit on the branch
     (wt / "feature.txt").write_text("feature code\n", encoding="utf-8")
     _git(["add", "feature.txt"], wt)
     _git(["commit", "-m", "feature commit"], wt)
@@ -454,7 +423,6 @@ def test_actionable_preview_and_no_mutation(tmp_path: Path):
         base_oid=_git(["rev-parse", "develop"], repo),
     )
 
-    # Merge branch into develop on origin and update local develop
     _git(["checkout", "develop"], repo)
     _git(["merge", "--no-ff", "-m", "Merge PR #105", "feat/ready-to-finish"], repo)
     merge_oid = _git(["rev-parse", "HEAD"], repo)
@@ -472,7 +440,6 @@ def test_actionable_preview_and_no_mutation(tmp_path: Path):
     ]
     evidence_file = write_canned_evidence(tmp_path / "evidence.json", evidence)
 
-    # Capture initial repository and worktree state before preview
     before_refs = _git(["show-ref"], repo)
     before_worktrees = _git(["worktree", "list", "--porcelain"], repo)
     before_wt_head = _git(["rev-parse", "HEAD"], wt)
@@ -485,7 +452,6 @@ def test_actionable_preview_and_no_mutation(tmp_path: Path):
         evidence_file=evidence_file,
     )
 
-    # Verify actionable preview
     assert res.status == "actionable"
     assert res.hold_reason is None
     assert len(res.proposed_actions) == 2
@@ -495,7 +461,6 @@ def test_actionable_preview_and_no_mutation(tmp_path: Path):
     assert branch_tip in res.proposed_actions[1]["command"]
     assert "refs/heads/feat/ready-to-finish" in res.proposed_actions[1]["command"]
 
-    # Verify dictionary serialization
     d = res.to_dict()
     assert d["status"] == "actionable"
     assert d["branch"] == "feat/ready-to-finish"
@@ -503,8 +468,6 @@ def test_actionable_preview_and_no_mutation(tmp_path: Path):
     assert d["pr_number"] == 105
     assert d["pr_merged"] is True
 
-    # ABSOLUTE NO-MUTATION PROOF:
-    # State after preview must match state before preview
     after_refs = _git(["show-ref"], repo)
     after_worktrees = _git(["worktree", "list", "--porcelain"], repo)
     after_wt_head = _git(["rev-parse", "HEAD"], wt)
@@ -531,8 +494,6 @@ def test_make_target_worktree_finish(tmp_path: Path):
         base_oid=head_oid,
     )
 
-    # Run make worktree-finish WORKTREE_PATH=... EXPECTED_HEAD_OID=...
-    # Without canned evidence or network GitHub token, it will cleanly evaluate to HOLD
     res = make_target(
         repo,
         "worktree-finish",
@@ -551,12 +512,7 @@ def test_make_target_worktree_finish(tmp_path: Path):
 
 
 def test_apply_executes_removal_and_ref_deletion_in_fixture(tmp_path: Path):
-    """APPLY=1 path removes the worktree and deletes the branch ref in a fixture.
 
-    Disposable fixture only: builds the same actionable state as the preview
-    test, runs apply_finish_actions, and proves the worktree is gone and the
-    local branch ref is deleted while develop and the merge commit survive.
-    """
     repo = init_repo_with_origin(tmp_path / "repo")
     wt = add_linked_worktree(repo, "feat/apply-me", tmp_path / "wt_apply")
 
@@ -604,7 +560,7 @@ def test_apply_executes_removal_and_ref_deletion_in_fixture(tmp_path: Path):
     assert all(e["outcome"] in ("removed", "deleted") for e in executed)
 
     assert not wt.exists()
-    # Branch ref must be gone: rev-parse fails.
+
     proc = subprocess.run(
         ["git", "rev-parse", "--verify", "refs/heads/feat/apply-me"],
         cwd=repo,
@@ -612,13 +568,13 @@ def test_apply_executes_removal_and_ref_deletion_in_fixture(tmp_path: Path):
         text=True,
     )
     assert proc.returncode != 0
-    # Develop and its merge commit survive.
+
     assert _git(["rev-parse", "HEAD"], repo) == merge_oid or True
     assert _git(["rev-parse", "develop"], repo) == merge_oid
 
 
 def test_apply_refuses_branch_drift_without_mutation(tmp_path: Path):
-    """Apply performs no mutation when the branch moved after preview."""
+
     repo = init_repo_with_origin(tmp_path / "repo")
     wt = add_linked_worktree(repo, "feat/drifted", tmp_path / "wt_drift")
 
@@ -659,7 +615,6 @@ def test_apply_refuses_branch_drift_without_mutation(tmp_path: Path):
     )
     assert res.status == "actionable"
 
-    # Move the branch after preview: apply must refuse.
     (wt / "later.txt").write_text("later\n", encoding="utf-8")
     _git(["add", "later.txt"], wt)
     _git(["commit", "-m", "later commit"], wt)
@@ -672,7 +627,7 @@ def test_apply_refuses_branch_drift_without_mutation(tmp_path: Path):
 
 
 def test_apply_from_inside_target_worktree_still_deletes_ref(tmp_path: Path, monkeypatch):
-    """Apply survives its own cwd deletion: git runs from the common dir."""
+
     repo = init_repo_with_origin(tmp_path / "repo")
     wt = add_linked_worktree(repo, "feat/apply-cwd", tmp_path / "wt_cwd")
 
@@ -713,7 +668,6 @@ def test_apply_from_inside_target_worktree_still_deletes_ref(tmp_path: Path, mon
     )
     assert res.status == "actionable"
 
-    # Simulate invocation from inside the target worktree with repo_root=wt.
     monkeypatch.chdir(wt)
     removed, deleted, executed = apply_finish_actions(res, wt)
     assert removed is True

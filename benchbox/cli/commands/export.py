@@ -1,5 +1,3 @@
-"""Result export command implementation."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -85,35 +83,6 @@ from benchbox.core.results.loader import (
 )
 @click.pass_context
 def export(ctx, result_file, formats, output_dir, last, benchmark, platform, force):
-    """Export benchmark results to various formats.
-
-    Re-export existing benchmark results in different formats (JSON, CSV, HTML)
-    without re-running the benchmark. Useful for sharing results, generating
-    reports, or converting to spreadsheet-friendly formats.
-
-    RESULT_FILE: Path to result JSON file to export (optional)
-
-    \b
-    Examples:
-        # Export specific result to CSV
-        benchbox export results/tpch_sf1_duckdb.json --format csv
-
-    \b
-        # Export to multiple formats
-        benchbox export results/tpcds_sf10.json --format csv --format html
-
-    \b
-        # Export most recent result
-        benchbox export --last --format html
-
-    \b
-        # Export latest TPC-H result to all formats
-        benchbox export --last --benchmark tpc_h --format json --format csv --format html
-
-    \b
-        # Export to custom directory
-        benchbox export --last --format csv --output-dir ./reports/
-    """
     if not formats:
         formats = ["json"]
 
@@ -142,7 +111,6 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
 
 
 def _resolve_export_source(result_file, last, benchmark, platform):
-    """Return the source Path to export from, or None if user guidance was printed."""
     if result_file:
         return Path(result_file)
 
@@ -173,7 +141,6 @@ def _resolve_export_source(result_file, last, benchmark, platform):
 
 
 def _load_export_result(source_path):
-    """Load a result JSON, printing user-facing errors and returning None on failure."""
     try:
         result, _raw_data = load_result_file(source_path)
     except FileNotFoundError as e:
@@ -199,7 +166,6 @@ def _load_export_result(source_path):
 
 
 def _confirm_overwrite(source_path, output_directory, formats) -> bool:
-    """Return True if export should proceed (no conflicts, or user confirmed)."""
     base_name = source_path.stem
     conflicts = [
         fmt

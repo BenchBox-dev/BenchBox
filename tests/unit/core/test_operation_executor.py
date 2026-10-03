@@ -1,9 +1,6 @@
-"""Unit tests for OperationExecutor interface.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -17,15 +14,11 @@ pytestmark = [
 
 @pytest.mark.unit
 class TestOperationExecutorInterface:
-    """Test OperationExecutor abstract base class."""
-
     def test_operation_executor_is_abstract(self):
-        """Test that OperationExecutor cannot be instantiated directly."""
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
             OperationExecutor()
 
     def test_operation_executor_requires_execute_operation(self):
-        """Test that execute_operation must be implemented."""
 
         class IncompleteExecutor(OperationExecutor):
             def get_all_operations(self):
@@ -38,7 +31,6 @@ class TestOperationExecutorInterface:
             IncompleteExecutor()
 
     def test_operation_executor_requires_get_all_operations(self):
-        """Test that get_all_operations must be implemented."""
 
         class IncompleteExecutor(OperationExecutor):
             def execute_operation(self, operation_id, connection, **kwargs):
@@ -51,7 +43,6 @@ class TestOperationExecutorInterface:
             IncompleteExecutor()
 
     def test_operation_executor_requires_get_operation_categories(self):
-        """Test that get_operation_categories must be implemented."""
 
         class IncompleteExecutor(OperationExecutor):
             def execute_operation(self, operation_id, connection, **kwargs):
@@ -112,17 +103,14 @@ class TestOperationExecutorInterface:
 
         import inspect
 
-        # Check execute_operation signature
         sig = inspect.signature(OperationExecutor.execute_operation)
         params = list(sig.parameters.keys())
         assert params == ["self", "operation_id", "connection", "kwargs"]
 
-        # Check get_all_operations signature
         sig = inspect.signature(OperationExecutor.get_all_operations)
         params = list(sig.parameters.keys())
         assert params == ["self"]
 
-        # Check get_operation_categories signature
         sig = inspect.signature(OperationExecutor.get_operation_categories)
         params = list(sig.parameters.keys())
         assert params == ["self"]

@@ -66,20 +66,14 @@ def test_parse_options_unknown_key_raises():
 
 
 def test_spark_platform_options_adaptive_enabled():
-    # Spec-row string defaults are normalized through the declared parser, so
-    # the default arrives with the same type as parsed user input.
     parsed = PlatformHookRegistry.parse_options("spark", [])
     assert parsed["adaptive_enabled"] is True
 
-    # Explicit values go through parse_bool, so AQE-off runs are reachable via
-    # --platform-option adaptive_enabled=false.
     parsed = PlatformHookRegistry.parse_options("spark", [("adaptive_enabled", "false")])
     assert parsed["adaptive_enabled"] is False
 
 
 def test_lakesail_platform_options_adaptive_enabled():
-    # LakeSail exposes the same AQE toggle as spark/velox; without this spec
-    # row --platform-option adaptive_enabled=false is rejected as unknown.
     parsed = PlatformHookRegistry.parse_options("lakesail", [])
     assert parsed["adaptive_enabled"] is True
 
@@ -90,12 +84,7 @@ def test_lakesail_platform_options_adaptive_enabled():
 @pytest.mark.parametrize(
     ("platform", "option", "expected"),
     [
-        # str 'true' reaching polars scan_parquet(rechunk=...) raised
-        # "failed to extract field Extract.rechunk" once #1062 started
-        # forwarding options into DataFrame adapter constructors.
         ("polars", "rechunk", True),
-        # str 'false' defaults are truthy — without parser normalization the
-        # effective default inverts wherever consumers rely on truthiness.
         ("polars", "streaming", False),
         ("sqlite", "check_same_thread", False),
         ("datafusion", "batch_size", 8192),
@@ -191,7 +180,6 @@ def test_database_manager_create_config_merges_options(monkeypatch):
     assert config.options["deployment_mode"] == "local"
     assert config.options["secure"] is True
     assert config.options["force_recreate"] is True
-    # Local mode should always include a data path
     if config.options.get("deployment_mode") == "local":
         assert config.options["data_path"]
     assert config.driver_package == "clickhouse-driver"
@@ -271,11 +259,8 @@ def test_database_manager_create_config_explicit_options_override_saved_credenti
 
 
 class TestPlatformConfigBuilders:
-    """Test platform-specific config builders for credential loading."""
-
     @pytest.fixture
     def mock_credential_manager(self):
-        """Mock CredentialManager for testing."""
         with patch("benchbox.security.credentials.CredentialManager") as mock_cm_class:
             mock_cm = Mock()
             mock_cm_class.return_value = mock_cm
@@ -283,7 +268,6 @@ class TestPlatformConfigBuilders:
 
     @pytest.fixture
     def mock_platform_info(self):
-        """Mock PlatformInfo for testing."""
         return Mock(display_name="Test Platform", driver_package="test-driver")
 
     def test_bigquery_config_builder_loads_credentials(self, mock_credential_manager):
@@ -296,19 +280,14 @@ class TestPlatformConfigBuilders:
             "credentials_path": "/saved/path/creds.json",
         }
 
-        # CLI options
         options = {"dataset_id": "cli-dataset", "location": "US"}
 
-        # Runtime overrides
         overrides = {"location": "EU"}
 
-        # Mock platform info
         info = Mock(display_name="BigQuery", driver_package="google-cloud-bigquery")
 
-        # Call the config builder
         config = _build_bigquery_config("bigquery", options, overrides, info)
 
-        # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("bigquery")
 
         assert isinstance(config, DatabaseConfig)
@@ -316,17 +295,15 @@ class TestPlatformConfigBuilders:
         assert config.name == "BigQuery"
         assert config.driver_package == "google-cloud-bigquery"
 
-        # Verify priority: defaults < saved < explicit_options < overrides
-        assert config.options["project_id"] == "saved-project"  # from saved (not overridden)
-        assert config.options["dataset_id"] == "saved-dataset"  # saved creds override registered defaults
-        assert config.options["location"] == "EU"  # from overrides (highest priority)
-        assert config.options["credentials_path"] == "/saved/path/creds.json"  # from saved
+        assert config.options["project_id"] == "saved-project"
+        assert config.options["dataset_id"] == "saved-dataset"
+        assert config.options["location"] == "EU"
+        assert config.options["credentials_path"] == "/saved/path/creds.json"
 
     def test_bigquery_config_builder_no_saved_credentials(self, mock_credential_manager):
 
         from benchbox.platforms.bigquery import _build_bigquery_config
 
-        # No saved credentials
         mock_credential_manager.get_platform_credentials.return_value = None
 
         options = {"project_id": "cli-project", "dataset_id": "cli-dataset"}
@@ -361,19 +338,14 @@ class TestPlatformConfigBuilders:
             "warehouse": "saved-wh",
         }
 
-        # CLI options
         options = {"warehouse": "cli-wh", "database": "cli-db"}
 
-        # Runtime overrides
         overrides = {"database": "override-db"}
 
-        # Mock platform info
         info = Mock(display_name="Snowflake", driver_package="snowflake-connector-python")
 
-        # Call the config builder
         config = _build_snowflake_config("snowflake", options, overrides, info)
 
-        # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("snowflake")
 
         assert isinstance(config, DatabaseConfig)
@@ -381,12 +353,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Snowflake"
         assert config.driver_package == "snowflake-connector-python"
 
-        # Verify priority: defaults < saved < explicit_options < overrides
-        assert config.options["account"] == "saved-account"  # from saved (not overridden)
-        assert config.options["username"] == "saved-user"  # from saved (not overridden)
-        assert config.options["password"] == "saved-pass"  # from saved (not overridden)
-        assert config.options["warehouse"] == "saved-wh"  # saved creds override registered defaults
-        assert config.options["database"] == "override-db"  # from overrides (highest priority)
+        assert config.options["account"] == "saved-account"
+        assert config.options["username"] == "saved-user"
+        assert config.options["password"] == "saved-pass"
+        assert config.options["warehouse"] == "saved-wh"
+        assert config.options["database"] == "override-db"
 
     def test_snowflake_config_builder_no_saved_credentials(self, mock_credential_manager):
 
@@ -417,12 +388,6 @@ class TestPlatformConfigBuilders:
         assert config.driver_package == "snowflake-connector-python"
 
     def test_snowflake_config_builder_forwards_edition(self, mock_credential_manager):
-        """The operator-supplied edition must survive config construction.
-
-        Normalized Snowflake cost requires the edition, which is not
-        service-observable; dropping it here silently pins every run to
-        cost_status unavailable.
-        """
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_credential_manager.get_platform_credentials.return_value = {}
@@ -442,19 +407,14 @@ class TestPlatformConfigBuilders:
             "database": "saved-db",
         }
 
-        # CLI options
         options = {"database": "cli-db", "port": 5439}
 
-        # Runtime overrides
         overrides = {"port": 5440}
 
-        # Mock platform info
         info = Mock(display_name="Redshift", driver_package="redshift-connector")
 
-        # Call the config builder
         config = _build_redshift_config("redshift", options, overrides, info)
 
-        # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("redshift")
 
         assert isinstance(config, DatabaseConfig)
@@ -462,12 +422,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Redshift"
         assert config.driver_package == "redshift-connector"
 
-        # Verify priority: defaults < saved < explicit_options < overrides
-        assert config.options["host"] == "saved-host.redshift.amazonaws.com"  # from saved (not overridden)
-        assert config.options["username"] == "saved-user"  # from saved (not overridden)
-        assert config.options["password"] == "saved-pass"  # from saved (not overridden)
-        assert config.options["database"] == "saved-db"  # saved creds override registered defaults
-        assert config.options["port"] == 5440  # from overrides (highest priority)
+        assert config.options["host"] == "saved-host.redshift.amazonaws.com"
+        assert config.options["username"] == "saved-user"
+        assert config.options["password"] == "saved-pass"
+        assert config.options["database"] == "saved-db"
+        assert config.options["port"] == 5440
 
     def test_redshift_config_builder_no_saved_credentials(self, mock_credential_manager):
 
@@ -508,19 +467,14 @@ class TestPlatformConfigBuilders:
             "catalog": "saved-catalog",
         }
 
-        # CLI options
         options = {"catalog": "cli-catalog", "schema": "cli-schema"}
 
-        # Runtime overrides
         overrides = {"schema": "override-schema"}
 
-        # Mock platform info
         info = Mock(display_name="Databricks", driver_package="databricks-sql-connector")
 
-        # Call the config builder
         config = _build_databricks_config("databricks", options, overrides, info)
 
-        # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("databricks")
 
         assert isinstance(config, DatabaseConfig)
@@ -528,12 +482,11 @@ class TestPlatformConfigBuilders:
         assert config.name == "Databricks"
         assert config.driver_package == "databricks-sql-connector"
 
-        # Verify priority: defaults < saved < explicit_options < overrides
-        assert config.options["server_hostname"] == "saved-host.databricks.com"  # from saved (not overridden)
-        assert config.options["http_path"] == "/sql/1.0/saved"  # from saved (not overridden)
-        assert config.options["access_token"] == "saved-token"  # from saved (not overridden)
-        assert config.options["catalog"] == "saved-catalog"  # saved creds override registered defaults
-        assert config.options["schema"] == "override-schema"  # from overrides (highest priority)
+        assert config.options["server_hostname"] == "saved-host.databricks.com"
+        assert config.options["http_path"] == "/sql/1.0/saved"
+        assert config.options["access_token"] == "saved-token"
+        assert config.options["catalog"] == "saved-catalog"
+        assert config.options["schema"] == "override-schema"
 
     def test_databricks_config_builder_no_saved_credentials(self, mock_credential_manager):
 
@@ -569,32 +522,24 @@ class TestPlatformConfigBuilders:
 
     def test_config_builder_functions_exist(self):
 
-        # This test verifies the functions exist, not that they're registered
-        # (registration requires platform dependencies to be available)
-
-        # Test BigQuery
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         assert callable(_build_bigquery_config)
 
-        # Test Snowflake
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         assert callable(_build_snowflake_config)
 
-        # Test Redshift
         from benchbox.platforms.redshift import _build_redshift_config
 
         assert callable(_build_redshift_config)
 
-        # Test Databricks
         from benchbox.platforms.databricks import _build_databricks_config
 
         assert callable(_build_databricks_config)
 
 
 def test_plan_capture_options_accepted_on_all_platforms():
-    """plan_max_depth/plan_capture_timeout_seconds are settable via --platform-option."""
     for platform in ("duckdb", "clickhouse", "databricks"):
         parsed = PlatformHookRegistry.parse_options(platform, [("plan_max_depth", "7")])
         assert parsed["plan_max_depth"] == 7
@@ -603,7 +548,6 @@ def test_plan_capture_options_accepted_on_all_platforms():
 
 
 def test_plan_capture_options_omitted_when_unset():
-    """Unset plan-capture knobs stay out of parsed options so adapter defaults apply."""
     parsed = PlatformHookRegistry.parse_options("duckdb", [])
     assert "plan_max_depth" not in parsed
     assert "plan_capture_timeout_seconds" not in parsed

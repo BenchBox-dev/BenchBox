@@ -21,9 +21,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q11_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -34,9 +32,7 @@ def q11_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q11_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter nation and supplier before joining with partsupp
-# ---------------------------------------------------------------------------
 
 
 def q11_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -93,9 +89,7 @@ def q11_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before joining
-# ---------------------------------------------------------------------------
 
 
 def q11_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -158,9 +152,7 @@ def q11_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit named DataFrames for each step
-# ---------------------------------------------------------------------------
 
 
 def q11_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -212,9 +204,7 @@ def q11_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add value column before total calculation
-# ---------------------------------------------------------------------------
 
 
 def q11_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -272,9 +262,7 @@ def q11_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q11_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -303,9 +291,7 @@ def q11_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q11_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - start from nation→supplier→partsupp
-# ---------------------------------------------------------------------------
 
 
 def q11_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -342,9 +328,7 @@ def q11_v7_expression_impl(ctx: DataFrameContext) -> Any:
 q11_v7_pandas_impl = make_variant_delegate(q11_v2_pandas_impl, name="q11_v7_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - apply nation name filter as part of join condition
-# ---------------------------------------------------------------------------
 
 
 def q11_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -375,9 +359,7 @@ def q11_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort
-# ---------------------------------------------------------------------------
 
 
 def q11_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -387,9 +369,7 @@ def q11_v9_expression_impl(ctx: DataFrameContext) -> Any:
 q11_v9_pandas_impl = make_variant_delegate(q11_v4_pandas_impl, name="q11_v9_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - value = availqty * supplycost (commuted)
-# ---------------------------------------------------------------------------
 
 
 q11_v10_expression_impl = make_variant_delegate(_q11_expr_base, name="q11_v10_expression_impl", module=__name__)
@@ -398,8 +378,7 @@ q11_v10_expression_impl = make_variant_delegate(_q11_expr_base, name="q11_v10_ex
 q11_v10_pandas_impl = make_variant_delegate(q11_v4_pandas_impl, name="q11_v10_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q11_VARIANTS = build_yaml_variants(__file__, globals(), 11, JOIN_AGG_SUBQUERY)

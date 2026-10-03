@@ -9,8 +9,10 @@ This section provides detailed API documentation for all supported benchmarks.
    :maxdepth: 1
 
    benchmarks/index
+   benchmarks/mixins
    benchmarks/tpch
    benchmarks/tpcds
+   benchmarks/tpchavoc
    benchmarks/tpcdi
    benchmarks/ssb
    benchmarks/clickbench

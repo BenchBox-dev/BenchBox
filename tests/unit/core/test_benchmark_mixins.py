@@ -1,10 +1,3 @@
-"""Tests for benchmark mixin contracts and MRO safety.
-
-Verifies that CursorValidationQueryExecutionMixin enforces its method
-contract at class definition time and that required methods resolve to
-PlatformAdapter (not stubs) in the standard inheritance chain.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,8 +22,6 @@ pytestmark = [
 
 
 class _FakeParent:
-    """Minimal stand-in providing the methods CursorValidationQueryExecutionMixin requires."""
-
     def log_verbose(self, msg: str) -> None:
         pass
 
@@ -42,8 +33,6 @@ class _FakeParent:
 
 
 class _DataGenerationBenchmark(DataGenerationMixin):
-    """Concrete DataGenerationMixin wrapper for unit coverage."""
-
     def __init__(self, *, batch_size: int | None = None) -> None:
         self._batch_size = batch_size
         self.tables: dict[str, Any] = {}
@@ -72,27 +61,20 @@ class _FacadeBenchmark(
         self._impl = Mock()
 
 
-# ---------------------------------------------------------------------------
-# MRO resolution tests
-# ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestCursorValidationMixinMRO:
-    """Guard against MRO-shadowing regressions (see commit f2ca27e5)."""
-
     def test_required_methods_resolve_to_parent_not_mixin(self):
 
         class ConcreteAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             pass
 
         adapter = ConcreteAdapter()
-        # These must NOT raise NotImplementedError - they should reach _FakeParent.
         adapter.log_verbose("test")
         adapter.log_very_verbose("test")
         result = adapter._build_query_result_with_validation(query_id="q1")
         assert result["status"] == "SUCCESS"
 
     def test_mixin_does_not_define_required_methods(self):
-        """Ensure the mixin itself has no stub implementations that could shadow."""
         mixin_own_methods = set(CursorValidationQueryExecutionMixin.__dict__.keys())
         for method_name in CursorValidationQueryExecutionMixin._REQUIRED_METHODS:
             assert method_name not in mixin_own_methods, (
@@ -101,7 +83,6 @@ class TestCursorValidationMixinMRO:
             )
 
     def test_real_adapters_resolve_methods_correctly(self):
-        """Spot-check that Trino/Firebolt/Presto resolve methods to PlatformAdapter."""
         from benchbox.platforms.base.adapter import PlatformAdapter
 
         for adapter_name in ("trino", "firebolt", "presto"):
@@ -109,7 +90,6 @@ class TestCursorValidationMixinMRO:
             adapter_cls = next(v for k, v in vars(module).items() if k.endswith("Adapter") and k[0].isupper())
             mro = adapter_cls.__mro__
             for method_name in CursorValidationQueryExecutionMixin._REQUIRED_METHODS:
-                # Find the first class in MRO that defines the method
                 provider = next(c for c in mro if method_name in c.__dict__)
                 assert provider is not CursorValidationQueryExecutionMixin, (
                     f"{adapter_cls.__name__}.{method_name} resolves to the mixin - "
@@ -117,42 +97,28 @@ class TestCursorValidationMixinMRO:
                 )
 
 
-# ---------------------------------------------------------------------------
-# __init_subclass__ enforcement tests
-# ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestCursorValidationMixinSubclassEnforcement:
-    """Verify __init_subclass__ catches missing method providers."""
-
     def test_subclass_without_provider_raises_type_error(self):
-        """A concrete class using the mixin without a parent that provides methods must fail."""
         with pytest.raises(TypeError, match="does not inherit a concrete implementation"):
 
             class BrokenAdapter(CursorValidationQueryExecutionMixin):
                 pass
 
     def test_intermediate_mixin_skips_enforcement(self):
-        """Classes with 'Mixin' or 'Base' suffix are not checked (they're not concrete)."""
 
         class IntermediateMixin(CursorValidationQueryExecutionMixin):
-            pass  # Should NOT raise
+            pass
 
     def test_valid_subclass_passes_enforcement(self):
-        """A concrete adapter with a proper parent passes the check."""
 
         class ValidAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
-            pass  # Should NOT raise
+            pass
 
 
-# ---------------------------------------------------------------------------
-# execute_query integration test
-# ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestCursorValidationExecuteQuery:
-    """Test execute_query flow through the mixin."""
-
     def test_execute_query_returns_success_with_valid_parent(self):
-        """End-to-end: mixin execute_query should succeed when parent provides methods."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             pass
@@ -168,7 +134,6 @@ class TestCursorValidationExecuteQuery:
         assert result["query_id"] == "q1"
 
     def test_build_query_stats_and_attach_query_stats_share_payload(self):
-        """Helper methods should use a shared stats payload."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             pass
@@ -184,7 +149,6 @@ class TestCursorValidationExecuteQuery:
         assert result["resource_usage"] is stats
 
     def test_execute_query_logs_row_count_warning(self):
-        """Validation warnings should be logged through log_verbose."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             def __init__(self) -> None:
@@ -215,7 +179,6 @@ class TestCursorValidationExecuteQuery:
         cursor.close.assert_called_once()
 
     def test_execute_query_logs_validation_failure(self):
-        """Validation failures should be logged through log_verbose."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             def __init__(self) -> None:
@@ -244,7 +207,6 @@ class TestCursorValidationExecuteQuery:
         assert adapter.verbose_messages == ["Row count validation FAILED: wrong row count"]
 
     def test_execute_query_logs_validation_success(self):
-        """Successful validation should route to log_very_verbose."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             def __init__(self) -> None:
@@ -273,7 +235,6 @@ class TestCursorValidationExecuteQuery:
         assert adapter.very_verbose_messages == ["Row count validation PASSED: 2 rows (expected: 2)"]
 
     def test_execute_query_returns_failed_result_on_exception(self):
-        """Execution failures should return a failed payload and close the cursor."""
 
         class TestAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             pass
@@ -299,8 +260,6 @@ class TestCursorValidationExecuteQuery:
 
 
 class TestDataGenerationMixin:
-    """Test CSV generation and load helpers."""
-
     def test_generate_data_defaults_to_all_tables(self):
         benchmark = _DataGenerationBenchmark()
         expected = {"customer": Path("customer.csv")}
@@ -392,8 +351,6 @@ class TestDataGenerationMixin:
 
 
 class TestFacadeMixins:
-    """Test simple delegation mixins."""
-
     def test_category_and_query_facades_delegate_to_impl(self):
         benchmark = _FacadeBenchmark()
         benchmark._impl.get_queries_by_category.return_value = {"Q1": "select 1"}

@@ -1,44 +1,5 @@
-"""Dependency upper-bound health check.
-
-BenchBox caps a handful of high-risk dependencies in ``pyproject.toml``
-(sqlglot, click, pydantic, pyarrow, duckdb today). Caps are enforced by
-``uv lock`` at install time, but nothing blocks a release if a capped
-dep has drifted into the last major before the ceiling. This script
-surfaces that signal.
-
-Two modes
----------
-* ``--fail-on=cap-reached``  (blocking, offline)
-    Exit non-zero if any locked version is at or past the full stated
-    upper bound. This should not happen under normal flow; it's a safety
-    net for lockfile-level drift.
-
-* ``--report-only``  (non-blocking, offline)
-    Emit a markdown report listing each capped dep, its locked version,
-    the cap, and whether the locked major equals ``cap_major - 1`` (the
-    "ceiling-minus-one" signal - the dep is one major away from
-    requiring a bump/hold decision). Suitable for appending to release
-    notes.
-
-Parsing is intentionally restrained: PEP 508 with a single exclusive
-upper bound of the form ``<N`` or ``<N.0`` or ``<N.0.0`` or a tighter
-minor/patch cap such as ``<1.4.0`` (the forms we actually use). Exotic
-specifiers fall through untracked rather than being misparsed.
-
-Design notes
-------------
-* Offline by design - CI must not page on upstream outages.
-* Single source of truth for bounds health; the quarterly review TODO
-  invokes the same script so check logic never drifts.
-* The "ceiling-minus-one" signal is warn-only (in --report-only) rather
-  than blocking, because BenchBox's caps intentionally sit at
-  current-major + 1, which means locked_major == cap_major - 1 is the
-  steady state. The blocking signal is cap-reached - the case where
-  bounds have already been violated.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root.
 
 from __future__ import annotations
 
@@ -100,8 +61,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 @dataclass(frozen=True)
 class CappedDep:
-    """A dependency with a stated upper bound."""
-
     name: str
     cap_major: int
     locked_version: str | None
@@ -110,7 +69,6 @@ class CappedDep:
 
     @property
     def effective_cap_version(self) -> Version:
-        """Full upper bound used for blocking comparisons."""
         if self.cap_version is not None:
             return self.cap_version
         if self.cap_text is not None:
@@ -122,7 +80,6 @@ class CappedDep:
 
     @property
     def cap_display(self) -> str:
-        """Compact upper-bound display for markdown reports."""
         if self._is_major_cap:
             return str(self.cap_major)
         return self.cap_text or str(self.effective_cap_version)
@@ -150,18 +107,15 @@ class CappedDep:
 
     @property
     def cap_reached(self) -> bool:
-        """Locked version >= full upper bound - bounds violation."""
         locked = self.locked_parsed
         return locked is not None and locked >= self.effective_cap_version
 
     @property
     def ceiling_minus_one(self) -> bool:
-        """Locked major == cap major - 1 - one bump from decision time."""
         return self._is_major_cap and self.locked_major is not None and self.locked_major == self.cap_major - 1
 
 
 def _extract_cap_major(spec: str) -> int | None:
-    """Return the upper-bound major from a PEP 508 specifier, or None."""
     parsed = _extract_upper_bound(spec)
     if parsed is None:
         return None
@@ -169,7 +123,6 @@ def _extract_cap_major(spec: str) -> int | None:
 
 
 def _extract_upper_bound(spec: str) -> tuple[str, Version] | None:
-    """Return the exclusive upper-bound text and parsed version, or None."""
     m = _UPPER_BOUND_RE.search(spec)
     if not m:
         return None
@@ -181,7 +134,6 @@ def _extract_upper_bound(spec: str) -> tuple[str, Version] | None:
 
 
 def _iter_capped_requirements(pyproject: dict) -> list[tuple[str, str]]:
-    """Flatten every dependency string in pyproject into (name, specifier) pairs."""
     out: list[tuple[str, str]] = []
     project = pyproject.get("project", {})
     for entry in project.get("dependencies", []):
@@ -204,7 +156,6 @@ def _split_requirement(raw: str) -> tuple[str, str]:
 
 
 def _parse_lockfile(lock_path: Path) -> dict[str, str]:
-    """Return {name: version} from a uv.lock file."""
     data = tomllib.loads(lock_path.read_text(encoding="utf-8"))
     result: dict[str, str] = {}
     for package in data.get("package", []):
@@ -216,7 +167,6 @@ def _parse_lockfile(lock_path: Path) -> dict[str, str]:
 
 
 def collect_capped_deps(pyproject_path: Path, lock_path: Path) -> list[CappedDep]:
-    """Parse pyproject + lockfile; return capped deps with locked versions."""
     pyproject = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     locked = _parse_lockfile(lock_path)
 
@@ -243,7 +193,6 @@ def collect_capped_deps(pyproject_path: Path, lock_path: Path) -> list[CappedDep
 
 
 def render_report(deps: list[CappedDep]) -> str:
-    """Markdown report - suitable for appending to release notes."""
     lines = [
         "# Dependency Upper Bounds - Status",
         "",

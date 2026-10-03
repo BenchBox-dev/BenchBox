@@ -1,9 +1,3 @@
-"""Tests for benchbox.core.dryrun module.
-
-Focuses on pure-computation methods and save_dry_run_results to bring
-coverage from ~40% to ≥50%.
-"""
-
 import json
 from datetime import datetime
 from pathlib import Path
@@ -20,11 +14,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# DryRunExecutor.__init__
-# ---------------------------------------------------------------------------
-
-
 class TestDryRunExecutorInit:
     def test_with_output_dir(self, tmp_path):
         executor = DryRunExecutor(output_dir=tmp_path / "custom")
@@ -37,11 +26,6 @@ class TestDryRunExecutorInit:
         assert "benchbox_dryrun_" in str(executor.output_dir)
 
 
-# ---------------------------------------------------------------------------
-# _serialize_config
-# ---------------------------------------------------------------------------
-
-
 class TestSerializeConfig:
     def setup_method(self):
         self.executor = DryRunExecutor()
@@ -49,25 +33,18 @@ class TestSerializeConfig:
     def test_serialize_object_with_dict(self):
         obj = MagicMock()
         obj.__dict__ = {"name": "tpch", "scale_factor": 0.01, "_private": "skip", "method": lambda: None}
-        # callable check filters out the method; _private is filtered by prefix
         result = self.executor._serialize_config(obj)
         assert result["name"] == "tpch"
         assert result["scale_factor"] == 0.01
         assert "_private" not in result
 
     def test_serialize_plain_value(self):
-        # Non-object without __dict__ returns empty dict
         result = self.executor._serialize_config(42)
         assert result == {}
 
     def test_serialize_none(self):
         result = self.executor._serialize_config(None)
         assert result == {}
-
-
-# ---------------------------------------------------------------------------
-# _estimate_data_size
-# ---------------------------------------------------------------------------
 
 
 class TestEstimateDataSize:
@@ -82,17 +59,17 @@ class TestEstimateDataSize:
     def test_tpch(self):
         bm = self._make_benchmark(1.0)
         result = self.executor._estimate_data_size(bm, "tpch")
-        assert result == 8 * 1.0 * 100  # 800 MB
+        assert result == 8 * 1.0 * 100
 
     def test_tpcds(self):
         bm = self._make_benchmark(1.0)
         result = self.executor._estimate_data_size(bm, "tpcds")
-        assert result == 24 * 1.0 * 100  # 2400 MB
+        assert result == 24 * 1.0 * 100
 
     def test_ssb(self):
         bm = self._make_benchmark(0.01)
         result = self.executor._estimate_data_size(bm, "ssb")
-        assert result == 6 * 0.01 * 100  # 6 MB
+        assert result == 6 * 0.01 * 100
 
     def test_clickbench(self):
         bm = self._make_benchmark(0.01)
@@ -102,12 +79,7 @@ class TestEstimateDataSize:
     def test_unknown(self):
         bm = self._make_benchmark(1.0)
         result = self.executor._estimate_data_size(bm, "custom")
-        assert result == 10 * 1.0 * 100  # default 10 MB base
-
-
-# ---------------------------------------------------------------------------
-# _estimate_memory_usage
-# ---------------------------------------------------------------------------
+        assert result == 10 * 1.0 * 100
 
 
 class TestEstimateMemoryUsage:
@@ -121,7 +93,6 @@ class TestEstimateMemoryUsage:
         sp.memory_gb = 16
 
         result = self.executor._estimate_memory_usage(bm, sp, "tpch")
-        # data_size = 8 * 0.01 * 100 = 8; memory = min(8*2.5, 16*1024*0.8) = 20
         assert result == pytest.approx(20.0)
 
     def test_capped_by_system_memory(self):
@@ -131,13 +102,7 @@ class TestEstimateMemoryUsage:
         sp.memory_gb = 4
 
         result = self.executor._estimate_memory_usage(bm, sp, "tpch")
-        # data_size = 8*100*100 = 80000; capped at 4*1024*0.8 = 3276.8
         assert result == pytest.approx(4 * 1024 * 0.8)
-
-
-# ---------------------------------------------------------------------------
-# _estimate_runtime
-# ---------------------------------------------------------------------------
 
 
 class TestEstimateRuntime:
@@ -150,7 +115,6 @@ class TestEstimateRuntime:
         bm.scale_factor = 1.0
 
         result = self.executor._estimate_runtime(bm)
-        # 22 queries * 10s * max(1.0, 0.01) / 60 = 220/60 ≈ 3.67
         assert result == pytest.approx(22 * 10 * 1.0 / 60.0)
 
     def test_small_scale(self):
@@ -159,13 +123,7 @@ class TestEstimateRuntime:
         bm.scale_factor = 0.001
 
         result = self.executor._estimate_runtime(bm)
-        # 1 * 10 * max(0.001, 0.01) / 60 = 0.1/60
         assert result == pytest.approx(10 * 0.01 / 60.0)
-
-
-# ---------------------------------------------------------------------------
-# _extract_constraint_config
-# ---------------------------------------------------------------------------
 
 
 class TestExtractConstraintConfig:
@@ -196,11 +154,6 @@ class TestExtractConstraintConfig:
         result = self.executor._extract_constraint_config(config)
         assert result["enable_primary_keys"] is False
         assert result["enable_foreign_keys"] is False
-
-
-# ---------------------------------------------------------------------------
-# _get_execution_context
-# ---------------------------------------------------------------------------
 
 
 class TestGetExecutionContext:
@@ -256,11 +209,6 @@ class TestGetExecutionContext:
         assert "Maintenance test execution" in result
 
 
-# ---------------------------------------------------------------------------
-# _estimate_resources
-# ---------------------------------------------------------------------------
-
-
 class TestEstimateResources:
     def setup_method(self):
         self.executor = DryRunExecutor()
@@ -289,14 +237,8 @@ class TestEstimateResources:
         assert "error" in result
 
 
-# ---------------------------------------------------------------------------
-# save_dry_run_results
-# ---------------------------------------------------------------------------
-
-
 class TestSaveDryRunResults:
     def _make_result(self, queries=None, execution_mode="sql"):
-        """Create a mock DryRunResult."""
         result = MagicMock()
         result.timestamp = datetime(2026, 2, 7, 12, 0, 0)
         result.model_dump.return_value = {
@@ -335,11 +277,9 @@ class TestSaveDryRunResults:
         assert saved["json"].exists()
         assert saved["yaml"].exists()
 
-        # Verify JSON content
         data = json.loads(saved["json"].read_text())
         assert data["benchmark_config"]["name"] == "tpch"
 
-        # Verify YAML content
         data = yaml.safe_load(saved["yaml"].read_text())
         assert data["benchmark_config"]["name"] == "tpch"
 
@@ -375,7 +315,7 @@ class TestSaveDryRunResults:
         saved = executor.save_dry_run_results(result)
 
         py_files = list(saved["queries_dir"].glob("*.py"))
-        assert len(py_files) == 1  # Only Q1, not _error
+        assert len(py_files) == 1
 
     def test_save_with_ddl_preview(self, tmp_path):
         executor = DryRunExecutor(output_dir=tmp_path)
@@ -434,11 +374,6 @@ class TestSaveDryRunResults:
         assert saved == {}
 
 
-# ---------------------------------------------------------------------------
-# _extract_standard_queries
-# ---------------------------------------------------------------------------
-
-
 class TestExtractStandardQueries:
     def setup_method(self):
         self.executor = DryRunExecutor()
@@ -446,7 +381,7 @@ class TestExtractStandardQueries:
     def test_get_queries(self):
         bm = MagicMock()
         bm.get_queries.return_value = {"Q1": "SELECT 1", "Q2": "SELECT 2"}
-        del bm.get_all_queries  # Ensure it uses get_queries first
+        del bm.get_all_queries
         del bm.query_manager
         result = self.executor._extract_standard_queries(bm)
         assert result == {"Q1": "SELECT 1", "Q2": "SELECT 2"}
@@ -476,14 +411,9 @@ class TestExtractStandardQueries:
         assert result == {"1": "SELECT 1"}
 
     def test_no_queries_found(self):
-        bm = MagicMock(spec=[])  # No attributes
+        bm = MagicMock(spec=[])
         result = self.executor._extract_standard_queries(bm)
         assert result == {}
-
-
-# ---------------------------------------------------------------------------
-# _generate_schema_sql - external table mode dispatch
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateSchemaSQL:
@@ -517,11 +447,6 @@ class TestGenerateSchemaSQL:
 
         result = self.executor._generate_schema_sql(bm, config)
         assert "CREATE TABLE" in result
-
-
-# ---------------------------------------------------------------------------
-# _generate_external_schema_sql
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateExternalSchemaSQL:
@@ -576,14 +501,13 @@ class TestGenerateExternalSchemaSQL:
         assert "read_parquet" in result
 
     def test_no_schema_returns_fallback_message(self):
-        bm = MagicMock(spec=[])  # no get_schema
+        bm = MagicMock(spec=[])
         config = self._make_config("iceberg")
 
         result = self.executor._generate_external_schema_sql(bm, config)
         assert "schema not available" in result
 
     def test_list_schema_format(self):
-        """Some benchmarks return list[dict] with 'name' keys."""
         bm = MagicMock()
         bm.get_schema.return_value = [{"name": "region"}, {"name": "nation"}]
         config = self._make_config("delta")
@@ -592,11 +516,6 @@ class TestGenerateExternalSchemaSQL:
         assert "CREATE VIEW region" in result
         assert "CREATE VIEW nation" in result
         assert "delta_scan" in result
-
-
-# ---------------------------------------------------------------------------
-# execute_dry_run - dry_run=True injected into platform config
-# ---------------------------------------------------------------------------
 
 
 class TestDryRunPlatformConfigInjection:
@@ -628,14 +547,12 @@ class TestDryRunPlatformConfigInjection:
 
             executor.execute_dry_run(config, sp, db_config)
 
-            # Verify dry_run=True was passed to get_platform_adapter
             call_kwargs = mock_adapter.call_args
             assert call_kwargs[1].get("dry_run") is True or (
                 len(call_kwargs[0]) > 1 and call_kwargs[0][1].get("dry_run") is True
             )
 
     def test_get_platform_config_resolves_data_source_benchmark(self):
-        """_get_platform_config should override benchmark_name with data source name."""
         executor = DryRunExecutor()
         benchmark_config = MagicMock()
         benchmark_config.name = "read_primitives"
@@ -655,7 +572,6 @@ class TestDryRunPlatformConfigInjection:
         assert mock_core.call_args[0][2] == "tpch"
 
     def test_get_platform_config_passes_through_when_no_data_source(self):
-        """_get_platform_config should keep original benchmark_name when no data source."""
         executor = DryRunExecutor()
         benchmark_config = MagicMock()
         benchmark_config.name = "tpch"
@@ -691,20 +607,9 @@ def test_preview_defaults_df_alias_to_dataframe_mode():
     assert response["execution_mode"] == "dataframe"
 
 
-# ---------------------------------------------------------------------------
-# Benchmark identity contract regression tests (w10 of
-# eliminate-non-data-loading-wrong-layer-compensation)
-# ---------------------------------------------------------------------------
-
-
 class TestDryRunBenchmarkIdentityContract:
-    """_extract_queries must use BenchmarkConfig.name for TPC routing, not
-    benchmark object internals (_name, display_name, class names)."""
-
     def test_extract_queries_uses_benchmark_config_name_for_tpch_routing(self):
-        """Routing to TPC-H maintenance path uses BenchmarkConfig.name, not _name."""
         executor = DryRunExecutor()
-        # Benchmark object whose _name does NOT contain "tpch" - would fail old sniffing.
         benchmark = MagicMock()
         benchmark._name = "adhoc"
 
@@ -719,7 +624,6 @@ class TestDryRunBenchmarkIdentityContract:
         assert result == {"RF1": "..."}
 
     def test_extract_queries_uses_benchmark_config_name_for_tpcds_routing(self):
-        """Routing to TPC-DS combined path uses BenchmarkConfig.name, not _name."""
         executor = DryRunExecutor()
         benchmark = MagicMock()
         benchmark._name = "custom"
@@ -754,26 +658,10 @@ class TestDryRunBenchmarkIdentityContract:
         assert result == {"Q1": "SELECT 1"}
 
 
-# ---------------------------------------------------------------------------
-# _extract_ddl_preview
-# ---------------------------------------------------------------------------
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestExtractDdlPreview:
-    """Regression coverage for the case-insensitive table_tunings lookup.
-
-    Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
-    templates key tables uppercase (e.g. "LINEITEM"). An exact-key lookup
-    silently drops every table, rendering an empty tuning preview.
-
-    Uses the real TPCHBenchmark and its get_schema() (the actual source of
-    table names in production) rather than a MagicMock benchmark double, so
-    this also pins down that _extract_ddl_preview reads from a method real
-    benchmarks actually implement.
-    """
-
     def setup_method(self):
         self.executor = DryRunExecutor()
 
@@ -790,9 +678,8 @@ class TestExtractDdlPreview:
         return TPCHBenchmark(scale_factor=0.01, output_dir=tmp_path, quiet=True)
 
     def test_lowercase_table_name_matches_uppercase_template_key(self, tmp_path):
-        """Real duckdb/tpch template ("LINEITEM") must resolve for benchmark table "lineitem"."""
         unified_config = self._load_duckdb_tpch_template()
-        assert "LINEITEM" in unified_config.table_tunings  # sanity: template keys are uppercase
+        assert "LINEITEM" in unified_config.table_tunings
 
         config = MagicMock()
         config.options = {"unified_tuning_configuration": unified_config}
@@ -801,7 +688,7 @@ class TestExtractDdlPreview:
         database_config.type = "duckdb"
 
         benchmark = self._make_tpch_benchmark(tmp_path)
-        assert "lineitem" in benchmark.get_schema()  # sanity: benchmark tables are lowercase
+        assert "lineitem" in benchmark.get_schema()
 
         ddl_preview, _post_load = self.executor._extract_ddl_preview(benchmark, config, database_config)
 
@@ -821,11 +708,6 @@ class TestExtractDdlPreview:
         assert post_load == {}
 
     def test_string_schema_does_not_raise(self, tmp_path):
-        """Public wrapper benchmarks (e.g. JoinOrder) return a DDL string from
-        get_schema() rather than a table_name -> columns mapping. Calling
-        .keys() on that string used to raise AttributeError; the preview
-        should instead come back empty rather than crash the dry run.
-        """
         unified_config = self._load_duckdb_tpch_template()
         config = MagicMock()
         config.options = {"unified_tuning_configuration": unified_config}
@@ -842,7 +724,6 @@ class TestExtractDdlPreview:
 
     def test_unknown_table_is_skipped(self, tmp_path):
         unified_config = self._load_duckdb_tpch_template()
-        # Rekey the loaded template so none of its tables match a real TPC-H table.
         unified_config.table_tunings = {
             f"NOT_A_REAL_TABLE_{i}": tuning for i, tuning in enumerate(unified_config.table_tunings.values())
         }
@@ -856,14 +737,7 @@ class TestExtractDdlPreview:
         assert ddl_preview == {}
 
 
-# ---------------------------------------------------------------------------
-# _extract_unified_tuning - platform-foreign optimization suppression
-# ---------------------------------------------------------------------------
-
-
 class TestExtractUnifiedTuningPlatformOptimizations:
-    """Databricks-only fields must not leak into non-Databricks platform previews."""
-
     def setup_method(self):
         self.executor = DryRunExecutor()
 

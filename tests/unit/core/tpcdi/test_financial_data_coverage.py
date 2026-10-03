@@ -1,8 +1,5 @@
-"""Coverage tests for benchbox.core.tpcdi.financial_data module.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import date
 
@@ -53,17 +50,9 @@ class TestFinancialConstants:
 
 class TestFinancialDataPatternsInit:
     def test_seeded_reproducibility(self):
-        """Same seed produces identical sequence of generated values.
-
-        FinancialDataPatterns uses global random.seed(), so reproducibility is
-        tested by creating an instance, recording the sequence, then re-seeding
-        via a new instance and verifying the same sequence results.
-        """
-        # Generate a sequence from seed 7
         p1 = FinancialDataPatterns(seed=7)
         tiers1 = [p1.generate_customer_tier() for _ in range(20)]
 
-        # Re-seeding (via a new instance) must reproduce the same sequence
         p2 = FinancialDataPatterns(seed=7)
         tiers2 = [p2.generate_customer_tier() for _ in range(20)]
         assert tiers1 == tiers2
@@ -79,7 +68,7 @@ class TestFinancialDataPatternsInit:
         p = FinancialDataPatterns()
         assert len(p.industries) == 12
         for item in p.industries:
-            assert len(item) == 3  # (id, name, sector_code)
+            assert len(item) == 3
 
     def test_sp_ratings_weights_sum_to_one(self):
         p = FinancialDataPatterns()
@@ -90,7 +79,7 @@ class TestFinancialDataPatternsInit:
         p = FinancialDataPatterns()
         assert len(p.trade_types) == 6
         for t in p.trade_types:
-            assert len(t) == 4  # (id, name, is_sell, is_market)
+            assert len(t) == 4
 
 
 class TestGenerateCustomerTier:
@@ -169,10 +158,9 @@ class TestGenerateSecurityPrice:
         import random
 
         p = FinancialDataPatterns(seed=42)
-        # Force a very large negative change to verify floor
         original_normalvariate = random.normalvariate
         try:
-            random.normalvariate = lambda mu, sigma: -10.0  # extreme drop
+            random.normalvariate = lambda mu, sigma: -10.0
             price = p.generate_security_price(base_price=0.001)
             assert price >= 0.01
         finally:
@@ -183,7 +171,7 @@ class TestGenerateTradingVolume:
     def test_large_cap_volume(self):
         p = FinancialDataPatterns(seed=20)
         vol = p.generate_trading_volume(1)
-        assert vol >= 500_000  # rough lower bound after variation
+        assert vol >= 500_000
 
     def test_mid_cap_volume(self):
         p = FinancialDataPatterns(seed=21)
@@ -211,13 +199,12 @@ class TestGenerateTradeQuantity:
 
     def test_rounding_to_hundreds(self):
         p = FinancialDataPatterns(seed=40)
-        # Force quantity that is >= 1000 to verify rounding to hundreds
-        qty = p.generate_trade_quantity(1, 0.10)  # very cheap stock → huge qty
+        qty = p.generate_trade_quantity(1, 0.10)
         assert qty % 100 == 0 or qty < 1000
 
     def test_rounding_to_tens(self):
         p = FinancialDataPatterns(seed=41)
-        qty = p.generate_trade_quantity(2, 50.0)  # mid-size trade
+        qty = p.generate_trade_quantity(2, 50.0)
         assert qty >= 1
 
 
@@ -255,7 +242,6 @@ class TestGenerateCompanySPRating:
             assert rating in valid_ratings
 
     def test_high_quality_industry_uses_modified_weights(self):
-        """Check that high-quality industries return ratings (doesn't crash)."""
         p = FinancialDataPatterns(seed=61)
         for code in ["UTIL", "CONS", "HLTH"]:
             r = p.generate_company_sp_rating(code)
@@ -291,7 +277,7 @@ class TestGetterMethods:
         p = FinancialDataPatterns()
         data = p.get_industry_data()
         assert len(data) == 12
-        assert data is not p.industries  # copy
+        assert data is not p.industries
 
     def test_get_status_types(self):
         p = FinancialDataPatterns()
@@ -304,7 +290,7 @@ class TestGetterMethods:
         p = FinancialDataPatterns()
         tt = p.get_trade_types()
         assert len(tt) == 6
-        assert tt is not p.trade_types  # copy
+        assert tt is not p.trade_types
 
 
 class TestGenerateRealisticTaxRates:

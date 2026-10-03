@@ -1,12 +1,6 @@
-"""Unit tests for UnifiedPandasFrame wrapper.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests for the platform-agnostic DataFrame wrapper that handles API differences
-between Pandas, cuDF, and Dask DataFrames.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,14 +21,7 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Helper Detection Function Tests
-# =============================================================================
-
-
 class TestIsDaskDataFrame:
-    """Tests for _is_dask_df helper function."""
-
     def test_pandas_dataframe_returns_false(self):
 
         import pandas as pd
@@ -69,8 +56,6 @@ class TestIsDaskDataFrame:
 
 
 class TestIsDataFrame:
-    """Tests for _is_dataframe helper function."""
-
     def test_pandas_dataframe_returns_true(self):
 
         import pandas as pd
@@ -94,14 +79,7 @@ class TestIsDataFrame:
         assert _is_dataframe([1, 2, 3]) is False
 
 
-# =============================================================================
-# UnifiedPandasFrame Tests
-# =============================================================================
-
-
 class TestUnifiedPandasFrameInit:
-    """Tests for UnifiedPandasFrame initialization."""
-
     def test_init_stores_df_and_adapter(self):
 
         import pandas as pd
@@ -127,8 +105,6 @@ class TestUnifiedPandasFrameInit:
 
 
 class TestUnifiedPandasFrameProperties:
-    """Tests for UnifiedPandasFrame property access."""
-
     def test_columns_returns_df_columns(self):
 
         import pandas as pd
@@ -160,8 +136,6 @@ class TestUnifiedPandasFrameProperties:
 
 
 class TestUnifiedPandasFrameItemAccess:
-    """Tests for UnifiedPandasFrame item access."""
-
     def test_getitem_column_returns_series(self):
 
         import pandas as pd
@@ -206,8 +180,6 @@ class TestUnifiedPandasFrameItemAccess:
 
 
 class TestUnifiedPandasFrameCopy:
-    """Tests for UnifiedPandasFrame copy operation."""
-
     def test_copy_returns_wrapper(self):
 
         import pandas as pd
@@ -217,7 +189,7 @@ class TestUnifiedPandasFrameCopy:
 
         result = wrapper.copy()
         assert isinstance(result, UnifiedPandasFrame)
-        assert result._df is not df  # Different DataFrame object
+        assert result._df is not df
 
     def test_copy_with_dask_uses_shallow(self):
 
@@ -233,14 +205,11 @@ class TestUnifiedPandasFrameCopy:
             result = wrapper.copy()
 
             assert isinstance(result, UnifiedPandasFrame)
-            # Should not raise - Dask only supports shallow copy
         except ImportError:
             pytest.skip("Dask not installed")
 
 
 class TestUnifiedPandasFrameMerge:
-    """Tests for UnifiedPandasFrame merge operation."""
-
     def test_merge_returns_wrapper(self):
 
         import pandas as pd
@@ -290,8 +259,6 @@ class TestUnifiedPandasFrameMerge:
 
 
 class TestUnifiedPandasFrameSort:
-    """Tests for UnifiedPandasFrame sort operations."""
-
     def test_sort_values_returns_wrapper(self):
 
         import pandas as pd
@@ -317,8 +284,6 @@ class TestUnifiedPandasFrameSort:
 
 
 class TestUnifiedPandasFrameHead:
-    """Tests for UnifiedPandasFrame head/tail operations."""
-
     def test_head_returns_wrapper(self):
 
         import pandas as pd
@@ -345,8 +310,6 @@ class TestUnifiedPandasFrameHead:
 
 
 class TestUnifiedPandasFrameRename:
-    """Tests for UnifiedPandasFrame rename operation."""
-
     def test_rename_returns_wrapper(self):
 
         import pandas as pd
@@ -362,8 +325,6 @@ class TestUnifiedPandasFrameRename:
 
 
 class TestUnifiedPandasFrameDrop:
-    """Tests for UnifiedPandasFrame drop operation."""
-
     def test_drop_columns_returns_wrapper(self):
 
         import pandas as pd
@@ -379,8 +340,6 @@ class TestUnifiedPandasFrameDrop:
 
 
 class TestUnifiedPandasFrameCompute:
-    """Tests for UnifiedPandasFrame compute operation."""
-
     def test_compute_on_pandas_returns_df(self):
 
         import pandas as pd
@@ -404,7 +363,6 @@ class TestUnifiedPandasFrameCompute:
 
             result = wrapper.compute()
 
-            # Result should be a Pandas DataFrame
             assert isinstance(result, pd.DataFrame)
             assert list(result["a"]) == [1, 2, 3]
         except ImportError:
@@ -412,8 +370,6 @@ class TestUnifiedPandasFrameCompute:
 
 
 class TestUnifiedPandasFrameLen:
-    """Tests for UnifiedPandasFrame length operation."""
-
     def test_len_returns_row_count(self):
 
         import pandas as pd
@@ -425,8 +381,6 @@ class TestUnifiedPandasFrameLen:
 
 
 class TestUnifiedPandasFrameRepr:
-    """Tests for UnifiedPandasFrame string representation."""
-
     def test_repr_includes_type_name(self):
 
         import pandas as pd
@@ -440,14 +394,7 @@ class TestUnifiedPandasFrameRepr:
         assert "DataFrame" in repr_str
 
 
-# =============================================================================
-# UnifiedPandasGroupBy Tests
-# =============================================================================
-
-
 class TestUnifiedPandasGroupByInit:
-    """Tests for UnifiedPandasGroupBy initialization."""
-
     def test_init_stores_parameters(self):
 
         import pandas as pd
@@ -472,8 +419,6 @@ class TestUnifiedPandasGroupByInit:
 
 
 class TestUnifiedPandasGroupByAgg:
-    """Tests for UnifiedPandasGroupBy aggregation."""
-
     def test_agg_routes_to_adapter(self):
 
         import pandas as pd
@@ -512,7 +457,6 @@ class TestUnifiedPandasGroupByAgg:
         assert isinstance(result, UnifiedPandasFrame)
 
     def test_agg_forwards_groupby_kwargs(self):
-        """Test that agg forwards construction kwargs (e.g. dropna=False)."""
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
@@ -533,7 +477,6 @@ class TestUnifiedPandasGroupByAgg:
         )
 
     def test_null_group_survives_production_wrapper_path(self):
-        """NULL groups are kept when groupby(dropna=False) flows to agg."""
         import pandas as pd
 
         from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
@@ -548,8 +491,6 @@ class TestUnifiedPandasGroupByAgg:
 
 
 class TestUnifiedPandasGroupByGetattr:
-    """Tests for UnifiedPandasGroupBy attribute proxy."""
-
     def test_getattr_proxies_to_native_groupby(self):
 
         import pandas as pd
@@ -559,21 +500,12 @@ class TestUnifiedPandasGroupByGetattr:
 
         groupby = UnifiedPandasGroupBy(df, ["a"], adapter)
 
-        # Access size() which is not explicitly handled
         result = groupby.size()
 
-        # Should return grouped sizes
         assert len(result) == 2
 
 
-# =============================================================================
-# Integration Tests with Real Pandas
-# =============================================================================
-
-
 class TestUnifiedPandasFrameIntegration:
-    """Integration tests using real Pandas operations."""
-
     def test_chained_operations(self):
 
         import pandas as pd
@@ -585,7 +517,6 @@ class TestUnifiedPandasFrameIntegration:
             }
         )
         adapter = Mock()
-        # Configure mock to call real pandas groupby_agg
         adapter.groupby_agg = lambda df, by, agg, as_index: (
             df.groupby(by, as_index=as_index).agg(**agg).reset_index()
             if not as_index
@@ -594,7 +525,6 @@ class TestUnifiedPandasFrameIntegration:
 
         wrapper = UnifiedPandasFrame(df, adapter)
 
-        # Chain operations
         result = wrapper[wrapper["value"] > 1].copy().sort_values("value", ascending=False).head(2)
 
         assert isinstance(result, UnifiedPandasFrame)
@@ -611,7 +541,6 @@ class TestUnifiedPandasFrameIntegration:
             }
         )
 
-        # Create adapter mock that implements groupby_agg properly
         adapter = Mock()
         adapter.groupby_agg = lambda df, by, agg, as_index: df.groupby(by, as_index=False).agg(**agg)
 

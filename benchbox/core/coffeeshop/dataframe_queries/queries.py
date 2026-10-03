@@ -105,9 +105,7 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from .parameters import get_parameters
 from .registry import register_query
 
-# =============================================================================
 # SA1: Daily revenue and order volume by region
-# =============================================================================
 
 
 def sa1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -168,9 +166,7 @@ def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values(["order_date", "region"])
 
 
-# =============================================================================
 # SA2: Top products by revenue for a given year
-# =============================================================================
 
 
 def sa2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -225,9 +221,7 @@ def sa2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # SA3: Monthly performance metrics
-# =============================================================================
 
 
 def sa3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -286,9 +280,7 @@ def sa3_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values(["year", "month"])
 
 
-# =============================================================================
 # SA4: Revenue share by region (window function)
-# =============================================================================
 
 
 def sa4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -346,9 +338,7 @@ def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values("revenue", ascending=False)
 
 
-# =============================================================================
 # SA5: Top-performing locations by revenue
-# =============================================================================
 
 
 def sa5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -403,9 +393,7 @@ def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # PR1: Product mix and revenue by subcategory
-# =============================================================================
 
 
 def pr1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -460,9 +448,7 @@ def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # PR2: Price-band distribution
-# =============================================================================
 
 
 def pr2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -522,9 +508,7 @@ def pr2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # TR1: Quarterly revenue and order growth
-# =============================================================================
 
 
 def tr1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -572,9 +556,7 @@ def tr1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # TM1: Order cadence by day-part for a region
-# =============================================================================
 
 
 def tm1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -669,9 +651,7 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # QC1: Average lines per order
-# =============================================================================
 
 
 def qc1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -722,9 +702,7 @@ def qc1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # QC2: Seasonal revenue comparison across regions
-# =============================================================================
 
 
 def qc2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -796,9 +774,8 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Query Registration
-# =============================================================================
+
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

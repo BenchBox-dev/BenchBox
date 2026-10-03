@@ -1,9 +1,6 @@
-"""Tests for GCP Dataproc Serverless platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,8 +16,6 @@ pytestmark = [
 
 
 class TestDataprocServerlessAdapterInitialization:
-    """Test DataprocServerlessAdapter initialization."""
-
     def test_missing_project_id_raises_error(self):
 
         with (
@@ -140,8 +135,6 @@ class TestDataprocServerlessAdapterInitialization:
 
 
 class TestDataprocServerlessTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
 
         with (
@@ -199,8 +192,6 @@ class TestDataprocServerlessTableFormat:
 
 
 class TestDataprocServerlessAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
 
         with (
@@ -252,8 +243,6 @@ class TestDataprocServerlessAdapterPlatformInfo:
 
 
 class TestDataprocServerlessAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_success(self):
 
         with (
@@ -293,7 +282,6 @@ class TestDataprocServerlessAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock batch client to raise an error
             mock_batch_client = MagicMock()
             mock_batch_client.list_batches.side_effect = Exception("Permission denied")
             mock_dataproc.BatchControllerClient.return_value = mock_batch_client
@@ -311,11 +299,8 @@ class TestDataprocServerlessAdapterConnection:
 
 
 class TestDataprocServerlessAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self, tmp_path):
 
-        # Create actual source directory to pass validation
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -346,8 +331,6 @@ class TestDataprocServerlessAdapterDataLoading:
 
 
 class TestDataprocBatchState:
-    """Test batch state constants."""
-
     def test_batch_state_values(self):
 
         from benchbox.platforms.gcp.dataproc_serverless_adapter import DataprocBatchState
@@ -369,8 +352,6 @@ class TestDataprocBatchState:
 
 
 class TestDataprocServerlessAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
 
         from benchbox.core.platform_registry import PlatformRegistry
@@ -394,8 +375,6 @@ class TestDataprocServerlessAdapterRegistry:
 
 
 class TestDataprocServerlessAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
 
         with (
@@ -445,7 +424,6 @@ class TestDataprocServerlessAdapterTuning:
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1", MagicMock()),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage", MagicMock()),
             patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -467,8 +445,6 @@ class TestDataprocServerlessAdapterTuning:
 
 
 class TestDataprocServerlessAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
 
         from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -482,8 +458,6 @@ class TestDataprocServerlessAdapterCLI:
 
 
 class TestDataprocServerlessAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
 
         with (
@@ -513,8 +487,6 @@ class TestDataprocServerlessAdapterFromConfig:
 
 
 class TestDataprocServerlessAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_metrics(self):
 
         with (
@@ -537,15 +509,11 @@ class TestDataprocServerlessAdapterClose:
 
             adapter.close()
 
-            # Verify logging was called
             mock_logger.info.assert_called()
 
 
 class TestDataprocServerlessUserConfigPrecedence:
-    """User spark_config entries must win over optimizer output (adapter level)."""
-
     def test_user_entries_win_and_survive_reconfigure(self):
-        """Pre-seeded user entries persist in job properties across benchmarks."""
         with patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging:
             mock_staging.from_uri.return_value = MagicMock()
 
@@ -568,8 +536,6 @@ class TestDataprocServerlessUserConfigPrecedence:
 
 
 class TestLoadDataRequestedFormat:
-    """Registration must follow the resolved upload format, not table_format alone."""
-
     def test_requested_delta_registers_delta(self, tmp_path):
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()

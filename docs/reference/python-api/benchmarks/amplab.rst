@@ -55,13 +55,6 @@ AMPLab Class
 
 **Constructor**:
 
-.. code-block:: python
-
-    AMPLab(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 **Parameters**:
 
@@ -84,6 +77,8 @@ Get SQL to create all AMPLab tables (rankings, uservisits, documents).
 **get_schema() -> dict[str, dict]**
 
 Get the table-definition mapping keyed by table name.
+
+The facade annotation says ``list[dict]``, but the delegated implementation returns a table-name mapping.
 
 Query Methods
 ~~~~~~~~~~~~~

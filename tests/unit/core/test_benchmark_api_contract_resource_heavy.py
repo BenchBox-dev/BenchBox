@@ -1,5 +1,3 @@
-"""Resource-heavy benchmark API contract checks."""
-
 from __future__ import annotations
 
 import subprocess
@@ -15,7 +13,6 @@ pytestmark = [
 
 
 def test_benchmark_registry_import_does_not_instantiate_probe_benchmarks() -> None:
-    """Static metadata should not instantiate benchmark classes during registry import."""
 
     script = r"""
 import importlib

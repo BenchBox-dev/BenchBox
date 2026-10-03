@@ -1,9 +1,3 @@
-"""Hardware and environment capture utilities.
-
-Provides safe CPU vendor and model detection for execution environment metadata
-using standard platform utilities without adding external runtime dependencies.
-"""
-
 from __future__ import annotations
 
 import json
@@ -12,7 +6,6 @@ import platform
 import subprocess
 from typing import Tuple
 
-# Known ARM implementer codes -> vendor names
 _ARM_IMPLEMENTERS: dict[str, str] = {
     "0x41": "ARM",
     "0x43": "Cavium",
@@ -22,7 +15,7 @@ _ARM_IMPLEMENTERS: dict[str, str] = {
     "0xc0": "Ampere",
 }
 
-# Known ARM part numbers for ARM implementer 0x41
+
 _ARM_PARTS: dict[str, str] = {
     "0xd0c": "Neoverse-N1",
     "0xd40": "Neoverse-V1",
@@ -57,7 +50,6 @@ _CPU_ARCHITECTURE_TOKENS = frozenset(
 
 
 def is_cpu_architecture_token(value: str, machine: str) -> bool:
-    """Return whether *value* names an architecture rather than a CPU model."""
     cleaned = value.strip().lower()
     if not cleaned:
         return True
@@ -67,14 +59,6 @@ def is_cpu_architecture_token(value: str, machine: str) -> bool:
 
 
 def detect_cpu_info() -> Tuple[str | None, str | None]:
-    """Detect CPU model and vendor using platform-appropriate standard tools.
-
-    Degrades gracefully to (None, None) if detection fails or is unsupported.
-    Guarantees no hostname, machine ID, or host identifiers are returned.
-
-    Returns:
-        tuple[cpu_model, cpu_vendor]: Detected strings or None if unavailable.
-    """
     sys_name = platform.system()
     if sys_name == "Darwin":
         model, vendor = _detect_darwin_cpu()
@@ -90,7 +74,6 @@ def detect_cpu_info() -> Tuple[str | None, str | None]:
 
 
 def _detect_darwin_cpu() -> Tuple[str | None, str | None]:
-    """Detect CPU model and vendor on Darwin / macOS via sysctl."""
     try:
         res = subprocess.run(
             ["sysctl", "-n", "machdep.cpu.brand_string"],
@@ -115,7 +98,6 @@ def _detect_darwin_cpu() -> Tuple[str | None, str | None]:
 
 
 def _resolve_linux_vendor(vendor_id: str | None, implementer: str | None, model_name: str | None) -> str | None:
-    """Infer CPU vendor from Linux cpuinfo fields."""
     if vendor_id:
         v_lower = vendor_id.lower()
         if "intel" in v_lower:
@@ -136,7 +118,6 @@ def _resolve_linux_vendor(vendor_id: str | None, implementer: str | None, model_
 
 
 def _detect_linux_cpu() -> Tuple[str | None, str | None]:
-    """Detect CPU model and vendor on Linux via /proc/cpuinfo."""
     try:
         if not os.path.exists("/proc/cpuinfo"):
             return None, None
@@ -173,7 +154,6 @@ def _detect_linux_cpu() -> Tuple[str | None, str | None]:
 
 
 def _detect_windows_cpu() -> Tuple[str | None, str | None]:
-    """Detect CPU model and vendor from Windows' hardware inventory."""
     try:
         result = subprocess.run(
             [

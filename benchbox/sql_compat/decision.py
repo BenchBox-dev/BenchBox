@@ -1,5 +1,3 @@
-"""CompatibilityDecision and typed payload dataclasses."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,12 +25,6 @@ class FailureMode(str, Enum):
     PERFORMANCE_REGRESSION = "PERFORMANCE_REGRESSION"
 
 
-# ---------------------------------------------------------------------------
-# Typed payload dataclasses (frozen + hashable so CompatibilityDecision can
-# be frozen=True)
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class BlockBenchmarkPayload:
     reason: str
@@ -58,11 +50,8 @@ class RewriteQueryPayload:
 
 @dataclass(frozen=True)
 class RewriteDDLPayload:
-    transformer_id: str  # method name on the adapter when governance_only=False; documentary otherwise
+    transformer_id: str
     description: str
-    # When True, BaseDdlOptimizer skips this rule at dispatch time (the adapter performs
-    # the rewrite via a different code path; the rule exists only to satisfy compat_lint
-    # governance). transformer_id need not name a real method on the adapter in that case.
     governance_only: bool = False
 
 
@@ -80,11 +69,9 @@ class PostTranslatePayload:
 
 @dataclass(frozen=True)
 class PKCapabilityPayload:
-    """Structured PRIMARY KEY capability record - typed fields, not a bare boolean."""
-
     ddl_accepted: bool
     uniqueness_enforced: bool
-    conditions: str | None  # e.g. "first N columns only" for StarRocks/Doris
+    conditions: str | None
     failure_mode_detail: str | None
 
 
@@ -97,7 +84,7 @@ CompatPayload = Union[
     SetSessionPolicyPayload,
     PostTranslatePayload,
     PKCapabilityPayload,
-    None,  # NATIVE carries no payload
+    None,
 ]
 
 

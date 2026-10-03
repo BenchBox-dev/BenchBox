@@ -1,14 +1,4 @@
-"""Unit tests for Transaction Primitives DataFrame operations.
-
-Tests for:
-- TransactionOperationType enum
-- DataFrameTransactionCapabilities dataclass
-- DataFrameTransactionResult dataclass
-- DataFrameTransactionOperationsManager
-- Platform validation and error messages
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -65,8 +55,6 @@ class _SparkTransactionFrame:
 
 
 class TestTransactionOperationType:
-    """Tests for TransactionOperationType enum."""
-
     def test_atomic_operations_exist(self):
 
         assert TransactionOperationType.ATOMIC_INSERT is not None
@@ -102,8 +90,6 @@ class TestTransactionOperationType:
 
 
 class TestDataFrameTransactionCapabilities:
-    """Tests for DataFrameTransactionCapabilities dataclass."""
-
     def test_default_no_transaction_support(self):
 
         caps = DataFrameTransactionCapabilities(platform_name="test")
@@ -158,7 +144,6 @@ class TestDataFrameTransactionCapabilities:
         assert caps.table_format == "iceberg"
 
     def test_polars_capabilities(self):
-        """Test pre-defined Polars capabilities (no transactions)."""
         caps = POLARS_TRANSACTION_CAPABILITIES
         assert caps.platform_name == "polars-df"
         assert caps.supports_transactions is False
@@ -167,7 +152,6 @@ class TestDataFrameTransactionCapabilities:
         assert "No transaction support" in caps.notes
 
     def test_pandas_capabilities(self):
-        """Test pre-defined Pandas capabilities (no transactions)."""
         caps = PANDAS_TRANSACTION_CAPABILITIES
         assert caps.platform_name == "pandas-df"
         assert caps.supports_transactions is False
@@ -214,18 +198,14 @@ class TestDataFrameTransactionCapabilities:
 
         delta_caps = DELTA_LAKE_TRANSACTION_CAPABILITIES
         unsupported = delta_caps.get_unsupported_operations()
-        # Delta Lake supports all operations
         assert len(unsupported) == 0
 
         polars_caps = POLARS_TRANSACTION_CAPABILITIES
         unsupported = polars_caps.get_unsupported_operations()
-        # Polars doesn't support any transaction operations
         assert len(unsupported) == len(list(TransactionOperationType))
 
 
 class TestDataFrameTransactionResult:
-    """Tests for DataFrameTransactionResult dataclass."""
-
     def test_success_result(self):
 
         result = DataFrameTransactionResult(
@@ -281,8 +261,6 @@ class TestDataFrameTransactionResult:
 
 
 class TestValidateTransactionPrimitivesPlatform:
-    """Tests for validate_transaction_primitives_platform function."""
-
     def test_pyspark_is_valid(self):
 
         is_valid, error_msg = validate_transaction_primitives_platform("pyspark-df")
@@ -306,7 +284,7 @@ class TestValidateTransactionPrimitivesPlatform:
         is_valid, error_msg = validate_transaction_primitives_platform("polars-df")
         assert is_valid is False
         assert "does not support DataFrame transactions" in error_msg
-        assert "pyspark-df" in error_msg  # Should suggest alternative
+        assert "pyspark-df" in error_msg
 
     def test_pandas_is_invalid(self):
 
@@ -326,14 +304,11 @@ class TestValidateTransactionPrimitivesPlatform:
         assert is_valid is False
 
     def test_unknown_platform_allowed(self):
-        """Test that unknown platforms are allowed (may have transaction support)."""
         is_valid, error_msg = validate_transaction_primitives_platform("custom-platform")
-        assert is_valid is True  # Unknown platforms are allowed
+        assert is_valid is True
 
 
 class TestDataFrameTransactionOperationsManager:
-    """Tests for DataFrameTransactionOperationsManager."""
-
     def test_polars_manager_no_transaction_support(self):
 
         manager = DataFrameTransactionOperationsManager("polars-df")
@@ -353,8 +328,8 @@ class TestDataFrameTransactionOperationsManager:
         msg = manager.get_unsupported_message()
 
         assert "polars-df" in msg
-        assert "pyspark-df" in msg.lower()  # Should suggest PySpark
-        assert "delta" in msg.lower()  # Should mention Delta Lake
+        assert "pyspark-df" in msg.lower()
+        assert "delta" in msg.lower()
 
     def test_manager_platform_name_normalized(self):
 
@@ -365,14 +340,11 @@ class TestDataFrameTransactionOperationsManager:
 
         manager = DataFrameTransactionOperationsManager("polars-df")
 
-        # Polars should not support any transaction operations
         assert manager.supports_operation(TransactionOperationType.ATOMIC_INSERT) is False
         assert manager.supports_operation(TransactionOperationType.ROLLBACK_TO_VERSION) is False
 
 
 class TestGetDataFrameTransactionManager:
-    """Tests for get_dataframe_transaction_manager factory function."""
-
     def test_returns_manager_for_dataframe_platform(self):
 
         manager = get_dataframe_transaction_manager("polars-df")
@@ -399,14 +371,12 @@ class TestGetDataFrameTransactionManager:
 
 
 class TestAtomicOperationsFailForNonAcidPlatforms:
-    """Test that atomic operations fail gracefully for non-ACID platforms."""
-
     def test_atomic_insert_fails_on_polars(self, tmp_path):
 
         manager = DataFrameTransactionOperationsManager("polars-df")
         result = manager.execute_atomic_insert(
             table_path=tmp_path / "test_table",
-            dataframe=None,  # Would fail anyway, but should fail on capability check first
+            dataframe=None,
         )
         assert result.success is False
         assert "ACID transaction support" in result.error_message
@@ -455,8 +425,6 @@ class TestAtomicOperationsFailForNonAcidPlatforms:
 
 
 class TestTableFormatValidation:
-    """Test table format validation."""
-
     def test_validate_nonexistent_table(self, tmp_path):
 
         manager = DataFrameTransactionOperationsManager("delta-lake")
@@ -465,8 +433,6 @@ class TestTableFormatValidation:
         assert "does not exist" in error_msg
 
     def test_validate_plain_parquet_directory(self, tmp_path):
-        """Test validation of plain Parquet directory (not Delta)."""
-        # Create a directory with a Parquet file but no _delta_log
         table_dir = tmp_path / "parquet_table"
         table_dir.mkdir()
         (table_dir / "part-00000.parquet").touch()
@@ -475,11 +441,10 @@ class TestTableFormatValidation:
         is_valid, error_msg = manager.validate_table_format(table_dir)
         assert is_valid is False
         assert "not a Delta Lake" in error_msg
-        assert "df.write.format('delta')" in error_msg  # Should suggest conversion
+        assert "df.write.format('delta')" in error_msg
 
     def test_validate_delta_table_directory(self, tmp_path):
 
-        # Create a directory structure that looks like a Delta table
         table_dir = tmp_path / "delta_table"
         table_dir.mkdir()
         delta_log = table_dir / "_delta_log"
@@ -495,7 +460,6 @@ class TestTableFormatValidation:
 
         manager = DataFrameTransactionOperationsManager("delta-lake")
 
-        # Path traversal attempt
         is_valid, error_msg = manager.validate_table_format(tmp_path / ".." / "etc" / "passwd")
         assert is_valid is False
         assert "Path traversal" in error_msg
@@ -504,15 +468,12 @@ class TestTableFormatValidation:
 
         manager = DataFrameTransactionOperationsManager("delta-lake")
 
-        # String path with traversal
         is_valid, error_msg = manager.validate_table_format("/data/../../../etc/passwd")
         assert is_valid is False
         assert "Path traversal" in error_msg
 
 
 class TestBenchmarkIntegration:
-    """Test integration with TransactionPrimitivesBenchmark."""
-
     def test_benchmark_supports_dataframe_mode_pyspark(self):
 
         from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
@@ -560,8 +521,6 @@ class TestBenchmarkIntegration:
 
 
 class TestNewOperationTypes:
-    """Tests for the four additional operation type implementations."""
-
     def test_all_12_operation_types_present(self):
         assert len(TransactionOperationType) == 12
 
@@ -578,32 +537,27 @@ class TestNewOperationTypes:
         assert TransactionOperationType.READ_YOUR_WRITES.value == "read_your_writes"
 
     def test_execute_concurrent_write_rejects_unsupported_platform(self):
-        """Polars cannot run concurrent write - should return failure result."""
         manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
         result = manager.execute_concurrent_write("/tmp/fake_table", [])
         assert result.success is False
         assert "concurrent_write" in result.error_message.lower() or "not supported" in result.error_message.lower()
 
     def test_execute_conflict_resolution_rejects_unsupported_platform(self):
-        """Pandas cannot run conflict resolution - should return failure result."""
         manager = DataFrameTransactionOperationsManager("pandas-df", PANDAS_TRANSACTION_CAPABILITIES)
         result = manager.execute_conflict_resolution("/tmp/fake_table", None)
         assert result.success is False
 
     def test_execute_snapshot_isolation_rejects_unsupported_platform(self):
-        """Polars has NONE isolation - should return failure result."""
         manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
         result = manager.execute_snapshot_isolation("/tmp/fake_table")
         assert result.success is False
 
     def test_execute_read_your_writes_rejects_unsupported_platform(self):
-        """Polars has no transaction support - should return failure result."""
         manager = DataFrameTransactionOperationsManager("polars-df", POLARS_TRANSACTION_CAPABILITIES)
         result = manager.execute_read_your_writes("/tmp/fake_table", None)
         assert result.success is False
 
     def test_delta_capabilities_support_all_new_operations(self):
-        """Delta Lake capabilities should support all 4 new operation types."""
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.CONCURRENT_WRITE)
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.CONFLICT_RESOLUTION)
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.SNAPSHOT_ISOLATION)
@@ -611,8 +565,6 @@ class TestNewOperationTypes:
 
 
 class TestTransactionWriteCounting:
-    """Tests for row-counting behavior in Spark transaction writes."""
-
     def test_concurrent_write_does_not_count_spark_input(self):
         manager = DataFrameTransactionOperationsManager("delta-lake", spark_session=object())
         manager.get_table_version = lambda _path: 1
@@ -657,12 +609,6 @@ class TestTransactionWriteCounting:
 
 
 class TestBenchmarkRegistryDataframeFlag:
-    """Tests that benchmark_registry correctly reports transaction_primitives DataFrame support.
-
-    execute_dataframe_workload() is now fully implemented (three-phase Delta Lake
-    execution via DataFrameTransactionOperationsManager), so the flag is True.
-    """
-
     def test_transaction_primitives_supports_dataframe(self):
         from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 

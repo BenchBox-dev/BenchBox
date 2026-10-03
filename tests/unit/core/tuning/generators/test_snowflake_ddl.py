@@ -1,16 +1,6 @@
-"""Unit tests for Snowflake DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the SnowflakeDDLGenerator class for:
-- CLUSTER BY clause generation
-- Clustering column limit enforcement
-- Search optimization generation
-- Mapping of sorting to clustering
-- Partitioning and distribution warnings
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,8 +23,6 @@ pytestmark = [
 
 
 class TestSnowflakeDDLGeneratorBasics:
-    """Tests for SnowflakeDDLGenerator basic properties."""
-
     def test_platform_name(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -50,8 +38,6 @@ class TestSnowflakeDDLGeneratorBasics:
 
 
 class TestClusterByGeneration:
-    """Tests for CLUSTER BY clause generation."""
-
     def test_basic_cluster_by(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -98,7 +84,6 @@ class TestClusterByGeneration:
             mock_logger.warning.assert_called_once()
             assert "max 3 clustering columns" in mock_logger.warning.call_args[0][0]
 
-        # Should only use first 3 columns
         assert clauses.cluster_by == "CLUSTER BY (col1, col2, col3)"
 
     def test_sorting_maps_to_clustering(self) -> None:
@@ -135,8 +120,6 @@ class TestClusterByGeneration:
 
 
 class TestDistributionWarning:
-    """Tests for distribution warning (not supported in Snowflake)."""
-
     def test_distribution_logs_warning(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -152,8 +135,6 @@ class TestDistributionWarning:
 
 
 class TestPartitioningInfo:
-    """Tests for partitioning info logging."""
-
     def test_partitioning_logs_info(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -169,8 +150,6 @@ class TestPartitioningInfo:
 
 
 class TestCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -221,8 +200,6 @@ class TestCreateTableDDL:
 
 
 class TestSearchOptimization:
-    """Tests for search optimization generation."""
-
     def test_generate_search_optimization_equality(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -256,8 +233,6 @@ class TestSearchOptimization:
 
 
 class TestClusteringInfoQuery:
-    """Tests for clustering info query generation."""
-
     def test_generate_clustering_info_query(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -271,8 +246,6 @@ class TestClusteringInfoQuery:
 
 
 class TestResumeRecluster:
-    """Tests for RESUME RECLUSTER generation."""
-
     def test_generate_resume_recluster(self) -> None:
 
         generator = SnowflakeDDLGenerator()
@@ -287,8 +260,6 @@ class TestResumeRecluster:
 
 
 class TestSearchOptimizationEnum:
-    """Tests for SearchOptimizationType enum."""
-
     def test_enum_values(self) -> None:
 
         assert SearchOptimizationType.EQUALITY.value == "EQUALITY"

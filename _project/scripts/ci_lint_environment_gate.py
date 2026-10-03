@@ -1,39 +1,4 @@
 #!/usr/bin/env python3
-"""Decide whether a `make ci-lint` guard is meaningful on a CI runner.
-
-`ci-lint` (Makefile) exists to mirror the `ci.yml` `code-lint` job locally
-(docs/operations/ci-local-parity.md), but `make ci-lint` can also run
-directly on a real, ephemeral GitHub-hosted runner (no workflow does today; the
-post-merge workflow that did was retired with the six-unit CI). Most
-guards are equally meaningful there: they inspect the checked-out tree, the
-installed venv, or the registries the repo ships, none of which differ
-between a laptop and a runner.
-
-A small number of guards instead read state that only exists on a developer
-machine -- a resolved Git identity, a tool installed at a hardcoded local
-path -- and behave one of two bad ways on a runner that lacks it: they fail
-for a reason that has nothing to do with the code under test (the pre-#1558
-`agent-identity-check` behavior), or worse, they silently no-op and report
-success while checking nothing (`skill-sync-check` against a `$(SKILL_SYNC)`
-path that plainly does not exist on the runner). The second failure mode is
-the more dangerous one: a guard that cannot fail reads as coverage in the
-Actions log and is never investigated.
-
-This module is the single place that draws that boundary. Before the
-Makefile recipe runs a runner-inapplicable guard, it asks this module; if the
-guard is listed AND the process is actually running on a GitHub Actions
-runner (`GITHUB_ACTIONS=true`, the platform-set variable -- never
-hand-toggled), the guard is skipped with a printed reason instead of run and
-either silently passing or noisily failing. Every other guard -- the
-overwhelming majority -- is untouched: this is a narrow allowlist of
-documented exceptions, not a generic on/off switch, and adding a guard here
-requires the same reasoning as removing coverage, because that is exactly
-what it does on a runner.
-
-Local and CI-local-parity invocations (`GITHUB_ACTIONS` unset) are never
-affected by this table -- every guard always runs there, including the two
-listed below, exactly as before this module existed.
-"""
 
 from __future__ import annotations
 
@@ -41,14 +6,6 @@ import argparse
 import os
 import sys
 
-# Guard slugs that are structurally incapable of producing a meaningful
-# result on an ephemeral GitHub-hosted runner -- not merely inconvenient to
-# run there. Each entry is the ci-lint recipe's own `failed="$$failed <slug>"`
-# tag, so the mapping to a specific guard is unambiguous. Adding an entry
-# here removes real CI coverage for that guard inside `make ci-lint`'s own
-# CI invocation -- do it only when the guard is
-# ALSO covered for real elsewhere in CI (see each reason below), never to
-# quiet a guard that is merely awkward to satisfy on a runner.
 RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
     "agent-identity": (
         "agent-identity-check resolves the runner's own `git config user.*`, "
@@ -119,13 +76,6 @@ CLI_DESCRIPTION = (
 
 
 def runs_on_runner(guard: str, *, github_actions: bool) -> tuple[bool, str | None]:
-    """Return `(should_run, reason)` for *guard* under the given environment.
-
-    `reason` is `None` whenever `should_run` is `True`. `github_actions=False`
-    (the local / CI-local-parity case) always returns `(True, None)` -- this
-    table only ever narrows CI-runner behavior, never local behavior, so a
-    developer or `make pr-preflight` never sees a guard silently disappear.
-    """
     if not github_actions:
         return True, None
     reason = RUNNER_INAPPLICABLE_GUARDS.get(guard)
@@ -134,17 +84,6 @@ def runs_on_runner(guard: str, *, github_actions: bool) -> tuple[bool, str | Non
     return False, reason
 
 
-#: The decision is carried on stdout, never in the exit status.
-#:
-#: An earlier version returned 0 for "run" and 1 for "skip", and the recipe
-#: used the process itself as the `if` condition. That inverted this module's
-#: whole purpose: every way of failing to *reach* a decision -- `uv` absent,
-#: a broken venv, this file renamed, a traceback -- also exits non-zero and
-#: was therefore indistinguishable from a deliberate skip, so the guard was
-#: silently disabled and nothing landed in the recipe's `failed` list. A gate
-#: that cannot be consulted must fall back to RUNNING the guard: a guard that
-#: fails noisily for an environmental reason is a nuisance, but a guard that
-#: vanishes without a trace is the exact defect this module exists to remove.
 DECISION_RUN = "RUN"
 DECISION_SKIP = "SKIP"
 
@@ -160,8 +99,6 @@ def main(argv: list[str] | None = None) -> int:
         print(DECISION_RUN)
         return 0
     print(DECISION_SKIP)
-    # The reason goes to stderr so it still reaches the Actions log while
-    # stdout stays exactly one machine-readable token for the recipe to test.
     print(
         f"ci-lint: skipping {args.guard} - environment-inapplicable on a CI runner -- {reason}",
         file=sys.stderr,

@@ -1,12 +1,3 @@
-"""Ruleset drift coverage: live develop review + v* tag protection.
-
-The develop ``require_code_owner_review`` rule is currently active in GitHub
-(ruleset id 15611785), so a missing rule must be a blocking finding by
-default. The explicit warning-only override remains covered for migration
-fixtures. The v* tag-creation ruleset (id 18774756) is likewise live and
-enforced.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -28,7 +19,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_review_enforcement():
-    """Load _project/scripts/ruleset_review_enforcement.py out of tree."""
     scripts_dir = REPO_ROOT / "_project" / "scripts"
     spec = importlib.util.spec_from_file_location(
         "ruleset_review_enforcement", scripts_dir / "ruleset_review_enforcement.py"
@@ -79,10 +69,6 @@ def _live_develop_ruleset(
                 "type": "required_status_checks",
                 "parameters": {
                     "strict_required_status_checks_policy": True,
-                    # Must mirror the develop-squash-only check list in
-                    # docs/operations/repo-admin-settings.md, otherwise these
-                    # fixtures report check drift and mask the review-rule
-                    # behaviour they exist to cover.
                     "required_status_checks": [
                         {"context": "core"},
                         {"context": "explorer"},
@@ -124,8 +110,6 @@ def test_develop_review_rule_can_be_warn_only_for_explicit_migration_override():
 
 
 def test_release_only_matches_runbook_expectations():
-    """release-only sanity: a live ruleset matching the runbook produces
-    no findings."""
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
         "release-only"
     ]
@@ -154,14 +138,7 @@ def test_release_only_matches_runbook_expectations():
     assert compare_ruleset(expected, live) == []
 
 
-# ---------------------------------------------------------------------------
-# v* tag-creation ruleset coverage (tag-and-pypi-environment-admin-hardening w3)
-# ---------------------------------------------------------------------------
-
-
 def test_tag_protection_missing_when_no_tag_ruleset_exists():
-    # Live state 2026-07-03: only v-release-branches-minimal exists, which
-    # targets refs/heads/v* (branches), not tags -- must NOT count.
     branch_ruleset = {
         "name": "v-release-branches-minimal",
         "target": "branch",
@@ -182,7 +159,6 @@ def test_tag_protection_satisfied_by_active_v_tag_creation_ruleset():
 
 
 def test_tag_protection_satisfied_when_ref_is_all_tags():
-    # A ~ALL tag ruleset covers refs/tags/v* too.
     findings = _rre.tag_protection_findings([_tag_ruleset(include=("~ALL",))])
     assert findings == []
 
@@ -201,28 +177,21 @@ def test_tag_glob_coverage_rejects_sample_covering_or_narrow_patterns(pattern: s
 
 
 def test_tag_protection_flags_inactive_or_incomplete_tag_ruleset():
-    # Present but not active.
     inactive = _rre.tag_protection_findings([_tag_ruleset(enforcement="evaluate")])
     assert inactive and "enforcement='evaluate'" in inactive[0]
-    # Present and active but no creation rule (e.g. only update/deletion).
     no_creation = _rre.tag_protection_findings([_tag_ruleset(rule_types=("deletion",))])
     assert no_creation and "no 'creation' rule" in no_creation[0]
-    # Active with a creation rule but ref does not cover v*.
     wrong_ref = _rre.tag_protection_findings([_tag_ruleset(include=("refs/tags/rc*",))])
     assert wrong_ref and "does not cover refs/tags/v*" in wrong_ref[0]
 
 
 def test_tag_protection_summary_only_payload_does_not_pass():
-    # The list endpoint omits conditions/rules; a summary must not read as
-    # protected (never green on absent evidence).
     summary = {"name": "v-tag-restricted", "target": "tag", "enforcement": "active"}
     findings = _rre.tag_protection_findings([summary])
     assert findings, "summary-only ruleset lacks a creation rule and must be flagged"
 
 
 def test_tag_check_is_enforced_now_that_ruleset_is_applied():
-    # The v* tag ruleset was applied 2026-07-10 (see repo-admin-settings.md
-    # live-state note), so the flag is flipped: a regression is now blocking.
     assert _rre.TAG_RULESET_ENFORCED is True
 
 
@@ -239,8 +208,6 @@ def test_tag_check_main_fails_when_missing_now_that_enforced(tmp_path, capsys):
 
 
 def test_tag_check_main_warns_non_blocking_when_flag_off(tmp_path, capsys, monkeypatch):
-    # Preserve coverage of the WARN-until-applied path the flag used to give by
-    # default: with the flag forced off, a missing ruleset is non-blocking.
     import json as _json
 
     monkeypatch.setattr(_rre, "TAG_RULESET_ENFORCED", False)
@@ -265,7 +232,6 @@ def test_tag_check_main_passes_when_ruleset_present(tmp_path, capsys):
 
 
 def test_tag_protection_flags_exclude_that_negates_v_coverage():
-    # include covers v* (or ~ALL) but exclude removes it -> not protected.
     negated = _rre.tag_protection_findings(
         [
             _tag_ruleset(include=("~ALL",))
@@ -276,21 +242,18 @@ def test_tag_protection_flags_exclude_that_negates_v_coverage():
 
 
 def test_tag_bypass_advisory_surfaces_actors_without_failing_structure():
-    # A structurally-valid ruleset with bypass actors is still "protected"
-    # (must_preserve: the release identity needs bypass), but the advisory
-    # forces the operator to confirm the actor list before enforcing.
     ruleset = _tag_ruleset() | {
         "bypass_actors": [{"actor_type": "Integration", "actor_id": 42, "bypass_mode": "always"}]
     }
-    assert _rre.is_tag_creation_protected([ruleset])  # structure OK
+    assert _rre.is_tag_creation_protected([ruleset])
     advisory = _rre.tag_bypass_advisory([ruleset])
     assert advisory and "bypass_actors" in advisory[0]
     assert "Integration:42" in advisory[0]
 
 
 def test_tag_bypass_advisory_empty_when_no_bypass_or_no_ruleset():
-    assert _rre.tag_bypass_advisory([_tag_ruleset()]) == []  # protected, no bypass
-    assert _rre.tag_bypass_advisory([]) == []  # nothing protecting
+    assert _rre.tag_bypass_advisory([_tag_ruleset()]) == []
+    assert _rre.tag_bypass_advisory([]) == []
 
 
 def test_tag_check_main_prints_bypass_confirmation_on_ok(tmp_path, capsys):
@@ -306,35 +269,21 @@ def test_tag_check_main_prints_bypass_confirmation_on_ok(tmp_path, capsys):
     assert "CONFIRM before enforcing:" in out
 
 
-# ---------------------------------------------------------------------------
-# Review-followup hardening: empty bypass_actors + fnmatch ref-glob matching
-# ---------------------------------------------------------------------------
-
-
 def test_tag_protection_flags_explicitly_empty_bypass_actors():
-    # A structurally-valid ruleset with bypass_actors: [] (GitHub's shape for
-    # "none configured") would itself block make release-finalize's own tag
-    # push, so it must NOT read as protected.
     ruleset = _tag_ruleset() | {"bypass_actors": []}
     findings = _rre.tag_protection_findings([ruleset])
     assert findings and "bypass_actors is empty" in findings[0]
     assert not _rre.is_tag_creation_protected([ruleset])
-    # No redundant advisory: the empty-bypass gap is already a finding above.
     assert _rre.tag_bypass_advisory([ruleset]) == []
 
 
 def test_tag_protection_does_not_flag_missing_bypass_actors_key():
-    # A caller that never populated bypass_actors at all (vs. GitHub
-    # confirming zero via an explicit []) is left unasserted -- unlike a
-    # confirmed-empty list, absence isn't evidence of anything.
     ruleset = _tag_ruleset()
     assert "bypass_actors" not in ruleset
     assert _rre.tag_protection_findings([ruleset]) == []
 
 
 def test_tag_protection_include_covers_via_broader_fnmatch_glob():
-    # refs/tags/* is a broader GitHub fnmatch glob that covers refs/tags/v*
-    # just as fully as the literal pattern -- not just an exact string match.
     findings = _rre.tag_protection_findings([_tag_ruleset(include=("refs/tags/*",))])
     assert findings == []
 
@@ -347,10 +296,6 @@ def test_tag_protection_rejects_globs_that_do_not_cover_the_full_v_domain(patter
 
 
 def test_tag_protection_flags_exclude_that_negates_v_coverage_via_broader_glob():
-    # The bug this regression pins: a prior exact-string exclude check missed
-    # a broader-but-still-covering exclude glob like refs/tags/* (as opposed
-    # to the byte-identical refs/tags/v* already covered by the older test
-    # above), so an admin who wrote refs/tags/* saw a false "protected" OK.
     negated = _rre.tag_protection_findings(
         [
             _tag_ruleset(include=("~ALL",))
@@ -361,25 +306,13 @@ def test_tag_protection_flags_exclude_that_negates_v_coverage_via_broader_glob()
 
 
 def test_tag_protection_narrower_exclude_does_not_negate_coverage():
-    # refs/tags/rc* (a disjoint, narrower glob) does not overlap refs/tags/v*
-    # at all, so it must not be treated as a negating exclude.
     findings = _rre.tag_protection_findings(
         [_tag_ruleset() | {"conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": ["refs/tags/rc*"]}}}]
     )
     assert findings == []
 
 
-# ---------------------------------------------------------------------------
-# scripts/ruleset_drift_check.py wiring (release-canary.yml's ruleset-drift
-# job) -- the tag predicate must actually run in CI, not just via the
-# standalone --rulesets-file CLI documented in the runbook.
-# ---------------------------------------------------------------------------
-
-
 def test_tag_creation_findings_blocks_by_default_when_no_tag_ruleset_exists():
-    # Live state after 2026-07-10: the v* tag ruleset is applied and
-    # TAG_RULESET_ENFORCED is True, so a missing target='tag' ruleset is a
-    # BLOCKING drift finding by default (no longer WARN-until-applied).
     all_live = [
         _live_develop_ruleset(),
     ]
@@ -390,8 +323,6 @@ def test_tag_creation_findings_blocks_by_default_when_no_tag_ruleset_exists():
 
 
 def test_tag_creation_findings_warns_when_enforcement_forced_off():
-    # Preserve the pre-2026-07-10 WARN-until-applied coverage via an explicit
-    # enforce_tag_rule=False override.
     all_live = [
         _live_develop_ruleset(),
     ]
@@ -406,7 +337,6 @@ def test_tag_creation_findings_empty_when_ruleset_present_and_no_bypass_gap():
         _tag_ruleset() | {"bypass_actors": [{"actor_type": "Integration", "actor_id": 1, "bypass_mode": "always"}]}
     ]
     findings = tag_creation_findings(all_live)
-    # A non-empty bypass list is an advisory, not a failure -- still non-blocking.
     assert blocking_findings(findings) == []
 
 
@@ -421,8 +351,6 @@ def test_tag_creation_findings_require_visible_bypass_actors_when_requested():
 
 
 def test_tag_creation_findings_can_be_switched_to_blocking_explicitly():
-    # The one-line enforce switch: TAG_RULESET_ENFORCED=True would make this
-    # call with enforce_tag_rule=True instead, turning the same gap blocking.
     findings = tag_creation_findings([], enforce_tag_rule=True)
     assert findings, "expected a blocking finding once tag-rule enforcement is on"
     assert not any(f.startswith(WARNING_PREFIX) for f in findings)

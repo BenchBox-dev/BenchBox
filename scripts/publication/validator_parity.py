@@ -41,6 +41,40 @@ import sys
 import tempfile
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Compare PR-head vs merge-SHA validation outcomes (A2 w4 parity).\n"
+    "\n"
+    "This script validates that the trusted-base validator produces identical\n"
+    "outcomes when run against payload extracted from MERGE_SHA versus the PR head.\n"
+    "It is the local parity counterpart to the pull_request_target + MERGE_SHA\n"
+    "revalidation in .github/workflows/validate-submission.yml.\n"
+    "\n"
+    "Contract:\n"
+    "- Executes validator from trusted base checkout (ref: BASE_SHA). Payload is\n"
+    "  extracted from MERGE_SHA via ``git show $MERGE_SHA:path`` or sparse checkout\n"
+    "  to /tmp/payload. Never executes validator code from the PR branch.\n"
+    "- Discovers changed bundles via three-dot ``BASE_SHA...MERGE_SHA`` diff with\n"
+    "  --diff-filter=ACMRD, then back-maps CHANGED_MANIFESTS / CHANGED_APPLIED /\n"
+    "  CHANGED_COMPANIONS to primary bundles via ``git ls-tree $MERGE_SHA``.\n"
+    "- Corpus parity: if CORPUS_CHANGED_PATHS_FILE is provided, validates it against\n"
+    "  the MERGE_SHA file list and runs ``scripts/generate_corpus_inventory.py --check``\n"
+    "  logic on the merge payload; empty file means no corpus changes, missing file\n"
+    "  is an error.\n"
+    "- Parity with benchbox/validation/bundle.py and scripts/validate_submission.py\n"
+    "  --corpus-changed-paths flag.\n"
+    "\n"
+    "Usage:\n"
+    "  uv run -- python scripts/publication/validator_parity.py --base-sha <sha> --merge-sha <sha> --head-sha <sha>\n"
+    "  uv run -- python scripts/publication/validator_parity.py --base-sha $BASE_SHA --merge-sha $MERGE_SHA --head-sha $HEAD_SHA --corpus-changed-paths /tmp/corpus_changed_paths.txt\n"
+    "  # Env fallback:\n"
+    "  BASE_SHA=... MERGE_SHA=... HEAD_SHA=... CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt uv run -- python scripts/publication/validator_parity.py\n"
+    "\n"
+    "Exit codes:\n"
+    "  0 - parity holds (head and merge outcomes identical and both succeed)\n"
+    "  1 - validation failure or parity divergence\n"
+    "  2 - usage / environment error (missing SHA, missing file, git failure)\n"
+)
+
 CHECKOUT_ROOT = Path(__file__).resolve().parents[2]
 if str(CHECKOUT_ROOT) not in sys.path:
     sys.path.insert(0, str(CHECKOUT_ROOT))
@@ -353,7 +387,7 @@ def _run_validation_on_payload(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--base-sha",
         dest="base_sha",

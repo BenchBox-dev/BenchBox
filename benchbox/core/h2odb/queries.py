@@ -1,21 +1,6 @@
-"""H2O DB benchmark query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides standard H2O DB benchmark queries that test various aspects of analytical database performance using taxi trip data.
-
-The queries cover:
-- Basic aggregations (sum, count, mean)
-- Grouping operations
-- Advanced analytics (percentiles, rolling operations)
-- String operations
-- Complex analytical queries
-
-For more information see:
-- https://h2oai.github.io/db-benchmark/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 
 class H2OQueryManager:

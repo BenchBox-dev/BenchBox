@@ -1,5 +1,3 @@
-"""Manifest handling mixin for the TPC-DI data generator."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,16 +18,12 @@ _TPCDI_CSV_METADATA = _load_manifest_specs()["csv_metadata"]
 
 
 class ManifestMixin:
-    """Provide manifest persistence and validation helpers."""
-
     def _validate_file_format_consistency(self, target_dir: Path) -> None:
-        """Ensure no raw .tbl files exist when compression is enabled; ensure no empty compressed files."""
         if not self.should_use_compression():
             return
         validate_tbl_compression_consistency(target_dir, self.get_compressor().get_file_extension())
 
     def _count_rows(self, p: Path) -> int:
-        """Count rows in a data file, transparently handling common compression formats."""
         try:
             compression = detect_compression(p)
             if compression == "gzip":

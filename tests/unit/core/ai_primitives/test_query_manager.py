@@ -1,9 +1,6 @@
-"""Tests for AI Primitives query manager.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -16,11 +13,8 @@ pytestmark = [
 
 
 class TestAIQueryManager:
-    """Tests for AIQueryManager."""
-
     @pytest.fixture()
     def manager(self):
-        """Create a query manager instance."""
         return AIQueryManager()
 
     def test_manager_creation(self, manager):
@@ -54,7 +48,6 @@ class TestAIQueryManager:
 
     def test_get_query_with_dialect(self, manager):
 
-        # Get a query that has snowflake variant
         sql = manager.get_query("generative_complete_simple", dialect="snowflake")
         assert "SNOWFLAKE.CORTEX" in sql or "placeholder" not in sql.lower()
 
@@ -108,7 +101,6 @@ class TestAIQueryManager:
         assert isinstance(supported, dict)
         assert len(supported) > 0
 
-        # Snowflake queries should have Cortex functions
         for query_id, sql in supported.items():
             assert sql is not None
 
@@ -116,7 +108,6 @@ class TestAIQueryManager:
 
         supported = manager.get_supported_queries("duckdb")
 
-        # DuckDB should have no supported queries (all skipped)
         assert len(supported) == 0
 
     def test_get_query_cost_estimate(self, manager):
@@ -132,16 +123,12 @@ class TestAIQueryManager:
         cost_100 = manager.get_query_cost_estimate("nlp_sentiment_batch", num_rows=100)
 
         assert cost_100 > cost_10
-        # Should scale roughly linearly
         assert cost_100 / cost_10 == pytest.approx(10.0, rel=0.1)
 
 
 class TestQueryVariants:
-    """Tests for query variant handling."""
-
     @pytest.fixture()
     def manager(self):
-        """Create a query manager instance."""
         return AIQueryManager()
 
     def test_snowflake_variants_use_cortex(self, manager):
@@ -149,7 +136,6 @@ class TestQueryVariants:
         supported = manager.get_supported_queries("snowflake")
 
         for query_id, sql in supported.items():
-            # Snowflake AI queries should use CORTEX namespace
             assert "SNOWFLAKE.CORTEX" in sql or "placeholder" in sql.lower()
 
     def test_bigquery_variants_use_ml(self, manager):
@@ -157,7 +143,6 @@ class TestQueryVariants:
         supported = manager.get_supported_queries("bigquery")
 
         for query_id, sql in supported.items():
-            # BigQuery AI queries should use ML namespace
             assert "ML." in sql or "placeholder" in sql.lower()
 
     def test_databricks_variants_use_ai(self, manager):
@@ -165,13 +150,10 @@ class TestQueryVariants:
         supported = manager.get_supported_queries("databricks")
 
         for query_id, sql in supported.items():
-            # Databricks AI queries should use ai_ prefix
             assert "ai_" in sql.lower() or "placeholder" in sql.lower()
 
     def test_base_sql_used_when_no_variant(self, manager):
 
-        # Get a query without specifying dialect
         sql_base = manager.get_query("generative_complete_simple")
 
-        # Base SQL should be the placeholder
         assert "placeholder" in sql_base.lower()

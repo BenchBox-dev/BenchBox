@@ -1,14 +1,6 @@
-"""PostgreSQL platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides PostgreSQL-specific functionality including:
-- COPY command for efficient bulk data loading
-- EXPLAIN/EXPLAIN ANALYZE for query plan capture
-- Support for TimescaleDB extensions (optional)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,7 +42,6 @@ from .base.data_loading import (
     resolve_csv_dialect,
 )
 
-# PostgreSQL dialect for SQLGlot
 POSTGRES_DIALECT = "postgres"
 
 try:
@@ -60,8 +51,6 @@ except ImportError:
 
 
 class _PostgresCopySink:
-    """File-like sink that lets PyArrow CSVWriter stream into psycopg COPY."""
-
     closed = False
 
     def __init__(self, copy: Any) -> None:
@@ -83,11 +72,6 @@ class _PostgresCopySink:
 
 
 def _write_parquet_to_copy(data_file: Path, copy: Any, *, include_header: bool = True) -> None:
-    """Stream a Parquet file as CSV directly into PostgreSQL COPY.
-
-    ``include_header`` is False when the file continues an already-open
-    multi-file COPY session whose header row was written by the first file.
-    """
     try:
         import pyarrow.csv as arrow_csv
         import pyarrow.parquet as pq
@@ -108,11 +92,6 @@ def _postgres_copy_sql(
     force_csv: bool = False,
 ) -> str:
     escaped_delim = dialect.delimiter.replace("'", "''")
-    # FORMAT text performs no quote parsing: a quoted empty ("") loads as two
-    # literal quote characters instead of an empty string. Quoted dialects
-    # (csv_quote declared, e.g. ClickBench) therefore use FORMAT csv, which
-    # parses quoted empties as empty strings while the NULL marker still maps
-    # only the bare sentinel to NULL.
     if dialect.null_marker is not None and not force_csv and dialect.quote is None:
         escaped_null = dialect.null_marker.replace("'", "''")
         return (
@@ -135,17 +114,6 @@ def _add_postgres_compatible_arguments(
     platform_label: str,
     include_timescale_toggle: bool = False,
 ) -> None:
-    """Register shared PostgreSQL-compatible CLI arguments.
-
-    These legacy ``--<prefix>-host`` / ``--<prefix>-port`` / … flags are
-    registered on the adapter for setup-wizard use (``benchbox platforms setup``).
-    The ``benchbox run`` flow does NOT invoke ``add_cli_arguments``; it relies
-    on ``register_option_specs`` + ``--platform-option key=value`` exclusively.
-
-    Maintenance note: whenever a field is added or removed from
-    ``PlatformHookRegistry.register_option_specs`` for a PG-family platform,
-    update this helper and vice-versa so the two registrations stay in sync.
-    """
     option_prefix = prefix.strip("-")
 
     parser.add_argument(
@@ -205,22 +173,6 @@ def _add_postgres_compatible_arguments(
 
 
 def _build_postgres_connection_kwargs(config: dict[str, Any], *, default_port: int = 5432) -> dict[str, Any]:
-    """Build the common connection kwargs shared by all PG-family from_config methods.
-
-    Extracts host/port/credentials/sslmode, derives the database name from
-    benchmark+scale_factor when no explicit database is given, and copies
-    through the common GUC and pool settings.  Adapter-specific keys (e.g.
-    chunk_interval for TimescaleDB) should be added by the caller after this
-    helper returns.
-
-    Args:
-        config: Unified config dict passed to from_config.
-        default_port: Override default port (e.g. CedarDB uses 5432 by default
-            but may differ per deployment; pass ``CEDARDB_DEFAULT_PORT`` here).
-
-    Returns:
-        Partial adapter_config dict ready to pass to the adapter constructor.
-    """
     from benchbox.utils.scale_factor import format_benchmark_name
 
     result: dict[str, Any] = {
@@ -271,24 +223,6 @@ def ensure_postgres_extension(
     *,
     cascade: bool = False,
 ) -> str:
-    """Verify a PostgreSQL extension is installed, creating it when absent.
-
-    Shared verify-or-create dance for PG-extension adapters (ParadeDB,
-    Citus): check ``pg_extension``, attempt ``CREATE EXTENSION IF NOT
-    EXISTS``, then re-check. Raises ``RuntimeError`` with install guidance
-    when the extension is still missing, so every adapter reports the same
-    actionable error instead of drifting copies.
-
-    Args:
-        conn: Open database connection.
-        logger: Adapter logger for version reporting.
-        extension: Extension name as registered in ``pg_extension``.
-        install_url: Project URL for the install guidance in the error.
-        cascade: Pass ``CASCADE`` to CREATE EXTENSION (needed by citus).
-
-    Returns:
-        Installed extension version string.
-    """
     cursor = conn.cursor()
     try:
         cursor.execute(f"SELECT extversion FROM pg_extension WHERE extname = '{extension}'")
@@ -326,22 +260,9 @@ def ensure_postgres_extension(
 
 
 class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
-    """PostgreSQL platform adapter with COPY-based data loading.
-
-    Supports PostgreSQL 12+ and optional TimescaleDB extensions.
-    Uses psycopg for database connectivity with efficient COPY loading.
-    """
-
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
     default_service_port = 5432
-    # psycopg connections do not support true concurrent statement execution
-    # across cursors of one connection (server-side session state --
-    # transactions, SET, prepared statements -- lives on the connection, and
-    # concurrent cursor use serializes or raises). Each throughput/pool-test
-    # stream therefore gets its own independent connection/session; see
-    # new_stream_connection() below and
-    # benchbox/platforms/base/connection_wrappers.py:StreamConnectionCapability.
     stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
@@ -349,12 +270,10 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         return "PostgreSQL"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for PostgreSQL."""
         return POSTGRES_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add PostgreSQL-specific CLI arguments."""
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -369,7 +288,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> PostgreSQLAdapter:
-        """Create PostgreSQL adapter from unified configuration."""
         adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["enable_timescale"] = config.get("enable_timescale", False)
         return cls(**adapter_config)
@@ -377,7 +295,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     def __init__(self, **config):
         super().__init__(**config)
 
-        # Check dependencies
         if psycopg is None:
             available, missing = check_platform_dependencies("postgresql")
             if not available:
@@ -386,7 +303,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
         self._dialect = POSTGRES_DIALECT
 
-        # Connection configuration
         self.host = config.get("host", "localhost")
         self.port = config.get("port", 5432)
         self.database = config.get("database", "benchbox")
@@ -395,24 +311,19 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         self.schema = config.get("schema", "public")
         self.sslmode = config.get("sslmode", "prefer")
 
-        # Admin database for metadata operations
         self.admin_database = config.get("admin_database", "postgres")
 
-        # Connection settings
         self.connect_timeout = config.get("connect_timeout", 10)
         self.statement_timeout = config.get("statement_timeout", 0)
 
-        # Performance settings
         self.work_mem = config.get("work_mem", "256MB")
         self.maintenance_work_mem = config.get("maintenance_work_mem", "512MB")
         self.effective_cache_size = config.get("effective_cache_size", "1GB")
         self.max_parallel_workers_per_gather = config.get("max_parallel_workers_per_gather", 2)
 
-        # TimescaleDB support
         self.enable_timescale = config.get("enable_timescale", False)
 
     def _get_connection_params(self, database: str | None = None) -> dict[str, Any]:
-        """Build psycopg connection parameters."""
         params = {
             "host": self.host,
             "port": self.port,
@@ -428,7 +339,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         if self.sslmode:
             params["sslmode"] = self.sslmode
 
-        # Remove None values
         return {k: v for k, v in params.items() if v is not None}
 
     def check_server_database_exists(
@@ -438,11 +348,9 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         database: str | None = None,
         **_: object,
     ) -> bool:
-        """Check if a database exists on the PostgreSQL server."""
         db_name = database or self.database
 
         try:
-            # Connect to admin database to check for target database
             params = self._get_connection_params(database=self.admin_database)
             conn = psycopg.connect(**params)
             conn.autocommit = True
@@ -469,20 +377,17 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         database: str | None = None,
         **_: object,
     ) -> None:
-        """Drop a database from PostgreSQL server."""
         db_name = database or self.database
 
         if not self._validate_identifier(db_name):
             raise ValueError(f"Invalid database identifier: {db_name}")
 
         try:
-            # Connect to admin database
             params = self._get_connection_params(database=self.admin_database)
             conn = psycopg.connect(**params)
             conn.autocommit = True
             cursor = conn.cursor()
 
-            # Terminate existing connections to the database
             cursor.execute(
                 """
                 SELECT pg_terminate_backend(pid)
@@ -492,8 +397,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 (db_name,),
             )
 
-            # Drop the database
-            # Safety: db_name validated by _validate_identifier() above (alphanumeric + underscore only)
             cursor.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
 
             cursor.close()
@@ -505,7 +408,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             raise
 
     def _create_database(self) -> None:
-        """Create the target database if it doesn't exist."""
         if not self._validate_identifier(self.database):
             raise ValueError(f"Invalid database identifier: {self.database}")
 
@@ -515,13 +417,11 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             conn.autocommit = True
             cursor = conn.cursor()
 
-            # Create database if not exists
             cursor.execute(
                 "SELECT 1 FROM pg_database WHERE datname = %s",
                 (self.database,),
             )
             if not cursor.fetchone():
-                # Safety: self.database validated by _validate_identifier() above
                 cursor.execute(f'CREATE DATABASE "{self.database}"')
                 self.logger.info(f"Created database: {self.database}")
 
@@ -533,21 +433,16 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             raise
 
     def create_connection(self, **connection_config) -> Any:
-        """Create PostgreSQL connection."""
         self.log_operation_start("PostgreSQL connection")
 
-        # Handle existing database
         self.handle_existing_database(**connection_config)
 
-        # Create database if needed
         if not self.check_server_database_exists():
             self._create_database()
 
-        # Connect to target database
         params = self._get_connection_params()
         conn = psycopg.connect(**params)
 
-        # Apply session settings
         cursor = conn.cursor()
         settings_applied = []
 
@@ -574,8 +469,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 conn.rollback()
                 self.logger.debug(f"Could not set {label}: {e}")
 
-        # Create schema if needed
-        # Safety: self.schema validated by _validate_identifier() before use in f-string
         if self.schema != "public" and self._validate_identifier(self.schema):
             cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
             cursor.execute(f'SET search_path TO "{self.schema}", public')
@@ -584,7 +477,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         conn.commit()
         cursor.close()
 
-        # Verify connection
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchone()
@@ -594,39 +486,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         return conn
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
-        """Open an independent PostgreSQL connection for one throughput stream.
-
-        Overrides the base ``SHARED_CURSOR`` implementation: psycopg
-        connections carry server-side session state (transactions, ``SET``
-        GUCs, prepared statements) and do not support true concurrent
-        statement execution across cursors of one connection, so sharing
-        ``connection`` across concurrent throughput streams would either
-        serialize on it or corrupt session-local state between streams. Each
-        stream instead gets a brand-new connection built from this adapter's
-        existing connection parameters, with the same session GUCs applied as
-        ``create_connection`` (schema/database creation is a one-time setup
-        step already done on the shared ``connection`` and is not repeated
-        here), plus the benchmark-type tuning ``configure_for_benchmark``
-        applies to the shared connection (equivalence dimension 4 - without
-        this a stream would measure vanilla planner settings while the setup
-        session measures OLAP tuning). The returned connection is closed by
-        the caller (the throughput/maintenance stream driver's ``finally``
-        block) -- see ``PlatformAdapter.new_stream_connection()`` for the
-        full contract.
-
-        Args:
-            connection: The adapter's shared platform connection. Not reused
-                here -- a fresh connection/session is always opened.
-            benchmark_type: Benchmark tuning vocabulary forwarded to
-                ``configure_for_benchmark`` (replay skipped when omitted);
-                resolved virtually so wire-compatible subclasses
-                (TimescaleDB, CedarDB, pg_duckdb) reapply their own tuning
-                deltas per stream.
-
-        Returns:
-            A new, independent psycopg connection for this stream.
-        """
-        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        del connection
         params = self._get_connection_params()
         conn = psycopg.connect(**params)
 
@@ -646,26 +506,11 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                     conn.rollback()
                     self.logger.debug(f"Could not apply stream session setting ({sql}): {e}")
 
-            # Safety: self.schema validated by _validate_identifier() before use in f-string
             if self.schema != "public" and self._validate_identifier(self.schema):
                 cursor.execute(f'SET search_path TO "{self.schema}", public')
 
-            # Reapply any subclass-specific session-local state (e.g. pg_duckdb's
-            # duckdb.force_execution) so this stream session is configured the
-            # same way as the setup connection instead of running as vanilla
-            # PostgreSQL. No-op for the base adapter.
             self._apply_stream_session_state(conn)
 
-            # Reapply the benchmark-type session tuning the shared connection
-            # carries (equivalence dimension 4): configure_for_benchmark runs
-            # against the setup connection during the tuning phase, and a
-            # stream that skipped it would measure different planner settings.
-            # Virtual dispatch reapplies wire-compatible subclass deltas
-            # (TimescaleDB chunk skipping, CedarDB OLAP plan shapes,
-            # pg_duckdb forced DuckDB routing, QuestDB parallel-filter SETs).
-            # Replay happens only when the caller supplies benchmark_type
-            # (the throughput drivers always do): maintenance and legacy
-            # callers that pass nothing keep their exact previous behavior.
             if benchmark_type is not None:
                 self.configure_for_benchmark(conn, benchmark_type)
 
@@ -679,38 +524,18 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 cursor.close()
 
     def _apply_stream_session_state(self, connection: Any) -> None:
-        """Reapply subclass session-local state to a fresh throughput-stream connection.
-
-        ``new_stream_connection`` opens an independent connection per stream and
-        applies this adapter's shared GUCs (work_mem, search_path, ...) inline.
-        Postgres-family subclasses whose ``create_connection`` sets *additional*
-        session-scoped state -- pg_duckdb's ``duckdb.force_execution`` / thread /
-        MotherDuck GUCs, pg_mooncake's ``mooncake.default_bucket`` -- MUST
-        override this hook so every stream session is configured the same way as
-        the setup connection; otherwise a multi-stream throughput/maintenance
-        run silently executes on differently-configured (often vanilla-
-        PostgreSQL) sessions and mismeasures the requested engine. One-time
-        database setup (extension creation, database/schema creation) stays in
-        ``create_connection`` and is deliberately NOT repeated per stream.
-
-        The base implementation is a no-op: plain PostgreSQL carries no
-        session-local state beyond the GUCs ``new_stream_connection`` applies.
-        """
-        del connection  # base adapter has no extra per-session state to reapply
+        del connection
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
-        # Get schema SQL and translate to PostgreSQL dialect
         schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
         cursor = connection.cursor()
 
-        # Execute each statement separately; on failure rollback and retry without FK constraints
         statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
         for stmt in statements:
             try:
@@ -718,8 +543,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             except Exception as e:
                 connection.rollback()
                 self.logger.warning(f"Schema statement failed: {e}")
-                # For CREATE TABLE failures, retry after stripping FOREIGN KEY constraints.
-                # Some servers (e.g. CedarDB) reject self-referential FKs at definition time.
                 if re.search(r"\bCREATE\s+TABLE\b", stmt, re.IGNORECASE) and "FOREIGN" in stmt.upper():
                     stripped = strip_foreign_keys(stmt)
                     if stripped != stmt:
@@ -742,12 +565,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         return duration
 
     def _transform_create_statement(self, stmt: str) -> str:
-        """Transform a CREATE TABLE statement before execution.
-
-        PostgreSQL itself executes the generated DDL unchanged. Subclasses
-        with storage-specific DDL variants can override this hook while
-        keeping the standard create_schema contract and error handling.
-        """
         return stmt
 
     @staticmethod
@@ -757,16 +574,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         data_files: list[Path],
         benchmark: Any,
     ) -> list[tuple[CsvDialect, bool, list[tuple[Path, bool]]]]:
-        """Partition one table's files into single-session COPY groups.
-
-        ``COPY ... FROM STDIN`` accepts a continuous byte stream, so every
-        file sharing a dialect can stream through one COPY session instead of
-        paying per-file statement setup. Files group by (parquet-vs-text,
-        delimiter, null marker, header, quote, force_csv); each group yields
-        its dialect, force_csv flag, and (file, strip_trailing_delim) pairs
-        in original order. Header rows after the first file in a group are
-        skipped by the streamer so concatenated headers never become data.
-        """
         groups: dict[tuple[Any, ...], tuple[CsvDialect, bool, list[tuple[Path, bool]]]] = {}
         order: list[tuple[Any, ...]] = []
         for data_file in data_files:
@@ -806,7 +613,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data using PostgreSQL COPY command for efficiency."""
         start_time = mono_time()
         table_stats = {}
 
@@ -874,10 +680,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                                             wrote_any = True
                                             ends_with_newline = chunk.endswith("\n")
                                         if wrote_any and index < last_file_index and not ends_with_newline:
-                                            # A chunk without a trailing newline would otherwise
-                                            # merge its last record with the next file's first
-                                            # row in the continuous COPY stream; EOF only acts
-                                            # as a record boundary at the end of the session.
                                             copy.write("\n")
                     connection.commit()
                 except Exception as e:
@@ -914,26 +716,18 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         return table_stats, loading_time, None
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> list[str] | None:
-        """PostgreSQL CTAS table-rewrite sorting is intentionally unsupported.
-
-        DROP+CTAS+RENAME would strip indexes, constraints, and other schema metadata.
-        PostgreSQL physical ordering should instead be handled via schema/index strategy.
-        """
         return None
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply PostgreSQL optimizations for benchmark type."""
         cursor = connection.cursor()
 
         if benchmark_type == "olap":
-            # OLAP optimizations
             cursor.execute("SET enable_seqscan = on")
             cursor.execute("SET enable_hashjoin = on")
             cursor.execute("SET enable_mergejoin = on")
-            cursor.execute("SET random_page_cost = 1.1")  # Assume fast storage
+            cursor.execute("SET random_page_cost = 1.1")
             cursor.execute("SET cpu_tuple_cost = 0.01")
         elif benchmark_type == "oltp":
-            # OLTP optimizations
             cursor.execute("SET synchronous_commit = on")
             cursor.execute("SET random_page_cost = 4.0")
 
@@ -946,44 +740,14 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         query: str,
         explain_options: dict[str, Any] | None = None,
     ) -> str | None:
-        """Get query execution plan using EXPLAIN (FORMAT JSON).
-
-        SELECT queries include ANALYZE and BUFFERS for actual timing and I/O.
-        DML statements (INSERT/UPDATE/DELETE/MERGE/COPY) use FORMAT JSON only:
-        EXPLAIN ANALYZE physically re-executes the statement, which would mutate
-        data a second time. The plan structure is still captured; execution
-        statistics are absent for DML.
-
-        ANALYZE is also suppressed when ``self.analyze_plans`` is False (e.g. the
-        isolated capture phase or the top-level ``--no-analyze-plans`` flag):
-        plain EXPLAIN (FORMAT JSON) captures the estimated plan structure without
-        re-executing the query, so a SELECT is not run a second time.
-        """
         from benchbox.platforms.base.result_capture import is_dml_query
 
-        # In TPC-DS power/throughput streaming paths a per-stream cursor is passed as
-        # `connection` (see _make_stream_cursor / PlatformAdapterConnection); a real
-        # connection exposes a callable `.cursor()`, a cursor does not. Detect which we
-        # were given so cursor-backed streams capture plans instead of silently failing.
-        #
-        # Always run EXPLAIN on a FRESH cursor that we own, never on the caller's stream
-        # cursor: capture_query_plan() runs this via run_with_timeout and may return on a
-        # timeout while a daemon thread is still executing EXPLAIN. Psycopg cursors are not
-        # safe for concurrent cross-thread use, so reusing the stream cursor would let the
-        # abandoned EXPLAIN corrupt the next query on that stream. When given a cursor,
-        # derive a new cursor from its underlying `.connection`; when given a real
-        # connection, open one from it. We own (and close) the cursor we create in both
-        # cases, never the caller's stream cursor.
         if callable(getattr(connection, "cursor", None)):
             cursor = connection.cursor()
         else:
             cursor = connection.connection.cursor()
         _owns_cursor = True
 
-        # Use FORMAT JSON so PostgreSQLQueryPlanParser can parse the output.
-        # ANALYZE and BUFFERS give actual timing and I/O info for SELECT queries,
-        # but they re-execute the statement. Skip them for DML (double-mutation
-        # guard) and whenever analyze_plans is disabled (estimated-plan-only).
         if self.analyze_plans and not is_dml_query(query):
             options = ["ANALYZE", "BUFFERS", "FORMAT JSON"]
         else:
@@ -1000,10 +764,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             plan_rows = cursor.fetchall()
             if _owns_cursor:
                 cursor.close()
-            # PostgreSQL returns the full JSON as the first column of the first row.
-            # psycopg decodes FORMAT JSON output as a Python object; re-serialize
-            # to a string so PostgreSQLQueryPlanParser.parse_explain_output() receives
-            # the string it expects.
             raw = plan_rows[0][0] if plan_rows else None
             if raw is not None and not isinstance(raw, str):
                 raw = json.dumps(raw)
@@ -1016,7 +776,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             return None
 
     def get_query_plan_parser(self):
-        """Get PostgreSQL query plan parser."""
         from benchbox.core.query_plans.parsers.postgresql import PostgreSQLQueryPlanParser
 
         return PostgreSQLQueryPlanParser()
@@ -1031,7 +790,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query and optionally capture the structured query plan."""
         return self.execute_query_with_plan_capture(
             super().execute_query,
             connection=connection,
@@ -1044,13 +802,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         )
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table to update statistics.
-
-        Raises on failure (does not swallow) so the opt-in statistics phase's
-        gather_statistics() -> run_statistics_phase() caller can detect and
-        record a real ANALYZE failure as status=FAILED, instead of the phase
-        being marked COMPLETED with no statistics actually built.
-        """
         if not self._validate_identifier(table_name):
             self.logger.warning(f"Invalid table identifier: {table_name}")
             return
@@ -1065,7 +816,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             cursor.close()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get PostgreSQL platform information."""
         platform_info = {
             "platform_type": "postgresql",
             "platform_name": "PostgreSQL",
@@ -1085,13 +835,11 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get PostgreSQL version
                 cursor.execute("SELECT version()")
                 version_row = cursor.fetchone()
                 if version_row:
                     platform_info["platform_version"] = version_row[0].split()[1] if version_row[0] else None
 
-                # Check for TimescaleDB
                 cursor.execute(
                     """
                     SELECT extname, extversion
@@ -1103,7 +851,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 if timescale:
                     platform_info["configuration"]["timescaledb_version"] = timescale[1]
 
-                # Get database size
                 cursor.execute(
                     "SELECT pg_size_pretty(pg_database_size(%s))",
                     (self.database,),
@@ -1117,14 +864,12 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             except Exception as e:
                 self.logger.debug(f"Error getting platform info: {e}")
 
-        # Add client library version
         if psycopg:
             platform_info["client_library_version"] = psycopg.__version__
 
         return platform_info
 
     def test_connection(self) -> bool:
-        """Test if connection can be established."""
         try:
             params = self._get_connection_params()
             conn = psycopg.connect(**params)
@@ -1139,27 +884,22 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             return False
 
     def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
-        """Apply tuning configurations to PostgreSQL tables."""
-        # PostgreSQL tuning is primarily handled through indexes and ANALYZE
+        pass
 
     def generate_tuning_clause(self, table_tuning: TableTuning | None) -> str:
-        """Generate PostgreSQL-specific tuning clauses."""
         if not table_tuning:
             return ""
-        # PostgreSQL doesn't use WITH clause for table tuning like columnar stores
         return ""
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration."""
-        # Most PostgreSQL tuning is session-based and already applied in create_connection
+        pass
 
     def apply_platform_optimizations(
         self,
         platform_config: PlatformOptimizationConfiguration,
         connection: Any,
     ) -> None:
-        """Apply PostgreSQL-specific optimizations."""
-        # Optimizations applied in configure_for_benchmark
+        pass
 
     def apply_constraint_configuration(
         self,
@@ -1167,30 +907,17 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         foreign_key_config: ForeignKeyConfiguration,
         connection: Any,
     ) -> None:
-        """Apply constraint configurations to PostgreSQL."""
-        # PostgreSQL enforces constraints by default
-        # Could defer foreign key checks if needed
+        pass
 
     def validate_platform_capabilities(self, benchmark_type: str):
-        """Validate PostgreSQL-specific capabilities for the benchmark.
-
-        Args:
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-
-        Returns:
-            ValidationResult with PostgreSQL capability validation status
-        """
         errors = []
         warnings = []
 
-        # Check if psycopg is available
         if psycopg is None:
             errors.append("psycopg library not available - install with 'pip install psycopg[binary]'")
         else:
-            # Check psycopg version
             try:
                 version = psycopg.__version__
-                # Warn if using versions older than psycopg3
                 version_parts = version.split(".")
                 major = int(version_parts[0])
                 if major < 3:
@@ -1200,10 +927,8 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             except (AttributeError, ValueError, IndexError):
                 warnings.append("Could not determine psycopg version")
 
-        # Check work_mem configuration
         if hasattr(self, "work_mem") and self.work_mem:
             try:
-                # Parse work_mem if it's a string (e.g., "256MB")
                 work_mem_str = str(self.work_mem).upper()
                 if work_mem_str.endswith("GB"):
                     memory_mb = float(work_mem_str[:-2]) * 1024
@@ -1212,14 +937,13 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 elif work_mem_str.endswith("KB"):
                     memory_mb = float(work_mem_str[:-2]) / 1024
                 else:
-                    memory_mb = float(work_mem_str) / (1024 * 1024)  # Assume bytes
+                    memory_mb = float(work_mem_str) / (1024 * 1024)
 
                 if memory_mb < 64:
                     warnings.append(f"work_mem ({self.work_mem}) may be too low for complex analytical queries")
             except (ValueError, TypeError):
                 warnings.append(f"Could not parse work_mem setting: {self.work_mem}")
 
-        # Platform-specific details
         platform_info = {
             "platform": self.platform_name,
             "benchmark_type": benchmark_type,
@@ -1235,7 +959,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         if psycopg:
             platform_info["psycopg_version"] = getattr(psycopg, "__version__", "unknown")
 
-        # Import ValidationResult here to avoid circular imports
         try:
             from benchbox.core.validation import ValidationResult
 
@@ -1246,18 +969,9 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 details=platform_info,
             )
         except ImportError:
-            # Fallback if validation module not available
             return None
 
     def validate_connection_health(self, connection: Any):
-        """Validate PostgreSQL connection health and capabilities.
-
-        Args:
-            connection: PostgreSQL connection object
-
-        Returns:
-            ValidationResult with connection health status
-        """
         errors = []
         warnings = []
         connection_info = {}
@@ -1265,7 +979,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         try:
             cursor = connection.cursor()
 
-            # Test basic query execution
             cursor.execute("SELECT 1 as test_value")
             result = cursor.fetchone()
             if result[0] != 1:
@@ -1273,13 +986,11 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             else:
                 connection_info["basic_query_test"] = "passed"
 
-            # Check PostgreSQL version
             try:
                 cursor.execute("SELECT version()")
                 version_result = cursor.fetchone()
                 if version_result:
                     connection_info["server_version"] = version_result[0]
-                    # Extract major version number
                     version_match = re.search(r"PostgreSQL (\d+)", version_result[0])
                     if version_match:
                         major_version = int(version_match.group(1))
@@ -1288,7 +999,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             except Exception:
                 warnings.append("Could not query PostgreSQL version")
 
-            # Check available work_mem setting
             try:
                 cursor.execute("SHOW work_mem")
                 work_mem_result = cursor.fetchone()
@@ -1297,7 +1007,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             except Exception:
                 warnings.append("Could not query work_mem setting")
 
-            # Check if TimescaleDB extension is available
             try:
                 cursor.execute("SELECT extname FROM pg_extension WHERE extname = 'timescaledb'")
                 timescale_result = cursor.fetchone()
@@ -1310,7 +1019,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         except Exception as e:
             errors.append(f"Connection health check failed: {str(e)}")
 
-        # Import ValidationResult here to avoid circular imports
         try:
             from benchbox.core.validation import ValidationResult
 
@@ -1325,7 +1033,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 },
             )
         except ImportError:
-            # Fallback if validation module not available
             return None
 
     _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "PRIMARY_KEYS", "FOREIGN_KEYS")

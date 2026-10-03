@@ -297,3 +297,47 @@ def test_cli_rejects_a_file_replaced_by_a_symbolic_link(repo: Path, capsys: pyte
 def test_cli_reports_a_git_failure_with_status_two(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert parity.main(["--root", str(repo), "--base", "f" * 40]) == 2
     assert "comment-parity:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "directive",
+    [
+        "# noqa: F401 - retained optional dependency",
+        "# noqa: F401  # retained import side effect",
+        "# noqa: F401, E501 - retained dependency",
+        "#noqa:F401 retained dependency",
+        "# ruff: noqa: F401 - retained dependency",
+        "# flake8: noqa: F401 - retained dependency",
+        "# ruff: noqa retained file exemption",
+        "# noqa retained blanket exemption",
+        "# noqa: F401, - reason",
+        "# noqa: F401,",
+        "# noqa: F401# reason",
+        "# ruff: noqa: F401, - reason",
+        "# flake8: noqa: F401, - reason",
+        "# noqa: F401,reason",
+        "# noqa: F401,,",
+        "# noqa: F401, ; reason",
+    ],
+)
+def test_noqa_reason_stays_bound_to_its_code(directive: str) -> None:
+    base = f'"""module prose"""\nx = 1  {directive}\ny = 2\n'
+    retained = f"x = 1  {directive}\ny = 2\n"
+    assert compare(base, retained).clean
+    assert compare(base, "x = 1\ny = 2\n").status == "drift"
+    assert compare(base, f"x = 1\ny = 2  {directive}\n").status == "drift"
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        "# explain noqa here",
+        "# noqareason",
+        "# noqaish: F401",
+        "# ruff: noqaish: F401",
+        "# noqa: explanation",
+        "# noqa: F401; reason",
+    ],
+)
+def test_noqa_words_in_ordinary_prose_are_not_directives(comment: str) -> None:
+    assert compare(f"x = 1  {comment}\n", "x = 1\n").clean

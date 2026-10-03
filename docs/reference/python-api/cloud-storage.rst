@@ -13,7 +13,7 @@ BenchBox provides seamless cloud storage integration through a minimal abstracti
 **Key Features**:
 
 - **Unified Path Handling**: Transparent support for local and cloud paths
-- **Automatic Upload**: Data generators automatically handle cloud storage uploads
+- **Local Staging**: Resolved staging paths retain remote targets for adapter-owned upload
 - **Credential Validation**: Built-in validation for cloud credentials
 - **Multi-Cloud Support**: AWS S3, Google Cloud Storage, Azure Blob Storage
 - **Platform Integration**: Native integration with cloud database platforms
@@ -35,10 +35,10 @@ Cloud storage paths work transparently with BenchBox:
         output_dir="s3://my-bucket/benchbox/tpch-data"
     )
 
-    # Generate data - automatically uploads to S3
+    # Generate through the benchmark's supported storage integration
     benchmark.generate_data()
 
-    # Run benchmark - DuckDB reads directly from S3
+    # Run with the adapter's supported storage configuration
     adapter = DuckDBAdapter()
     results = adapter.run_benchmark(benchmark)
 
@@ -76,7 +76,13 @@ API Reference
 Path Detection
 ~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.is_cloud_path
+.. py:function:: benchbox.utils.cloud_storage.is_cloud_path(path: Union[str, Path]) -> bool
+
+   Classify the string representation of a path. Recognize s3, gs/gcs, az/azure,
+   abfss/abfs and dbfs URI schemes, plus supported Snowflake stage references.
+   Classification is not credential validation or evidence that a platform supports
+   that storage target. No cloud request is made by this classifier.
+
 
 Check if a path points to cloud storage.
 
@@ -104,7 +110,22 @@ Check if a path points to cloud storage.
 Path Creation
 ~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.create_path_handler
+.. py:function:: benchbox.utils.cloud_storage.create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath]
+
+   Return a local Path for local locations or a cloudpathlib handler for supported
+   ordinary cloud URIs. Normalize recognized URI aliases before cloudpathlib use.
+   Databricks dbfs:/Volumes/catalog/schema/volume, Snowflake stage references and
+   ADLS abfss/abfs paths create a local temporary staging directory whose wrapper
+   retains the remote target for the platform adapter. Existing DatabricksPath,
+   CloudStagingPath and recognized loaded CloudPath objects pass through unchanged.
+
+   Staging wrappers expose a local path to generators; constructing a handler does
+   not upload generated files. Preserve cloud_target (CloudStagingPath) or dbfs_target (DatabricksPath) when passing a wrapper through
+   the benchmark's output-directory plumbing.
+
+   :raises ImportError: An ordinary cloud path requires unavailable cloudpathlib.
+   :raises ValueError: A Databricks path does not name a Unity Catalog Volume, or cloudpathlib rejects the path.
+
 
 Create appropriate path handler for local or cloud paths.
 
@@ -112,7 +133,7 @@ Create appropriate path handler for local or cloud paths.
 
 - **path** (str | Path): Local or cloud storage path
 
-**Returns**: Path | CloudPath - Path object for local paths, CloudPath for cloud paths
+**Returns**: Path | CloudPath | DatabricksPath | CloudStagingPath - A local, ordinary cloud, or local staging path handler
 
 **Raises**:
 
@@ -137,10 +158,196 @@ Create appropriate path handler for local or cloud paths.
     local_path.mkdir(parents=True, exist_ok=True)
     cloud_path.mkdir(parents=True, exist_ok=True)
 
+Local Staging Path Wrappers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:class:: benchbox.utils.cloud_storage.DatabricksPath(local_path: Union[str, Path], dbfs_target: str)
+
+   Associate a local filesystem path with a remote upload target stored in
+   ``dbfs_target``. Construction converts strings to pathlib.Path and retains a
+   supplied Path. It does not create directories or upload files; directory
+   persistence and cleanup belong to the caller that supplies local_path.
+
+   ``str(wrapper)`` and ``os.fspath(wrapper)`` expose the local path. Keep the
+   wrapper when passing the output directory to an adapter: converting it to
+   Path discards its remote target. The ``/`` operator returns a plain local
+   Path, as do joinpath(), parent and resolve().
+
+   Two wrappers of this same class compare their local paths and remote
+   targets. Comparison with a string or Path uses only the local path. Hashing
+   uses the local path. Filesystem queries and mutations below are local.
+
+   .. py:attribute:: dbfs_target
+      :type: str
+
+      The remote target supplied at construction, retained verbatim.
+
+   .. py:method:: exists() -> bool
+
+      Return whether the local path exists.
+
+   .. py:method:: mkdir(parents: bool=True, exist_ok: bool=True) -> None
+
+      Create the local directory. Both parent creation and acceptance of an existing directory default to True.
+
+   .. py:method:: is_dir() -> bool
+
+      Return whether the local path names a directory.
+
+   .. py:method:: is_file() -> bool
+
+      Return whether the local path names a regular file.
+
+   .. py:method:: iterdir() -> Iterator[Path]
+
+      Return an iterator over immediate children as plain local Path objects.
+
+   .. py:method:: glob(pattern: str) -> Iterator[Path]
+
+      Return an iterator over matching local Path objects, using pathlib glob semantics.
+
+   .. py:method:: rglob(pattern: str) -> Iterator[Path]
+
+      Return an iterator over matching local Path objects recursively.
+
+   .. py:attribute:: name
+      :type: str
+
+      The final component of the local path.
+
+   .. py:attribute:: parent
+      :type: Path
+
+      The local parent as a plain Path; the returned object does not retain the remote target.
+
+   .. py:attribute:: parts
+      :type: tuple
+
+      The local path components as a tuple. This is a property.
+
+   .. py:method:: as_posix() -> str
+
+      Return the local path with forward slashes.
+
+   .. py:attribute:: suffix
+      :type: str
+
+      The suffix of the final local path component, including its leading dot when present.
+
+   .. py:method:: joinpath(*other: Union[str, Path]) -> Path
+
+      Join local components and return a plain Path without remote target metadata.
+
+   .. py:method:: stat(*, follow_symlinks: bool=True) -> os.stat_result
+
+      Return local filesystem metadata. Follow symlinks unless follow_symlinks=False.
+
+   .. py:method:: resolve(strict: bool=False) -> Path
+
+      Resolve the local path to an absolute plain Path. strict=False permits missing components; the returned Path does not retain the remote target.
+
+.. py:class:: benchbox.utils.cloud_storage.CloudStagingPath(local_path: Union[str, Path], cloud_target: str)
+
+   Associate a local filesystem path with a remote upload target stored in
+   ``cloud_target``. Construction converts strings to pathlib.Path and retains a
+   supplied Path. It does not create directories or upload files; directory
+   persistence and cleanup belong to the caller that supplies local_path.
+
+   ``str(wrapper)`` and ``os.fspath(wrapper)`` expose the local path. Keep the
+   wrapper when passing the output directory to an adapter: converting it to
+   Path discards its remote target. The ``/`` operator returns a plain local
+   Path, as do joinpath(), parent and resolve().
+
+   Two wrappers of this same class compare their local paths and remote
+   targets. Comparison with a string or Path uses only the local path. Hashing
+   uses the local path. Filesystem queries and mutations below are local.
+
+   .. py:attribute:: cloud_target
+      :type: str
+
+      The remote target supplied at construction, retained verbatim.
+
+   .. py:method:: exists() -> bool
+
+      Return whether the local path exists.
+
+   .. py:method:: mkdir(parents: bool=True, exist_ok: bool=True) -> None
+
+      Create the local directory. Both parent creation and acceptance of an existing directory default to True.
+
+   .. py:method:: is_dir() -> bool
+
+      Return whether the local path names a directory.
+
+   .. py:method:: is_file() -> bool
+
+      Return whether the local path names a regular file.
+
+   .. py:method:: iterdir() -> Iterator[Path]
+
+      Return an iterator over immediate children as plain local Path objects.
+
+   .. py:method:: glob(pattern: str) -> Iterator[Path]
+
+      Return an iterator over matching local Path objects, using pathlib glob semantics.
+
+   .. py:method:: rglob(pattern: str) -> Iterator[Path]
+
+      Return an iterator over matching local Path objects recursively.
+
+   .. py:attribute:: name
+      :type: str
+
+      The final component of the local path.
+
+   .. py:attribute:: parent
+      :type: Path
+
+      The local parent as a plain Path; the returned object does not retain the remote target.
+
+   .. py:attribute:: parts
+      :type: tuple
+
+      The local path components as a tuple. This is a property.
+
+   .. py:attribute:: suffix
+      :type: str
+
+      The suffix of the final local path component, including its leading dot when present.
+
+   .. py:method:: joinpath(*other: Union[str, Path]) -> Path
+
+      Join local components and return a plain Path without remote target metadata.
+
+   .. py:method:: stat(*, follow_symlinks: bool=True) -> os.stat_result
+
+      Return local filesystem metadata. Follow symlinks unless follow_symlinks=False.
+
+   .. py:method:: as_posix() -> str
+
+      Return the local path with forward slashes.
+
+   .. py:method:: resolve(strict: bool=False) -> Path
+
+      Resolve the local path to an absolute plain Path. strict=False permits missing components; the returned Path does not retain the remote target.
+
 Credential Validation
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.validate_cloud_credentials
+.. py:function:: benchbox.utils.cloud_storage.validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]
+
+   Return valid, provider, error and env_vars keys. Local paths are valid without
+   credentials. Databricks and Snowflake stage paths return valid=True as deferred
+   adapter checks; this does not prove authorization. ADLS checks expected Azure
+   environment variables without importing cloudpathlib. Ordinary cloud providers
+   require cloudpathlib; S3 accepts environment credentials, AWS_PROFILE, or an AWS
+   credentials/config file, while other providers check their expected variables.
+
+   Ordinary cloud validation then constructs a path and calls exists(), which can
+   issue a remote request. A successful credential check does not guarantee that
+   the object exists or that writes are authorized. Provider/SDK failures return
+   valid=False and an error description.
+
 
 Validate cloud credentials for a given path.
 
@@ -181,7 +388,16 @@ Validate cloud credentials for a given path.
 Path Information
 ~~~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.get_cloud_path_info
+.. py:function:: benchbox.utils.cloud_storage.get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]
+
+   Return is_cloud, provider, bucket, path and credentials_valid. Local paths have
+   bucket=None and credentials_valid=True. Databricks adds volume_info with catalog,
+   schema and volume; Snowflake adds stage_info. ADLS splits the URI authority into
+   container bucket and account. Ordinary cloud information includes account
+   (None for other providers) and calls validate_cloud_credentials, so inspection
+   can issue remote requests. Databricks/Snowflake credential flags defer to their
+   platform adapter rather than verifying access here.
+
 
 Get detailed information about a cloud path.
 
@@ -228,7 +444,14 @@ Get detailed information about a cloud path.
 Directory Creation
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.ensure_cloud_directory
+.. py:function:: benchbox.utils.cloud_storage.ensure_cloud_directory(path: Union[str, Path, CloudPath]) -> Union[Path, CloudPath, DatabricksPath]
+
+   Resolve strings/Paths with create_path_handler and return the resulting handler.
+   Call mkdir(parents=True, exist_ok=True) when available. Otherwise check exists()
+   and log that an absent directory may be created on its first write. Remote
+   handlers can issue cloud requests; provider errors propagate. Object stores do
+   not necessarily have a physical directory to create.
+
 
 Ensure cloud or local directory exists.
 
@@ -236,7 +459,9 @@ Ensure cloud or local directory exists.
 
 - **path** (str | Path | CloudPath): Directory path to create
 
-**Returns**: Path | CloudPath - Path object (local or cloud)
+**Returns**: Path | CloudPath | DatabricksPath | CloudStagingPath. The resolved
+handler retains staging-wrapper behavior. The declared return annotation omits
+CloudStagingPath; callers can receive it at runtime.
 
 **Raises**:
 
@@ -261,16 +486,49 @@ Ensure cloud or local directory exists.
 Cloud Path Adapter
 ~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.utils.cloud_storage.CloudPathAdapter
-   :members:
+.. py:class:: benchbox.utils.cloud_storage.CloudPathAdapter(path: Union[str, Path])
+
+   Wrap a local or cloud path behind a small common interface. Construction resolves
+   a path handler and, for cloud paths, obtains path information; credential
+   inspection can therefore issue a remote request. original_path, is_cloud,
+   path_handler and path_info hold the resolved state.
+
+.. py:method:: benchbox.utils.cloud_storage.CloudPathAdapter.exists() -> bool
+
+   Return the handler existence result, or False when the handler raises. An access error and absence therefore share this result.
+
+
+.. py:method:: benchbox.utils.cloud_storage.CloudPathAdapter.mkdir(parents: bool=True, exist_ok: bool=True) -> None
+
+   Call the handler mkdir with the supplied parents/exist_ok flags when available; otherwise do nothing. Handler errors propagate.
+
+
+.. py:method:: benchbox.utils.cloud_storage.CloudPathAdapter.__str__() -> str
+
+   Return the underlying handler string representation.
+
+
+.. py:method:: benchbox.utils.cloud_storage.CloudPathAdapter.__truediv__(other: str) -> CloudPathAdapter
+
+   Join a component using the underlying handler and wrap the result in a new CloudPathAdapter.
+
+
+.. py:property:: benchbox.utils.cloud_storage.CloudPathAdapter.name
+   :type: str
+
+   Return the handler final path component.
+
+
+.. py:property:: benchbox.utils.cloud_storage.CloudPathAdapter.parent
+   :type: CloudPathAdapter
+
+   Return a new CloudPathAdapter for the parent; new cloud adapter construction can inspect credentials.
+
+
 
 Unified interface for local and cloud paths with transparent operation handling.
 
 **Constructor**:
-
-.. code-block:: python
-
-    CloudPathAdapter(path: Union[str, Path])
 
 **Parameters**:
 
@@ -320,12 +578,29 @@ Unified interface for local and cloud paths with transparent operation handling.
 Cloud Storage Generator Mixin
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.utils.cloud_storage.CloudStorageGeneratorMixin
-   :members:
+.. py:class:: benchbox.utils.cloud_storage.CloudStorageGeneratorMixin
 
-Mixin class for data generators to add cloud storage upload functionality.
+   Provide a generator extension hook that invokes local generation for a resolved
+   output path. The mixin does not upload files or resolve a URI itself. Staging
+   wrappers retain cloud_target or dbfs_target for adapter-owned upload during loading.
 
-**Purpose**: Provides standardized cloud upload handling for all benchmark data generators without code duplication.
+.. py:method:: benchbox.utils.cloud_storage.CloudStorageGeneratorMixin._is_cloud_output(output_dir) -> bool
+
+   Classify output_dir after converting it to a string with is_cloud_path.
+
+
+.. py:method:: benchbox.utils.cloud_storage.CloudStorageGeneratorMixin._handle_cloud_or_local_generation(output_dir, local_generate_func, verbose: bool=False)
+
+   Call local_generate_func(output_dir) and return its value unchanged. The callback
+   owns local file creation; pass a Path or resolved staging wrapper rather than a
+   raw cloud URI to a callback that uses local filesystem operations. verbose is
+   accepted for compatibility but has no effect in this hook.
+
+
+
+Mixin class for generators using local or resolved staging paths.
+
+**Purpose**: Invoke the local generator callback without discarding a resolved staging wrapper. The platform adapter owns remote upload.
 
 **Methods**:
 
@@ -333,21 +608,9 @@ Mixin class for data generators to add cloud storage upload functionality.
 
    Check if output directory is a cloud path.
 
-.. method:: _generate_with_cloud_upload(local_generate_func, output_dir, verbose=False) -> dict
+.. method:: _handle_cloud_or_local_generation(output_dir, local_generate_func, verbose=False)
 
-   Generic cloud upload wrapper for data generators.
-
-   **Parameters**:
-
-   - **local_generate_func** (callable): Function that generates data locally and returns dict of {table: path}
-   - **output_dir** (str | Path): Cloud storage output directory
-   - **verbose** (bool): Whether to print verbose output
-
-   **Returns**: dict - Mapping of table names to cloud storage paths
-
-.. method:: _handle_cloud_or_local_generation(output_dir, local_generate_func, verbose=False) -> dict
-
-   Handle both cloud and local generation paths automatically.
+   Invoke local_generate_func with the supplied resolved output path.
 
    **Parameters**:
 
@@ -355,13 +618,13 @@ Mixin class for data generators to add cloud storage upload functionality.
    - **local_generate_func** (callable): Function to generate data locally
    - **verbose** (bool): Whether to print verbose output
 
-   **Returns**: dict - Mapping of table names to file paths (local or cloud)
+   **Returns**: The callback return value, unchanged (typically a mapping of table names to generated local file paths)
 
 **Usage in Generators**:
 
 .. code-block:: python
 
-    from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin
+    from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 
     class MyBenchmarkGenerator(CloudStorageGeneratorMixin):
         def generate_data(self, output_dir, verbose=False):
@@ -374,13 +637,18 @@ Mixin class for data generators to add cloud storage upload functionality.
 
             # Automatically handle cloud or local
             return self._handle_cloud_or_local_generation(
-                output_dir, local_generate, verbose
+                create_path_handler(output_dir), local_generate, verbose
             )
 
 Usage Guide Formatting
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.format_cloud_usage_guide
+.. py:function:: benchbox.utils.cloud_storage.format_cloud_usage_guide(provider: str) -> str
+
+   Return the built-in setup guide for the exact provider key s3, gs, azure or dbfs.
+   Other keys return "No setup guide available for provider: ...". This formats text
+   only; it does not configure credentials or verify a provider connection.
+
 
 Format setup guide for cloud storage provider.
 
@@ -412,7 +680,11 @@ Format setup guide for cloud storage provider.
 Support Validation
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.cloud_storage.validate_cloud_path_support
+.. py:function:: benchbox.utils.cloud_storage.validate_cloud_path_support() -> bool
+
+   Return whether cloudpathlib can be loaded. This may load the optional library,
+   but does not test credentials, a remote path, or staging-only platform support.
+
 
 Validate that cloud path support is available.
 
@@ -429,6 +701,114 @@ Validate that cloud path support is available.
     else:
         print("❌ Install cloud storage support:")
         print('   uv add benchbox --extra cloudstorage')
+
+
+Provider Classification and Output Preservation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:function:: benchbox.utils.cloud_storage.is_snowflake_stage_path(path: Union[str, Path]) -> bool
+
+   Recognize leading ``@`` user (``@~``), table (``@%table``), named and up to
+   three-part qualified stage references, optionally followed by a slash and
+   subpath. Identifiers are unquoted or double quoted; doubled quotes escape a
+   quote within a quoted identifier. A slash inside a quoted stage identifier
+   belongs to that identifier. PurePath inputs normalize backslashes to slashes;
+   strings retain their spelling. An ``@`` within a cloud URI is not a stage.
+
+.. py:function:: benchbox.utils.cloud_storage.snowflake_stage_mode_error(path: Union[str, Path], *, table_mode: str = "native") -> str | None
+
+   Return no error for non-stage inputs. For a stage, case-insensitive external
+   mode returns an explanatory error because CREATE STAGE URL requires a cloud
+   URI. All other modes accept only user stages and reject named/table stages:
+   native loads upload to each table's own stage instead of reusing staging_root.
+   This produces an error string; it does not raise or validate credentials.
+
+.. py:function:: benchbox.utils.cloud_storage.is_adls_path(path: Union[str, Path]) -> bool
+
+   Recognize the abfss and abfs scheme family. These URIs encode their storage
+   account in the authority, so conversion to az would lose that account;
+   create_path_handler stages them locally with the original target retained.
+
+.. py:function:: benchbox.utils.cloud_storage.is_databricks_path(path: Union[str, Path]) -> bool
+
+   Recognize the dbfs URI scheme. This predicate does not check the UC Volume
+   path shape; create_path_handler requires the literal dbfs:/Volumes/ prefix.
+
+.. py:function:: benchbox.utils.cloud_storage.cloud_provider_family(path: Union[str, Path]) -> Union[str, None]
+
+   Return aws for s3, gcp for gs/gcs, azure for az/azure/abfss/abfs, or databricks
+   for dbfs. Return None for local paths, unknown schemes and schemeless Snowflake
+   stages. Provider gating uses these families rather than separate alias lists.
+
+.. py:class:: benchbox.utils.cloud_storage.CloudScheme(canonical: str, aliases: tuple[str, ...], family: str, env_vars: tuple[str, ...], stages_locally: bool = False)
+
+   Immutable named tuple describing a supported scheme. canonical is the spelling
+   registered by cloudpathlib, or the retained spelling for a staged family;
+   aliases lists accepted alternative spellings; family supports platform gates;
+   env_vars lists credential variables checked by validate_cloud_credentials.
+   stages_locally selects generic local staging instead of cloudpathlib.
+   dbfs has this flag False and uses the separate DatabricksPath branch.
+   The shared scheme table drives recognition, alias normalization, provider
+   families and credential checks so adding a spelling does not bypass one of
+   those checks. Non-staged aliases gcs and azure rewrite to gs and az; abfs
+   retains its account-bearing URI instead of rewriting to cloudpathlib az.
+
+.. py:function:: benchbox.utils.cloud_storage.normalize_output_dir(path: Union[str, Path, None]) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath, None]
+
+   Preserve None and existing local Path, DatabricksPath and CloudStagingPath
+   objects by identity. Otherwise delegate to create_path_handler, including its
+   cloudpathlib support and errors. Benchmark output-directory assignments must
+   retain staging wrappers rather than pass them through Path, which would keep
+   only the local cache and discard the remote upload target.
+
+Remote File Operations
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:class:: benchbox.utils.cloud_storage.RemoteFileSystemAdapter
+
+   Protocol for validation-time remote file operations. Inputs are opaque absolute
+   remote paths including their scheme; implementations own remote access.
+
+   .. py:method:: file_exists(remote_path: str) -> bool
+
+      Report whether the remote file exists.
+
+   .. py:method:: read_file(remote_path: str) -> bytes
+
+      Read the file contents as bytes.
+
+   .. py:method:: write_file(remote_path: str, content: bytes) -> None
+
+      Write the supplied bytes to the remote file.
+
+   .. py:method:: list_files(remote_path: str, pattern: str = "*") -> list[str]
+
+      List matching paths under the remote location.
+
+.. py:class:: benchbox.utils.cloud_storage.DatabricksVolumeAdapter(workspace_client: Any | None = None, *, host: str | None = None, token: str | None = None)
+
+   Implement RemoteFileSystemAdapter through the Databricks Files API. Construction
+   lazily imports databricks.sdk even when workspace_client is supplied; missing
+   or failing SDK imports raise ImportError. Use the supplied client, or construct
+   WorkspaceClient with https:// prefixed to a nonempty host and the supplied
+   token; None leaves those settings to SDK configuration. Remove the dbfs:
+   marker before Files API calls.
+
+   file_exists returns False on provider errors. read_file accepts downloaded
+   bytes or a stream with read(); write_file uploads a BytesIO with overwrite=True.
+   Read/write errors become RuntimeError with the original exception as cause.
+   list_files extracts path, then file_path, then string representation from
+   returned objects; fnmatch filters their final slash-separated component with
+   the supplied pattern. Listing errors return an empty list. Dictionary entries
+   have no special key lookup. These operations can make real remote requests.
+
+.. py:function:: benchbox.utils.cloud_storage.get_remote_fs_adapter(remote_path: str) -> RemoteFileSystemAdapter
+
+   Support only dbfs paths. Lazily construct WorkspaceClient using SDK environment
+   configuration and return DatabricksVolumeAdapter. Missing SDK support raises
+   ImportError; other initialization failures raise RuntimeError with credential
+   guidance. Other providers raise ValueError. This factory does not validate
+   the UC Volume prefix or introduce placeholder support for other providers.
 
 Usage Examples
 --------------
@@ -613,12 +993,12 @@ Use CloudPathAdapter for transparent local/cloud path handling:
 Custom Data Generator with Cloud Support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create custom data generator with automatic cloud upload:
+Create a generator that writes to a local or resolved staging path:
 
 .. code-block:: python
 
     from pathlib import Path
-    from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin
+    from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 
     class CustomBenchmarkGenerator(CloudStorageGeneratorMixin):
         """Custom benchmark generator with cloud storage support."""
@@ -626,10 +1006,11 @@ Create custom data generator with automatic cloud upload:
         def __init__(self, row_count: int):
             self.row_count = row_count
 
-        def generate_data(self, output_dir: str, verbose: bool = False):
-            """Generate benchmark data with automatic cloud upload."""
+        def generate_data(self, output_dir, verbose: bool = False):
+            """Generate files in a local or resolved staging directory."""
 
             def local_generate(local_dir: Path):
+                local_dir = Path(local_dir)
                 """Generate data locally."""
                 import csv
 
@@ -659,7 +1040,7 @@ Create custom data generator with automatic cloud upload:
 
             # Handle both cloud and local generation automatically
             return self._handle_cloud_or_local_generation(
-                output_dir,
+                create_path_handler(output_dir),
                 local_generate,
                 verbose
             )
@@ -669,19 +1050,13 @@ Create custom data generator with automatic cloud upload:
     local_paths = generator.generate_data("/tmp/custom-benchmark", verbose=True)
     print(f"Generated locally: {local_paths}")
 
-    # Usage with cloud storage (S3)
-    cloud_paths = generator.generate_data(
-        "s3://my-bucket/custom-benchmark",
-        verbose=True
-    )
-    print(f"Generated and uploaded to cloud: {cloud_paths}")
-    # Output:
-    # Generating data locally in temporary directory: /tmp/benchbox_gen_xyz
-    # Will upload to cloud storage: s3://my-bucket/custom-benchmark
-    # Uploading /tmp/benchbox_gen_xyz/customer.csv to s3://my-bucket/custom-benchmark/customer.csv
-    # Successfully uploaded customer.csv
-    # Uploading /tmp/benchbox_gen_xyz/orders.csv to s3://my-bucket/custom-benchmark/orders.csv
-    # Successfully uploaded orders.csv
+    staged_target = create_path_handler("dbfs:/Volumes/catalog/schema/volume/data")
+    staged_paths = generator.generate_data(staged_target, verbose=True)
+    print(f"Generated locally for {staged_target.dbfs_target}: {staged_paths}")
+
+The staged files remain local at this point. A compatible platform adapter must
+upload them during loading; the mixin has not transferred them to the remote
+volume. Creating this staging wrapper does not validate Databricks credentials.
 
 Path Information Inspection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

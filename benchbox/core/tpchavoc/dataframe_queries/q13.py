@@ -22,9 +22,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_GROUP_BY, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
-# ---------------------------------------------------------------------------
 
 
 def q13_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -35,9 +33,7 @@ def q13_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q13_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter orders before the left join
-# ---------------------------------------------------------------------------
 
 
 def q13_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -69,9 +65,7 @@ def q13_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q13_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before join
-# ---------------------------------------------------------------------------
 
 
 def q13_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -124,9 +118,7 @@ def q13_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit DataFrames for each step
-# ---------------------------------------------------------------------------
 
 
 def q13_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -169,9 +161,7 @@ def q13_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return dist.sort_values(["custdist", "c_count"], ascending=[False, False])
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add order count directly from filtered set
-# ---------------------------------------------------------------------------
 
 
 q13_v5_expression_impl = make_variant_delegate(q13_v2_expression_impl, name="q13_v5_expression_impl", module=__name__)
@@ -180,9 +170,7 @@ q13_v5_expression_impl = make_variant_delegate(q13_v2_expression_impl, name="q13
 q13_v5_pandas_impl = make_variant_delegate(_q13_pandas_base, name="q13_v5_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style - maximum method chaining
-# ---------------------------------------------------------------------------
 
 
 def q13_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -208,10 +196,8 @@ def q13_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q13_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - use customer as right table (orders left join customer)
 #     Note: semantically equivalent because we're counting per customer
-# ---------------------------------------------------------------------------
 
 
 def q13_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -263,9 +249,7 @@ def q13_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - use different regex pattern form
-# ---------------------------------------------------------------------------
 
 
 def q13_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -317,9 +301,7 @@ def q13_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort - pass descending flags explicitly
-# ---------------------------------------------------------------------------
 
 
 def q13_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -330,9 +312,7 @@ def q13_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q13_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - use value_counts-style aggregation for distribution
-# ---------------------------------------------------------------------------
 
 
 q13_v10_expression_impl = make_variant_delegate(q13_v7_expression_impl, name="q13_v10_expression_impl", module=__name__)
@@ -359,8 +339,7 @@ def q13_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q13_VARIANTS = build_yaml_variants(__file__, globals(), 13, JOIN_AGG_GROUP_BY)

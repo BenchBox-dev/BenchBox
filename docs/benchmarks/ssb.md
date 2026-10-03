@@ -42,6 +42,10 @@ The SSB schema consists of a single fact table (**LINEORDER**) surrounded by fou
 | **SUPPLIER** | Supplier information | ~2,000 |
 | **PART** | Product catalog | ~200,000 |
 
+BenchBox keeps the DATE dimension at 2,556 rows. The generated CUSTOMER, SUPPLIER, PART and LINEORDER row counts are `int(30_000 * scale_factor)`, `int(2_000 * scale_factor)`, `int(200_000 * scale_factor)` and `int(6_000_000 * scale_factor)`, respectively.
+
+The DataFrame query parameter module uses static defaults. `get_parameters(query_id)` returns an `SSBParameters` record whose `params` field is a copy of that query's defaults, or an empty dictionary for an unknown query ID; it does not derive substitutions from a seed.
+
 ### Schema Transformation from TPC-H
 
 SSB transforms TPC-H's normalized schema by:

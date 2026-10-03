@@ -1,37 +1,6 @@
-"""Shared Python<->TypeScript `tuning_mode` vocabulary pin (ADR-2).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-From the 2026-07-12 tuning review, finding R7 / ADR-002
-(docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md): there
-was no single shared source for the pinned `tuning_mode` vocabulary, so
-`benchbox/cli/tuning.py` (`tuned`/`notuning`/`auto`/`balanced`) and
-`results-explorer/src/components/TuningBadge.tsx` (`tuned`/`notuning`/`auto`)
-independently hardcoded different, non-agreeing sets.
-
-ADR-2 §2 pins the vocabulary as *exactly* `{tuned, tuned-fallback, notuning,
-auto, custom}` plus a distinct "not recorded" state for absent/legacy data,
-and requires "a single shared artifact consumed by both the Python and
-TypeScript test suites, so the two sides cannot drift independently again".
-
-This module is the Python half of that pin:
-`tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml` is the shared
-artifact (note: not under a `data/` directory -- the repo's `.gitignore`
-blanket-ignores any directory literally named `data/`, which would silently
-drop this checked-in fixture); `results-explorer/src/lib/__tests__/tuningModeVocabulary.test.ts`
-is the TypeScript half (it loads the *same* YAML file via a `uv run --
-python -c` subprocess -- the same shell-out pattern already established by
-`db-remediation-pin.test.ts` -- rather than hardcoding its own mirror, so
-there is exactly one place the vocabulary is declared).
-
-This pins the ADR-2 TARGET vocabulary as a test contract. `benchbox.core.tuning.modes`
-is the production constants module that migrates emitters/consumers onto this
-vocabulary (`tuning-mode-vocabulary-and-facet-implementation-20260712`); the
-tests below assert it -- and `TuningResolution.canonical_mode` -- agree with
-this fixture, so the two cannot drift apart again.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -54,16 +23,11 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# See tests/unit/cli/test_cli_data_load_modes.py for why this module-lookup
-# dance (rather than string-based mock.patch targets) is needed on Python
-# 3.10: benchbox.cli.commands re-exports `run` as a Click Command under the
-# same name as the submodule.
 __import__("benchbox.cli.commands.run")
 _run_module = sys.modules["benchbox.cli.commands.run"]
 
 VOCAB_PATH = Path(__file__).resolve().parent / "fixtures" / "tuning_mode_vocabulary.yaml"
 
-# ADR-2 §2's decided vocabulary, in the order the ADR lists it.
 EXPECTED_MODES = ["tuned", "tuned-fallback", "notuning", "auto", "custom"]
 EXPECTED_NOT_RECORDED_SENTINEL = "not-recorded"
 
@@ -90,8 +54,6 @@ class TestSharedVocabularyArtifactMatchesADR2:
         assert spec["not_recorded_sentinel"] == EXPECTED_NOT_RECORDED_SENTINEL
 
     def test_raw_file_paths_are_not_part_of_the_vocabulary(self) -> None:
-        # ADR-2 §2: "Raw file paths are not a legal tuning_mode value under
-        # any circumstance." Pin that no artifact entry looks like a path.
         spec = _load_vocabulary_artifact()
         for mode in spec["modes"]:
             assert "/" not in mode
@@ -99,17 +61,11 @@ class TestSharedVocabularyArtifactMatchesADR2:
             assert not mode.endswith(".yaml")
 
     def test_balanced_is_not_part_of_the_vocabulary(self) -> None:
-        # ADR-2 §2: the wizard's "balanced" string is a template flavor
-        # selector, not a tuning_mode value, and must not appear verbatim.
         spec = _load_vocabulary_artifact()
         assert "balanced" not in spec["modes"]
 
 
 class TestProductionConstantsMatchTheSharedFixture:
-    """`benchbox.core.tuning.modes` is production code, not just a test pin --
-    assert it agrees with the shared fixture rather than only with the ADR
-    text, so a future edit to one is caught by the other."""
-
     def test_modes_tuple_matches_fixture_order(self) -> None:
         spec = _load_vocabulary_artifact()
         assert list(tuning_modes.MODES) == spec["modes"] == EXPECTED_MODES
@@ -135,9 +91,6 @@ class TestProductionConstantsMatchTheSharedFixture:
 
 
 class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
-    """`TuningResolution.canonical_mode` (ADR-2 §1) is the resolver-side
-    production mapping onto this same pinned vocabulary."""
-
     def test_tuned_via_auto_discovered_template_is_tuned(self) -> None:
         resolution = TuningResolution(mode=TuningMode.TUNED, source=TuningSource.AUTO_DISCOVERED, enabled=True)
         assert resolution.canonical_mode == tuning_modes.TUNED
@@ -147,9 +100,6 @@ class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
         assert resolution.canonical_mode == tuning_modes.TUNED_FALLBACK
 
     def test_tuned_via_wizard_is_tuned_not_tuned_fallback(self) -> None:
-        # ADR-2 §1: wizard-produced configs get `wizard` source provenance,
-        # not the `tuned-fallback` mode -- the wizard actually configured a
-        # real tuning setup, unlike a declined/no-template fallback.
         resolution = TuningResolution(mode=TuningMode.TUNED, source=TuningSource.INTERACTIVE_WIZARD, enabled=True)
         assert resolution.canonical_mode == tuning_modes.TUNED
 
@@ -158,13 +108,6 @@ class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
         assert resolution.canonical_mode == tuning_modes.TUNED
 
     def test_tuned_via_packaged_resource_is_tuned_not_tuned_fallback(self) -> None:
-        # #1188 added the packaged-template discovery tier (TuningSource.
-        # PACKAGED_RESOURCE) as a last-resort template source when benchbox
-        # runs outside a repo checkout. A packaged template is a genuine
-        # curated template (just bundled with the package instead of found
-        # under examples/tunings/), so this must map to plain `tuned`, not
-        # `tuned-fallback` -- pinning the composition of that tier with
-        # canonical_mode (only TUNED+FALLBACK is tuned-fallback).
         resolution = TuningResolution(mode=TuningMode.TUNED, source=TuningSource.PACKAGED_RESOURCE, enabled=True)
         assert resolution.canonical_mode == tuning_modes.TUNED
 
@@ -194,22 +137,7 @@ class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
 
 
 class TestFallbackLabelingEndToEnd:
-    """ADR-2 §1 end-to-end: a `--tuning tuned` run that finds no template is
-    recorded with the distinct `tuned-fallback` mode, and `--official` refuses
-    it outright rather than silently submitting an unoptimized config as if
-    it were a genuine tuned run."""
-
     def _invoke(self, tmp_path, monkeypatch, *, official: bool = False, scale: str = "0.01"):
-        # Force template discovery to miss across every tier in
-        # get_tuning_template_paths(): BENCHBOX_TUNING_PATH pointed at a
-        # nonexistent directory, an empty cwd (so the project-relative and
-        # cwd-relative candidates miss too), and `coffeeshop` as the
-        # benchmark -- unlike tpch, it has no template under
-        # examples/tunings/duckdb/ *and* no packaged template under
-        # benchbox/core/tuning/templates/duckdb/ (the #1188 last-resort
-        # tier, which ships templates for tpch/tpcds/ssb/etc. and would
-        # otherwise resolve this to TuningSource.PACKAGED_RESOURCE instead
-        # of FALLBACK).
         monkeypatch.setenv("BENCHBOX_TUNING_PATH", str(tmp_path / "no-such-tuning-dir"))
         monkeypatch.chdir(tmp_path)
 
@@ -258,10 +186,6 @@ class TestFallbackLabelingEndToEnd:
             return result, orchestrator
 
     def test_duckdb_coffeeshop_has_no_template_anywhere(self) -> None:
-        """Guard the premise of these e2e tests: if a duckdb/coffeeshop
-        template is ever added (examples/tunings/ or the packaged tier),
-        these tests would silently stop exercising the fallback path and
-        must switch to a different platform/benchmark pair instead."""
         from benchbox.core.tuning.packaged_templates import packaged_template_path
 
         assert not Path("examples/tunings/duckdb/coffeeshop_tuned.yaml").exists()
@@ -273,14 +197,9 @@ class TestFallbackLabelingEndToEnd:
         assert result.exit_code == 0, result.output
         orchestrator.return_value.execute_benchmark.assert_called_once()
         execution_context = orchestrator.return_value.execute_benchmark.call_args.kwargs["execution_context"]
-        # ADR-2 §1/§2: the recorded mode is the canonical `tuned-fallback`
-        # value, not `tuned` (which would silently facet-match a genuinely
-        # curated-template run) and never the raw `--tuning` argument.
         assert execution_context.tuning_mode == tuning_modes.TUNED_FALLBACK
 
     def test_official_refuses_tuned_fallback(self, tmp_path, monkeypatch) -> None:
-        # scale=1 is TPC-compliant, so the run reaches tuning resolution
-        # instead of being rejected earlier by the official-mode scale gate.
         result, orchestrator = self._invoke(tmp_path, monkeypatch, official=True, scale="1")
 
         assert result.exit_code != 0

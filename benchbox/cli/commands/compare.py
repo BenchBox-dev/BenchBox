@@ -1,18 +1,6 @@
-"""Compare command implementation for benchbox results.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Supports two modes:
-1. File comparison: Compare existing result files
-2. Run mode: Run benchmarks across platforms then compare
-
-Mode is inferred from arguments:
-- If -p/--platform provided → run mode
-- If file paths provided → file comparison mode
-- If no arguments → interactive wizard
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,13 +30,10 @@ from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 
 def _escape_html(value: Any) -> str:
-    """Escape arbitrary comparison data before placing it in HTML text."""
     return html_escape(str(value), quote=True)
 
 
 class ResultFileMetadata:
-    """Metadata extracted from a benchmark result file."""
-
     def __init__(
         self,
         path: Path,
@@ -69,7 +54,6 @@ class ResultFileMetadata:
 
     @property
     def formatted_timestamp(self) -> str:
-        """Return a human-readable timestamp."""
         try:
             from datetime import datetime
 
@@ -80,7 +64,6 @@ class ResultFileMetadata:
 
     @property
     def short_path(self) -> str:
-        """Return a shortened path for display."""
         parts = self.path.parts
         if len(parts) > 3:
             return str(Path(*parts[-3:]))
@@ -91,18 +74,6 @@ def _discover_result_files_with_metadata(
     search_dirs: list[Path] | None = None,
     max_files: int = 100,
 ) -> list[ResultFileMetadata]:
-    """Discover benchmark result files and extract their metadata.
-
-    Searches for JSON files with valid BenchBox result schema v2.0 (version field)
-    and extracts benchmark, platform, scale, and timestamp metadata.
-
-    Args:
-        search_dirs: Directories to search. Defaults to benchmark_runs/results, results, .
-        max_files: Maximum number of files to scan (for performance)
-
-    Returns:
-        List of ResultFileMetadata objects, sorted by timestamp (newest first)
-    """
     if search_dirs is None:
         search_dirs = [
             Path("benchmark_runs/results"),
@@ -118,8 +89,6 @@ def _discover_result_files_with_metadata(
         if not search_dir.exists() or not search_dir.is_dir():
             continue
 
-        # Find JSON files, sorted by modification time (newest first)
-        # Skip companion files
         json_files = sorted(
             (f for f in search_dir.glob("**/*.json") if not f.name.endswith(COMPANION_SUFFIXES)),
             key=lambda p: p.stat().st_mtime,
@@ -127,7 +96,6 @@ def _discover_result_files_with_metadata(
         )
 
         for filepath in json_files[:max_files]:
-            # Skip if already seen (handles overlapping search directories)
             resolved = filepath.resolve()
             if resolved in seen_paths:
                 continue
@@ -137,15 +105,12 @@ def _discover_result_files_with_metadata(
                 with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
 
-                # Validate it's a supported BenchBox result file
                 if not is_loader_supported_result_schema(data):
                     continue
 
-                # Also require benchmark section (distinguishes from manifests etc.)
                 if "benchmark" not in data:
                     continue
 
-                # Extract metadata (v2.0 format)
                 benchmark_section = data.get("benchmark", {})
                 run_section = data.get("run", {})
                 platform_section = data.get("platform", {})
@@ -162,10 +127,8 @@ def _discover_result_files_with_metadata(
                 discovered.append(metadata)
 
             except (json.JSONDecodeError, OSError, KeyError):
-                # Skip files that can't be parsed or have missing fields
                 continue
 
-    # Sort by timestamp (newest first)
     def parse_timestamp(meta: ResultFileMetadata) -> str:
         return meta.timestamp or ""
 
@@ -235,7 +198,6 @@ def _discover_result_files_with_metadata(
     ),
 )
 @click.argument("result_files", nargs=-1, type=click.Path(exists=True))
-# Platform options (triggers run mode when provided)
 @click.option(
     "-p",
     "--platform",
@@ -243,7 +205,6 @@ def _discover_result_files_with_metadata(
     multiple=True,
     help="Platforms to compare (triggers run mode). Repeatable: -p duckdb -p sqlite",
 )
-# Hidden deprecated --run flag for backwards compatibility
 @click.option(
     "--run",
     "run_mode_flag",
@@ -304,7 +265,6 @@ def _discover_result_files_with_metadata(
     is_flag=True,
     help="List available platforms and exit",
 )
-# Common options
 @click.option(
     "--fail-on-regression",
     type=str,
@@ -345,7 +305,6 @@ def _discover_result_files_with_metadata(
     is_flag=True,
     help="Disable interactive prompts (for CI/CD)",
 )
-# Query plan comparison options (file mode)
 @click.option(
     "--include-plans",
     is_flag=True,
@@ -381,68 +340,10 @@ def compare(
     include_plans,
     plan_threshold,
 ):
-    """Compare benchmark results, query plans, or run cross-platform benchmarks.
-
-    Mode is automatically detected:
-
-    \b
-    RUN MODE (with -p/--platform):
-      Run benchmarks across multiple platforms and compare.
-      benchbox compare -p duckdb -p sqlite
-
-    \b
-    FILE MODE (with file paths):
-      Compare existing benchmark result files.
-      benchbox compare baseline.json current.json
-
-    \b
-    INTERACTIVE MODE (no arguments):
-      Launch interactive wizard to guide you through comparison.
-      benchbox compare
-
-    \b
-    Examples:
-        # Run SQL platform comparison
-        benchbox compare -p duckdb -p sqlite -p clickhouse
-
-    \b
-        # Run DataFrame platform comparison
-        benchbox compare -p polars-df -p pandas-df --scale 0.1
-
-    \b
-        # Compare two result files
-        benchbox compare baseline.json current.json
-
-    \b
-        # Compare with regression threshold (CI/CD)
-        benchbox compare baseline.json current.json --fail-on-regression 10%
-
-    \b
-        # Compare files with query plan analysis
-        benchbox compare baseline.json current.json --include-plans
-
-    \b
-        # Show only significant plan changes (< 90% similar)
-        benchbox compare baseline.json current.json --include-plans --plan-threshold 0.9
-
-    \b
-        # List available platforms
-        benchbox compare --list-platforms
-
-    \b
-        # Generate charts with results
-        benchbox compare -p duckdb -p sqlite -o ./comparison --generate-charts
-
-    \b
-        # Non-interactive mode (CI/CD)
-        benchbox compare --non-interactive -p duckdb -p sqlite
-    """
-    # Handle --list-platforms
     if list_platforms:
         _list_available_platforms()
         return
 
-    # Show deprecation warning if --run flag was explicitly used
     if run_mode_flag:
         warnings.warn(
             "The --run flag is deprecated and can be omitted. "
@@ -455,10 +356,6 @@ def compare(
             "[yellow]Note: The --run flag is deprecated. Use: benchbox compare -p duckdb -p sqlite[/yellow]\n"
         )
 
-    # Determine mode from arguments:
-    # 1. If platforms specified → run mode
-    # 2. If result files specified → file mode
-    # 3. Neither → interactive mode (or error if --non-interactive)
     has_platforms = bool(platforms)
     has_files = bool(result_files)
 
@@ -470,7 +367,6 @@ def compare(
         sys.exit(1)
 
     if has_platforms:
-        # Run mode: execute benchmarks across platforms
         _run_platform_comparison(
             platforms=list(platforms),
             platform_type=platform_type,
@@ -486,7 +382,6 @@ def compare(
             theme=theme,
         )
     elif has_files:
-        # File mode: compare existing result files
         _run_file_comparison(
             result_files=result_files,
             fail_on_regression=fail_on_regression,
@@ -497,7 +392,6 @@ def compare(
             plan_threshold=plan_threshold,
         )
     else:
-        # No arguments: interactive mode or error
         if non_interactive:
             console.print("[red]Error: No platforms or files specified[/red]")
             console.print("\n[bold]Usage:[/bold]")
@@ -506,7 +400,6 @@ def compare(
             console.print("\n[dim]Use --list-platforms to see available platforms[/dim]")
             sys.exit(1)
 
-        # Check for TTY
         if not sys.stdin.isatty() or not sys.stdout.isatty():
             console.print("[red]Error: Interactive mode requires a terminal (TTY)[/red]")
             console.print("\n[bold]Provide arguments for non-interactive usage:[/bold]")
@@ -515,7 +408,6 @@ def compare(
             console.print("\n[dim]Or use --non-interactive flag with required options[/dim]")
             sys.exit(1)
 
-        # Launch interactive wizard
         _run_interactive_wizard(
             output_format=output_format,
             output_file=output_file,
@@ -534,11 +426,9 @@ def _run_interactive_wizard(
     fail_on_regression: str | None,
     show_all_queries: bool,
 ):
-    """Interactive wizard for platform comparison."""
     console.print("\n[bold blue]BenchBox Platform Comparison[/bold blue]")
     console.print("Compare benchmark performance across different platforms.\n")
 
-    # Step 1: Choose comparison type
     console.print("[bold]Step 1:[/bold] What would you like to do?\n")
     console.print("  [cyan]1[/cyan]  Compare platforms (run benchmarks)")
     console.print("  [cyan]2[/cyan]  Compare result files\n")
@@ -550,7 +440,6 @@ def _run_interactive_wizard(
     )
 
     if mode_choice == "1":
-        # Run mode: platform comparison
         _interactive_platform_comparison(
             output_format=output_format,
             output_file=output_file,
@@ -558,7 +447,6 @@ def _run_interactive_wizard(
             theme=theme,
         )
     else:
-        # File mode: compare result files
         _interactive_file_comparison(
             output_format=output_format,
             output_file=output_file,
@@ -573,21 +461,17 @@ def _interactive_platform_comparison(
     generate_charts: bool,
     theme: str,
 ):
-    """Interactive wizard for platform comparison."""
     from benchbox.platforms import (
         list_available_dataframe_platforms,
         list_available_platforms,
     )
 
-    # Step 2: Select platforms
     console.print("\n[bold]Step 2:[/bold] Select platforms to compare\n")
 
-    # Get available platforms
     sql_platforms = list_available_platforms()
     df_platforms_dict = list_available_dataframe_platforms()
     df_platforms = [name for name, available in df_platforms_dict.items() if available]
 
-    # Display available platforms in a table
     table = Table(title="Available Platforms", show_header=True)
     table.add_column("ID", style="cyan bold", width=4, justify="right")
     table.add_column("Platform", style="green", width=20)
@@ -595,12 +479,10 @@ def _interactive_platform_comparison(
 
     all_platforms = []
 
-    # Add SQL platforms
     for i, platform in enumerate(sorted(sql_platforms), start=1):
         table.add_row(str(i), platform, "SQL")
         all_platforms.append((platform, "sql"))
 
-    # Add DataFrame platforms
     for i, platform in enumerate(sorted(df_platforms), start=len(sql_platforms) + 1):
         table.add_row(str(i), platform, "DataFrame")
         all_platforms.append((platform, "dataframe"))
@@ -614,7 +496,6 @@ def _interactive_platform_comparison(
         console.print("  pip install benchbox[dataframe]")
         sys.exit(1)
 
-    # Get platform selection (comma-separated IDs)
     console.print("\n[dim]Enter platform IDs separated by commas (minimum 2)[/dim]")
     default_selection = "1,2" if len(all_platforms) >= 2 else "1"
 
@@ -641,7 +522,6 @@ def _interactive_platform_comparison(
     selected_platforms = [all_platforms[id - 1][0] for id in selected_ids]
     console.print(f"\n[green]✓ Selected:[/green] {', '.join(selected_platforms)}")
 
-    # Step 3: Select benchmark
     console.print("\n[bold]Step 3:[/bold] Configure benchmark\n")
 
     benchmark = Prompt.ask(
@@ -664,7 +544,6 @@ def _interactive_platform_comparison(
         )
     )
 
-    # Step 4: Confirm and run
     console.print("\n[bold]Step 4:[/bold] Review configuration\n")
     console.print(f"  Platforms:  {', '.join(selected_platforms)}")
     console.print(f"  Benchmark:  {benchmark}")
@@ -675,7 +554,6 @@ def _interactive_platform_comparison(
         console.print("[yellow]Comparison cancelled[/yellow]")
         return
 
-    # Run comparison
     _run_platform_comparison(
         platforms=selected_platforms,
         platform_type="auto",
@@ -698,7 +576,6 @@ def _interactive_file_comparison(
     fail_on_regression: str | None,
     show_all_queries: bool,
 ):
-    """Interactive wizard for file comparison with guided selection."""
     console.print("\n[bold]Step 2:[/bold] How do you want to select files?\n")
     console.print("  [cyan]1[/cyan]  Browse by benchmark/platform/scale (recommended)")
     console.print("  [cyan]2[/cyan]  Enter file paths directly\n")
@@ -715,7 +592,6 @@ def _interactive_file_comparison(
     console.print(f"\n[green]✓ Baseline:[/green] {baseline_path}")
     console.print(f"[green]✓ Current:[/green]  {current_path}")
 
-    # Ask about plan comparison
     console.print("\n[bold]Step 3:[/bold] Options\n")
     include_plans = Confirm.ask(
         "Include query plan analysis? (requires captured plans)",
@@ -726,7 +602,6 @@ def _interactive_file_comparison(
         console.print("[yellow]Comparison cancelled[/yellow]")
         return
 
-    # Run comparison
     _run_file_comparison(
         result_files=(str(baseline_path), str(current_path)),
         fail_on_regression=fail_on_regression,
@@ -739,11 +614,6 @@ def _interactive_file_comparison(
 
 
 def _guided_file_selection() -> tuple[Path, Path] | None:
-    """Guide user through benchmark/platform/scale selection to find result files.
-
-    Returns:
-        Tuple of (baseline_path, current_path) or None if cancelled
-    """
     console.print("\n[bold]Discovering result files...[/bold]")
     all_results = _discover_result_files_with_metadata()
 
@@ -754,7 +624,6 @@ def _guided_file_selection() -> tuple[Path, Path] | None:
 
     console.print(f"[dim]Found {len(all_results)} result files[/dim]\n")
 
-    # Step 1: Select benchmark
     selected_benchmark = _select_from_options(
         items=sorted({r.benchmark for r in all_results}),
         label="benchmark",
@@ -764,7 +633,6 @@ def _guided_file_selection() -> tuple[Path, Path] | None:
 
     filtered = [r for r in all_results if r.benchmark == selected_benchmark]
 
-    # Step 2: Select platform
     selected_platform = _select_from_options(
         items=sorted({r.platform for r in filtered}),
         label="platform",
@@ -775,7 +643,6 @@ def _guided_file_selection() -> tuple[Path, Path] | None:
 
     filtered = [r for r in filtered if r.platform == selected_platform]
 
-    # Step 3: Select scale factor
     selected_scale = _select_from_options(
         items=sorted({r.scale for r in filtered}),
         label="scale factor",
@@ -785,14 +652,13 @@ def _guided_file_selection() -> tuple[Path, Path] | None:
     )
 
     filtered = [r for r in filtered if r.scale == selected_scale]
-    filtered = filtered[:10]  # Already sorted by timestamp (newest first)
+    filtered = filtered[:10]
 
     if len(filtered) < 2:
         console.print(f"\n[yellow]Only {len(filtered)} result(s) found for this combination.[/yellow]")
         console.print("[dim]Need at least 2 results to compare.[/dim]")
         return None
 
-    # Step 4: Select files to compare
     return _select_comparison_files(filtered)
 
 
@@ -803,7 +669,6 @@ def _select_from_options(
     format_fn: Any,
     header: str | None = None,
 ) -> Any:
-    """Prompt user to select from a list of options. Auto-selects if only one option."""
     if len(items) == 1:
         console.print(f"[dim]Only one {label} found: {items[0]}[/dim]")
         return items[0]
@@ -823,11 +688,9 @@ def _select_from_options(
 
 
 def _select_comparison_files(filtered: list[ResultFileMetadata]) -> tuple[Path, Path] | None:
-    """Display filtered results and let user select baseline and current files."""
     console.print(f"\n[bold]Select files to compare ({len(filtered)} results):[/bold]\n")
     _display_results_table(filtered)
 
-    # Select baseline
     while True:
         baseline_input = Prompt.ask("\nBaseline file (older/first)", default="2" if len(filtered) >= 2 else "1")
         if baseline_input.isdigit():
@@ -837,7 +700,6 @@ def _select_comparison_files(filtered: list[ResultFileMetadata]) -> tuple[Path, 
                 break
         console.print(f"[yellow]Enter 1-{len(filtered)}[/yellow]")
 
-    # Select current
     while True:
         current_input = Prompt.ask("Current file (newer/second)", default="1")
         if current_input.isdigit():
@@ -854,15 +716,9 @@ def _select_comparison_files(filtered: list[ResultFileMetadata]) -> tuple[Path, 
 
 
 def _direct_file_selection() -> tuple[Path, Path] | None:
-    """Allow user to enter file paths directly.
-
-    Returns:
-        Tuple of (baseline_path, current_path) or None if cancelled
-    """
     console.print("\n[bold]Enter file paths:[/bold]")
     console.print("[dim]Enter full or relative paths to result JSON files[/dim]\n")
 
-    # Baseline file
     while True:
         baseline_input = Prompt.ask("Baseline file path")
         if not baseline_input:
@@ -875,7 +731,6 @@ def _direct_file_selection() -> tuple[Path, Path] | None:
             continue
         break
 
-    # Current file
     while True:
         current_input = Prompt.ask("Current file path")
         if not current_input:
@@ -896,12 +751,6 @@ def _direct_file_selection() -> tuple[Path, Path] | None:
 
 
 def _display_results_table(results: list[ResultFileMetadata]) -> None:
-    """Display a rich table of result files with metadata.
-
-    Args:
-        results: List of ResultFileMetadata objects to display
-    """
-    # Color mapping for benchmarks
     benchmark_colors = {
         "TPC-H": "green",
         "TPC-DS": "blue",
@@ -918,11 +767,9 @@ def _display_results_table(results: list[ResultFileMetadata]) -> None:
     table.add_column("File", style="dim", width=30)
 
     for i, meta in enumerate(results, start=1):
-        # Apply color based on benchmark
         bench_color = benchmark_colors.get(meta.benchmark, "white")
         benchmark_styled = f"[{bench_color}]{meta.benchmark}[/{bench_color}]"
 
-        # Format scale factor
         scale_str = f"SF {meta.scale}"
 
         table.add_row(
@@ -938,7 +785,6 @@ def _display_results_table(results: list[ResultFileMetadata]) -> None:
 
 
 def _list_available_platforms():
-    """List available SQL and DataFrame platforms."""
     from benchbox.platforms import (
         list_available_dataframe_platforms,
         list_available_platforms,
@@ -946,7 +792,6 @@ def _list_available_platforms():
 
     console.print("\n[bold]Available Platforms[/bold]\n")
 
-    # SQL Platforms
     console.print("[green]SQL Platforms:[/green]")
     sql_platforms = list_available_platforms()
     for platform in sorted(sql_platforms):
@@ -954,7 +799,6 @@ def _list_available_platforms():
 
     console.print()
 
-    # DataFrame Platforms
     console.print("[cyan]DataFrame Platforms:[/cyan]")
     df_platforms = list_available_dataframe_platforms()
 
@@ -980,14 +824,6 @@ def _list_available_platforms():
 
 
 def _build_platform_runner():
-    """Build the runner that executes one benchmark on one platform.
-
-    Lives in the CLI because it wires the orchestrator, the database manager
-    and the system profiler -- ``benchbox.core`` is not allowed to import
-    ``benchbox.cli`` (import-linter contract "utils < core < platforms < cli"),
-    so the surface injects this into the comparison suite the same way
-    ``execute_run`` takes an ``adapter_factory``.
-    """
     from benchbox.cli.database import DatabaseManager
     from benchbox.cli.orchestrator import BenchmarkOrchestrator
     from benchbox.cli.system import SystemProfiler
@@ -1048,7 +884,6 @@ def _run_platform_comparison(
     generate_charts: bool,
     theme: str,
 ):
-    """Run benchmarks across platforms and compare."""
     from benchbox.core.comparison import (
         PlatformType,
         UnifiedBenchmarkConfig,
@@ -1056,7 +891,6 @@ def _run_platform_comparison(
         UnifiedComparisonPlotter,
     )
 
-    # Validate platforms
     if not platforms:
         console.print("[red]Error: Specify platforms with -p/--platform[/red]")
         console.print("\n[bold]Examples:[/bold]")
@@ -1069,12 +903,10 @@ def _run_platform_comparison(
         console.print("[red]Error: At least 2 platforms required for comparison[/red]")
         sys.exit(1)
 
-    # Parse query IDs
     query_ids = None
     if queries:
         query_ids = [q.strip() for q in queries.split(",")]
 
-    # Map platform type
     type_map = {
         "sql": PlatformType.SQL,
         "dataframe": PlatformType.DATAFRAME,
@@ -1082,7 +914,6 @@ def _run_platform_comparison(
     }
     ptype = type_map[platform_type]
 
-    # Create config
     config = UnifiedBenchmarkConfig(
         platform_type=ptype,
         scale_factor=scale,
@@ -1094,7 +925,6 @@ def _run_platform_comparison(
 
     suite = UnifiedBenchmarkSuite(config=config, platform_runner=_build_platform_runner())
 
-    # Display header
     console.print("\n[bold]Cross-Platform Benchmark Comparison[/bold]")
     console.print(f"Platforms: {', '.join(platforms)}")
     console.print(f"Benchmark: {benchmark}")
@@ -1103,7 +933,6 @@ def _run_platform_comparison(
     console.print(f"Iterations: {iterations}")
     console.print()
 
-    # Run comparison
     console.print("[dim]Running benchmarks...[/dim]")
     try:
         results = suite.run_comparison(platforms=platforms, data_dir=data_dir)
@@ -1114,13 +943,10 @@ def _run_platform_comparison(
         console.print(f"[red]Benchmark failed: {e}[/red]")
         sys.exit(1)
 
-    # Get summary
     summary = suite.get_summary(results)
 
-    # Output results
     _output_comparison_results(output_format, output_file, suite, config, results, summary)
 
-    # Generate charts if requested
     if generate_charts and output_file:
         _generate_comparison_charts(output_file, results, theme, UnifiedComparisonPlotter)
 
@@ -1128,12 +954,6 @@ def _run_platform_comparison(
 
 
 def _exit_on_comparison_failure(results: list, summary: Any) -> None:
-    """Exit non-zero when the comparison did not actually compare anything.
-
-    A run in which every platform failed used to print a table claiming 100%
-    success and a 1.00x speedup and then exit 0, so callers and CI wrappers
-    could not tell a total failure from a real result.
-    """
     failed = [r for r in results if r.success_rate <= 0]
 
     if not summary.is_comparable:
@@ -1162,7 +982,6 @@ def _output_comparison_results(
     results: list,
     summary: Any,
 ) -> None:
-    """Output comparison results in the specified format."""
     if output_format == "text":
         content = suite._generate_text_report(results)
         _write_or_print(content, output_file, "comparison.txt")
@@ -1203,7 +1022,6 @@ def _output_comparison_results(
 
 
 def _write_or_print(content: str, output_file: str | None, default_filename: str) -> None:
-    """Write content to file or print to console."""
     if output_file:
         output_path = Path(output_file)
         if not output_path.suffix:
@@ -1216,7 +1034,6 @@ def _write_or_print(content: str, output_file: str | None, default_filename: str
 
 
 def _generate_comparison_charts(output_file: str, results: list, theme: str, plotter_class: type) -> None:
-    """Generate comparison charts if requested."""
     try:
         output_dir = Path(output_file)
         if output_dir.suffix:
@@ -1244,8 +1061,6 @@ def _run_file_comparison(
     include_plans: bool = False,
     plan_threshold: float = 0.0,
 ):
-    """Compare existing benchmark result files."""
-    # Validate inputs
     if len(result_files) < 2:
         console.print("[red]Error: At least 2 result files required for comparison[/red]")
         console.print("\n[bold]Usage:[/bold]")
@@ -1257,7 +1072,6 @@ def _run_file_comparison(
 
     regression_threshold = _validate_regression_threshold(fail_on_regression)
 
-    # For now, support 2-file comparison (baseline vs current)
     if len(result_files) > 2:
         console.print("[yellow]Note: Multi-file comparison not yet supported. Comparing first 2 files only.[/yellow]\n")
 
@@ -1276,7 +1090,6 @@ def _run_file_comparison(
 
 
 def _validate_regression_threshold(fail_on_regression: str | None) -> float | None:
-    """Parse and validate the regression threshold argument."""
     if not fail_on_regression:
         return None
     regression_threshold = _parse_threshold(fail_on_regression)
@@ -1290,7 +1103,6 @@ def _validate_regression_threshold(fail_on_regression: str | None) -> float | No
 
 
 def _load_comparison_files(baseline_path: Path, current_path: Path) -> tuple[Any, Any]:
-    """Load and return the baseline and current result files."""
     try:
         baseline, _baseline_raw = load_result_file(baseline_path)
         current, _current_raw = load_result_file(current_path)
@@ -1319,7 +1131,6 @@ def _perform_comparison(
     plan_threshold: float,
     output_format: str = "text",
 ) -> dict[str, Any]:
-    """Run the core comparison and optional plan comparison."""
     exporter = ResultExporter()
     comparison = exporter.compare_results(baseline_path, current_path)
 
@@ -1327,8 +1138,6 @@ def _perform_comparison(
         console.print(f"[red]Comparison failed: {comparison['error']}[/red]")
         sys.exit(1)
 
-    # JSON output must stay machine-readable (the generation_compatibility block
-    # travels inside the payload); warn on stdout only for human-readable formats.
     if output_format != "json":
         generation = comparison.get("generation_compatibility") or {}
         if generation.get("warning"):
@@ -1356,7 +1165,6 @@ def _output_file_comparison(
     output_file: str | None,
     show_all_queries: bool,
 ) -> None:
-    """Format and display/save the comparison output."""
     format_dispatch = {
         "text": lambda: _format_text_comparison(comparison, baseline, current, show_all_queries),
         "json": lambda: json.dumps(comparison, indent=2),
@@ -1373,15 +1181,12 @@ def _output_file_comparison(
         Path(output_file).write_text(content, encoding="utf-8")
         console.print(f"[green]Comparison saved to {output_file}[/green]")
     elif output_format == "json":
-        # Machine-readable output must bypass rich line-wrapping, which would
-        # splice literal newlines into long JSON string values.
         click.echo(content)
     else:
         console.print(content)
 
 
 def _check_regression_threshold(comparison: dict[str, Any], regression_threshold: float | None) -> None:
-    """Check for regressions and exit if threshold exceeded."""
     if regression_threshold is None:
         return
     has_regression = _check_regression(comparison, regression_threshold)
@@ -1397,7 +1202,6 @@ def _check_regression_threshold(comparison: dict[str, Any], regression_threshold
 
 
 def _build_execution_map(results: Any) -> dict[str, Any]:
-    """Collect the first execution per query ID across all phases."""
     execution_map: dict[str, Any] = {}
     for execution in iter_query_results(results):
         query_id = execution.get("query_id")
@@ -1411,45 +1215,30 @@ def _compare_plans(
     current: Any,
     plan_threshold: float = 0.0,
 ) -> dict[str, Any] | None:
-    """Compare query plans between two benchmark results.
-
-    Args:
-        baseline: Baseline BenchmarkResults
-        current: Current BenchmarkResults
-        plan_threshold: Only include plans with similarity below this threshold
-
-    Returns:
-        Dictionary with plan comparison data, or None if no plans available
-    """
     from benchbox.core.query_plans.comparison import (
         QueryPlanComparator,
         generate_plan_comparison_summary,
     )
 
-    # Generate plan comparison summary (handles all the heavy lifting)
     try:
         summary = generate_plan_comparison_summary(
             baseline,
             current,
-            regression_threshold_pct=20.0,  # Default 20% regression threshold
+            regression_threshold_pct=20.0,
         )
     except Exception as e:
         console.print(f"[yellow]Warning: Plan comparison failed: {e}[/yellow]")
         return None
 
-    # No plans to compare
     if summary.plans_compared == 0:
         return None
 
-    # Build plan comparison result
     plan_comparisons = []
     comparator = QueryPlanComparator()
 
-    # Get detailed per-query plan comparisons
     baseline_map = _build_execution_map(baseline)
     current_map = _build_execution_map(current)
 
-    # Compare common queries
     common_queries = set(baseline_map.keys()) & set(current_map.keys())
 
     for query_id in sorted(common_queries):
@@ -1462,15 +1251,12 @@ def _compare_plans(
         if not baseline_plan or not current_plan:
             continue
 
-        # Compare plans
         comparison = comparator.compare_plans(baseline_plan, current_plan)
         similarity = comparison.similarity.overall_similarity
 
-        # Apply threshold filter (include if similarity < threshold, or if threshold is 0)
         if plan_threshold > 0 and similarity >= plan_threshold:
             continue
 
-        # Get performance change for this query
         baseline_time = baseline_exec.get("execution_time_ms", 0.0) or 0.0
         current_time = current_exec.get("execution_time_ms", 0.0) or 0.0
         perf_change_pct = 0.0
@@ -1493,7 +1279,6 @@ def _compare_plans(
             }
         )
 
-    # Identify regressions (plan changed AND perf degraded)
     regressions = [p for p in plan_comparisons if p["is_regression"]]
 
     return {
@@ -1508,10 +1293,8 @@ def _compare_plans(
 
 
 def _parse_threshold(threshold_str: str) -> float | None:
-    """Parse regression threshold from string to decimal."""
     threshold_str = threshold_str.strip()
 
-    # Handle percentage format (e.g., "10%", "5.5%")
     if threshold_str.endswith("%"):
         try:
             value = float(threshold_str[:-1])
@@ -1519,7 +1302,6 @@ def _parse_threshold(threshold_str: str) -> float | None:
         except ValueError:
             return None
 
-    # Handle decimal format (e.g., "0.1", "0.05")
     try:
         return float(threshold_str)
     except ValueError:
@@ -1527,11 +1309,6 @@ def _parse_threshold(threshold_str: str) -> float | None:
 
 
 def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
-    """Check if any query or overall performance regressed beyond threshold.
-
-    ``threshold`` is a decimal fraction (``--fail-on-regression 10%`` parses to
-    0.1); the shared policy takes percent, so it is scaled here at the boundary.
-    """
     threshold_percent = threshold * 100
 
     perf_changes = comparison.get("performance_changes", {})
@@ -1550,12 +1327,10 @@ def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
 
 
 def _markdown_cell(value: Any) -> str:
-    """Make arbitrary comparison data safe for a Markdown table cell."""
     return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
 
 
 def _format_markdown_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
-    """Format a file comparison as a Markdown report."""
     lines = [
         "# Benchmark Comparison Report",
         "",
@@ -1678,11 +1453,6 @@ def _format_markdown_comparison(comparison: dict[str, Any], baseline: Any, curre
 
 
 def _format_generation_section(lines: list[str], comparison: dict[str, Any]) -> None:
-    """Append the data-generation compatibility warning.
-
-    Saved text must carry the caveat the console prints: without it the file
-    is exactly the misleading artifact the generation check exists to prevent.
-    """
     generation = comparison.get("generation_compatibility") or {}
     warning = generation.get("warning")
     if not warning:
@@ -1695,7 +1465,6 @@ def _format_generation_section(lines: list[str], comparison: dict[str, Any]) -> 
 
 
 def _format_text_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
-    """Format comparison as human-readable text."""
     lines: list[str] = []
 
     _format_header_section(lines, comparison, baseline)
@@ -1714,7 +1483,6 @@ def _format_text_comparison(comparison: dict[str, Any], baseline: Any, current: 
 
 
 def _format_header_section(lines: list[str], comparison: dict[str, Any], baseline: Any) -> None:
-    """Format the header and metadata section."""
     lines.append("=" * 80)
     lines.append("BENCHMARK COMPARISON REPORT")
     lines.append("=" * 80)
@@ -1729,7 +1497,6 @@ def _format_header_section(lines: list[str], comparison: dict[str, Any], baselin
 
 
 def _format_summary_section(lines: list[str], comparison: dict[str, Any]) -> None:
-    """Format the overall summary section."""
     summary = comparison.get("summary", {})
     if not summary:
         return
@@ -1745,7 +1512,6 @@ def _format_summary_section(lines: list[str], comparison: dict[str, Any]) -> Non
 
 
 def _format_performance_metrics_section(lines: list[str], comparison: dict[str, Any]) -> None:
-    """Format the performance metrics changes section."""
     perf_changes = comparison.get("performance_changes", {})
     if not perf_changes:
         return
@@ -1783,7 +1549,6 @@ def _format_performance_metrics_section(lines: list[str], comparison: dict[str, 
 
 
 def _format_geometric_mean_section(lines: list[str], query_comparisons: list[dict[str, Any]]) -> None:
-    """Format the geometric mean section."""
     if not query_comparisons:
         return
 
@@ -1821,7 +1586,6 @@ def _format_geometric_mean_section(lines: list[str], query_comparisons: list[dic
 
 
 def _format_query_details_section(lines: list[str], query_comparisons: list[dict[str, Any]], show_all: bool) -> None:
-    """Format the per-query comparison section."""
     if not query_comparisons:
         return
 
@@ -1851,7 +1615,6 @@ def _format_query_details_section(lines: list[str], query_comparisons: list[dict
 
 
 def _query_severity_and_change(improved: bool, change_pct: float) -> tuple[str, str]:
-    """Return (severity_label, change_str) for a query comparison."""
     if improved:
         return "✓ FASTER", f"-{abs(change_pct):.2f}%"
     if change_pct > 50:
@@ -1866,7 +1629,6 @@ def _query_severity_and_change(improved: bool, change_pct: float) -> tuple[str, 
 
 
 def _format_plan_analysis_section(lines: list[str], comparison: dict[str, Any]) -> None:
-    """Format the query plan analysis section."""
     plan_comparison = comparison.get("plan_comparison")
     if not plan_comparison:
         return
@@ -1930,7 +1692,6 @@ def _format_plan_analysis_section(lines: list[str], comparison: dict[str, Any]) 
 
 
 def _plan_status_label(plans_identical: bool, similarity: float, is_regression: bool) -> str:
-    """Return status label for a plan comparison row."""
     if plans_identical:
         return "✓ Identical"
     if similarity >= 0.95:
@@ -1943,7 +1704,6 @@ def _plan_status_label(plans_identical: bool, similarity: float, is_regression: 
 
 
 def _append_html_generation_section(html: list[str], comparison: dict[str, Any]) -> None:
-    """Append the data-generation compatibility warning to saved HTML."""
     generation = comparison.get("generation_compatibility") or {}
     warning = generation.get("warning")
     if not warning:
@@ -1953,7 +1713,6 @@ def _append_html_generation_section(html: list[str], comparison: dict[str, Any])
 
 
 def _format_html_comparison(comparison: dict[str, Any], baseline: Any, current: Any) -> str:
-    """Format comparison as HTML."""
     html: list[str] = []
     _append_html_header(html)
     _append_html_metadata(html, comparison, baseline)
@@ -1967,7 +1726,6 @@ def _format_html_comparison(comparison: dict[str, Any], baseline: Any, current: 
 
 
 def _append_html_header(html: list[str]) -> None:
-    """Append HTML document header with styles."""
     html.append("<!DOCTYPE html>")
     html.append("<html>")
     html.append("<head>")
@@ -1989,7 +1747,6 @@ def _append_html_header(html: list[str]) -> None:
 
 
 def _append_html_metadata(html: list[str], comparison: dict[str, Any], baseline: Any) -> None:
-    """Append HTML metadata section (title, file paths, benchmark info)."""
     html.append("<h1>Benchmark Comparison Report</h1>")
     html.append(f"<p><strong>Baseline:</strong> {_escape_html(comparison['baseline_file'])}</p>")
     html.append(f"<p><strong>Current:</strong> {_escape_html(comparison['current_file'])}</p>")
@@ -2001,7 +1758,6 @@ def _append_html_metadata(html: list[str], comparison: dict[str, Any], baseline:
 
 
 def _append_html_summary_table(html: list[str], comparison: dict[str, Any]) -> None:
-    """Append HTML summary table."""
     summary = comparison.get("summary", {})
     if not summary:
         return
@@ -2020,7 +1776,6 @@ def _append_html_summary_table(html: list[str], comparison: dict[str, Any]) -> N
 
 
 def _html_query_row_class_and_severity(improved: bool, change_pct: float) -> tuple[str, str]:
-    """Return (row_class, severity) for an HTML query comparison row."""
     if improved:
         return "", "Improved"
     if change_pct > 50:
@@ -2033,7 +1788,6 @@ def _html_query_row_class_and_severity(improved: bool, change_pct: float) -> tup
 
 
 def _append_html_query_comparison(html: list[str], comparison: dict[str, Any]) -> None:
-    """Append HTML query comparison table."""
     query_comparisons = comparison.get("query_comparisons", [])
     if not query_comparisons:
         return
@@ -2059,7 +1813,6 @@ def _append_html_query_comparison(html: list[str], comparison: dict[str, Any]) -
 
 
 def _html_plan_status(plan: dict[str, Any]) -> tuple[str, str]:
-    """Return (status, status_class) for a plan comparison row."""
     if plan.get("plans_identical"):
         return "Identical", "improved"
     similarity = plan.get("similarity", 1.0)
@@ -2073,7 +1826,6 @@ def _html_plan_status(plan: dict[str, Any]) -> tuple[str, str]:
 
 
 def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> None:
-    """Append HTML query plan analysis section."""
     plan_comparison = comparison.get("plan_comparison")
     if not plan_comparison:
         return
@@ -2085,7 +1837,6 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
     plans_changed = plan_comparison.get("plans_changed", 0)
     regressions_detected = plan_comparison.get("regressions_detected", 0)
 
-    # Summary cards
     html.append("<div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0;'>")
     html.append(
         f"<div style='background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;'><strong>{_escape_html(plans_compared)}</strong><br>Plans Compared</div>"
@@ -2102,7 +1853,6 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
     )
     html.append("</div>")
 
-    # Plan comparison table
     query_plans = plan_comparison.get("query_plans", [])
     if query_plans:
         html.append("<table>")
@@ -2128,7 +1878,6 @@ def _append_html_plan_section(html: list[str], comparison: dict[str, Any]) -> No
 
         html.append("</table>")
 
-    # Regressions alert
     regressions = plan_comparison.get("regressions", [])
     if regressions:
         html.append(

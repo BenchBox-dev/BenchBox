@@ -1,12 +1,6 @@
-"""BenchBox MCP Server implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module creates and configures the MCPServer with all BenchBox
-tools, resources, and prompts.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,7 +29,6 @@ from benchbox.mcp.tools.discovery import register_discovery_tools
 from benchbox.mcp.tools.results import register_results_tools
 from benchbox.mcp.tools.visualization import register_visualization_tools
 
-# Configure logging to stderr (stdout is reserved for MCP JSON-RPC)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -50,20 +43,11 @@ MCP_CACHE_HINTS = {
     "prompts/list": CacheHint(ttl_ms=300_000, scope="public"),
     "resources/list": CacheHint(ttl_ms=300_000, scope="public"),
     "resources/templates/list": CacheHint(ttl_ms=300_000, scope="public"),
-    # Resource bodies include tenant result metadata and system profiles.
     "resources/read": CacheHint(ttl_ms=0, scope="private"),
 }
 
 
 def _install_static_registry_capability_policy(mcp: MCPServer) -> None:
-    """Advertise that BenchBox registries do not change at runtime.
-
-    The SDK derives modern ``listChanged`` flags from the presence of the
-    ``subscriptions/listen`` transport, but BenchBox has no supported runtime
-    tool, prompt, or resource-list mutation path. Keep the subscription
-    transport for protocol compatibility while making the public capability
-    contract match the static registries.
-    """
     low_level_server = mcp._lowlevel_server  # type: ignore[attr-defined]
     discover_entry = low_level_server.get_request_handler("server/discover")
     if discover_entry is None:  # pragma: no cover - an SDK contract failure
@@ -88,7 +72,6 @@ def _resolve_log_level(
     *,
     env: Mapping[str, str] | None = None,
 ) -> int:
-    """Resolve MCP logging level with precedence explicit > env > INFO."""
     if isinstance(explicit_log_level, int):
         return explicit_log_level
 
@@ -119,25 +102,11 @@ def create_benchbox_server(
     env: Mapping[str, str] | None = None,
     remote_security: RemoteSecurityRuntime | None = None,
 ) -> MCPServer:
-    """Create and configure the BenchBox MCP server.
-
-    The server provides tools for:
-    - Discovery: List platforms, benchmarks, and system info
-    - Benchmark execution: Run benchmarks, validate configs, dry-run
-    - Results: Get results, compare runs, export data
-
-    Returns:
-        Configured MCPServer instance.
-    """
-    # Suppress all console output - MCP servers must not write to stdout
-    # (stdout is reserved exclusively for JSON-RPC messages)
     from benchbox.utils.printing import set_quiet
 
     set_quiet(True)
     logging.getLogger().setLevel(_resolve_log_level(log_level, env=env))
 
-    # Resolve paths only when not already provided (avoids double resolution
-    # when called from cli.py which pre-resolves via resolve_runtime_paths).
     if results_dir is not None and charts_dir is not None:
         resolved_results_dir = Path(results_dir)
         resolved_charts_dir = Path(charts_dir)
@@ -163,9 +132,6 @@ def create_benchbox_server(
             remote_security.config.jobs,
             remote_security.workspaces,
         )
-        # The SDK rejection warnings include the raw attacker-controlled Host
-        # or Origin value. Preserve the generic HTTP rejection without making
-        # those headers a log-egress channel.
         configure_transport_security_logging()
         middleware.append(remote_security.middleware)
         server_kwargs.update(
@@ -208,7 +174,6 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
         remote_security.workspaces.current_charts_dir if remote_security is not None else resolved_charts_dir
     )
 
-    # Register all tools
     logger.info("Registering discovery tools...")
     register_discovery_tools(mcp)
 
@@ -248,8 +213,6 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     register_all_prompts(mcp)
     _install_static_registry_capability_policy(mcp)
 
-    # Path options are threaded through here and consumed by MCP modules.
-    # They are logged for startup visibility.
     logger.info(
         "MCP path configuration: results_dir=%s charts_dir=%s",
         "tenant-scoped" if remote_security is not None else resolved_results_dir,

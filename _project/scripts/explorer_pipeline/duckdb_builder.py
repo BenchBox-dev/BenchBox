@@ -1,9 +1,3 @@
-"""DuckDB snapshot builder for the results explorer.
-
-Creates results.duckdb containing all canonical browser metric tables and views.
-This file is loaded by DuckDB-WASM in the browser for filtering and analysis.
-"""
-
 from __future__ import annotations
 
 import json
@@ -32,12 +26,8 @@ from _project.scripts.explorer_pipeline.transformer import normalize_cpu_family
 
 logger = logging.getLogger(__name__)
 
-# Type alias for the summary accumulator key: (benchmark, scale_factor, phase)
 _SummaryKey = tuple[str, float, str]
 
-# Keys that ``pipeline._build_meta_leaderboard`` contractually emits on every
-# cohort platform row. ``_populate_cohort_metadata`` validates this contract
-# before writing - a missing key is an upstream bug, not a nullable field.
 _COHORT_PLATFORM_REQUIRED_KEYS = frozenset({"platform_id", "platform", "result_id", "short_id", "trust_label"})
 
 _NORMALIZED_COST_COLUMNS = [
@@ -69,11 +59,6 @@ _LEGACY_COST_DEPLOYMENT_COLUMNS = [
 _COST_SCOPES = frozenset({"compute_only", "compute_plus_storage"})
 _COST_STATUSES = frozenset({"normalized", "not_applicable_local", "unavailable"})
 
-# If this module grows further, consider splitting DDL (_create_schema,
-# _create_views) from the ten _populate_* helpers into sibling modules
-# ``duckdb_schema.py`` and ``duckdb_populate.py``. Kept cohesive for now so the
-# ten-table contract stays readable in a single file.
-
 
 def _finite_float_or_none(entry: ManifestEntry, key: str, value: Any) -> float | None:
     if value is None:
@@ -98,17 +83,6 @@ def _required_cost_choice(entry: ManifestEntry, value: Any, key: str, choices: f
 
 
 def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
-    """Flatten entry.normalized_cost metadata into the DuckDB column contract.
-
-    Structural validation (required provenance strings, scope/status
-    vocabulary) runs here as well as in the transformer ingest because the
-    legacy ``build()`` entry point accepts hand-built entries whose
-    ``NormalizedCost`` dataclass instance bypassed that validation: the
-    dataclass accepts out-of-vocabulary statuses and empty provenance
-    strings, and ``ManifestEntry`` carries an already-created instance
-    without revalidation. Finiteness of the numeric payload is enforced here
-    for the same reason.
-    """
     cost = entry.normalized_cost
     return (
         _finite_float_or_none(entry, "normalized_cost_usd", cost.normalized_cost_usd),
@@ -122,7 +96,6 @@ def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
 
 
 def _environment_facet_column_values(entry: ManifestEntry) -> tuple:
-    """Flatten normalized execution-environment facets into browser columns."""
     return (
         entry.deployment_class,
         entry.cloud_provider,
@@ -133,7 +106,6 @@ def _environment_facet_column_values(entry: ManifestEntry) -> tuple:
 
 
 def _legacy_cost_deployment_column_values(entry: ManifestEntry) -> tuple:
-    """Keep legacy cost-deployment shape columns for existing cost/chart surfaces."""
     deployment = entry.normalized_cost.deployment
     return (
         deployment.instance_type,
@@ -165,10 +137,6 @@ def _entry_timing_eligibility(entry: ManifestEntry) -> TimingEligibility:
 
 
 class DuckDBSnapshotBuilder:
-    """Builds results.duckdb from a collection of manifest entries."""
-
-    # Ordered column definitions matching ManifestEntry fields exactly.
-    # Used by the legacy build() method; kept for backward compatibility.
     _COLUMNS = [
         ("result_id", "VARCHAR"),
         ("benchmark", "VARCHAR"),
@@ -205,14 +173,6 @@ class DuckDBSnapshotBuilder:
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
-        """Create results.duckdb with a ``results`` table.
-
-        Overwrites any existing file at *output_path*.
-
-        Args:
-            entries: List of ManifestEntry objects to persist.
-            output_path: Destination path for the .duckdb file.
-        """
         try:
             import duckdb
         except ImportError as exc:
@@ -221,8 +181,6 @@ class DuckDBSnapshotBuilder:
             ) from exc
 
         col_names = [name for name, _ in self._COLUMNS]
-        # Guard: _entry_to_tuple must return exactly as many values as _COLUMNS.
-        # This assertion fires at build time if the two fall out of sync.
         _sentinel = self._entry_to_tuple(
             ManifestEntry(
                 result_id="",
@@ -274,23 +232,6 @@ class DuckDBSnapshotBuilder:
         bundle_url_prefix: str,
         output_path: Path,
     ) -> None:
-        """Build the canonical 10-table DuckDB browser store.
-
-        Creates all tables and views defined in browser-duckdb-schema.sql and
-        populates them from pipeline data in a single pass. Overwrites any
-        existing file at *output_path*. The legacy build() method remains
-        available for callers that only need the flat results table.
-
-        Args:
-            entries: All ManifestEntry objects for this pipeline run.
-            details_map: result_id → DetailResult for each processed bundle.
-            summaries: Sequence of ((benchmark, scale_factor, phase), BenchmarkSummary).
-            short_id_map: short_id → result_id mapping from _build_short_ids.
-            full_to_short: result_id → short_id reverse mapping.
-            meta: Meta-leaderboard dict from _build_meta_leaderboard.
-            bundle_url_prefix: URL prefix for bundle download links.
-            output_path: Destination path for the .duckdb file.
-        """
         try:
             import duckdb
         except ImportError as exc:
@@ -332,24 +273,17 @@ class DuckDBSnapshotBuilder:
 
     @staticmethod
     def _candidate_path(output_path: Path) -> Path:
-        """Return an exact same-directory temporary path for atomic promotion."""
         return output_path.with_name(f".{output_path.name}.{uuid.uuid4().hex}.tmp")
 
     @staticmethod
     def _cleanup_candidate(candidate_path: Path) -> None:
-        """Remove only the builder-owned candidate and its exact WAL sibling."""
         for path in (candidate_path, candidate_path.with_name(candidate_path.name + ".wal")):
             try:
                 path.unlink()
             except FileNotFoundError:
                 pass
 
-    # ------------------------------------------------------------------
-    # Schema DDL
-    # ------------------------------------------------------------------
-
     def _create_schema(self, con: Any) -> None:
-        """Create all canonical tables and views in one pass."""
         con.execute("""
             CREATE TABLE result_environment (
                 result_id   VARCHAR PRIMARY KEY,
@@ -743,13 +677,6 @@ class DuckDBSnapshotBuilder:
         """)
 
     def _create_metadata(self, con: Any) -> None:
-        """Create the one-row read-model metadata table consumed by the browser.
-
-        Uses ``IF NOT EXISTS`` to mirror ``docs/development/browser-duckdb-schema.sql``.
-        Callers (``build``, ``build_full``) currently open a fresh DuckDB file,
-        but keeping this helper single-row idempotent prevents future connection
-        reuse from leaving multiple read-model versions behind.
-        """
         con.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
                 read_model_version INTEGER NOT NULL
@@ -757,10 +684,6 @@ class DuckDBSnapshotBuilder:
         """)
         con.execute("DELETE FROM metadata")
         con.execute("INSERT INTO metadata VALUES (?)", [EXPLORER_READ_MODEL_VERSION])
-
-    # ------------------------------------------------------------------
-    # Population helpers
-    # ------------------------------------------------------------------
 
     def _populate_environment(
         self,
@@ -848,13 +771,6 @@ class DuckDBSnapshotBuilder:
             plans_published = detail.plans_published if detail is not None else False
             has_tuning = detail.has_tuning if detail is not None else False
             bundle_download_url = f"{bundle_url_prefix}/{entry.result_id}.json"
-            # Preserve the None (unknown/no logical profile recorded) vs []
-            # (a logical profile WAS recorded and genuinely has zero
-            # mechanisms) distinction from DetailResult.physical_mechanisms:
-            # SQL NULL means unknown; "" (join of an empty list) means
-            # recorded-empty. `if ... else None` would collapse both to
-            # NULL, making a legacy/unrecorded row indistinguishable from a
-            # genuinely zero-mechanism row downstream.
             physical_mechanisms = (
                 None
                 if detail is None or detail.physical_mechanisms is None
@@ -1063,12 +979,6 @@ class DuckDBSnapshotBuilder:
                         platform_row.platform,
                         full_to_short.get(platform_row.result_id, ""),
                         platform_row.trust_label,
-                        # funding comes off the manifest entry rather than
-                        # PlatformRow: PlatformRow is serialized into the
-                        # BenchmarkSummary artifact, and widening that artifact
-                        # is a separate contract change. Absent entry means a
-                        # row with no manifest, which is the same "no disclosure
-                        # was made" state as the producer default.
                         entry.funding if entry is not None else "unspecified",
                         platform_row.tuning_mode,
                         platform_row.tuning_hash,
@@ -1113,10 +1023,6 @@ class DuckDBSnapshotBuilder:
         summaries: list[tuple[_SummaryKey, BenchmarkSummary]],
         entries_by_result: dict[str, ManifestEntry],
     ) -> None:
-        # One row per (cohort_key, result_id) - every publishable variant is
-        # preserved. The same platform may appear more than once per cohort
-        # when run with different tuning_mode or trust_label; the UI layer
-        # decides any display-time collapsing.
         rows: list[tuple] = []
         ranking_context_by_result: dict[str, tuple[TimingEligibility, str | None, int, str | None]] = {}
         for _, summary in summaries:
@@ -1170,10 +1076,6 @@ class DuckDBSnapshotBuilder:
                         cohort_ranking_exclusion_reason,
                     ),
                 )
-                # Required keys are contractually emitted by
-                # ``pipeline._build_meta_leaderboard``. A missing key here
-                # means an upstream change broke the contract; fail loudly
-                # rather than silently writing NULLs.
                 missing = _COHORT_PLATFORM_REQUIRED_KEYS - p.keys()
                 if missing:
                     raise ValueError(

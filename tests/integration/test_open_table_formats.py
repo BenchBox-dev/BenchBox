@@ -1,22 +1,6 @@
-"""Integration tests for open table format conversions.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides smoke tests for the format conversion pipeline to verify
-end-to-end functionality for all supported open table formats:
-- Parquet (always available - uses PyArrow)
-- Delta Lake (requires deltalake optional dependency)
-- Apache Iceberg (requires pyiceberg optional dependency)
-
-These tests verify that:
-1. Data can be converted from TBL to each format
-2. DuckDB can read the converted data
-3. Query results match expected values
-4. Compression options work correctly
-5. Partitioned output is queryable
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import importlib.util
 import sys
@@ -35,14 +19,8 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Test Data and Fixtures
-# =============================================================================
-
-
 @pytest.fixture
 def tpch_customer_schema():
-    """TPC-H customer table schema (simplified for testing)."""
     return {
         "columns": [
             {"name": "c_custkey", "type": "INTEGER"},
@@ -59,9 +37,7 @@ def tpch_customer_schema():
 
 @pytest.fixture
 def tpch_customer_tbl(tmp_path: Path) -> Path:
-    """Create a sample TPC-H customer TBL file."""
     tbl_file = tmp_path / "customer.tbl"
-    # TBL format: pipe-delimited with trailing pipe
     tbl_file.write_text(
         "1|Customer#000000001|IVhzIApeRb|15|25-989-741-2988|711.56|BUILDING|regular packages|\n"
         "2|Customer#000000002|XSTf4,NCwDVaW|13|23-768-687-3665|121.65|AUTOMOBILE|theodolites|\n"
@@ -74,7 +50,6 @@ def tpch_customer_tbl(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def tpch_lineitem_schema():
-    """TPC-H lineitem table schema (simplified for partitioning tests)."""
     return {
         "columns": [
             {"name": "l_orderkey", "type": "INTEGER"},
@@ -99,9 +74,7 @@ def tpch_lineitem_schema():
 
 @pytest.fixture
 def tpch_lineitem_tbl(tmp_path: Path) -> Path:
-    """Create a sample TPC-H lineitem TBL file with partitionable data."""
     tbl_file = tmp_path / "lineitem.tbl"
-    # Data with multiple return flags and line statuses for partition testing
     tbl_file.write_text(
         "1|155190|7706|1|17.00|21168.23|0.04|0.02|N|O|1996-03-13|1996-02-12|1996-03-22|DELIVER IN PERSON|TRUCK|egular courts|\n"
         "1|67310|7311|2|36.00|45983.16|0.09|0.06|N|O|1996-04-12|1996-02-28|1996-04-20|TAKE BACK RETURN|MAIL|ly final dep|\n"
@@ -112,15 +85,8 @@ def tpch_lineitem_tbl(tmp_path: Path) -> Path:
     return tbl_file
 
 
-# =============================================================================
-# Phase 1: Parquet Format Smoke Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestParquetFormatSmoke:
-    """Smoke tests for Parquet format conversion and DuckDB querying."""
-
     def test_parquet_conversion_and_duckdb_query(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
@@ -133,33 +99,27 @@ class TestParquetFormatSmoke:
             options=ConversionOptions(output_dir=tmp_path),
         )
 
-        # Verify conversion succeeded
         assert result.success
         assert result.row_count == 5
         parquet_file = result.output_files[0]
         assert parquet_file.exists()
 
-        # Query with DuckDB
         conn = duckdb.connect(":memory:")
         df = conn.execute(f"SELECT * FROM read_parquet('{parquet_file}')").fetchdf()
 
-        # Verify row count
         assert len(df) == 5
 
-        # Verify data integrity with specific queries
         count_result = conn.execute(f"SELECT COUNT(*) FROM read_parquet('{parquet_file}')").fetchone()
         assert count_result[0] == 5
 
-        # Verify aggregation works
         sum_result = conn.execute(f"SELECT SUM(c_acctbal) FROM read_parquet('{parquet_file}')").fetchone()
         expected_sum = 711.56 + 121.65 + 7498.12 + 2866.83 + 794.47
         assert abs(float(sum_result[0]) - expected_sum) < 0.01
 
-        # Verify filtering works
         filter_result = conn.execute(
             f"SELECT c_custkey, c_name FROM read_parquet('{parquet_file}') WHERE c_acctbal > 1000"
         ).fetchall()
-        assert len(filter_result) == 2  # Customer 3 and 4 have acctbal > 1000
+        assert len(filter_result) == 2
         custkeys = {row[0] for row in filter_result}
         assert custkeys == {3, 4}
 
@@ -178,11 +138,9 @@ class TestParquetFormatSmoke:
         assert result.success
         assert result.metadata["compression"] == "snappy"
 
-        # Verify file is readable
         table = pq.read_table(result.output_files[0])
         assert table.num_rows == 5
 
-        # Verify DuckDB can read it
         conn = duckdb.connect(":memory:")
         count = conn.execute(f"SELECT COUNT(*) FROM read_parquet('{result.output_files[0]}')").fetchone()[0]
         assert count == 5
@@ -201,7 +159,6 @@ class TestParquetFormatSmoke:
         assert result.success
         assert result.metadata["compression"] == "gzip"
 
-        # Verify DuckDB can read gzip-compressed Parquet
         conn = duckdb.connect(":memory:")
         df = conn.execute(f"SELECT * FROM read_parquet('{result.output_files[0]}')").fetchdf()
         assert len(df) == 5
@@ -220,7 +177,6 @@ class TestParquetFormatSmoke:
         assert result.success
         assert result.metadata["compression"] == "zstd"
 
-        # Verify DuckDB can read zstd-compressed Parquet
         conn = duckdb.connect(":memory:")
         df = conn.execute(f"SELECT * FROM read_parquet('{result.output_files[0]}')").fetchdf()
         assert len(df) == 5
@@ -245,22 +201,18 @@ class TestParquetFormatSmoke:
         assert result.metadata["partitioned"]
         assert result.metadata["partition_cols"] == ["l_returnflag"]
 
-        # Verify partition directories exist
         partitioned_dir = result.output_files[0]
         assert partitioned_dir.is_dir()
         assert (partitioned_dir / "l_returnflag=N").exists()
         assert (partitioned_dir / "l_returnflag=R").exists()
 
-        # Query partitioned dataset with DuckDB using glob pattern
         conn = duckdb.connect(":memory:")
 
-        # Read all partitions
         all_rows = conn.execute(
             f"SELECT * FROM read_parquet('{partitioned_dir}/**/*.parquet', hive_partitioning=true)"
         ).fetchall()
         assert len(all_rows) == 5
 
-        # Verify partition pruning works - query only 'N' partition
         n_rows = conn.execute(
             f"""
             SELECT l_orderkey, l_returnflag
@@ -268,10 +220,9 @@ class TestParquetFormatSmoke:
             WHERE l_returnflag = 'N'
             """
         ).fetchall()
-        assert len(n_rows) == 3  # 3 rows have returnflag='N'
+        assert len(n_rows) == 3
         assert all(row[1] == "N" for row in n_rows)
 
-        # Verify aggregation across partitions
         agg_result = conn.execute(
             f"""
             SELECT l_returnflag, COUNT(*) as cnt
@@ -281,7 +232,6 @@ class TestParquetFormatSmoke:
             """
         ).fetchall()
         assert len(agg_result) == 2
-        # N: 3 rows, R: 2 rows
         flag_counts = {row[0]: row[1] for row in agg_result}
         assert flag_counts["N"] == 3
         assert flag_counts["R"] == 2
@@ -289,20 +239,12 @@ class TestParquetFormatSmoke:
         conn.close()
 
 
-# =============================================================================
-# Phase 2: Delta Lake Format Smoke Tests
-# =============================================================================
-
-
-# Check if deltalake is available
 DELTALAKE_AVAILABLE = importlib.util.find_spec("deltalake") is not None
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(not DELTALAKE_AVAILABLE, reason="deltalake package not installed")
 class TestDeltaLakeFormatSmoke:
-    """Smoke tests for Delta Lake format conversion."""
-
     def test_delta_conversion_and_structure(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
 
         from benchbox.utils.format_converters.delta_converter import DeltaConverter
@@ -315,18 +257,15 @@ class TestDeltaLakeFormatSmoke:
             options=ConversionOptions(output_dir=tmp_path),
         )
 
-        # Verify conversion succeeded
         assert result.success
         assert result.row_count == 5
 
-        # Verify Delta Lake directory structure
         delta_dir = tmp_path / "customer"
         assert delta_dir.exists()
         assert (delta_dir / "_delta_log").exists()
 
-        # Verify transaction log exists
         log_files = list((delta_dir / "_delta_log").glob("*.json"))
-        assert len(log_files) >= 1  # At least one commit
+        assert len(log_files) >= 1
 
     def test_delta_duckdb_query_via_delta_scan(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
@@ -345,18 +284,14 @@ class TestDeltaLakeFormatSmoke:
         assert result.success
         delta_dir = tmp_path / "customer"
 
-        # Query with DuckDB using delta extension
         conn = duckdb.connect(":memory:")
 
-        # Install and load delta extension
         conn.execute("INSTALL delta")
         conn.execute("LOAD delta")
 
-        # Query the Delta table
         count = conn.execute(f"SELECT COUNT(*) FROM delta_scan('{delta_dir}')").fetchone()[0]
         assert count == 5
 
-        # Verify data integrity
         sum_result = conn.execute(f"SELECT SUM(c_acctbal) FROM delta_scan('{delta_dir}')").fetchone()[0]
         expected_sum = 711.56 + 121.65 + 7498.12 + 2866.83 + 794.47
         assert abs(float(sum_result) - expected_sum) < 0.01
@@ -379,31 +314,22 @@ class TestDeltaLakeFormatSmoke:
 
         assert result.success
 
-        # Read the first transaction log file
         delta_log_dir = tmp_path / "customer" / "_delta_log"
         log_file = delta_log_dir / "00000000000000000000.json"
         assert log_file.exists()
 
-        # Parse the transaction log (newline-delimited JSON)
         actions = []
         with open(log_file, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     actions.append(json.loads(line))
 
-        # Should have protocol, metaData, and add actions
         action_types = {list(action.keys())[0] for action in actions}
         assert "protocol" in action_types
         assert "metaData" in action_types
         assert "add" in action_types
 
     def test_delta_manifest_validation_reuse(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """After Delta conversion, manifest validation should pass for directory entries.
-
-        This is a regression test: directory-based format entries previously failed
-        validation because stat().st_size on a directory returns the inode size,
-        not the recursive file sum stored in size_bytes.
-        """
         import json
 
         from benchbox.utils.format_converters.delta_converter import DeltaConverter
@@ -418,7 +344,6 @@ class TestDeltaLakeFormatSmoke:
 
         assert result.success
 
-        # Build a manifest like the conversion orchestrator would
         delta_dir = tmp_path / "customer"
         from benchbox.utils.datagen_version import current_datagen_stamp
 
@@ -447,7 +372,6 @@ class TestDeltaLakeFormatSmoke:
         manifest_path = tmp_path / "_datagen_manifest.json"
         manifest_path.write_text(json.dumps(manifest))
 
-        # Validate: compute_entry_size(delta_dir) should match result.output_size_bytes
         from benchbox.utils.datagen_manifest import compute_entry_size
 
         actual_size = compute_entry_size(delta_dir)
@@ -455,7 +379,6 @@ class TestDeltaLakeFormatSmoke:
             f"compute_entry_size ({actual_size}) should match converter output_size_bytes ({result.output_size_bytes})"
         )
 
-        # Full validation via _validate_manifest_if_present
         from unittest.mock import Mock
 
         from benchbox.core.runner.runner import _ensure_data_generated
@@ -484,12 +407,6 @@ class TestDeltaLakeFormatSmoke:
         dummy.generate_data.assert_not_called()
 
 
-# =============================================================================
-# Phase 3: Apache Iceberg Format Smoke Tests
-# =============================================================================
-
-
-# Check if pyiceberg is available
 PYICEBERG_AVAILABLE = importlib.util.find_spec("pyiceberg") is not None
 
 
@@ -497,8 +414,6 @@ PYICEBERG_AVAILABLE = importlib.util.find_spec("pyiceberg") is not None
 @pytest.mark.skipif(not PYICEBERG_AVAILABLE, reason="pyiceberg package not installed")
 @pytest.mark.skipif(sys.platform == "win32", reason="pyiceberg generates Unix-style paths incompatible with Windows")
 class TestIcebergFormatSmoke:
-    """Smoke tests for Apache Iceberg format conversion."""
-
     def test_iceberg_conversion_and_structure(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
@@ -513,17 +428,14 @@ class TestIcebergFormatSmoke:
             options=ConversionOptions(output_dir=tmp_path),
         )
 
-        # Verify conversion succeeded
         assert result.success
         assert result.row_count == 5
 
-        # Verify Iceberg metadata structure exists
         iceberg_dir = tmp_path / "customer"
         assert iceberg_dir.exists()
         metadata_dir = iceberg_dir / "metadata"
         assert metadata_dir.exists()
 
-        # Should have at least one metadata file
         metadata_files = list(metadata_dir.glob("*.json")) + list(metadata_dir.glob("*.avro"))
         assert len(metadata_files) >= 1
 
@@ -543,35 +455,24 @@ class TestIcebergFormatSmoke:
 
         assert result.success
 
-        # Find version-hint or latest metadata
         metadata_dir = tmp_path / "customer" / "metadata"
         metadata_files = sorted(metadata_dir.glob("v*.metadata.json"))
 
         if metadata_files:
-            # Read the latest metadata file
             with open(metadata_files[-1], encoding="utf-8") as f:
                 metadata = json.load(f)
 
-            # Verify essential Iceberg metadata fields
             assert "format-version" in metadata
             assert "table-uuid" in metadata
             assert "schema" in metadata or "schemas" in metadata
 
 
-# =============================================================================
-# Phase 4: CLI Integration Tests
-# =============================================================================
-
-
 @pytest.fixture
 def tpch_data_dir_with_manifest(tmp_path_factory) -> Path:
-    """Create a directory with TBL data and a valid manifest for CLI testing."""
     import json
 
-    # Create a unique tmp directory for this fixture
     data_dir = tmp_path_factory.mktemp("cli_test_data")
 
-    # Create the customer TBL file inline (same data as tpch_customer_tbl)
     tbl_file = data_dir / "customer.tbl"
     tbl_file.write_text(
         "1|Customer#000000001|IVhzIApeRb|15|25-989-741-2988|711.56|BUILDING|regular packages|\n"
@@ -581,7 +482,6 @@ def tpch_data_dir_with_manifest(tmp_path_factory) -> Path:
         "5|Customer#000000005|KvpyuHCplr|3|13-750-942-6364|794.47|HOUSEHOLD|pending foxes|\n"
     )
 
-    # Create a v2 manifest
     manifest = {
         "version": 2,
         "benchmark": "tpch",
@@ -611,16 +511,6 @@ def tpch_data_dir_with_manifest(tmp_path_factory) -> Path:
 
 @pytest.mark.integration
 class TestCLIConvertIntegration:
-    """Integration tests for the CLI convert command.
-
-    Note: The CLI convert command has a known limitation where benchmark.get_schema()
-    is called with a table_name argument, but TPC-H's get_schema() takes no arguments.
-    These tests verify CLI availability and error handling rather than full conversion.
-
-    Direct converter tests (TestParquetFormatSmoke, TestDeltaLakeFormatSmoke,
-    TestIcebergFormatSmoke) already verify the core conversion functionality.
-    """
-
     def test_cli_convert_help(self):
 
         from click.testing import CliRunner
@@ -709,17 +599,10 @@ class TestCLIConvertIntegration:
         result = runner.invoke(convert, ["--help"])
 
         assert result.exit_code == 0
-        # Verify all compression options are documented
         for compression in ["snappy", "gzip", "zstd", "none"]:
             assert compression in result.output
 
 
-# =============================================================================
-# Phase 5: DuckLake Format Smoke Tests
-# =============================================================================
-
-
-# Check if DuckLake extension is available
 try:
     _test_conn = duckdb.connect(":memory:")
     _test_conn.execute("INSTALL ducklake")
@@ -733,8 +616,6 @@ except Exception:
 @pytest.mark.integration
 @pytest.mark.skipif(not DUCKLAKE_AVAILABLE, reason="DuckLake extension not available")
 class TestDuckLakeFormatSmoke:
-    """Smoke tests for DuckLake format conversion and DuckDB querying."""
-
     def test_ducklake_conversion_and_structure(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
@@ -749,16 +630,13 @@ class TestDuckLakeFormatSmoke:
             options=ConversionOptions(output_dir=tmp_path),
         )
 
-        # Verify conversion succeeded
         assert result.success
         assert result.row_count == 5
 
-        # Verify DuckLake directory structure
         ducklake_dir = tmp_path / "customer"
         assert ducklake_dir.exists()
         assert ducklake_dir.is_dir()
 
-        # DuckLake stores catalog metadata and data separately
         assert (ducklake_dir / "metadata.ducklake").exists()
         assert (ducklake_dir / "data").exists()
         assert (ducklake_dir / "data").is_dir()
@@ -780,27 +658,22 @@ class TestDuckLakeFormatSmoke:
         metadata_path = ducklake_dir / "metadata.ducklake"
         data_path = ducklake_dir / "data"
 
-        # Query with DuckDB using ducklake extension
         conn = duckdb.connect(":memory:")
         conn.execute("LOAD ducklake")
 
-        # Attach DuckLake catalog
         conn.execute(f"ATTACH 'ducklake:{metadata_path}' AS ducklake_db (DATA_PATH '{data_path}')")
 
-        # Verify row count
         count = conn.execute("SELECT COUNT(*) FROM ducklake_db.main.customer").fetchone()[0]
         assert count == 5
 
-        # Verify data integrity
         sum_result = conn.execute("SELECT SUM(c_acctbal) FROM ducklake_db.main.customer").fetchone()[0]
         expected_sum = 711.56 + 121.65 + 7498.12 + 2866.83 + 794.47
         assert abs(float(sum_result) - expected_sum) < 0.01
 
-        # Verify filtering works
         filter_result = conn.execute(
             "SELECT c_custkey, c_name FROM ducklake_db.main.customer WHERE c_acctbal > 1000"
         ).fetchall()
-        assert len(filter_result) == 2  # Customer 3 and 4 have acctbal > 1000
+        assert len(filter_result) == 2
         custkeys = {row[0] for row in filter_result}
         assert custkeys == {3, 4}
 
@@ -824,9 +697,8 @@ class TestDuckLakeFormatSmoke:
         assert "table_path" in result.metadata
         assert "metadata_path" in result.metadata
         assert "data_path" in result.metadata
-        assert result.metadata["num_columns"] == 8  # 8 columns in customer schema
+        assert result.metadata["num_columns"] == 8
 
-        # Check size metrics
         assert result.source_size_bytes > 0
         assert result.output_size_bytes > 0
 
@@ -834,7 +706,6 @@ class TestDuckLakeFormatSmoke:
 
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
-        # Create sharded TBL files
         tbl_file1 = tmp_path / "customer.tbl.1"
         tbl_file1.write_text(
             "1|Customer#000000001|IVhzIApeRb|15|25-989-741-2988|711.56|BUILDING|regular packages|\n"
@@ -859,7 +730,6 @@ class TestDuckLakeFormatSmoke:
         assert result.success
         assert result.row_count == 5
 
-        # Verify we can query all 5 rows
         ducklake_dir = tmp_path / "customer"
         metadata_path = ducklake_dir / "metadata.ducklake"
         data_path = ducklake_dir / "data"
@@ -876,11 +746,8 @@ class TestDuckLakeFormatSmoke:
 @pytest.mark.integration
 @pytest.mark.skipif(not DUCKLAKE_AVAILABLE, reason="DuckLake extension not available")
 class TestDuckLakeMaintenanceOperations:
-    """Integration tests for DuckLake ACID maintenance operations."""
-
     @pytest.fixture
     def ducklake_customer_table(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict) -> Path:
-        """Create a DuckLake customer table for testing maintenance operations."""
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
         converter = DuckLakeConverter()
@@ -901,7 +768,6 @@ class TestDuckLakeMaintenanceOperations:
 
         ops = DuckLakeMaintenanceOperations()
 
-        # Create new rows to insert
         new_data = pa.table(
             {
                 "c_custkey": [6, 7],
@@ -924,7 +790,6 @@ class TestDuckLakeMaintenanceOperations:
         assert result.success
         assert result.rows_affected == 2
 
-        # Verify rows were inserted
         metadata_path = ducklake_customer_table / "metadata.ducklake"
         data_path = ducklake_customer_table / "data"
 
@@ -933,7 +798,7 @@ class TestDuckLakeMaintenanceOperations:
         conn.execute(f"ATTACH 'ducklake:{metadata_path}' AS ducklake_db (DATA_PATH '{data_path}')")
 
         count = conn.execute("SELECT COUNT(*) FROM ducklake_db.main.customer").fetchone()[0]
-        assert count == 7  # 5 original + 2 new
+        assert count == 7
         conn.close()
 
     def test_ducklake_delete_rows(self, ducklake_customer_table: Path):
@@ -942,7 +807,6 @@ class TestDuckLakeMaintenanceOperations:
 
         ops = DuckLakeMaintenanceOperations()
 
-        # Delete customers with acctbal > 5000 (should delete customer 3)
         result = ops.delete_rows(
             table_path=ducklake_customer_table,
             condition="c_acctbal > 5000",
@@ -951,7 +815,6 @@ class TestDuckLakeMaintenanceOperations:
         assert result.success
         assert result.rows_affected == 1
 
-        # Verify row was deleted
         metadata_path = ducklake_customer_table / "metadata.ducklake"
         data_path = ducklake_customer_table / "data"
 
@@ -960,12 +823,11 @@ class TestDuckLakeMaintenanceOperations:
         conn.execute(f"ATTACH 'ducklake:{metadata_path}' AS ducklake_db (DATA_PATH '{data_path}')")
 
         count = conn.execute("SELECT COUNT(*) FROM ducklake_db.main.customer").fetchone()[0]
-        assert count == 4  # 5 - 1
+        assert count == 4
 
-        # Verify the right row was deleted
         remaining = conn.execute("SELECT c_custkey FROM ducklake_db.main.customer ORDER BY c_custkey").fetchall()
         custkeys = [row[0] for row in remaining]
-        assert 3 not in custkeys  # Customer 3 had acctbal 7498.12
+        assert 3 not in custkeys
         conn.close()
 
     def test_ducklake_update_rows(self, ducklake_customer_table: Path):
@@ -974,8 +836,6 @@ class TestDuckLakeMaintenanceOperations:
 
         ops = DuckLakeMaintenanceOperations()
 
-        # Update market segment for customers with acctbal < 800
-        # Customers 1 (711.56), 2 (121.65), and 5 (794.47) match this condition
         result = ops.update_rows(
             table_path=ducklake_customer_table,
             condition="c_acctbal < 800",
@@ -983,9 +843,8 @@ class TestDuckLakeMaintenanceOperations:
         )
 
         assert result.success
-        assert result.rows_affected == 3  # Customers 1, 2, and 5
+        assert result.rows_affected == 3
 
-        # Verify updates
         metadata_path = ducklake_customer_table / "metadata.ducklake"
         data_path = ducklake_customer_table / "data"
 
@@ -1011,7 +870,6 @@ class TestDuckLakeMaintenanceOperations:
         ops = DuckLakeMaintenanceOperations()
         caps = ops.get_capabilities()
 
-        # Verify ACID capabilities
         assert caps.supports_insert is True
         assert caps.supports_delete is True
         assert caps.supports_update is True
@@ -1020,21 +878,17 @@ class TestDuckLakeMaintenanceOperations:
         assert caps.supports_time_travel is True
         assert caps.supports_row_level_delete is True
 
-        # Verify capabilities match global constant
         assert caps == DUCKLAKE_CAPABILITIES
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(not DUCKLAKE_AVAILABLE, reason="DuckLake extension not available")
 class TestDuckLakeDataLoadingHandlers:
-    """Integration tests for DuckLake data loading handlers."""
-
     def test_ducklake_file_handler_detection(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
 
         from benchbox.platforms.base.data_loading import FileFormatRegistry
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
-        # First create a DuckLake table
         converter = DuckLakeConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -1046,7 +900,6 @@ class TestDuckLakeDataLoadingHandlers:
 
         ducklake_dir = tmp_path / "customer"
 
-        # Test detection
         handler = FileFormatRegistry.get_handler(ducklake_dir)
         assert handler is not None
         assert handler.__class__.__name__ == "DuckLakeFileHandler"
@@ -1056,7 +909,6 @@ class TestDuckLakeDataLoadingHandlers:
         from benchbox.platforms.base.data_loading import DuckDBDuckLakeHandler
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
-        # Create DuckLake table
         converter = DuckLakeConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -1068,7 +920,6 @@ class TestDuckLakeDataLoadingHandlers:
 
         ducklake_dir = tmp_path / "customer"
 
-        # Create a target DuckDB database with customer table schema
         conn = duckdb.connect(":memory:")
         conn.execute("""
             CREATE TABLE customer (
@@ -1083,7 +934,6 @@ class TestDuckLakeDataLoadingHandlers:
             )
         """)
 
-        # Create mock adapter with required attributes
         class MockAdapter:
             dry_run_mode = False
 
@@ -1099,7 +949,6 @@ class TestDuckLakeDataLoadingHandlers:
 
         assert row_count == 5
 
-        # Verify data was loaded
         loaded_count = conn.execute("SELECT COUNT(*) FROM customer").fetchone()[0]
         assert loaded_count == 5
         conn.close()

@@ -1,5 +1,3 @@
-"""Unit tests for BundleTransformer."""
-
 from __future__ import annotations
 
 import copy
@@ -20,7 +18,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 class TestToManifestEntry:
     def test_offset_timestamp_preserves_id_date_and_normalizes_read_model_date(self, tmp_path: Path) -> None:
-        """Public IDs retain their source date while read models use UTC."""
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["run"]["timestamp"] = "2026-09-05T00:15:00+14:00"
         bundle = tmp_path / "offset.json"
@@ -91,7 +88,6 @@ class TestToManifestEntry:
         assert entry.driver_version == "1.2.0"
 
     def test_duckdb_dev_build_keeps_engine_and_package_versions_separate(self, tmp_path: Path) -> None:
-        """DuckDB's engine identity must remain distinct from its wheel version."""
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"].update(
             {
@@ -239,10 +235,8 @@ class TestResultIdFromBundle:
         transformer = BundleTransformer()
         rid = transformer.result_id_from_bundle(bundle_file)
 
-        # Expected: {benchmark}-{platform}-sf{scale}-{yyyymmdd}-{sha8}
         assert rid.startswith("tpch-duckdb-sf0.1-")
         parts = rid.split("-")
-        # sha8 should be last segment: 8 hex chars
         sha_part = parts[-1]
         assert len(sha_part) == 8
         assert all(c in "0123456789abcdef" for c in sha_part)
@@ -319,7 +313,6 @@ class TestSchemaGate:
 
 class TestZeroDurationQuery:
     def test_zero_ms_preserved(self, tmp_path: Path) -> None:
-        """A query with ms=0.0 must not be silently skipped or replaced."""
         data = {**MINIMAL_BUNDLE}
         data["queries"] = [
             {"id": "Q1", "ms": 0.0, "rows": 0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
@@ -335,7 +328,6 @@ class TestZeroDurationQuery:
         assert detail.queries[0].duration_ms == pytest.approx(0.0)
 
     def test_warmup_queries_admitted_to_queries_but_excluded_from_display_timings(self, tmp_path: Path) -> None:
-        """Warmup queries appear in detail.queries for query_executions, but do not feed display_timings."""
         data = {**MINIMAL_BUNDLE}
         data["queries"] = [
             {"id": "Q1", "ms": 100.0, "iter": 0, "stream": 0, "run_type": "warmup", "status": "SUCCESS"},
@@ -348,28 +340,22 @@ class TestZeroDurationQuery:
         rid = transformer.result_id_from_bundle(bundle)
         detail = transformer.to_detail_result(bundle, rid)
 
-        # Both warmup and measurement appear in queries (for query_executions ingest)
         assert len(detail.queries) == 2
         run_types = {q.run_type for q in detail.queries}
         assert run_types == {"warmup", "measurement"}
 
-        # But display_timings for Q1 must only use measurement (200.0)
         dt_q1 = next(dt for dt in detail.display_timings if dt.query_id == "Q1")
         assert dt_q1.display_ms == pytest.approx(200.0)
         assert dt_q1.sample_count == 1
 
 
 class TestExtendedManifestFields:
-    """Tests for the extended fields added to ManifestEntry and DetailResult."""
-
     def test_geomean_ms_computed(self, bundle_file: Path) -> None:
-        """geomean_ms is exp(mean(ln(ms))) over measurement queries."""
         import math
 
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)
 
-        # Q1=8000, Q6=4000 → geomean = sqrt(8000*4000) = sqrt(32_000_000)
         expected = math.exp((math.log(8000.0) + math.log(4000.0)) / 2)
         assert entry.geomean_ms == pytest.approx(expected)
 
@@ -436,7 +422,6 @@ class TestExtendedManifestFields:
         assert all(c in "0123456789abcdef" for c in entry.tuning_hash)
 
     def test_tuning_mode_falls_back_to_execution_block(self, tmp_path: Path) -> None:
-        """Seed-corpus bundles wrote tuning_mode under execution, not config."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -452,7 +437,6 @@ class TestExtendedManifestFields:
         assert detail.tuning_mode == "tuned"
 
     def test_tuning_mode_prefers_config_over_execution(self, tmp_path: Path) -> None:
-        """When both locations carry a value, config.tuning_mode wins."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -467,7 +451,6 @@ class TestExtendedManifestFields:
         assert entry.tuning_mode == "custom"
 
     def test_tuning_mode_stays_none_when_absent_everywhere(self, tmp_path: Path) -> None:
-        """A bundle that never recorded tuning_mode must not be assigned a fake mode."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -480,9 +463,6 @@ class TestExtendedManifestFields:
         assert entry.tuning_mode is None
 
     def test_legacy_raw_file_path_treated_as_not_recorded(self, tmp_path: Path) -> None:
-        """ADR-2 consequences: a pre-vocabulary-pin bundle with a raw local
-        tuning-file path as `tuning_mode` is not guessed into `custom` -- it's
-        treated as not-recorded, same as if the field were absent."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -496,8 +476,6 @@ class TestExtendedManifestFields:
         assert entry.tuning_mode is None
 
     def test_legacy_balanced_flavor_string_treated_as_not_recorded(self, tmp_path: Path) -> None:
-        """ADR-2 §2: the wizard's old "balanced" flavor string is not a
-        tuning_mode value and must not pass through ingest verbatim."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -511,8 +489,6 @@ class TestExtendedManifestFields:
         assert entry.tuning_mode is None
 
     def test_legacy_config_value_falls_back_to_valid_execution_value(self, tmp_path: Path) -> None:
-        """An unrecognized config.tuning_mode doesn't block a canonical value
-        recorded (redundantly) under execution.tuning_mode on the same bundle."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -527,9 +503,6 @@ class TestExtendedManifestFields:
         assert entry.tuning_mode == "tuned"
 
     def test_physical_mechanisms_and_rendering_id_extracted_from_logical_profile(self, tmp_path: Path) -> None:
-        """ADR-2 §3: platform.tuning.logical_profile feeds DetailResult so the
-        ComparabilityReceipt can warn on mismatched physical mechanisms and
-        facetMatching can offer physical_rendering_id as a secondary facet."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -553,12 +526,6 @@ class TestExtendedManifestFields:
     def test_physical_mechanisms_none_and_rendering_id_none_when_no_logical_profile_recorded(
         self, bundle_file: Path
     ) -> None:
-        """A bundle with no platform.tuning.logical_profile at all is UNKNOWN
-        (None), not "recorded zero mechanisms" ([]). Collapsing these would
-        make a legacy bundle compared against a genuinely zero-mechanism
-        tuned run look like a real "different mechanisms" mismatch instead
-        of "nothing to compare" (see ComparabilityReceipt's undefined-guard,
-        which depends on this distinction surviving ingest)."""
         transformer = BundleTransformer()
         detail = transformer.to_detail_result(bundle_file, result_id="no-logical-profile")
 
@@ -568,10 +535,6 @@ class TestExtendedManifestFields:
     def test_physical_mechanisms_empty_list_when_logical_profile_recorded_with_zero_mechanisms(
         self, tmp_path: Path
     ) -> None:
-        """A logical_profile object IS present but genuinely has zero
-        mechanisms -- this is the ADR-2 motivating case (one platform
-        renders six mechanisms, another renders zero, for the same tuned
-        template) and must be distinguishable from "no profile recorded"."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -590,7 +553,6 @@ class TestExtendedManifestFields:
         assert detail.physical_mechanisms is not None
 
     def test_tuned_fallback_and_custom_pass_through_verbatim(self, tmp_path: Path) -> None:
-        """The two new ADR-2 vocabulary values ingest like any other canonical mode."""
         import copy
 
         for mode in ("tuned-fallback", "custom"):
@@ -605,7 +567,6 @@ class TestExtendedManifestFields:
             assert entry.tuning_mode == mode
 
     def test_tuning_hash_uses_execution_fallback_mode(self, tmp_path: Path) -> None:
-        """tuning_hash resolves mode via the same execution.tuning_mode fallback."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -620,8 +581,6 @@ class TestExtendedManifestFields:
         assert len(entry.tuning_hash) == 8
 
     def test_config_hashes_ingested_verbatim_from_tuning_summary(self, tmp_path: Path) -> None:
-        """New-generation bundles carry requested_config_hash + applied_ledger_hash,
-        read verbatim from platform.tuning (never recomputed)."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -637,13 +596,11 @@ class TestExtendedManifestFields:
         assert entry.applied_ledger_hash == "b" * 64
 
     def test_config_hashes_none_for_legacy_bundle(self, bundle_file: Path) -> None:
-        """Legacy bundles (no platform.tuning hashes) keep current behavior: None."""
         entry = BundleTransformer().to_manifest_entry(bundle_file)
         assert entry.requested_config_hash is None
         assert entry.applied_ledger_hash is None
 
     def test_applied_ledger_hash_none_when_only_requested_present(self, tmp_path: Path) -> None:
-        """A tuned run whose applied ledger recorded nothing emits requested only."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -656,9 +613,6 @@ class TestExtendedManifestFields:
         assert entry.applied_ledger_hash is None
 
     def test_tuning_policy_generation_ingested_verbatim_from_tuning_summary(self, tmp_path: Path) -> None:
-        """ADR-3 seam: a new-generation bundle carries the explicit generation
-        marker, read verbatim from platform.tuning (never derived from a
-        version). Ingested onto both the manifest entry and the detail."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -671,17 +625,11 @@ class TestExtendedManifestFields:
         assert transformer.to_detail_result(bundle, result_id="gen").tuning_policy_generation == "adr-003"
 
     def test_tuning_policy_generation_none_for_legacy_bundle(self, bundle_file: Path) -> None:
-        """Legacy bundles (no platform.tuning generation marker) load unchanged:
-        the field stays None -- downstream that absence is the "pre-seam"
-        generation, only a receipt note differs."""
         transformer = BundleTransformer()
         assert transformer.to_manifest_entry(bundle_file).tuning_policy_generation is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_policy_generation is None
 
     def test_tuning_validation_status_ingested_verbatim_from_tuning_summary(self, tmp_path: Path) -> None:
-        """ADR-1 verified-state: a new-generation bundle carries the honest
-        applied-ledger tuning_validation_status in platform.tuning, read verbatim
-        (never recomputed) onto both the manifest entry and the detail."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -694,8 +642,6 @@ class TestExtendedManifestFields:
         assert transformer.to_detail_result(bundle, result_id="v").tuning_validation_status == "applied_verified"
 
     def test_tuning_validation_status_none_for_legacy_bundle(self, bundle_file: Path) -> None:
-        """Legacy bundles (no platform.tuning.validation_status) load unchanged:
-        the field stays None -- downstream that absence is "unknown"."""
         transformer = BundleTransformer()
         assert transformer.to_manifest_entry(bundle_file).tuning_validation_status is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_validation_status is None
@@ -703,14 +649,6 @@ class TestExtendedManifestFields:
     def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A real tuned DataFrame run's exported bundle carries its applied-ledger
-        hash in platform.tuning, and the explorer ingests it verbatim.
-
-        This exercises the whole DataFrame parity chain: the DF adapter records
-        applied runtime settings into the shared ledger, ``build_result_payload``
-        emits the ``platform.tuning`` summary block, and the transformer ingests
-        ``applied_ledger_hash`` -- the same seam #1264 added for SQL bundles.
-        """
         from types import SimpleNamespace
 
         from benchbox.core.dataframe.tuning.interface import DataFrameTuningConfiguration
@@ -744,7 +682,6 @@ class TestExtendedManifestFields:
         assert detail.applied_ledger_hash == result.applied_ledger_hash
 
     def test_tuning_hash_dict_detail_is_hashed_canonically(self, tmp_path: Path) -> None:
-        """A dict tuning_config is machine-readable, so key order must not affect the hash."""
         import copy
 
         data_a = copy.deepcopy(MINIMAL_BUNDLE)
@@ -767,12 +704,6 @@ class TestExtendedManifestFields:
         assert entry_a.tuning_hash is not None
 
     def test_tuning_hash_string_repr_detail_is_not_hashed(self, tmp_path: Path) -> None:
-        """A repr() string is not canonical: it must be dropped, not hashed verbatim.
-
-        Two bundles with cosmetically different repr strings for the same mode
-        must produce the same hash (mode-only), proving the repr text itself
-        is excluded from the hash payload.
-        """
         import copy
 
         data_a = copy.deepcopy(MINIMAL_BUNDLE)
@@ -801,7 +732,6 @@ class TestExtendedManifestFields:
         assert entry_a.tuning_hash == mode_only.tuning_hash
 
     def test_tuning_hash_none_when_detail_is_repr_string_and_no_mode(self, tmp_path: Path) -> None:
-        """No mode + a non-canonical repr string detail: nothing machine-readable to hash."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -829,7 +759,6 @@ class TestExtendedManifestFields:
         assert entry.validation_status == "passed"
 
     def test_validation_status_dict_form(self, tmp_path: Path) -> None:
-        """summary.validation may be a dict {"status": "passed", ...} - extract .status."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1096,12 +1025,6 @@ class TestExtendedManifestFields:
             transformer.to_manifest_entry(bundle)
 
     def test_explicitly_empty_normalized_cost_rejected(self, tmp_path: Path) -> None:
-        """An explicit ``"normalized_cost": {}`` block is malformed evidence.
-
-        It must reach strict ingest validation (missing provenance fields)
-        rather than degrade to synthetic unavailable metadata as if no cost
-        block had been supplied.
-        """
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["normalized_cost"] = {}
         bundle = tmp_path / "empty_normalized_cost.json"
@@ -1112,7 +1035,6 @@ class TestExtendedManifestFields:
             transformer.to_manifest_entry(bundle)
 
     def test_absent_normalized_cost_stays_unavailable(self, bundle_file: Path) -> None:
-        """A bundle with no cost block still gets synthetic unavailable metadata."""
         entry = BundleTransformer().to_manifest_entry(bundle_file)
 
         assert entry.normalized_cost.cost_status == "unavailable"
@@ -1152,12 +1074,6 @@ class TestExtendedManifestFields:
         value: str,
         message: str,
     ) -> None:
-        """Structural cost validation lives in the transformer ingest.
-
-        The typed read model cannot carry these values (the ``NormalizedCost``
-        dataclass rejects them at construction), so the bundle is refused
-        before any read model exists.
-        """
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["normalized_cost"] = NormalizedCost(
             normalized_cost_usd="0.42",
@@ -1177,7 +1093,6 @@ class TestExtendedManifestFields:
             transformer.to_manifest_entry(bundle)
 
     def test_test_type_inferred_from_phases(self, tmp_path: Path) -> None:
-        """test_type falls back to phases block when benchmark.test_type is absent."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1192,7 +1107,6 @@ class TestExtendedManifestFields:
         assert entry.test_type == "throughput"
 
     def test_empty_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
-        """A present-but-empty phase block is no evidence the phase ran."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1207,7 +1121,6 @@ class TestExtendedManifestFields:
         assert entry.test_type is None
 
     def test_extended_fields_in_detail_result(self, bundle_file: Path) -> None:
-        """DetailResult carries the same extended fields as ManifestEntry."""
         import math
 
         transformer = BundleTransformer()
@@ -1222,8 +1135,6 @@ class TestExtendedManifestFields:
 
 
 class TestQueryTimingExtendedFields:
-    """Tests for run_type, iter, stream fields on QueryTiming."""
-
     def test_run_type_iter_stream_preserved(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         rid = transformer.result_id_from_bundle(bundle_file)
@@ -1251,14 +1162,6 @@ class TestQueryTimingExtendedFields:
 
 
 class TestAppliedReceiptCompanion:
-    """ADR-1 per-statement introspection receipt ingestion.
-
-    The receipt lives in the ``{stem}.applied.json`` companion next to the
-    bundle. The transformer stores its ``receipt`` sub-object verbatim as a
-    canonical JSON string and degrades to ``None`` for every unusable shape --
-    a broken companion must never fail the build.
-    """
-
     RECEIPT: dict = {
         "platform": "duckdb",
         "corroborated": True,
@@ -1288,8 +1191,6 @@ class TestAppliedReceiptCompanion:
         return bundle
 
     def test_receipt_ingested_verbatim_onto_entry_and_detail(self, tmp_path: Path) -> None:
-        """The companion's ``receipt`` sub-object is stored as-is -- no verdict,
-        corroboration decision, or summary is recomputed here."""
         payload = {
             "status": "applied_verified",
             "applied_ledger_hash": "a" * 64,
@@ -1304,11 +1205,9 @@ class TestAppliedReceiptCompanion:
 
         assert entry_receipt is not None
         assert entry_receipt == detail_receipt
-        # Round-trips to exactly the receipt the companion recorded.
         assert json.loads(entry_receipt) == self.RECEIPT
 
     def test_receipt_serialization_is_canonical_and_deterministic(self, tmp_path: Path) -> None:
-        """Key order in the companion must not change the stored string."""
         shuffled = {"entries": [], "corroborated": False, "platform": "duckdb"}
         ordered = {"corroborated": False, "entries": [], "platform": "duckdb"}
         first = self._bundle_with_companion(tmp_path, json.dumps({"receipt": shuffled}))
@@ -1359,7 +1258,6 @@ class TestAppliedReceiptCompanion:
         assert marker["original_byte_count"] > 32
 
     def test_missing_companion_yields_none(self, tmp_path: Path) -> None:
-        """The common case: no introspection ran, so no companion exists."""
         bundle = self._bundle_with_companion(tmp_path, None)
 
         transformer = BundleTransformer()
@@ -1367,7 +1265,6 @@ class TestAppliedReceiptCompanion:
         assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
 
     def test_malformed_companion_json_degrades_to_none_without_raising(self, tmp_path: Path) -> None:
-        """A truncated/corrupt companion must not fail the build."""
         bundle = self._bundle_with_companion(tmp_path, '{"receipt": {"entries": [')
 
         transformer = BundleTransformer()
@@ -1375,7 +1272,6 @@ class TestAppliedReceiptCompanion:
         assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
 
     def test_companion_without_receipt_key_yields_none(self, tmp_path: Path) -> None:
-        """``receipt`` is optional -- it exists only when introspection ran."""
         payload = {
             "status": "applied_unverified",
             "applied_ledger_hash": "b" * 64,
@@ -1394,14 +1290,12 @@ class TestAppliedReceiptCompanion:
         assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
 
     def test_non_object_companion_payload_yields_none(self, tmp_path: Path) -> None:
-        """A JSON document that is valid but not an object is still unusable."""
         bundle = self._bundle_with_companion(tmp_path, json.dumps(["not", "a", "payload"]))
 
         transformer = BundleTransformer()
         assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
 
     def test_unreadable_companion_degrades_to_none(self, tmp_path: Path) -> None:
-        """A directory where the companion should be: an OSError, not a crash."""
         bundle = self._bundle_with_companion(tmp_path, None)
         bundle.with_name("receipted.applied.json").mkdir()
 
@@ -1410,13 +1304,6 @@ class TestAppliedReceiptCompanion:
 
 
 class TestExecutionModeExtraction:
-    """The SQL-vs-DataFrame facet must resolve for every published bundle.
-
-    It read only ``config.execution_mode`` / ``execution.execution_mode``,
-    which no bundle writes, so ``execution_mode`` was NULL for all 207 rows in
-    the shipping snapshot and the facet filtered nothing.
-    """
-
     def test_reads_the_key_path_current_develop_writes(self) -> None:
         bundle = {"platform": {"config": {"execution_mode": "sql"}}}
         assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "sql"
@@ -1433,11 +1320,6 @@ class TestExecutionModeExtraction:
         assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_execution_mode_field_is_not_consulted(self) -> None:
-        """``execution.mode`` says "sql" for 105 DataFrame runs in the corpus.
-
-        Trusting it would mislabel more than half the published results, so it
-        is deliberately excluded from the key paths.
-        """
         bundle = {
             "config": {"mode": "dataframe"},
             "execution": {"mode": "sql"},
@@ -1446,7 +1328,6 @@ class TestExecutionModeExtraction:
         assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_unknown_vocabulary_stays_none(self) -> None:
-        """An invented mode is worse than an honestly empty facet."""
         assert (
             transformer_module._execution_mode(transformer_module._parse_bundle({"config": {"mode": "balanced"}}))
             is None
@@ -1469,12 +1350,6 @@ class TestExecutionModeExtraction:
 
 
 class TestPublishedCorpusResolvesExecutionMode:
-    """Corpus-level guard: no published bundle may yield a NULL facet.
-
-    The unit cases above pin the key paths; this pins the actual corpus, which
-    is what the public site renders.
-    """
-
     def test_every_published_bundle_resolves(self) -> None:
         corpus = Path(__file__).resolve().parents[4] / "results-data" / "bundles"
         if not corpus.is_dir():
@@ -1494,7 +1369,6 @@ class TestPublishedCorpusResolvesExecutionMode:
         assert not unresolved, f"{len(unresolved)} of {total} bundles yield a NULL execution_mode: {unresolved[:5]}"
 
     def test_resolved_mode_agrees_with_the_filename_suffix(self) -> None:
-        """``_df_`` / ``_sql_`` in the filename is an independent witness."""
         corpus = Path(__file__).resolve().parents[4] / "results-data" / "bundles"
         if not corpus.is_dir():
             pytest.skip("results-data/bundles not present in this checkout")

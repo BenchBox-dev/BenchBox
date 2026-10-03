@@ -1,15 +1,4 @@
-"""Unit tests for DataFrame profiling module.
-
-Tests for:
-- QueryExecutionProfile dataclass
-- QueryProfileContext timing tracking
-- MemoryTracker runtime memory tracking
-- DataFrameProfiler aggregate statistics
-- Query plan capture functions
-- profile_query_execution helper
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -41,8 +30,6 @@ pytestmark = [
 
 
 class TestQueryExecutionProfile:
-    """Tests for QueryExecutionProfile dataclass."""
-
     def test_basic_creation(self):
 
         profile = QueryExecutionProfile(
@@ -124,8 +111,6 @@ class TestQueryExecutionProfile:
 
 
 class TestQueryPlan:
-    """Tests for QueryPlan dataclass."""
-
     def test_basic_creation(self):
 
         plan = QueryPlan(
@@ -163,21 +148,18 @@ class TestQueryPlan:
 
 
 class TestQueryProfileContext:
-    """Tests for QueryProfileContext timing."""
-
     def test_basic_context(self):
 
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
-        # Simulate execution
-        time.sleep(0.05)  # 50ms — 5× margin for Windows timer resolution
+        time.sleep(0.05)
 
         profile = ctx.get_profile()
 
         assert profile.query_id == "Q1"
         assert profile.platform == "polars"
-        assert profile.execution_time_ms >= 10  # At least 10ms
+        assert profile.execution_time_ms >= 10
 
     def test_planning_phase_timing(self):
 
@@ -199,7 +181,7 @@ class TestQueryProfileContext:
         ctx._start_time = time.perf_counter()
 
         ctx.start_collect()
-        time.sleep(0.05)  # 50ms — 5× margin for Windows timer resolution
+        time.sleep(0.05)
         ctx.end_collect()
 
         profile = ctx.get_profile()
@@ -252,22 +234,18 @@ class TestQueryProfileContext:
 
 
 class TestMemoryTracker:
-    """Tests for MemoryTracker runtime memory tracking."""
-
     def test_basic_tracking(self):
 
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
 
-        # Allocate some memory
         data = [0] * 100000
         time.sleep(0.05)
 
         peak = tracker.stop()
 
-        # Should have recorded some memory usage
         assert peak >= 0
-        del data  # cleanup
+        del data
 
     def test_peak_memory_property(self):
 
@@ -286,7 +264,7 @@ class TestMemoryTracker:
         tracker.stop()
 
         samples = tracker.samples
-        assert len(samples) >= 1  # At least baseline sample
+        assert len(samples) >= 1
 
     def test_get_statistics(self):
 
@@ -313,23 +291,18 @@ class TestMemoryTracker:
         assert stats["peak_mb"] == 0.0
 
     def test_stop_idempotent(self):
-        """Test that stop() is idempotent."""
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
         tracker.stop()
 
-        # Second stop should be safe
         peak = tracker.stop()
         assert peak >= 0
 
 
 class TestTrackMemoryContextManager:
-    """Tests for track_memory context manager."""
-
     def test_context_manager_usage(self):
 
         with track_memory(sample_interval_ms=10) as tracker:
-            # Allocate some memory
             data = [0] * 100000
             time.sleep(0.03)
             del data
@@ -338,17 +311,13 @@ class TestTrackMemoryContextManager:
 
 
 class TestGetCurrentMemoryMb:
-    """Tests for get_current_memory_mb function."""
-
     def test_returns_value(self):
 
         memory = get_current_memory_mb()
-        assert memory >= 0  # May be 0 if psutil not available
+        assert memory >= 0
 
 
 class TestDataFrameProfiler:
-    """Tests for DataFrameProfiler class."""
-
     def test_basic_profiling(self):
 
         profiler = DataFrameProfiler(platform="polars")
@@ -445,8 +414,6 @@ class TestDataFrameProfiler:
 
 
 class TestProfileQueryExecution:
-    """Tests for profile_query_execution helper function."""
-
     def test_basic_execution(self):
 
         def query_fn():
@@ -502,11 +469,9 @@ class TestProfileQueryExecution:
         )
 
         assert profile.peak_memory_mb >= 0
-        # Check memory stats are in metrics
         assert "memory_baseline_mb" in profile.metrics
 
     def test_with_plan_capture(self):
-        """Test profiled execution with plan capture."""
         mock_plan = QueryPlan(
             platform="test",
             plan_type="logical",
@@ -532,8 +497,6 @@ class TestProfileQueryExecution:
 
 
 class TestProfiledExecutionResult:
-    """Tests for ProfiledExecutionResult class."""
-
     def test_basic_creation(self):
 
         profile = QueryExecutionProfile(
@@ -556,8 +519,6 @@ class TestProfiledExecutionResult:
 
 
 class TestComparisonResult:
-    """Tests for ComparisonResult dataclass."""
-
     def test_dataframe_faster(self):
 
         result = ComparisonResult(
@@ -592,8 +553,6 @@ class TestComparisonResult:
 
 
 class TestCompareExecutionModes:
-    """Tests for compare_execution_modes function."""
-
     def test_comparison(self):
 
         profiles = [
@@ -607,16 +566,12 @@ class TestCompareExecutionModes:
 
         assert len(results) == 2
 
-        # Q1: DataFrame faster (100 vs 150)
         assert results[0].winner == "dataframe"
 
-        # Q2: SQL faster (200 vs 100)
         assert results[1].winner == "sql"
 
 
 class TestCaptureQueryPlan:
-    """Tests for query plan capture functions."""
-
     def test_capture_query_plan_unknown_platform(self):
 
         result = capture_query_plan({}, "unknown")
@@ -625,15 +580,13 @@ class TestCaptureQueryPlan:
     def test_capture_query_plan_polars_no_explain(self):
 
         mock_df = MagicMock()
-        del mock_df.explain  # Remove explain method
+        del mock_df.explain
 
         result = capture_query_plan(mock_df, "polars")
         assert result is None
 
 
 class TestProfileMetricType:
-    """Tests for ProfileMetricType enum."""
-
     def test_metric_types(self):
 
         assert ProfileMetricType.TIMING.value == "timing"

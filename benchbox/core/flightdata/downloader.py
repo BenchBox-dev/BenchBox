@@ -1,26 +1,6 @@
-"""Flight data downloader for BTS On-Time Performance dataset.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Downloads US Bureau of Transportation Statistics (BTS) On-Time Performance
-data and converts to the BenchBox flight data schema.
-
-Data source: BTS TranStats On-Time Reporting
-https://www.transtats.bts.gov/ontime/
-
-Scale factor mapping (SF=1 ≈ 1GB raw data):
-  SF=0.01  1 month    small synthetic/dev sample
-  SF=0.1   ~4 months  development-sized sample
-  SF=1.0   ~3.4 years ~24M flights    ~1GB
-  SF=10    ~410 months ~9.6 GB         near-linear
-  SF≥11.12 all 456 months exhausted    ~11.1 GB ceiling
-
-The BTS corpus spans Jan 1987 - Dec 2024 (456 months). Beyond SF≈11.12,
-all available months are used and data size caps at ~11.1 GB (456/41 SF-units
-× ~1 GB per SF-unit). A warning is logged when this ceiling is reached.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -64,12 +44,9 @@ _DOWNLOADER_SPECS = _load_downloader_specs()
 _DATA_COVERAGE = _DOWNLOADER_SPECS["data_coverage"]
 _FLIGHT_SHARDS = _DOWNLOADER_SPECS["flight_shards"]
 
-# BTS TranStats On-Time Performance download URL template
-# Format: YEAR_MONTH (e.g., 2023_1 for January 2023)
 BTS_BASE_URL = _DOWNLOADER_SPECS["bts_base_url"]
 BTS_CSV_ENCODING = str(_DOWNLOADER_SPECS["csv_encoding"])
 
-# Data coverage
 FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
 LAST_AVAILABLE_YEAR = int(_DATA_COVERAGE["last_available_year"])
 APPROXIMATE_MONTHLY_FLIGHTS = int(_DATA_COVERAGE["approximate_monthly_flights"])
@@ -77,12 +54,6 @@ MONTHS_PER_SCALE_FACTOR = int(_DATA_COVERAGE["months_per_scale_factor"])
 
 
 def _unavailable_months() -> set[tuple[int, int]]:
-    """Expand ``unavailable_months`` ranges from the downloader spec.
-
-    Each entry is ``[start_year, start_month, end_year, end_month]`` covering
-    BTS PREZIP archives the provider no longer serves (verified by HTTP
-    probing, not assumed). Returns an empty set when the spec lists none.
-    """
     missing: set[tuple[int, int]] = set()
     for entry in _DATA_COVERAGE.get("unavailable_months") or []:
         start_year, start_month, end_year, end_month = (int(v) for v in entry)
@@ -101,11 +72,8 @@ FLIGHTS_SHARD_ROW_TARGET = int(_FLIGHT_SHARDS["row_target"])
 FLIGHTS_SHARD_DIRNAME = _FLIGHT_SHARDS["dirname"]
 FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
 
-# BTS CSV field names (subset used in BenchBox schema)
 BTS_FIELD_NAMES = _DOWNLOADER_SPECS["bts_field_names"]
 
-# Pinned reproducible source contract: month windows always end here, never at
-# "latest available", so newly published BTS months cannot silently shift data.
 _PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
 PINNED_END_YEAR = int(_PINNED_SOURCE.get("end_year", LAST_AVAILABLE_YEAR))
 PINNED_END_MONTH = int(_PINNED_SOURCE.get("end_month", 12))
@@ -113,20 +81,9 @@ PINNED_SOURCE_SHA256 = {str(url): str(digest) for url, digest in (_PINNED_SOURCE
 
 
 def _scale_to_months(scale_factor: float) -> int:
-    """Convert scale factor to number of months of data to download.
-
-    Args:
-        scale_factor: BenchBox scale factor
-
-    Returns:
-        Number of months of data needed
-    """
-    # SF=1.0 ≈ 1GB ≈ ~41 months of data (~24M flights / ~600K per month)
-    # SF=0.01 ≈ 10MB ≈ 1 week → round up to 1 month for data availability
     months = max(1, round(scale_factor * MONTHS_PER_SCALE_FACTOR))
     max_months = (LAST_AVAILABLE_YEAR - FIRST_AVAILABLE_YEAR + 1) * 12
     if months >= max_months:
-        # Ceiling GB ≈ ceiling SF × 1 GB/SF (since SF=1 ≈ 1 GB by calibration).
         ceiling_gb = max_months / MONTHS_PER_SCALE_FACTOR
         logger.warning(
             "FlightData: BTS corpus exhausted at SF=%.1f (all %d months used). "
@@ -143,21 +100,6 @@ def _months_sequence(
     end_year: int = PINNED_END_YEAR,
     end_month: int = PINNED_END_MONTH,
 ) -> list[tuple[int, int]]:
-    """Generate (year, month) pairs working backwards from the pinned end month.
-
-    The default window ends at the pinned source contract (``PINNED_END_YEAR`` /
-    ``PINNED_END_MONTH``), not at latest-available: BTS publishes new months
-    continuously, and ending at "latest" would silently shift every scale
-    factor's dataset. Bumping the pin is an explicit, reviewed change.
-
-    Args:
-        num_months: Number of months to generate
-        end_year: Last year to include
-        end_month: Last month to include within the end year
-
-    Returns:
-        List of (year, month) tuples, most recent first
-    """
     result = []
     year, month = end_year, end_month
     for _ in range(num_months):
@@ -175,9 +117,6 @@ def _months_sequence(
             year -= 1
         if year < FIRST_AVAILABLE_YEAR:
             break
-    # Backfill past skipped months so the window keeps its month count when
-    # older archives exist; if the corpus edge is reached first, the window
-    # is shorter and _scale_to_months already logged the ceiling.
     while len(result) < num_months and year >= FIRST_AVAILABLE_YEAR:
         if (year, month) not in UNAVAILABLE_MONTHS:
             result.append((year, month))
@@ -189,12 +128,6 @@ def _months_sequence(
 
 
 class FlightDataDownloader(CompressionMixin, VerbosityMixin):
-    """Downloads and processes BTS On-Time Performance flight data.
-
-    Supports downloading real BTS data or generating synthetic data as fallback.
-    Uses time-based scale factors: larger SF = more years of historical data.
-    """
-
     def __init__(
         self,
         scale_factor: float,
@@ -206,17 +139,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         allow_synthetic_fallback: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize downloader.
-
-        Args:
-            scale_factor: Scale factor controlling data volume
-            output_dir: Directory to write output CSV files
-            seed: Random seed for synthetic data and sampling
-            verbose: Verbosity level
-            quiet: Suppress all output
-            force_redownload: Re-download even if files exist
-            allow_synthetic_fallback: Permit synthetic months after download errors at SF >= 0.1
-        """
         super().__init__(**kwargs)
 
         self.scale_factor = scale_factor
@@ -231,10 +153,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self._num_months = _scale_to_months(scale_factor)
         self._months = _months_sequence(self._num_months)
         if len(self._months) < self._num_months:
-            # Gaps in the provider archive (see unavailable_months in the
-            # downloader spec) mean fewer months are downloadable than the
-            # scale factor requests. Report the effective count so manifests
-            # and logs describe the corpus that was actually generated.
             logger.warning(
                 "FlightData: only %d of %d requested months are available; "
                 "corpus is capped at the downloadable window.",
@@ -255,12 +173,9 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         }
         self._table_row_counts: dict[str, int] = {}
         self._table_file_row_counts: dict[Path, int] = {}
-        # Observed SHA-256 of each ingested BTS zip, persisted with the
-        # manifest so the recorded corpus pins which bytes were ingested.
         self._content_hashes: dict[str, str] = {}
 
     def source_provenance(self) -> dict[str, Any]:
-        """Return fail-closed provenance and promotion eligibility for this corpus."""
         urls = set(self.source_contract()["urls"])
         expected = {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256}
         observed = {url: self._content_hashes[url] for url in urls if url in self._content_hashes}
@@ -289,16 +204,8 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         }
 
     def download(self) -> dict[str, Path | list[Path]]:
-        """Download or generate flight data and reference tables.
-
-        Returns:
-            Dictionary mapping table names to local CSV file paths
-        """
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Reject a stale or unverifiable cache: without this, an upgraded
-        # installation silently reuses the previous corpus because the output
-        # file names are unchanged.
         if not self.force_redownload:
             persisted_id = self._persisted_source_contract_id()
             if persisted_id is None:
@@ -326,7 +233,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
         airports_path = self.output_dir / self.get_compressed_filename("airports.csv")
 
-        # Copy reference data from package
         if not airlines_path.exists() or self.force_redownload:
             self._copy_reference_file("airlines.csv", airlines_path)
 
@@ -357,16 +263,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return table_files
 
     def backfill_csv_dialect_metadata(self) -> bool:
-        """Patch empty-means-NULL dialect metadata into a reused manifest.
-
-        Caches generated before the null-marker fix carry manifests whose
-        entries lack ``csv_null_marker`` (or record ``None``), so SQL loaders
-        would keep loading empty fields as ``""`` even though current
-        generations write ``""``. The runner reuses a structurally valid
-        manifest without regenerating, so heal it in place: set the marker to
-        ``""`` on this benchmark's own csv entries and rewrite the file.
-        Returns True when the manifest was changed.
-        """
         manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
         try:
             manifest = load_manifest(manifest_path)
@@ -396,10 +292,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                         changed = True
         if not changed:
             return False
-        # Rewrite atomically so an interrupted heal cannot leave an invalid
-        # manifest behind (the next run would then regenerate the data), keep
-        # the trailing newline DataGenerationManifest.write emits, and never
-        # fail a run over a read-only cache: the data itself is still usable.
         try:
             tmp_path = manifest_path.with_name(manifest_path.name + ".tmp")
             tmp_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -410,13 +302,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return True
 
     def repair_reusable_layout(self) -> dict[str, Path | list[Path]] | None:
-        """Repair a reusable FlightData cache when its source layout is loader-hostile.
-
-        Older SF1 caches used a single large zstd-compressed ``flights.csv.zst``.
-        The file can be byte-valid while still failing several native readers.
-        Replacing it with manifest-tracked CSV shards keeps the reusable corpus
-        deterministic without forcing a network redownload.
-        """
         if not self._should_use_sharded_flights():
             return None
 
@@ -452,7 +337,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return table_files
 
     def _copy_reference_file(self, filename: str, dest: Path) -> None:
-        """Copy a reference data CSV from the package to the output directory."""
         ref_dir = Path(__file__).parent / "reference_data"
         src = ref_dir / filename
         if src.exists():
@@ -461,7 +345,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 for line in source:
                     target.write(line)
                     row_count += 1
-            # Subtract 1 for the header row
             table_name = dest.name.split(".")[0]
             self._table_row_counts[table_name] = max(0, row_count - 1)
             self._table_file_row_counts[dest] = max(0, row_count - 1)
@@ -470,7 +353,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             logger.warning(f"Reference file not found: {src}")
 
     def _ensure_flights_data(self, flights_path: Path) -> Path | list[Path]:
-        """Return the active flights source files, generating or repairing when needed."""
         if self.force_redownload:
             self._remove_flights_outputs(flights_path)
 
@@ -494,11 +376,9 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return flights_path
 
     def _should_use_sharded_flights(self) -> bool:
-        """Return True when FlightData volume should avoid a single large CSV stream."""
         return self._num_months >= MONTHS_PER_SCALE_FACTOR
 
     def _remove_flights_outputs(self, flights_path: Path) -> None:
-        """Remove stale FlightData fact outputs before force regeneration."""
         with contextlib.suppress(OSError):
             flights_path.unlink()
         for candidate in self.output_dir.glob("flights.csv.*"):
@@ -542,16 +422,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return None
 
     def _generate_flights_csv(self, output_path: Path) -> int:
-        """Generate flights CSV by downloading BTS data or using synthetic fallback.
-
-        Args:
-            output_path: Path to write the combined flights CSV
-        """
         self.log_verbose(f"Generating flight data for {self._num_months} months (SF={self.scale_factor})")
 
         with self.open_output_file(output_path, "wt") as f:
             writer = csv.writer(f)
-            # Write header matching FLIGHT_SCHEMA columns
             writer.writerow(
                 [
                     "flight_id",
@@ -597,7 +471,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return self._stats["total_flights"]
 
     def _generate_flights_shards(self) -> list[Path]:
-        """Generate one deterministic flights CSV shard per source month."""
         self.log_verbose(f"Generating sharded flight data for {self._num_months} months (SF={self.scale_factor})")
         shard_dir = self._flights_shard_dir()
         shutil.rmtree(shard_dir, ignore_errors=True)
@@ -626,7 +499,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
 
     @staticmethod
     def _flight_header() -> list[str]:
-        """Return the CSV header matching FLIGHT_SCHEMA columns."""
         return [
             "flight_id",
             "flight_date",
@@ -659,7 +531,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         ]
 
     def _split_existing_flights_file(self, legacy_path: Path) -> list[Path]:
-        """Split an existing single FlightData CSV into loader-friendly shards."""
         staging_dir = self.output_dir / ".flights-shards.tmp"
         final_dir = self._flights_shard_dir()
         shutil.rmtree(staging_dir, ignore_errors=True)
@@ -790,9 +661,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             extra_metadata={
                 "source_contract": self.source_contract(),
                 "source_contract_id": self.source_contract_id(),
-                # Observed SHA-256 of each ingested BTS zip: pins which bytes
-                # the corpus came from (a provider-side byte change surfaces
-                # as a new manifest on the next fresh generation).
                 "content_hashes": dict(self._content_hashes),
                 "source_provenance": self.source_provenance(),
             },
@@ -800,9 +668,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         metadata = {
             "csv_delimiter": ",",
             "csv_has_header": True,
-            # Empty fields in the generated CSVs encode NULL (the writers emit ""
-            # for missing delays/times), so the manifest must request empty->NULL
-            # conversion. None would disable conversion and load blanks as "".
             "csv_null_marker": "",
         }
         for table_name, paths_or_path in table_files.items():
@@ -818,19 +683,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         manifest.write()
 
     def _process_month(self, writer: csv.writer, year: int, month: int, start_id: int) -> int:
-        """Attempt to download BTS data for one month, fall back to synthetic.
-
-        Args:
-            writer: CSV writer to write rows to
-            year: Year of data
-            month: Month of data (1-12)
-            start_id: Starting flight_id for this batch
-
-        Returns:
-            Number of rows written
-        """
-        # For small scale factors (SF < 0.1), always use synthetic to avoid
-        # network calls in CI/testing. Users wanting real data should use SF >= 0.1.
         if self.scale_factor < 0.1:
             self._stats["months_synthetic"] += 1
             self._stats["synthetic_months"].append(f"{year}-{month:02d}")
@@ -843,11 +695,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             self._stats["downloaded_months"].append(f"{year}-{month:02d}")
             return rows
         except (urllib.error.URLError, urllib.error.HTTPError, OSError, zipfile.BadZipFile, ValueError) as e:
-            # ValueError covers archive/content parsing failures: a valid ZIP
-            # with no CSV, and UnicodeDecodeError (a ValueError subclass) from
-            # undecodable rows. Without this, those errors bypass the fallback
-            # and the top-level cleanup, leaving partial output beside the old
-            # manifest, which a later run could mislabel as complete.
             if not self.allow_synthetic_fallback:
                 raise RuntimeError(f"BTS download failed for {year}-{month:02d}; real data is required") from e
             logger.warning(f"BTS download failed for {year}-{month:02d}: {e}. Using synthetic data.")
@@ -857,18 +704,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             return rows
 
     def _download_bts_month(self, writer: csv.writer, url: str, year: int, month: int, start_id: int) -> int:
-        """Download one month of BTS data and write to CSV.
-
-        Args:
-            writer: CSV writer
-            url: BTS download URL
-            year: Data year
-            month: Data month
-            start_id: Starting flight_id
-
-        Returns:
-            Number of rows written
-        """
         self.log_verbose(f"  Downloading BTS data: {year}-{month:02d}")
 
         req = urllib.request.Request(
@@ -882,15 +717,11 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             raise ChecksumMismatchError(path=url, expected_sha256=expected_sha256, actual_sha256=actual_sha256)
         rows_written = 0
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            # Find the CSV file inside the ZIP
             csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
             if not csv_names:
                 raise ValueError(f"No CSV found in ZIP from {url}")
 
             with zf.open(csv_names[0]) as csv_file:
-                # Historical BTS exports are Windows-1252 CSVs. Using their
-                # declared legacy encoding preserves bytes such as the 0xE4 in
-                # February 2002 tail numbers without lossy replacement.
                 reader = csv.DictReader(io.TextIOWrapper(csv_file, encoding=BTS_CSV_ENCODING))
 
                 for bts_row in reader:
@@ -903,18 +734,8 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return rows_written
 
     def _transform_bts_row(self, bts: dict[str, str], flight_id: int) -> list[Any] | None:
-        """Transform a BTS CSV row to the BenchBox schema.
-
-        Args:
-            bts: Dictionary of BTS field names to values
-            flight_id: Synthetic ID to assign
-
-        Returns:
-            List of values matching FLIGHT_SCHEMA columns, or None to skip row
-        """
 
         def _float_or_null(val: str) -> str:
-            """Return val as float string or empty string for NULL."""
             v = val.strip()
             if v in ("", ".", "NA", "N/A"):
                 return ""
@@ -970,20 +791,8 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         ]
 
     def _generate_synthetic_month(self, writer: csv.writer, year: int, month: int, start_id: int) -> int:
-        """Generate realistic synthetic flight data for one month.
-
-        Args:
-            writer: CSV writer
-            year: Year to generate data for
-            month: Month to generate data for (1-12)
-            start_id: Starting flight_id
-
-        Returns:
-            Number of rows written
-        """
         rng = self._rng
 
-        # Major routes and carriers
         carriers = ["AA", "DL", "UA", "WN", "B6", "AS", "NK", "F9", "HA", "OO"]
         airports = [
             "ATL",
@@ -1018,7 +827,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "AUS",
         ]
 
-        # Typical distances (miles) between airport pairs
         route_distances = {
             ("ATL", "LAX"): 1946,
             ("ATL", "ORD"): 587,
@@ -1039,7 +847,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
 
         _, days_in_month = calendar.monthrange(year, month)
 
-        # Adjust flight volume for year (COVID dip in 2020)
         if year == 2020:
             daily_flights = rng.randint(5000, 12000)
         elif year == 2021:
@@ -1047,15 +854,13 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         else:
             daily_flights = rng.randint(18000, 25000)
 
-        # Precompute per-origin destination lists to avoid O(n) list creation per flight
         dest_by_origin = {a: [b for b in airports if b != a] for a in airports}
 
         rows_written = 0
 
         for day in range(1, days_in_month + 1):
             flight_date = date(year, month, day)
-            day_of_week = flight_date.weekday() + 1  # 1=Monday, 7=Sunday
-            # Weekday adjustment (weekends slightly lower)
+            day_of_week = flight_date.weekday() + 1
             day_count = int(daily_flights * (0.85 if day_of_week >= 6 else 1.0))
 
             for _ in range(day_count):
@@ -1063,20 +868,16 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 origin = rng.choice(airports)
                 dest = rng.choice(dest_by_origin[origin])
 
-                # Look up or estimate distance
                 dist = route_distances.get((origin, dest), route_distances.get((dest, origin), rng.randint(200, 2500)))
 
-                # Scheduled times (HHMM format)
                 dep_hour = rng.randint(5, 22)
                 dep_min = rng.choice([0, 15, 30, 45])
                 crs_dep = dep_hour * 100 + dep_min
 
-                # Estimated flight duration (minutes): ~1hr for 500mi, +45min per 500mi
                 crs_elapsed = max(60, int(60 + (dist / 500.0) * 45))
                 arr_total_min = dep_hour * 60 + dep_min + crs_elapsed
                 crs_arr = (arr_total_min // 60 % 24) * 100 + (arr_total_min % 60)
 
-                # Cancellation (~2% rate, higher in winter months for weather)
                 cancel_prob = 0.03 if month in (1, 2, 12) else 0.015
                 cancelled = 1 if rng.random() < cancel_prob else 0
 
@@ -1089,22 +890,18 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     diverted = 0
                 else:
                     cancellation_code = ""
-                    # Departure delay: mostly on-time, some delayed
-                    delay_prob = 0.22  # 22% of flights delayed
+                    delay_prob = 0.22
                     if rng.random() < delay_prob:
-                        dep_delay_min = rng.expovariate(1 / 25)  # Exponential dist, mean ~25min
+                        dep_delay_min = rng.expovariate(1 / 25)
                         dep_delay_min = min(dep_delay_min, 300)
                     else:
-                        # Early or minimal delay
                         dep_delay_min = rng.uniform(-10, 15)
 
                     dep_delay_min = round(dep_delay_min, 1)
 
-                    # Actual departure time
                     actual_dep_min = dep_hour * 60 + dep_min + dep_delay_min
                     dep_time = (int(actual_dep_min // 60) % 24) * 100 + round(actual_dep_min % 60)
 
-                    # Arrival: some delay recovery in flight
                     recovery = rng.uniform(0, min(abs(dep_delay_min) * 0.3, 15))
                     arr_delay_min = round(dep_delay_min - recovery, 1)
 
@@ -1112,14 +909,12 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     arr_time = (int(actual_arr_min // 60) % 24) * 100 + round(actual_arr_min % 60)
 
                     actual_elapsed = crs_elapsed + arr_delay_min - dep_delay_min + recovery
-                    air_time = actual_elapsed * 0.85  # ~85% of elapsed is airborne
+                    air_time = actual_elapsed * 0.85
 
                     dep_delay = dep_delay_min
                     arr_delay = arr_delay_min
                     diverted = 1 if rng.random() < 0.003 else 0
 
-                    # Delay attribution (when late)
-                    # Assign to categories ensuring sum equals arr_delay_min
                     if arr_delay_min > 15:
                         remaining = arr_delay_min
                         carrier_delay = round(remaining * rng.uniform(0, 0.5), 1)
@@ -1129,7 +924,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                         nas_delay = round(remaining * rng.uniform(0, 0.4), 1)
                         remaining -= nas_delay
                         sec_delay = round(remaining * rng.uniform(0, 0.05), 1)
-                        # Assign all remaining to late_aircraft so components sum to total
                         late_delay = round(arr_delay_min - carrier_delay - weather_delay - nas_delay - sec_delay, 1)
                     else:
                         carrier_delay = weather_delay = nas_delay = sec_delay = late_delay = ""
@@ -1172,25 +966,13 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
 
     @property
     def months(self) -> list[tuple[int, int]]:
-        """Get the (year, month) pairs this downloader will process.
-
-        Returns:
-            List of (year, month) tuples, most recent first
-        """
         return self._months
 
     @property
     def num_months(self) -> int:
-        """Get the number of months of data to process."""
         return self._num_months
 
     def source_contract(self) -> dict[str, Any]:
-        """Pinned reproducible source contract for the configured window.
-
-        Returns the exact remote file set this downloader will read, so runs
-        record which source snapshot they came from and reviewers can see a
-        source change as a contract change.
-        """
         return {
             "source": "bts-transtats",
             "base_url": BTS_BASE_URL,
@@ -1206,16 +988,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         }
 
     def source_contract_id(self) -> str:
-        """Stable identifier for :meth:`source_contract`.
-
-        Persisted in the generation manifest so a later pin change rejects
-        the stale cache instead of silently reusing the previous corpus.
-        """
         canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def manifest_matches_source_identity(self, manifest: dict[str, Any]) -> bool:
-        """Require a complete month partition under the active source policy."""
         if manifest.get("source_contract_id") != self.source_contract_id():
             return False
         provenance = manifest.get("source_provenance")
@@ -1239,7 +1015,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return self.scale_factor < 0.1 or self.allow_synthetic_fallback or not synthetic
 
     def _persisted_source_contract_id(self) -> str | None:
-        """Return the contract id recorded in the existing manifest, if any."""
         manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
         try:
             manifest = load_manifest(manifest_path)
@@ -1249,7 +1024,6 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return contract_id if isinstance(contract_id, str) else None
 
     def _restore_persisted_provenance(self) -> None:
-        """Restore evidence needed to classify a reused verified corpus."""
         try:
             manifest = load_manifest(Path(self.output_dir) / MANIFEST_FILENAME)
         except (OSError, ValueError):
@@ -1269,5 +1043,4 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     self._stats[count_key] = len(months)
 
     def get_download_stats(self) -> dict[str, Any]:
-        """Return statistics about the download operation."""
         return {**self._stats, "source_provenance": self.source_provenance()}

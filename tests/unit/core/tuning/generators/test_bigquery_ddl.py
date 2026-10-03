@@ -1,16 +1,6 @@
-"""Unit tests for BigQuery DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the BigQueryDDLGenerator class for:
-- Time-based partitioning (DATE, DATETIME, TIMESTAMP)
-- Integer range partitioning (RANGE_BUCKET)
-- Clustering column generation (max 4 columns)
-- Table OPTIONS generation
-- Partition filter requirement
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,8 +23,6 @@ pytestmark = [
 
 
 class TestBigQueryDDLGeneratorBasics:
-    """Tests for BigQueryDDLGenerator basic properties."""
-
     def test_platform_name(self) -> None:
 
         generator = BigQueryDDLGenerator()
@@ -50,8 +38,6 @@ class TestBigQueryDDLGeneratorBasics:
 
 
 class TestPartitioningGeneration:
-    """Tests for PARTITION BY clause generation."""
-
     def test_date_partitioning_day(self) -> None:
 
         generator = BigQueryDDLGenerator()
@@ -122,8 +108,6 @@ class TestPartitioningGeneration:
 
 
 class TestClusteringGeneration:
-    """Tests for CLUSTER BY clause generation."""
-
     def test_basic_clustering(self) -> None:
 
         generator = BigQueryDDLGenerator()
@@ -152,7 +136,6 @@ class TestClusteringGeneration:
         assert clauses.cluster_by == "CLUSTER BY o_orderdate, o_custkey, o_orderkey"
 
     def test_clustering_limit_enforced(self) -> None:
-        """Test that clustering is limited to max 4 columns with warning."""
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="wide_table",
@@ -170,7 +153,6 @@ class TestClusteringGeneration:
             mock_logger.warning.assert_called_once()
             assert "max 4 clustering columns" in mock_logger.warning.call_args[0][0]
 
-        # Should only use first 4 columns
         assert clauses.cluster_by == "CLUSTER BY col1, col2, col3, col4"
 
     def test_sorting_maps_to_clustering(self) -> None:
@@ -199,8 +181,6 @@ class TestClusteringGeneration:
 
 
 class TestDistributionWarning:
-    """Tests for distribution warning (not supported in BigQuery)."""
-
     def test_distribution_logs_warning(self) -> None:
 
         generator = BigQueryDDLGenerator()
@@ -216,8 +196,6 @@ class TestDistributionWarning:
 
 
 class TestRequirePartitionFilter:
-    """Tests for require_partition_filter option."""
-
     def test_require_partition_filter_enabled(self) -> None:
 
         generator = BigQueryDDLGenerator(require_partition_filter=True)
@@ -240,8 +218,6 @@ class TestRequirePartitionFilter:
 
 
 class TestCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
 
         generator = BigQueryDDLGenerator()
@@ -334,8 +310,6 @@ class TestCreateTableDDL:
 
 
 class TestPartitionGranularityEnum:
-    """Tests for PartitionGranularity enum."""
-
     def test_enum_values(self) -> None:
 
         assert PartitionGranularity.DAY.value == "DAY"

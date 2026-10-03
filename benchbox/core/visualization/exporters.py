@@ -1,5 +1,3 @@
-"""Export helpers for BenchBox visualizations."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,17 +15,6 @@ def export_ascii(
     base_name: str,
     format: str = "txt",
 ) -> Path:
-    """Export ASCII chart content to a text file.
-
-    Args:
-        ascii_content: The rendered ASCII chart string.
-        output_dir: Directory to write files into.
-        base_name: Base filename without extension.
-        format: Output format (txt or ascii).
-
-    Returns:
-        Path to the exported file.
-    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -330,22 +317,6 @@ def render_ascii_chart(
     options: Any | None = None,
     **kwargs: Any,
 ) -> str:
-    """Render data as an ASCII chart.
-
-    Args:
-        chart_type: Data-first chart type. Result-aware semantic chart IDs such
-                    as power_bar are rendered through render_ascii_chart_from_results().
-        data: Chart data in the appropriate format for the chart type.
-        title: Optional chart title.
-        options: ChartOptions instance.
-        **kwargs: Additional arguments passed to the chart constructor.
-
-    Returns:
-        Rendered ASCII chart as a string.
-
-    Raises:
-        VisualizationError: If chart type is not supported.
-    """
     from benchbox.core.visualization.ascii_api import ChartOptions
 
     opts = options or ChartOptions()

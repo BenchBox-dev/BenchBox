@@ -1,15 +1,3 @@
-"""docs.yml skipped-deploy marker contract pins.
-
-When the independent-publication receipt gates off the legacy release deploy,
-a follow-on job must mark exactly this run's pre-created github-pages record
-`inactive` so deployment history does not read the skip as `success`. Two
-past defects shape these pins: posting without `auto_inactive=false` marks
-every prior successful github-pages deployment inactive (including the live
-independent-publication deployment), and a bare newest-first lookup by SHA can
-select the wrong record because duplicate github-pages records per SHA exist
-(reruns, concurrent queued runs).
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,13 +1,6 @@
-"""Unit tests for platform-dependent memory detection in dataframe tuning defaults.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Verifies that _get_available_memory_gb() falls through its platform-specific
-branches correctly on Linux (/proc/meminfo), macOS (sysctl), and Windows (8 GB
-fallback) by patching away psutil and the platform-specific I/O calls.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,7 +19,6 @@ pytestmark = [
 
 
 def _patch_no_psutil():
-    """Context manager that makes psutil unavailable for the duration of the test."""
     saved = sys.modules.get("psutil")
     sys.modules["psutil"] = None  # type: ignore[assignment]
 
@@ -44,17 +36,13 @@ def _patch_no_psutil():
 
 
 class TestGetAvailableMemoryLinux:
-    """Memory detection on Linux via /proc/meminfo."""
-
     def test_reads_memavailable_from_proc(self):
         meminfo = "MemTotal:       16384000 kB\nMemAvailable:    8192000 kB\nSwapTotal: 0 kB\n"
         with _patch_no_psutil(), patch("builtins.open", mock_open(read_data=meminfo)):
             result = _get_available_memory_gb()
-        # 8192000 kB / 1024^2 = ~7.8125 GB
         assert abs(result - 8192000 / (1024**2)) < 0.001
 
     def test_falls_through_when_no_memavailable_line(self):
-        """If /proc/meminfo has no MemAvailable, fall through to sysctl/fallback."""
         meminfo = "MemTotal:       16384000 kB\nSwapTotal: 0 kB\n"
         sysctl_result = MagicMock(returncode=0, stdout=str(16 * 1024**3))
 
@@ -64,7 +52,6 @@ class TestGetAvailableMemoryLinux:
             patch("subprocess.run", return_value=sysctl_result),
         ):
             result = _get_available_memory_gb()
-        # sysctl path: 16 GB * 0.7
         assert abs(result - 16 * 0.7) < 0.01
 
     def test_oserror_falls_through(self):
@@ -79,10 +66,8 @@ class TestGetAvailableMemoryLinux:
 
 
 class TestGetAvailableMemoryMacOS:
-    """Memory detection on macOS via sysctl hw.memsize."""
-
     def test_sysctl_success(self):
-        total_bytes = 32 * 1024**3  # 32 GB
+        total_bytes = 32 * 1024**3
         sysctl_result = MagicMock(returncode=0, stdout=str(total_bytes))
 
         with (
@@ -91,7 +76,6 @@ class TestGetAvailableMemoryMacOS:
             patch("subprocess.run", return_value=sysctl_result),
         ):
             result = _get_available_memory_gb()
-        # 70% of 32 GB
         assert abs(result - 32 * 0.7) < 0.01
 
     def test_sysctl_failure_returns_fallback(self):
@@ -107,8 +91,6 @@ class TestGetAvailableMemoryMacOS:
 
 
 class TestGetAvailableMemoryWindowsFallback:
-    """On Windows there is no /proc/meminfo and no sysctl - must return 8 GB."""
-
     def test_all_paths_fail_returns_default(self):
         import subprocess
 

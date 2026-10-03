@@ -1,9 +1,6 @@
-"""Coverage-focused tests for DatabricksAdapter uncovered paths.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -18,14 +15,8 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Shared fixture
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True)
 def _mock_databricks_deps():
-    """Mock Databricks dependency check and SQL imports."""
     with (
         patch("benchbox.platforms.databricks.adapter.databricks_sql"),
         patch("benchbox.platforms.databricks.check_platform_dependencies", return_value=(True, [])),
@@ -45,14 +36,7 @@ def _make_adapter(**kwargs):
     return DatabricksAdapter(**defaults)
 
 
-# ---------------------------------------------------------------------------
-# _auto_detect_databricks_config direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestAutoDetectDatabricksConfig:
-    """Test _auto_detect_databricks_config reads from Databricks SDK."""
-
     def test_returns_none_when_sdk_import_fails(self):
         from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -112,14 +96,7 @@ class TestAutoDetectDatabricksConfig:
         assert result is None
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info - SDK warehouse metadata path
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoSdkPath:
-    """Test get_platform_info warehouse metadata via Databricks SDK."""
-
     def test_captures_compute_configuration_from_sdk(self):
         adapter = _make_adapter(http_path="/sql/1.0/warehouses/abc123")
 
@@ -160,7 +137,6 @@ class TestGetPlatformInfoSdkPath:
         assert cc["warehouse_metadata_collection_status"] == "available"
 
     def test_platform_info_sdk_import_error_silenced(self):
-        """SDK ImportError is silenced and recorded as unavailable metadata."""
         adapter = _make_adapter()
 
         with (
@@ -175,7 +151,6 @@ class TestGetPlatformInfoSdkPath:
         assert info["compute_configuration"]["warehouse_metadata_error_class"] in {"ImportError", "ModuleNotFoundError"}
 
     def test_platform_info_sdk_exception_silenced(self):
-        """SDK runtime exception does not propagate and records unavailable metadata."""
         adapter = _make_adapter()
 
         mock_sdk = MagicMock()
@@ -193,22 +168,12 @@ class TestGetPlatformInfoSdkPath:
         assert info["compute_configuration"]["warehouse_metadata_error_class"] == "RuntimeError"
 
 
-# ---------------------------------------------------------------------------
-# workspace region detection via metastore summary
-# ---------------------------------------------------------------------------
-
-
 class TestDetectDatabricksRegion:
-    """Test workspace region detection when the region was not configured."""
-
     def _mock_sdk_with_region(self, region):
         mock_summary = MagicMock()
         mock_summary.region = region
         mock_workspace = MagicMock()
         mock_workspace.metastores.summary.return_value = mock_summary
-        # Fail warehouse lookup: an unconstrained warehouses.get() mock would
-        # store MagicMocks throughout compute_configuration, which the
-        # normalization path cannot sanitize promptly.
         mock_workspace.warehouses.get.side_effect = RuntimeError("warehouse lookup disabled")
         mock_sdk = MagicMock()
         mock_sdk.WorkspaceClient.return_value = mock_workspace
@@ -278,14 +243,7 @@ class TestDetectDatabricksRegion:
         assert info["configuration"]["region"] is None
 
 
-# ---------------------------------------------------------------------------
-# normalized result metadata
-# ---------------------------------------------------------------------------
-
-
 class TestNormalizedResultMetadata:
-    """Test Databricks normalized workspace, warehouse, and storage facets."""
-
     def test_sdk_observed_serverless_warehouse_maps_to_normalized_metadata(self):
         adapter = _make_adapter(
             http_path="/sql/1.0/warehouses/abc123",
@@ -388,14 +346,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_storage"]["uc_volume"] == "stage"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_stage_root branching (DatabricksPath case)
-# ---------------------------------------------------------------------------
-
-
 class TestResolveStageRoot:
-    """Test _resolve_stage_root branch for DatabricksPath input."""
-
     def test_uses_dbfs_target_from_databricks_path(self):
         from benchbox.utils.cloud_storage import DatabricksPath
 
@@ -406,7 +357,6 @@ class TestResolveStageRoot:
         assert root == "dbfs:/Volumes/cat/sch/vol/data"
 
     def test_raises_when_no_staging_available(self, tmp_path):
-        """ValueError raised when no cloud staging is configured."""
         adapter = _make_adapter()
         adapter.staging_root = None
         adapter.uc_catalog = None
@@ -417,14 +367,7 @@ class TestResolveStageRoot:
             adapter._resolve_stage_root(tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# _external_location_from_file_uri trailing slash / directory paths
-# ---------------------------------------------------------------------------
-
-
 class TestExternalLocationFromFileUri:
-    """Extra paths for _external_location_from_file_uri."""
-
     def test_trailing_slash_stripped(self):
         from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -438,14 +381,7 @@ class TestExternalLocationFromFileUri:
             DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders.csv")
 
 
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
-
-
 class TestDatabricksAddCliArguments:
-    """Test add_cli_arguments registers expected flags."""
-
     def test_server_hostname_arg(self):
         import argparse
 
@@ -477,16 +413,8 @@ class TestDatabricksAddCliArguments:
         assert args.catalog == "workspace"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_stage_root - cloud URI and UC volume branches
-# ---------------------------------------------------------------------------
-
-
 class TestResolveStageRootCloudURI:
-    """Test _resolve_stage_root branches for cloud URI and UC volume inputs."""
-
     def test_s3_uri_returned_as_is(self):
-        """staging_root as s3:// URI is returned directly (trailing slash stripped)."""
         adapter = _make_adapter()
         adapter.staging_root = "s3://my-bucket/data"
         adapter.uc_catalog = None
@@ -497,7 +425,6 @@ class TestResolveStageRootCloudURI:
         assert result == "s3://my-bucket/data"
 
     def test_abfss_uri_returned_as_is(self):
-        """staging_root as abfss:// URI is returned directly."""
         adapter = _make_adapter()
         adapter.staging_root = "abfss://container@account.dfs.core.windows.net/path"
         adapter.uc_catalog = None
@@ -508,7 +435,6 @@ class TestResolveStageRootCloudURI:
         assert result == "abfss://container@account.dfs.core.windows.net/path"
 
     def test_uc_volume_triple_used_when_no_staging_root(self, tmp_path):
-        """When uc_catalog/uc_schema/uc_volume are set, returns dbfs:/Volumes/... path."""
         adapter = _make_adapter()
         adapter.staging_root = None
         adapter.uc_catalog = "cat"
@@ -519,7 +445,6 @@ class TestResolveStageRootCloudURI:
         assert result == "dbfs:/Volumes/cat/sch/vol"
 
     def test_raises_when_no_cloud_staging_configured(self, tmp_path):
-        """ValueError raised when no cloud staging and no UC volume config."""
         adapter = _make_adapter()
         adapter.staging_root = None
         adapter.uc_catalog = None
@@ -530,16 +455,8 @@ class TestResolveStageRootCloudURI:
             adapter._resolve_stage_root(tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# _load_single_table - table-not-found and COPY INTO construction
-# ---------------------------------------------------------------------------
-
-
 class TestLoadSingleTable:
-    """Test _load_single_table error path and COPY INTO SQL construction."""
-
     def test_raises_runtime_error_when_table_missing_from_existing_tables(self):
-        """RuntimeError raised when table_name is not in existing_tables."""
         adapter = _make_adapter()
         adapter.uc_catalog = "main"
         adapter.uc_schema = "bench"
@@ -561,11 +478,10 @@ class TestLoadSingleTable:
                 table_name="orders",
                 file_path=Path("orders.tbl"),
                 stage_root="dbfs:/Volumes/main/bench",
-                existing_tables={"lineitem", "customer"},  # orders missing
+                existing_tables={"lineitem", "customer"},
             )
 
     def test_copy_into_sql_contains_table_and_uri(self):
-        """COPY INTO statement sent to cursor references the correct table and file URI."""
         from unittest.mock import call, patch
 
         adapter = _make_adapter()
@@ -576,14 +492,12 @@ class TestLoadSingleTable:
 
         cursor = MagicMock()
         cursor.fetchone.return_value = (42,)
-        # DESCRIBE TABLE response, then COPY INTO result rows
         cursor.fetchall.side_effect = [
             [("id", "int", ""), ("amount", "decimal(8,2)", "")],
             [("orders.parquet", "LOADED", "", 42, "", "")],
         ]
         connection = MagicMock()
         benchmark = MagicMock()
-        # Return no schema so column_list is empty
         benchmark.get_schema.return_value = {}
 
         with (
@@ -600,18 +514,15 @@ class TestLoadSingleTable:
                 existing_tables={"orders", "lineitem"},
             )
 
-        # Collect all SQL strings passed to cursor.execute()
         executed_sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
         copy_sql = next((s for s in executed_sqls if "COPY INTO" in s), None)
         assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
         assert "ORDERS" in copy_sql
         assert "dbfs:/Volumes/main/bench/orders.parquet" in copy_sql
-        # Parquet loads cast through a SELECT to the Delta column types
         assert "FILEFORMAT = PARQUET" in copy_sql
         assert "CAST(`id` AS int)" in copy_sql
 
     def _copy_sql_for_csv(self, tmp_stem, metadata):
-        """Run _load_single_table for a CSV and return the COPY INTO SQL."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
 
         adapter = _make_adapter()
@@ -641,7 +552,6 @@ class TestLoadSingleTable:
         return copy_sql
 
     def test_copy_into_honors_manifest_header(self):
-        """Manifest csv_has_header=true must set header=true in FORMAT_OPTIONS."""
         copy_sql = self._copy_sql_for_csv(
             "trips",
             {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""},
@@ -649,7 +559,6 @@ class TestLoadSingleTable:
         assert "'header'='true'" in copy_sql
 
     def test_copy_into_header_csv_uses_cast_select(self):
-        """Header CSVs load through a DESCRIBE-driven cast SELECT."""
         from unittest.mock import call, patch
 
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
@@ -689,21 +598,12 @@ class TestLoadSingleTable:
         assert "CAST(`amount` AS decimal(8,2))" in copy_sql
 
     def test_copy_into_defaults_to_no_header(self):
-        """CSVs without manifest metadata keep header=false."""
         copy_sql = self._copy_sql_for_csv("orders", {})
         assert "'header'='false'" in copy_sql
 
 
-# ---------------------------------------------------------------------------
-# create_external_tables - happy path
-# ---------------------------------------------------------------------------
-
-
 class TestCreateExternalTables:
-    """Test create_external_tables constructs CREATE TABLE ... USING PARQUET."""
-
     def test_happy_path_issues_create_table_sql(self):
-        """Verify CREATE TABLE ... USING PARQUET LOCATION is issued for each table."""
         from unittest.mock import patch
 
         adapter = _make_adapter()
@@ -713,7 +613,6 @@ class TestCreateExternalTables:
         data_files = {"orders": "dbfs:/Volumes/main/bench/orders.parquet"}
 
         cursor = MagicMock()
-        # SHOW TABLES returns a row whose index-1 element is the table name
         cursor.fetchall.return_value = [("main", "orders", False)]
         cursor.fetchone.return_value = (1500,)
         connection = MagicMock()
@@ -739,16 +638,8 @@ class TestCreateExternalTables:
         assert "orders" in table_stats
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark - spark_configs and disable_result_cache
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmark:
-    """Test configure_for_benchmark applies Spark configs and cache control."""
-
     def test_spark_configs_are_set_via_cursor(self):
-        """SET <key> = <value> is called for each entry in spark_configs."""
         adapter = _make_adapter()
         adapter.disable_result_cache = False
         adapter.spark_configs = {
@@ -767,7 +658,6 @@ class TestConfigureForBenchmark:
         assert any("spark.sql.shuffle.partitions" in s for s in executed_sqls)
 
     def test_disable_result_cache_executes_set_statement(self):
-        """SET use_cached_result = false is issued when disable_result_cache=True."""
         adapter = _make_adapter()
         adapter.disable_result_cache = True
         adapter.spark_configs = {}
@@ -783,16 +673,8 @@ class TestConfigureForBenchmark:
         assert any("use_cached_result" in s and "false" in s for s in executed_sqls)
 
 
-# ---------------------------------------------------------------------------
-# execute_query - failure path
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQueryFailurePath:
-    """Test execute_query returns FAILED dict when cursor.execute raises."""
-
     def test_returns_failed_dict_on_exception(self):
-        """When cursor.execute() raises, result has status=FAILED and error key."""
         from unittest.mock import patch
 
         adapter = _make_adapter()
@@ -819,14 +701,7 @@ class TestExecuteQueryFailurePath:
         assert result["query_id"] == "Q1"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_databricks_clustering_strategy - full precedence coverage
-# ---------------------------------------------------------------------------
-
-
 class TestResolveClusteringStrategy:
-    """Test _resolve_databricks_clustering_strategy precedence rules."""
-
     def test_returns_none_when_no_effective_config(self):
         adapter = _make_adapter()
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
@@ -868,7 +743,6 @@ class TestResolveClusteringStrategy:
         assert result == "liquid_clustering"
 
     def test_liquid_rejects_z_order_enabled(self):
-        """Liquid clustering rejects contradictory z_ordering_enabled flag."""
         adapter = _make_adapter()
         platform_opts = MagicMock()
         platform_opts.databricks_clustering_strategy = "z_order"
@@ -937,14 +811,7 @@ class TestResolveClusteringStrategy:
         assert result == "z_order"
 
 
-# ---------------------------------------------------------------------------
-# from_config() - config assembly
-# ---------------------------------------------------------------------------
-
-
 class TestFromConfig:
-    """Test DatabricksAdapter.from_config() configuration resolution."""
-
     def test_passes_explicit_credentials_to_adapter(self):
         from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -961,7 +828,6 @@ class TestFromConfig:
         assert adapter.catalog == "production"
 
     def test_skips_placeholder_server_hostname_triggers_autodetect(self):
-        """Placeholder server_hostname causes auto-detect to be called."""
         from benchbox.platforms.databricks import DatabricksAdapter
 
         config = {
@@ -991,7 +857,6 @@ class TestFromConfig:
             "catalog": "main",
         }
         adapter = DatabricksAdapter.from_config(config)
-        # Schema should be auto-generated (not default "benchbox")
         assert adapter.schema is not None
         assert adapter.schema != ""
 
@@ -1083,21 +948,14 @@ class TestFromConfig:
             "http_path": "/sql/1.0/warehouses/auto123",
             "access_token": "auto-token",
         }
-        config = {}  # No explicit credentials
+        config = {}
         with patch.object(DatabricksAdapter, "_auto_detect_databricks_config", return_value=auto_config):
             adapter = DatabricksAdapter.from_config(config)
         assert adapter.server_hostname == "auto.cloud.databricks.com"
         assert adapter.access_token == "auto-token"
 
 
-# ---------------------------------------------------------------------------
-# _create_admin_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCreateAdminConnection:
-    """Test _create_admin_connection invokes databricks_sql.connect."""
-
     def test_connects_with_correct_params(self):
         adapter = _make_adapter()
 
@@ -1123,14 +981,7 @@ class TestCreateAdminConnection:
         assert "BenchBox" in call_kwargs.kwargs.get("user_agent_entry", "")
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
-    """Test check_server_database_exists branches."""
-
     def test_returns_true_when_catalog_and_schema_exist(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
@@ -1140,8 +991,8 @@ class TestCheckServerDatabaseExists:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.side_effect = [
-            [("main",), ("hive_metastore",)],  # SHOW CATALOGS
-            [("benchbox",), ("default",)],  # SHOW SCHEMAS IN main
+            [("main",), ("hive_metastore",)],
+            [("benchbox",), ("default",)],
         ]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -1157,7 +1008,7 @@ class TestCheckServerDatabaseExists:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.return_value = [("main",)]  # SHOW CATALOGS - doesn't include missing_cat
+        mock_cursor.fetchall.return_value = [("main",)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
             result = adapter.check_server_database_exists()
@@ -1173,8 +1024,8 @@ class TestCheckServerDatabaseExists:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.side_effect = [
-            [("main",)],  # SHOW CATALOGS
-            [("other_schema",)],  # SHOW SCHEMAS - doesn't include missing_schema
+            [("main",)],
+            [("other_schema",)],
         ]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -1189,14 +1040,7 @@ class TestCheckServerDatabaseExists:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# drop_database
-# ---------------------------------------------------------------------------
-
-
 class TestDropDatabase:
-    """Test drop_database issues DROP SCHEMA CASCADE."""
-
     def test_issues_drop_schema_cascade(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
@@ -1213,23 +1057,13 @@ class TestDropDatabase:
         assert any("DROP SCHEMA" in s and "CASCADE" in s for s in executed)
 
     def test_raises_on_connection_failure(self):
-        """When _create_admin_connection raises, drop_database propagates an error."""
         adapter = _make_adapter()
         with patch.object(adapter, "_create_admin_connection", side_effect=RuntimeError("fail")):
-            # The source code has a bug where catalog/schema are unbound in the except block
-            # when connection itself fails - we just verify some exception is raised
             with pytest.raises(Exception):
                 adapter.drop_database()
 
 
-# ---------------------------------------------------------------------------
-# _build_ctas_sort_sql
-# ---------------------------------------------------------------------------
-
-
 class TestBuildCtasSortSql:
-    """Test _build_ctas_sort_sql generates the right SQL for different methods."""
-
     def _make_col(self, name):
         col = MagicMock()
         col.name = name
@@ -1276,14 +1110,7 @@ class TestBuildCtasSortSql:
             adapter._build_ctas_sort_sql("ORDERS", [self._make_col("col1")])
 
 
-# ---------------------------------------------------------------------------
-# _fix_databricks_sql_syntax
-# ---------------------------------------------------------------------------
-
-
 class TestFixDatabricksSqlSyntax:
-    """Test _fix_databricks_sql_syntax removes NULLS FIRST/LAST from PKs."""
-
     def test_removes_nulls_last_from_pk(self):
         adapter = _make_adapter()
         sql = "CREATE TABLE t (id INT, PRIMARY KEY (id NULLS LAST))"
@@ -1304,14 +1131,7 @@ class TestFixDatabricksSqlSyntax:
         assert result == sql
 
 
-# ---------------------------------------------------------------------------
-# _convert_to_delta_table
-# ---------------------------------------------------------------------------
-
-
 class TestConvertToDeltaTable:
-    """Test _convert_to_delta_table adds USING DELTA and TBLPROPERTIES."""
-
     def test_adds_using_delta_when_missing(self):
         adapter = _make_adapter()
         sql = "CREATE TABLE orders (id INT, val VARCHAR(100))"
@@ -1325,7 +1145,6 @@ class TestConvertToDeltaTable:
         assert "CREATE OR REPLACE TABLE" in result
 
     def test_if_not_exists_kept_without_or_replace(self):
-        # CREATE OR REPLACE ... IF NOT EXISTS is a Databricks syntax error.
         adapter = _make_adapter()
         sql = "CREATE TABLE IF NOT EXISTS DimDate (SK_DateID BIGINT)"
         result = adapter._convert_to_delta_table(sql)
@@ -1348,7 +1167,6 @@ class TestConvertToDeltaTable:
         assert result == sql
 
     def test_comment_prefixed_create_still_converted(self):
-        """Schema chunks with "--" headers must still get OR REPLACE + USING DELTA."""
         adapter = _make_adapter()
         sql = "-- Generated staging load tables\nCREATE TABLE orders (id INT)"
         result = adapter._convert_to_delta_table(sql)
@@ -1356,7 +1174,6 @@ class TestConvertToDeltaTable:
         assert "CREATE OR REPLACE TABLE orders (id INT) USING DELTA" in result
 
     def test_pre_pass_applies_to_every_statement(self):
-        """Pre-pass list comprehension transforms each statement independently."""
         adapter = _make_adapter()
         statements = [
             "CREATE TABLE orders (id INT, val VARCHAR(100))",
@@ -1369,16 +1186,8 @@ class TestConvertToDeltaTable:
         assert all("USING DELTA" in r for r in results)
 
 
-# ---------------------------------------------------------------------------
-# _apply_tpcdi_databricks_rewrites
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTpcdiDatabricksRewrites:
-    """Test _apply_tpcdi_databricks_rewrites dialect normalization."""
-
     def test_flag_literals_become_boolean(self):
-        """BIT flag comparisons use IS TRUE/FALSE; integer columns untouched."""
         adapter = _make_adapter()
         result = adapter._apply_tpcdi_databricks_rewrites(
             "SELECT * FROM DimCustomer WHERE IsCurrent = 1 AND BatchID = 1"
@@ -1394,7 +1203,6 @@ class TestApplyTpcdiDatabricksRewrites:
         assert "TT_IS_SELL IS FALSE" in result
 
     def test_julianday_and_now_rewritten(self):
-        """SQLite date idioms map to Databricks equivalents."""
         adapter = _make_adapter()
         result = adapter._apply_tpcdi_databricks_rewrites("SELECT JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))")
         assert "JULIANDAY" not in result
@@ -1410,14 +1218,7 @@ class TestApplyTpcdiDatabricksRewrites:
         assert "DATE_SUB(CURRENT_DATE(), 90)" in result
 
 
-# ---------------------------------------------------------------------------
-# optimize_table and vacuum_table
-# ---------------------------------------------------------------------------
-
-
 class TestOptimizeAndVacuumTable:
-    """Test optimize_table and vacuum_table issue the correct SQL."""
-
     def test_optimize_table_executes_optimize(self):
         adapter = _make_adapter()
         adapter.enable_delta_optimization = True
@@ -1469,14 +1270,7 @@ class TestOptimizeAndVacuumTable:
         mock_cursor.execute.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# analyze_table
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeTable:
-    """Test analyze_table issues ANALYZE TABLE COMPUTE STATISTICS."""
-
     def test_executes_analyze_table(self):
         adapter = _make_adapter()
 
@@ -1490,7 +1284,6 @@ class TestAnalyzeTable:
         assert any("ANALYZE TABLE" in s and "LINEITEM" in s for s in executed)
 
     def test_analyze_table_warning_on_failure(self):
-        """Failed ANALYZE should not raise but log a warning."""
         adapter = _make_adapter()
 
         mock_conn = MagicMock()
@@ -1498,19 +1291,11 @@ class TestAnalyzeTable:
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = RuntimeError("analyze failed")
 
-        # Should not raise
         adapter.analyze_table(mock_conn, "lineitem")
         mock_cursor.execute.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings - liquid clustering and z_order paths
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTunings:
-    """Test apply_table_tunings dispatches to liquid or z_order correctly."""
-
     def _make_tuning(self, table_name="orders"):
         tuning = MagicMock()
         tuning.table_name = table_name
@@ -1539,11 +1324,10 @@ class TestApplyTableTunings:
 
         tuning = self._make_tuning("orders")
 
-        # Return DELTA in table info
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.return_value = [("Provider", "DELTA")]  # DESCRIBE EXTENDED result
+        mock_cursor.fetchall.return_value = [("Provider", "DELTA")]
 
         from unittest.mock import patch as _patch
 
@@ -1606,14 +1390,7 @@ class TestApplyTableTunings:
         assert any("ZORDER BY" in s for s in executed)
 
 
-# ---------------------------------------------------------------------------
-# _ensure_uc_volume_exists
-# ---------------------------------------------------------------------------
-
-
 class TestEnsureUcVolumeExists:
-    """Test _ensure_uc_volume_exists SQL statements."""
-
     def test_creates_schema_and_volume(self):
         adapter = _make_adapter()
 
@@ -1650,14 +1427,7 @@ class TestEnsureUcVolumeExists:
             adapter._ensure_uc_volume_exists("dbfs:/Volumes/cat/sch/vol", mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# _upload_manifest_to_uc_volume
-# ---------------------------------------------------------------------------
-
-
 class TestUploadManifestToUcVolume:
-    """Test _upload_manifest_to_uc_volume writes manifest to correct path."""
-
     def test_uploads_to_volume_root(self, tmp_path):
         adapter = _make_adapter()
 
@@ -1694,14 +1464,7 @@ class TestUploadManifestToUcVolume:
             adapter._upload_manifest_to_uc_volume(manifest_path, "dbfs:/Volumes/cat/sch/vol", mock_workspace)
 
 
-# ---------------------------------------------------------------------------
-# _upload_single_file and _upload_file_content_to_uc
-# ---------------------------------------------------------------------------
-
-
 class TestUploadSingleFile:
-    """Test _upload_single_file and _upload_file_content_to_uc."""
-
     def test_returns_dbfs_uri_on_success(self, tmp_path):
         adapter = _make_adapter()
 
@@ -1747,14 +1510,7 @@ class TestUploadSingleFile:
             adapter._upload_single_file(data_file, "/Volumes/cat/sch/vol", "dbfs:/Volumes/cat/sch/vol", mock_workspace)
 
 
-# ---------------------------------------------------------------------------
-# _detect_sharded_files
-# ---------------------------------------------------------------------------
-
-
 class TestDetectShardedFiles:
-    """Test _detect_sharded_files sharding detection logic."""
-
     def test_non_sharded_file_returns_false(self, tmp_path):
         data_file = tmp_path / "orders.tbl"
         data_file.write_bytes(b"data")
@@ -1766,7 +1522,6 @@ class TestDetectShardedFiles:
         assert chunks == []
 
     def test_sharded_file_with_numeric_suffix_returns_true(self, tmp_path):
-        # Create sharded files orders.tbl.1, orders.tbl.2
         for i in range(1, 3):
             f = tmp_path / f"orders.tbl.{i}"
             f.write_bytes(b"chunk")
@@ -1779,7 +1534,6 @@ class TestDetectShardedFiles:
         assert len(chunks) == 2
 
     def test_compressed_sharded_file_detected(self, tmp_path):
-        # Create sharded + compressed files like orders.tbl.1.zst, orders.tbl.2.zst
         for i in range(1, 3):
             f = tmp_path / f"orders.tbl.{i}.zst"
             f.write_bytes(b"compressed chunk")
@@ -1793,14 +1547,7 @@ class TestDetectShardedFiles:
         assert "*.zst" in pattern
 
 
-# ---------------------------------------------------------------------------
-# _resolve_databricks_data_files
-# ---------------------------------------------------------------------------
-
-
 class TestResolveDatabricksDataFiles:
-    """Test _resolve_databricks_data_files resolution paths."""
-
     def test_delegates_to_resolver(self):
         adapter = _make_adapter()
         benchmark = MagicMock()
@@ -1840,14 +1587,7 @@ class TestResolveDatabricksDataFiles:
         assert result.tables == {"orders": [Path("orders.1.parquet"), Path("orders.2.parquet")]}
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Test _get_existing_tables fetches non-temporary tables."""
-
     def test_returns_non_temp_tables(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
@@ -1856,11 +1596,10 @@ class TestGetExistingTables:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        # Format: (database, tableName, isTemporary)
         mock_cursor.fetchall.return_value = [
             ("bench", "orders", False),
             ("bench", "lineitem", False),
-            ("bench", "tmp_view", True),  # Should be excluded
+            ("bench", "tmp_view", True),
         ]
 
         result = adapter._get_existing_tables(mock_conn)
@@ -1878,14 +1617,7 @@ class TestGetExistingTables:
         assert result == []
 
 
-# ---------------------------------------------------------------------------
-# _get_platform_metadata
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformMetadata:
-    """Test _get_platform_metadata fetches version and catalog info."""
-
     def test_returns_spark_version_and_catalogs(self):
         adapter = _make_adapter()
 
@@ -1893,14 +1625,13 @@ class TestGetPlatformMetadata:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Sequentially return for each cursor.execute call
         mock_cursor.fetchone.side_effect = [
-            ("14.3 LTS",),  # SELECT version()
-            ("main", "benchbox"),  # SELECT current_catalog(), current_schema()
+            ("14.3 LTS",),
+            ("main", "benchbox"),
         ]
         mock_cursor.fetchall.side_effect = [
-            [("current_database",)],  # SHOW FUNCTIONS
-            [("spark.sql.shuffle.partitions", "200")],  # SET
+            [("current_database",)],
+            [("spark.sql.shuffle.partitions", "200")],
         ]
 
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
@@ -1923,14 +1654,7 @@ class TestGetPlatformMetadata:
         assert "metadata_error" in metadata
 
 
-# ---------------------------------------------------------------------------
-# apply_platform_optimizations
-# ---------------------------------------------------------------------------
-
-
 class TestApplyPlatformOptimizations:
-    """Test apply_platform_optimizations is a no-op that logs."""
-
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1947,14 +1671,7 @@ class TestApplyPlatformOptimizations:
             mock_info.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Test apply_unified_tuning dispatches to sub-methods."""
-
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -1986,14 +1703,7 @@ class TestApplyUnifiedTuning:
         mock_constraint.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# apply_constraint_configuration
-# ---------------------------------------------------------------------------
-
-
 class TestApplyConstraintConfiguration:
-    """Test apply_constraint_configuration logs but doesn't execute SQL."""
-
     def test_no_op_when_pk_and_fk_are_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -2016,14 +1726,7 @@ class TestApplyConstraintConfiguration:
             mock_info.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# _is_cloud_uri
-# ---------------------------------------------------------------------------
-
-
 class TestIsCloudUri:
-    """Test _is_cloud_uri classifies URIs correctly."""
-
     def test_s3_uri_is_cloud(self):
         from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -2045,14 +1748,7 @@ class TestIsCloudUri:
         assert DatabricksAdapter._is_cloud_uri("/local/path/data") is False
 
 
-# ---------------------------------------------------------------------------
-# validate_external_table_requirements
-# ---------------------------------------------------------------------------
-
-
 class TestValidateExternalTableRequirements:
-    """Test validate_external_table_requirements raises when not configured."""
-
     def test_raises_when_no_staging_no_uc_volume(self):
         adapter = _make_adapter()
         adapter.staging_root = None
@@ -2081,19 +1777,11 @@ class TestValidateExternalTableRequirements:
         adapter.uc_schema = "sch"
         adapter.uc_volume = "vol"
 
-        # Valid UC volume triple satisfies requirement without raising ValueError
         adapter.validate_external_table_requirements()
         assert adapter.uc_catalog == "cat" and adapter.uc_schema == "sch" and adapter.uc_volume == "vol"
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info - with connection (version query path)
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoWithConnection:
-    """Test get_platform_info when a connection is provided."""
-
     def test_captures_version_from_connection(self):
         adapter = _make_adapter()
 
@@ -2124,18 +1812,10 @@ class TestGetPlatformInfoWithConnection:
         ):
             info = adapter.get_platform_info(connection=mock_conn)
 
-        # Should not raise; platform_version should be None
         assert info["platform_version"] is None
 
 
-# ---------------------------------------------------------------------------
-# _resolve_file_uri_and_delimiter
-# ---------------------------------------------------------------------------
-
-
 class TestResolveFileUriAndDelimiter:
-    """Test _resolve_file_uri_and_delimiter handles all file types."""
-
     def test_dbfs_volumes_path_used_directly(self):
         adapter = _make_adapter()
         file_uri, filename, delimiter = adapter._resolve_file_uri_and_delimiter(
@@ -2150,7 +1830,7 @@ class TestResolveFileUriAndDelimiter:
             Path("orders.tbl"), "dbfs:/Volumes/cat/sch/vol"
         )
         assert file_uri == "dbfs:/Volumes/cat/sch/vol/orders.tbl"
-        assert delimiter == "|"  # TPC format uses pipe
+        assert delimiter == "|"
 
     def test_csv_non_tpc_file_uses_comma_delimiter(self):
         adapter = _make_adapter()
@@ -2223,14 +1903,7 @@ class TestResolveFileUriAndDelimiter:
         ) == ["dbfs:/Volumes/cat/sch/vol/orders.tbl"]
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
-    """Test close_connection handles edge cases."""
-
     def test_closes_valid_connection(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
@@ -2253,14 +1926,7 @@ class TestCloseConnection:
             assert "close failed" in mock_warn.call_args[0][0]
 
 
-# ---------------------------------------------------------------------------
-# get_target_dialect and platform_name
-# ---------------------------------------------------------------------------
-
-
 class TestBasicProperties:
-    """Test trivial property methods."""
-
     def test_get_target_dialect_returns_databricks(self):
         adapter = _make_adapter()
         assert adapter.get_target_dialect() == "databricks"
@@ -2270,14 +1936,7 @@ class TestBasicProperties:
         assert adapter.platform_name == "Databricks"
 
 
-# ---------------------------------------------------------------------------
-# _get_remote_file_uris_from_manifest
-# ---------------------------------------------------------------------------
-
-
 class TestGetRemoteFileUrisFromManifest:
-    """Test _get_remote_file_uris_from_manifest builds correct URI map."""
-
     def test_single_file_per_table(self):
         adapter = _make_adapter()
         manifest = {
@@ -2293,8 +1952,6 @@ class TestGetRemoteFileUrisFromManifest:
         assert result["orders"] == "dbfs:/Volumes/cat/sch/vol/orders.parquet"
 
     def test_sharded_files_get_exact_uri_list(self):
-        # COPY INTO rejects mid-path globs, so sharded tables map to exact
-        # per-file URIs (one COPY INTO per shard at load time).
         adapter = _make_adapter()
         manifest = {
             "tables": {
@@ -2315,7 +1972,7 @@ class TestGetRemoteFileUrisFromManifest:
         adapter = _make_adapter()
         manifest = {
             "tables": {
-                "orders": [],  # empty - should be skipped
+                "orders": [],
             }
         }
         result = adapter._get_remote_file_uris_from_manifest("dbfs:/Volumes/cat/sch/vol", manifest)
@@ -2339,14 +1996,7 @@ class TestGetRemoteFileUrisFromManifest:
         ]
 
 
-# ---------------------------------------------------------------------------
-# supports_tuning_type
-# ---------------------------------------------------------------------------
-
-
 class TestSupportsTuningType:
-    """Test supports_tuning_type returns correct values."""
-
     def test_returns_true_for_clustering(self):
         adapter = _make_adapter()
         try:
@@ -2361,18 +2011,10 @@ class TestSupportsTuningType:
         adapter = _make_adapter()
         with patch.dict("sys.modules", {"benchbox.core.tuning.interface": None}):
             result = adapter.supports_tuning_type("clustering")
-        # Without the module we can't match - just ensure no exception
         assert isinstance(result, bool)
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClause:
-    """Test generate_tuning_clause builds the correct SQL clauses."""
-
     def test_returns_empty_string_when_no_tuning(self):
         adapter = _make_adapter()
         tuning = MagicMock()
@@ -2432,14 +2074,7 @@ class TestGenerateTuningClause:
         assert "CLUSTER BY" in result
 
 
-# ---------------------------------------------------------------------------
-# create_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnection:
-    """Test create_connection sets up catalog context."""
-
     def test_sets_catalog_on_new_database(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
@@ -2480,9 +2115,6 @@ class TestCreateConnection:
         assert any("USE SCHEMA" in s and "bench_tpch" in s for s in executed)
 
     def test_sets_schema_on_new_database(self):
-        """Fresh databases also get schema context: pooled connections never
-        reach create_schema(), so deferring USE SCHEMA there strands them on
-        the default schema."""
         adapter = _make_adapter()
         adapter.catalog = "main"
         adapter.schema = "bench_tpch"
@@ -2511,14 +2143,7 @@ class TestCreateConnection:
                     adapter.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchema:
-    """Test create_schema creates Delta Lake tables."""
-
     def test_creates_schema_and_executes_statements(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
@@ -2591,14 +2216,7 @@ class TestCreateSchema:
                         adapter.create_schema(benchmark, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# execute_query - success path
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteQuerySuccessPath:
-    """Test execute_query success cases."""
-
     def test_returns_dict_with_status_ok(self):
         adapter = _make_adapter()
 
@@ -2673,21 +2291,13 @@ class TestExecuteQuerySuccessPath:
         assert result.get("translated_query") is None
 
 
-# ---------------------------------------------------------------------------
-# load_data - orchestration path
-# ---------------------------------------------------------------------------
-
-
 class TestLoadData:
-    """Test load_data orchestrates tables correctly."""
-
     def test_loads_all_tables_and_returns_stats(self):
         adapter = _make_adapter()
         adapter.catalog = "main"
         adapter.schema = "bench"
 
         cursor = MagicMock()
-        # SHOW TABLES returns orders and lineitem
         cursor.fetchall.return_value = [
             ("bench", "orders", False),
             ("bench", "lineitem", False),
@@ -2752,18 +2362,10 @@ class TestLoadData:
                                     data_dir=Path("/data"),
                                 )
 
-        # Table should be recorded with 0 rows on failure
         assert table_stats["orders"] == 0
 
 
-# ---------------------------------------------------------------------------
-# _upload_to_uc_volume - main body (no reuse)
-# ---------------------------------------------------------------------------
-
-
 class TestUploadToUcVolumeMainBody:
-    """Test _upload_to_uc_volume processes files and returns URI map."""
-
     def test_single_non_sharded_file_uploaded(self, tmp_path):
         adapter = _make_adapter()
         adapter.server_hostname = "test.cloud.databricks.com"
@@ -2815,7 +2417,6 @@ class TestUploadToUcVolumeMainBody:
                         force_upload=True,
                     )
 
-        # Missing file should be skipped, result empty
         assert "orders" not in result
 
     def test_reuse_result_returned_early(self, tmp_path):
@@ -2882,14 +2483,7 @@ class TestUploadToUcVolumeMainBody:
         ]
 
 
-# ---------------------------------------------------------------------------
-# _maybe_upload_to_uc_volume
-# ---------------------------------------------------------------------------
-
-
 class TestMaybeUploadToUcVolume:
-    """Test _maybe_upload_to_uc_volume dispatches correctly."""
-
     def test_uploads_when_data_is_local_and_uc_volume_path(self, tmp_path):
         adapter = _make_adapter()
 
@@ -2916,19 +2510,11 @@ class TestMaybeUploadToUcVolume:
         with patch.object(adapter, "_ensure_uc_volume_exists") as mock_ensure:
             result = adapter._maybe_upload_to_uc_volume(data_files, stage_root, tmp_path, mock_conn)
 
-        # No upload for S3 staging
         mock_ensure.assert_not_called()
         assert result == data_files
 
 
-# ---------------------------------------------------------------------------
-# _upload_sharded_files
-# ---------------------------------------------------------------------------
-
-
 class TestUploadShardedFiles:
-    """Test _upload_sharded_files uploads all chunk files."""
-
     def test_uploads_all_chunk_files(self, tmp_path):
         adapter = _make_adapter()
 
@@ -2975,14 +2561,7 @@ class TestUploadShardedFiles:
                 )
 
 
-# ---------------------------------------------------------------------------
-# _upload_single_table_path (shard auto-detect branch)
-# ---------------------------------------------------------------------------
-
-
 class TestUploadSingleTablePath:
-    """Shard auto-detect must return exact URIs, never a glob (COPY INTO rejects globs)."""
-
     def test_sharded_branch_returns_exact_uri_list(self, tmp_path):
         from pathlib import Path
 
@@ -3028,14 +2607,7 @@ class TestUploadSingleTablePath:
             )
 
 
-# ---------------------------------------------------------------------------
-# _deduplicate_output_aliases
-# ---------------------------------------------------------------------------
-
-
 class TestDeduplicateOutputAliases:
-    """Duplicate top-level outputs gain numeric suffixes; unique queries pass through."""
-
     def test_self_join_duplicates_get_suffixes(self):
         adapter = _make_adapter()
         sql = (
@@ -3054,14 +2626,7 @@ class TestDeduplicateOutputAliases:
         assert adapter._deduplicate_output_aliases(sql) == sql
 
 
-# ---------------------------------------------------------------------------
-# _upload_file_content_to_uc
-# ---------------------------------------------------------------------------
-
-
 class TestUploadFileContentToUc:
-    """Test _upload_file_content_to_uc reads and uploads correctly."""
-
     def test_uploads_content_to_workspace(self, tmp_path):
         adapter = _make_adapter()
 
@@ -3090,14 +2655,7 @@ class TestUploadFileContentToUc:
             )
 
 
-# ---------------------------------------------------------------------------
-# _select_databricks_warehouse helper function
-# ---------------------------------------------------------------------------
-
-
 class TestSelectDatabricksWarehouse:
-    """Test the module-level _select_databricks_warehouse function."""
-
     def test_returns_none_for_empty_list(self):
         import logging
 
@@ -3161,14 +2719,7 @@ class TestSelectDatabricksWarehouse:
         logger.info.assert_called()
 
 
-# ---------------------------------------------------------------------------
-# _get_connection_params
-# ---------------------------------------------------------------------------
-
-
 class TestGetConnectionParams:
-    """Test _get_connection_params returns correct param dict."""
-
     def test_returns_adapter_defaults(self):
         adapter = _make_adapter()
         params = adapter._get_connection_params()
@@ -3187,14 +2738,7 @@ class TestGetConnectionParams:
         assert params["access_token"] == "override-tok"
 
 
-# ---------------------------------------------------------------------------
-# _resolve_uc_manifest_path
-# ---------------------------------------------------------------------------
-
-
 class TestResolveUcManifestPath:
-    """Test _resolve_uc_manifest_path for regular Path and DatabricksPath."""
-
     def test_returns_manifest_in_data_dir_for_regular_path(self, tmp_path):
         adapter = _make_adapter()
         result = adapter._resolve_uc_manifest_path(tmp_path)
@@ -3209,14 +2753,7 @@ class TestResolveUcManifestPath:
         assert "_datagen_manifest.json" in str(result)
 
 
-# ---------------------------------------------------------------------------
-# _manifest_pattern_for_name static method
-# ---------------------------------------------------------------------------
-
-
 class TestManifestPatternForName:
-    """Test _manifest_pattern_for_name extracts base and extension."""
-
     def test_compressed_sharded_file(self):
         from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -3235,7 +2772,6 @@ class TestManifestPatternForName:
         from benchbox.platforms.databricks import DatabricksAdapter
 
         base, ext = DatabricksAdapter._manifest_pattern_for_name("orders.parquet")
-        # Non-sharded - uses stem/suffix logic
         assert "orders" in base
 
     def test_dsdgen_underscore_chunks_detected(self):
@@ -3257,10 +2793,6 @@ class TestManifestPatternForName:
         assert DatabricksAdapter._is_manifest_shard_name("inventory_3.dat") is False
 
 
-# ---------------------------------------------------------------------------
-# Databricks version probing via SELECT current_version()
-# ---------------------------------------------------------------------------
-
 _LIVE_WAREHOUSE_STRUCT = {
     "dbr_version": None,
     "dbsql_version": "2026.36",
@@ -3276,7 +2808,6 @@ def _mock_version_connection(
     execute_side_effect=None,
     fetchall_values=None,
 ):
-    """Build a MagicMock connection with a single shared cursor."""
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_conn.cursor.return_value = mock_cursor
@@ -3290,8 +2821,6 @@ def _mock_version_connection(
 
 
 class TestSanitizeSparkEngineVersion:
-    """Unit tests for hash-aware SELECT version() sanitization."""
-
     def test_strips_placeholder_hash(self):
         from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
 
@@ -3322,8 +2851,6 @@ class TestSanitizeSparkEngineVersion:
 
 
 class TestFirstColumnScalarGuard:
-    """_first_column must not truncate bare scalar strings via indexing."""
-
     def test_bare_string_returned_intact(self):
         from benchbox.platforms.databricks.adapter import _first_column
 
@@ -3342,8 +2869,6 @@ class TestFirstColumnScalarGuard:
 
 
 class TestParseCurrentVersionPayload:
-    """Unit tests for current_version() struct normalization."""
-
     def test_parses_warehouse_dict(self):
         from benchbox.platforms.databricks.adapter import _parse_current_version_payload
 
@@ -3409,8 +2934,6 @@ class TestParseCurrentVersionPayload:
 
 
 class TestGetPlatformInfoCurrentVersion:
-    """get_platform_info() prefers current_version() with version() fallback."""
-
     def test_warehouse_dict_struct(self):
         adapter = _make_adapter()
         conn, cursor = _mock_version_connection(fetchone_values=[(dict(_LIVE_WAREHOUSE_STRUCT),)])
@@ -3549,8 +3072,6 @@ class TestGetPlatformInfoCurrentVersion:
 
 
 class TestGetPlatformMetadataCurrentVersion:
-    """_get_platform_metadata() records DBSQL version plus sanitized Spark version."""
-
     def test_warehouse_records_dbsql_and_spark_versions(self):
         adapter = _make_adapter()
         conn, cursor = _mock_version_connection(
@@ -3621,11 +3142,6 @@ class TestGetPlatformMetadataCurrentVersion:
         assert metadata["spark_version"] == "4.2.0"
 
 
-# ---------------------------------------------------------------------------
-# preprocess_operation_sql
-# ---------------------------------------------------------------------------
-
-
 def _make_operation(write_sql: str, overrides: dict | None = None):
     from benchbox.core.write_primitives.catalog import WriteOperation
 
@@ -3639,8 +3155,6 @@ def _make_operation(write_sql: str, overrides: dict | None = None):
 
 
 class TestPreprocessOperationSql:
-    """Databricks VARCHAR requires a length; rewrite to STRING."""
-
     def test_cast_varchar_rewritten(self):
         adapter = _make_adapter()
 
@@ -3649,7 +3163,6 @@ class TestPreprocessOperationSql:
         assert result == "SELECT CAST(n AS STRING)"
 
     def test_unnest_generate_series_rewritten_to_explode_sequence(self):
-        """Databricks has neither unnest nor generate_series (UNRESOLVED_ROUTINE live)."""
         adapter = _make_adapter()
 
         result = adapter.preprocess_operation_sql(

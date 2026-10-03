@@ -1,15 +1,4 @@
-"""Unit tests for DataFrame Validation Framework.
-
-Tests for:
-- ValidationResult dataclass
-- Row count validation
-- Column name validation
-- Fuzzy float comparison
-- DataFrame comparison
-- DataFrameValidator class
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -37,10 +26,7 @@ pytestmark = [
 
 
 class TestValidationResult:
-    """Tests for ValidationResult dataclass."""
-
     def test_success_creates_valid_result(self):
-        """Test that success() creates a valid result."""
         result = ValidationResult.success()
 
         assert result.is_valid is True
@@ -49,7 +35,6 @@ class TestValidationResult:
         assert result.warnings == []
 
     def test_success_with_metrics(self):
-        """Test success() with metrics."""
         metrics = {"rows": 100, "columns": 5}
         result = ValidationResult.success(metrics)
 
@@ -57,7 +42,6 @@ class TestValidationResult:
         assert result.metrics == metrics
 
     def test_failure_creates_invalid_result(self):
-        """Test that failure() creates an invalid result."""
         result = ValidationResult.failure("Row count mismatch")
 
         assert result.is_valid is False
@@ -65,7 +49,6 @@ class TestValidationResult:
         assert "Row count mismatch" in result.errors
 
     def test_error_creates_error_result(self):
-        """Test that error() creates an error result."""
         result = ValidationResult.error("Cannot compare DataFrames")
 
         assert result.is_valid is False
@@ -73,7 +56,6 @@ class TestValidationResult:
         assert "Cannot compare DataFrames" in result.errors
 
     def test_add_error_marks_invalid(self):
-        """Test that add_error() marks result as invalid."""
         result = ValidationResult.success()
         result.add_error("Something went wrong")
 
@@ -82,7 +64,6 @@ class TestValidationResult:
         assert "Something went wrong" in result.errors
 
     def test_add_warning_keeps_valid(self):
-        """Test that add_warning() keeps result valid."""
         result = ValidationResult.success()
         result.add_warning("Minor issue")
 
@@ -99,7 +80,6 @@ class TestValidationResult:
         assert bool(invalid) is False
 
     def test_merge_combines_results(self):
-        """Test that merge() combines two results."""
         result1 = ValidationResult.success({"rows": 100})
         result1.add_warning("Warning 1")
 
@@ -114,7 +94,6 @@ class TestValidationResult:
         assert len(merged.warnings) == 2
 
     def test_merge_propagates_failure(self):
-        """Test that merge() propagates failure."""
         result1 = ValidationResult.success()
         result2 = ValidationResult.failure("Error")
 
@@ -125,8 +104,6 @@ class TestValidationResult:
 
 
 class TestValidateRowCount:
-    """Tests for validate_row_count function."""
-
     def test_exact_match(self):
 
         result = validate_row_count(100, 100)
@@ -164,8 +141,6 @@ class TestValidateRowCount:
 
 
 class TestValidateColumnNames:
-    """Tests for validate_column_names function."""
-
     def test_exact_match(self):
 
         result = validate_column_names(["a", "b", "c"], ["a", "b", "c"])
@@ -183,7 +158,6 @@ class TestValidateColumnNames:
         config = ValidationConfig(ignore_column_order=False)
         result = validate_column_names(["c", "b", "a"], ["a", "b", "c"], config=config)
 
-        # Should still be valid but with warning
         assert result.is_valid is True
         assert len(result.warnings) == 1
 
@@ -210,8 +184,6 @@ class TestValidateColumnNames:
 
 
 class TestFuzzyFloatCompare:
-    """Tests for fuzzy_float_compare function."""
-
     def test_exact_match(self):
 
         assert fuzzy_float_compare(1.0, 1.0) is True
@@ -243,8 +215,6 @@ class TestFuzzyFloatCompare:
 
 
 class TestCompareDataframes:
-    """Tests for compare_dataframes function."""
-
     def test_identical_dataframes(self):
 
         df1 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
@@ -294,7 +264,6 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_sort_invariant(self):
-        """Test sort-invariant comparison."""
         df1 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
         df2 = pl.DataFrame({"a": [3, 1, 2], "b": [6, 4, 5]})
 
@@ -315,11 +284,10 @@ class TestCompareDataframes:
 
         config = ValidationConfig(level=ValidationLevel.LOOSE)
         df1 = pl.DataFrame({"a": [1, 2, 3]})
-        df2 = pl.DataFrame({"b": [4, 5, 6]})  # Different column name and values
+        df2 = pl.DataFrame({"b": [4, 5, 6]})
 
         result = compare_dataframes(df1, df2, config=config)
 
-        # Loose validation fails on column mismatch, but would pass row count
         assert result.metrics["actual_rows"] == 3
         assert result.metrics["expected_rows"] == 3
 
@@ -345,8 +313,6 @@ class TestCompareDataframes:
 
 
 class TestCompareWithSql:
-    """Tests for compare_with_sql function."""
-
     def test_adds_query_context(self):
 
         df1 = pl.DataFrame({"a": [1, 2, 3]})
@@ -368,8 +334,6 @@ class TestCompareWithSql:
 
 
 class TestValidateQueryResult:
-    """Tests for validate_query_result function."""
-
     def test_row_count_only(self):
 
         df = pl.DataFrame({"a": [1, 2, 3]})
@@ -404,10 +368,7 @@ class TestValidateQueryResult:
 
 
 class TestDataFrameValidator:
-    """Tests for DataFrameValidator class."""
-
     def test_validate_stores_results(self):
-        """Test that validate() stores results."""
         validator = DataFrameValidator()
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 3]})
@@ -428,11 +389,10 @@ class TestDataFrameValidator:
         assert len(validator.results) == 1
 
     def test_summary(self):
-        """Test summary() method."""
         validator = DataFrameValidator()
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 3]})
-        df3 = pl.DataFrame({"a": [1, 2, 4]})  # Different
+        df3 = pl.DataFrame({"a": [1, 2, 4]})
 
         validator.validate(df1, df2, query_id="Q1")
         validator.validate(df1, df3, query_id="Q2")
@@ -446,7 +406,6 @@ class TestDataFrameValidator:
         assert summary["is_valid"] is False
 
     def test_reset(self):
-        """Test reset() clears results."""
         validator = DataFrameValidator()
         df = pl.DataFrame({"a": [1, 2, 3]})
 
@@ -462,7 +421,7 @@ class TestDataFrameValidator:
         validator = DataFrameValidator(config=config)
 
         df1 = pl.DataFrame({"a": [1.0]})
-        df2 = pl.DataFrame({"a": [1.0005]})  # Within 1e-3 tolerance
+        df2 = pl.DataFrame({"a": [1.0005]})
 
         result = validator.validate(df1, df2)
 
@@ -470,8 +429,6 @@ class TestDataFrameValidator:
 
 
 class TestValidationConfig:
-    """Tests for ValidationConfig dataclass."""
-
     def test_default_values(self):
 
         config = ValidationConfig()
@@ -495,8 +452,6 @@ class TestValidationConfig:
 
 
 class TestValidationLevel:
-    """Tests for ValidationLevel enum."""
-
     def test_levels(self):
 
         assert ValidationLevel.STRICT.value == "strict"
@@ -505,8 +460,6 @@ class TestValidationLevel:
 
 
 class TestComparisonStatus:
-    """Tests for ComparisonStatus enum."""
-
     def test_statuses(self):
 
         assert ComparisonStatus.MATCH.value == "match"

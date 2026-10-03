@@ -1,29 +1,3 @@
-"""Local/CI lint-guard parity pin.
-
-Guards that only run in CI (never locally) fire for the first time on a
-pushed PR, costing a full remote round trip per miss. This test parses
-``.github/workflows/ci.yml`` -- the source of truth -- and asserts that
-every guard command the `lint` job (job id ``code-lint``) runs after its
-dependency-install step also appears, verbatim, in the Makefile's
-``ci-lint`` recipe. Parity is asserted at the COMMAND level (not just
-target/step names): a local target that happens to share a name with a CI
-step but runs different logic must NOT be treated as satisfying parity.
-
-Steps that are genuinely CI-only stay out of ``ci-lint`` and must be listed
-in ``EXCLUDED_STEPS`` below with a reason -- never silently dropped and
-never faked by weakening the CI guard to pass locally. See
-docs/operations/ci-local-parity.md for the parity invariant and how to add
-a new lint guard without breaking this test.
-
-This module also pins the `code-lint` job's report-all structure: every
-guard step runs to completion in one CI cycle (via `continue-on-error`)
-instead of the job stopping at the first failure, and a final
-`lint-guard-summary` step derives the guard set from the `guard-*` id
-naming convention -- never a hand-maintained id list, which would let a
-newly added guard silently escape aggregation. See
-docs/operations/ci-local-parity.md for the naming-convention contract.
-"""
-
 from __future__ import annotations
 
 import re
@@ -32,36 +6,20 @@ from pathlib import Path
 import pytest
 import yaml
 
-# medium, not fast: at authoring time the fast-lane merge ref sat at exactly
-# the max_fast_tests ceiling (25545); medium still runs in the required
-# pre-merge lane (medium-test), so parity stays enforced without contending
-# on the shared fast-lane budget this batch is in the middle of fixing.
 pytestmark = pytest.mark.medium
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-PUBLICATION_DOCS_WORKFLOW = None  # retired by the ci.yml flip
+PUBLICATION_DOCS_WORKFLOW = None
 RELEASE_TEST_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "test.yml"
 MAKEFILE = REPO_ROOT / "Makefile"
 LINT_JOB_ID = "code-lint"
 
-# Naming convention the `code-lint` job's report-all aggregation relies on:
-# every independent guard step gets `id: guard-<slug>` + `continue-on-error:
-# true`, and the aggregator (below) discovers the guard set by filtering the
-# `steps` context on this prefix -- never a hand-maintained id list, which
-# would let a newly added guard silently escape aggregation.
 GUARD_ID_PREFIX = "guard-"
 AGGREGATOR_STEP_NAME = "lint-guard-summary"
 
-# Steps whose `run:` command is a setup/install action, not a guard -- they
-# have no failure-condition semantics of their own and ci-lint doesn't need
-# a matching line (uv/make handle env sync implicitly). Identified by name
-# so reordering the job doesn't silently stop excluding them.
 SETUP_STEP_NAMES = {"Install dependencies"}
 
-# Steps that are genuinely CI-only. Every entry needs a reason, and the test
-# below fails if a listed step is renamed or removed -- so this dict can't
-# rot into cover for a guard that quietly stopped existing.
 MERGE_GROUP_ONLY_NOTE = (
     "merge_group-only input, honored by `fast_lane_ceiling_check.py` only when the "
     "runner's own event file also says merge_group: the script rejects the "
@@ -71,10 +29,6 @@ MERGE_GROUP_ONLY_NOTE = (
 )
 
 EXCLUDED_STEPS: dict[str, str] = {
-    # The fast-lane ceiling step is excluded only because its merge_group-only
-    # branch has no local equivalent. The dedicated strict-command test below
-    # pins the ordinary --strict command to the Makefile recipe, while the
-    # merge-group branch and skip aggregation are pinned by workflow assertions.
     "Fast lane ceiling": MERGE_GROUP_ONLY_NOTE,
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
@@ -90,11 +44,6 @@ EXCLUDED_STEPS: dict[str, str] = {
     ),
 }
 
-# The develop PR umbrella is not the only merge-gating workflow. Keep the
-# guard-shaped steps in the release test workflow and the independent
-# publication docs lane visible here as well. A local equivalent may be a
-# stricter Make target; a hosted-only exception must name the missing input or
-# service and is documented in docs/operations/ci-local-parity.md.
 MERGE_GATE_WORKFLOWS = {
     "ci.yml": PR_WORKFLOW,
     "test.yml": RELEASE_TEST_WORKFLOW,
@@ -113,8 +62,6 @@ MERGE_GATE_NON_GUARD_JOBS = {
     "certification-identity",
     "ci-required-result",
     "release-required-result",
-    # ci.yml unit result jobs only aggregate needs into pass/fail; they run
-    # no guard logic of their own, so they need no local equivalent.
     "core",
     "explorer",
     "results-data",
@@ -136,10 +83,6 @@ MERGE_GATE_GUARD_TOKENS = (
     "lint",
 )
 
-# Step keys that have a local proving command. The value is deliberately a
-# substring rather than a workflow-specific command parser: command-level
-# parity for code-lint remains owned by _guard_commands() above, while these
-# entries pin the other merge-gate surfaces to their local entry points.
 MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Verify source bundled binary manifest"): "scripts/bundled_binary_manifest.py",
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
@@ -422,8 +365,6 @@ def _is_guard_shaped_step(job_name: str, step: dict) -> bool:
         return False
     if name == AGGREGATOR_STEP_NAME:
         return False
-    # The code-lint parser above remains the detailed command-level contract;
-    # this broader inventory catches guard/check steps in other merge gates.
     return job_name != LINT_JOB_ID and any(token in f"{name} {run}".lower() for token in MERGE_GATE_GUARD_TOKENS)
 
 
@@ -434,15 +375,6 @@ def _load_lint_job_steps() -> list[dict]:
 
 
 def _guard_commands() -> dict[str, list[str]]:
-    """Map step name -> list of individual shell command lines.
-
-    Steps with no `run:` key (pure `uses:` actions like checkout/setup-python),
-    the dependency-install step, and the `lint-guard-summary` aggregator itself
-    are excluded here; everything else is a candidate guard. The aggregator
-    has no local equivalent to mirror -- it's the report-all mechanism, not a
-    policy guard -- so ci-lint's own report-all block (see the `ci-lint`
-    target's comment) covers the same job without needing a matching line.
-    """
     commands: dict[str, list[str]] = {}
     for step in _load_lint_job_steps():
         name = step.get("name")
@@ -457,7 +389,6 @@ def _guard_commands() -> dict[str, list[str]]:
 
 
 def _ci_lint_recipe_text() -> str:
-    """Extract the tab-indented recipe body of the `ci-lint:` Makefile target."""
     lines = MAKEFILE.read_text(encoding="utf-8").splitlines()
     start = None
     for i, line in enumerate(lines):
@@ -484,13 +415,6 @@ def _normalize_recipe_lines(recipe_text: str) -> list[str]:
         stripped = stripped.lstrip("@")
         if not stripped or stripped.startswith("#"):
             continue
-        # ci-lint runs every guard inside one shell invocation (the whole
-        # recipe is a single logical line joined with `\` continuations) so
-        # it can collect every guard's exit code instead of `make` aborting
-        # at the first failure -- see the report-all comment on the
-        # `ci-lint` target. Each guard-command line therefore ends with a
-        # `; \` continuation marker that isn't part of the guard command
-        # itself, so strip it before comparing.
         if stripped.endswith("\\"):
             stripped = stripped[:-1].rstrip()
         if stripped.endswith(";"):
@@ -500,16 +424,6 @@ def _normalize_recipe_lines(recipe_text: str) -> list[str]:
 
 
 def _command_satisfied(command: str, recipe_lines: list[str]) -> bool:
-    """Return True if `command` (a single guard shell command) is present in
-    the ci-lint recipe at the COMMAND level.
-
-    `make <target>` commands are matched against a `$(MAKE) <target>` or
-    `make <target>` recipe line (Makefile convention uses $(MAKE) so
-    sub-invocations respect -n/-j, but tolerate a literal `make` too).
-    Everything else (uv run ..., sh script.sh, npx ...) must appear
-    verbatim as its own recipe line -- this is what prevents a
-    same-named-but-different local command from faking parity.
-    """
     make_target_match = re.match(r"^make\s+(\S+)$", command)
     if make_target_match:
         target = make_target_match.group(1)
@@ -519,8 +433,6 @@ def _command_satisfied(command: str, recipe_lines: list[str]) -> bool:
 
 
 def test_lint_job_guards_run_in_ci_lint() -> None:
-    """Every non-excluded ci.yml `lint`-job guard command must appear,
-    command-for-command, in the `ci-lint` Makefile recipe."""
     guard_commands = _guard_commands()
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
 
@@ -541,7 +453,6 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
 
 
 def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
-    """The wall-clock policy runs the same command in the workflow and in ci-lint."""
     timing = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-timing-policy")
     workflow_run = str(timing["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
@@ -552,7 +463,6 @@ def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
 
 
 def test_fast_lane_ceiling_strict_command_is_mirrored_in_ci_lint() -> None:
-    """The merge-group-only branch must not hide the ordinary strict guard."""
     ceiling = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-ceiling")
     workflow_run = str(ceiling["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
@@ -564,13 +474,6 @@ def test_fast_lane_ceiling_strict_command_is_mirrored_in_ci_lint() -> None:
 
 
 def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemption() -> None:
-    """Check-shaped merge gates must not be silently CI-only.
-
-    ``code-lint`` keeps its detailed command-by-command assertion above. This
-    inventory extends the same policy to the independent PR publication lane
-    and release test workflow, where a newly added ``--check``/guard step
-    would otherwise bypass the lint-only parity pin.
-    """
     missing: list[str] = []
     for workflow_name, workflow_path in MERGE_GATE_WORKFLOWS.items():
         for job_name, step in _workflow_steps(workflow_path):
@@ -591,7 +494,6 @@ def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemptio
 
 
 def test_merge_gate_local_equivalents_and_exemptions_are_documented() -> None:
-    """Keep the parity inventory fail-closed and its exceptions reviewable."""
     docs = (REPO_ROOT / "docs" / "operations" / "ci-local-parity.md").read_text(encoding="utf-8")
     makefile = MAKEFILE.read_text(encoding="utf-8")
     assert "Hosted-only guard inventory" in docs
@@ -607,23 +509,6 @@ def test_merge_gate_local_equivalents_and_exemptions_are_documented() -> None:
 
 
 def test_ci_lint_identity_check_is_gated_rather_than_fed_a_synthetic_identity() -> None:
-    """The runner has no Git identity, so the audit is skipped, not faked.
-
-    This test used to pin a ``GIT_CONFIG_COUNT=2 ... / unset ...`` pair that
-    injected a synthetic ``BenchBox CI`` identity so the resolved-config audit
-    had something to read on a runner. That only ever swapped one input the
-    audit cannot fail on for another: a synthetic identity matches no known
-    agent either, so the guard passed without verifying anything.
-
-    The guard is now skipped on a runner via the environment gate, and the
-    synthetic identity is gone because nothing consumed it. Pinning the old
-    text here would have made this test assert recipe content with no
-    behaviour behind it - a vacuous pass, which is the exact defect class the
-    gate exists to remove.
-
-    ``agent-commit-range-check`` stays unconditional and is the real
-    merge-time authorship control; it is asserted separately below.
-    """
     recipe = _ci_lint_recipe_text()
     assert "ci_lint_environment_gate.py agent-identity" in recipe, (
         "ci-lint no longer consults the environment gate before agent-identity-check"
@@ -631,7 +516,6 @@ def test_ci_lint_identity_check_is_gated_rather_than_fed_a_synthetic_identity() 
     assert "GIT_CONFIG_COUNT" not in recipe, (
         "the synthetic runner identity is back; the audit it fed is skipped on CI, so it feeds nothing"
     )
-    # The control that must never be gated.
     assert "ci_lint_environment_gate.py agent-commit-range" not in recipe, (
         "agent-commit-range-check is gated; it is the merge-time authorship control and must always run"
     )
@@ -639,10 +523,6 @@ def test_ci_lint_identity_check_is_gated_rather_than_fed_a_synthetic_identity() 
 
 
 def test_excluded_steps_still_exist() -> None:
-    """EXCLUDED_STEPS must only reference lint-job steps that still exist,
-    under their current name -- otherwise a rename/removal could silently
-    leave a stale, unenforced exclusion (or hide that the step's guard is no
-    longer excluded/covered at all)."""
     current_step_names = {step.get("name") for step in _load_lint_job_steps()}
     stale = sorted(name for name in EXCLUDED_STEPS if name not in current_step_names)
     assert not stale, (
@@ -652,12 +532,6 @@ def test_excluded_steps_still_exist() -> None:
 
 
 def test_guard_steps_follow_naming_convention() -> None:
-    """Every independent guard step in `code-lint` must carry both
-    `id: guard-*` and `continue-on-error: true` -- that's what lets the
-    `lint-guard-summary` aggregator discover the guard set programmatically
-    (see GUARD_ID_PREFIX) instead of a hand-maintained id list that a new
-    guard could silently escape. Non-guard steps (checkout/setup-python/
-    setup-uv/install-deps, and the aggregator itself) must carry neither."""
     violations: list[str] = []
     for step in _load_lint_job_steps():
         name = step.get("name")
@@ -689,9 +563,6 @@ def test_guard_steps_follow_naming_convention() -> None:
 
 
 def test_lint_guard_summary_step_exists() -> None:
-    """The report-all aggregator step must exist, be named exactly
-    `lint-guard-summary`, and run with `if: always()` so it still executes
-    (and reports) after an earlier guard fails with continue-on-error."""
     steps = _load_lint_job_steps()
     matches = [step for step in steps if step.get("name") == AGGREGATOR_STEP_NAME]
     assert matches, f"code-lint job has no {AGGREGATOR_STEP_NAME!r} step"
@@ -704,7 +575,6 @@ def test_lint_guard_summary_step_exists() -> None:
     assert aggregator.get("if") == "always()", (
         f"{AGGREGATOR_STEP_NAME!r} step must run with `if: always()` so it still reports after an earlier guard fails"
     )
-    # Must be the last step -- it aggregates every guard that ran before it.
     assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
 
 

@@ -58,9 +58,9 @@ rather than compete.
 
 ### What stays exactly as-is
 
-All required fields, all guardrail fields, all context fields:
+The following is a field-name inventory, not a serialized task record:
 
-```yaml
+```text
 # Required
 title, worktree, priority, status, description
 

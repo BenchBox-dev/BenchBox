@@ -37,6 +37,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Verify live publication endpoints, candidate receipts, and no-op deployment invariants.\n"
+    "\n"
+    "This script inspects live publication endpoints and pre-deploy candidate receipts\n"
+    "(e.g. public documentation, Results Explorer, and the public DuckDB database),\n"
+    "comparing live and candidate checksums and headers against a deployment receipt\n"
+    "or publication baseline.\n"
+    "\n"
+    "Contract:\n"
+    "- Pre-deploy candidate check: when --candidate-manifest or --candidate-digest is\n"
+    "  provided, compares candidate checksums against --baseline-manifest / --baseline-digest.\n"
+    "  If --expect-noop is set, fails immediately if the candidate mutates baseline state.\n"
+    "- Live probe check: probes required publication endpoints for responsiveness (200 OK),\n"
+    "  latency, and checksum equality.\n"
+    "- When --require-receipt is provided, requires a valid manifest/receipt and\n"
+    "  verifies that endpoint or candidate hashes match expected values.\n"
+    "- Outputs structured diagnostic summary with timing and status codes.\n"
+    "\n"
+    "Exit codes:\n"
+    "  0 - All live probes and receipt verifications passed.\n"
+    "  1 - Verification failure (HTTP error, checksum mismatch, unexpected mutation).\n"
+    "  2 - Configuration or usage error (unreadable manifest, invalid arguments).\n"
+)
+
 DEFAULT_BASE_URL = "https://benchbox.dev"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_ENDPOINTS = (
@@ -641,7 +665,7 @@ def evaluate_certification_reports(reports_dir: Path) -> FiveDimensionCertificat
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

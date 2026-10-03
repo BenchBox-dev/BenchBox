@@ -54,7 +54,7 @@ class TestValidatePlanTree:
 
     def test_detects_empty_operator_type(self) -> None:
         root = LogicalOperator(
-            operator_type="",  # type: ignore[arg-type]
+            operator_type="",
             operator_id="op_1",
         )
 

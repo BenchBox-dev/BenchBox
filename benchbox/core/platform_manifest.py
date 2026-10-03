@@ -1,10 +1,3 @@
-"""Import-safe platform metadata authority.
-
-This module intentionally imports only the Python standard library.  Platform
-metadata consumers must project from :data:`PLATFORM_MANIFEST`; importing the
-manifest must never import an optional database or DataFrame SDK.
-"""
-
 from __future__ import annotations
 
 import json
@@ -48,8 +41,6 @@ _REQUIRED_METADATA_FIELDS = frozenset(
 
 @dataclass(frozen=True)
 class AdapterImportSpec:
-    """Lazy runtime import coordinates for one canonical platform."""
-
     module: str
     class_name: str
     registration_order: int
@@ -58,8 +49,6 @@ class AdapterImportSpec:
 
 @dataclass(frozen=True)
 class PlatformAliasSpec:
-    """One alternate spelling with explicit consumer and mode semantics."""
-
     name: str
     scopes: tuple[AliasScope, ...]
     implied_mode: DefaultMode | None = None
@@ -67,8 +56,6 @@ class PlatformAliasSpec:
 
 @dataclass(frozen=True)
 class PlatformManifestEntry:
-    """One canonical platform and every static identity attached to it."""
-
     key: str
     aliases: tuple[PlatformAliasSpec, ...]
     metadata: Mapping[str, Any]
@@ -76,16 +63,13 @@ class PlatformManifestEntry:
 
     @property
     def support_status(self) -> SupportStatus:
-        """Return the product support classification."""
         return cast(SupportStatus, self.metadata["support_status"])
 
     @property
     def capabilities(self) -> Mapping[str, Any]:
-        """Return the static execution/deployment capability declaration."""
         return cast(Mapping[str, Any], self.metadata["capabilities"])
 
     def metadata_dict(self) -> dict[str, Any]:
-        """Return a mutable JSON-shaped copy for legacy registry consumers."""
         return cast(dict[str, Any], _thaw_json(self.metadata))
 
 
@@ -3193,27 +3177,22 @@ PLATFORM_MANIFEST_BY_KEY: Mapping[str, PlatformManifestEntry] = MappingProxyType
 
 
 def get_platform_manifest_entry(key: str) -> PlatformManifestEntry | None:
-    """Return a canonical manifest entry without importing an adapter SDK."""
     return PLATFORM_MANIFEST_BY_KEY.get(key.lower())
 
 
 def is_valid_platform_key(key: str) -> bool:
-    """Return whether a canonical or extension key has valid registry syntax."""
     return bool(_PLATFORM_KEY_PATTERN.fullmatch(key))
 
 
 def get_platform_aliases(scope: AliasScope) -> dict[str, str]:
-    """Project accepted spellings for one consumer scope."""
     return {alias.name: entry.key for entry in PLATFORM_MANIFEST for alias in entry.aliases if scope in alias.scopes}
 
 
 def get_all_platform_aliases() -> dict[str, str]:
-    """Project the union of scoped aliases for collision and extension checks."""
     return {alias.name: entry.key for entry in PLATFORM_MANIFEST for alias in entry.aliases}
 
 
 def get_platform_alias_modes(scope: AliasScope) -> dict[str, DefaultMode]:
-    """Project explicit mode semantics for aliases in one consumer scope."""
     return {
         alias.name: alias.implied_mode
         for entry in PLATFORM_MANIFEST
@@ -3223,12 +3202,10 @@ def get_platform_alias_modes(scope: AliasScope) -> dict[str, DefaultMode]:
 
 
 def get_platform_metadata() -> dict[str, dict[str, Any]]:
-    """Project mutable legacy metadata in deterministic manifest order."""
     return {entry.key: entry.metadata_dict() for entry in PLATFORM_MANIFEST}
 
 
 def get_adapter_imports() -> tuple[tuple[str, str, str], ...]:
-    """Project lazy adapter coordinates in the compatibility registration order."""
     return tuple(
         (entry.key, entry.adapter.module, entry.adapter.class_name)
         for entry in sorted(

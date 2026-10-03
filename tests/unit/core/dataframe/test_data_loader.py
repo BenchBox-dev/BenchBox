@@ -1,13 +1,4 @@
-"""Unit tests for DataFrame Data Loading Strategy.
-
-Tests for:
-- DataFrameDataLoader
-- SchemaMapper
-- FormatConverter
-- DataCache
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -44,8 +35,6 @@ pytestmark = [
 
 
 class TestSchemaMapper:
-    """Tests for SchemaMapper class."""
-
     def test_get_column_names(self):
 
         try:
@@ -68,8 +57,8 @@ class TestSchemaMapper:
             schema = SchemaMapper.get_polars_schema(LINEITEM)
 
             assert schema["l_orderkey"] == "Int64"
-            assert schema["l_quantity"] == "Float64"  # DECIMAL maps to Float64
-            assert schema["l_returnflag"] == "Utf8"  # CHAR maps to Utf8
+            assert schema["l_quantity"] == "Float64"
+            assert schema["l_returnflag"] == "Utf8"
             assert schema["l_shipdate"] == "Date"
         except ImportError:
             pytest.skip("TPC-H schema not available")
@@ -83,7 +72,7 @@ class TestSchemaMapper:
 
             assert schema["o_orderkey"] == "int64"
             assert schema["o_totalprice"] == "float64"
-            assert schema["o_orderstatus"] == "object"  # CHAR
+            assert schema["o_orderstatus"] == "object"
             assert schema["o_orderdate"] == "datetime64[ns]"
         except ImportError:
             pytest.skip("TPC-H schema not available")
@@ -103,14 +92,11 @@ class TestSchemaMapper:
 
 
 class TestFormatConverter:
-    """Tests for FormatConverter class."""
-
     def test_convert_csv_to_parquet_basic(self):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create test CSV
             csv_path = tmpdir / "test.csv"
             csv_path.write_text("a,b,c\n1,2,3\n4,5,6\n")
 
@@ -127,23 +113,6 @@ class TestFormatConverter:
             assert parquet_path.exists()
 
     def test_convert_declared_string_columns_survive_production_load_path(self):
-        """A leading-zero VARCHAR keeps its zeros and an all-empty TEXT follows the
-        dialect on the CSV->Parquet production path (w6 acceptance).
-
-        A leading-zero VARCHAR ('007') must not be inferred as an integer, and an
-        all-empty declared-text column must load identically to the SQL reference:
-        for a .tbl source (null_marker == "", e.g. TPC/JoinOrder) DuckDB nulls empty
-        fields, so the DataFrame surface does too.
-
-        Crucially the column types and null marker are DERIVED by the production
-        loader (``DataFrameDataLoader._get_pyarrow_types`` /
-        ``_get_null_markers``) from the declared schema, not hand-injected. Because
-        the converter's ``_resolve_arrow_types`` defaults unrecognized names to
-        ``pa.string()``, a test that passed ``column_types`` by hand would still
-        pass even if the loader stopped mapping declared string columns; driving the
-        derivation here means this test FAILS (the '007' VARCHAR would be inferred as
-        an int) if production stops mapping/passing declared string column types.
-        """
         import pyarrow.parquet as pq
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -152,8 +121,6 @@ class TestFormatConverter:
             tbl_path.write_text("007|\n010|\n100|\n")
             parquet_path = tmpdir / "codes.parquet"
 
-            # A minimal benchmark declaring a VARCHAR and a TEXT column, exactly as
-            # the production schema-normalization path consumes it.
             class _DeclaredStringBenchmark:
                 name = "declared_string_fixture"
 
@@ -170,10 +137,6 @@ class TestFormatConverter:
             benchmark = _DeclaredStringBenchmark()
             loader = DataFrameDataLoader(platform="polars")
 
-            # PRODUCTION derivation: the declared VARCHAR/TEXT columns must be
-            # mapped to a string Arrow type here. If the loader stopped mapping
-            # declared string columns this dict would omit them and the leading-zero
-            # assertion below would fail.
             pyarrow_types = loader._get_pyarrow_types(benchmark)
             derived_types = pyarrow_types["codes"]
             assert derived_types["code"] == "string", (
@@ -185,16 +148,11 @@ class TestFormatConverter:
                 f"TEXT column; got {derived_types.get('note')!r}"
             )
 
-            # PRODUCTION null-marker resolution: a .tbl source resolves to the
-            # empty->NULL marker (""), matching the DuckDB SQL reference.
             null_markers = loader._get_null_markers(benchmark, {"codes": tbl_path})
             assert null_markers["codes"] == "", (
                 f"a .tbl source should resolve to the empty->NULL marker; got {null_markers['codes']!r}"
             )
 
-            # Feed the PRODUCTION-derived types and null marker into the converter
-            # (not hand-injected values), so the contract this test guards is the
-            # real schema -> arrow-types -> converter plumbing.
             status, row_count = FormatConverter.convert_csv_to_parquet(
                 source_path=tbl_path,
                 target_path=parquet_path,
@@ -207,10 +165,7 @@ class TestFormatConverter:
             assert status == ConversionStatus.SUCCESS
             assert row_count == 3
             table = pq.read_table(parquet_path)
-            # Leading zeros preserved (string, not inferred int).
             assert table.column("code").to_pylist() == ["007", "010", "100"]
-            # All-empty TEXT is pinned to a string column (not dropped to a null
-            # type), matching the SQL reference's nullable VARCHAR.
             assert str(table.schema.field("note").type) in {"string", "large_string"}
 
     def test_convert_tbl_file(self):
@@ -218,7 +173,6 @@ class TestFormatConverter:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create test TBL file (has trailing delimiter per TPC spec)
             tbl_path = tmpdir / "test.tbl"
             tbl_path.write_text("1|Alice|100.00|\n2|Bob|200.00|\n")
 
@@ -291,7 +245,6 @@ class TestFormatConverter:
             csv_path = tmpdir / "test.csv"
             csv_path.write_text("x,y\n1,2\n")
 
-            # Target in non-existent nested directory
             parquet_path = tmpdir / "nested" / "deep" / "test.parquet"
 
             status, _ = FormatConverter.convert_csv_to_parquet(
@@ -317,18 +270,11 @@ class TestFormatConverter:
             assert row_count == 0
 
     def test_convert_csv_to_parquet_date_column_types(self):
-        """Test that date columns are typed as date32 when column_types is provided.
-
-        Regression test: without explicit column_types, PyArrow infers date
-        strings (e.g. '1995-09-01') as string type, causing Polars queries
-        to fail with 'cannot compare date/datetime/time to a string value'.
-        """
         import pyarrow.parquet as pq
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create a TBL file with date columns (like TPC-H lineitem)
             tbl_path = tmpdir / "lineitem.tbl"
             tbl_path.write_text(
                 "1|100|50|1|17.0|100.00|0.04|0.02|N|O|1996-03-13|1996-02-12|1996-03-22|DELIVER IN PERSON|TRUCK|comment|\n"
@@ -384,7 +330,6 @@ class TestFormatConverter:
             assert status == ConversionStatus.SUCCESS
             assert row_count == 2
 
-            # Verify the Parquet schema has date types, not strings
             table = pq.read_table(parquet_path)
             schema = table.schema
 
@@ -394,20 +339,10 @@ class TestFormatConverter:
             assert schema.field("l_commitdate").type == pa.date32()
             assert schema.field("l_receiptdate").type == pa.date32()
 
-            # Verify date values are actual dates, not strings
             shipdate_col = table.column("l_shipdate")
             assert shipdate_col[0].as_py() == __import__("datetime").date(1996, 3, 13)
 
     def test_convert_csv_inferred_time_column_written_as_string(self):
-        """A time-like column with no declared type lands in Parquet as a string.
-
-        Regression test: when the benchmark schema is unavailable the converter
-        runs on full PyArrow inference, which types ``HH:MM:SS`` fields as
-        ``time32[ms]``. Parquet stores that as ``INT32 TIME(MILLIS,false)``,
-        which Spark rejects on read (``PARQUET_TYPE_ILLEGAL``) -- the PySpark
-        TPC-DS/coffeeshop cached-Parquet failure. The converter must coerce
-        inferred TIME columns to string, matching SchemaMapper's TIME policy.
-        """
         import pyarrow as pa
         import pyarrow.parquet as pq
 
@@ -417,8 +352,6 @@ class TestFormatConverter:
             csv_path.write_text("order_id,order_time,quantity\n1,08:30:00,2\n2,14:45:15,1\n3,23:59:59,5\n")
             parquet_path = tmpdir / "order_lines.parquet"
 
-            # No column_types: the schema-less path taken when the benchmark
-            # schema lookup yields nothing for the table.
             status, row_count = FormatConverter.convert_csv_to_parquet(
                 source_path=csv_path,
                 target_path=parquet_path,
@@ -433,20 +366,17 @@ class TestFormatConverter:
             table = pq.read_table(parquet_path)
             assert table.schema.field("order_time").type == pa.string()
             assert table.column("order_time").to_pylist() == ["08:30:00", "14:45:15", "23:59:59"]
-            # No TIME logical type anywhere: the file must stay Spark-readable.
             for field in table.schema:
                 assert not pa.types.is_time32(field.type), field.name
                 assert not pa.types.is_time64(field.type), field.name
 
     def test_coerce_time_columns_to_string_preserves_other_types(self):
-        """The TIME coercion touches only time32/time64 columns."""
         import pyarrow as pa
 
         table = pa.table(
             {
                 "id": pa.array([1, 2], type=pa.int64()),
                 "day": pa.array([18628, 18629], type=pa.date32()),
-                # time32[s] is the unit CSV inference produces for "HH:MM:SS".
                 "at": pa.array([8 * 3600, 86399], type=pa.time32("s")),
             }
         )
@@ -456,12 +386,10 @@ class TestFormatConverter:
         assert coerced.schema.field("id").type == pa.int64()
         assert coerced.schema.field("day").type == pa.date32()
 
-        # A table without TIME columns is returned unchanged.
         plain = pa.table({"id": pa.array([1], type=pa.int64())})
         assert FormatConverter._coerce_time_columns_to_string(plain).schema == plain.schema
 
     def test_coerce_time64_micros_and_nulls_to_string(self):
-        """time64/us values keep microsecond fidelity; nulls stay null."""
         import datetime
 
         import pyarrow as pa
@@ -479,12 +407,6 @@ class TestFormatConverter:
         assert coerced.column("at").to_pylist() == ["12:34:56.789123", None]
 
     def test_sql_type_to_pyarrow_covers_type_families(self):
-        """Declared SQL type families resolve to a PyArrow type (w9 regression).
-
-        Before w9 the lookup only knew the few names in PYARROW_TYPE_MAP, so a
-        declared TEXT/STRING/BIGINT/NUMERIC column fell through to inference and a
-        null-heavy or numeric-looking text column got the wrong dtype.
-        """
         assert SchemaMapper.sql_type_to_pyarrow("TEXT") == "string"
         assert SchemaMapper.sql_type_to_pyarrow("text not null") == "string"
         assert SchemaMapper.sql_type_to_pyarrow("STRING") == "string"
@@ -497,23 +419,14 @@ class TestFormatConverter:
         assert SchemaMapper.sql_type_to_pyarrow("DATE") == "date32"
         assert SchemaMapper.sql_type_to_pyarrow("TIMESTAMP") == "timestamp[us]"
         assert SchemaMapper.sql_type_to_pyarrow("TIME") == "string"
-        # Genuinely unknown types are left to inference (None).
         assert SchemaMapper.sql_type_to_pyarrow("SOMEWEIRDTYPE") is None
 
     def test_convert_csv_null_marker_controls_empty_string_vs_null(self):
-        """null_marker gates empty-field handling for string columns (w9 regression).
-
-        With null_marker=None an empty field stays "" (matching DuckDB's nullstr
-        sentinel); with null_marker="" it becomes NULL. The same data must
-        materialize differently per the benchmark's resolved CSV dialect so the
-        DataFrame surface does not emit None where the SQL surface emits "".
-        """
         import pyarrow.parquet as pq
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             csv_path = tmpdir / "t.csv"
-            # row 1 has an empty 'note'
             csv_path.write_text("1|\n2|hello\n")
             column_names = ["id", "note"]
             column_types = {"id": "int64", "note": "string"}
@@ -545,13 +458,6 @@ class TestFormatConverter:
             assert note_nulled == [None, "hello"]
 
     def test_convert_tbl_with_column_types_casts_dates(self):
-        """Test that column_types ensures date typing in TBL files.
-
-        TBL files are headerless with pipe delimiters. Without column_types,
-        auto_dict_encode may cause date columns to be dictionary-encoded as
-        strings instead of proper date32 types. This is the scenario that
-        caused the Polars regression.
-        """
         import pyarrow as pa
         import pyarrow.parquet as pq
 
@@ -605,8 +511,6 @@ class TestFormatConverter:
 
 
 class TestSourceFileDiscovery:
-    """Tests for source file discovery with sharded paths."""
-
     def test_get_source_files_with_list_paths(self, tmp_path):
         loader = DataFrameDataLoader(platform="polars")
         shard1 = tmp_path / "customer.tbl.1"
@@ -622,8 +526,6 @@ class TestSourceFileDiscovery:
 
 
 class TestSourceFormatDetection:
-    """Tests for source format detection with list paths."""
-
     def test_detect_source_format_with_list(self, tmp_path):
         loader = DataFrameDataLoader(platform="polars")
         shard1 = tmp_path / "orders.tbl.1"
@@ -636,8 +538,6 @@ class TestSourceFormatDetection:
 
 
 class TestCacheManifest:
-    """Tests for CacheManifest dataclass."""
-
     def test_to_dict(self):
 
         manifest = CacheManifest(
@@ -696,10 +596,7 @@ class TestCacheManifest:
 
 
 class TestDataCache:
-    """Tests for DataCache class."""
-
     def test_explicit_string_cache_dir_is_normalized_to_path(self):
-        """String cache_dir values should be normalized and usable for path joins."""
         cache = DataCache("tmp/cache")
         assert isinstance(cache.cache_dir, Path)
 
@@ -707,7 +604,6 @@ class TestDataCache:
         assert path == Path("tmp/cache") / "tpch_sf1" / "parquet" / DATAFRAME_CACHE_VERSION
 
     def test_default_cache_uses_runtime_cwd(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-        """Default cache path should resolve from current CWD at DataCache construction time."""
         with patch.dict("os.environ", {}, clear=True):
             monkeypatch.chdir(tmp_path)
             cache = DataCache()
@@ -734,7 +630,6 @@ class TestDataCache:
             assert path.name == "_manifest.json"
 
     def test_old_cache_layout_is_ignored(self):
-        """Old cache layout without version segment should not be used."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             cache = DataCache(tmpdir)
@@ -769,11 +664,9 @@ class TestDataCache:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
-            # Create cache structure
             cache_path = cache.get_cache_path("tpch", 1.0, DataFormat.PARQUET)
             cache_path.mkdir(parents=True)
 
-            # Create dummy parquet files
             (cache_path / "customer.parquet").touch()
             (cache_path / "orders.parquet").touch()
 
@@ -802,7 +695,6 @@ class TestDataCache:
             cache_path = cache.get_cache_path("tpch", 1.0, DataFormat.PARQUET)
             cache_path.mkdir(parents=True)
 
-            # Only create one file but manifest references two
             (cache_path / "customer.parquet").touch()
 
             manifest = {
@@ -844,7 +736,6 @@ class TestDataCache:
             with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
-            # Different hash should invalidate cache
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET, source_hash="new_hash") is False
 
     def test_get_cached_files(self):
@@ -905,7 +796,6 @@ class TestDataCache:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
-            # Create cache structure
             cache_path = cache.get_cache_path("tpch", 1.0, DataFormat.PARQUET)
             cache_path.mkdir(parents=True)
             (cache_path / "test.parquet").touch()
@@ -918,8 +808,6 @@ class TestDataCache:
 
 
 class TestDataFrameDataLoader:
-    """Tests for DataFrameDataLoader class."""
-
     def test_init_default(self):
 
         loader = DataFrameDataLoader()
@@ -955,7 +843,6 @@ class TestDataFrameDataLoader:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create test files
             (tmpdir / "customer.tbl").touch()
             (tmpdir / "orders.tbl").touch()
             (tmpdir / "lineitem.parquet").touch()
@@ -986,7 +873,6 @@ class TestDataFrameDataLoader:
         assert format == DataFormat.PARQUET
 
     def test_get_schema_info_accepts_table_objects(self):
-        """Table-like schema values provide column names for conversion."""
         loader = DataFrameDataLoader()
 
         column = MagicMock()
@@ -1001,7 +887,6 @@ class TestDataFrameDataLoader:
         assert schema_info["sat_lineitem"] == ["load_end_dts"]
 
     def test_get_schema_info_accepts_column_mapping(self):
-        """Dict-of-columns schemas provide column names for raw CSV loads."""
         loader = DataFrameDataLoader()
         benchmark = MagicMock()
         benchmark.get_schema.return_value = {
@@ -1039,7 +924,6 @@ class TestDataFrameDataLoader:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
-            # Create a directory where a file is expected (contamination scenario)
             (tmpdir / "customer").mkdir()
 
             loader = DataFrameDataLoader()
@@ -1092,14 +976,11 @@ class TestDataFrameDataLoader:
 
             loader = DataFrameDataLoader(cache_dir=cache_dir)
 
-            # Setup mock cache
             cache_path = loader.cache.get_cache_path("tpch", 1.0, DataFormat.PARQUET)
             cache_path.mkdir(parents=True)
 
-            # Create cached files
             (cache_path / "customer.parquet").touch()
 
-            # Create valid manifest
             manifest = {
                 "benchmark": "tpch",
                 "scale_factor": 1.0,
@@ -1115,7 +996,6 @@ class TestDataFrameDataLoader:
             benchmark.name = "tpch"
             benchmark.tables = {"customer": Path(tmpdir / "customer.tbl")}
 
-            # Create source file
             (tmpdir / "customer.tbl").touch()
 
             with (
@@ -1151,8 +1031,6 @@ class TestDataFrameDataLoader:
 
 
 class TestLoadedTable:
-    """Tests for LoadedTable dataclass."""
-
     def test_creation(self):
 
         table = LoadedTable(
@@ -1169,8 +1047,6 @@ class TestLoadedTable:
 
 
 class TestDataLoadResult:
-    """Tests for DataLoadResult dataclass."""
-
     def test_success_with_tables(self):
 
         result = DataLoadResult(
@@ -1196,14 +1072,11 @@ class TestDataLoadResult:
 
 
 class TestSourceHash:
-    """Tests for source hash computation."""
-
     def test_compute_source_hash(self):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create test files
             (tmpdir / "a.tbl").write_text("data")
             (tmpdir / "b.tbl").write_text("more data")
 
@@ -1214,11 +1087,9 @@ class TestSourceHash:
 
             hash1 = _compute_source_hash(tmpdir, tables)
 
-            # Same files should produce same hash
             hash2 = _compute_source_hash(tmpdir, tables)
             assert hash1 == hash2
 
-            # Modifying a file should change hash
             (tmpdir / "a.tbl").write_text("different data")
             hash3 = _compute_source_hash(tmpdir, tables)
             assert hash3 != hash1
@@ -1239,8 +1110,6 @@ class TestSourceHash:
 
 
 class TestGetTPCHColumnNames:
-    """Tests for get_tpch_column_names function."""
-
     def test_returns_all_tables(self):
 
         columns = get_tpch_column_names()
@@ -1272,31 +1141,25 @@ class TestGetTPCHColumnNames:
 
 
 class TestEnvironmentOverride:
-    """Tests for environment variable overrides."""
-
     def test_cache_dir_env_override(self):
 
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"BENCHBOX_CACHE_DIR": tmpdir}):
-            cache = DataCache()  # No explicit cache_dir
+            cache = DataCache()
 
             assert str(cache.cache_dir) == tmpdir
 
 
 class TestFormatConverterWithWriteConfig:
-    """Tests for FormatConverter with DataFrameWriteConfiguration."""
-
     def test_convert_with_sort_by(self):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create test CSV with unordered data
             csv_path = tmpdir / "test.csv"
             csv_path.write_text("id,name,value\n3,charlie,300\n1,alice,100\n2,bob,200\n")
 
             parquet_path = tmpdir / "test.parquet"
 
-            # Create write config with sorting
             write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="id", order="asc")])
 
             status, row_count = FormatConverter.convert_csv_to_parquet(
@@ -1310,7 +1173,6 @@ class TestFormatConverterWithWriteConfig:
             assert row_count == 3
             assert parquet_path.exists()
 
-            # Verify data is sorted
             import pyarrow.parquet as pq
 
             table = pq.read_table(parquet_path)
@@ -1354,9 +1216,7 @@ class TestFormatConverterWithWriteConfig:
 
             parquet_path = tmpdir / "test.parquet"
 
-            write_config = DataFrameWriteConfiguration(
-                row_group_size=2  # Small for testing
-            )
+            write_config = DataFrameWriteConfiguration(row_group_size=2)
 
             status, row_count = FormatConverter.convert_csv_to_parquet(
                 source_path=csv_path,
@@ -1368,11 +1228,9 @@ class TestFormatConverterWithWriteConfig:
             assert status == ConversionStatus.SUCCESS
             assert row_count == 5
 
-            # Verify row groups
             import pyarrow.parquet as pq
 
             meta = pq.read_metadata(parquet_path)
-            # Should have 3 row groups (5 rows / 2 per group = 3 groups)
             assert meta.num_row_groups >= 2
 
     def test_convert_with_compression(self):
@@ -1409,7 +1267,7 @@ class TestFormatConverterWithWriteConfig:
 
             write_config = DataFrameWriteConfiguration(
                 compression="zstd",
-                compression_level=9,  # High compression
+                compression_level=9,
             )
 
             status, row_count = FormatConverter.convert_csv_to_parquet(
@@ -1423,7 +1281,6 @@ class TestFormatConverterWithWriteConfig:
             assert parquet_path.exists()
 
     def test_convert_with_data_page_version(self):
-        """Test CSV conversion with data_page_version set to 2.0."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1453,17 +1310,14 @@ class TestFormatConverterWithWriteConfig:
 
         table = pa.table({"id": [1, 2], "value": ["a", "b"]})
 
-        # Without data_page_version
         config_none = DataFrameWriteConfiguration()
         kwargs = FormatConverter._build_write_kwargs("zstd", config_none, table)
         assert "data_page_version" not in kwargs
 
-        # With data_page_version v1.0
         config_v1 = DataFrameWriteConfiguration(data_page_version="1.0")
         kwargs = FormatConverter._build_write_kwargs("zstd", config_v1, table)
         assert kwargs["data_page_version"] == "1.0"
 
-        # With data_page_version v2.0
         config_v2 = DataFrameWriteConfiguration(data_page_version="2.0")
         kwargs = FormatConverter._build_write_kwargs("zstd", config_v2, table)
         assert kwargs["data_page_version"] == "2.0"
@@ -1478,7 +1332,6 @@ class TestFormatConverterWithWriteConfig:
 
             parquet_path = tmpdir / "test.parquet"
 
-            # Sort by column that doesn't exist
             write_config = DataFrameWriteConfiguration(
                 sort_by=[
                     SortColumn(name="nonexistent", order="asc"),
@@ -1493,12 +1346,10 @@ class TestFormatConverterWithWriteConfig:
                 write_config=write_config,
             )
 
-            # Should succeed despite invalid column
             assert status == ConversionStatus.SUCCESS
             assert row_count == 2
 
     def test_convert_with_default_write_config(self):
-        """Test conversion with default (empty) write config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1507,7 +1358,7 @@ class TestFormatConverterWithWriteConfig:
 
             parquet_path = tmpdir / "test.parquet"
 
-            write_config = DataFrameWriteConfiguration()  # Default config
+            write_config = DataFrameWriteConfiguration()
 
             status, _ = FormatConverter.convert_csv_to_parquet(
                 source_path=csv_path,
@@ -1520,8 +1371,6 @@ class TestFormatConverterWithWriteConfig:
 
 
 class TestDataFrameDataLoaderWithWriteConfig:
-    """Tests for DataFrameDataLoader with write configuration."""
-
     def test_init_with_write_config(self):
 
         write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="id", order="asc")])
@@ -1538,7 +1387,7 @@ class TestDataFrameDataLoaderWithWriteConfig:
             sort_by=[
                 SortColumn(name="l_shipdate", order="asc"),
                 SortColumn(name="l_orderkey", order="asc"),
-                SortColumn(name="c_custkey", order="asc"),  # Not in lineitem
+                SortColumn(name="c_custkey", order="asc"),
             ],
             row_group_size=1000000,
         )
@@ -1548,14 +1397,12 @@ class TestDataFrameDataLoaderWithWriteConfig:
         filtered = loader._get_table_write_config(base_config, "lineitem", lineitem_cols)
 
         assert filtered is not None
-        # Should only have sort columns that exist in table
         assert len(filtered.sort_by) == 2
         sort_names = [s.name for s in filtered.sort_by]
         assert "l_shipdate" in sort_names
         assert "l_orderkey" in sort_names
         assert "c_custkey" not in sort_names
 
-        # Non-column settings should be preserved
         assert filtered.row_group_size == 1000000
 
     def test_get_table_write_config_returns_none_for_none(self):
@@ -1575,7 +1422,6 @@ class TestDataFrameDataLoaderWithWriteConfig:
         assert result is default_config
 
     def test_get_table_write_config_no_columns_returns_original(self):
-        """Test that config without column info returns original."""
         loader = DataFrameDataLoader()
 
         config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="id", order="asc")])
@@ -1584,8 +1430,6 @@ class TestDataFrameDataLoaderWithWriteConfig:
         assert result is config
 
     def test_applied_write_layout_set_on_cache_hit_with_nondefault_config(self):
-        """The honest applied-layout signal is set when the returned (cached) data
-        physically carries a non-default write_config (the cache key folds it in)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             loader = DataFrameDataLoader(cache_dir=tmpdir / "cache")
@@ -1608,8 +1452,6 @@ class TestDataFrameDataLoaderWithWriteConfig:
             assert loader.applied_write_layout is write_config
 
     def test_applied_write_layout_none_when_source_returned_verbatim(self):
-        """No conversion ran (source already in target format, no sort), so no
-        physical layout was applied even though a non-default config was supplied."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             source = tmpdir / "customer.tbl"
@@ -1620,7 +1462,6 @@ class TestDataFrameDataLoaderWithWriteConfig:
             benchmark.name = "tpch"
             benchmark.tables = {"customer": source}
 
-            # Compression-only config (no sort_by) does not force conversion.
             write_config = DataFrameWriteConfiguration(compression="snappy")
             paths = loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
 
@@ -1630,31 +1471,22 @@ class TestDataFrameDataLoaderWithWriteConfig:
             assert loader.applied_write_layout is None
 
     def test_applied_write_layout_none_when_target_format_is_not_parquet(self):
-        """Regression (PR #1269 review follow-up): `_convert_data` returns the source
-        files unchanged for a non-Parquet target, so no physical layout is written --
-        the signal must stay None even though a sort_by config forced us past the
-        already-in-target-format early return. Otherwise the adapter folds POST_LOAD
-        statements and an applied hash into the ledger for a layout never applied."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             source = tmpdir / "customer.csv"
             source.write_text("1|Alice|100.00\n")
 
-            # prefer_parquet=False -> optimal target format is CSV, not Parquet.
             loader = DataFrameDataLoader(prefer_parquet=False)
             benchmark = MagicMock()
             benchmark.name = "tpch"
             benchmark.tables = {"customer": source}
 
-            # sort_by forces the conversion path (past the verbatim early return),
-            # but _convert_data cannot apply a layout to a non-Parquet target.
             write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="c_custkey", order="asc")])
             loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
 
             assert loader.applied_write_layout is None
 
     def test_applied_write_layout_none_for_default_config_on_cache_hit(self):
-        """A default write_config applies no physical layout -> signal stays None."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             loader = DataFrameDataLoader(cache_dir=tmpdir / "cache")

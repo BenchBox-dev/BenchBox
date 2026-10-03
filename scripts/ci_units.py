@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""Decide which merge units a change touches.
-
-Reads ``.github/ci-units.yml`` and a newline-delimited list of changed paths
-(or a diff against a base ref) and reports which of the six units
-(``core``, ``explorer``, ``results-data``, ``docs``, ``landing``, ``tooling``)
-have work to do.
-
-Rules:
-
-* A path belongs to every unit whose patterns match it.
-* A path that matches no unit belongs to ``core`` (fail closed).
-* A path matching ``all-units`` runs every unit.
-* An empty change set runs every unit (fail closed).
-
-The script is stdlib-only so the classifier job needs no dependency sync.
-"""
 
 from __future__ import annotations
 
@@ -51,7 +35,6 @@ DEFAULT_RULES = Path(__file__).resolve().parents[1] / ".github" / "ci-units.yml"
 
 
 def load_unit_rules(path: Path) -> dict[str, list[str]]:
-    """Load the simple ``key:`` / ``- "pattern"`` shape without PyYAML."""
     rules: dict[str, list[str]] = {}
     current: str | None = None
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -74,7 +57,6 @@ def load_unit_rules(path: Path) -> dict[str, list[str]]:
 
 
 def classify_units(changed_paths: Iterable[str], rules: dict[str, list[str]]) -> dict[str, object]:
-    """Return per-unit needs plus the paths that selected each unit."""
     paths = [normalize_path(p) for p in changed_paths if normalize_path(p)]
     unit_paths: dict[str, list[str]] = {unit: [] for unit in UNITS}
     unowned: list[str] = []
@@ -96,8 +78,6 @@ def classify_units(changed_paths: Iterable[str], rules: dict[str, list[str]]) ->
         "unowned_paths": unowned,
         "units": needed,
         "unit_paths": unit_paths,
-        # Lint and the unit-test tier also cover the scripts and workflow
-        # tests that live under tooling, so either unit needs them.
         "code_tests_needed": needed["core"] or needed["tooling"],
     }
 
@@ -154,7 +134,6 @@ def main(argv: list[str] | None = None) -> int:
         try:
             paths = git_changed_paths(args.base_ref)
         except (subprocess.CalledProcessError, OSError) as exc:
-            # Fail closed: a lookup error must run every unit, never none.
             print(f"ci_units: diff failed ({exc}); running every unit", file=sys.stderr)
             paths = []
     else:

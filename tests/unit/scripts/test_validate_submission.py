@@ -1,5 +1,3 @@
-"""Tests for public submission bundle validation."""
-
 from __future__ import annotations
 
 import hashlib
@@ -29,8 +27,6 @@ pytestmark = [
 
 
 class TestManifestProvenance:
-    """Provenance/funding validation + vendor-label governance (item 3)."""
-
     def _run(self, manifest: dict, bundle_name: str = "tpch_result.json", subdir: str = "bundles") -> ValidationResult:
         vr = ValidationResult("test")
         primary_path = Path("/repo") / "results-data" / subdir / bundle_name
@@ -72,7 +68,6 @@ class TestManifestProvenance:
         assert any("result_source" in e for e in vr.errors)
 
     def test_self_asserted_vendor_outside_vendor_subtree_rejected(self):
-        # The core governance check: a community bundle cannot claim vendor.
         vr = self._run({"result_source": "vendor"}, subdir="bundles")
         assert not vr.ok
         assert any("vendor" in e and "self-assert" in e for e in vr.errors)
@@ -82,13 +77,7 @@ class TestManifestProvenance:
         assert vr.ok
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 def _minimal_bundle() -> dict:
-    """Return a minimal valid schema-v2 bundle dict."""
     return {
         "version": "2.1",
         "run": {
@@ -115,9 +104,6 @@ def _minimal_bundle() -> dict:
 
 
 def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized") -> dict:
-    """Return a minimal valid BenchBox normalized-cost provenance block."""
-    # "node_hour" matches this block's Redshift-like deployment and is in the
-    # NORMALIZED_COST_BILLING_UNITS vocabulary the bundle validator enforces.
     billing_unit = "node_hour" if status == "normalized" else "not_applicable"
     pricing_region = "us-east-1" if status == "normalized" else "not_applicable"
     return {
@@ -139,7 +125,6 @@ def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized"
 
 @pytest.fixture
 def valid_bundle_file(tmp_path: Path) -> Path:
-    """Write a valid bundle to a temp file."""
     p = tmp_path / "tpch_result.json"
     p.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
     return p
@@ -147,7 +132,6 @@ def valid_bundle_file(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bundle_dir(tmp_path: Path) -> Path:
-    """Create a temp directory with a valid bundle."""
     d = tmp_path / "bundles"
     d.mkdir()
     (d / "tpch_result.json").write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
@@ -155,18 +139,12 @@ def bundle_dir(tmp_path: Path) -> Path:
 
 
 def test_checked_in_corpus_satisfies_public_integrity_policy() -> None:
-    """Policy and checked-in corpus must change together, never drift apart."""
     repo_root = Path(__file__).resolve().parents[3]
     paths = discover_bundles(repo_root / "results-data" / "bundles")
     results = validate_bundles(paths, allow_partial_validation=True)
     failures = {result.path: result.errors for result in results if not result.ok}
 
     assert not failures
-
-
-# ---------------------------------------------------------------------------
-# _validate_bundle
-# ---------------------------------------------------------------------------
 
 
 class TestValidateBundle:
@@ -425,7 +403,7 @@ class TestValidateBundle:
         assert "working_dir" in output
 
     def test_missing_top_level_keys(self):
-        data = {"version": "2.1"}  # Missing everything else
+        data = {"version": "2.1"}
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
@@ -465,7 +443,7 @@ class TestValidateBundle:
 
     def test_missing_run_keys(self):
         data = _minimal_bundle()
-        data["run"] = {"id": "x"}  # Missing timestamp and total_duration_ms
+        data["run"] = {"id": "x"}
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
@@ -481,7 +459,7 @@ class TestValidateBundle:
 
     def test_missing_benchmark_keys(self):
         data = _minimal_bundle()
-        data["benchmark"] = {"name": "TPC-H"}  # Missing id and scale_factor
+        data["benchmark"] = {"name": "TPC-H"}
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
@@ -497,7 +475,7 @@ class TestValidateBundle:
 
     def test_missing_platform_name(self):
         data = _minimal_bundle()
-        data["platform"] = {"version": "1.0"}  # Missing name
+        data["platform"] = {"version": "1.0"}
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
@@ -508,7 +486,7 @@ class TestValidateBundle:
         data["benchmark"]["id"] = "my-custom-bench"
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
-        assert vr.ok  # warning, not error
+        assert vr.ok
         assert any("Unknown benchmark id" in w for w in vr.warnings)
 
     @pytest.mark.parametrize("benchmark_id", ["flightdata", "tsbs_devops", "tpcdi"])
@@ -555,7 +533,6 @@ class TestValidateBundle:
         assert any("summary.validation must be 'passed'" in e for e in vr.errors)
 
     def test_partial_validation_allowed_only_when_flagged(self):
-        """Trusted mirror path may accept seed partials; community path may not."""
         data = _minimal_bundle()
         data["summary"]["validation"] = "partial"
         community = ValidationResult("community")
@@ -778,7 +755,7 @@ class TestValidateBundle:
 
     def test_missing_query_keys_fails(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1"}]  # Missing ms
+        data["queries"] = [{"id": "Q1"}]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
@@ -871,7 +848,6 @@ class TestValidateBundle:
         assert any("requires deployment metadata" in e for e in vr.errors)
 
     def test_normalized_cost_accepts_tib_scanned(self):
-        """BigQuery's per-tebibyte unit is in the validator vocabulary."""
         data = _minimal_bundle()
         data["normalized_cost"] = _normalized_cost_block(cost="1.25")
         data["normalized_cost"]["billing_unit"] = "tib_scanned"
@@ -883,7 +859,6 @@ class TestValidateBundle:
         assert vr.ok, vr.errors
 
     def test_normalized_cost_accepts_legacy_tb_scanned(self):
-        """Pre-ADR BigQuery bundles recorded as tb_scanned still validate."""
         data = _minimal_bundle()
         data["normalized_cost"] = _normalized_cost_block(cost="1.25")
         data["normalized_cost"]["billing_unit"] = "tb_scanned"
@@ -895,7 +870,6 @@ class TestValidateBundle:
         assert vr.ok, vr.errors
 
     def test_normalized_cost_rejects_unit_outside_vocabulary(self):
-        """A fictional billing_unit cannot back normalized cost."""
         data = _minimal_bundle()
         data["normalized_cost"] = _normalized_cost_block(cost="1.25")
         data["normalized_cost"]["billing_unit"] = "bogus_unit"
@@ -906,11 +880,6 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("concrete billing_unit" in e for e in vr.errors)
-
-
-# ---------------------------------------------------------------------------
-# cache-control receipt gate + empty result rows tripwire
-# ---------------------------------------------------------------------------
 
 
 def _bundle_with_cache_control(receipt, platform_name="Snowflake", **compute_fields):
@@ -963,8 +932,6 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_absent_receipt_with_declared_enabled_cache_refused(self):
-        # A receipt-capable platform declaring result_cache_enabled without a
-        # receipt advertises cached timings with no disabling evidence.
         for platform_name in ("Snowflake", "Redshift", "Databricks"):
             vr = ValidationResult("test")
             data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
@@ -979,8 +946,6 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
-        # Platforms that never record a receipt (e.g. DuckDB) keep the
-        # legacy exemption even when they declare an enabled cache.
         vr = ValidationResult("test")
         data = _bundle_with_cache_control(None, platform_name="DuckDB", result_cache_enabled=True)
         _validate_bundle(data, vr)
@@ -994,8 +959,6 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_explicit_enabled_cache_receipt_refused(self):
-        # End to end: the receipt adapters record for disable_result_cache=False
-        # carries confirmed-enabled evidence, which cannot stand as clean.
         from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
 
         receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
@@ -1066,10 +1029,6 @@ class TestEmptyResultRows:
         assert any("result-rows-empty" in w for w in vr.warnings)
 
 
-# timing plausibility warnings (C1-C4; warnings only, never refuse)
-# ---------------------------------------------------------------------------
-
-
 def _timing_bundle(
     per_query_ms,
     *,
@@ -1080,12 +1039,6 @@ def _timing_bundle(
     rows_loaded=866602,
     validation="passed",
 ):
-    """Build a bundle with explicit per-query timings.
-
-    ``per_query_ms`` maps query id to ms (single value or list of samples).
-    Archived shapes mirror the September cloud TPC-H runs that motivated
-    these gates.
-    """
     queries = []
     for qid, ms in per_query_ms.items():
         for sample in ms if isinstance(ms, list) else [ms]:
@@ -1132,9 +1085,6 @@ class TestTimingPlateau:
         assert not any("timing-plateau" in w for w in vr.warnings)
 
     def test_fast_flat_run_is_silent(self):
-        # P2: a tight band of genuinely fast queries is fast execution, not
-        # fixed-overhead dominance. Mirrors the checked-in TPC-H SF0.01 DuckDB
-        # bundle (per-query means span 5-8ms, max/min 1.48, CV 0.09).
         vr = ValidationResult("test")
         _validate_bundle(_timing_bundle({f"Q{i}": 5.0 + (i % 4) for i in range(1, 23)}), vr)
         assert vr.ok, vr.errors
@@ -1142,8 +1092,6 @@ class TestTimingPlateau:
         assert "timing-plateau" not in vr.override_required
 
     def test_subsecond_peak_stays_silent(self):
-        # Peak 960ms sits below the absolute floor; the relative spread alone
-        # must not block it.
         vr = ValidationResult("test")
         _validate_bundle(_timing_bundle(_flat_queries(base=900.0, spread=60.0)), vr)
         assert vr.ok, vr.errors
@@ -1163,8 +1111,6 @@ class TestTimingPlateau:
 
     def test_few_distinct_queries_unevaluable(self):
         vr = ValidationResult("test")
-        # Mirror lane: a 2-query fixture cannot satisfy canonical coverage;
-        # the plateau gate under test is orthogonal to it.
         _validate_bundle(_timing_bundle({"Q1": 4400.0, "Q2": 4450.0}), vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert not any("timing-plateau" in w for w in vr.warnings)
@@ -1173,7 +1119,7 @@ class TestTimingPlateau:
         data = _timing_bundle({f"Q{i}": 0.0 for i in range(1, 23)})
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
-        assert not vr.ok  # owned by the queries-section gate
+        assert not vr.ok
         assert not any("timing-plateau" in w for w in vr.warnings)
 
     def test_sub_millisecond_rows_are_timer_noise_not_evidence(self):
@@ -1221,8 +1167,6 @@ class TestSmallScaleFloor:
         assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
 
     def test_nonfinite_rows_loaded_is_unreported_not_fatal(self):
-        # A JSON number like 1e309 parses to inf; int() would raise
-        # OverflowError. The validator must treat it as unreported.
         for bad_rows in (float("inf"), float("-inf"), float("nan")):
             vr = ValidationResult("test")
             _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=bad_rows), vr)
@@ -1291,7 +1235,6 @@ class TestScaleInvariance:
         results = validate_bundles([lo, hi])
         warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
         assert warned
-        # The 0.1 -> 10 span is 100x, not the 0.1x lower endpoint.
         assert all("grows 100x in scale" in w for w in warned)
 
     def test_single_scale_is_silent(self, tmp_path):
@@ -1365,8 +1308,6 @@ class TestScaleInvariance:
         )
         results = validate_bundles([lo, hi])
         assert all(vr.ok for vr in results)
-        # The per-query leg still evaluates, but the message must admit the
-        # geomean leg could not run — never a silent arithmetic-mean fallback.
         warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
         assert warned
         assert all("geomean unevaluable" in w for w in warned)
@@ -1410,8 +1351,6 @@ class TestFloorOutlier:
                     rows_loaded=8_661_245,
                 )
             )
-        # Mirror lane: these peer fixtures are deliberately short-coverage
-        # synthetic bundles; the coverage gate is orthogonal to peer logic.
         return validate_bundles(paths, allow_partial_validation=True)
 
     def test_slow_peer_warns_informationally(self, tmp_path):
@@ -1427,15 +1366,11 @@ class TestFloorOutlier:
         assert not any("floor-outlier" in w for vr in (first, second) for w in vr.warnings)
 
     def test_same_platform_reruns_are_not_peers(self, tmp_path):
-        # Three reruns of one engine satisfy the bundle-count quorum but
-        # offer zero cross-platform evidence: no outlier may be declared.
         results = self._peer_set(tmp_path, [4500.0, 350.0, 300.0], platforms=["SameEngine"] * 3)
         assert all(vr.ok for vr in results)
         assert not any("floor-outlier" in w for vr in results for w in vr.warnings)
 
     def test_own_platform_rerun_does_not_dilute_peers(self, tmp_path):
-        # A fast rerun of the slow engine shares its platform key, so it is
-        # consolidated away; the two genuinely distinct peers still convict.
         slow, _mid, _fast, rerun = self._peer_set(
             tmp_path,
             [4500.0, 350.0, 300.0, 360.0],
@@ -1444,10 +1379,6 @@ class TestFloorOutlier:
         assert all(vr.ok for vr in (slow, rerun))
         assert any("floor-outlier" in w for w in slow.warnings)
         assert not any("floor-outlier" in w for w in rerun.warnings)
-
-
-# compliance_class + canonical query-set coverage gates
-# ---------------------------------------------------------------------------
 
 
 class TestSubmissionDeterministicGates:
@@ -1549,8 +1480,6 @@ class TestSubmissionDeterministicGates:
         assert CANONICAL_LOGICAL_QUERY_COUNTS == _KNOWN_LOGICAL_QUERY_COUNTS
 
     def test_matching_cardinality_with_wrong_ids_is_refused(self):
-        # 22 distinct labels, none of them canonical: cardinality alone
-        # must not pass the gate.
         data = _minimal_bundle()
         data["queries"] = [{"id": f"FAKE{i}", "ms": 100, "status": "SUCCESS"} for i in range(22)]
         data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
@@ -1561,8 +1490,6 @@ class TestSubmissionDeterministicGates:
         assert any("missing:" in e for e in vr.errors)
 
     def test_canonical_membership_accepts_producer_id_variants(self):
-        # Q-prefix, bare, padded, and query_-prefixed spellings all name
-        # the same canonical queries once normalized.
         variants = [f"Q{i}" for i in range(1, 8)] + [str(i) for i in range(8, 15)]
         variants += [f"query_{i}" for i in range(15, 20)] + [f"  q{i} " for i in range(20, 23)]
         data = _minimal_bundle()
@@ -1606,8 +1533,6 @@ class TestSubmissionDeterministicGates:
         assert any("12_v4" in error for error in vr.errors)
 
     def test_tpchavoc_success_without_timing_does_not_cover_variant(self):
-        # A SUCCESS row with ms null carries no measurement and must not
-        # satisfy variant coverage, even with 219 other timed rows.
         from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS
 
         data = _minimal_bundle()
@@ -1743,7 +1668,6 @@ class TestSubmissionDeterministicGates:
         assert "1.1" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
         assert "4.3" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
         assert len(CANONICAL_LOGICAL_QUERY_IDS["clickbench"]) == 43
-        # SSB flight IDs in producer Q-prefixed form validate.
         data = _minimal_bundle()
         data["benchmark"]["id"] = "ssb"
         data["queries"] = [
@@ -1768,11 +1692,6 @@ class TestSubmissionDeterministicGates:
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
-
-
-# ---------------------------------------------------------------------------
-# _validate_manifest_hash
-# ---------------------------------------------------------------------------
 
 
 class TestValidateManifestHash:
@@ -1862,10 +1781,6 @@ class TestValidateManifestHash:
         assert any("result.json" in e for e in vr.errors)
 
     def test_missing_hash_field_errors(self, tmp_path: Path):
-        # A present manifest whose whole purpose is the bundle-hash contract
-        # must carry it. Missing bundle_hash is an ERROR (not a warning), so an
-        # empty/incomplete manifest cannot pass CI while still granting the
-        # sidecar-derived community-submission trust label.
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(json.dumps({"bundle_file": "result.json"}), encoding="utf-8")
 
@@ -1885,7 +1800,6 @@ class TestValidateManifestHash:
 
     @pytest.mark.parametrize("bad_hash", [123, None, ["abc"], {"hash": "x"}])
     def test_non_string_hash_errors(self, tmp_path: Path, bad_hash):
-        """Non-string bundle_hash values should error (not crash, not pass)."""
         manifest = tmp_path / "submission-manifest.json"
         manifest.write_text(
             json.dumps({"bundle_file": "result.json", "bundle_hash": bad_hash}),
@@ -1898,7 +1812,6 @@ class TestValidateManifestHash:
         assert any("no bundle_hash" in e for e in vr.errors)
 
     def test_companion_hash_mismatch_fails(self, tmp_path: Path):
-        """A companion file with a wrong hash must surface a per-file error."""
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         bundle_file = bundle_dir / "result.json"
@@ -1935,7 +1848,6 @@ class TestValidateManifestHash:
         ],
     )
     def test_unsafe_bundle_filename_rejected(self, tmp_path: Path, unsafe_name: str):
-        """Manifest-supplied filenames must not escape the bundle directory."""
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         manifest = bundle_dir / "submission-manifest.json"
@@ -1950,7 +1862,6 @@ class TestValidateManifestHash:
         assert any("Unsafe bundle_file" in e for e in vr.errors)
 
     def test_unsafe_companion_filename_rejected(self, tmp_path: Path):
-        """Companion-hash keys must also be plain filenames."""
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         bundle_file = bundle_dir / "result.json"
@@ -1974,12 +1885,6 @@ class TestValidateManifestHash:
         assert any("Unsafe companion filename" in e for e in vr.errors)
 
     def test_robust_when_corpus_already_populated(self, tmp_path: Path):
-        """Sibling bundles in the directory must not affect validation.
-
-        Regression coverage for the directory-vs-file-scope hash bug
-        (filed and fixed 2026-04-27 via
-        fix-submission-hash-mismatch-vs-validator-directory-scope).
-        """
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
         bundle_file = bundle_dir / "result.json"
@@ -1997,11 +1902,6 @@ class TestValidateManifestHash:
         vr = ValidationResult("test")
         _validate_manifest_hash(manifest, bundle_dir, vr)
         assert vr.ok, f"Expected pass with sibling bundles present, got: {vr.errors}"
-
-
-# ---------------------------------------------------------------------------
-# discover_bundles
-# ---------------------------------------------------------------------------
 
 
 class TestDiscoverBundles:
@@ -2024,11 +1924,6 @@ class TestDiscoverBundles:
         (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
 
         assert discover_bundles(tmp_path) == [tmp_path / "result.JSON"]
-
-
-# ---------------------------------------------------------------------------
-# validate_bundles (integration)
-# ---------------------------------------------------------------------------
 
 
 class TestValidateBundles:
@@ -2115,9 +2010,6 @@ class TestValidateBundles:
         assert results[0].ok
 
     def test_present_but_empty_manifest_fails_end_to_end(self, tmp_path: Path):
-        # A present-but-contentless sidecar must not pass: it would otherwise
-        # grant the sidecar-derived community-submission trust label while the
-        # bundle bytes are never hash-verified.
         bundle = tmp_path / "result.json"
         bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
         manifest = tmp_path / "result.manifest.json"
@@ -2130,13 +2022,10 @@ class TestValidateBundles:
         assert any("bundle_hash" in e or "bundle_file" in e for e in results[0].errors)
 
     def test_missing_sidecar_passes_by_default(self, valid_bundle_file: Path):
-        # Default (maintainer path): no sidecar is fine — absence of a sidecar
-        # is how a maintainer-run bundle is distinguished.
         results = validate_bundles([valid_bundle_file])
         assert results[0].ok
 
     def test_require_manifest_errors_on_missing_sidecar(self, valid_bundle_file: Path):
-        # Community path: the sidecar is mandatory.
         results = validate_bundles([valid_bundle_file], require_manifest=True)
         assert len(results) == 1
         assert not results[0].ok
@@ -2191,18 +2080,12 @@ class TestAllowPartialValidation:
         assert main([str(bundle), "--allow-partial-validation"]) == 0
 
     def test_allow_partial_still_rejects_private_path_leaks(self, tmp_path: Path, capsys):
-        """Privacy fail-closed is independent of the partial waiver."""
         bundle = tmp_path / "leaky-partial.json"
         data = _minimal_bundle()
         data["summary"]["validation"] = "partial"
         data["platform"]["config"] = {"working_dir": "/Users/alice/private"}
         bundle.write_text(json.dumps(data), encoding="utf-8")
         assert main([str(bundle), "--allow-partial-validation"]) == 1
-
-
-# ---------------------------------------------------------------------------
-# format_summary / format_pr_comment
-# ---------------------------------------------------------------------------
 
 
 class TestFormatters:
@@ -2218,11 +2101,6 @@ class TestFormatters:
         assert "## Submission Validation: PASSED" in md
         assert "tpch" in md
         assert "DuckDB" in md
-
-
-# ---------------------------------------------------------------------------
-# main() CLI entrypoint
-# ---------------------------------------------------------------------------
 
 
 class TestMain:
@@ -2262,11 +2140,6 @@ class TestMain:
         output = capsys.readouterr().out
         assert "PLANS.JSON" in output
         assert "private absolute paths" in output
-
-
-# ---------------------------------------------------------------------------
-# warn-require-override contract (model, exit code, version, rendering)
-# ---------------------------------------------------------------------------
 
 
 class TestOverrideContract:
@@ -2355,11 +2228,6 @@ class TestOverrideContract:
         bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
         assert main([str(bundle), "--bogus-flag"]) == 2
         assert "unrecognized flag" in capsys.readouterr().err
-
-
-# ---------------------------------------------------------------------------
-# committed override artifacts (<stem>.override.json)
-# ---------------------------------------------------------------------------
 
 
 def _override_doc(*rules, **kw):
@@ -2475,7 +2343,7 @@ class TestOverrideSatisfaction:
             json.dumps(_override_doc(expires="2000-01-01")), encoding="utf-8"
         )
         (vr,) = validate_bundles([bundle])
-        assert not vr.ok  # malformed-audit artifact is an error, not silent
+        assert not vr.ok
         assert main([str(bundle)]) == 1
 
     def test_main_passes_with_valid_artifact(self, tmp_path, capsys):

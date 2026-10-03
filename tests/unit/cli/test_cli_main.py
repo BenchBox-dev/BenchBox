@@ -1,9 +1,6 @@
-"""Unit tests for CLI main entry point.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
@@ -17,12 +14,6 @@ from click.testing import CliRunner
 import benchbox
 from benchbox.cli.main import cli, run
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -34,8 +25,6 @@ pytestmark = [
 
 @pytest.mark.unit
 class TestConfigManagerFactory:
-    """Test config manager factory function."""
-
     def test_get_config_manager_returns_instance(self):
 
         from benchbox.cli.config import ConfigManager
@@ -58,8 +47,6 @@ class TestConfigManagerFactory:
 
 @pytest.mark.unit
 class TestCLIMain:
-    """Test CLI main entry point and commands."""
-
     def test_cli_group_help(self):
 
         runner = CliRunner()
@@ -85,7 +72,6 @@ class TestCLIMain:
 
     @patch("benchbox.utils.version.get_version_info")
     def test_cli_version_json(self, mock_version_info):
-        """CLI JSON version output should preserve the version utility payload."""
         mock_version_info.return_value = {
             "benchbox_version": benchbox.__version__,
             "pyproject_version": benchbox.__version__,
@@ -129,8 +115,6 @@ class TestCLIMain:
 
 @pytest.mark.unit
 class TestRunCommand:
-    """Test run command functionality."""
-
     def test_run_command_help(self):
 
         runner = CliRunner()
@@ -142,7 +126,6 @@ class TestRunCommand:
         assert "--benchmark" in result.output
         assert "--scale" in result.output
         assert "--output" in result.output
-        # New help system uses --help all instead of --help-all
         assert "--help" in result.output
         assert "all" in result.output.lower()
 
@@ -161,8 +144,6 @@ class TestRunCommand:
         mock_profiler_class,
         mock_get_cfg,
     ):
-
-        # Setup mocks
 
         mock_profiler = Mock()
         mock_system_profile = Mock()
@@ -194,10 +175,8 @@ class TestRunCommand:
 
         runner = CliRunner()
 
-        # Interactive mode requires TTY - test that it properly rejects non-TTY
         result = runner.invoke(cli, ["run"])
 
-        # Should exit with code 2 (TTY required error)
         assert result.exit_code == 2
 
     @patch("benchbox.cli.main.get_config_manager")
@@ -232,7 +211,6 @@ class TestRunCommand:
         cfg.validate_config.return_value = True
         mock_get_cfg.return_value = cfg
 
-        # Setup all mocks for interactive fallback
         mock_profiler = Mock()
         mock_system_profile = Mock()
         mock_system_profile.cpu_cores_logical = 8
@@ -263,11 +241,8 @@ class TestRunCommand:
 
         runner = CliRunner()
 
-        # Test quick mode without all required arguments - should fall back to interactive
-        # which requires TTY
         result = runner.invoke(cli, ["run", "--quick"])
 
-        # Should exit with code 2 (TTY required for interactive fallback)
         assert result.exit_code == 2
 
     @patch("benchbox.cli.main.get_config_manager")
@@ -311,15 +286,12 @@ class TestRunCommand:
         mock_benchmark_manager.benchmarks = {"tpch": {"display_name": "TPC-H", "estimated_time_range": (2, 10)}}
         mock_benchmark_manager_class.return_value = mock_benchmark_manager
 
-        # Mock system profiler
         mock_profiler = Mock()
         mock_system_profile = Mock()
         mock_system_profile.cpu_cores_logical = 8
         mock_system_profile.memory_total_gb = 16
         mock_profiler.get_system_profile.return_value = mock_system_profile
         mock_profiler_class.return_value = mock_profiler
-
-        # Mock orchestrator - will be patched inline
 
         runner = CliRunner()
 
@@ -358,7 +330,6 @@ class TestRunCommand:
                     )
 
         assert result.exit_code == 0
-        # Verify orchestrator was invoked and results exported
         mock_orchestrator.execute_benchmark.assert_called_once()
         mock_exporter.export_result.assert_called_once()
 
@@ -366,7 +337,6 @@ class TestRunCommand:
 
         runner = CliRunner()
 
-        # Test invalid scale factor
         result = runner.invoke(cli, ["run", "--scale", "invalid"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
@@ -403,7 +373,6 @@ class TestRunCommand:
         cfg.validate_config.return_value = True
         mock_get_cfg.return_value = cfg
 
-        # Setup all mocks for interactive mode
         mock_profiler = Mock()
         mock_system_profile = Mock()
         mock_system_profile.cpu_cores_logical = 8
@@ -434,11 +403,9 @@ class TestRunCommand:
 
         runner = CliRunner()
 
-        # Test with only output directory - should fall back to interactive (requires TTY)
         with runner.isolated_filesystem():
             result = runner.invoke(cli, ["run", "--output", "./test_output"])
 
-        # Should exit with code 2 (TTY required)
         assert result.exit_code == 2
 
     def test_run_command_default_scale_factor(self):
@@ -446,14 +413,11 @@ class TestRunCommand:
         runner = CliRunner()
         result = runner.invoke(run, ["--help"])
 
-        # Check that default scale factor is documented
         assert "0.01" in result.output
 
 
 @pytest.mark.unit
 class TestCLIIntegration:
-    """Test CLI integration scenarios."""
-
     @patch.object(_run_module, "SystemProfiler")
     @patch.object(_run_module, "DatabaseManager")
     @patch.object(_run_module, "BenchmarkManager")
@@ -469,8 +433,6 @@ class TestCLIIntegration:
         mock_database_manager,
         mock_profiler,
     ):
-        """Test full CLI workflow with all components mocked."""
-        # Setup system profiler
         mock_profiler_instance = Mock()
         mock_system_profile = Mock()
         mock_system_profile.cpu_cores_logical = 8
@@ -505,10 +467,8 @@ class TestCLIIntegration:
 
         runner = CliRunner()
 
-        # Test interactive mode without TTY - should reject
         result = runner.invoke(cli, ["run"])
 
-        # Should exit with code 2 (TTY required)
         assert result.exit_code == 2
 
     def test_cli_error_handling_invalid_command(self):
@@ -541,7 +501,6 @@ class TestCLIIntegration:
         mock_profiler_class,
     ):
 
-        # Setup all mocks for interactive mode
         mock_profiler = Mock()
         mock_system_profile = Mock()
         mock_system_profile.cpu_cores_logical = 8
@@ -572,49 +531,39 @@ class TestCLIIntegration:
 
         runner = CliRunner()
 
-        # Test that context object is created - interactive mode requires TTY
         result = runner.invoke(cli, ["run"])
 
-        # Should exit with code 2 (TTY required)
         assert result.exit_code == 2
 
 
 @pytest.mark.unit
 class TestCLIExceptionHandling:
-    """Test CLI exception handling scenarios."""
-
     @patch("benchbox.cli.main.ConfigManager")
     @patch("benchbox.cli.main.SystemProfiler")
     def test_system_profiler_exception_handling(self, mock_profiler_class, mock_config_manager):
 
         mock_config_manager.return_value = Mock()
 
-        # Make SystemProfiler raise an exception
         mock_profiler_class.side_effect = Exception("System profiling failed")
 
         runner = CliRunner()
         result = runner.invoke(cli, ["run"])
 
-        # CLI should handle the exception gracefully
         assert result.exit_code != 0
 
     @patch("benchbox.cli.main.ConfigManager")
     def test_config_manager_exception_handling(self, mock_config_manager):
 
-        # Make ConfigManager raise an exception
         mock_config_manager.side_effect = Exception("Config initialization failed")
 
         runner = CliRunner()
         result = runner.invoke(cli, ["run"])
 
-        # CLI should handle the exception gracefully
         assert result.exit_code != 0
 
 
 @pytest.mark.unit
 class TestCLICompressionOptions:
-    """Test CLI compression options."""
-
     def test_run_command_compression_help(self):
 
         runner = CliRunner()
@@ -628,7 +577,6 @@ class TestCLICompressionOptions:
 
         runner = CliRunner()
 
-        # Test invalid compression type (new composite format)
         result = runner.invoke(cli, ["run", "--compression", "invalid"])
         assert result.exit_code != 0
         assert "Invalid compression type" in result.output
@@ -637,7 +585,6 @@ class TestCLICompressionOptions:
 
         runner = CliRunner()
 
-        # Test invalid compression level (should be a number in format type:level)
         result = runner.invoke(cli, ["run", "--compression", "zstd:invalid"])
         assert result.exit_code != 0
         assert "Invalid compression level" in result.output

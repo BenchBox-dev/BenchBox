@@ -1,5 +1,3 @@
-"""Deterministic, bounded SQLGlot translation-fuzzing pilot."""
-
 from __future__ import annotations
 
 import argparse
@@ -40,7 +38,6 @@ CLI_DESCRIPTION = "Deterministic, bounded SQLGlot translation-fuzzing pilot."
 
 
 def _case_sql(rng: random.Random) -> str:
-    """Produce a diverse query from a portable, deterministic grammar."""
     table = rng.choice(("orders", "customers", "events", "lineitem", "products", "accounts"))
     column = rng.choice(("id", "amount", "created_at", "quantity", "status", "name"))
     projection = rng.choice(
@@ -71,7 +68,6 @@ def _case_sql(rng: random.Random) -> str:
 
 
 def generate_case(seed: int, index: int) -> tuple[int, str]:
-    """Return the deterministic per-case seed and SQL for a campaign seed."""
     case_seed = seed + index
     return case_seed, _case_sql(random.Random(case_seed))
 
@@ -81,7 +77,6 @@ def _error(exc: BaseException) -> str:
 
 
 def run_shape(sql: str, source: str, target: str) -> dict[str, Any]:
-    """Translate and parse one shape, retaining a replayable failure signature."""
     result: dict[str, Any] = {
         "source_dialect": source,
         "target_dialect": target,
@@ -103,7 +98,6 @@ def run_shape(sql: str, source: str, target: str) -> dict[str, Any]:
 
 
 def evaluate(sql: str, source: str, target: str) -> dict[str, dict[str, Any]]:
-    """Always exercise both wrapper call shapes, even if the first one fails."""
     return {SHAPES[0]: run_shape(sql, target, target), SHAPES[1]: run_shape(sql, "postgres", target)}
 
 
@@ -141,7 +135,6 @@ def shrink(
     deadline_started: float | None = None,
     deadline_seconds: float | None = None,
 ) -> str:
-    """Minimize while preserving the exact two-shape outcome and bounded runtime."""
     baseline = evaluate(sql, source, target)
     if failing_shapes != {name for name in SHAPES if baseline[name]["status"] == "fail"}:
         raise ValueError("failing_shapes disagrees with the baseline outcome")
@@ -263,7 +256,6 @@ def _validate_failure_payload(data: object, args: argparse.Namespace) -> tuple[l
 
 
 def _validate_advisory_evidence(failure_path: Path, summary_path: Path, args: argparse.Namespace) -> None:
-    """Ensure nightly may safely downgrade only a fully recorded discovery."""
     failure = json.loads(failure_path.read_text(encoding="utf-8"))
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     _validate_failure_payload(failure, args)

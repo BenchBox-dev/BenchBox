@@ -1,57 +1,4 @@
 #!/usr/bin/env python3
-"""Cross-surface applicability sweep (benchmark-cross-surface-equivalence-gate w2).
-
-The oracle coverage map flags a benchmark as a cross-surface candidate when it is
-dual-surface (ships SQL queries AND has ``supports_dataframe=True``) and currently
-unguarded. But ``supports_dataframe`` is a *loading* capability flag: it does NOT
-mean the benchmark ships comparable DataFrame *query* implementations. The
-cross-surface gate compares a query's SQL result to its DataFrame result, so it is
-only applicable to benchmarks that ship DataFrame *queries*.
-
-Signal: each benchmark that ships a DataFrame query surface exposes a
-``QueryRegistry`` (a ``<BENCH>_DATAFRAME_QUERIES`` instance) in its
-``benchbox.core.<bench>.dataframe_queries`` module/package -- this is the registry
-the cross-surface gate builders (e.g. ``build_clickbench_duckdb``) consume
-directly. Detecting that registry is the authoritative gate-applicability signal.
-
-History: an earlier version of this sweep used the production query *resolver*
-(``get_dataframe_queries_for_benchmark``). That under-counted: the resolver only
-special-cases tpch/tpcds/clickbench plus a generic ``get_dataframe_queries()``
-method, so benchmarks that expose only a ``<BENCH>_DATAFRAME_QUERIES`` registry
-(e.g. coffeeshop -- which was nonetheless successfully gated in #842) resolved to
-zero and were wrongly dispatched to a fallback oracle. Registry detection fixes
-that.
-
-Classification per candidate:
-  - ``gateable``: has a registry whose ids overlap the SQL ids as-is -> wire a
-    cross-surface gate on the overlapping ids (w3). A non-zero VERIFIED id overlap
-    is what makes a benchmark genuinely gateable.
-  - ``candidate-unverified``: has a registry but ZERO ids overlap the SQL ids
-    verbatim, so there is no verified SQL<->DataFrame query correspondence. A gate
-    here would require GUESSING which DataFrame query maps to which SQL query, and
-    the campaign's own TODO warns "do NOT guess" (e.g. nyctaxi/tsbs). This is NOT
-    counted as gateable coverage: it needs an independent, per-benchmark id mapping
-    to be confirmed first (some, like tpcds_obt at 3 DF vs ~89 SQL queries, may
-    never be a clean correspondence). The honest status the M2 review demanded.
-  - ``not-cheaply-gateable``: would need a full canonical dataset fetch, a
-    downloader-backed network fetch, or a non-bounded scale (rejects SF=0.01,
-    ships ``data_manifest.toml``, or ships a network-backed ``downloader.py``;
-    e.g. joinorder accepts only SF=1.0 via its IMDb 2013 manifest, nyctaxi
-    downloads the pinned TLC Parquet months before sampling) -> NOT wired as
-    a routine-PR gate, no matter the id overlap. The reason names the scale /
-    provenance evidence; joinorder_synthetic (already CI-enforced) is the
-    scaled stand-in for joinorder.
-  - ``no-df-query-surface``: no DataFrame query registry -> NOT cross-surface
-    gateable; needs a w2 fallback oracle (differential second-engine or a curated
-    expected-results subset).
-  - ``blocked``: could not instantiate the benchmark or read its registry.
-
-Report-mode (regenerate the committed artifact). Detecting a registry + reading
-SQL ids needs only an import + a benchmark instance (no generated data), so the
-sweep is cheap. Enumerating real divergences still requires a load-faithful
-per-benchmark gate builder (see ``build_ssb_duckdb`` /
-``build_clickbench_duckdb``).
-"""
 
 from __future__ import annotations
 
@@ -67,9 +14,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 ARTIFACT = _REPO_ROOT / "_project" / "analysis" / "cross-surface-applicability.md"
 
-# Scales to try when instantiating a benchmark (some reject the default small SF
-# and require a canonical scale, e.g. joinorder=1.0, tpcds_obt>=1.0). Reading SQL
-# ids needs no generated data, so a larger scale here is still cheap.
 _INSTANTIATE_SCALES = (0.01, 1.0)
 
 GATEABLE = "gateable"
@@ -79,11 +23,6 @@ NO_DF_QUERY_SURFACE = "no-df-query-surface"
 BLOCKED = "blocked"
 ABANDONED = "abandoned"
 
-# Benchmarks whose SQL<->DataFrame id correspondence was investigated and
-# explicitly abandoned (not merely unverified): even if the scale/provenance
-# bars below are later cleared, the mapping itself was judged not achievable
-# without renumbering one side, so the sweep must keep reporting the recorded
-# verdict instead of inviting re-investigation as ``candidate-unverified``.
 _ABANDONED_CORRESPONDENCE: dict[str, str] = {
     "tpcds_obt": (
         "DataFrame Q1..Q17 denote OBT-native analytics while SQL ids denote "
@@ -92,10 +31,6 @@ _ABANDONED_CORRESPONDENCE: dict[str, str] = {
     ),
 }
 
-# Statuses that mean "a cross-surface gate is genuinely applicable today". Only a
-# VERIFIED id overlap counts: a zero-overlap registry (``candidate-unverified``)
-# is deliberately excluded, because counting an unverified id mapping as coverage
-# is exactly the theater the M2 review flagged.
 _GATEABLE_STATUSES = frozenset({GATEABLE})
 
 
@@ -156,24 +91,12 @@ CLI_DESCRIPTION = (
 
 
 def _dataframe_query_registry(benchmark_id: str) -> Any | None:
-    """Return the benchmark's DataFrame ``QueryRegistry``, or ``None`` if it ships none.
-
-    Each benchmark with a DataFrame query surface exposes a ``QueryRegistry``
-    instance in ``benchbox.core.<bench>.dataframe_queries``; the cross-surface gate
-    builders consume it directly. Detect it by type rather than by a derived name,
-    because the constant name is not uniform (e.g. ``ODB_DATAFRAME_QUERIES`` for
-    h2odb, ``JOINORDER_DATAFRAME_QUERIES`` for both joinorder variants).
-    """
     from benchbox.core.dataframe.query import QueryRegistry
 
     target = f"benchbox.core.{benchmark_id}.dataframe_queries"
     try:
         module = importlib.import_module(target)
     except ModuleNotFoundError as exc:
-        # Only treat this as "no df-query surface" when the TARGET module itself is
-        # absent. If a nested dependency of the module is missing/renamed, the
-        # surface exists but is broken: re-raise so it is classified ``blocked``
-        # rather than silently undercounted as a fallback-oracle candidate.
         if exc.name is None or exc.name == target:
             return None
         raise
@@ -183,27 +106,10 @@ def _dataframe_query_registry(benchmark_id: str) -> Any | None:
     return None
 
 
-# Benchmarks whose downloader synthesizes fully offline at the bounded
-# SF=0.01 cell (no network fetch in routine PRs). FlightData's downloader
-# always synthesizes below SF=0.1 (see FlightDataDownloader._process_month),
-# so it stays ``generated`` for gate-cost purposes despite shipping a
-# downloader. Any other downloader-backed benchmark fetches remote data even
-# at the bounded scale and is ``network-fetch``.
 _BOUNDED_OFFLINE_DOWNLOADERS = frozenset({"flightdata"})
 
 
 def _data_provenance(benchmark_id: str) -> str:
-    """Classify how a benchmark acquires data: manifest fetch vs network fetch vs generation.
-
-    A benchmark that ships ``benchbox/core/<id>/data_manifest.toml`` fetches a
-    canonical dataset (e.g. joinorder's IMDb 2013 archive) instead of generating
-    a cheap bounded cell, so wiring it as a routine-PR gate would drag a full
-    dataset fetch into CI. A benchmark that ships a per-benchmark
-    ``downloader.py`` likewise performs remote fetches at the bounded scale
-    (e.g. nyctaxi downloads the pinned TLC Parquet months before sampling),
-    unless it is an explicit bounded-offline exception. Everything else
-    (synthetic generators) counts as ``generated`` for gate-cost purposes.
-    """
     benchmark_dir = _REPO_ROOT / "benchbox" / "core" / benchmark_id
     try:
         if (benchmark_dir / "data_manifest.toml").exists():
@@ -216,16 +122,6 @@ def _data_provenance(benchmark_id: str) -> str:
 
 
 def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str, str]:
-    # Resolve through the SAME core loader production runs use
-    # (benchbox/core/benchmark_loader.py), not the public-wrapper registry. Several
-    # wrappers do not forward ``get_dataframe_queries`` even though their core
-    # classes do (e.g. tpcds_obt, joinorder, read_primitives), so resolving via the
-    # public wrapper would see 0 DataFrame queries and misclassify a gateable
-    # benchmark as a fallback-oracle candidate.
-    #
-    # Returns ``(instance, used_scale, error, bounded_scale_error)``: the fourth
-    # element records why SF=0.01 failed ("" when it succeeded), so callers can
-    # report the bounded-scale reason instead of just the fallback scale.
     from benchbox.core.benchmark_loader import get_core_benchmark_class
 
     cls = get_core_benchmark_class(benchmark_id)
@@ -242,10 +138,9 @@ def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str, str]
 
 
 def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
-    """Classify a benchmark's cross-surface gate applicability via registry detection."""
     try:
         registry = _dataframe_query_registry(benchmark_id)
-    except ImportError as exc:  # broken (not absent) df-query module -> a finding, not "no surface"
+    except ImportError as exc:
         return BLOCKED, {"error": f"dataframe_queries import {type(exc).__name__}: {exc}"}
     if registry is None:
         return NO_DF_QUERY_SURFACE, {"df_queries": 0}
@@ -267,16 +162,8 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         "raw_id_overlap": raw_overlap,
         "scale": used_scale,
     }
-    # Recorded abandon verdicts outrank the scale/provenance bars below: the
-    # mapping itself was judged unachievable, so clearing the bounded scale
-    # must not re-invite investigation as ``candidate-unverified``.
     if benchmark_id in _ABANDONED_CORRESPONDENCE:
         return ABANDONED, {**detail, "reason": _ABANDONED_CORRESPONDENCE[benchmark_id]}
-    # Bounded-scale honesty (M1): a gate must be one cheap bounded cell. A
-    # benchmark that rejects SF=0.01, fetches a canonical dataset via
-    # data_manifest.toml, or performs downloader-backed network fetches at the
-    # bounded scale cannot land as a routine-PR gate, no matter how clean its
-    # id overlap is -- report it as not-cheaply-gateable with the reason.
     provenance = _data_provenance(benchmark_id)
     bounded_ok = used_scale is not None and abs(float(used_scale) - _INSTANTIATE_SCALES[0]) < 1e-9
     if not bounded_ok or provenance in ("manifest-fetch", "network-fetch"):
@@ -291,22 +178,13 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         if benchmark_id == "joinorder":
             reasons.append("use joinorder_synthetic (already CI-enforced) for scaled smoke-test data")
         return NOT_CHEAPLY_GATEABLE, {**detail, "data_source": provenance, "reason": "; ".join(reasons)}
-    # Honesty (M2): only a VERIFIED (non-zero) verbatim id overlap is gateable. A
-    # zero-overlap registry has no confirmed SQL<->DataFrame query correspondence,
-    # so it is a ``candidate-unverified`` until an independent id mapping is
-    # confirmed per benchmark -- never silently counted as gateable coverage.
     status = GATEABLE if raw_overlap > 0 else CANDIDATE_UNVERIFIED
     return status, {**detail, "data_source": provenance}
 
 
 def build_applicability_sweep() -> list[dict[str, Any]]:
-    """Drill into every dual-surface unguarded-or-staged benchmark from the coverage map."""
     from _project.scripts.generate_oracle_coverage_map import build_coverage_map
 
-    # A STAGED cross-surface gate is registered but NOT CI-enforced
-    # (``cross_surface_enforced is False``), so the benchmark still needs its
-    # verified-overlap candidacy drilled here. Enforced gates stay out: their
-    # correspondence already blocks CI.
     coverage = {
         row["benchmark"]: row
         for row in build_coverage_map()

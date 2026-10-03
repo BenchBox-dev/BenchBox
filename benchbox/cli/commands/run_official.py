@@ -1,5 +1,3 @@
-"""Deprecated run-official compatibility command."""
-
 import contextlib
 import functools
 import sys
@@ -20,12 +18,6 @@ from benchbox.core.run_service import (
 
 @contextlib.contextmanager
 def _forward_requested_streams(streams: int | None) -> Iterator[None]:
-    """Temporarily forward a requested stream count through the legacy seam.
-
-    ``run-official`` now passes ``concurrency`` directly to ``run``.  Keep this
-    narrow context manager for callers and tests that used the historical
-    compatibility seam while the deprecated command is still importable.
-    """
     if not streams:
         yield
         return
@@ -83,7 +75,6 @@ def run_official(
     quiet,
     validate_results,
 ):
-    """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
     try:
         validate_tpc_scale_factor(scale)
     except ValueError:
@@ -118,8 +109,6 @@ def run_official(
             console.print(f"[green]Concurrency: {streams} concurrent stream(s) will run the throughput phase[/green]")
 
     try:
-        # Streams is now a first-class run parameter — forwarded as ``concurrency``
-        # so the run service sets ``BenchmarkConfig.concurrency`` directly.
         ctx.invoke(
             run,
             platform=platform,

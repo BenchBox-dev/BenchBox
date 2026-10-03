@@ -1,12 +1,6 @@
-"""Tests for DataFrame Cross-Platform Benchmark Suite.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests verify the benchmark suite infrastructure works correctly,
-without requiring full benchmark runs.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,7 +22,6 @@ from benchbox.core.dataframe.benchmark_suite import (
     SQLVsDataFrameSummary,
 )
 
-# Mark all tests in this module as unit tests (fast)
 pytestmark = [
     pytest.mark.performance,
     pytest.mark.stress,
@@ -36,10 +29,7 @@ pytestmark = [
 
 
 class TestBenchmarkConfig:
-    """Tests for BenchmarkConfig dataclass."""
-
     def test_default_config(self):
-        """Test default configuration values."""
         config = BenchmarkConfig()
         assert config.scale_factor == 0.01
         assert config.query_ids is None
@@ -49,7 +39,6 @@ class TestBenchmarkConfig:
         assert config.capture_plans is True
 
     def test_custom_config(self):
-        """Test custom configuration values."""
         config = BenchmarkConfig(
             scale_factor=1.0,
             query_ids=["Q1", "Q6"],
@@ -65,10 +54,7 @@ class TestBenchmarkConfig:
 
 
 class TestPlatformCapability:
-    """Tests for PlatformCapability dataclass."""
-
     def test_polars_capability(self):
-        """Test Polars platform capability."""
         cap = PLATFORM_CAPABILITIES.get("polars-df")
         assert cap is not None
         assert cap.family == "expression"
@@ -79,7 +65,6 @@ class TestPlatformCapability:
         assert cap.supports_distributed is False
 
     def test_pandas_capability(self):
-        """Test Pandas platform capability."""
         cap = PLATFORM_CAPABILITIES.get("pandas-df")
         assert cap is not None
         assert cap.family == "pandas"
@@ -87,7 +72,6 @@ class TestPlatformCapability:
         assert cap.supports_lazy is False
 
     def test_pyspark_capability(self):
-        """Test PySpark platform capability."""
         cap = PLATFORM_CAPABILITIES.get("pyspark-df")
         assert cap is not None
         assert cap.family == "expression"
@@ -95,7 +79,6 @@ class TestPlatformCapability:
         assert cap.supports_distributed is True
 
     def test_cudf_capability(self):
-        """Test cuDF platform capability."""
         cap = PLATFORM_CAPABILITIES.get("cudf-df")
         assert cap is not None
         assert cap.family == "pandas"
@@ -104,10 +87,7 @@ class TestPlatformCapability:
 
 
 class TestQueryBenchmarkResult:
-    """Tests for QueryBenchmarkResult dataclass."""
-
     def test_empty_result_statistics(self):
-        """Test statistics with empty execution times."""
         result = QueryBenchmarkResult(
             query_id="Q1",
             platform="polars-df",
@@ -122,7 +102,6 @@ class TestQueryBenchmarkResult:
         assert result.coefficient_of_variation == 0.0
 
     def test_single_execution_statistics(self):
-        """Test statistics with single execution."""
         result = QueryBenchmarkResult(
             query_id="Q1",
             platform="polars-df",
@@ -130,14 +109,13 @@ class TestQueryBenchmarkResult:
             execution_times_ms=[100.0],
         )
         assert result.mean_time_ms == 100.0
-        assert result.std_time_ms == 0.0  # Can't compute std with 1 value
+        assert result.std_time_ms == 0.0
         assert result.min_time_ms == 100.0
         assert result.max_time_ms == 100.0
         assert result.p50_time_ms == 100.0
         assert result.p95_time_ms == 100.0
 
     def test_multiple_execution_statistics(self):
-        """Test statistics with multiple executions."""
         result = QueryBenchmarkResult(
             query_id="Q1",
             platform="polars-df",
@@ -151,7 +129,6 @@ class TestQueryBenchmarkResult:
         assert result.p50_time_ms == 100.0
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
         result = QueryBenchmarkResult(
             query_id="Q1",
             platform="polars-df",
@@ -172,10 +149,7 @@ class TestQueryBenchmarkResult:
 
 
 class TestPlatformBenchmarkResult:
-    """Tests for PlatformBenchmarkResult dataclass."""
-
     def test_aggregate_calculations(self):
-        """Test aggregate metric calculations."""
         config = BenchmarkConfig(scale_factor=0.01)
         query_results = [
             QueryBenchmarkResult(
@@ -200,20 +174,16 @@ class TestPlatformBenchmarkResult:
             query_results=query_results,
         )
 
-        # Total time should be sum of mean times
-        expected_total = 105.0 + 52.33333  # approximate means
+        expected_total = 105.0 + 52.33333
         assert abs(result.total_time_ms - expected_total) < 1.0
 
-        # Geometric mean should be calculated
         assert result.geometric_mean_ms > 0
 
-        # Success metrics
         assert result.successful_queries == 2
         assert result.failed_queries == 0
         assert result.success_rate == 100.0
 
     def test_mixed_success_failure(self):
-        """Test with mixed success and failure results."""
         config = BenchmarkConfig()
         query_results = [
             QueryBenchmarkResult(
@@ -243,7 +213,6 @@ class TestPlatformBenchmarkResult:
         assert result.success_rate == 50.0
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
         config = BenchmarkConfig(scale_factor=0.1, query_ids=["Q1"])
         query_results = [
             QueryBenchmarkResult(
@@ -270,62 +239,47 @@ class TestPlatformBenchmarkResult:
 
 
 class TestDataFrameBenchmarkSuite:
-    """Tests for DataFrameBenchmarkSuite class."""
-
     def test_init_default_config(self):
-        """Test initialization with default config."""
         suite = DataFrameBenchmarkSuite()
         assert suite.config.scale_factor == 0.01
         assert suite.config.benchmark_iterations == 3
 
     def test_init_custom_config(self):
-        """Test initialization with custom config."""
         config = BenchmarkConfig(scale_factor=1.0, query_ids=["Q1"])
         suite = DataFrameBenchmarkSuite(config=config)
         assert suite.config.scale_factor == 1.0
         assert suite.config.query_ids == ["Q1"]
 
     def test_get_available_platforms(self):
-        """Test getting available platforms."""
         suite = DataFrameBenchmarkSuite()
         platforms = suite.get_available_platforms()
 
-        # Should return a list
         assert isinstance(platforms, list)
 
-        # At minimum, polars should be available (core dependency)
         assert "polars-df" in platforms
 
     def test_get_platform_capability(self):
-        """Test getting platform capability."""
         suite = DataFrameBenchmarkSuite()
 
         cap = suite.get_platform_capability("polars-df")
         assert cap is not None
         assert cap.platform_name == "polars-df"
 
-        # Unknown platform returns None
         unknown = suite.get_platform_capability("unknown-df")
         assert unknown is None
 
     def test_get_platforms_by_category(self):
-        """Test filtering platforms by category."""
         suite = DataFrameBenchmarkSuite()
 
         single_node = suite.get_platforms_by_category(PlatformCategory.SINGLE_NODE)
-        # Polars and pandas should be in single node
-        assert "polars-df" in single_node or len(single_node) >= 0  # May vary by installed deps
+        assert "polars-df" in single_node or len(single_node) >= 0
 
         distributed = suite.get_platforms_by_category(PlatformCategory.DISTRIBUTED)
-        # PySpark should be in distributed (if installed)
         assert isinstance(distributed, list)
 
 
 class TestComparisonSummary:
-    """Tests for ComparisonSummary dataclass."""
-
     def test_to_dict(self):
-        """Test serialization to dictionary."""
         summary = ComparisonSummary(
             platforms=["polars-df", "pandas-df"],
             fastest_platform="polars-df",
@@ -347,10 +301,7 @@ class TestComparisonSummary:
 
 
 class TestBenchmarkSuiteReporting:
-    """Tests for benchmark suite reporting functionality."""
-
     def test_get_summary(self):
-        """Test generating comparison summary."""
         suite = DataFrameBenchmarkSuite()
         config = BenchmarkConfig()
 
@@ -394,7 +345,6 @@ class TestBenchmarkSuiteReporting:
         assert summary.query_winners["Q1"] == "polars-df"
 
     def test_export_results_json(self):
-        """Test exporting results to JSON."""
         suite = DataFrameBenchmarkSuite()
         config = BenchmarkConfig()
 
@@ -425,7 +375,6 @@ class TestBenchmarkSuiteReporting:
             assert "Q1" in content
 
     def test_export_results_markdown(self):
-        """Test exporting results to Markdown."""
         suite = DataFrameBenchmarkSuite()
         config = BenchmarkConfig()
 
@@ -473,32 +422,27 @@ class TestBenchmarkSuiteReporting:
 
 
 class TestSQLComparisonResult:
-    """Tests for SQLComparisonResult dataclass."""
-
     def test_speedup_calculation(self):
-        """Test automatic speedup calculation."""
         result = SQLComparisonResult(
             query_id="Q1",
             sql_platform="duckdb",
             df_platform="polars-df",
             sql_time_ms=100.0,
-            df_time_ms=50.0,  # DataFrame is 2x faster
+            df_time_ms=50.0,
         )
         assert result.speedup == 2.0
 
     def test_speedup_sql_faster(self):
-        """Test speedup when SQL is faster."""
         result = SQLComparisonResult(
             query_id="Q1",
             sql_platform="duckdb",
             df_platform="polars-df",
-            sql_time_ms=50.0,  # SQL is 2x faster
+            sql_time_ms=50.0,
             df_time_ms=100.0,
         )
         assert result.speedup == 0.5
 
     def test_zero_time_no_division_error(self):
-        """Test that zero times don't cause division error."""
         result = SQLComparisonResult(
             query_id="Q1",
             sql_platform="duckdb",
@@ -506,10 +450,9 @@ class TestSQLComparisonResult:
             sql_time_ms=0.0,
             df_time_ms=100.0,
         )
-        assert result.speedup == 1.0  # Default value preserved
+        assert result.speedup == 1.0
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
         result = SQLComparisonResult(
             query_id="Q1",
             sql_platform="duckdb",
@@ -530,10 +473,7 @@ class TestSQLComparisonResult:
 
 
 class TestSQLVsDataFrameSummary:
-    """Tests for SQLVsDataFrameSummary dataclass."""
-
     def test_df_wins_percentage(self):
-        """Test DataFrame wins percentage calculation."""
         summary = SQLVsDataFrameSummary(
             sql_platform="duckdb",
             df_platform="polars-df",
@@ -547,7 +487,6 @@ class TestSQLVsDataFrameSummary:
         assert summary.df_wins_percentage == 70.0
 
     def test_df_wins_percentage_zero_queries(self):
-        """Test percentage with zero queries."""
         summary = SQLVsDataFrameSummary(
             sql_platform="duckdb",
             df_platform="polars-df",
@@ -561,7 +500,6 @@ class TestSQLVsDataFrameSummary:
         assert summary.df_wins_percentage == 0.0
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
         results = [
             SQLComparisonResult(
                 query_id="Q1",
@@ -590,22 +528,17 @@ class TestSQLVsDataFrameSummary:
 
 
 class TestSQLVsDataFrameBenchmark:
-    """Tests for SQLVsDataFrameBenchmark class."""
-
     def test_init_default_config(self):
-        """Test initialization with default config."""
         benchmark = SQLVsDataFrameBenchmark()
         assert benchmark.config.scale_factor == 0.01
 
     def test_init_custom_config(self):
-        """Test initialization with custom config."""
         config = BenchmarkConfig(scale_factor=1.0, query_ids=["Q1", "Q6"])
         benchmark = SQLVsDataFrameBenchmark(config=config)
         assert benchmark.config.scale_factor == 1.0
         assert benchmark.config.query_ids == ["Q1", "Q6"]
 
     def test_generate_report(self):
-        """Test markdown report generation."""
         benchmark = SQLVsDataFrameBenchmark()
         results = [
             SQLComparisonResult(

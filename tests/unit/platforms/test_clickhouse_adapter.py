@@ -41,7 +41,6 @@ class TestClickHouseAdapter:
     def test_tpcds_q35_is_removed_from_local_memory_incompatibilities(self):
         """Q35's ClickHouse semi-join rewrite removes its known local memory failure."""
         assert 35 not in ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES["tpcds"]
-        assert "Query 35" not in ClickHouseAdapter.__doc__
 
     def test_initialization_success(self):
         """Test successful adapter initialization in server mode."""

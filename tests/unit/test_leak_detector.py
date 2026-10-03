@@ -1,5 +1,3 @@
-"""Behavioral tests for post-teardown process-state detection."""
-
 from __future__ import annotations
 
 import os
@@ -150,8 +148,6 @@ def _run_probe(
     )
     env = dict(os.environ, PYTHONPATH=str(REPO_ROOT), EXISTING_PROBE="original")
     env.pop("PYTEST_CURRENT_TEST", None)
-    # The parent pytest controller owns the shared lock. This child collects
-    # only the isolated probe, with no project conftest or native workloads.
     return subprocess.run(
         [
             sys.executable,
@@ -219,7 +215,6 @@ def test_restored_monkeypatch_and_generator_teardown_pass(tmp_path: Path) -> Non
 
 
 def _run_module_fixture_probe(tmp_path: Path, last_test_body: str) -> subprocess.CompletedProcess[str]:
-    """Run a module whose scoped fixture sets and restores one variable around its tests."""
     (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers = unit\n", encoding="utf-8")
     (tmp_path / "test_probe.py").write_text(
         "import os, pytest\npytestmark = pytest.mark.unit\n"
@@ -264,7 +259,6 @@ def _run_module_fixture_probe(tmp_path: Path, last_test_body: str) -> subprocess
 
 
 def test_a_module_fixture_restoring_state_is_not_blamed_on_the_last_test(tmp_path: Path) -> None:
-    """The module fixture's teardown runs inside the last test's teardown; it is not a leak of that test."""
     result = _run_module_fixture_probe(tmp_path, "pass")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "2 passed" in result.stdout

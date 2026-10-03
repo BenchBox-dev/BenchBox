@@ -1,22 +1,3 @@
-"""Unit tests for benchbox.platforms._spark_helpers.
-
-Covers:
-  * ``get_spark_query_plan`` - EXPLAIN EXTENDED capture and error fallback.
-  * ``validate_spark_identifier`` - 128-char Spark/Hive identifier gate.
-  * ``optimize_spark_table_definition`` - V1/V2 USING + constraint stripping
-    + SMALLINT upcasting.
-  * ``purge_orphaned_warehouse_directory`` - the C1 fix; including the N1
-    safety property that a probe FAILURE is not treated as "empty".
-  * ``run_spark_schema_creation_loop`` - the shared schema-creation loop
-    used by spark/lakesail/velox; including R2 (no silent swallow when
-    extraction fails) and the on_pre_loop / on_location_collision hooks.
-
-The adapter-level tests exercise these helpers indirectly via delegation;
-this file pins the contracts directly so a regression in the helpers is
-caught at the helper layer rather than smuggled through three adapter
-test files.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -89,7 +70,6 @@ class TestErrorHandling:
         assert result is None
 
     def test_returns_none_on_attribute_error(self) -> None:
-        # Simulates a None / closed connection
         result = get_spark_query_plan(None, "SELECT 1")
         assert result is None
 
@@ -132,11 +112,6 @@ class TestErrorHandling:
         assert any("Could not get query plan" in message for message in records)
 
 
-# ---------------------------------------------------------------------------
-# validate_spark_identifier
-# ---------------------------------------------------------------------------
-
-
 class TestValidateSparkIdentifier:
     def test_accepts_simple_names(self) -> None:
         assert validate_spark_identifier("orders") is True
@@ -156,11 +131,6 @@ class TestValidateSparkIdentifier:
     def test_enforces_128_char_limit(self) -> None:
         assert validate_spark_identifier("a" * 128) is True
         assert validate_spark_identifier("a" * 129) is False
-
-
-# ---------------------------------------------------------------------------
-# optimize_spark_table_definition
-# ---------------------------------------------------------------------------
 
 
 class TestOptimizeSparkTableDefinition:
@@ -226,7 +196,6 @@ class TestOptimizeSparkTableDefinition:
         assert "INT" in result.upper()
 
     def test_v2_format_preserves_constraints(self) -> None:
-        """Delta/Iceberg call sites pass strip_v1_constraints=False; constraints survive."""
         result = optimize_spark_table_definition(
             "CREATE TABLE t (id INT PRIMARY KEY)",
             table_format="delta",
@@ -244,25 +213,18 @@ class TestOptimizeSparkTableDefinition:
         assert "SMALLINT" in result.upper()
 
     def test_strip_constraints_with_nested_paren_check(self) -> None:
-        """R1: nested-paren CHECK clauses must be stripped cleanly, not corrupted.
-
-        The previous greedy ``[^)]*`` regex stopped at the first ``)``, leaving
-        the rest of the clause dangling and producing unbalanced output.
-        """
         result = optimize_spark_table_definition(
             "CREATE TABLE t (a INT, b INT, CHECK ((a > 0) AND (b > 0)))",
             table_format="parquet",
         )
         assert "CHECK" not in result.upper()
         assert "AND" not in result.upper()
-        # Output should be a balanced, parseable CREATE TABLE.
         assert result.count("(") == result.count(")")
         assert result.endswith("USING PARQUET")
         assert "a INT" in result
         assert "b INT" in result
 
     def test_strip_constraints_with_multi_column_foreign_key(self) -> None:
-        """Multi-column FOREIGN KEY with REFERENCES must strip cleanly."""
         result = optimize_spark_table_definition(
             "CREATE TABLE t (a INT, b INT, c INT, FOREIGN KEY (a, b) REFERENCES other(c, d))",
             table_format="parquet",
@@ -274,7 +236,6 @@ class TestOptimizeSparkTableDefinition:
         assert "c INT" in result
 
     def test_strip_v1_constraints_removes_inline_unique(self) -> None:
-        """R3: inline column-level UNIQUE must be stripped (Spark V1 rejects it)."""
         result = optimize_spark_table_definition(
             "CREATE TABLE t (id INT, email STRING UNIQUE)",
             table_format="parquet",
@@ -283,7 +244,6 @@ class TestOptimizeSparkTableDefinition:
         assert "email STRING" in result
 
     def test_strip_v1_constraints_preserves_table_unique_clause_then_strips(self) -> None:
-        """Both inline UNIQUE and table-level UNIQUE(...) clauses must be removed."""
         result = optimize_spark_table_definition(
             "CREATE TABLE t (id INT, email STRING UNIQUE, UNIQUE (id))",
             table_format="parquet",
@@ -294,28 +254,19 @@ class TestOptimizeSparkTableDefinition:
         assert "email STRING" in result
 
     def test_repeated_space_collapse_preserves_newlines(self) -> None:
-        """N5: whitespace collapsing must NOT fold newlines (multi-line DDL)."""
         result = optimize_spark_table_definition(
             "CREATE TABLE t (\n    a INT,\n    b INT,\n    PRIMARY KEY (a)\n)",
             table_format="parquet",
         )
-        # Newlines from the source DDL should survive the strip+collapse pass.
         assert "\n" in result
         assert "PRIMARY KEY" not in result.upper()
 
     def test_table_level_pk_after_trailing_comma_leaves_no_dangling_paren(self) -> None:
-        """Stripping ``, PRIMARY KEY (col)`` must not leave a bare ``, (col)`` group.
-
-        Regression: the inline-PK regex used to drop just the keywords, leaving
-        ``service_zone VARCHAR, (location_id))`` which Sail's DataFusion parser
-        rejected with ``found ( expected identifier``.
-        """
         result = optimize_spark_table_definition(
             "CREATE TABLE taxi_zones (\n    location_id INTEGER,\n    zone VARCHAR,\n    PRIMARY KEY (location_id)\n)",
             table_format="parquet",
         )
         assert "PRIMARY KEY" not in result.upper()
-        # No dangling parenthesised group where a column definition should be.
         assert "(location_id))" not in result.replace(" ", "")
         assert result.count("(") == result.count(")")
         assert result.endswith("USING PARQUET")
@@ -323,12 +274,6 @@ class TestOptimizeSparkTableDefinition:
         assert "zone VARCHAR" in result
 
     def test_strips_leading_line_comments_so_create_table_is_detected(self) -> None:
-        """A ``-- comment`` header must not block normalisation of the DDL below it.
-
-        Several benchmark schema generators (metadata_primitives, write_primitives,
-        transaction_primitives) emit a comment banner before ``CREATE TABLE``;
-        without stripping it the constraint clauses reached Sail verbatim.
-        """
         result = optimize_spark_table_definition(
             "-- Benchmark schema\n-- second comment line\n\n"
             "CREATE TABLE region (\n    r_regionkey INTEGER NOT NULL,\n"
@@ -341,9 +286,6 @@ class TestOptimizeSparkTableDefinition:
         assert result.endswith("USING PARQUET")
 
     def test_strips_leading_block_comments(self) -> None:
-        """SQLGlot transpilation rewrites -- headers into /* */ blocks folded onto
-        the first statement; those must also be stripped before CREATE TABLE
-        detection."""
         result = optimize_spark_table_definition(
             "/* Benchmark Schema */ /* second banner */ "
             "CREATE TABLE `region` (`r_regionkey` INT NOT NULL, "
@@ -361,7 +303,6 @@ class TestOptimizeSparkTableDefinition:
         assert optimize_spark_table_definition("   \n  ", table_format="parquet") == ""
 
     def test_fixed_size_array_type_rewritten_to_array_element_type(self) -> None:
-        """DuckDB ``FLOAT[128]`` array columns become portable ``ARRAY<FLOAT>``."""
         result = optimize_spark_table_definition(
             "CREATE TABLE vectors (id BIGINT, embedding FLOAT[128], doc_id VARCHAR(100))",
             table_format="parquet",
@@ -371,7 +312,6 @@ class TestOptimizeSparkTableDefinition:
         assert "embedding ARRAY<FLOAT>" in result
 
     def test_array_type_with_transpiled_fixed_size_suffix_normalised(self) -> None:
-        """SQLGlot may emit ``ARRAY<FLOAT>[128]``; the trailing suffix must drop."""
         result = optimize_spark_table_definition(
             "CREATE TABLE vectors (id BIGINT, embedding ARRAY<FLOAT>[128])",
             table_format="parquet",
@@ -381,13 +321,7 @@ class TestOptimizeSparkTableDefinition:
         assert result.endswith("USING PARQUET")
 
 
-# ---------------------------------------------------------------------------
-# purge_orphaned_warehouse_directory
-# ---------------------------------------------------------------------------
-
-
 def _purge_stub(*, list_tables_return=None, list_tables_raises=None, current_db="default") -> MagicMock:
-    """Build a minimal spark stub for purge tests."""
     spark = MagicMock()
     if list_tables_raises is not None:
         spark.catalog.listTables.side_effect = list_tables_raises
@@ -400,11 +334,6 @@ def _purge_stub(*, list_tables_return=None, list_tables_raises=None, current_db=
 
 
 class TestPurgeOrphanedWarehouseDirectory:
-    """The C1 fix: drop+recreate the current DB iff catalog probe says empty.
-
-    Probe FAILURE must NOT trigger the drop (the false-positive trap).
-    """
-
     def test_noop_when_catalog_has_tables(self) -> None:
         existing_table = MagicMock()
         existing_table.name = "orders"
@@ -428,7 +357,6 @@ class TestPurgeOrphanedWarehouseDirectory:
         assert any("USE `benchbox_run`" in s for s in executed)
 
     def test_skips_when_catalog_probe_raises(self) -> None:
-        """N1: probe failure must NOT be misread as 'empty'."""
         spark = _purge_stub(list_tables_raises=RuntimeError("transient gRPC error"))
 
         purge_orphaned_warehouse_directory(spark, logger=logging.getLogger(__name__))
@@ -438,7 +366,6 @@ class TestPurgeOrphanedWarehouseDirectory:
             assert "DROP DATABASE" not in sql_text.upper()
 
     def test_skips_when_current_database_invalid(self) -> None:
-        """A hostile current-database name must not be embedded."""
         spark = MagicMock()
         spark.catalog.listTables.return_value = []
         rows_mock = MagicMock()
@@ -452,7 +379,6 @@ class TestPurgeOrphanedWarehouseDirectory:
             assert "DROP DATABASE" not in sql_text.upper()
 
     def test_logs_at_info_when_purge_fires(self, caplog) -> None:
-        """C3: a successful purge must surface at INFO so -v users see it."""
         spark = _purge_stub(list_tables_return=[], current_db="benchbox_run")
         with caplog.at_level(logging.INFO, logger=__name__):
             purge_orphaned_warehouse_directory(spark, logger=logging.getLogger(__name__))
@@ -461,7 +387,6 @@ class TestPurgeOrphanedWarehouseDirectory:
         assert any("Purged potentially-orphaned warehouse" in m for m in info_messages)
 
     def test_swallows_drop_failures(self) -> None:
-        """If DROP fails after empty-catalog probe, log and return without raising."""
         spark = MagicMock()
         spark.catalog.listTables.return_value = []
         rows_mock = MagicMock()
@@ -474,13 +399,7 @@ class TestPurgeOrphanedWarehouseDirectory:
 
         spark.sql.side_effect = sql_side_effect
 
-        # Should not raise.
         purge_orphaned_warehouse_directory(spark, logger=logging.getLogger(__name__))
-
-
-# ---------------------------------------------------------------------------
-# run_spark_schema_creation_loop
-# ---------------------------------------------------------------------------
 
 
 class TestRunSparkSchemaCreationLoop:
@@ -502,7 +421,6 @@ class TestRunSparkSchemaCreationLoop:
         assert all("USING PARQUET" in str(call.args[0]).upper() for call in spark.sql.call_args_list)
 
     def test_pre_loop_hook_runs_once_before_statements(self) -> None:
-        """Velox uses on_pre_loop to call purge_orphaned_warehouse_directory."""
         spark = MagicMock()
         order: list[str] = []
         spark.sql.side_effect = lambda q: (order.append("sql"), MagicMock())[1]
@@ -578,7 +496,6 @@ class TestRunSparkSchemaCreationLoop:
             )
 
     def test_location_collision_hook_fires_on_location_already_exists(self) -> None:
-        """Spark.py uses on_location_collision to rmtree the orphaned warehouse dir."""
         spark = MagicMock()
         collision_calls: list[tuple] = []
         first_call = {"flag": True}
@@ -586,9 +503,6 @@ class TestRunSparkSchemaCreationLoop:
         def sql_side_effect(query):
             if first_call["flag"] and query.startswith("CREATE TABLE"):
                 first_call["flag"] = False
-                # Real Spark error format: bracketed class name + human message.
-                # The helper's "already exists" (with space) and
-                # "location_already_exists" (with underscore) checks both match.
                 raise RuntimeError("[LOCATION_ALREADY_EXISTS] The location for table 'orders' already exists.")
             return MagicMock()
 
@@ -610,7 +524,6 @@ class TestRunSparkSchemaCreationLoop:
         assert collision_calls[0][1] == "orders"
 
     def test_location_collision_hook_skipped_for_plain_already_exists(self) -> None:
-        """Hook should NOT fire when error is plain 'already exists' (not LOCATION)."""
         spark = MagicMock()
         collision_calls: list[tuple] = []
         first_call = {"flag": True}
@@ -637,13 +550,9 @@ class TestRunSparkSchemaCreationLoop:
         assert collision_calls == []
 
     def test_raises_when_extract_returns_none(self) -> None:
-        """R2 + N6: do not silently swallow; raise with a clear, specific message."""
         spark = MagicMock()
         spark.sql.side_effect = RuntimeError("View already exists")
 
-        # ALTER VIEW is not a CREATE TABLE so extract_spark_table_name returns None.
-        # The wrapped RuntimeError must explain *why* recovery was skipped, not
-        # just re-emit the underlying Spark error.
         with pytest.raises(RuntimeError, match="strict-ASCII identifier validation"):
             run_spark_schema_creation_loop(
                 spark,
@@ -653,8 +562,6 @@ class TestRunSparkSchemaCreationLoop:
             )
 
     def test_raises_when_extracted_name_fails_validation(self) -> None:
-        """N6: schema-qualified names extract OK but fail strict-ASCII validation;
-        the helper must raise with a clear message rather than the bare Spark error."""
         spark = MagicMock()
         spark.sql.side_effect = RuntimeError("Table already exists")
 
@@ -686,13 +593,7 @@ class TestRunSparkSchemaCreationLoop:
             lambda s: s,
             logger=logging.getLogger(__name__),
         )
-        # Only the non-empty statement runs.
         assert spark.sql.call_count == 1
-
-
-# ---------------------------------------------------------------------------
-# SparkLikeAdapterMixin
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -721,8 +622,6 @@ class _DummyUnifiedConfig:
 
 
 class _StubAdapter(SparkLikeAdapterMixin):
-    """Bare-minimum host class for the mixin contract tests."""
-
     def __init__(self, name: str = "TestPlatform") -> None:
         self.platform_name = name
         self.logger = logging.getLogger(__name__)
@@ -733,9 +632,6 @@ class _StubAdapter(SparkLikeAdapterMixin):
 
 
 class TestSparkLikeAdapterMixin:
-    """C2: shared bodies for apply_constraint_configuration / apply_unified_tuning /
-    apply_platform_optimizations - identical across spark/lakesail/velox."""
-
     def test_apply_constraint_configuration_logs_platform_name(self, caplog) -> None:
         adapter = _StubAdapter("LakeSail")
         with caplog.at_level(logging.INFO, logger=__name__):
@@ -772,8 +668,6 @@ class TestSparkLikeAdapterMixin:
         assert any("Failed to apply Spark config spark.foo.bar" in m for m in warnings)
 
     def test_platform_optimizations_recorded_in_applied_ledger(self) -> None:
-        # spark.conf.set bypasses RecordingConnection; the applied config must be
-        # recorded so a tuned native-Spark run reports applied_unverified, not noop.
         from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
 
         adapter = _StubAdapter("Spark")
@@ -814,7 +708,7 @@ class TestSparkLikeAdapterMixin:
         assert by_stmt["SET spark.sql.cbo.enabled=true"] == EXECUTED
 
     def test_platform_optimizations_without_ledger_does_not_raise(self) -> None:
-        adapter = _StubAdapter("Spark")  # no _applied_tuning_ledger attribute
+        adapter = _StubAdapter("Spark")
         spark = MagicMock()
         adapter.apply_platform_optimizations(_DummyPlatformConfig({"sql.cbo.enabled": "true"}), connection=spark)
         spark.conf.set.assert_called_with("spark.sql.cbo.enabled", "true")
@@ -829,11 +723,9 @@ class TestSparkLikeAdapterMixin:
             table_tunings={"orders": "TUNING_A", "customer": "TUNING_B"},
         )
         adapter.apply_unified_tuning(config, connection=spark)
-        # Two table tunings, both reached.
         recorded = [tuning for tuning, _ in adapter.table_tuning_calls]
         assert "TUNING_A" in recorded
         assert "TUNING_B" in recorded
-        # Platform-optimisation forward also fired.
         spark.conf.set.assert_called_with("spark.sql.adaptive.enabled", "true")
 
     def test_apply_unified_tuning_returns_early_on_none(self) -> None:
@@ -843,8 +735,6 @@ class TestSparkLikeAdapterMixin:
 
 
 class TestSparkAqeSharedKeys:
-    """Shared AQE/CBO key contracts used by spark, lakesail, velox, pyspark."""
-
     def test_aqe_keys_cover_all_three_toggles(self) -> None:
         assert set(SPARK_AQE_KEYS) == {
             "spark.sql.adaptive.enabled",
@@ -868,8 +758,6 @@ class TestSparkAqeSharedKeys:
 
 
 class TestApplySparkOlapRuntimeConf:
-    """Shared OLAP run-time helper honors the toggle and explicit overrides."""
-
     def test_disabled_sets_all_aqe_keys_false(self) -> None:
         spark = MagicMock()
         apply_spark_olap_runtime_conf(spark, "tpch", adaptive_enabled=False)
@@ -914,7 +802,6 @@ class TestApplySparkOlapRuntimeConf:
         spark = MagicMock()
         spark.conf.set.side_effect = RuntimeError("conf error")
 
-        # Should not raise.
         apply_spark_olap_runtime_conf(spark, "tpch", adaptive_enabled=True)
 
 

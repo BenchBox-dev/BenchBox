@@ -1,26 +1,3 @@
-"""Data-generation versioning for stale-datagen detection.
-
-Changing data-generation base constants (for example the ``base_row_counts``
-in a ``generator_specs.yaml``) silently invalidates comparisons between data
-generated before and after the change. This module versions the generation
-inputs so cached datagen directories can be recognized as stale:
-
-- ``DATA_GENERATION_VERSION`` marks the generation-logic generation. Bump it
-  whenever the generator code changes incompatibly.
-- ``compute_base_constants_hash`` fingerprints the base-constant inputs for a
-  benchmark, so editing a specs file is detected even without a version bump.
-  Only benchmarks with registered specs files (currently ``tpch``,
-  ``tpch_skew``, ``tsbs_devops``/``tsbs``) get a content fingerprint; every
-  other benchmark falls back to the version marker alone, so its hash cannot
-  detect specs edits. Register a benchmark here when it gains a specs file.
-
-Datagen manifests stamp both values; the runner treats a manifest whose stamp
-differs from current as invalid and regenerates (the automatic equivalent of
-``--force`` datagen). ``BenchmarkResults.data_generation_version`` records the
-version that produced a result so old and new results are not silently
-compared.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -28,13 +5,9 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-# Generation-logic generation. Bump on incompatible generator changes.
 DATA_GENERATION_VERSION = 1
 
-# Benchmark slug (as stored lowercased in datagen manifests) to the
-# base-constant files that determine its generated data. tpch_skew carries
-# both specs because skewed output depends on the base TPC-H inputs and on
-# the skew column indices applied on top of them.
+
 _BENCHMARK_SPECS_FILES: dict[str, tuple[str, ...]] = {
     "tpch": ("benchbox/core/tpch/generator_specs.yaml",),
     "tpch_skew": (
@@ -55,24 +28,18 @@ def _spec_files_for(benchmark: str | None) -> list[Path]:
 
 
 def compute_base_constants_hash(benchmark: str | None = None) -> str:
-    """Return the hex fingerprint of the base constants for a benchmark.
 
-    Falls back to the version marker alone when a benchmark has no
-    registered specs files, so unmapped benchmarks still get a stable stamp.
-    """
     digest = hashlib.sha256(f"datagen-v{DATA_GENERATION_VERSION}".encode())
     for path in _spec_files_for(benchmark):
         try:
             digest.update(path.read_bytes())
         except OSError:
-            # Installed layouts may omit spec files; the version marker
-            # still distinguishes logic generations.
             continue
     return digest.hexdigest()
 
 
 def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]:
-    """Return the stamp written into freshly generated manifests."""
+
     return {
         "data_generation_version": DATA_GENERATION_VERSION,
         "base_constants_hash": compute_base_constants_hash(benchmark),
@@ -80,12 +47,7 @@ def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]:
 
 
 def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[str, Any] | None = None) -> str:
-    """Fingerprint generation constants and an optional effective configuration.
 
-    The existing base-constants hash remains part of this value, allowing a
-    benchmark to add runtime generation inputs without weakening YAML-spec
-    invalidation.
-    """
     payload = {
         "base_constants_hash": compute_base_constants_hash(benchmark),
         "configuration": dict(configuration) if configuration is not None else None,
@@ -96,7 +58,7 @@ def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[
 
 
 def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> bool:
-    """Return whether a manifest's datagen stamp matches current inputs."""
+
     if not isinstance(manifest, Mapping):
         return False
     if manifest.get("data_generation_version") != DATA_GENERATION_VERSION:
@@ -106,7 +68,7 @@ def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: s
 
 
 def describe_datagen_staleness(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> str | None:
-    """Explain why a manifest is datagen-stale, or None when current."""
+
     if manifest_datagen_is_current(manifest, benchmark):
         return None
     if not isinstance(manifest, Mapping):

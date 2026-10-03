@@ -1,29 +1,6 @@
-"""Regression coverage for the tuning FK-aware drop ordering defect.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Background (fk-aware-drop-ordering-20260717): once tuning constraints reach DuckDB,
-loading TPC-H with sorting configured on a referenced parent table (e.g. ``SUPPLIER``,
-which is referenced by ``LINEITEM`` and ``PARTSUPP``) failed in a single run with:
-
-    Cannot drop entry "supplier" because there are entries that depend on it.
-
-This occurred because ``apply_ctas_sort`` ran ``CREATE OR REPLACE TABLE supplier``
-immediately after loading the table, which implicitly dropped the table while dependent
-tables (created at schema-creation time with foreign keys) referenced it.
-
-The fix makes ``apply_ctas_sort`` FK-aware: when foreign keys are active, the CTAS sort
-rewrites data in-place using a temporary table (temp CTAS + DELETE + INSERT + temp DROP),
-preserving table identity, primary keys, foreign keys, and dependent references.
-
-This test module verifies two invariants per TODO w2:
-1. The tuned single-run load with FK + sort on referenced parents succeeds without
-   the DROP-ordering error.
-2. The FK constraints are still enforced afterward -- violating INSERT statements must
-   be rejected.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -45,7 +22,6 @@ _SCALE_FACTOR = 0.01
 
 
 def _fk_and_sort_enabled_tuning_config() -> UnifiedTuningConfiguration:
-    """Tuning config with FK enforcement and sorting on referenced parents."""
     return UnifiedTuningConfiguration.from_dict(
         {
             "primary_keys": {"enabled": True, "enforce_uniqueness": True},
@@ -98,7 +74,6 @@ def _fk_and_sort_enabled_tuning_config() -> UnifiedTuningConfiguration:
 
 @pytest.fixture(scope="module")
 def tpch_fk_and_sort_duckdb(tmp_path_factory: pytest.TempPathFactory):
-    """Real DuckDB DB with TPC-H SF 0.01 data, FK + sort tuning enabled."""
     base = tmp_path_factory.mktemp("tpch_fk_drop_order")
     db_path = str(base / "tpch_tuned.duckdb")
     adapter = DuckDBAdapter(database_path=db_path)
@@ -117,7 +92,6 @@ def tpch_fk_and_sort_duckdb(tmp_path_factory: pytest.TempPathFactory):
 
 
 def test_fk_and_sort_tuned_load_completes_for_every_table(tpch_fk_and_sort_duckdb):
-    """The full tuned load must succeed with nonzero rows in every table."""
     _adapter, _bench, _conn, table_stats = tpch_fk_and_sort_duckdb
 
     expected_tables = {"region", "nation", "supplier", "part", "partsupp", "customer", "orders", "lineitem"}
@@ -132,10 +106,8 @@ def test_fk_and_sort_tuned_load_completes_for_every_table(tpch_fk_and_sort_duckd
 
 
 def test_fk_constraint_is_still_enforced_after_ctas_sort(tpch_fk_and_sort_duckdb):
-    """FK constraints must remain enforced after in-place CTAS sorting."""
     _adapter, _bench, conn, _table_stats = tpch_fk_and_sort_duckdb
 
-    # Violating insert into orders referencing nonexistent customer
     with pytest.raises(Exception, match="[Ff]oreign key"):
         conn.execute(
             "INSERT INTO orders (o_orderkey, o_custkey, o_orderstatus, o_totalprice, "
@@ -143,7 +115,6 @@ def test_fk_constraint_is_still_enforced_after_ctas_sort(tpch_fk_and_sort_duckdb
             "VALUES (999999999, 999999999, 'O', 1.0, '2026-01-01', '1-URGENT', 'Clerk#1', 0, 'x')"
         )
 
-    # Violating insert into partsupp referencing nonexistent supplier
     with pytest.raises(Exception, match="[Ff]oreign key"):
         conn.execute(
             "INSERT INTO partsupp (ps_partkey, ps_suppkey, ps_availqty, ps_supplycost, ps_comment) "
@@ -155,19 +126,16 @@ def test_table_data_is_physically_sorted_after_ctas_sort(tpch_fk_and_sort_duckdb
 
     _adapter, _bench, conn, _table_stats = tpch_fk_and_sort_duckdb
 
-    # Check supplier order
     supp_rows = conn.execute("SELECT s_suppkey FROM supplier").fetchall()
     supp_keys = [r[0] for r in supp_rows]
     assert supp_keys == sorted(supp_keys), "supplier rows must be sorted by s_suppkey"
 
-    # Check orders order
     orders_rows = conn.execute("SELECT o_orderkey FROM orders").fetchall()
     orders_keys = [r[0] for r in orders_rows]
     assert orders_keys == sorted(orders_keys), "orders rows must be sorted by o_orderkey"
 
 
 def test_populated_parent_rewrite_preserves_dependents_and_fk_enforcement(tmp_path: Path):
-    """A later re-sort must preserve populated child rows and restore their FK."""
     adapter = DuckDBAdapter(database_path=str(tmp_path / "populated_parent.duckdb"))
     conn = adapter.create_connection()
     conn.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY, value INTEGER)")
@@ -197,7 +165,6 @@ def test_populated_parent_rewrite_preserves_dependents_and_fk_enforcement(tmp_pa
 
 
 def test_physical_pk_not_null_and_fk_constraints_survive_sort_when_config_flags_are_off(tmp_path: Path):
-    """Physical constraints, not requested flags, determine whether table identity must be preserved."""
     adapter = DuckDBAdapter(database_path=str(tmp_path / "physical_constraints.duckdb"))
     conn = adapter.create_connection()
     conn.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY, required_value INTEGER NOT NULL)")
@@ -238,7 +205,6 @@ def test_physical_pk_not_null_and_fk_constraints_survive_sort_when_config_flags_
 
 
 def test_active_caller_transaction_is_preserved_without_nested_begin(tmp_path: Path):
-    """Sorted ingestion must not abort, commit, or roll back a caller-owned transaction."""
     adapter = DuckDBAdapter(database_path=str(tmp_path / "active_transaction.duckdb"))
     adapter._applied_tuning_ledger = AppliedTuningLedger()
     conn = adapter.create_connection()

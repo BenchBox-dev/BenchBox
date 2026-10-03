@@ -1,5 +1,4 @@
 # ruff: noqa: SIM905
-"""Workload execution helpers for StarRocks."""
 
 from __future__ import annotations
 
@@ -24,27 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 def _stream_load_treats_empty_as_null(delimiter: str) -> bool:
-    """Decide the StarRocks Stream Load null_format header from the CSV delimiter.
-
-    Comma-delimited CSV is the historical StarRocks default for empty=NULL ingest
-    (null_format=""); pipe-delimited TPC TBL and tab CSV keep empties as literal
-    empty strings (null_format=\\N). Keying on delimiter — rather than the
-    resolver's null_marker signal — preserves behaviour for unannotated comma
-    CSVs whose dialect resolves to null_marker=None.
-    """
     return delimiter == ","
 
 
 def _split_sql_literals(query: str) -> list[tuple[str, bool]]:
-    """Split SQL into alternating (text, is_literal) segments.
-
-    ``is_literal`` is True for single-quoted string literals (including their
-    surrounding quotes). Double-quotes and backticks are left in the code
-    segment because StarRocks needs to rewrite ANSI-quoted identifiers; any
-    MySQL-style double-quoted *literal* would be non-portable and isn't used
-    by in-repo benchmark queries. MySQL escape forms handled: backslash escape
-    and SQL-standard ``''`` doubling inside single-quoted literals.
-    """
     segments: list[tuple[str, bool]] = []
     n = len(query)
     i = 0
@@ -77,19 +59,14 @@ def _split_sql_literals(query: str) -> list[tuple[str, bool]]:
 
 
 def _apply_outside_literals(pattern: re.Pattern[str], repl: str, query: str) -> str:
-    """Run ``pattern.sub(repl, …)`` on code segments only, preserving string literals."""
     parts = _split_sql_literals(query)
     return "".join(text if is_lit else pattern.sub(repl, text) for text, is_lit in parts)
 
 
 class StarRocksWorkloadMixin:
-    """Provide schema management and workload execution utilities for StarRocks."""
-
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using StarRocks-optimized table definitions."""
         start_time = mono_time()
 
-        # Get constraint settings from tuning configuration
         enable_primary_keys, enable_foreign_keys = self._get_constraint_configuration()
         self._log_constraint_configuration(enable_primary_keys, enable_foreign_keys)
 
@@ -100,27 +77,15 @@ class StarRocksWorkloadMixin:
                 tuning_config=effective_config,
             )
 
-            # Physical table_tunings (partitioning/sorting/distribution columns)
-            # render only when tuning is actually enabled -- matching the same
-            # `self.tuning_enabled` gate DataLoader uses elsewhere, and per ADR-3
-            # baseline policy (notuning = platform defaults + engine-mandatory
-            # DISTRIBUTED BY only, no tuned rendering).
             table_tunings = None
             if self.tuning_enabled and effective_config is not None:
                 table_tunings = effective_config.table_tunings
 
-            # Strip SQL line comments before splitting so comment-prefixed blocks
-            # (e.g. metadata_primitives header, write_primitives staging separator)
-            # don't hide the CREATE TABLE from _optimize_table_definition.
             schema_sql_clean = re.sub(r"--[^\n]*\n?", "", schema_sql)
             statements = [stmt.strip() for stmt in schema_sql_clean.split(";") if stmt.strip()]
 
             cursor = connection.cursor()
             try:
-                # Increase tablet creation timeout to avoid spurious DDL failures
-                # under concurrent load. This is a server-wide frontend config;
-                # we ignore errors so managed deployments without ADMIN privilege
-                # still work - they just get the default 10s timeout.
                 try:
                     cursor.execute('ADMIN SET FRONTEND CONFIG("tablet_create_timeout_second"="600")')
                 except Exception:
@@ -142,80 +107,40 @@ class StarRocksWorkloadMixin:
         return elapsed_seconds(start_time)
 
     def _optimize_table_definition(self, statement: str, table_tunings: dict[str, Any] | None = None) -> str:
-        """Optimize table definition for StarRocks compatibility.
-
-        Args:
-            statement: A single CREATE TABLE statement (DuckDB dialect).
-            table_tunings: Optional mapping of table_name -> TableTuning, from
-                the effective tuning configuration, present only when tuning is
-                enabled (see create_schema). When a matching, non-empty
-                TableTuning exists for this statement's table, tuned
-                PARTITION BY / DISTRIBUTED BY / ORDER BY clauses are rendered via
-                core.tuning.generators.starrocks.StarRocksDDLGenerator -- the
-                same single renderer dry-run preview uses (ADR-3) -- instead of
-                the engine-mandatory first-column DISTRIBUTED BY baseline.
-        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Remove AUTOINCREMENT / AUTO_INCREMENT (not standard in StarRocks DDL from DuckDB)
         statement = re.sub(r"\bAUTOINCREMENT\b", "", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bAUTO_INCREMENT\b", "", statement, flags=re.IGNORECASE)
 
-        # StarRocks uses Duplicate Key model by default (good for OLAP)
-        # Ensure ENGINE is not present (StarRocks uses different syntax)
-
-        # Remove any ENGINE clauses from DuckDB-style DDL
         statement = re.sub(r"\s+ENGINE\s*=\s*\w+(\([^)]*\))?", "", statement, flags=re.IGNORECASE)
 
-        # Convert DuckDB types to StarRocks types
         statement = self._convert_types(statement)
 
         statement = strip_foreign_keys(statement)
 
-        # Extract primary key columns BEFORE stripping, so we can preserve the
-        # PRIMARY KEY model for StarRocks (which supports UPDATE/DELETE on PK tables).
-        # Check for table-level "PRIMARY KEY (col1, col2)" first, then inline "col TYPE PRIMARY KEY".
         pk_match = re.search(r"\bPRIMARY\s+KEY\s*\(([^)]+)\)", statement, re.IGNORECASE)
         if pk_match:
             pk_cols_raw = pk_match.group(1)
         else:
-            # Inline PRIMARY KEY on a column definition line: "  col_name TYPE PRIMARY KEY"
-            # Use MULTILINE so ^ anchors to the line start, and avoid . crossing lines.
             pk_inline = re.search(r"^\s+(\w+)\s+\w[\w()]*.*\bPRIMARY\s+KEY\b", statement, re.IGNORECASE | re.MULTILINE)
             pk_cols_raw = pk_inline.group(1) if pk_inline else None
 
-        # Remove table-level PRIMARY KEY constraint first so its argument list
-        # is consumed before the inline-PK regex can strip just the keywords.
-        # Handles: "  last_col TYPE NOT NULL,\n  PRIMARY KEY (col1, col2)"
         statement = re.sub(r",?\s*PRIMARY\s+KEY\s*\([^)]+\)", "", statement, flags=re.IGNORECASE)
 
-        # Remove inline PRIMARY KEY from column definitions (no argument list follows).
-        # Handles: "  o_orderkey INTEGER PRIMARY KEY"
         statement = re.sub(r"\s+PRIMARY\s+KEY\b", "", statement, flags=re.IGNORECASE)
 
-        # Cache first column - used by both DUPLICATE KEY and DISTRIBUTED BY clauses.
         first_col = self._extract_first_column(statement)
 
-        # Add table model if not present (recompute upper after mutations).
-        # If the original DDL had a PRIMARY KEY, preserve that model so StarRocks
-        # allows UPDATE/DELETE operations (DUPLICATE KEY tables are append-only).
-        # StarRocks requires PK columns to be the FIRST N columns in schema order,
-        # so we verify that before committing to PRIMARY KEY model.
         current_upper = statement.upper()
         if "DUPLICATE KEY" not in current_upper and "PRIMARY KEY" not in current_upper:
             use_pk = False
             if pk_cols_raw:
                 pk_cols = [c.strip().strip("`").strip('"') for c in pk_cols_raw.split(",")]
                 col_names = re.findall(r"^\s+(\w+)\s+\w", statement, re.MULTILINE)
-                # Fall back to DUPLICATE KEY if column-name extraction failed - a
-                # malformed parse must not silently accept an unverified PK order.
-                # PK columns must appear in order as the first len(pk_cols) columns.
                 use_pk = len(col_names) > 0 and len(col_names) >= len(pk_cols) and col_names[: len(pk_cols)] == pk_cols
 
             if use_pk and pk_cols_raw:
-                # Preserve PRIMARY KEY model: StarRocks syntax is "PRIMARY KEY (col)"
-                # outside the column list, before DISTRIBUTED BY.
                 pk_clause = f"PRIMARY KEY ({pk_cols_raw.strip()})"
                 stripped = statement.rstrip()
                 if stripped.endswith(";"):
@@ -229,42 +154,22 @@ class StarRocksWorkloadMixin:
                 else:
                     statement = stripped + f"\nDUPLICATE KEY(`{first_col}`)"
 
-        # Recompute after possible DUPLICATE KEY mutation
         current_upper = statement.upper()
 
-        # Resolve tuned PARTITION BY / DISTRIBUTED BY / ORDER BY clauses through
-        # the single StarRocks DDL renderer. Returns None (engine-mandatory
-        # baseline only) when tuning is disabled or no non-empty TableTuning is
-        # configured for this table.
         from benchbox.core.tuning.ddl_generator import get_ddl_generator
 
         generator = get_ddl_generator("starrocks")
         tuning_clauses, tuned_table_name = self._resolve_tuned_ddl_clauses(statement, table_tunings, generator)
 
-        # Add DISTRIBUTED BY HASH (engine-mandatory) plus any tuned PARTITION BY /
-        # ORDER BY clauses, in StarRocks' required clause order: PARTITION BY ->
-        # DISTRIBUTED BY -> ORDER BY. Every clause string comes from the generator
-        # so dry-run preview and this execution path can never disagree. Untuned
-        # tables (tuning_clauses is None) get exactly the historical
-        # DISTRIBUTED BY HASH(<first_column>) BUCKETS 8 baseline.
         if "DISTRIBUTED BY" not in current_upper and first_col:
             suffix_clauses: list[str] = []
-            # Genuinely tuned clauses (for the applied-tuning ledger, w4) -- the
-            # engine-mandatory first-column DISTRIBUTED BY is excluded because it
-            # is a baseline requirement, not a tuning choice.
             tuned_clauses: list[str] = []
 
-            # partition_by already holds the rendered PARTITION BY clause
-            # (single-renderer contract), so it is used verbatim.
             if tuning_clauses is not None and tuning_clauses.partition_by and "PARTITION BY" not in current_upper:
                 partition_clause = tuning_clauses.partition_by
                 suffix_clauses.append(partition_clause)
                 tuned_clauses.append(partition_clause)
 
-            # Tuned distribution overrides the first-column baseline. distribute_by
-            # already holds the rendered DISTRIBUTED BY clause (single-renderer
-            # contract), so it is used verbatim; only the untuned baseline
-            # renders here from the first column.
             dist_tuned = bool(tuning_clauses and tuning_clauses.distribute_by)
             if dist_tuned:
                 distribution_clause = tuning_clauses.distribute_by
@@ -274,8 +179,6 @@ class StarRocksWorkloadMixin:
             if dist_tuned:
                 tuned_clauses.append(distribution_clause)
 
-            # order_by already holds the rendered ORDER BY clause
-            # (single-renderer contract), so it is used verbatim.
             if tuning_clauses is not None and tuning_clauses.order_by and "ORDER BY" not in current_upper:
                 order_clause = tuning_clauses.order_by
                 suffix_clauses.append(order_clause)
@@ -288,22 +191,11 @@ class StarRocksWorkloadMixin:
             else:
                 statement = stripped + f"\n{suffix}"
 
-            # Record what was actually rendered into this executed CREATE TABLE.
             self._record_starrocks_tuning_to_ledger(tuned_table_name, tuned_clauses)
 
         return statement
 
     def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None, generator: Any):
-        """Resolve tuned PARTITION BY / DISTRIBUTED BY / ORDER BY clauses for this
-        statement's table, if any.
-
-        Returns ``(clauses, table_name)``. ``clauses`` is None when tuning is not
-        enabled (``table_tunings`` is falsy), no TableTuning is configured for
-        this table, or the configured TableTuning renders no clauses -- callers
-        fall back to the engine-mandatory DISTRIBUTED BY baseline in that case.
-        ``table_name`` is the parsed CREATE TABLE name (for ledger attribution),
-        or None when it could not be parsed.
-        """
         if not table_tunings:
             return None, None
 
@@ -312,9 +204,6 @@ class StarRocksWorkloadMixin:
             return None, None
         table_name = match.group(1)
 
-        # Benchmark table names are lowercase while shipped tuning templates key
-        # tables uppercase (e.g. "LINEITEM") -- same case-insensitive lookup
-        # pattern as core/dryrun.py and the ClickHouse workload.
         table_tuning = None
         for configured_name, configured_tuning in table_tunings.items():
             if str(configured_name).upper() == table_name.upper():
@@ -330,17 +219,6 @@ class StarRocksWorkloadMixin:
         return clauses, table_name
 
     def _record_starrocks_tuning_to_ledger(self, table_name: str | None, clauses: list[str]) -> None:
-        """Record rendered StarRocks tuning clauses into the applied-tuning ledger.
-
-        StarRocks applies PARTITION BY / DISTRIBUTED BY / ORDER BY as CREATE TABLE
-        clauses (not standalone statements), so the base connection-wrapping
-        capture never sees them; recording them here is what lets a tuned run
-        report ``applied_unverified`` instead of ``noop`` (w4). Only genuinely
-        tuned clauses are recorded -- the engine-mandatory first-column
-        DISTRIBUTED BY baseline is not a tuning choice. Guarded: a no-op when no
-        ledger is attached (non-tuned or non-benchmark runs), and capture never
-        breaks a run.
-        """
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is None or not clauses:
             return
@@ -349,57 +227,34 @@ class StarRocksWorkloadMixin:
 
             for clause in clauses:
                 ledger.record(clause, PHASE_DDL, mechanism="starrocks_ddl_generator", table=table_name)
-        except Exception as exc:  # capture must never break a run
+        except Exception as exc:
             self.logger.debug("StarRocks applied-ledger record degraded: %s", exc)
 
-    # DuckDB/standard SQL → StarRocks type mappings.
-    # Each entry is (pattern, replacement, case_sensitive). TIMESTAMP and TIME are
-    # reserved SQL words that also appear as column names (write_primitives uses
-    # "timestamp"); marking those case-sensitive avoids mangling the column names,
-    # since SQL type keywords are conventionally uppercase.
     _TYPE_MAPPINGS: tuple[tuple[str, str, bool], ...] = (
         (r"\bHUGEINT\b", "LARGEINT", False),
         (r"\bINTEGER\b", "INT", False),
-        # ClickBench data contains uint16 values (e.g. 51544) that exceed signed
-        # SMALLINT range (-32768..32767); promote to INT to avoid load failures.
         (r"\bSMALLINT\b", "INT", False),
         (r"\bTIMESTAMP\b", "DATETIME", True),
         (r"\bTIME\b", "VARCHAR(10)", True),
         (r"\bSTRING\b", "VARCHAR(65533)", False),
         (r"\bTEXT\b", "VARCHAR(65533)", False),
-        # DuckDB/SQLite allow bare VARCHAR (unbounded); StarRocks requires a size.
-        # Only match when NOT followed by '(' to avoid mangling VARCHAR(50) etc.
         (r"\bVARCHAR\b(?!\s*\()", "VARCHAR(65533)", False),
         (r"\bBOOLEAN\b", "BOOLEAN", False),
         (r"\bDOUBLE\s+PRECISION\b", "DOUBLE", False),
         (r"\bREAL\b", "FLOAT", False),
         (r"\bBLOB\b", "VARCHAR(65533)", False),
-        # DuckDB fixed-size float arrays (e.g. FLOAT[128]) → ARRAY<FLOAT>
         (r"\bFLOAT\[\d+\]", "ARRAY<FLOAT>", False),
-        # DECIMAL with precision is fine as-is
     )
 
     def _convert_types(self, statement: str) -> str:
-        """Convert DuckDB/standard SQL types to StarRocks-compatible types."""
         for pattern, replacement, case_sensitive in self._TYPE_MAPPINGS:
             flags = 0 if case_sensitive else re.IGNORECASE
             statement = re.sub(pattern, replacement, statement, flags=flags)
-        # TIMESTAMP/TIME stay case-sensitive above so a column literally named
-        # "timestamp" keeps its name. A lowercase occurrence in type position
-        # (right after another identifier, e.g. "ts timestamp") is a type
-        # written in non-conventional case; normalize it. A leading lowercase
-        # "timestamp" is a column name and is left alone.
         statement = re.sub(r"(\w+\s+)timestamp\b", r"\1DATETIME", statement)
         statement = re.sub(r"(\w+\s+)time\b", r"\1VARCHAR(10)", statement)
         return statement
 
     def _extract_first_column(self, statement: str) -> str | None:
-        """Extract the first column name from a CREATE TABLE statement.
-
-        The extracted name is validated against the SQL identifier pattern
-        before return, so it is safe to interpolate into DDL fragments
-        (backticks are still applied by the caller).
-        """
         paren_start = statement.find("(")
         if paren_start == -1:
             return None
@@ -418,17 +273,11 @@ class StarRocksWorkloadMixin:
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using INSERT statements for compatibility."""
         from benchbox.platforms.base.data_loading import DataLoader
 
         def starrocks_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
             base_ext = FileFormatRegistry.get_base_data_extension(file_path)
 
-            # Use STREAM LOAD (HTTP) for CSV/TBL files: produces exactly one
-            # tablet rowset per table rather than one per INSERT batch, avoiding
-            # the compaction-pressure failures that hit large tables (6M+ rows)
-            # when batch INSERT accumulates 600+ rowsets before StarRocks BE can
-            # compact them.  expr_children_limit is also irrelevant for STREAM LOAD.
             if base_ext in (".tbl", ".dat", ".csv"):
                 dialect_source = data_source or DataSource(source_type="starrocks_handler", tables={})
                 dialect = resolve_csv_dialect(
@@ -446,21 +295,9 @@ class StarRocksWorkloadMixin:
                     has_header=dialect.has_header,
                 )
             elif base_ext == ".parquet":
-                # Generic ParquetFileHandler uses '?' placeholders (DuckDB) and
-                # connection.executemany() - both incompatible with PyMySQL.
                 return StarRocksParquetHandler()
-            return None  # Fall back to generic handler
+            return None
 
-        # Raise per-query and network timeouts to survive multi-hour bulk-INSERT
-        # sessions (loading 10M+ rows via batch INSERT can take 45-90 min).
-        # net_read_timeout / net_write_timeout are server-side socket budgets per
-        # packet read/write; without them StarRocks closes connections that stall
-        # mid-batch even if query_timeout is generous.
-        #
-        # max_allowed_packet: StarRocks defaults to 4 MB which is too small for
-        # wide-table multi-row INSERTs (e.g. tpcds_obt has 518 cols; 400 rows ×
-        # 518 cols × ~20 bytes/value ≈ 4 MB - right at the limit).  64 MB gives
-        # wide tables plenty of headroom.
         cursor = connection.cursor()
         try:
             cursor.execute("SET query_timeout = 86400")
@@ -484,7 +321,6 @@ class StarRocksWorkloadMixin:
         return table_stats, loading_time, None
 
     def _get_existing_tables(self, connection) -> list[str]:
-        """Get list of existing tables in the StarRocks database."""
         try:
             cursor = connection.cursor()
             try:
@@ -497,10 +333,6 @@ class StarRocksWorkloadMixin:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
 
-    # StarRocks / MySQL reserved words that are legal SQL aliases on other
-    # platforms (DuckDB, PostgreSQL, SQLite) but require backtick-quoting here.
-    # Seeded from the StarRocks and MySQL reserved-word lists with the words
-    # most likely to appear as column aliases in benchmark query catalogs.
     _RESERVED_ALIAS_WORDS: frozenset[str] = frozenset(  # noqa: SIM905
         "character rank order group key value values partition range rows select table column columns index database "
         "schema status type default primary unique current_date current_time current_timestamp interval match natural "
@@ -509,21 +341,13 @@ class StarRocksWorkloadMixin:
 
     _ALIAS_RE = re.compile(r"\bAS\s+(\w+)\b", re.IGNORECASE)
 
-    # ANSI SUBSTRING(expr FROM start FOR length) → MySQL SUBSTRING(expr, start, length).
-    # All three groups accept any content that does not contain parentheses, so simple
-    # column refs, dotted references, and arithmetic expressions all translate. Nested
-    # function calls are rejected by the outer `[^()]` bound - the caller emits a
-    # one-shot warning if an untranslated ANSI form slips through.
     _ANSI_SUBSTRING_RE = re.compile(
         r"\bSUBSTRING\s*\(\s*([^()]+?)\s+FROM\s+([^()]+?)\s+FOR\s+([^()]+?)\s*\)",
         re.IGNORECASE,
     )
-    # Detects any remaining ANSI SUBSTRING ... FROM ... FOR form (including nested
-    # parens the main regex can't describe). Used to emit a translation warning.
     _ANSI_SUBSTRING_DETECT_RE = re.compile(r"\bSUBSTRING\b[^;]*?\bFROM\b[^;]*?\bFOR\b", re.IGNORECASE)
 
     def _quote_reserved_aliases(self, query: str) -> str:
-        """Backtick-quote column aliases that clash with StarRocks reserved words."""
 
         def replacer(m: re.Match) -> str:
             alias = m.group(1)
@@ -535,16 +359,7 @@ class StarRocksWorkloadMixin:
         return "".join(text if is_lit else self._ALIAS_RE.sub(replacer, text) for text, is_lit in parts)
 
     def _translate_ansi_substring(self, query: str) -> str:
-        """Convert ANSI SUBSTRING(expr FROM n FOR m) to MySQL SUBSTRING(expr, n, m).
-
-        Operates on code segments only (literals are preserved). Warns once per
-        process if an ANSI SUBSTRING form remains after translation - that form
-        will fail at execute time and the warning points at translation, not the
-        server.
-        """
         result = _apply_outside_literals(self._ANSI_SUBSTRING_RE, r"SUBSTRING(\1, \2, \3)", query)
-        # Detector runs on code segments only so literal strings containing the
-        # pattern (e.g. inside an error message or JSON) don't trigger warnings.
         code_only = "".join(text for text, is_lit in _split_sql_literals(result) if not is_lit)
         if self._ANSI_SUBSTRING_DETECT_RE.search(code_only):
             logger.warning(
@@ -554,23 +369,12 @@ class StarRocksWorkloadMixin:
             )
         return result
 
-    # Keywords that cannot be implicit aliases - when one follows a subquery's closing ),
-    # we know no alias was provided and we need to inject one.
     _SQL_KEYWORDS = frozenset(  # noqa: SIM905
         "WHERE HAVING GROUP ORDER LIMIT UNION EXCEPT INTERSECT JOIN INNER LEFT RIGHT FULL CROSS ON AND OR NOT THEN "
         "ELSE END CASE WHEN SELECT FROM AS IS IN NULL TRUE FALSE BETWEEN LIKE ILIKE SIMILAR".split()  # noqa: SIM905
     )
 
     def _inject_missing_subquery_aliases(self, query: str) -> str:  # noqa: C901
-        """Add AS aliases to unaliased FROM subqueries (required by StarRocks / MySQL).
-
-        Standard SQL allows ``FROM (SELECT …)`` and ``FROM t, (SELECT …)``, but
-        StarRocks inherits MySQL's rule that every derived table must carry an alias.
-        This method does a single left-to-right pass, tracking parenthesis depth to
-        locate each closing ``)`` of a FROM-subquery or comma-joined subquery, then
-        checks whether an alias immediately follows.  If not, it inserts one.
-        Triggers: ``FROM (`` and ``, (`` (which introduce derived tables in FROM).
-        """
         out: list[str] = []
         i = 0
         n = len(query)
@@ -589,8 +393,6 @@ class StarRocksWorkloadMixin:
             return pos
 
         def consume_subquery_and_alias(open_paren_pos: int) -> int:
-            """Consume from open_paren_pos (inclusive) to closing ), injecting alias if needed.
-            Returns position after closing ) (plus any injected alias text)."""
             nonlocal counter
             out.append("(")
             pos = open_paren_pos + 1
@@ -613,23 +415,20 @@ class StarRocksWorkloadMixin:
                 out.append(c)
                 pos += 1
 
-            # Check what follows the closing )
             j = pos
             while j < n and query[j] in " \t\n\r":
                 j += 1
             after_sub = query[j:]
 
             if re.match(r"^AS\s+", after_sub, re.IGNORECASE):
-                return pos  # already aliased
+                return pos
 
             m_id = re.match(r"^([A-Za-z_`]\w*)", after_sub)
             if m_id:
                 word = m_id.group(1).strip("`").upper()
                 if word not in self._SQL_KEYWORDS:
-                    return pos  # implicit alias
+                    return pos
 
-            # Peek inside: only inject if the subquery starts with SELECT/WITH
-            # (avoids aliasing IN (...) or function-call parens after commas)
             inner_start = open_paren_pos + 1
             inner_stripped = query[inner_start:].lstrip()
             first_kw = re.match(r"^(SELECT|WITH)\b", inner_stripped, re.IGNORECASE)
@@ -648,7 +447,6 @@ class StarRocksWorkloadMixin:
                 i = j
                 continue
 
-            # Trigger 1: FROM (
             if ch in ("F", "f") and query[i : i + 4].upper() == "FROM":
                 before_ok = i == 0 or not (query[i - 1].isalnum() or query[i - 1] == "_")
                 j = i + 4
@@ -658,11 +456,10 @@ class StarRocksWorkloadMixin:
                     while ws_end < n and query[ws_end] in " \t\n\r":
                         ws_end += 1
                     if ws_end < n and query[ws_end] == "(":
-                        out.append(query[i:ws_end])  # FROM + whitespace
+                        out.append(query[i:ws_end])
                         i = consume_subquery_and_alias(ws_end)
                         continue
 
-            # Trigger 2: , ( - comma-joined derived table
             if ch == ",":
                 out.append(",")
                 i += 1
@@ -670,27 +467,18 @@ class StarRocksWorkloadMixin:
                 while ws_end < n and query[ws_end] in " \t\n\r":
                     ws_end += 1
                 if ws_end < n and query[ws_end] == "(":
-                    out.append(query[i:ws_end])  # whitespace after comma
+                    out.append(query[i:ws_end])
                     i = consume_subquery_and_alias(ws_end)
-                continue  # always skip fallthrough out.append(ch) + i+=1
+                continue
 
             out.append(ch)
             i += 1
 
         return "".join(out)
 
-    # Matches ANSI double-quoted simple identifiers: "table_name", "column_name", etc.
-    # StarRocks uses MySQL mode where double-quotes denote string literals, not identifiers.
     _ANSI_IDENTIFIER_RE = re.compile(r'"([a-zA-Z_][a-zA-Z0-9_]*)"')
 
     def _translate_ansi_identifiers(self, query: str) -> str:
-        """Convert ANSI double-quoted identifiers to MySQL backtick-quoted identifiers.
-
-        Runs only on code segments; anything inside single-quoted string literals
-        is passed through unchanged. This protects against silent semantic
-        corruption when a literal happens to contain a token that matches the
-        identifier shape (e.g. ``'... "active" ...'``).
-        """
         return _apply_outside_literals(self._ANSI_IDENTIFIER_RE, r"`\1`", query)
 
     def execute_query(
@@ -703,7 +491,6 @@ class StarRocksWorkloadMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing."""
         query = self._quote_reserved_aliases(query)
         query = self._translate_ansi_substring(query)
         query = self._translate_ansi_identifiers(query)
@@ -724,13 +511,6 @@ class StarRocksWorkloadMixin:
 
 
 class StarRocksStreamLoadHandler(FileFormatHandler):
-    """Load CSV/TBL data via StarRocks STREAM LOAD HTTP API.
-
-    Each call produces exactly one tablet rowset regardless of data size,
-    eliminating the compaction-pressure / expr_children_limit tensions that
-    plague INSERT VALUES for large tables.
-    """
-
     def __init__(
         self,
         delimiter: str,
@@ -782,7 +562,6 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
             "strict_mode": "false",
         }
         if self.null_empty_strings:
-            # Mark empty/NaN/Inf cells with \N so StarRocks stores NULL.
             headers["null_format"] = "\\N"
 
         compression_handler = FileFormatRegistry.get_compression_handler(file_path)
@@ -798,12 +577,6 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
                         row = ["\\N" if (cell == "" or cell.lower() in null_markers) else cell for cell in row]
                     yield (self.delimiter.join(row) + "\n").encode("utf-8")
 
-        # Retry on transient HTTP 5xx, network errors, or BE-unavailable responses.
-        # Loads can run for hours; a single TCP reset or BE pause shouldn't kill the
-        # whole benchmark. max_filter_ratio=0 stays in force so a restarted load
-        # still fails fast on bad rows.
-        # BE-unavailable symptom: StarRocks FE returns HTTP 200 with a JSON body
-        # whose Message contains ":0" (empty host) when no BE is reachable.
         max_attempts = 3
         last_err: Exception | None = None
         resp: Any = None
@@ -811,8 +584,6 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
             try:
                 resp = _requests.put(url, headers=headers, data=_data_stream(), timeout=7200)
                 if resp.status_code in (200, 307):
-                    # Check for BE-unavailable error in a successful HTTP response
-                    # before breaking so we can retry instead of silently failing.
                     try:
                         body = _json.loads(resp.text)
                         msg = body.get("Message", "")
@@ -829,7 +600,6 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
                     except Exception:
                         pass
                     break
-                # 5xx → retriable
                 if 500 <= resp.status_code < 600 and attempt < max_attempts:
                     logger.warning(
                         "STREAM LOAD HTTP %s for %s (attempt %d/%d); retrying",
@@ -854,7 +624,7 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
                     _time.sleep(5 * attempt)
                     continue
                 raise RuntimeError(f"STREAM LOAD connection error for {table_name}: {e}") from e
-        else:  # loop exited without break - only possible when last attempt raised
+        else:
             raise RuntimeError(f"STREAM LOAD exhausted retries for {table_name}: {last_err}")
 
         result = _json.loads(resp.text)
@@ -866,34 +636,18 @@ class StarRocksStreamLoadHandler(FileFormatHandler):
 
 
 class StarRocksCSVHandler(FileFormatHandler):
-    """Handle CSV/TBL data loading into StarRocks via INSERT statements."""
-
     def __init__(self, delimiter: str, *, null_empty_strings: bool = True, has_header: bool = False):
         self.delimiter = delimiter
-        # Some benchmarks (e.g. ClickBench) use empty strings as real values
-        # for NOT NULL columns; others (TPC-H/DS) use '' to represent NULL.
         self.null_empty_strings = null_empty_strings
         self.has_header = has_header
 
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format."""
         return self.delimiter
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load data from CSV/TBL file into StarRocks table using batch INSERT."""
         validate_sql_identifier(table_name, "table name")
 
         row_count = 0
-        # StarRocks has two competing constraints for INSERT VALUES batches:
-        #  1. expr_children_limit (FE config, default 10 000): hard cap on the
-        #     number of rows per INSERT statement.  Exceeding it yields
-        #     "Getting syntax error … The inserted rows are N exceeded the
-        #     maximum limit 10 000".
-        #  2. Tablet-version compaction pressure: each INSERT creates one tablet
-        #     version; >~1 000 uncommitted versions causes the BE to drop
-        #     connections (error 2013).
-        # Staying at 9 999 keeps us under the expr_children_limit while still
-        # producing far fewer versions than the original 5 000 batch size.
         batch_size = 9_999
         compression_handler = FileFormatRegistry.get_compression_handler(file_path)
         sql: str | None = None
@@ -903,15 +657,11 @@ class StarRocksCSVHandler(FileFormatHandler):
             with compression_handler.open(file_path) as f:
                 reader = csv.reader(f, delimiter=self.delimiter)
                 if self.has_header:
-                    next(reader, None)  # discard header row
+                    next(reader, None)
                 batch: list[list] = []
 
                 for row in reader:
                     if self.null_empty_strings:
-                        # Convert empty strings and IEEE non-finite representations to
-                        # None so StarRocks receives NULL rather than a string that
-                        # fails implicit conversion for numeric columns (e.g. nyctaxi
-                        # uses 'nan' for missing congestion_surcharge values).
                         batch.append(
                             [
                                 None if cell == "" or cell.lower() in ("nan", "inf", "-inf", "+inf") else cell
@@ -943,14 +693,6 @@ class StarRocksCSVHandler(FileFormatHandler):
 
 
 class StarRocksParquetHandler(FileFormatHandler):
-    """Handle Parquet data loading into StarRocks using PyArrow + batch INSERT.
-
-    ParquetFileHandler in the base layer uses '?' placeholders (DuckDB-style)
-    and calls connection.executemany() directly.  StarRocks speaks MySQL protocol
-    (%s placeholders) and exposes executemany() only on cursors, so we need a
-    platform-specific handler.
-    """
-
     def get_delimiter(self) -> str:
         return ""
 
@@ -973,24 +715,18 @@ class StarRocksParquetHandler(FileFormatHandler):
         columns_str = ", ".join(f"`{c}`" for c in validated_cols)
         insert_sql = f"INSERT INTO `{table_name}` ({columns_str}) VALUES ({placeholders})"
 
-        # Scale batch size to keep each multi-row INSERT safely under the
-        # max_allowed_packet limit (which we raise to 64 MB in load_data but
-        # default is 4 MB).  Fewer, larger batches also reduce the tablet
-        # version count, limiting compaction pressure in StarRocks.
         num_cols = len(column_names)
         if num_cols <= 30:
-            batch_size = 10_000  # narrow tables (tsbs, tpch_skew)
+            batch_size = 10_000
         elif num_cols <= 100:
-            batch_size = 2_000  # medium tables
+            batch_size = 2_000
         else:
-            batch_size = 100  # wide tables: 518 cols × 100 rows ≈ 1 MB - safe
+            batch_size = 100
 
         row_count = 0
         cursor = connection.cursor()
         try:
             for batch in pf.iter_batches(batch_size=batch_size):
-                # batch.to_pylist() returns list[dict]; convert to list[tuple] in
-                # column order for executemany.
                 rows = [tuple(row[col] for col in column_names) for row in batch.to_pylist()]
                 if rows:
                     cursor.executemany(insert_sql, rows)

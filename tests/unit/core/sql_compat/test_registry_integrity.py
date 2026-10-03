@@ -1,14 +1,3 @@
-"""Registry integrity tests.
-
-Verifies that:
-1. Exact duplicate rule registration is idempotent (module re-import safe).
-2. Duplicate rule_id with different semantics still raises a conflict.
-3. Registry idempotency survives the sys.modules re-import scenario (patch.dict teardown).
-4. Azure Synapse DDL_OPTIMIZE rule resolves via the canonical ``synapse`` key.
-5. DDL_OPTIMIZE rules carry non-empty transformer_id and description (governance check).
-6. DDL_OPTIMIZE baseline records stay in sync with rule files.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -73,12 +62,6 @@ def test_registry_rejects_duplicate_rule_id_with_different_semantics():
 
 
 def test_registry_idempotent_on_module_reimport():
-    """Re-importing a rule module must not raise CompatibilityRegistryConflict.
-
-    patch.dict(sys.modules, ...) removes the module on context exit, causing the
-    next import to re-execute module-level REGISTRY.register() calls against the
-    persistent singleton. The idempotency guard must absorb these silently.
-    """
     module_name = "benchbox.sql_compat.rules.ddl_optimize.velox_ddl_rewrites"
     rule_id = "ddl_optimize.velox.all.optimize_table_definition"
 
@@ -87,7 +70,7 @@ def test_registry_idempotent_on_module_reimport():
     assert count_before >= 1
 
     sys.modules.pop(module_name, None)
-    importlib.import_module(module_name)  # must not raise
+    importlib.import_module(module_name)
 
     count_after = sum(1 for _, entry in REGISTRY.all_rules() if entry.decision.rule_id == rule_id)
     assert count_after == count_before
@@ -108,15 +91,10 @@ def test_registry_idempotent_on_module_reimport():
         ("starrocks", "ddl_optimize.starrocks.all."),
         ("trino", "ddl_optimize.trino.all."),
         ("velox", "ddl_optimize.velox.all."),
-        ("synapse", "ddl_optimize.azure_synapse.all."),  # canonical key
+        ("synapse", "ddl_optimize.azure_synapse.all."),
     ],
 )
 def test_ddl_optimize_rule_payload_is_populated(platform: str, rule_id_prefix: str):
-    """Each DDL_OPTIMIZE rule must carry a non-empty transformer_id and description.
-
-    transformer_id is documentary only (no runtime dispatch), but a missing or
-    empty value indicates an incomplete governance entry.
-    """
     import pkgutil
 
     import benchbox.sql_compat.rules.ddl_optimize as _ddl_pkg
@@ -162,7 +140,6 @@ def test_synapse_ddl_optimize_rule_uses_canonical_platform_key():
 
 
 def test_ddl_optimize_baseline_matches_rule_files():
-    """_ddl_optimize_records() count stays in sync with the ddl_optimize rule directory."""
     from benchbox.sql_compat.baseline_tool import _ddl_optimize_records
 
     records = _ddl_optimize_records()

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for the shared data-backed soundness checker."""
 
 from __future__ import annotations
 

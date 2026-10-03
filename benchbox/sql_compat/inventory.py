@@ -1,25 +1,3 @@
-"""Compatibility inventory tool for BenchBox.
-
-Walks benchbox/ source files and enumerates every dialect-branching
-compatibility decision point. Outputs _project/compat/inventory.jsonl with
-one JSON record per site:
-
-    {"file": "...", "line": N, "kind": "...", "platforms": [...],
-     "suggested_phase": "...", "description": "..."}
-
-Kinds:
-    skip             - query or benchmark skip decision
-    rewrite          - query text rewrite (AST or string transform)
-    ddl              - DDL modification (CREATE TABLE, PK handling)
-    type_mapping     - legitimate local type mapping (compat_local)
-    session_setting  - session policy (emitted before query)
-    benchmark_gate   - pre-run platform×benchmark compatibility check
-
-Usage:
-    uv run -- python -m benchbox.sql_compat.inventory [--root BENCHBOX_DIR]
-    uv run -- python -m benchbox.sql_compat.inventory --output PATH
-"""
-
 from __future__ import annotations
 
 import ast
@@ -69,7 +47,6 @@ _DIALECT_PLATFORMS = {
     "vertica",
 }
 
-# Functions whose existence at definition-site marks a compatibility decision.
 _SKIP_FUNC_NAMES = {"get_platform_skip_queries", "get_df_platform_skip_queries"}
 _DDL_FUNC_NAMES = {"_supports_primary_keys"}
 _REWRITE_FUNC_NAMES = {
@@ -77,16 +54,11 @@ _REWRITE_FUNC_NAMES = {
     "add_subquery_aliases",
     "add_query_settings",
 }
-# Names that mark an adapter as performing DDL optimization. New adapters should
-# prefer one of the canonical names (_optimize_table_definition,
-# _transform_create_statement); custom names are listed here so the drift checker
-# stays accurate. If you add a new custom-named DDL transformer, add it here AND
-# register a Phase.DDL_OPTIMIZE rule for the platform.
 _DDL_OPTIMIZE_FUNC_NAMES = {
     "_optimize_table_definition",
-    "_transform_create_statement",  # SingleStore: uses BaseDdlOptimizer dispatch instead
-    "_inject_doris_ddl_clauses",  # Doris: monolithic transform (PK + FK + type maps + clauses)
-    "_strip_pk_constraints",  # QuestDB: PK strip path
+    "_transform_create_statement",
+    "_inject_doris_ddl_clauses",
+    "_strip_pk_constraints",
 }
 _DDL_REWRITE_FUNCTION_NAME_FRAGMENTS = (
     "create",
@@ -127,44 +99,23 @@ _DDL_STATUS_ORDER: tuple[DdlGovernanceStatus, ...] = (
 )
 _TYPE_MAP_FUNC_NAMES = {"_map_type_to_dialect"}
 
-# Map adapter file stems → registry platform keys (only needed for exceptions to the rule
-# "stem == platform_key").  Nested adapter files (workload.py, adapter.py) use parent-dir name.
-# The matching rule files are named after the platform_key (synapse_ddl_rewrites.py,
-# fabric_dw_ddl_rewrites.py) so BaseDdlOptimizer's f"{platform_key}_ddl_rewrites" lookup works.
 _FILE_STEM_TO_PLATFORM_KEY: dict[str, str] = {
     "azure_synapse": "synapse",
     "fabric_warehouse": "fabric_dw",
 }
 
-# Shared helper functions whose runtime callers are platform adapters with their
-# own DDL_OPTIMIZE rules. The detector reports them under each governed platform
-# instead of the helper module's private file stem.
 _DDL_HELPER_PLATFORM_KEYS: dict[tuple[str, str], tuple[str, ...]] = {
     ("_spark_helpers.py", "optimize_spark_table_definition"): ("lakesail", "spark", "velox"),
-    # Shared Presto/Trino base-class hook: one _optimize_table_definition
-    # serves both governed platforms (each keeps its own registered
-    # DDL_OPTIMIZE transformer, resolved via the aliases below).
     ("presto_trino_adapter_base.py", "_optimize_table_definition"): ("presto", "trino"),
 }
 _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
     ("bigquery", "_convert_to_bigquery_table"): ("bigquery_convert_to_bigquery_table",),
     ("clickhouse", "_optimize_table_definition"): ("clickhouse_ddl_optimizer",),
-    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
-    # (line ~120) to compute the PARTITION BY/ORDER BY clauses it splices into the
-    # statement; it is part of the same registered DDL_OPTIMIZE transform, not a
-    # second independent rewrite.
     ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
-    # _convert_to_hudi_table is a helper invoked by _convert_to_delta_table
-    # when table_format is "hudi" to emit USING HUDI DDL; it is part of the
-    # same registered DDL_OPTIMIZE transform, not a second independent rewrite.
     ("databricks", "_convert_to_hudi_table"): ("databricks_delta_ddl_optimizer",),
-    # _hudi_table_properties is a helper invoked by _convert_to_hudi_table
-    # to compute the per-statement TBLPROPERTIES it splices into the
-    # statement; it is part of the same registered DDL_OPTIMIZE transform,
-    # not a second independent rewrite.
     ("databricks", "_hudi_table_properties"): ("databricks_delta_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
     ("fabric_dw", "_optimize_table_definition"): ("fabric_dw_ddl_optimizer",),
@@ -178,28 +129,20 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("snowflake", "_optimize_table_definition"): ("snowflake_ddl_optimizer",),
     ("spark", "optimize_spark_table_definition"): ("spark_ddl_optimizer",),
     ("starrocks", "_optimize_table_definition"): ("starrocks_ddl_optimizer",),
-    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
-    # to compute the PARTITION BY/DISTRIBUTED BY/ORDER BY clauses it splices into
-    # the statement via the single StarRocksDDLGenerator; it is part of the same
-    # registered DDL_OPTIMIZE transform, not a second independent rewrite (mirrors
-    # the clickhouse entry above).
     ("starrocks", "_resolve_tuned_ddl_clauses"): ("starrocks_ddl_optimizer",),
     ("synapse", "_optimize_table_definition"): ("azure_synapse_ddl_optimizer",),
     ("trino", "_optimize_table_definition"): ("trino_ddl_optimizer",),
     ("velox", "optimize_spark_table_definition"): ("velox_ddl_optimizer",),
 }
 
-# Regex for session-setting patterns (grep over raw source)
 _SESSION_SETTING_RES = [
-    re.compile(r"SETTINGS\s+\w+\s*=\s*\d+"),  # ClickHouse SETTINGS clause
-    re.compile(r"joined_subquery_requires_alias"),  # ClickHouse known setting
-    re.compile(r"SET\s+enable_result_cache"),  # Redshift cache control
+    re.compile(r"SETTINGS\s+\w+\s*=\s*\d+"),
+    re.compile(r"joined_subquery_requires_alias"),
+    re.compile(r"SET\s+enable_result_cache"),
 ]
 
-# Class-level query variant constants: _PLATFORM_Qn (e.g. _CLICKHOUSE_Q9)
 _VARIANT_CONST_RE = re.compile(r"^_([A-Z]+)_Q(\d+)$")
 
-# QUERY_VARIANTS dict name
 _QUERY_VARIANTS_NAME = "QUERY_VARIANTS"
 
 
@@ -215,14 +158,6 @@ class InventoryEntry:
 
 @dataclass(frozen=True)
 class DdlDriftExemption:
-    """A local DDL rewrite intentionally outside registry enforcement.
-
-    Keep this list empty unless a platform has a documented reason that a
-    detected CREATE TABLE rewrite cannot be represented by a DDL_OPTIMIZE rule.
-    The drift checker reports exemptions separately so "clean" cannot be
-    confused with "runtime-dispatched".
-    """
-
     platform_key: str
     func_name: str | None
     reason: str
@@ -245,13 +180,7 @@ class _DdlRegistrationInfo:
         return bool(self.governance_only_transformers)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _extract_string_literals(node: ast.AST) -> list[str]:
-    """Collect all string literal values from a node tree."""
     result = []
     for child in ast.walk(node):
         if isinstance(child, ast.Constant) and isinstance(child.value, str):
@@ -260,7 +189,6 @@ def _extract_string_literals(node: ast.AST) -> list[str]:
 
 
 def _extract_platforms(node: ast.expr) -> list[str]:
-    """Extract platform names from a comparison value (tuple, list, or constant)."""
     strings = _extract_string_literals(node)
     return sorted({s for s in strings if s in _DIALECT_PLATFORMS})
 
@@ -270,7 +198,6 @@ def _rel(path: Path, root: Path) -> str:
 
 
 def _normalize_sql_marker(value: str) -> str:
-    """Normalize SQL/regex string fragments enough for source-signature checks."""
     marker = value.lower()
     marker = re.sub(r"\\s[+*]?", " ", marker)
     marker = marker.replace("\\b", " ")
@@ -309,7 +236,6 @@ def _accepts_statement_text(node: ast.FunctionDef | ast.AsyncFunctionDef) -> boo
 
 
 def _looks_like_create_table_rewrite(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    """Detect CREATE TABLE rewrite behavior without relying on method names."""
     if not _accepts_statement_text(node):
         return False
     if not _has_create_table_literal(node):
@@ -322,13 +248,7 @@ def _looks_like_create_table_rewrite(node: ast.FunctionDef | ast.AsyncFunctionDe
     return _has_ddl_text_transform_call(node) and _has_ddl_rewrite_output_marker(node)
 
 
-# ---------------------------------------------------------------------------
-# AST-based detectors
-# ---------------------------------------------------------------------------
-
-
 def _detect_dialect_branches(tree: ast.Module, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Find `if dialect in (...)` / `if dialect == "..."` / `if "x" in dialect` patterns."""
     rel = _rel(filepath, root)
 
     for node in ast.walk(tree):
@@ -336,18 +256,15 @@ def _detect_dialect_branches(tree: ast.Module, filepath: Path, root: Path) -> It
             continue
         test = node.test
 
-        # if dialect in ("a", "b", ...)  or  if dialect == "a"
         if isinstance(test, ast.Compare) and len(test.ops) == 1:
             left = test.left
             comparators = test.comparators
 
-            # dialect in (...)  or  dialect == "x"
             if isinstance(left, ast.Name) and left.id == "dialect":
                 op = test.ops[0]
                 if isinstance(op, (ast.In, ast.Eq)):
                     platforms = _extract_platforms(comparators[0])
                     if platforms:
-                        # Classify: inside _map_type_to_dialect → type_mapping, else ddl or skip
                         kind: CompatKind = "ddl"
                         suggested = "schema_emit"
                         yield InventoryEntry(
@@ -360,7 +277,6 @@ def _detect_dialect_branches(tree: ast.Module, filepath: Path, root: Path) -> It
                         )
                         continue
 
-            # "platform_name" in dialect  or  "platform_name" in x.lower()
             for comp in comparators:
                 if isinstance(comp, ast.Name) and comp.id == "dialect":
                     plats = _extract_platforms(left)
@@ -374,11 +290,9 @@ def _detect_dialect_branches(tree: ast.Module, filepath: Path, root: Path) -> It
                             description=f"Dialect membership check: {plats} in dialect",
                         )
 
-        # if "clickhouse" in dialect.lower() etc.
         if isinstance(test, ast.Call):
-            continue  # handled via containment in comparators above
+            continue
 
-        # BoolOp: if dialect == "a" or dialect == "b"
         if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
             platforms: list[str] = []
             for val in test.values:
@@ -398,7 +312,6 @@ def _detect_dialect_branches(tree: ast.Module, filepath: Path, root: Path) -> It
 
 
 def _detect_named_functions(tree: ast.Module, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Detect known compatibility function definitions."""
     rel = _rel(filepath, root)
 
     for node in ast.walk(tree):
@@ -407,7 +320,6 @@ def _detect_named_functions(tree: ast.Module, filepath: Path, root: Path) -> Ite
         name = node.name
 
         if name in _SKIP_FUNC_NAMES:
-            # Extract platform names from string constants in the function body
             platforms = sorted(
                 {
                     s.lower()
@@ -487,11 +399,6 @@ def _detect_named_functions(tree: ast.Module, filepath: Path, root: Path) -> Ite
 
 
 def _detect_query_variants(tree: ast.Module, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Detect QUERY_VARIANTS dict assignments (non-sqlglot multi-platform query source).
-
-    Handles both plain assignment (ast.Assign) and annotated assignment
-    (ast.AnnAssign: ``QUERY_VARIANTS: dict[...] = {...}``).
-    """
     rel = _rel(filepath, root)
 
     def _check_assign(target_name: str, value_node: ast.expr | None, lineno: int) -> InventoryEntry | None:
@@ -515,14 +422,12 @@ def _detect_query_variants(tree: ast.Module, filepath: Path, root: Path) -> Iter
         )
 
     for node in ast.walk(tree):
-        # Plain assignment: QUERY_VARIANTS = {...}
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     entry = _check_assign(target.id, node.value, node.lineno)
                     if entry:
                         yield entry
-        # Annotated assignment: QUERY_VARIANTS: dict[...] = {...}
         elif isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name):
                 entry = _check_assign(node.target.id, node.value, node.lineno)
@@ -531,7 +436,6 @@ def _detect_query_variants(tree: ast.Module, filepath: Path, root: Path) -> Iter
 
 
 def _detect_platform_query_constants(tree: ast.Module, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Detect class-level _PLATFORM_Qn constants (pre-written variant SQL)."""
     rel = _rel(filepath, root)
 
     for node in ast.walk(tree):
@@ -558,11 +462,9 @@ def _detect_platform_query_constants(tree: ast.Module, filepath: Path, root: Pat
 
 
 def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Detect unsupported_benchmarks dict (benchmark_gate)."""
     rel = _rel(filepath, root)
 
     for node in ast.walk(tree):
-        # Dict literal with "unsupported_benchmarks" key
         if isinstance(node, ast.Dict):
             for key in node.keys:
                 if isinstance(key, ast.Constant) and key.value == "unsupported_benchmarks":
@@ -574,7 +476,6 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                         suggested_phase="benchmark_gate",
                         description="unsupported_benchmarks dict entry in platform capabilities",
                     )
-        # Field access: caps.unsupported_benchmarks
         if isinstance(node, ast.Attribute) and node.attr == "unsupported_benchmarks":
             yield InventoryEntry(
                 file=rel,
@@ -584,7 +485,6 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 suggested_phase="benchmark_gate",
                 description="caps.unsupported_benchmarks access - benchmark_gate preflight",
             )
-        # Legacy CLI shape: getattr(caps, "unsupported_benchmarks", None)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -601,8 +501,6 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 suggested_phase="benchmark_gate",
                 description="getattr(caps, 'unsupported_benchmarks') - benchmark_gate preflight",
             )
-        # Explicit compatibility API: PlatformRegistry.get_benchmark_block_reason(),
-        # get_unsupported_benchmarks(), or is_benchmark_supported() call sites.
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -623,17 +521,7 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
             )
 
 
-# ---------------------------------------------------------------------------
-# Regex-based detectors (source-level)
-# ---------------------------------------------------------------------------
-
-
 def _docstring_line_ranges(tree: ast.Module) -> set[int]:
-    """Return the set of 1-based line numbers that are inside string literals used as docstrings.
-
-    Covers module, class, and function docstrings (first statement is ast.Expr(Constant(str))).
-    Uses end_lineno so multi-line docstrings are fully excluded.
-    """
     docstring_lines: set[int] = set()
     for node in ast.walk(tree):
         if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -655,7 +543,6 @@ def _docstring_line_ranges(tree: ast.Module) -> set[int]:
 def _detect_session_settings(
     source: str, filepath: Path, root: Path, docstring_lines: set[int] | None = None
 ) -> Iterator[InventoryEntry]:
-    """Find session-policy patterns via regex. Skips comments and docstring interiors."""
     rel = _rel(filepath, root)
     lines = source.splitlines()
     excluded = docstring_lines or set()
@@ -675,11 +562,10 @@ def _detect_session_settings(
                     suggested_phase="query_adapter",
                     description=f"Session policy pattern: {stripped[:80]}",
                 )
-                break  # one entry per line
+                break
 
 
 def _detect_dataframe_skip_calls(source: str, filepath: Path, root: Path) -> Iterator[InventoryEntry]:
-    """Find get_platform_skip_queries / get_df_platform_skip_queries call sites."""
     rel = _rel(filepath, root)
     lines = source.splitlines()
     call_re = re.compile(r"(get_platform_skip_queries|get_df_platform_skip_queries)\s*\(")
@@ -699,30 +585,19 @@ def _detect_dataframe_skip_calls(source: str, filepath: Path, root: Path) -> Ite
             )
 
 
-# ---------------------------------------------------------------------------
-# Main scan
-# ---------------------------------------------------------------------------
-
-
 def _should_scan(path: Path) -> bool:
     parts = path.parts
     return (
         path.suffix == ".py"
         and "__pycache__" not in parts
         and ".git" not in parts
-        and "sql_compat" not in parts  # don't scan the inventory itself
+        and "sql_compat" not in parts
         and not path.stem.startswith("test_")
         and path.stem != "conftest"
     )
 
 
 def _reclassify_inside_type_mapping(entries: list[InventoryEntry], tree: ast.Module, rel: str) -> None:
-    """Promote ddl entries inside _map_type_to_dialect to type_mapping.
-
-    Dialect branches inside a known type-mapping function are legitimate local
-    rendering, not compatibility policy. Uses end_lineno (Python 3.8+) to
-    determine function scope.
-    """
     ranges: list[tuple[int, int]] = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -739,7 +614,6 @@ def _reclassify_inside_type_mapping(entries: list[InventoryEntry], tree: ast.Mod
 
 
 def scan(root: Path) -> list[InventoryEntry]:
-    """Walk *root* and return all inventory entries, deduplicated by (file, line, kind)."""
     entries: list[InventoryEntry] = []
     seen: set[tuple[str, int, str]] = set()
 
@@ -772,11 +646,9 @@ def scan(root: Path) -> list[InventoryEntry]:
                     seen.add(key)
                     file_entries.append(entry)
 
-        # Post-process: branches inside type-mapping functions are type_mapping, not ddl
         _reclassify_inside_type_mapping(file_entries, tree, rel)
         entries.extend(file_entries)
 
-    # Sort by file then line number
     entries.sort(key=lambda e: (e.file, e.line))
     return entries
 
@@ -789,7 +661,6 @@ def write_jsonl(entries: list[InventoryEntry], output: Path) -> None:
 
 
 def _validate_mandatory_sites(entries: list[InventoryEntry]) -> list[str]:
-    """Return error messages for any mandatory sites not found."""
     errors: list[str] = []
 
     gate_sites = [e for e in entries if e.kind == "benchmark_gate" and "run.py" in e.file]
@@ -804,14 +675,6 @@ def _validate_mandatory_sites(entries: list[InventoryEntry]) -> list[str]:
 
 
 def _platform_key_from_adapter_path(filepath: Path) -> str:
-    """Infer the registry platform key from an adapter file path.
-
-    Most adapters follow the pattern ``platforms/{platform}.py`` where the
-    file stem equals the registry key.  Nested layouts (e.g.,
-    ``platforms/starrocks/workload.py``) use the parent directory name.  A
-    small exception table handles cases where the file name and registry key
-    diverge (azure_synapse → synapse; fabric_warehouse → fabric_dw).
-    """
     stem = filepath.stem
     if stem in ("workload", "adapter"):
         stem = filepath.parent.name
@@ -830,7 +693,6 @@ class DdlDriftEntry:
 
 
 def _load_ddl_rule_modules() -> None:
-    """Import all DDL_OPTIMIZE rule modules or raise with a compact error."""
     import importlib
     import pkgutil
 
@@ -851,7 +713,6 @@ def _load_ddl_rule_modules() -> None:
 
 
 def _registered_ddl_info_by_platform() -> dict[str, _DdlRegistrationInfo]:
-    """Return registered DDL transformer metadata for each platform."""
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.decision import RewriteDDLPayload
     from benchbox.sql_compat.registry import REGISTRY
@@ -916,7 +777,6 @@ def _ddl_status_for_function(
 def _iter_ddl_rewrite_functions(
     tree: ast.Module,
 ) -> Iterator[tuple[ast.FunctionDef | ast.AsyncFunctionDef, str, str]]:
-    """Yield DDL rewrite functions with detection metadata."""
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -931,12 +791,6 @@ def _iter_ddl_rewrite_functions(
 
 
 def collect_ddl_governance_statuses(root: Path) -> list[DdlDriftEntry]:
-    """Return detected DDL rewrite behavior and its governance status.
-
-    A clean codebase may include runtime-dispatched transforms, governance-only
-    local transforms, and explicit exemptions. Only unregistered or
-    uninspectable entries fail the drift gate.
-    """
     _load_ddl_rule_modules()
     registered_info = _registered_ddl_info_by_platform()
 
@@ -1002,13 +856,6 @@ def collect_ddl_governance_statuses(root: Path) -> list[DdlDriftEntry]:
 
 
 def check_ddl_drift(root: Path) -> list[DdlDriftEntry]:
-    """Return unregistered or uninspectable DDL-optimize transforms found under *root*.
-
-    Scans platform adapter files for known DDL optimizer method names and
-    behavior signatures such as CREATE TABLE guards with ``.replace()``,
-    ``re.sub()``, or DDL output clauses. The returned entries are the subset
-    that would make ``compat_lint`` unsafe to call clean.
-    """
     return [
         entry
         for entry in collect_ddl_governance_statuses(root)

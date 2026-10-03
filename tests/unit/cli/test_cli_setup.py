@@ -1,15 +1,6 @@
-"""Tests for the CLI setup command.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Credential state comes from real ``~/.benchbox/credentials.yaml`` files under
-an isolated HOME, driven through the real CredentialManager. Only network
-validators, environment-dependent dependency checks, and per-platform
-interactive setup dispatch (prompt plus network) stay mocked; every config
-read/write assertion goes against the real file.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from unittest.mock import patch
@@ -29,12 +20,6 @@ pytestmark = [
 
 @pytest.fixture()
 def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Isolate the default credential store (``~/.benchbox``) to tmp_path.
-
-    ``Path.home()`` honors USERPROFILE (not HOME) on Windows, so both must
-    point at tmp_path or the Windows lanes read/write the runner's real
-    credential store.
-    """
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     return tmp_path
@@ -45,13 +30,7 @@ def _credentials_file(home: Path) -> Path:
 
 
 def _seed_credentials(home: Path, entries: dict[str, tuple[dict, CredentialStatus]]) -> CredentialManager:
-    """Write real credential entries through the real manager.
-
-    Args:
-        home: Isolated HOME the default store resolves under.
-        entries: Mapping of platform to (credentials dict, status).
-    """
-    del home  # Store location derives from the isolated HOME, not this arg.
+    del home
     manager = CredentialManager()
     for platform, (creds, status) in entries.items():
         manager.set_platform_credentials(platform, creds, status)
@@ -66,8 +45,6 @@ def _read_credentials(home: Path) -> dict:
 
 
 class TestSetupCommand:
-    """Test the setup CLI command."""
-
     def test_setup_command_exists(self):
 
         runner = CliRunner()
@@ -206,7 +183,6 @@ class TestSetupCommand:
         stored = _read_credentials(isolated_home)["databricks"]
         assert stored["status"] == CredentialStatus.VALID.value
         assert "last_validated" in stored
-        # A fresh manager reading the file back sees the validated status.
         assert CredentialManager().get_credential_status("databricks") == CredentialStatus.VALID
 
     @patch("benchbox.platforms.databricks.credentials.validate_databricks_credentials")
@@ -239,12 +215,6 @@ class TestSetupCommand:
 
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     def test_setup_missing_dependencies(self, mock_check_deps, isolated_home: Path):
-        """Test setup with missing platform dependencies (forced branch).
-
-        The missing-dependency branch is forced via mock: deriving the branch
-        from the live check would let a broken check (wrongly reporting
-        available) select the permissive branch and still pass.
-        """
         del isolated_home
         mock_check_deps.return_value = (False, ["databricks-sdk", "databricks-connect"])
         runner = CliRunner()
@@ -269,7 +239,6 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Databricks Credentials Setup" in result.output
         mock_setup_databricks.assert_called_once()
-        # The real manager (not a mock) is passed to the setup handler.
         call_args = mock_setup_databricks.call_args
         assert isinstance(call_args[0][0], CredentialManager)
 
@@ -367,8 +336,6 @@ class TestSetupCommand:
 
 
 class TestSetupValidation:
-    """Test validation logic for setup command."""
-
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
     def test_validate_snowflake(self, mock_validate, isolated_home: Path):
 
@@ -419,7 +386,6 @@ class TestSetupValidation:
 
     @patch("benchbox.platforms.credentials.motherduck.validate_motherduck_credentials")
     def test_validate_motherduck_without_stored_credentials(self, mock_validate, isolated_home: Path):
-        """MotherDuck validates from MOTHERDUCK_TOKEN even without stored credentials."""
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -453,8 +419,6 @@ class TestSetupValidation:
 
 
 class TestSetupIntegration:
-    """Integration tests for setup command."""
-
     def test_setup_real_execution_list(self, isolated_home: Path):
 
         runner = CliRunner()
@@ -478,11 +442,6 @@ class TestSetupIntegration:
     def test_setup_motherduck_interactive_flow_writes_real_file(
         self, mock_validate, isolated_home: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        """Full MotherDuck prompt flow writes a real credential file.
-
-        Only the network validator stays mocked; dependency check, prompts,
-        manager, and YAML store are all real.
-        """
         monkeypatch.setenv("MOTHERDUCK_TOKEN", "test-token")
         mock_validate.return_value = (True, None)
 
@@ -495,11 +454,9 @@ class TestSetupIntegration:
         assert stored["database"] == "benchbox"
         assert stored["token_env_var"] == "MOTHERDUCK_TOKEN"
         assert stored["status"] == CredentialStatus.VALID.value
-        # The one-time token is never persisted to the credential store.
         assert "test-token" not in _credentials_file(isolated_home).read_text(encoding="utf-8")
 
     def test_setup_status_reflects_previous_setup_run(self, isolated_home: Path):
-        """A file written by one CLI run is visible to the next (round-trip)."""
         _seed_credentials(
             isolated_home,
             {"snowflake": ({"account": "xy12345", "user": "tester"}, CredentialStatus.VALID)},

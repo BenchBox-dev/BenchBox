@@ -1,15 +1,6 @@
-"""Unit tests for DataFrame write-time physical layout configuration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the DataFrameWriteConfiguration class and related components for:
-- SortColumn and PartitionColumn specifications
-- Configuration serialization and deserialization
-- Platform capability validation
-- Compression level validation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,8 +23,6 @@ pytestmark = [
 
 
 class TestSortColumn:
-    """Tests for SortColumn dataclass."""
-
     def test_default_order(self) -> None:
 
         col = SortColumn(name="l_shipdate")
@@ -74,8 +63,6 @@ class TestSortColumn:
 
 
 class TestPartitionColumn:
-    """Tests for PartitionColumn dataclass."""
-
     def test_default_strategy(self) -> None:
 
         col = PartitionColumn(name="o_orderdate")
@@ -105,8 +92,6 @@ class TestPartitionColumn:
 
 
 class TestPartitionStrategy:
-    """Tests for PartitionStrategy enum."""
-
     def test_enum_values(self) -> None:
 
         assert PartitionStrategy.VALUE.value == "value"
@@ -116,8 +101,6 @@ class TestPartitionStrategy:
 
 
 class TestDataFrameWriteConfiguration:
-    """Tests for DataFrameWriteConfiguration dataclass."""
-
     def test_default_configuration(self) -> None:
 
         config = DataFrameWriteConfiguration()
@@ -168,7 +151,6 @@ class TestDataFrameWriteConfiguration:
         with pytest.raises(ValueError, match="out of range for zstd"):
             DataFrameWriteConfiguration(compression="zstd", compression_level=25)
 
-        # Valid level should work
         config = DataFrameWriteConfiguration(compression="zstd", compression_level=9)
         assert config.compression_level == 9
 
@@ -177,7 +159,6 @@ class TestDataFrameWriteConfiguration:
         with pytest.raises(ValueError, match="out of range for gzip"):
             DataFrameWriteConfiguration(compression="gzip", compression_level=10)
 
-        # Valid level should work
         config = DataFrameWriteConfiguration(compression="gzip", compression_level=6)
         assert config.compression_level == 6
 
@@ -197,8 +178,6 @@ class TestDataFrameWriteConfiguration:
 
 
 class TestDataFrameWriteConfigurationSerialization:
-    """Tests for DataFrameWriteConfiguration serialization."""
-
     def test_to_dict_empty(self) -> None:
 
         config = DataFrameWriteConfiguration()
@@ -260,10 +239,10 @@ class TestDataFrameWriteConfigurationSerialization:
 
         assert len(config.sort_by) == 2
         assert config.sort_by[0].name == "l_shipdate"
-        assert config.sort_by[0].order == "asc"  # Default
+        assert config.sort_by[0].order == "asc"
 
         assert len(config.partition_by) == 1
-        assert config.partition_by[0].strategy == PartitionStrategy.VALUE  # Default
+        assert config.partition_by[0].strategy == PartitionStrategy.VALUE
 
     def test_from_dict_full(self) -> None:
 
@@ -293,8 +272,6 @@ class TestDataFrameWriteConfigurationSerialization:
 
 
 class TestGetEnabledTypes:
-    """Tests for get_enabled_types method."""
-
     def test_empty_config(self) -> None:
 
         config = DataFrameWriteConfiguration()
@@ -332,8 +309,6 @@ class TestGetEnabledTypes:
 
 
 class TestPlatformCapabilities:
-    """Tests for platform capability functions."""
-
     def test_polars_capabilities(self) -> None:
 
         caps = get_platform_write_capabilities("polars")
@@ -345,7 +320,7 @@ class TestPlatformCapabilities:
     def test_dask_capabilities(self) -> None:
 
         caps = get_platform_write_capabilities("dask")
-        assert caps["sort_by"] is False  # Limited
+        assert caps["sort_by"] is False
         assert caps["partition_by"] is True
         assert caps["repartition_count"] is True
 
@@ -364,8 +339,6 @@ class TestPlatformCapabilities:
 
 
 class TestValidateWriteConfigForPlatform:
-    """Tests for validate_write_config_for_platform function."""
-
     def test_valid_polars_config(self) -> None:
 
         config = DataFrameWriteConfiguration(
@@ -408,8 +381,6 @@ class TestValidateWriteConfigForPlatform:
 
 
 class TestDataFrameWriteTuningType:
-    """Tests for DataFrameWriteTuningType enum."""
-
     def test_enum_values(self) -> None:
 
         assert DataFrameWriteTuningType.PARTITION_BY.value == "partition_by"
@@ -422,8 +393,6 @@ class TestDataFrameWriteTuningType:
 
 
 class TestConversionOptionsDataPageVersionValidation:
-    """Runtime validation for ConversionOptions.data_page_version field."""
-
     def test_valid_data_page_versions(self):
         from benchbox.utils.format_converters.base import ConversionOptions
 

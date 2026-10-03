@@ -1,8 +1,3 @@
-"""Behavior-verifying tests for DataFusion adapter using real SessionContext.
-
-Every test creates a real DataFusion context - no MagicMock on the connection path.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -23,7 +18,6 @@ pytestmark = [
 
 @pytest.fixture()
 def adapter(tmp_path):
-    """Create a DataFusion adapter."""
     from benchbox.platforms.datafusion import DataFusionAdapter
 
     return DataFusionAdapter(
@@ -35,7 +29,6 @@ def adapter(tmp_path):
 
 @pytest.fixture()
 def ctx(adapter):
-    """Create a real DataFusion SessionContext."""
     conn = adapter.create_connection()
     yield conn
     try:
@@ -46,8 +39,6 @@ def ctx(adapter):
 
 class TestDataFusionRealConnection:
     def test_create_connection_returns_usable_context(self, ctx):
-        # DataFusion adapter wraps the SessionContext in a compat layer
-        # Verify it has the expected interface
         assert hasattr(ctx, "sql") or hasattr(ctx, "execute")
 
     def test_execute_simple_query(self, adapter, ctx):
@@ -63,11 +54,9 @@ class TestDataFusionRealConnection:
         assert result.get("error") is None
 
     def test_execute_query_with_csv_data(self, adapter, ctx, tmp_path):
-        # Write a CSV file
         csv_path = tmp_path / "data.csv"
         csv_path.write_text("id,name,value\n1,alpha,10\n2,beta,20\n3,gamma,30\n")
 
-        # Register as table
         ctx.register_csv("test_data", str(csv_path))
 
         result = adapter.execute_query(
@@ -107,14 +96,11 @@ class TestDataFusionRealConnection:
         assert result.get("error") is None
 
     def test_configure_for_benchmark_is_no_op(self, adapter, ctx):
-        """configure_for_benchmark should not raise (DataFusion sets opts at connection time)."""
         adapter.configure_for_benchmark(ctx, "olap")
         adapter.configure_for_benchmark(ctx, "tpch")
 
 
 class TestDataFusionPureFunctions:
-    """Tests for pure-function helpers in DataFusion adapter."""
-
     @pytest.fixture()
     def adapter(self, tmp_path):
         from benchbox.platforms.datafusion import DataFusionAdapter
@@ -222,8 +208,6 @@ class TestDataFusionPureFunctions:
 
 
 class TestDataFusionCursorCompat:
-    """Tests for _requires_eager_execution on the cursor compat layer."""
-
     def test_insert_requires_eager(self):
         from benchbox.platforms.datafusion import DataFusionConnectionCompat
 

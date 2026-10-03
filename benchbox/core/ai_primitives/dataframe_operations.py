@@ -1,43 +1,6 @@
-"""DataFrame operations for AI Primitives benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides DataFrame implementations of AI Primitives benchmark operations,
-enabling benchmarking of ML/AI operations on DataFrame platforms using local models.
-
-AI Primitives tests AI/ML functions across categories:
-- Embedding (3 queries): Vector embedding generation using sentence-transformers
-- NLP (5 queries): Sentiment analysis, classification, entity extraction
-- Transform (4 queries): Summarization, translation, grammar correction - REQUIRE LLM API
-- Generative (4 queries): Text completion, Q&A, SQL generation - REQUIRE LLM API
-
-DataFrame Implementation Scope:
-    **In Scope (8 queries - local model support):**
-    - Sentiment analysis (nlp_sentiment_single, nlp_sentiment_batch)
-    - Classification (nlp_classify_priority, nlp_classify_segment)
-    - Entity extraction (nlp_entity_extraction)
-    - Embedding generation (embedding_single, embedding_batch, embedding_large_dimension)
-
-    **Out of Scope (8 queries - require LLM API):**
-    - Text completion (generative_complete_simple, generative_complete_customer_profile)
-    - Question answering (generative_question_answer)
-    - SQL generation (generative_sql_generation)
-    - Summarization (transform_summarize_short, transform_summarize_long)
-    - Translation (transform_translate_comment)
-    - Grammar correction (transform_grammar_fix)
-
-Platform Support:
-    - PySpark MLlib: spark-nlp or UDFs with sentence-transformers
-    - Polars: Apply with sentence-transformers, TextBlob
-    - Pandas: Apply with sentence-transformers, TextBlob, spaCy
-
-Dependencies:
-    - sentence-transformers: For embedding operations
-    - textblob: For sentiment analysis
-    - spacy: For entity extraction (optional)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -57,37 +20,26 @@ logger = logging.getLogger(__name__)
 
 
 class AIOperationType(Enum):
-    """Types of AI operations supported by the DataFrame benchmark.
-
-    These map to AI Primitives benchmark categories with local model support.
-    """
-
-    # Embedding operations (sentence-transformers)
     EMBEDDING_SINGLE = "embedding_single"
     EMBEDDING_BATCH = "embedding_batch"
     EMBEDDING_LARGE_DIMENSION = "embedding_large_dimension"
 
-    # NLP operations (TextBlob, spaCy)
     SENTIMENT_SINGLE = "sentiment_single"
     SENTIMENT_BATCH = "sentiment_batch"
     CLASSIFY_PRIORITY = "classify_priority"
     CLASSIFY_SEGMENT = "classify_segment"
     ENTITY_EXTRACTION = "entity_extraction"
 
-    # Vector similarity operations (NumPy)
     COSINE_SIMILARITY = "cosine_similarity"
     EUCLIDEAN_DISTANCE = "euclidean_distance"
     TOP_K_SIMILARITY = "top_k_similarity"
 
 
-# Query IDs that require LLM API and should be skipped for DataFrame execution
 SKIP_FOR_DATAFRAME = [
-    # Generative queries (require LLM API)
     "generative_complete_simple",
     "generative_complete_customer_profile",
     "generative_question_answer",
     "generative_sql_generation",
-    # Transform queries (require LLM API)
     "transform_summarize_short",
     "transform_summarize_long",
     "transform_translate_comment",
@@ -97,20 +49,6 @@ SKIP_FOR_DATAFRAME = [
 
 @dataclass
 class AIModelCapabilities:
-    """Available ML model capabilities for AI DataFrame operations.
-
-    Detects which ML libraries are installed and available for use.
-    This enables graceful degradation when optional dependencies are missing.
-
-    Attributes:
-        has_sentence_transformers: sentence-transformers is installed
-        has_textblob: textblob is installed
-        has_spacy: spaCy is installed
-        has_numpy: NumPy is installed (for vector operations)
-        has_torch: PyTorch is installed (for sentence-transformers)
-        missing_packages: List of missing packages with install commands
-    """
-
     has_sentence_transformers: bool = False
     has_textblob: bool = False
     has_spacy: bool = False
@@ -120,15 +58,9 @@ class AIModelCapabilities:
 
     @classmethod
     def detect(cls) -> AIModelCapabilities:
-        """Detect available ML model capabilities.
-
-        Returns:
-            AIModelCapabilities with detected capabilities
-        """
         caps = cls()
         missing = []
 
-        # Check NumPy (required for vector operations)
         try:
             import numpy  # noqa: F401
 
@@ -136,7 +68,6 @@ class AIModelCapabilities:
         except ImportError:
             missing.append("numpy: pip install numpy")
 
-        # Check PyTorch (required for sentence-transformers)
         try:
             import torch  # noqa: F401
 
@@ -144,7 +75,6 @@ class AIModelCapabilities:
         except ImportError:
             missing.append("torch: pip install torch")
 
-        # Check sentence-transformers
         try:
             import sentence_transformers  # noqa: F401
 
@@ -152,7 +82,6 @@ class AIModelCapabilities:
         except ImportError:
             missing.append("sentence-transformers: pip install sentence-transformers")
 
-        # Check TextBlob
         try:
             import textblob  # noqa: F401
 
@@ -160,7 +89,6 @@ class AIModelCapabilities:
         except ImportError:
             missing.append("textblob: pip install textblob")
 
-        # Check spaCy
         try:
             import spacy  # noqa: F401
 
@@ -172,30 +100,18 @@ class AIModelCapabilities:
         return caps
 
     def can_run_embeddings(self) -> bool:
-        """Check if embedding operations can run."""
         return self.has_sentence_transformers and self.has_torch
 
     def can_run_sentiment(self) -> bool:
-        """Check if sentiment analysis can run."""
         return self.has_textblob
 
     def can_run_classification(self) -> bool:
-        """Check if classification can run."""
-        return self.has_textblob  # Uses simple rule-based classification
+        return self.has_textblob
 
     def can_run_entity_extraction(self) -> bool:
-        """Check if entity extraction can run."""
-        return self.has_spacy or self.has_textblob  # Fallback to regex-based
+        return self.has_spacy or self.has_textblob
 
     def get_missing_for_operation(self, operation: AIOperationType) -> list[str]:
-        """Get missing packages for a specific operation.
-
-        Args:
-            operation: The operation to check
-
-        Returns:
-            List of missing package install commands
-        """
         missing = []
 
         if operation in (
@@ -232,19 +148,6 @@ class AIModelCapabilities:
 
 @dataclass
 class DataFrameAICapabilities:
-    """Platform capabilities for DataFrame AI operations.
-
-    Declares what AI operations a DataFrame platform supports based on
-    available ML libraries and platform features.
-
-    Attributes:
-        platform_name: Name of the platform
-        model_caps: Underlying model capabilities
-        supports_udf: Platform supports user-defined functions
-        supports_batch_inference: Platform can batch ML inference efficiently
-        notes: Platform-specific notes
-    """
-
     platform_name: str
     model_caps: AIModelCapabilities = field(default_factory=AIModelCapabilities.detect)
     supports_udf: bool = True
@@ -252,14 +155,6 @@ class DataFrameAICapabilities:
     notes: str = ""
 
     def supports_operation(self, operation: AIOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation type to check
-
-        Returns:
-            True if the operation is supported
-        """
         if operation in (
             AIOperationType.EMBEDDING_SINGLE,
             AIOperationType.EMBEDDING_BATCH,
@@ -286,32 +181,11 @@ class DataFrameAICapabilities:
         return False
 
     def get_unsupported_operations(self) -> list[AIOperationType]:
-        """Get list of operations not supported by this platform.
-
-        Returns:
-            List of unsupported AIOperationType values
-        """
         return [op for op in AIOperationType if not self.supports_operation(op)]
 
 
 @dataclass
 class DataFrameAIResult:
-    """Result of a DataFrame AI operation.
-
-    Attributes:
-        operation_type: Type of AI operation
-        success: Whether the operation completed successfully
-        start_time: Operation start timestamp (Unix time)
-        end_time: Operation end timestamp (Unix time)
-        duration_ms: Operation duration in milliseconds
-        rows_processed: Number of rows processed
-        model_name: Name of the model used
-        model_load_time_ms: Time to load the model (if applicable)
-        inference_time_ms: Time for inference (excluding model load)
-        error_message: Error description if operation failed
-        metrics: Additional operation-specific metrics
-    """
-
     operation_type: AIOperationType
     success: bool
     start_time: float
@@ -331,16 +205,6 @@ class DataFrameAIResult:
         error_message: str,
         start_time: float | None = None,
     ) -> DataFrameAIResult:
-        """Create a failure result.
-
-        Args:
-            operation_type: The operation that failed
-            error_message: Description of the failure
-            start_time: Optional start time (defaults to now)
-
-        Returns:
-            DataFrameAIResult indicating failure
-        """
         now = time.time()
         return cls(
             operation_type=operation_type,
@@ -353,21 +217,8 @@ class DataFrameAIResult:
         )
 
 
-# =============================================================================
-# Model Loading and Caching
-# =============================================================================
-
-
 @lru_cache(maxsize=4)
 def _get_sentence_transformer_model(model_name: str) -> Any:
-    """Get a cached sentence-transformers model.
-
-    Args:
-        model_name: Name of the model to load
-
-    Returns:
-        SentenceTransformer model instance
-    """
     from sentence_transformers import SentenceTransformer
 
     logger.info(f"Loading sentence-transformers model: {model_name}")
@@ -376,38 +227,16 @@ def _get_sentence_transformer_model(model_name: str) -> Any:
 
 @lru_cache(maxsize=1)
 def _get_spacy_model(model_name: str = "en_core_web_sm") -> Any:
-    """Get a cached spaCy model.
-
-    Args:
-        model_name: Name of the model to load
-
-    Returns:
-        spaCy model instance
-    """
     import spacy
 
     logger.info(f"Loading spaCy model: {model_name}")
     return spacy.load(model_name)
 
 
-# =============================================================================
-# Embedding Operations
-# =============================================================================
-
-
 def generate_embedding(
     text: str,
     model_name: str = "all-MiniLM-L6-v2",
 ) -> list[float]:
-    """Generate embedding for a single text using sentence-transformers.
-
-    Args:
-        text: Text to embed
-        model_name: sentence-transformers model name
-
-    Returns:
-        Embedding as list of floats
-    """
     model = _get_sentence_transformer_model(model_name)
     embedding = model.encode(text, convert_to_numpy=True)
     return embedding.tolist()
@@ -418,35 +247,12 @@ def generate_embeddings_batch(
     model_name: str = "all-MiniLM-L6-v2",
     batch_size: int = 32,
 ) -> list[list[float]]:
-    """Generate embeddings for a batch of texts.
-
-    Args:
-        texts: List of texts to embed
-        model_name: sentence-transformers model name
-        batch_size: Batch size for encoding
-
-    Returns:
-        List of embeddings as lists of floats
-    """
     model = _get_sentence_transformer_model(model_name)
     embeddings = model.encode(texts, convert_to_numpy=True, batch_size=batch_size)
     return [emb.tolist() for emb in embeddings]
 
 
-# =============================================================================
-# Sentiment Operations
-# =============================================================================
-
-
 def analyze_sentiment(text: str) -> float:
-    """Analyze sentiment of text using TextBlob.
-
-    Args:
-        text: Text to analyze
-
-    Returns:
-        Sentiment polarity score (-1 to 1)
-    """
     from textblob import TextBlob
 
     blob = TextBlob(str(text) if text else "")
@@ -454,75 +260,35 @@ def analyze_sentiment(text: str) -> float:
 
 
 def analyze_sentiment_batch(texts: list[str]) -> list[float]:
-    """Analyze sentiment for a batch of texts.
-
-    Args:
-        texts: List of texts to analyze
-
-    Returns:
-        List of sentiment polarity scores
-    """
     return [analyze_sentiment(text) for text in texts]
 
 
-# =============================================================================
-# Classification Operations
-# =============================================================================
-
-
 def classify_priority(text: str, labels: list[str] | None = None) -> str:
-    """Classify text into priority categories using rule-based approach.
-
-    For production use, this would use a trained classifier or zero-shot
-    classification with transformers. This implementation uses simple
-    keyword matching for benchmark purposes.
-
-    Args:
-        text: Text to classify
-        labels: Optional list of labels (default: urgent, normal, low priority)
-
-    Returns:
-        Predicted priority label
-    """
     if labels is None:
         labels = ["urgent", "normal", "low priority"]
 
     text_lower = str(text).lower() if text else ""
 
-    # Simple keyword-based classification
     urgent_keywords = ["urgent", "asap", "immediately", "critical", "emergency", "rush"]
     low_keywords = ["later", "whenever", "no rush", "low priority", "optional"]
 
     for keyword in urgent_keywords:
         if keyword in text_lower:
-            return labels[0]  # urgent
+            return labels[0]
 
     for keyword in low_keywords:
         if keyword in text_lower:
-            return labels[2]  # low priority
+            return labels[2]
 
-    return labels[1]  # normal
+    return labels[1]
 
 
 def classify_segment(text: str, segments: list[str] | None = None) -> str:
-    """Classify text into market segment using rule-based approach.
-
-    For production use, this would use a trained classifier. This implementation
-    uses simple keyword matching for benchmark purposes.
-
-    Args:
-        text: Text to classify
-        segments: Optional list of segments (default: TPC-H segments)
-
-    Returns:
-        Predicted segment label
-    """
     if segments is None:
         segments = ["AUTOMOBILE", "BUILDING", "FURNITURE", "HOUSEHOLD", "MACHINERY"]
 
     text_lower = str(text).lower() if text else ""
 
-    # Simple keyword-based classification
     segment_keywords = {
         "AUTOMOBILE": ["car", "vehicle", "auto", "motor", "drive", "engine"],
         "BUILDING": ["construct", "build", "house", "structure", "architect"],
@@ -537,25 +303,10 @@ def classify_segment(text: str, segments: list[str] | None = None) -> str:
                 if keyword in text_lower:
                     return segment
 
-    # Default to first segment if no match
     return segments[0]
 
 
-# =============================================================================
-# Entity Extraction Operations
-# =============================================================================
-
-
 def extract_entities(text: str, entity_types: list[str] | None = None) -> dict[str, list[str]]:
-    """Extract entities from text using spaCy or regex fallback.
-
-    Args:
-        text: Text to extract entities from
-        entity_types: Optional list of entity types to extract
-
-    Returns:
-        Dictionary mapping entity type to list of extracted entities
-    """
     if entity_types is None:
         entity_types = ["feature", "material", "color", "size"]
 
@@ -575,7 +326,6 @@ def extract_entities(text: str, entity_types: list[str] | None = None) -> dict[s
 
 
 def _extract_entities_spacy(text_str: str, entity_types: list[str], result: dict[str, list[str]]) -> None:
-    """Extract entities using spaCy NLP model."""
     nlp = _get_spacy_model()
     doc = nlp(text_str)
 
@@ -597,7 +347,6 @@ def _extract_entities_spacy(text_str: str, entity_types: list[str], result: dict
 
 
 def _extract_entities_regex(text_str: str, entity_types: list[str], result: dict[str, list[str]]) -> None:
-    """Extract entities using regex patterns as a fallback."""
     import re
 
     _regex_patterns: dict[str, str] = {
@@ -611,21 +360,7 @@ def _extract_entities_regex(text_str: str, entity_types: list[str], result: dict
             result[etype] = list(set(re.findall(pattern, text_str, re.IGNORECASE)))
 
 
-# =============================================================================
-# Vector Similarity Operations
-# =============================================================================
-
-
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """Compute cosine similarity between two vectors.
-
-    Args:
-        vec1: First vector
-        vec2: Second vector
-
-    Returns:
-        Cosine similarity score (-1 to 1, where 1 is identical, 0 is orthogonal, -1 is opposite)
-    """
     import numpy as np
 
     v1 = np.array(vec1)
@@ -642,15 +377,6 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
 
 
 def euclidean_distance(vec1: list[float], vec2: list[float]) -> float:
-    """Compute Euclidean distance between two vectors.
-
-    Args:
-        vec1: First vector
-        vec2: Second vector
-
-    Returns:
-        Euclidean distance
-    """
     import numpy as np
 
     v1 = np.array(vec1)
@@ -664,16 +390,6 @@ def top_k_similarity(
     vectors: list[list[float]],
     k: int = 10,
 ) -> list[tuple[int, float]]:
-    """Find top-K most similar vectors using cosine similarity.
-
-    Args:
-        query_vec: Query vector
-        vectors: List of vectors to search
-        k: Number of results to return
-
-    Returns:
-        List of (index, similarity) tuples, sorted by similarity descending
-    """
     import numpy as np
 
     query = np.array(query_vec)
@@ -690,53 +406,19 @@ def top_k_similarity(
             sim = float(np.dot(query, v) / (query_norm * v_norm))
             similarities.append((i, sim))
 
-    # Sort by similarity descending and take top-k
     similarities.sort(key=lambda x: x[1], reverse=True)
     return similarities[:k]
 
 
-# =============================================================================
-# DataFrame Operations Manager
-# =============================================================================
-
-
 class DataFrameAIOperationsManager:
-    """Manager for DataFrame AI operations.
-
-    Provides AI operation execution for DataFrame platforms, with capability
-    detection and graceful error handling for missing dependencies.
-
-    Example:
-        manager = DataFrameAIOperationsManager("polars-df")
-
-        # Check capabilities before running
-        if manager.supports_operation(AIOperationType.EMBEDDING_SINGLE):
-            result = manager.execute_embedding_single(texts)
-
-        # Get helpful error for missing dependencies
-        if not manager.supports_operation(AIOperationType.EMBEDDING_BATCH):
-            emit(manager.get_unsupported_message(AIOperationType.EMBEDDING_BATCH))
-    """
-
     def __init__(self, platform_name: str) -> None:
-        """Initialize the AI operations manager.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pandas-df", "pyspark-df")
-        """
         self.platform_name = platform_name.lower()
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Detect available capabilities
         self._model_caps = AIModelCapabilities.detect()
         self._capabilities = self._build_capabilities()
 
     def _build_capabilities(self) -> DataFrameAICapabilities:
-        """Build platform capabilities.
-
-        Returns:
-            DataFrameAICapabilities for this platform
-        """
         notes = []
 
         if "polars" in self.platform_name:
@@ -757,38 +439,17 @@ class DataFrameAIOperationsManager:
             platform_name=self.platform_name,
             model_caps=self._model_caps,
             supports_udf=True,
-            supports_batch_inference="pyspark" not in self.platform_name,  # PySpark needs batching
+            supports_batch_inference="pyspark" not in self.platform_name,
             notes=" ".join(notes),
         )
 
     def get_capabilities(self) -> DataFrameAICapabilities:
-        """Get platform AI capabilities.
-
-        Returns:
-            DataFrameAICapabilities for this platform
-        """
         return self._capabilities
 
     def supports_operation(self, operation: AIOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation to check
-
-        Returns:
-            True if supported
-        """
         return self._capabilities.supports_operation(operation)
 
     def get_unsupported_message(self, operation: AIOperationType) -> str:
-        """Get error message for unsupported operation.
-
-        Args:
-            operation: The unsupported operation
-
-        Returns:
-            Helpful error message with install instructions
-        """
         missing = self._model_caps.get_missing_for_operation(operation)
 
         if not missing:
@@ -809,15 +470,6 @@ class DataFrameAIOperationsManager:
         texts: list[str],
         model_name: str = "all-MiniLM-L6-v2",
     ) -> DataFrameAIResult:
-        """Execute single embedding generation.
-
-        Args:
-            texts: List of texts to embed (one at a time)
-            model_name: sentence-transformers model name
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
         operation = AIOperationType.EMBEDDING_SINGLE
 
@@ -829,12 +481,10 @@ class DataFrameAIOperationsManager:
             )
 
         try:
-            # Load model (cached)
             model_load_start = mono_time()
             _ = _get_sentence_transformer_model(model_name)
             model_load_time = (elapsed_seconds(model_load_start)) * 1000
 
-            # Generate embeddings
             inference_start = mono_time()
             embeddings = [generate_embedding(text, model_name) for text in texts]
             inference_time = (elapsed_seconds(inference_start)) * 1000
@@ -866,16 +516,6 @@ class DataFrameAIOperationsManager:
         model_name: str = "all-MiniLM-L6-v2",
         batch_size: int = 32,
     ) -> DataFrameAIResult:
-        """Execute batch embedding generation.
-
-        Args:
-            texts: List of texts to embed
-            model_name: sentence-transformers model name
-            batch_size: Batch size for encoding
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
         operation = AIOperationType.EMBEDDING_BATCH
 
@@ -918,14 +558,6 @@ class DataFrameAIOperationsManager:
             return DataFrameAIResult.failure(operation, str(e), start_time)
 
     def execute_sentiment_single(self, texts: list[str]) -> DataFrameAIResult:
-        """Execute single sentiment analysis.
-
-        Args:
-            texts: List of texts to analyze (one at a time)
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
         operation = AIOperationType.SENTIMENT_SINGLE
 
@@ -959,14 +591,6 @@ class DataFrameAIOperationsManager:
             return DataFrameAIResult.failure(operation, str(e), start_time)
 
     def execute_sentiment_batch(self, texts: list[str]) -> DataFrameAIResult:
-        """Execute batch sentiment analysis.
-
-        Args:
-            texts: List of texts to analyze
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
         operation = AIOperationType.SENTIMENT_BATCH
 
@@ -1005,16 +629,6 @@ class DataFrameAIOperationsManager:
         labels: list[str],
         operation: AIOperationType,
     ) -> DataFrameAIResult:
-        """Execute text classification.
-
-        Args:
-            texts: List of texts to classify
-            labels: List of possible labels
-            operation: Classification operation type
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
 
         if not self.supports_operation(operation):
@@ -1029,7 +643,7 @@ class DataFrameAIOperationsManager:
 
             if operation == AIOperationType.CLASSIFY_PRIORITY:
                 predictions = [classify_priority(text, labels) for text in texts]
-            else:  # CLASSIFY_SEGMENT
+            else:
                 predictions = [classify_segment(text, labels) for text in texts]
 
             inference_time = (elapsed_seconds(inference_start)) * 1000
@@ -1059,15 +673,6 @@ class DataFrameAIOperationsManager:
         texts: list[str],
         entity_types: list[str] | None = None,
     ) -> DataFrameAIResult:
-        """Execute entity extraction.
-
-        Args:
-            texts: List of texts to extract entities from
-            entity_types: Optional list of entity types to extract
-
-        Returns:
-            DataFrameAIResult with operation outcome
-        """
         start_time = time.time()
         operation = AIOperationType.ENTITY_EXTRACTION
 
@@ -1104,24 +709,9 @@ class DataFrameAIOperationsManager:
             return DataFrameAIResult.failure(operation, str(e), start_time)
 
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
 def get_dataframe_ai_manager(platform_name: str) -> DataFrameAIOperationsManager | None:
-    """Get a DataFrame AI operations manager for a platform.
-
-    Args:
-        platform_name: Platform name (e.g., "polars-df", "pandas-df", "pyspark-df")
-
-    Returns:
-        DataFrameAIOperationsManager if platform is a DataFrame platform,
-        None otherwise.
-    """
     platform_lower = platform_name.lower()
 
-    # Check if this is a DataFrame platform
     df_platforms = ("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark", "datafusion-df")
     if not any(p in platform_lower for p in df_platforms):
         logger.debug(f"Platform {platform_name} is not a DataFrame platform")
@@ -1135,32 +725,12 @@ def get_dataframe_ai_manager(platform_name: str) -> DataFrameAIOperationsManager
 
 
 def get_skip_for_dataframe() -> list[str]:
-    """Get query IDs that should be skipped for DataFrame execution.
-
-    These are generative/transform queries that require LLM API integration
-    and are not supported for local DataFrame execution.
-
-    Returns:
-        List of query IDs to skip
-    """
     return SKIP_FOR_DATAFRAME.copy()
 
 
 def validate_ai_primitives_dataframe_platform(platform_name: str) -> tuple[bool, str]:
-    """Validate that a platform can run AI Primitives DataFrame benchmark.
-
-    Checks if the platform is a DataFrame platform and has required dependencies
-    for at least some AI operations.
-
-    Args:
-        platform_name: Platform name to validate
-
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
     platform_lower = platform_name.lower()
 
-    # Check if this is a DataFrame platform
     df_platforms = ("polars-df", "polars", "pandas-df", "pandas", "pyspark-df", "pyspark", "datafusion-df")
     if not any(p in platform_lower for p in df_platforms):
         return False, (
@@ -1176,7 +746,6 @@ def validate_ai_primitives_dataframe_platform(platform_name: str) -> tuple[bool,
             f"  benchbox run --platform polars-df --benchmark ai_primitives --mode dataframe\n"
         )
 
-    # Check for available ML libraries
     caps = AIModelCapabilities.detect()
 
     if not caps.can_run_embeddings() and not caps.can_run_sentiment():
@@ -1203,7 +772,6 @@ __all__ = [
     "get_dataframe_ai_manager",
     "get_skip_for_dataframe",
     "validate_ai_primitives_dataframe_platform",
-    # Individual operations
     "generate_embedding",
     "generate_embeddings_batch",
     "analyze_sentiment",

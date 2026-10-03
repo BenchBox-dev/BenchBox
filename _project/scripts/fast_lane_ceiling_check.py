@@ -1,12 +1,3 @@
-"""Fast-lane test-count ceiling enforcement.
-
-Owns the pytest-collection checks that bound how many tests the ``fast`` lane
-may collect: the absolute ``max_fast_tests`` ceiling, the forbidden-marker and
-forbidden-path guards, the per-PR delta guard, and the develop baseline count
-emitter. It is deliberately independent of the monotonic-clock policy in
-``timing_policy_check.py`` so either can change or be removed on its own.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -19,9 +10,6 @@ from pathlib import Path
 from typing import TypedDict, cast
 
 
-# Keys prefixed with "_" in the fast-lane policy JSON are human-facing annotations
-# (e.g. "_ceiling_log", a pointer string to _project/config/fast_lane_ceiling_log.md)
-# and are intentionally not modeled here.
 class FastLanePolicy(TypedDict, total=False):
     enabled: bool
     max_fast_tests: int
@@ -40,45 +28,18 @@ def _load_fast_lane_policy(path: Path) -> FastLanePolicy:
 
 _COLLECT_COUNT_PATTERN = re.compile(r"(\d+)/(\d+) tests collected(?: \((\d+) deselected\))?")
 
-# Headroom (max_fast_tests - collected) below this triggers a FAST_LANE_WARNING
-# (advisory only -- does not affect exit code) pointing at the +500 quantum
-# bump convention in fast_lane_ceiling_log.md. See
-# docs/operations/fast-lane-budget.md.
 FAST_LANE_HEADROOM_WARNING_THRESHOLD = 100
 
-# Delta-guard thresholds for --delta-check (PR lane, additive to the absolute
-# ceiling enforced by _check_fast_lane_policy -- never a substitute for it).
 FAST_LANE_DELTA_FAIL_THRESHOLD = 150
 FAST_LANE_DELTA_WARN_THRESHOLD = 75
 
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
-# Composition grace (merge queue only). Independently green PRs can compose over
-# the ceiling in one merge group; ejecting the group blames PRs that each fit,
-# and re-queueing repeats the failure until someone bumps the ceiling. The
-# repository's approved native queue permits five entries per merge group, so
-# the grace covers one delta limit for every possible queued entry rather than
-# assuming a one-PR group.
-#
-# Keep this synchronized with APPROVED_MERGE_QUEUE["max_entries_to_merge"] in
-# scripts/ruleset_drift_check.py. The value is an explicit CLI flag, not an
-# environment variable: ci.yml runs the PR's own workflow file, so an env-var
-# decision could be self-granted by editing the workflow. The pull_request lane
-# passes no grace, so a PR whose own merge ref crosses still fails there, and the
-# nightly ratchet files the bump issue once headroom is negative.
 MAX_MERGE_QUEUE_ENTRIES = 5
 MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD * MAX_MERGE_QUEUE_ENTRIES
 
 
 def _github_event_name() -> str | None:
-    """Read the triggering event from runner-provided event identity.
-
-    ``GITHUB_EVENT_NAME`` is set by the runner and cannot be supplied by the
-    pull request workflow. Prefer it because merge_group payloads expose an
-    action and merge-group metadata, but do not include an ``event_name``
-    field. The event file remains the fallback for local tests and runners that
-    do not export the name directly.
-    """
     runner_event = os.environ.get("GITHUB_EVENT_NAME", "").strip()
     if runner_event:
         return runner_event
@@ -103,12 +64,6 @@ def _github_event_name() -> str | None:
 
 
 def _ceiling_grace_from_event(raw: str | None) -> int:
-    """Resolve the grace flag against the triggering event.
-
-    The flag is only honored on merge_group. A pull_request run passes no
-    flag in the committed workflow, and a forged flag on any other event is
-    rejected instead of silently ignored, so misconfiguration fails closed.
-    """
     event = _github_event_name()
     if raw is None or not raw.strip():
         return 0
@@ -157,13 +112,6 @@ def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
 
 
 class FastLaneCollectError(RuntimeError):
-    """The collect subprocess could not run, so the policy was never checked.
-
-    Distinct from a policy violation: nothing is known to be wrong with the
-    fast lane, we simply failed to measure it. Conflating the two reports a
-    green tree as several FAST_LANE_VIOLATIONs.
-    """
-
     def __init__(self, message: str, *, violations: list[str] | None = None) -> None:
         super().__init__(message)
         self.violations = list(violations or [])
@@ -172,7 +120,6 @@ class FastLaneCollectError(RuntimeError):
 def _collect_environment_error(
     markexpr: str, returncode: int, output: str, *, violations: list[str] | None = None
 ) -> FastLaneCollectError:
-    """Build an actionable error for a collect run that produced no count."""
     tail = "\n".join(line for line in output.strip().splitlines()[-5:])
     return FastLaneCollectError(
         f"could not run pytest --collect-only for '-m {markexpr}' "
@@ -195,7 +142,6 @@ def _parse_collect_count(output: str) -> int | None:
 
 
 def _has_justified_ceiling_bump(repo_root: Path) -> bool:
-    """Return whether this PR records a convention-compliant fast-lane bump."""
     policy_path = repo_root / "_project" / "config" / "fast_test_lane_policy.json"
     try:
         current_limit = int(_load_fast_lane_policy(policy_path).get("max_fast_tests", 500))
@@ -289,16 +235,6 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_
 
 
 def _emit_fast_count(repo_root: Path) -> int:
-    """Collect the fast lane and print ONLY the machine-readable count.
-
-    Used by fast-lane-baseline.yml to persist a baseline count for the PR
-    lane's --delta-check (see below) to diff against. Deliberately minimal
-    output (bare integer, nothing else on stdout) so a workflow step can
-    redirect stdout straight into a cache-backed file. On a collection failure
-    or parse failure, prints a message to stderr and returns nonzero -- the *workflow* step
-    that calls this is responsible for never failing the post-merge job
-    itself (guarded with `|| true`/a fallback there), not this function.
-    """
     rc, output = _run_pytest_collect(repo_root, "fast")
     if rc not in (0, 5):
         print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
@@ -312,13 +248,6 @@ def _emit_fast_count(repo_root: Path) -> int:
 
 
 def _delta_check(repo_root: Path, develop_count_file: Path, *, require_baseline: bool = False) -> int:
-    """Compare this run's fast-lane collect count against a develop baseline count.
-
-    Callers that can tolerate a cold cache may retain the historical skip by
-    leaving ``require_baseline`` false. The pull-request guard sets it true so
-    every PR proves its per-PR delta before a merge-group composition can rely
-    on the corresponding grace allowance.
-    """
 
     def baseline_unavailable(reason: str) -> int:
         if require_baseline:
@@ -458,9 +387,6 @@ def main() -> int:
     try:
         fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy, ceiling_grace=ceiling_grace)
     except FastLaneCollectError as exc:
-        # Not a policy violation: the lane was never measured. Reported
-        # separately so a broken environment cannot masquerade as a set of
-        # fast-lane breaches.
         fast_lane_violations = exc.violations
         print(f"Fast lane policy violations: {len(fast_lane_violations)}")
         for violation in fast_lane_violations:

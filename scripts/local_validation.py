@@ -1,30 +1,4 @@
 #!/usr/bin/env python3
-"""Serialize local validation gates and coalesce duplicate same-input runs.
-
-Two agents (or two worktrees) often invoke the same local gate against the
-same tree within minutes of each other. The second invocation historically
-collided on the shared test lock and retried in a lock-error loop. This tool
-makes that case cheap and honest:
-
-* Identical validated inputs reuse a completed receipt instead of executing.
-* Anything else (unknown identity, changed files/ref/tool, incomplete or
-  failed prior run, different gate) executes.
-* Concurrent identical requests serialize on a per-receipt lock: the waiter
-  re-checks after acquiring and reuses the winner's receipt, so simultaneous
-  identical requests execute once while unrelated gates proceed in parallel.
-
-Receipts never certify hosted required checks and never transfer across
-changed integration trees: the worktree HEAD, status, base ref, and tool
-versions are all part of the identity. A failed prior run leaves no receipt,
-so failures always re-execute.
-
-Usage:
-  python scripts/local_validation.py run --gate pr-preflight-fast -- make pr-preflight-fast-tests
-  python scripts/local_validation.py run --gate member-check --batch-id B --batch-member M --batch-role member -- pytest tests/unit -q
-  python scripts/local_validation.py ordered --focused-cmd 'pytest -m fast -q' --preflight-cmd 'make pr-preflight'
-  python scripts/local_validation.py show --gate pr-preflight-fast
-  python scripts/local_validation.py clear-test-lock ~/.benchbox/test.lock
-"""
 
 from __future__ import annotations
 
@@ -68,8 +42,6 @@ CLI_DESCRIPTION = (
     "  python scripts/local_validation.py clear-test-lock ~/.benchbox/test.lock\n"
 )
 
-# Bounds keep identity computation cheap; exceeding them means "unknown",
-# which forces execution (fail open to running, never to false reuse).
 MAX_UNTRACKED_FILES = 200
 MAX_UNTRACKED_BYTES = 50 * 1024 * 1024
 LOCK_POLL_SECONDS = 0.25
@@ -78,9 +50,6 @@ MAX_IDENTITY_RETRIES = 3
 MAX_ORDERED_RETRIES = 3
 WAIT_PROGRESS_SECONDS = 5.0
 
-# These files affect local gate behavior even when a gate command does not
-# mention them directly.  Their content is recorded separately from the
-# changed-file list so a receipt cannot outlive a local configuration edit.
 VALIDATION_CONFIG_FILES = (
     ".pre-commit-config.yaml",
     "Makefile",
@@ -94,9 +63,6 @@ VALIDATION_CONFIG_FILES = (
 VALIDATION_ENV_PREFIXES = ("BENCHBOX_", "PYTEST_", "PYTHON", "UV_", "PRE_COMMIT")
 VALIDATION_ENV_KEYS = {"CI", "GITHUB_ACTIONS", "PATH", "VIRTUAL_ENV"}
 RECEIPT_STORE_ENV = "BENCHBOX_VALIDATION_RECEIPTS_DIR"
-# Selector variables choose where evidence is stored or whether a wrapper runs;
-# they do not change gate behavior. BENCHBOX_PREPUSH only enables the opt-in
-# pre-push fast-test lane, so it must not fork the focused-stage identity.
 VALIDATION_ENV_IGNORED = frozenset({RECEIPT_STORE_ENV, "BENCHBOX_PREPUSH"})
 _WORKTREE_PLACEHOLDER = "<worktree>"
 MEMBER_BATCH_FIELDS = (
@@ -146,11 +112,10 @@ ACCOUNTING_FIELDS = frozenset(
 
 
 class IdentityUnknown(Exception):
-    """The working-tree identity cannot be established exactly."""
+    pass
 
 
 def read_holder(lock_path: Path) -> str:
-    """Best-effort holder description for wait/timeout messages."""
     try:
         return lock_path.read_text(encoding="utf-8", errors="replace").strip() or "(empty lock file)"
     except OSError:
@@ -158,12 +123,6 @@ def read_holder(lock_path: Path) -> str:
 
 
 def write_holder(fd: int, lock_path: Path, *, phase: str, gate: str | None = None) -> None:
-    """Publish bounded owner/progress information while holding *fd*.
-
-    The kernel lock, rather than this text, is the liveness authority.  The
-    text is only diagnostic and is deliberately best effort so a read-only or
-    unusual filesystem cannot turn a valid lock into a bypass.
-    """
     started = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     command = " ".join(shlex.quote(part) for part in sys.argv[:8])
     details = f" phase:{phase}"
@@ -179,7 +138,6 @@ def write_holder(fd: int, lock_path: Path, *, phase: str, gate: str | None = Non
 
 
 def _close_lock(fd: int) -> None:
-    """Release a receipt lock fd acquired via :func:`wait_on_fd`."""
     if sys.platform == "win32":
         try:
             try:
@@ -199,15 +157,6 @@ def _close_lock(fd: int) -> None:
 
 
 def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
-    """Acquire an exclusive lock on open *fd*, waiting up to *timeout_seconds*.
-
-    Raises TimeoutError carrying the last observed holder description without
-    closing *fd*. KeyboardInterrupt cancels the wait. A held lock always
-    means a live holder: the kernel releases locks on process death, so this
-    never steals, deletes, or bypasses. Shared with tests/conftest.py.
-    Uses ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows so the
-    canonical preflight remains usable on native Windows.
-    """
     deadline = time.monotonic() + max(0.0, timeout_seconds)
     wait_started = time.monotonic()
     last_report = 0.0
@@ -231,8 +180,6 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
                     )
                 return
             except OSError as exc:
-                # The CRT reports a nonblocking locking violation as EACCES.
-                # Other errors (such as EBADF or EINVAL) are not contention.
                 if exc.errno != errno.EACCES:
                     raise
                 holder = read_holder(lock_path)
@@ -272,11 +219,6 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
 
 
 def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
-    """Open *lock_path* and acquire it via :func:`wait_on_fd`.
-
-    Returns the open fd (caller must close it to release). Closes the fd
-    before raising while waiting for the lock.
-    """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
@@ -292,7 +234,6 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
 
 
 def clear_inactive_lock(lock_path: Path) -> int:
-    """Clear inactive diagnostic text without unlinking the lock pathname."""
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
@@ -333,14 +274,6 @@ def _sha256_file(path: Path) -> str:
 
 
 def _normalize_worktree_text(text: str, repo: Path | None) -> str:
-    """Replace a worktree-local absolute prefix with a stable placeholder.
-
-    Each linked worktree has its own ``.venv`` and absolute checkout path, so
-    ``PATH``, ``VIRTUAL_ENV``, and resolved tool paths would otherwise fork the
-    receipt identity for identical heads. Normalizing the current checkout
-    prefix lets identical inputs coalesce across worktrees while system paths
-    outside the checkout keep their absolute identity.
-    """
     if repo is None or not text:
         return text
     try:
@@ -359,7 +292,6 @@ def _normalize_worktree_text(text: str, repo: Path | None) -> str:
 
 
 def _tool_identity(executable: str, repo: Path | None = None) -> dict[str, str]:
-    """Resolve the exact executable and record its version."""
     resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
     if not resolved:
         raise IdentityUnknown(f"cannot resolve executable: {executable}")
@@ -381,12 +313,6 @@ def _tool_identity(executable: str, repo: Path | None = None) -> dict[str, str]:
 
 
 def _command_tools(argv: list[str]) -> list[str]:
-    """Find executables whose versions can affect a local command.
-
-    The command itself remains part of the identity.  Version probing is
-    intentionally limited to the command's executable and wrappers commonly
-    used by this repository, avoiding unrelated ambient-tool drift.
-    """
     if not argv:
         return []
     candidates = [argv[0]]
@@ -397,7 +323,6 @@ def _command_tools(argv: list[str]) -> list[str]:
 
 
 def _hash_bounded(repo: Path, names: list[str], kind: str, budget: list) -> dict[str, str]:
-    """Content digests under shared file/byte bounds; raises IdentityUnknown."""
     if len(names) > MAX_UNTRACKED_FILES:
         raise IdentityUnknown(f"{len(names)} {kind} files exceed bound")
     digests: dict[str, str] = {}
@@ -418,12 +343,6 @@ def _hash_bounded(repo: Path, names: list[str], kind: str, budget: list) -> dict
 
 
 def active_skill_mirror_identity(repo: Path, budget: list) -> dict:
-    """Digest the ignored active skill mirror when it is present.
-
-    The mirror is intentionally untracked, so Git porcelain cannot contribute
-    it to receipt identity. A validation run that reads the mirror must not be
-    reused in a checkout where the mirror is absent or has different bytes.
-    """
     root = repo / ".agents" / "skills"
     if not root.is_dir():
         return {"present": False}
@@ -432,7 +351,6 @@ def active_skill_mirror_identity(repo: Path, budget: list) -> dict:
 
 
 def tracked_modified(porcelain: list[str]) -> list[str]:
-    """Worktree-relative paths of tracked files with any staged/unstaged change."""
     names = []
     for line in porcelain:
         if line.startswith("?? ") or len(line) < 4:
@@ -459,17 +377,6 @@ def _config_digests(repo: Path) -> dict[str, str | None]:
 
 
 def _environment_identity(repo: Path | None = None) -> dict[str, str]:
-    """Hash gate-relevant environment values without persisting raw secrets.
-
-    ``BENCHBOX_VALIDATION_RECEIPTS_DIR`` is intentionally excluded: it selects
-    the local evidence store and does not change gate behavior; including it
-    would also make the receipt key depend on the store that contains it.
-    ``BENCHBOX_PREPUSH`` is likewise excluded: it only enables the opt-in
-    pre-push fast-test lane and must not fork the focused-stage receipt shared
-    with manual preflight.
-    Worktree-local ``PATH`` and ``VIRTUAL_ENV`` prefixes are normalized so
-    identical heads in different linked worktrees share one receipt.
-    """
     selected: dict[str, str] = {}
     for key, value in os.environ.items():
         if key in VALIDATION_ENV_IGNORED:
@@ -534,7 +441,6 @@ def _batch_config_hash_at_commit(repo: Path, revision: str) -> str:
 
 
 def _git_diff_paths(repo: Path, base: str, head: str) -> list[str]:
-    """Return canonical changed paths, retaining both sides of renames."""
     try:
         output = _git(repo, "diff", "--name-status", "-z", "-M", f"{base}...{head}")
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
@@ -612,12 +518,6 @@ def _canonical_member_record(repo: Path, raw: object, integration_head: str) -> 
 
 
 def _canonical_member_identity(repo: Path, value: object) -> tuple[list[dict] | None, str]:
-    """Canonicalize integrator members while preserving declared order.
-
-    Feature delivery binds an explicit ordered member set, so the supplied
-    sequence is part of the integration identity: different orders produce
-    different receipt keys instead of coalescing onto one receipt.
-    """
     if not isinstance(value, (list, tuple)) or not value:
         return None, "integrator member_identity must be a non-empty JSON list"
     try:
@@ -726,7 +626,6 @@ def _validate_integrator_batch(repo: Path, batch: dict) -> tuple[bool, str]:
 
 
 def validate_batch(repo: Path, batch: dict | None) -> tuple[bool, str]:
-    """Validate role-specific delivery metadata against the current checkout."""
     normalized, reason = _prepare_batch(repo, batch)
     if reason:
         return False, reason
@@ -744,13 +643,6 @@ def _validate_prepared_batch(repo: Path, normalized: dict | None) -> tuple[bool,
 
 
 def content_identity(repo: Path, argv: list[str]) -> dict:
-    """Exact validated-input identity for *repo* and command *argv*.
-
-    Raises IdentityUnknown. Tracked modifications are content-hashed (porcelain
-    status text alone cannot see edits to an already-dirty file), and the exact
-    command is part of the key so a stronger command under the same gate name
-    never reuses a weaker command's receipt.
-    """
     try:
         head = _git(repo, "rev-parse", "HEAD").strip()
         base = _git(repo, "rev-parse", "origin/develop").strip()
@@ -787,9 +679,6 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
 
 
 def store_dir(repo: Path) -> Path:
-    """Content-shared receipt store: identity already binds head/base SHAs,
-    tree digests, argv, interpreter, and lockfile, so identical validated
-    inputs coalesce across worktrees instead of re-executing per clone."""
     override = os.environ.get("BENCHBOX_VALIDATION_RECEIPTS_DIR")
     if override:
         return Path(override).expanduser()
@@ -834,11 +723,6 @@ def _identity_key(gate: str, identity: dict | None, batch: dict | None) -> str |
 
 
 def _event_batch(batch: dict | None) -> dict | None:
-    """Return only validated delivery identity; never persist caller input.
-
-    Integrator member order is preserved: the declared integration sequence is
-    part of the identity, so accounting groups must not sort it away.
-    """
     if batch is None:
         return None
     role = batch.get("role") if isinstance(batch, dict) else None
@@ -968,7 +852,6 @@ def _append_accounting_event(
     reason: str | None = None,
     lock_wait_seconds: float = 5.0,
 ) -> None:
-    """Append one immutable local accounting event; accounting never gates execution."""
     safe_batch = _event_batch(batch)
     event = {
         "schema": 2,
@@ -1266,13 +1149,6 @@ def run_gate_with_status(
     repo: Path,
     store: Path,
 ) -> tuple[int, str]:
-    """Run *argv* under the singleflight receipt contract.
-
-    Returns ``(exit_code, status)`` where *status* is the actual post-lock
-    outcome (``executed``, ``reused``, or ``failed``). Callers must use this
-    status for accounting instead of inferring reuse from a pre-lock receipt
-    probe, which races with concurrent identical invocations.
-    """
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     started = time.monotonic()
 
@@ -1339,9 +1215,6 @@ def run_gate_with_status(
             )
             raise
         try:
-            # The tree may have changed while waiting.  Never reuse a receipt
-            # or execute against the old key after that race; move to the new
-            # receipt namespace while retaining the bounded lock wait.
             current_unknown = False
             try:
                 current = content_identity(repo, list(argv))
@@ -1433,8 +1306,6 @@ def run_gate_with_status(
             return code, status
         finally:
             _close_lock(lock_fd)
-    # A continuously changing tree cannot safely produce reusable evidence.
-    # Execute once without a receipt instead of spinning or reusing stale data.
     print("[local-validation] inputs changed repeatedly; executing without receipt")
     return _execute_without_receipt(
         gate=gate,
@@ -1457,7 +1328,6 @@ def run_gate(
     repo: Path,
     store: Path,
 ) -> int:
-    """Run *argv* under the singleflight receipt contract. Returns its exit code."""
     return run_gate_with_status(gate, argv, batch, lock_wait_seconds, repo, store)[0]
 
 
@@ -1493,12 +1363,6 @@ def run_ordered_path(
     repo: Path,
     store: Path,
 ) -> int:
-    """Run the focused local gate before the required preflight gate.
-
-    The two names are explicit receipt namespaces.  A preflight receipt can
-    never stand in for the focused check, and a failed focused gate prevents
-    the required path from being reported as complete.
-    """
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     started = time.monotonic()
     for attempt in range(MAX_ORDERED_RETRIES):

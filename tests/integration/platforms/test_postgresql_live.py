@@ -1,15 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for PostgreSQL.
-
-Setup:
-    make test-docker-up-postgresql
-
-These tests require a running PostgreSQL instance accessible at localhost:5432.
-"""
 
 import json
 
@@ -29,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture
 def postgresql_adapter():
-    """Create a PostgreSQL adapter connected to a local Docker instance."""
     skip_unless_docker_service("localhost", 5432, platform="PostgreSQL")
     adapter = PostgreSQLAdapter(
         host="localhost",
@@ -44,7 +34,6 @@ def postgresql_adapter():
 
 @pytest.fixture
 def postgresql_adapter_with_capture():
-    """Create a PostgreSQL adapter with query plan capture enabled."""
     skip_unless_docker_service("localhost", 5432, platform="PostgreSQL")
     adapter = PostgreSQLAdapter(
         host="localhost",
@@ -59,8 +48,6 @@ def postgresql_adapter_with_capture():
 
 
 class TestLivePostgreSQLConnection:
-    """Test basic PostgreSQL connectivity via Docker."""
-
     def test_connection(self, postgresql_adapter):
 
         connection = postgresql_adapter.create_connection()
@@ -77,8 +64,6 @@ class TestLivePostgreSQLConnection:
 
 
 class TestLivePostgreSQLQueryExecution:
-    """Test query execution against a live PostgreSQL instance."""
-
     def test_create_schema(self, postgresql_adapter):
 
         connection = postgresql_adapter.create_connection()
@@ -100,7 +85,6 @@ class TestLivePostgreSQLQueryExecution:
             postgresql_adapter.close_connection(connection)
 
     def test_execute_query(self, postgresql_adapter):
-        """Verify basic query execution with SELECT 1."""
         connection = postgresql_adapter.create_connection()
         try:
             result = postgresql_adapter.execute_query(
@@ -115,16 +99,12 @@ class TestLivePostgreSQLQueryExecution:
 
 
 class TestLivePostgreSQLQueryPlanCapture:
-    """Test query plan capture against a live PostgreSQL instance."""
-
     def test_get_query_plan_returns_json(self, postgresql_adapter):
-        """get_query_plan should return a non-empty JSON string."""
         connection = postgresql_adapter.create_connection()
         try:
             plan = postgresql_adapter.get_query_plan(connection, "SELECT 1")
             assert plan is not None
             assert len(plan) > 0
-            # PostgreSQL FORMAT JSON wraps the plan in a list
             parsed = json.loads(plan)
             assert isinstance(parsed, list)
             assert len(parsed) > 0
@@ -132,7 +112,6 @@ class TestLivePostgreSQLQueryPlanCapture:
             postgresql_adapter.close_connection(connection)
 
     def test_capture_query_plan_returns_dag(self, postgresql_adapter_with_capture):
-        """capture_query_plan should return a QueryPlanDAG for a simple SELECT."""
         adapter = postgresql_adapter_with_capture
         connection = adapter.create_connection()
         try:
@@ -144,19 +123,17 @@ class TestLivePostgreSQLQueryPlanCapture:
             adapter.close_connection(connection)
 
     def test_capture_query_plan_has_fingerprint(self, postgresql_adapter_with_capture):
-        """Captured plan must have a non-empty fingerprint."""
         adapter = postgresql_adapter_with_capture
         connection = adapter.create_connection()
         try:
             plan, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp")
             assert plan is not None
             assert plan.plan_fingerprint
-            assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+            assert len(plan.plan_fingerprint) == 64
         finally:
             adapter.close_connection(connection)
 
     def test_capture_query_plan_fingerprint_stable(self, postgresql_adapter_with_capture):
-        """Same query executed twice must produce identical fingerprints."""
         adapter = postgresql_adapter_with_capture
         connection = adapter.create_connection()
         try:

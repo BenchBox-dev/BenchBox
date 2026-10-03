@@ -1106,7 +1106,7 @@ if __name__ == "__main__":
 
 ### dbt Integration
 
-```jinja
+```sql+jinja
 
 {{ config(materialized='view') }}
 
@@ -1145,7 +1145,7 @@ FROM {{ source('tpcdi_raw', 'customers_historical') }}
 WHERE Status IS NOT NULL
 ```
 
-```jinja
+```sql+jinja
 -- models/marts/dim_customer.sql
 -- Final customer dimension with SCD Type 2 logic
 

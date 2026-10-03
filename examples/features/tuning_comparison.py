@@ -1,28 +1,10 @@
 #!/usr/bin/env python3
-"""Demonstrate comparing tuned vs baseline performance.
-
-This example shows how to:
-- Run benchmarks with and without tuning configurations
-- Compare performance improvements
-- Quantify optimization impact
-- Make informed decisions about tuning trade-offs
-
-Usage:
-    python features/tuning_comparison.py
-
-Key Concepts:
-    - Baseline (no tuning) vs optimized (tuned) performance
-    - Tuning configuration files
-    - Performance improvement metrics
-    - Cost/benefit analysis of optimizations
-"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -32,16 +14,6 @@ from benchbox.tpch import TPCH
 
 
 def run_baseline_benchmark():
-    """Run benchmark without any tuning (baseline).
-
-    Baseline runs use default database settings with no optimizations.
-    This provides a reference point for measuring tuning impact.
-
-    Use when:
-    - Establishing performance baseline
-    - Comparing against default configurations
-    - Understanding unoptimized performance
-    """
     print("=" * 70)
     print("BASELINE: No Tuning (Default Settings)")
     print("=" * 70)
@@ -49,25 +21,19 @@ def run_baseline_benchmark():
     print("No optimizations applied")
     print()
 
-    # Create benchmark with small scale for demonstration
     benchmark = TPCH(
-        scale_factor=0.01,  # Small dataset for fast comparison
+        scale_factor=0.01,
         output_dir=Path("./benchmark_runs/features/tuning/baseline"),
         force_regenerate=False,
     )
 
-    # Generate data (cached after first run)
     benchmark.generate_data()
 
-    # Create adapter with default settings
-    # No tuning configuration specified = baseline
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Run power test without tuning
     print("Executing queries with default settings...")
     results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-    # Display results
     print("\n✓ Baseline Complete!")
     print(f"  Total queries: {results.total_queries}")
     print(f"  Total time: {results.total_execution_time:.2f}s")
@@ -79,19 +45,6 @@ def run_baseline_benchmark():
 
 
 def run_tuned_benchmark():
-    """Run benchmark with tuning configuration (optimized).
-
-    Tuned runs apply optimizations like:
-    - Memory settings (work_mem, shared_buffers)
-    - Parallel query execution settings
-    - Query optimizer hints
-    - Index recommendations
-
-    Use when:
-    - Evaluating optimization effectiveness
-    - Testing production configurations
-    - Maximizing performance
-    """
     print("=" * 70)
     print("OPTIMIZED: With Tuning Configuration")
     print("=" * 70)
@@ -99,7 +52,6 @@ def run_tuned_benchmark():
     print("Applying tuning configuration")
     print()
 
-    # Create benchmark (same as baseline for fair comparison)
     benchmark = TPCH(
         scale_factor=0.01,
         output_dir=Path("./benchmark_runs/features/tuning/tuned"),
@@ -108,13 +60,8 @@ def run_tuned_benchmark():
 
     benchmark.generate_data()
 
-    # Create adapter
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Run power test WITH tuning
-    # Note: In production, tuning config would be loaded from YAML file
-    # Example: tunings/duckdb/tpch_tuned.yaml
-    # For this demo, DuckDB auto-optimizes many things internally
     print("Executing queries with optimizations...")
     print("Note: DuckDB automatically applies many optimizations")
     print("In production, load tuning from YAML config file")
@@ -123,10 +70,8 @@ def run_tuned_benchmark():
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        # In full implementation: tuning_config=tuning_config
     )
 
-    # Display results
     print("\n✓ Optimized Run Complete!")
     print(f"  Total queries: {results.total_queries}")
     print(f"  Total time: {results.total_execution_time:.2f}s")
@@ -138,19 +83,11 @@ def run_tuned_benchmark():
 
 
 def compare_results(baseline_results, tuned_results):
-    """Compare baseline vs tuned results and show improvement metrics.
-
-    This demonstrates how to:
-    - Calculate performance improvements
-    - Identify optimization impact
-    - Make data-driven tuning decisions
-    """
     print("=" * 70)
     print("PERFORMANCE COMPARISON")
     print("=" * 70)
     print()
 
-    # Overall metrics
     baseline_time = baseline_results.total_execution_time
     tuned_time = tuned_results.total_execution_time
 
@@ -164,7 +101,6 @@ def compare_results(baseline_results, tuned_results):
     print(f"  Improvement:       {percent_improvement:.1f}%")
     print()
 
-    # Per-query comparison
     print("Per-Query Breakdown:")
     print("-" * 70)
     print(f"{'Query':<10} {'Baseline':<15} {'Tuned':<15} {'Improvement':<15}")
@@ -195,7 +131,6 @@ def compare_results(baseline_results, tuned_results):
     print("-" * 70)
     print()
 
-    # Summary
     total_queries = len(baseline_queries)
     avg_improvement = total_improvement / total_queries if total_queries > 0 else 0
 
@@ -207,7 +142,6 @@ def compare_results(baseline_results, tuned_results):
 
 
 def show_tuning_strategies():
-    """Show common tuning strategies and their use cases."""
     print("=" * 70)
     print("TUNING STRATEGIES")
     print("=" * 70)
@@ -246,7 +180,6 @@ def show_tuning_strategies():
 
 
 def show_tuning_workflow():
-    """Show recommended workflow for performance tuning."""
     print("=" * 70)
     print("TUNING WORKFLOW")
     print("=" * 70)
@@ -283,7 +216,6 @@ def show_tuning_workflow():
 
 
 def main() -> int:
-    """Demonstrate tuning comparison workflow."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: TUNING COMPARISON")
@@ -293,20 +225,15 @@ def main() -> int:
     print("to quantify the impact of optimizations.")
     print()
 
-    # Run both configurations
     baseline_results = run_baseline_benchmark()
     tuned_results = run_tuned_benchmark()
 
-    # Compare results
     compare_results(baseline_results, tuned_results)
 
-    # Show tuning strategies
     show_tuning_strategies()
 
-    # Show recommended workflow
     show_tuning_workflow()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

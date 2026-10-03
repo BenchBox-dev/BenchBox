@@ -1,9 +1,6 @@
-"""Unit tests for TPC-DI ETL source data format generators.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 import xml.etree.ElementTree as ET
@@ -27,8 +24,6 @@ from benchbox.core.tpcdi.etl.sources import (
 
 
 class TestCSVSourceFormat:
-    """Test CSV source format generator."""
-
     def test_initialization(self) -> None:
 
         csv_format = CSVSourceFormat()
@@ -70,7 +65,6 @@ class TestCSVSourceFormat:
             file_path = Path(tmpdir) / "test.csv"
             csv_format.write_to_file(test_data, file_path)
 
-            # Verify file was created and has correct content
             assert file_path.exists()
             loaded_data = pd.read_csv(file_path)
             pd.testing.assert_frame_equal(loaded_data, test_data)
@@ -89,16 +83,13 @@ class TestCSVSourceFormat:
             file_path = Path(tmpdir) / "test_pipe.csv"
             csv_format.write_to_file(test_data, file_path)
 
-            # Verify file has pipe delimiter
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "|" in content
-                assert "," not in content.split("\n")[1]  # Not in data rows
+                assert "," not in content.split("\n")[1]
 
 
 class TestXMLSourceFormat:
-    """Test XML source format generator."""
-
     def test_initialization(self) -> None:
 
         xml_format = XMLSourceFormat()
@@ -137,20 +128,16 @@ class TestXMLSourceFormat:
             file_path = Path(tmpdir) / "test.xml"
             xml_format.write_to_file(test_data, file_path)
 
-            # Verify file was created and is well-formed XML
             assert file_path.exists()
             tree = ET.parse(file_path)
             root = tree.getroot()
 
-            # Verify root element and record elements
             assert root.tag == "employees"
             records = root.findall("employee")
             assert len(records) == len(test_data)
 
 
 class TestFixedWidthSourceFormat:
-    """Test fixed-width source format generator."""
-
     def test_initialization(self) -> None:
 
         field_widths = {"id": 10, "name": 20, "amount": 15}
@@ -191,13 +178,10 @@ class TestFixedWidthSourceFormat:
             file_path = Path(tmpdir) / "test.txt"
             fw_format.write_to_file(test_data, file_path)
 
-            # Verify file was created
             assert file_path.exists()
 
-            # Verify fixed-width formatting
             with open(file_path, encoding="utf-8") as f:
                 lines = f.readlines()
-                # Each line should have length = sum of field widths
                 expected_length = sum(field_widths.values())
                 for line in lines:
                     assert len(line.rstrip("\n")) == expected_length
@@ -214,12 +198,10 @@ class TestFixedWidthSourceFormat:
 
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
-                assert "_" in content  # Should have padding with underscores
+                assert "_" in content
 
 
 class TestPipeDelimitedSourceFormat:
-    """Test pipe-delimited source format generator."""
-
     def test_initialization(self) -> None:
 
         pipe_format = PipeDelimitedSourceFormat()
@@ -259,10 +241,8 @@ class TestPipeDelimitedSourceFormat:
             file_path = Path(tmpdir) / "test.txt"
             pipe_format.write_to_file(test_data, file_path)
 
-            # Verify file was created
             assert file_path.exists()
 
-            # Verify pipe delimiter
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
                 assert "|" in content
@@ -287,14 +267,12 @@ class TestPipeDelimitedSourceFormat:
 
 
 class TestSourceDataGenerator:
-    """Test main source data generator."""
-
     def test_initialization(self) -> None:
 
         generator = SourceDataGenerator(scale_factor=2.0, seed=42)
         assert generator.scale_factor == 2.0
         assert generator.seed == 42
-        assert len(generator.formats) == 4  # csv, xml, fixed_width, pipe
+        assert len(generator.formats) == 4
 
     def test_default_formats_registered(self) -> None:
 
@@ -313,13 +291,11 @@ class TestSourceDataGenerator:
         assert generator.formats["custom_csv"] == custom_format
 
     def test_generate_historical_data(self) -> None:
-        """Test generating historical data."""
         generator = SourceDataGenerator(scale_factor=0.01)
         with tempfile.TemporaryDirectory() as tmpdir:
             result = generator.generate_historical_data("csv", Path(tmpdir))
             assert isinstance(result, dict)
             assert len(result) > 0
-            # Verify paths are Path objects
             for _key, path in result.items():
                 assert isinstance(path, Path)
 
@@ -330,7 +306,6 @@ class TestSourceDataGenerator:
             result = generator.generate_incremental_data("csv", Path(tmpdir), batch_number=2)
             assert isinstance(result, dict)
             assert len(result) > 0
-            # Verify batch number in keys
             for key in result:
                 assert "batch2" in key
 

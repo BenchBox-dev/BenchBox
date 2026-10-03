@@ -3,52 +3,14 @@ API Reference
 
 .. tags:: reference, python-api
 
-This page provides a quick overview of all benchmark modules. For detailed API documentation, see :doc:`reference/python-api/index`.
+Use the maintained :doc:`reference/python-api/index` for public API contracts.
 
-.. automodule:: benchbox.amplab
-   :members:
-   :noindex:
+.. toctree::
+   :maxdepth: 1
 
-.. automodule:: benchbox.base
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.clickbench
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.coffeeshop
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.h2odb
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.joinorder
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.read_primitives
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.ssb
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.tpcdi
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.tpcds
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.tpch
-   :members:
-   :noindex:
-
-.. automodule:: benchbox.tpchavoc
-   :members:
-   :noindex:
+   reference/python-api/base
+   reference/python-api/benchmarks
+   reference/python-api/platforms
+   reference/python-api/tuning
+   reference/python-api/results
+   reference/python-api/utilities

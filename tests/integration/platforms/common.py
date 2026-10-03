@@ -1,11 +1,3 @@
-"""Shared helpers for platform integration smoke tests.
-
-This module provides reusable stubs for optional client libraries and
-utility helpers used by the platform smoke tests. Each stub captures
-executed statements so tests can assert on orchestration behaviour
-without requiring real cloud services.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -15,14 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Generic benchmark helper
-
 
 @dataclass
 class SmokeBenchmark:
-    """Minimal benchmark implementation for smoke testing."""
-
     name: str
     create_sql: str
     tables: dict[str, Path]
@@ -32,7 +19,6 @@ class SmokeBenchmark:
 
 
 def create_smoke_benchmark(tmp_path: Path, *, table_name: str = "lineitem", suffix: str = ".csv") -> SmokeBenchmark:
-    """Create a simple benchmark with a single table data file."""
 
     data_path = tmp_path / f"{table_name}{suffix}"
     data_path.write_text("1,alpha\n2,beta\n", encoding="utf-8")
@@ -44,11 +30,6 @@ def create_smoke_benchmark(tmp_path: Path, *, table_name: str = "lineitem", suff
 def run_smoke_benchmark(
     adapter: Any, benchmark: SmokeBenchmark, data_dir: Path, benchmark_type: str = "analytics"
 ) -> tuple[dict[str, int], dict[str, Any], Any]:
-    """Execute the key adapter phases for smoke testing.
-
-    Returns the table statistics, platform metadata, and the underlying
-    connection state captured by the stub connection.
-    """
 
     connection = adapter.create_connection()
     try:
@@ -61,10 +42,6 @@ def run_smoke_benchmark(
         adapter.close_connection(connection)
 
     return table_stats, metadata, state
-
-
-# ---------------------------------------------------------------------------
-# Databricks stub implementation
 
 
 @dataclass
@@ -133,13 +110,9 @@ class _DatabricksCursor:
 
 class _DatabricksConnection:
     def __init__(self, state_or_server: DatabricksStubState | str, *args: Any, **kwargs: Any) -> None:
-        """Initialize connection, accepting either stub state or real Databricks connection args."""
-        # If first arg is DatabricksStubState, use it; otherwise create default state
         if isinstance(state_or_server, DatabricksStubState):
             self._state = state_or_server
         else:
-            # Being called with real connection args (server_hostname, http_path, access_token, ...)
-            # Create a default state
             self._state = DatabricksStubState()
         self._closed = False
 
@@ -151,7 +124,6 @@ class _DatabricksConnection:
 
 
 def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str = "benchbox") -> DatabricksStubState:
-    """Install a databricks.sql stub returning the fake connection."""
 
     state = DatabricksStubState(catalog=catalog, schema=schema)
 
@@ -179,7 +151,7 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
     sdk_module.WorkspaceClient = _WorkspaceClient
 
     root_module = types.ModuleType("databricks")
-    root_module.__path__ = []  # Mark as package
+    root_module.__path__ = []
     root_module.sql = sql_module
     root_module.sdk = sdk_module
 
@@ -190,7 +162,7 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
     monkeypatch.setitem(sys.modules, "databricks.sql", sql_module)
     monkeypatch.setitem(sys.modules, "databricks.sql.client", client_module)
 
-    try:  # Ensure adapter module sees the stubbed client
+    try:
         import benchbox.platforms.databricks.adapter as adapter_module
 
         adapter_module.databricks_sql = sql_module
@@ -199,10 +171,6 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# Google BigQuery / Cloud Storage stub implementation
 
 
 @dataclass
@@ -233,7 +201,6 @@ class _BigQueryQueryJob:
             table_fragment = sql[from_index + len("from") :].strip().strip("`")
             table_name = table_fragment.split(".")[-1].split()[0].upper()
             return [(self._state.row_counts.get(table_name, 0),)]
-        # Schema DDL queries return empty iterable
         return []
 
 
@@ -261,7 +228,6 @@ class _BigQueryClient:
         self._state = BigQueryStubState(project, location)
         self._storage_client: _StorageClient | None = None
 
-    # Expose state for tests
     @property
     def state(self) -> BigQueryStubState:
         return self._state
@@ -291,7 +257,7 @@ class _BigQueryClient:
         return _BigQueryQueryJob(self._state, sql)
 
     def load_table_from_uri(self, uri: str, table_ref: str, job_config: Any) -> _BigQueryLoadJob:
-        _ = job_config  # job config not used in stub
+        _ = job_config
         return _BigQueryLoadJob(self._state, table_ref, uri)
 
 
@@ -360,17 +326,16 @@ class QueryPriority:
 
 
 class NotFound(Exception):
-    """Stubbed NotFound exception."""
+    pass
 
 
 class Conflict(Exception):
-    """Stubbed Conflict exception."""
+    pass
 
 
 def install_google_cloud_stubs(
     monkeypatch, *, project_id: str = "smoke-project", location: str = "US"
 ) -> BigQueryStubState:
-    """Install google.cloud.bigquery and storage stubs."""
 
     client = _BigQueryClient(project_id, location)
     client._storage_client = _StorageClient(client.state)
@@ -423,16 +388,11 @@ def install_google_cloud_stubs(
         monkeypatch.setattr(adapter_module, "storage", storage_module)
         monkeypatch.setattr(adapter_module, "NotFound", NotFound)
         monkeypatch.setattr(adapter_module, "Conflict", Conflict, raising=False)
-        # Patch google_auth reference so _load_credentials works with stubs
         monkeypatch.setattr(adapter_module, "google_auth", auth_module)
     except ImportError:  # pragma: no cover - defensive
         pass
 
     return client.state
-
-
-# ---------------------------------------------------------------------------
-# Redshift stub implementation
 
 
 @dataclass
@@ -461,9 +421,7 @@ class _RedshiftCursor:
         elif "select count(*)" in lowered:
             from_index = lowered.find("from")
             table_fragment = sql[from_index + len("from") :].strip().strip('"')
-            # Extract table name, handling schema-qualified names (e.g., "public.lineitem" -> "lineitem")
             table_with_schema = table_fragment.split()[0]
-            # If schema-qualified, take last part; otherwise use as-is
             table = table_with_schema.split(".")[-1].upper()
             self._results = [(self._state.row_counts.get(table, 0),)]
         elif lowered.startswith("copy "):
@@ -513,8 +471,6 @@ class _Boto3Client:
 
 
 class _RedshiftBoto3Session:
-    """Stub for boto3.Session used by Redshift's _create_s3_client."""
-
     def __init__(self, state: RedshiftStubState, **_: Any) -> None:
         self._state = state
 
@@ -524,14 +480,12 @@ class _RedshiftBoto3Session:
         raise ValueError(f"Unknown service: {service_name}")
 
     def get_credentials(self) -> object:
-        """Return a truthy sentinel so _create_s3_client does not raise."""
         return True
 
 
 def install_redshift_stubs(
     monkeypatch, *, host: str = "example.redshift.amazonaws.com", port: int = 5439
 ) -> RedshiftStubState:
-    """Install stubs for redshift_connector/psycopg and boto3."""
 
     state = RedshiftStubState(host=host, port=port)
 
@@ -565,18 +519,11 @@ def install_redshift_stubs(
     return state
 
 
-# ---------------------------------------------------------------------------
-# Snowflake stub implementation
-
-
 @dataclass
 class SnowflakeStubState:
     statements: list[str] = field(default_factory=list)
     put_commands: list[str] = field(default_factory=list)
     copy_commands: list[str] = field(default_factory=list)
-    # Tables start empty so the smoke exercises the upload path; a successful
-    # COPY fills the table (mirroring the adapter's idempotent-rerun skip,
-    # which bypasses the load when the target already holds rows).
     row_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -629,7 +576,6 @@ class _SnowflakeConnection:
 
 
 def install_snowflake_stub(monkeypatch) -> SnowflakeStubState:
-    """Install a snowflake.connector stub."""
 
     state = SnowflakeStubState()
 
@@ -656,16 +602,12 @@ def install_snowflake_stub(monkeypatch) -> SnowflakeStubState:
         import benchbox.platforms.snowflake as adapter_module
 
         adapter_module.snowflake = root_module
-        adapter_module.DictCursor = None  # Not used in smoke tests
+        adapter_module.DictCursor = None
         adapter_module.SnowflakeError = errors_module.Error
     except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# AWS Athena stub implementation
 
 
 @dataclass
@@ -688,7 +630,7 @@ class _AthenaCursor:
         self._state = state
         self._results: list[tuple[Any, ...]] = []
         self.query_id = "stub-query-id-12345"
-        self.data_scanned_in_bytes = 1024 * 1024  # 1 MB
+        self.data_scanned_in_bytes = 1024 * 1024
 
     def execute(self, sql: str) -> None:
         self._state.statements.append(sql)
@@ -699,13 +641,11 @@ class _AthenaCursor:
         elif lowered.startswith("select version"):
             self._results = [("Athena engine version 3",)]
         elif "select count(*)" in lowered:
-            # Extract table name from query
             from_index = lowered.find("from")
             table_fragment = sql[from_index + len("from") :].strip()
             table_name = table_fragment.split()[0].upper()
             self._results = [(self._state.row_counts.get(table_name, 0),)]
         elif lowered.startswith("create external table"):
-            # Track table creation
             import re
 
             match = re.search(r"create\s+external\s+table\s+(?:if\s+not\s+exists\s+)?(\S+)", lowered)
@@ -743,7 +683,7 @@ class _AthenaConnection:
 
 
 class _EntityNotFoundError(Exception):
-    """Stub for Glue EntityNotFoundException."""
+    pass
 
 
 class _GluePaginator:
@@ -759,8 +699,6 @@ class _GlueExceptions:
 
 
 class _GlueClient:
-    """Stub for boto3 Glue client."""
-
     def __init__(self, state: AthenaStubState) -> None:
         self._state = state
         self._databases: set[str] = set()
@@ -791,8 +729,6 @@ class _GlueClient:
 
 
 class _S3Client:
-    """Stub for boto3 S3 client."""
-
     def __init__(self, state: AthenaStubState) -> None:
         self._state = state
 
@@ -801,8 +737,6 @@ class _S3Client:
 
 
 class _Boto3Session:
-    """Stub for boto3.Session."""
-
     def __init__(self, state: AthenaStubState, **_: Any) -> None:
         self._state = state
 
@@ -821,14 +755,12 @@ def install_athena_stubs(
     workgroup: str = "primary",
     s3_bucket: str = "benchbox-smoke",
 ) -> AthenaStubState:
-    """Install stubs for pyathena and boto3 (Glue/S3)."""
 
     state = AthenaStubState(region=region, workgroup=workgroup, s3_bucket=s3_bucket)
 
     def athena_connect(**params: Any) -> _AthenaConnection:
         return _AthenaConnection(state, **params)
 
-    # Create pyathena module stub
     pyathena_module = types.ModuleType("pyathena")
     pyathena_module.connect = athena_connect
     pyathena_module.__version__ = "3.0.0"
@@ -836,7 +768,6 @@ def install_athena_stubs(
     cursor_module = types.ModuleType("pyathena.cursor")
     cursor_module.Cursor = _AthenaCursor
 
-    # Create boto3 module stub
     boto3_module = types.ModuleType("boto3")
     boto3_module.Session = lambda **kwargs: _Boto3Session(state, **kwargs)
     boto3_module.client = lambda service, **kwargs: _Boto3Session(state).client(service, **kwargs)
@@ -844,11 +775,9 @@ def install_athena_stubs(
     monkeypatch.setitem(sys.modules, "pyathena", pyathena_module)
     monkeypatch.setitem(sys.modules, "pyathena.cursor", cursor_module)
     monkeypatch.setitem(sys.modules, "boto3", boto3_module)
-    # The adapter's credential check reads the environment and ~/.aws; the stubs own both.
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "athena-stub-access-key")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "athena-stub-secret-key")
 
-    # Patch the adapter module to use our stubs
     try:
         import benchbox.platforms.athena as adapter_module
 
@@ -859,10 +788,6 @@ def install_athena_stubs(
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# ClickHouse stub implementation
 
 
 @dataclass
@@ -932,7 +857,6 @@ def install_clickhouse_stub(
     host: str = "localhost",
     port: int = 9000,
 ) -> ClickHouseStubState:
-    """Install clickhouse-driver stub."""
 
     state = ClickHouseStubState(host=host, port=port)
 
@@ -977,10 +901,6 @@ def install_clickhouse_stub(
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# Trino stub implementation
 
 
 @dataclass
@@ -1048,13 +968,12 @@ def install_trino_stub(
     port: int = 8080,
     catalog: str = "memory",
 ) -> TrinoStubState:
-    """Install trino stub."""
 
     state = TrinoStubState(host=host, port=port, catalog=catalog)
 
     def connect(**params: Any) -> _TrinoConnection:
         conn = _TrinoConnection(state, **params)
-        conn._state = state  # Expose state for test verification
+        conn._state = state
         return conn
 
     trino_module = types.ModuleType("trino")
@@ -1085,10 +1004,6 @@ def install_trino_stub(
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# Presto stub implementation
 
 
 @dataclass
@@ -1156,13 +1071,12 @@ def install_presto_stub(
     port: int = 8080,
     catalog: str = "memory",
 ) -> PrestoStubState:
-    """Install prestodb stub."""
 
     state = PrestoStubState(host=host, port=port, catalog=catalog)
 
     def connect(**params: Any) -> _PrestoConnection:
         conn = _PrestoConnection(state, **params)
-        conn._state = state  # Expose state for test verification
+        conn._state = state
         return conn
 
     prestodb_module = types.ModuleType("prestodb")
@@ -1193,10 +1107,6 @@ def install_presto_stub(
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# PostgreSQL stub implementation
 
 
 @dataclass
@@ -1277,13 +1187,12 @@ def install_postgresql_stub(
     port: int = 5432,
     database: str = "benchbox",
 ) -> PostgreSQLStubState:
-    """Install psycopg stub."""
 
     state = PostgreSQLStubState(host=host, port=port, database=database)
 
     def connect(**params: Any) -> _PostgreSQLConnection:
         conn = _PostgreSQLConnection(state, **params)
-        conn._state = state  # Expose state for test verification
+        conn._state = state
         return conn
 
     psycopg_module = types.ModuleType("psycopg")
@@ -1337,10 +1246,6 @@ __all__ = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# InfluxDB stub implementation
-
-
 @dataclass
 class InfluxDBStubState:
     host: str = "localhost"
@@ -1355,18 +1260,14 @@ class InfluxDBStubState:
 
 
 class _InfluxDBStubClient:
-    """Stub for influxdb3-python InfluxDBClient3."""
-
     def __init__(self, state: InfluxDBStubState, **kwargs: Any) -> None:
         self._state = state
         self._kwargs = kwargs
 
     def query(self, sql: str) -> Any:
-        """Return stub Arrow table-like object."""
         self._state.statements.append(sql)
         lowered = sql.strip().lower()
 
-        # Create mock PyArrow Table-like response
         class MockTable:
             def __init__(self, data: dict[str, list[Any]], num_rows: int):
                 self._data = data
@@ -1378,8 +1279,6 @@ class _InfluxDBStubClient:
         if lowered == "select 1":
             return MockTable({"result": [1]}, 1)
         elif "count(*)" in lowered:
-            # Extract table name for count queries (handles quoted names like FROM "cpu")
-            # Remove quotes for matching
             normalized = lowered.replace('"', "")
             if "from cpu" in normalized:
                 return MockTable({"count": [self._state.row_counts.get("cpu", 0)]}, 1)
@@ -1392,7 +1291,6 @@ class _InfluxDBStubClient:
             return MockTable({}, 0)
 
     def write(self, data: str, write_precision: str = "ns") -> None:
-        """Record write operation."""
         self._state.writes.append(data)
 
     def close(self) -> None:
@@ -1408,18 +1306,14 @@ def install_influxdb_stub(
     database: str = "benchbox",
     mode: str = "core",
 ) -> InfluxDBStubState:
-    """Install influxdb3-python stub."""
 
     state = InfluxDBStubState(host=host, port=port, token=token, database=database, mode=mode)
 
-    # Create stub module
     influxdb3_module = types.ModuleType("influxdb3")
     influxdb3_module.InfluxDBClient3 = lambda **kwargs: _InfluxDBStubClient(state, **kwargs)
 
-    # Install in sys.modules before any imports
     monkeypatch.setitem(sys.modules, "influxdb3", influxdb3_module)
 
-    # Patch the _dependencies module - critical for adapter availability check
     import benchbox.platforms.influxdb._dependencies as deps_module
 
     monkeypatch.setattr(deps_module, "INFLUXDB3_AVAILABLE", True)
@@ -1427,14 +1321,12 @@ def install_influxdb_stub(
     monkeypatch.setattr(deps_module, "INFLUXDB_AVAILABLE", True)
     monkeypatch.setattr(deps_module, "InfluxDBClient3", lambda **kwargs: _InfluxDBStubClient(state, **kwargs))
 
-    # Also patch the main __init__ module which re-exports these
     import benchbox.platforms.influxdb as influxdb_module
 
     monkeypatch.setattr(influxdb_module, "INFLUXDB_AVAILABLE", True)
     monkeypatch.setattr(influxdb_module, "INFLUXDB3_AVAILABLE", True)
     monkeypatch.setattr(influxdb_module, "FLIGHTSQL_AVAILABLE", False)
 
-    # Patch check_platform_dependencies to return True for influxdb
     import benchbox.utils.dependencies as dep_utils
 
     original_check = dep_utils.check_platform_dependencies
@@ -1446,12 +1338,10 @@ def install_influxdb_stub(
 
     monkeypatch.setattr(dep_utils, "check_platform_dependencies", patched_check)
 
-    # Also need to patch the adapter module directly since it imports the flag
     import benchbox.platforms.influxdb.adapter as adapter_module
 
     monkeypatch.setattr(adapter_module, "INFLUXDB_AVAILABLE", True)
 
-    # Patch the client module which also checks availability during connect()
     import benchbox.platforms.influxdb.client as client_module
 
     monkeypatch.setattr(client_module, "INFLUXDB3_AVAILABLE", True)
@@ -1461,15 +1351,8 @@ def install_influxdb_stub(
     return state
 
 
-# ---------------------------------------------------------------------------
-# Cloud Spark adapter stubs (Athena Spark, EMR Serverless, Dataproc, Dataproc Serverless)
-# These adapters use session-based/batch-based execution, not traditional SQL connections.
-
-
 @dataclass
 class CloudSparkStubState:
-    """Shared state for cloud Spark adapter stubs."""
-
     project_id: str = "smoke-project"
     region: str = "us-east-1"
     bucket: str = "benchbox-smoke"
@@ -1487,8 +1370,6 @@ class CloudSparkStubState:
 
 
 class _CloudSparkAthenaClient:
-    """Stub for boto3 Athena client (Spark sessions)."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
@@ -1527,8 +1408,6 @@ class _CloudSparkAthenaClient:
 
 
 class _CloudSparkEMRServerlessClient:
-    """Stub for boto3 EMR Serverless client."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
@@ -1561,22 +1440,19 @@ class _CloudSparkEMRServerlessClient:
 
 
 class _CloudSparkDataprocBatchClient:
-    """Stub for google.cloud.dataproc_v1.BatchControllerClient."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
     def create_batch(self, **kwargs: Any) -> Any:
         self._state.batches_submitted.append(kwargs)
 
-        # Return a mock operation that resolves immediately
         class MockOperation:
             def __init__(self, state: CloudSparkStubState):
                 self._state = state
 
             def result(self, timeout: int | None = None) -> Any:
                 class MockBatch:
-                    state = 4  # SUCCEEDED
+                    state = 4
                     runtime_info = type("RuntimeInfo", (), {"endpoints": {}})()
 
                 return MockBatch()
@@ -1585,15 +1461,13 @@ class _CloudSparkDataprocBatchClient:
 
     def get_batch(self, name: str) -> Any:
         class MockBatch:
-            state = 4  # SUCCEEDED
+            state = 4
             runtime_info = type("RuntimeInfo", (), {"endpoints": {}})()
 
         return MockBatch()
 
 
 class _CloudSparkDataprocJobClient:
-    """Stub for google.cloud.dataproc_v1.JobControllerClient."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
@@ -1606,7 +1480,7 @@ class _CloudSparkDataprocJobClient:
 
             def result(self, timeout: int | None = None) -> Any:
                 class MockJob:
-                    status = type("Status", (), {"state": 4})()  # DONE
+                    status = type("Status", (), {"state": 4})()
                     reference = type("Reference", (), {"job_id": f"job-{len(self._state.jobs_submitted)}"})()
                     driver_output_resource_uri = f"gs://{self._state.bucket}/output"
 
@@ -1616,14 +1490,12 @@ class _CloudSparkDataprocJobClient:
 
     def get_job(self, **kwargs: Any) -> Any:
         class MockJob:
-            status = type("Status", (), {"state": 4})()  # DONE
+            status = type("Status", (), {"state": 4})()
 
         return MockJob()
 
 
 class _CloudSparkGCSClient:
-    """Stub for google.cloud.storage.Client."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
@@ -1661,8 +1533,6 @@ class _CloudSparkGCSClient:
 
 
 class _CloudSparkS3Client:
-    """Stub for boto3 S3 client (for cloud Spark adapters)."""
-
     def __init__(self, state: CloudSparkStubState):
         self._state = state
 
@@ -1696,11 +1566,9 @@ def install_athena_spark_stub(
     workgroup: str = "spark-workgroup",
     s3_bucket: str = "benchbox-smoke",
 ) -> CloudSparkStubState:
-    """Install stubs for Athena Spark adapter (boto3 Athena + S3)."""
 
     state = CloudSparkStubState(region=region, bucket=s3_bucket)
 
-    # Create boto3 client factory
     def make_client(service: str, **kwargs: Any) -> Any:
         if service == "athena":
             return _CloudSparkAthenaClient(state)
@@ -1713,13 +1581,11 @@ def install_athena_spark_stub(
 
     monkeypatch.setitem(sys.modules, "boto3", boto3_module)
 
-    # Patch the adapter module
     import benchbox.platforms.aws.athena_spark_adapter as adapter_module
 
     monkeypatch.setattr(adapter_module, "BOTO3_AVAILABLE", True)
     monkeypatch.setattr(adapter_module, "boto3", boto3_module)
 
-    # Patch dependency check
     import benchbox.utils.dependencies as dep_utils
 
     original_check = dep_utils.check_platform_dependencies
@@ -1741,7 +1607,6 @@ def install_emr_serverless_stub(
     s3_bucket: str = "benchbox-smoke",
     application_id: str = "app-12345",
 ) -> CloudSparkStubState:
-    """Install stubs for EMR Serverless adapter (boto3 EMR Serverless + S3)."""
 
     state = CloudSparkStubState(region=region, bucket=s3_bucket, application_id=application_id)
 
@@ -1784,16 +1649,13 @@ def install_dataproc_stub(
     gcs_bucket: str = "benchbox-smoke",
     cluster_name: str = "benchbox-cluster",
 ) -> CloudSparkStubState:
-    """Install stubs for Dataproc adapter (google.cloud.dataproc_v1 + storage)."""
 
     state = CloudSparkStubState(project_id=project_id, region=region, bucket=gcs_bucket, cluster_name=cluster_name)
 
-    # Create dataproc_v1 module stubs
     dataproc_v1_module = types.ModuleType("google.cloud.dataproc_v1")
     dataproc_v1_module.JobControllerClient = lambda: _CloudSparkDataprocJobClient(state)
-    dataproc_v1_module.ClusterControllerClient = lambda: None  # Not used in smoke tests
+    dataproc_v1_module.ClusterControllerClient = lambda: None
 
-    # Job state enum
     class JobState:
         PENDING = 1
         RUNNING = 2
@@ -1806,7 +1668,6 @@ def install_dataproc_stub(
     storage_module = types.ModuleType("google.cloud.storage")
     storage_module.Client = lambda project=None, credentials=None: _CloudSparkGCSClient(state)
 
-    # Create module hierarchy
     cloud_module = types.ModuleType("google.cloud")
     cloud_module.__path__ = []
     cloud_module.dataproc_v1 = dataproc_v1_module
@@ -1848,15 +1709,12 @@ def install_dataproc_serverless_stub(
     region: str = "us-central1",
     gcs_bucket: str = "benchbox-smoke",
 ) -> CloudSparkStubState:
-    """Install stubs for Dataproc Serverless adapter (google.cloud.dataproc_v1 + storage)."""
 
     state = CloudSparkStubState(project_id=project_id, region=region, bucket=gcs_bucket)
 
-    # Create dataproc_v1 module stubs
     dataproc_v1_module = types.ModuleType("google.cloud.dataproc_v1")
     dataproc_v1_module.BatchControllerClient = lambda: _CloudSparkDataprocBatchClient(state)
 
-    # Batch state enum
     class BatchState:
         PENDING = 1
         RUNNING = 2
@@ -1904,10 +1762,6 @@ def install_dataproc_serverless_stub(
     monkeypatch.setattr(dep_utils, "check_platform_dependencies", patched_check)
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# StarRocks stub implementation
 
 
 @dataclass
@@ -2002,7 +1856,6 @@ def install_starrocks_stub(
     host: str = "localhost",
     port: int = 9030,
 ) -> StarRocksStubState:
-    """Install pymysql stub for StarRocks adapter testing."""
 
     state = StarRocksStubState(host=host, port=port)
 
@@ -2046,10 +1899,6 @@ def install_starrocks_stub(
     return state
 
 
-# ---------------------------------------------------------------------------
-# Databend stub implementation
-
-
 @dataclass
 class DatabendStubState:
     host: str = "localhost"
@@ -2061,8 +1910,6 @@ class DatabendStubState:
 
 
 class _DatabendRow:
-    """Stub row object returned by Databend driver queries."""
-
     def __init__(self, data: tuple[Any, ...]):
         self._data = data
 
@@ -2071,8 +1918,6 @@ class _DatabendRow:
 
 
 class _DatabendBlockingClient:
-    """Stub for databend_driver.BlockingDatabendClient."""
-
     def __init__(self, dsn: str, state: DatabendStubState):
         self._dsn = dsn
         self._state = state
@@ -2133,7 +1978,6 @@ def install_databend_stub(
     host: str = "localhost",
     port: int = 8000,
 ) -> DatabendStubState:
-    """Install databend_driver stub for Databend adapter testing."""
 
     state = DatabendStubState(host=host, port=port)
 
@@ -2146,17 +1990,12 @@ def install_databend_stub(
 
     monkeypatch.setitem(sys.modules, "databend_driver", driver_module)
 
-    # Patch the adapter module's import state
     import benchbox.platforms.databend.adapter as adapter_module
 
     monkeypatch.setattr(adapter_module, "DATABEND_AVAILABLE", True)
     monkeypatch.setattr(adapter_module, "databend_driver", driver_module)
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# Apache Doris stub implementation
 
 
 @dataclass
@@ -2248,7 +2087,6 @@ def install_doris_stub(
     host: str = "localhost",
     port: int = 9030,
 ) -> DorisStubState:
-    """Install pymysql stub for Apache Doris adapter testing."""
 
     state = DorisStubState(host=host, port=port)
 
@@ -2277,21 +2115,15 @@ def install_doris_stub(
     monkeypatch.setitem(sys.modules, "pymysql.cursors", cursors_module)
     monkeypatch.setitem(sys.modules, "pymysql.err", err_module)
 
-    # Patch the adapter module to use our stubs
     try:
         import benchbox.platforms.doris as adapter_module
 
         adapter_module.pymysql = pymysql_module
-        # Disable requests so load_data uses INSERT fallback (testable without HTTP)
         adapter_module._requests = None
     except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
-
-
-# ---------------------------------------------------------------------------
-# LakeSail stub implementation
 
 
 @dataclass
@@ -2305,8 +2137,6 @@ class LakeSailStubState:
 
 
 class _LakeSailStubRow:
-    """Stub for a PySpark Row-like object."""
-
     def __init__(self, **kwargs: Any) -> None:
         self._values = list(kwargs.values())
         for key, value in kwargs.items():
@@ -2320,8 +2150,6 @@ class _LakeSailStubRow:
 
 
 class _LakeSailStubDataFrame:
-    """Stub for a PySpark DataFrame."""
-
     def __init__(self, data: list[dict[str, Any]] | None = None, schema: Any = None) -> None:
         self._data = data or []
         self._schema = schema
@@ -2391,8 +2219,6 @@ class _LakeSailStubDataFrame:
 
 
 class _LakeSailStubCatalog:
-    """Stub for SparkSession.catalog."""
-
     def __init__(self, state: LakeSailStubState) -> None:
         self._state = state
 
@@ -2407,8 +2233,6 @@ class _LakeSailStubCatalog:
 
 
 class _LakeSailStubReader:
-    """Stub for SparkSession.read."""
-
     def __init__(self, state: LakeSailStubState) -> None:
         self._state = state
         self._format = "csv"
@@ -2438,8 +2262,6 @@ class _LakeSailStubReader:
 
 
 class _LakeSailStubConf:
-    """Stub for SparkSession.conf."""
-
     def __init__(self) -> None:
         self._conf: dict[str, str] = {}
 
@@ -2451,8 +2273,6 @@ class _LakeSailStubConf:
 
 
 class _LakeSailStubSession:
-    """Stub for PySpark SparkSession connected via Spark Connect."""
-
     def __init__(self, state: LakeSailStubState) -> None:
         self._state = state
         self.catalog = _LakeSailStubCatalog(state)
@@ -2464,7 +2284,6 @@ class _LakeSailStubSession:
         return "3.5.0-sail"
 
     def table(self, table_name: str) -> _LakeSailStubDataFrame:
-        """Return a stub DataFrame for a table (used by SparkDataLoadMixin for schema inference)."""
         return _LakeSailStubDataFrame([{"col1": "value1"}])
 
     def sql(self, query: str) -> _LakeSailStubDataFrame:
@@ -2492,7 +2311,6 @@ class _LakeSailStubSession:
         ):
             return _LakeSailStubDataFrame()
         else:
-            # Default: return 2 rows for query execution
             return _LakeSailStubDataFrame([{"col1": "val1"}, {"col1": "val2"}])
 
     def stop(self) -> None:
@@ -2500,8 +2318,6 @@ class _LakeSailStubSession:
 
 
 class _LakeSailStubBuilder:
-    """Stub for SparkSession.builder with Spark Connect .remote() support."""
-
     def __init__(self, state: LakeSailStubState) -> None:
         self._state = state
 
@@ -2525,23 +2341,19 @@ def install_lakesail_stub(
     endpoint: str = "sc://localhost:50051",
     database: str = "benchbox_test",
 ) -> LakeSailStubState:
-    """Install stubs for LakeSail adapter (PySpark Spark Connect)."""
 
     state = LakeSailStubState(endpoint=endpoint, database=database)
 
-    # Create stub PySpark modules
     pyspark_module = types.ModuleType("pyspark")
     pyspark_module.__version__ = "3.5.0"
 
     pyspark_sql_module = types.ModuleType("pyspark.sql")
 
-    # Create SparkSession class with stub builder
     class StubSparkSession:
         builder = _LakeSailStubBuilder(state)
 
     pyspark_sql_module.SparkSession = StubSparkSession
 
-    # Create stub types module
     pyspark_types_module = types.ModuleType("pyspark.sql.types")
     for type_name in [
         "StructType",
@@ -2559,7 +2371,6 @@ def install_lakesail_stub(
     monkeypatch.setitem(sys.modules, "pyspark.sql", pyspark_sql_module)
     monkeypatch.setitem(sys.modules, "pyspark.sql.types", pyspark_types_module)
 
-    # Patch the adapter module
     try:
         import benchbox.platforms.lakesail as adapter_module
 
@@ -2576,10 +2387,6 @@ def install_lakesail_stub(
         ]:
             setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
 
-        # Make the adapter think the server is reachable so tests skip the
-        # real TCP connection and pysail import checks.
-        # The adapter calls is_spark_connect_reachable from _spark_helpers, which
-        # the lakesail module imports by name - patch that imported name.
         monkeypatch.setattr(
             adapter_module,
             "is_spark_connect_reachable",
@@ -2588,7 +2395,6 @@ def install_lakesail_stub(
     except ImportError:  # pragma: no cover
         pass
 
-    # Patch dependency check
     try:
         import benchbox.utils.dependencies as dep_utils
 

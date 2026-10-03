@@ -1,37 +1,4 @@
 #!/usr/bin/env python3
-"""Decide whether the develop tip is already covered before an hourly sweep.
-
-The ``schedule`` trigger in ``develop-post-merge.yml`` exists to cover
-dropped push events, but most sweeps re-run the slim gates on a tip SHA
-that a per-push run already gated. A tip is *covered* when EITHER of the
-following holds:
-
-1. A ``develop-post-merge.yml`` run with event ``push`` and ``head_sha``
-   exactly equal to the tip reached a terminal conclusion of ``success``.
-   Failed, cancelled, startup-failed, missing, or still-running runs are NOT
-   coverage; the sweep runs the gates again.
-2. The tip is queue-certified under the exact rule in ci-dedupe-01
-   (:func:`queue_certification.find_certifying_run` with a push-to-develop
-   event/ref): the merge queue already passed this exact SHA.
-
-Nothing else counts: no tree matching, no ``schedule``-run evidence, no
-parent inheritance.
-
-Fail-open by design: any API error, pagination gap, missing permission,
-ambiguous match, or timeout reports ``covered=false`` with a reason, and
-the process still exits 0 so the lookup can never red a workflow on its
-own. Callers gate the sweep gates on ``covered == 'true'`` and run the
-full gates otherwise.
-
-The event gate lives HERE, not in a workflow ``if:``: downstream jobs
-read this lookup's outputs on every event, and references to a skipped
-job's outputs do not evaluate reliably. The sweep-coverage job therefore
-runs unconditionally and this script returns ``covered=false`` without
-any API call when the event is not ``schedule``.
-
-Stdlib-only (urllib, no ``gh`` dependency) so the lookup step needs no
-dependency sync; unit tests inject a fake ``urlopen``.
-"""
 
 from __future__ import annotations
 
@@ -88,14 +55,11 @@ API_BASE = "https://api.github.com"
 POST_MERGE_WORKFLOW_FILE = ".github/workflows/develop-post-merge.yml"
 REQUEST_TIMEOUT_SECONDS = 20
 
-# Terminal conclusions that prove the tip's gates actually executed. A
-# cancelled or startup_failure run never ran the gates to a verdict, so it
-# is not coverage; the sweep runs.
 COVERING_CONCLUSIONS = ("success",)
 
 
 class CoverageError(RuntimeError):
-    """The lookup could not complete; the caller must fail open."""
+    pass
 
 
 def _api_get(
@@ -145,7 +109,6 @@ def _find_covering_push_run(
     token: str,
     urlopen: Callable[..., Any],
 ) -> dict[str, Any]:
-    """Return ``{covered, covering_run_id, reason}`` from per-push runs."""
     candidates = sorted(
         _push_runs_for_sha(sha, repo, token, urlopen),
         key=lambda run: str(run.get("created_at") or ""),
@@ -183,7 +146,6 @@ def find_coverage(
     urlopen: Callable[..., Any] | None = None,
     event: str = "schedule",
 ) -> dict[str, Any]:
-    """Return ``{covered, covering_run_id, reason}``; never raises on lookup failure."""
     if event != "schedule":
         return {
             "covered": False,

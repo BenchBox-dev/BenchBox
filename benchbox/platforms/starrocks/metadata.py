@@ -1,20 +1,15 @@
-"""Metadata helpers for the StarRocks adapter."""
-
 from __future__ import annotations
 
 from typing import Any
 
 
 class StarRocksMetadataMixin:
-    """Provide metadata and configuration helpers for StarRocks."""
-
     @property
     def platform_name(self) -> str:
         return "StarRocks"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add StarRocks-specific CLI arguments."""
         sr_group = parser.add_argument_group("StarRocks Arguments")
         sr_group.add_argument(
             "--host",
@@ -54,11 +49,9 @@ class StarRocksMetadataMixin:
         )
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for StarRocks."""
         return "starrocks"
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get StarRocks platform information."""
         platform_info = {
             "platform_type": "starrocks",
             "platform_name": "StarRocks",
@@ -71,7 +64,6 @@ class StarRocksMetadataMixin:
             },
         }
 
-        # Get client library version
         try:
             from benchbox.platforms.starrocks._dependencies import pymysql as _pymysql
 
@@ -82,7 +74,6 @@ class StarRocksMetadataMixin:
         except (ImportError, AttributeError):
             platform_info["client_library_version"] = None
 
-        # Query server version if connection available
         if connection:
             try:
                 cursor = connection.cursor()

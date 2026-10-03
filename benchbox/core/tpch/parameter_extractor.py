@@ -1,15 +1,8 @@
-"""TPC-H parameter extraction from qgen binary output.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extracts substitution parameter values from qgen-generated SQL so that DataFrame
-query implementations can use identical parameters to their SQL counterparts for
-a given seed, scale factor, and stream combination.
+# TPC Benchmark(TM) H (TPC-H) - Copyright (c) Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) H (TPC-H) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,23 +18,6 @@ def extract_tpch_parameters(
     seed: int,
     scale_factor: float = 1.0,
 ) -> dict[int, dict[str, Any]]:
-    """Extract TPC-H substitution parameters from qgen output for all 22 queries.
-
-    Runs the qgen binary with the given seed/SF and parses the generated SQL
-    to extract parameter values. This is the authoritative source of truth
-    for TPC-H query parameters.
-
-    Args:
-        seed: Random number generator seed for parameter generation.
-        scale_factor: Scale factor for parameter calculations.
-
-    Returns:
-        Dict mapping query_id (1-22) to parameter dict. Each parameter dict
-        uses the same keys as TPCH_DEFAULT_PARAMS in dataframe_queries.py.
-
-    Raises:
-        RuntimeError: If qgen binary is not available.
-    """
     from benchbox.core.tpch.queries import QGenBinary
 
     qgen = QGenBinary()
@@ -59,11 +35,7 @@ def extract_tpch_parameters(
     return params
 
 
-# -- Per-query extraction functions ----------------------------------------
-
-
 def _extract_query_params(query_id: int, sql: str) -> dict[str, Any] | None:
-    """Dispatch to the appropriate extractor for a given query."""
     extractor = _EXTRACTORS.get(query_id)
     if extractor is None:
         return None
@@ -75,7 +47,6 @@ def _extract_query_params(query_id: int, sql: str) -> dict[str, Any] | None:
 
 
 def _q1(sql: str) -> dict[str, Any]:
-    # l_shipdate <= date '1998-12-01' - interval '68' day
     m = re.search(r"interval\s+'(\d+)'\s+day", sql, re.IGNORECASE)
     delta = int(m.group(1)) if m else 90
     cutoff = date(1998, 12, 1)
@@ -84,7 +55,6 @@ def _q1(sql: str) -> dict[str, Any]:
 
 
 def _q2(sql: str) -> dict[str, Any]:
-    # p_size = 38 and p_type like '%STEEL' and r_name = 'ASIA'
     size_m = re.search(r"p_size\s*=\s*(\d+)", sql)
     type_m = re.search(r"p_type\s+like\s+'%(\w+)'", sql, re.IGNORECASE)
     region_m = re.search(r"r_name\s*=\s*'([^']+)'", sql)
@@ -96,7 +66,6 @@ def _q2(sql: str) -> dict[str, Any]:
 
 
 def _q3(sql: str) -> dict[str, Any]:
-    # c_mktsegment = 'FURNITURE' and o_orderdate < date '1995-03-17'
     seg_m = re.search(r"c_mktsegment\s*=\s*'([^']+)'", sql)
     date_m = re.search(r"o_orderdate\s*<\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     order_date = _parse_date(date_m.group(1)) if date_m else date(1995, 3, 15)
@@ -107,16 +76,13 @@ def _q3(sql: str) -> dict[str, Any]:
 
 
 def _q4(sql: str) -> dict[str, Any]:
-    # o_orderdate >= date '1995-07-01'
     date_m = re.search(r"o_orderdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1993, 7, 1)
-    # End date is start + 3 months (interval in SQL)
     end_date = _add_months(start_date, 3)
     return {"start_date": start_date, "end_date": end_date}
 
 
 def _q5(sql: str) -> dict[str, Any]:
-    # r_name = 'AMERICA' and o_orderdate >= date '1993-01-01'
     region_m = re.search(r"r_name\s*=\s*'([^']+)'", sql)
     date_m = re.search(r"o_orderdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1994, 1, 1)
@@ -129,7 +95,6 @@ def _q5(sql: str) -> dict[str, Any]:
 
 
 def _q6(sql: str) -> dict[str, Any]:
-    # l_shipdate >= date '1993-01-01' ... l_discount between 0.07 - 0.01 and 0.07 + 0.01 ... l_quantity < 25
     date_m = re.search(r"l_shipdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     disc_m = re.search(r"l_discount\s+between\s+([\d.]+)\s*-\s*[\d.]+\s+and\s+([\d.]+)\s*\+", sql, re.IGNORECASE)
     qty_m = re.search(r"l_quantity\s*<\s*(\d+)", sql)
@@ -153,7 +118,6 @@ def _q6(sql: str) -> dict[str, Any]:
 
 
 def _q7(sql: str) -> dict[str, Any]:
-    # n1.n_name = 'MOZAMBIQUE' and n2.n_name = 'UNITED KINGDOM'
     m = re.search(r"n1\.n_name\s*=\s*'([^']+)'\s+and\s+n2\.n_name\s*=\s*'([^']+)'", sql, re.IGNORECASE)
     return {
         "nation1": m.group(1) if m else "FRANCE",
@@ -162,7 +126,6 @@ def _q7(sql: str) -> dict[str, Any]:
 
 
 def _q8(sql: str) -> dict[str, Any]:
-    # nation = 'MOZAMBIQUE' ... r_name = 'AFRICA' ... p_type = 'PROMO POLISHED TIN'
     nation_m = re.search(r"when\s+nation\s*=\s*'([^']+)'", sql, re.IGNORECASE)
     region_m = re.search(r"r_name\s*=\s*'([^']+)'", sql)
     type_m = re.search(r"p_type\s*=\s*'([^']+)'", sql)
@@ -174,13 +137,11 @@ def _q8(sql: str) -> dict[str, Any]:
 
 
 def _q9(sql: str) -> dict[str, Any]:
-    # p_name like '%thistle%'
     m = re.search(r"p_name\s+like\s+'%([^%]+)%'", sql, re.IGNORECASE)
     return {"color": m.group(1) if m else "green"}
 
 
 def _q10(sql: str) -> dict[str, Any]:
-    # o_orderdate >= date '1993-11-01'
     date_m = re.search(r"o_orderdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1993, 10, 1)
     end_date = _add_months(start_date, 3)
@@ -188,7 +149,6 @@ def _q10(sql: str) -> dict[str, Any]:
 
 
 def _q11(sql: str) -> dict[str, Any]:
-    # n_name = 'JAPAN' ... sum(...) * 0.0001000000
     nation_m = re.search(r"n_name\s*=\s*'([^']+)'", sql)
     frac_m = re.search(r"\*\s*([\d.]+)\s*$", sql, re.MULTILINE)
     return {
@@ -198,7 +158,6 @@ def _q11(sql: str) -> dict[str, Any]:
 
 
 def _q12(sql: str) -> dict[str, Any]:
-    # l_shipmode in ('FOB', 'REG AIR') ... l_receiptdate >= date '1993-01-01'
     modes_m = re.search(r"l_shipmode\s+in\s+\('([^']+)',\s*'([^']+)'\)", sql, re.IGNORECASE)
     date_m = re.search(r"l_receiptdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1994, 1, 1)
@@ -212,7 +171,6 @@ def _q12(sql: str) -> dict[str, Any]:
 
 
 def _q13(sql: str) -> dict[str, Any]:
-    # o_comment not like '%special%packages%'
     m = re.search(r"o_comment\s+not\s+like\s+'%([^%]+)%([^%]+)%'", sql, re.IGNORECASE)
     return {
         "word1": m.group(1) if m else "special",
@@ -221,7 +179,6 @@ def _q13(sql: str) -> dict[str, Any]:
 
 
 def _q14(sql: str) -> dict[str, Any]:
-    # l_shipdate >= date '1993-04-01'
     date_m = re.search(r"l_shipdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1995, 9, 1)
     end_date = _add_months(start_date, 1)
@@ -229,7 +186,6 @@ def _q14(sql: str) -> dict[str, Any]:
 
 
 def _q15(sql: str) -> dict[str, Any]:
-    # l_shipdate >= date '1995-07-01'
     date_m = re.search(r"l_shipdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
     start_date = _parse_date(date_m.group(1)) if date_m else date(1996, 1, 1)
     end_date = _add_months(start_date, 3)
@@ -237,7 +193,6 @@ def _q15(sql: str) -> dict[str, Any]:
 
 
 def _q16(sql: str) -> dict[str, Any]:
-    # p_brand <> 'Brand#41' and p_type not like 'MEDIUM BURNISHED%' and p_size in (4, 22, ...)
     brand_m = re.search(r"p_brand\s*<>\s*'([^']+)'", sql)
     type_m = re.search(r"p_type\s+not\s+like\s+'([^%]+)%'", sql, re.IGNORECASE)
     sizes_m = re.search(r"p_size\s+in\s+\(([^)]+)\)", sql, re.IGNORECASE)
@@ -250,7 +205,6 @@ def _q16(sql: str) -> dict[str, Any]:
 
 
 def _q17(sql: str) -> dict[str, Any]:
-    # p_brand = 'Brand#12' and p_container = 'SM BAG'
     brand_m = re.search(r"p_brand\s*=\s*'([^']+)'", sql)
     container_m = re.search(r"p_container\s*=\s*'([^']+)'", sql)
     return {
@@ -260,13 +214,11 @@ def _q17(sql: str) -> dict[str, Any]:
 
 
 def _q18(sql: str) -> dict[str, Any]:
-    # sum(l_quantity) > 313
     m = re.search(r"sum\(l_quantity\)\s*>\s*(\d+)", sql)
     return {"quantity_threshold": int(m.group(1)) if m else 300}
 
 
 def _q19(sql: str) -> dict[str, Any]:
-    # Three brand/quantity groups
     brands = re.findall(r"p_brand\s*=\s*'([^']+)'", sql)
     quantities = re.findall(r"l_quantity\s*>=\s*(\d+)", sql)
     return {
@@ -280,7 +232,6 @@ def _q19(sql: str) -> dict[str, Any]:
 
 
 def _q20(sql: str) -> dict[str, Any]:
-    # p_name like 'ivory%' ... n_name = 'KENYA' ... l_shipdate >= date '1996-01-01'
     color_m = re.search(r"p_name\s+like\s+'([^%]+)%'", sql, re.IGNORECASE)
     nation_m = re.search(r"n_name\s*=\s*'([^']+)'", sql)
     date_m = re.search(r"l_shipdate\s*>=\s*date\s+'(\d{4}-\d{2}-\d{2})'", sql)
@@ -295,13 +246,11 @@ def _q20(sql: str) -> dict[str, Any]:
 
 
 def _q21(sql: str) -> dict[str, Any]:
-    # n_name = 'PERU'
     m = re.search(r"n_name\s*=\s*'([^']+)'", sql)
     return {"nation_name": m.group(1) if m else "SAUDI ARABIA"}
 
 
 def _q22(sql: str) -> dict[str, Any]:
-    # substring(c_phone from 1 for 2) in ('24', '33', '31', '10', '15', '28', '23')
     m = re.search(r"for\s+2\)\s+in\s*\n?\s*\(([^)]+)\)", sql, re.IGNORECASE)
     if m:
         codes = re.findall(r"'(\d+)'", m.group(1))
@@ -310,17 +259,12 @@ def _q22(sql: str) -> dict[str, Any]:
     return {"country_codes": codes}
 
 
-# -- Helpers ---------------------------------------------------------------
-
-
 def _parse_date(s: str) -> date:
-    """Parse YYYY-MM-DD date string."""
     parts = s.split("-")
     return date(int(parts[0]), int(parts[1]), int(parts[2]))
 
 
 def _add_months(d: date, months: int) -> date:
-    """Add months to a date (day stays the same)."""
     month = d.month + months
     year = d.year + (month - 1) // 12
     month = (month - 1) % 12 + 1
@@ -328,11 +272,8 @@ def _add_months(d: date, months: int) -> date:
 
 
 def _add_years(d: date, years: int) -> date:
-    """Add years to a date."""
     return date(d.year + years, d.month, d.day)
 
-
-# -- Extractor dispatch table ---------------------------------------------
 
 _EXTRACTORS: dict[int, Any] = {
     1: _q1,
@@ -360,8 +301,6 @@ _EXTRACTORS: dict[int, Any] = {
 }
 
 
-# -- Cache -----------------------------------------------------------------
-
 _cache: dict[tuple[int, float], dict[int, dict[str, Any]]] = {}
 
 
@@ -371,22 +310,6 @@ def get_tpch_extracted_parameters(
     *,
     use_cache: bool = True,
 ) -> dict[int, dict[str, Any]]:
-    """Get TPC-H parameters extracted from qgen, with caching.
-
-    This is the primary entry point. Results are cached per (seed, scale_factor)
-    to avoid redundant binary invocations during a benchmark run.
-
-    Args:
-        seed: Random number generator seed.
-        scale_factor: Scale factor for parameter calculations.
-        use_cache: Whether to use cached results.
-
-    Returns:
-        Dict mapping query_id (1-22) to parameter dict.
-
-    Raises:
-        RuntimeError: If qgen binary is not available.
-    """
     cache_key = (seed, scale_factor)
     if use_cache and cache_key in _cache:
         return _cache[cache_key]
@@ -398,5 +321,4 @@ def get_tpch_extracted_parameters(
 
 
 def clear_cache() -> None:
-    """Clear the parameter extraction cache."""
     _cache.clear()

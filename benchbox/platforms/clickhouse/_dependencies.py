@@ -1,5 +1,3 @@
-"""Optional dependencies for ClickHouse platform support."""
-
 from __future__ import annotations
 
 import importlib
@@ -22,7 +20,6 @@ chdb: ModuleType | None = None
 
 
 def _import_with_cwd_restore(module_name: str) -> ModuleType:
-    """Import an optional module without leaking a temporary working directory."""
     original_cwd = os.getcwd()
     try:
         return importlib.import_module(module_name)
@@ -31,14 +28,12 @@ def _import_with_cwd_restore(module_name: str) -> ModuleType:
 
 
 def import_chdb() -> ModuleType:
-    """Import chDB and restore the caller's cwd even when native loading fails."""
     global chdb
     chdb = _import_with_cwd_restore("chdb")
     return chdb
 
 
 def import_chdb_session() -> ModuleType:
-    """Import chDB's session module through the cwd-safe package import."""
     import_chdb()
     return _import_with_cwd_restore("chdb.session")
 

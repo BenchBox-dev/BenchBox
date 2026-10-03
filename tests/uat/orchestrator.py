@@ -1,14 +1,3 @@
-"""UAT sweep orchestrator: walks the YAML `phases:` list in order.
-
-`run_sweep` is the entry point for `make uat-sweep CONFIG=...`. It
-respects `dry_run:` (used by W10's structural-parity replay test).
-
-Sequential platform execution discipline (UAT W3 line 222 in
-_project/handoffs/results-explorer-uat-retrospective-20260502.md):
-phases run in serial; the execute phase iterates platforms in serial
-internally; no `parallel=True` knob anywhere.
-"""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -40,11 +29,6 @@ class SweepResult:
     aborted_phase: str | None
     abort_reason: str | None
     phase_exit_codes: dict[str, int]
-    # Additive: the raw per-phase results, threaded through so a single-phase
-    # caller (e.g. `make uat-execute`, which routes through this same phase
-    # loop -- see uat-execute-path-unification w2) can report the same detail
-    # `_handle_execute` used to build by hand, without re-deriving it. None
-    # when the corresponding phase did not run this sweep.
     preflight: Any = None
     execute_outcome: Any = None
 
@@ -65,55 +49,21 @@ CellRunner = Callable[..., CellResult]
 
 
 class DiskFloorAbort(RuntimeError):
-    """Raised when the mid-sweep free-space floor is crossed."""
-
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
 
 
 class SweepCancelled(KeyboardInterrupt):
-    """A sweep-process SIGTERM upgraded to a Ctrl-C-equivalent cancellation.
-
-    Subclasses `KeyboardInterrupt` so it rides the exact same unwinding path a
-    real Ctrl-C already took: the per-platform `finally` in `run_execute` tears
-    the Docker stack down, no finalize marker is written (so report/gate treat
-    the run as unfinished, not green), and the process exits nonzero
-    (uat-sweep-durability-and-signal-teardown w2).
-    """
-
     def __init__(self, signal_name: str) -> None:
         super().__init__(signal_name)
         self.signal_name = signal_name
 
 
-# Sentinel distinct from a real previous handler of None (SIG_DFL is not None,
-# but signal.getsignal can legitimately return None for a handler set outside
-# Python); used to mean "shim was never installed, do not restore".
 _SHIM_NOT_INSTALLED = object()
 
 
 def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -> object | None:
-    """Convert SIGTERM to `SweepCancelled` for the sweep process only (w2/w3).
-
-    Returns the previous SIGTERM handler to restore, or the not-installed
-    sentinel when the shim could not be installed (not running in the main
-    thread -- `signal.signal` raises there). Installing in the sweep's own
-    process does not touch cell subprocesses directly: `timeouts.py` owns
-    their process-group kill semantics via `run_with_timeout`'s own
-    `except BaseException` guard (with `Popen()` itself inside that guarded
-    `try`, see its docstring), which fires as `SweepCancelled` unwinds
-    through wherever `run_with_timeout` currently is -- including a blocked
-    `communicate()` call. Returning the sentinel (rather than raising) keeps
-    a sweep driven from a worker thread working with default SIGTERM
-    behavior; row durability does not depend on the shim, only the
-    orderly-teardown upgrade does.
-
-    The handler records the cancellation (signal name, phase in flight,
-    timestamp) to uat_lifecycle.log before raising (w3), so a killed sweep
-    leaves a durable breadcrumb of when and where it was cancelled -- written
-    from the handler because the phase loop never returns to do it.
-    """
 
     def _raise_cancelled(signum: int, _frame: object) -> None:
         signal_name = signal.Signals(signum).name
@@ -133,10 +83,6 @@ def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -
 def _restore_sweep_sigterm_shim(previous: object | None) -> None:
     if previous is _SHIM_NOT_INSTALLED:
         return
-    # A previous handler of None means SIGTERM was last set outside Python;
-    # `signal.signal(sig, None)` rejects that, so fall back to SIG_DFL rather
-    # than silently leaving our SweepCancelled-raising shim installed past the
-    # sweep. Restoring the default is the honest "no Python handler" state.
     restore_to = signal.SIG_DFL if previous is None else previous
     try:
         signal.signal(signal.SIGTERM, restore_to)  # type: ignore[arg-type]
@@ -145,7 +91,6 @@ def _restore_sweep_sigterm_shim(previous: object | None) -> None:
 
 
 def capture_run_source_info(repo_root: Path | None = None) -> RunSourceInfo:
-    """Capture source provenance once per sweep."""
     root = repo_root or Path(__file__).resolve().parents[2]
     commit_sha = _git_output(root, "rev-parse", "HEAD") or "unknown"
     commit_short_sha = _git_output(root, "rev-parse", "--short", "HEAD") or commit_sha[:12]
@@ -174,22 +119,6 @@ def _git_output(repo_root: Path, *args: str) -> str:
 
 
 def _cell_datagen_dir(benchmark_runs_dir: Path | str | None, benchmark: str, scale: float) -> Path | None:
-    """Return the datagen directory the cell's own CLI invocation will use.
-
-    `tests/uat/runner.py` always launches cells with
-    ``--output <benchmark_runs_dir>/datagen``, and the run command normalizes
-    that root with :func:`benchbox.utils.output_path.normalize_output_root`,
-    which appends ``<requested benchmark>_<sf>``. A custom ``--output`` takes
-    precedence over the shared-datagen resolution in
-    ``benchbox/cli/orchestrator.py``, so under UAT an alias workload does *not*
-    land in its canonical source's directory: ``read_primitives`` writes to
-    ``read_primitives_sf...``, not ``tpch_sf...``.
-
-    Reuse is therefore keyed by this resolved path rather than by the
-    registry's ``data_source``. Keying by the canonical source would merge two
-    directories UAT deliberately keeps apart and drop a reserve for data the
-    cell still has to generate.
-    """
     if benchmark_runs_dir is None:
         return None
     try:
@@ -202,18 +131,6 @@ def _cell_datagen_dir(benchmark_runs_dir: Path | str | None, benchmark: str, sca
 
 
 def _datagen_cache_complete(path: Path | None) -> bool:
-    """Report whether `path` holds a *finished, reusable* dataset.
-
-    Generators populate their output directory before writing
-    ``_datagen_manifest.json`` last, so a non-empty directory can be a
-    generation that died partway. Only the manifest proves the dataset is
-    complete enough for a later cell to reuse; anything short of it keeps the
-    full datagen reserve, which is the safe direction for a disk guard.
-
-    A present manifest whose datagen stamp is stale is likewise not reusable:
-    the cell regenerates (the automatic equivalent of ``--force`` datagen),
-    so the reserve stays intact.
-    """
     if path is None:
         return False
     try:
@@ -246,29 +163,6 @@ def _build_disk_floor_runner(
     benchmark_runs_dir: Path | str | None = None,
     datagen_cache_probe: Callable[[Path | None], bool] | None = None,
 ) -> CellRunner:
-    """Wrap a cell runner with predictive and post-cell disk checks.
-
-    The predictive check reserves the known lower-bound growth for the next
-    inventory-covered cell before handing it to the subprocess. It prevents a
-    large measured datagen/transient envelope from consuming the configured
-    floor between the existing post-cell observations. Unknown rows and
-    unmeasured database terms remain explicitly lower-bound predictions; the
-    post-cell floor is still the backstop for demand the inventory cannot see.
-
-    Datagen reuse is keyed by the datagen directory the cell will actually
-    write -- resolved from the sweep's own `benchmark_runs_dir`, the way the
-    cell's `--output` is resolved -- and counted only once that directory holds
-    a completed dataset. A rerun over existing data does not reserve growth it
-    will not create, while a cell that died before or during generation leaves
-    the next cell's reserve intact.
-
-    `cell_stream`, when provided, is called with each cell's result the moment
-    it completes -- the hook the durable sweep uses to append + fsync that row
-    to cells.jsonl immediately (uat-sweep-durability-and-signal-teardown w1),
-    so a mid-sweep process death keeps every completed cell's row instead of
-    losing the whole batch. It fires before the post-cell disk-floor check so
-    a row is on disk even when that check aborts the sweep.
-    """
 
     seen_datagen_dirs: set[Path] = set()
     read_free_space = free_space_reader or preflight_budget.free_space_gib
@@ -331,15 +225,6 @@ def _build_disk_floor_runner(
 
 
 def _record_container_engine_identity(log_dir: Path) -> str | None:
-    """Resolve + record the container engine identity at sweep start (uat-container-engine-routing w2).
-
-    Best-effort: a resolution failure (no compose-capable binary on PATH at
-    all) does not abort the sweep here -- a config with no Docker-managed
-    platforms never needs one, and one that does will fail loudly at its own
-    compose-up step with a clear DockerAssetError. Returns the resolved
-    binary name (for the accounting sidecar), or None when resolution
-    failed.
-    """
     try:
         binary, version = docker_assets.container_engine_identity()
     except docker_assets.DockerAssetError as exc:
@@ -355,15 +240,6 @@ def run_sweep(
     log_dir_override: Path | None = None,
     databases_root: Path | None = None,
 ) -> SweepResult:
-    """Orchestrate the YAML's `phases:` list. Returns SweepResult.
-
-    Installs a sweep-process SIGTERM shim (uat-sweep-durability-and-signal-teardown
-    w2) so an operator `kill` (or a CI cancellation) tears the Docker stack
-    down, records the cancellation (w3), and exits nonzero exactly like Ctrl-C,
-    then always restores the previous handler. The phase loop itself lives in
-    `_run_sweep_phases`; the split keeps that restore in a single, obvious
-    try/finally instead of threading it through every `break`.
-    """
     now = _dt.datetime.now()
     log_dir = log_dir_override or exec_phase.reserve_default_log_dir(config, now=now)
     benchmark_runs_dir = exec_phase.default_benchmark_runs_dir(config, now=now)
@@ -402,9 +278,6 @@ def _run_sweep_phases(  # noqa: C901
     source_info: RunSourceInfo,
     phase_holder: list[str | None],
 ) -> SweepResult:
-    """Walk the YAML `phases:` list. Split out of `run_sweep` so the SIGTERM
-    shim's restore lives in one try/finally there; this body is unchanged from
-    the pre-split loop except for recording the in-flight phase for w3."""
     phase_exit_codes: dict[str, int] = {}
     aborted_phase: str | None = None
     abort_reason: str | None = None
@@ -460,17 +333,7 @@ def _run_sweep_phases(  # noqa: C901
                 break
         elif phase == "execute":
             attempted_cells: list[CellResult] = []
-            # Load the inventory once for the pre-cell predictive guard. A
-            # malformed inventory is not allowed to disable the guard; the
-            # preflight phase already reports the same parse failure as a
-            # structured abort when it is present, while execute-only runs
-            # fail before launching a cell.
             predictive_budget_table = preflight_budget.load_budget_table() if config.disk_gate_enabled else None
-            # Stream each cell's row to cells.jsonl as it completes so a
-            # mid-sweep kill keeps the rows already earned (w1). The final
-            # atomic write_cells_jsonl below replaces this incrementally-grown
-            # file with identical authoritative content and adds the finalize
-            # marker; a kill before that leaves the streamed rows unfinalized.
             cell_stream_writer = cells_io.CellStreamWriter(cells_jsonl, source_info=source_info)
             execute_kwargs: dict[str, Any] = {
                 "log_dir": log_dir,
@@ -495,22 +358,7 @@ def _run_sweep_phases(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = exc.reason
-                # Hardcoded, and correct here: this except arm is reachable
-                # only from `_build_disk_floor_runner`'s mid-cell disk
-                # watch, which raises DiskFloorAbort and nothing else. The
-                # free-memory gate never lands here -- it returns an
-                # ExecuteOutcome carrying abort_kind="memory_floor",
-                # handled in the `execute_outcome.aborted` branch below.
                 abort_kind = "disk_floor"
-                # Synthesize an ExecuteOutcome from what run_execute had
-                # already accumulated before the abort propagated, instead
-                # of passing execute_outcome=None. The None path forced
-                # _emit_abort_artifacts to fall back to
-                # _compatibility_pruned_for_config, a second independent
-                # re-enumeration that can diverge from the one execute
-                # actually used. execute.py threads its real enumeration
-                # onto the exception (`exc.compatibility_pruned`)
-                # specifically so this constructor can use it directly.
                 execute_outcome = exec_phase.ExecuteOutcome(
                     phase="execute",
                     results=tuple(attempted_cells),
@@ -531,12 +379,6 @@ def _run_sweep_phases(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
-                    # The skipped-unreachable / startup-failed Cell objects
-                    # (not just their counts) are lost crossing the exception
-                    # boundary, so the synthesized outcome above always
-                    # carries empty collections -- override with the real
-                    # counts run_execute annotated the exception with, or the
-                    # abort report would under-count total_defined.
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                     startup_failed_count=getattr(exc, "startup_failed_count", 0),
                     died_mid_platform_count=getattr(exc, "died_mid_platform_count", 0),
@@ -641,10 +483,6 @@ def _run_sweep_phases(  # noqa: C901
                     container_engine=container_engine,
                 )
                 break
-            # Only passed cells are submission-ready. A failed official cell
-            # still exports a result JSON (runner.py resolves the path
-            # regardless of exit code), but packaging/submitting it would
-            # present a known-bad run as a candidate submission.
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path and r.status == "passed"]
             submissions_dir = exec_phase.default_submissions_dir(config, now=now)
             pr = run_package(
@@ -678,12 +516,6 @@ def _run_sweep_phases(  # noqa: C901
                 playwright_browsers=config.explorer_smoke.playwright_browsers,
             )
             phase_exit_codes[phase] = result.exit_code()
-            # Thread the ran/skipped distinction into the gate summary: an
-            # explorer_smoke skip is exit 0 by design (node/explorer absent),
-            # so the exit code alone cannot tell "browser coverage happened"
-            # from "browser coverage silently didn't" -- the release-gate
-            # aggregation (`make uat-gate-check`) enforces `ran` for stages
-            # whose `phases:` list includes explorer_smoke.
             if getattr(result, "skipped", False):
                 explorer_smoke_status = (
                     "skipped_no_node" if getattr(result, "skip_reason", None) == "node not on PATH" else "skipped"
@@ -691,16 +523,6 @@ def _run_sweep_phases(  # noqa: C901
             else:
                 explorer_smoke_status = gate_summary.EXPLORER_SMOKE_RAN
             if getattr(result, "skip_reason", None) == "node not on PATH":
-                # macOS operator machines legitimately lack `node` for
-                # non-explorer sweeps -- exit 0 stays, but the drop in
-                # browser coverage must be visible instead of a silent skip.
-                # Thread the status into the existing accounting sidecar
-                # (written by the execute phase, which always precedes
-                # explorer_smoke) rather than a second sidecar write; if no
-                # sidecar exists yet (e.g. a `phases:` list that runs
-                # explorer_smoke without execute), there is nothing durable
-                # to patch and the stderr warning is the only record -- see
-                # uat-fail-advance-consistency w2.
                 recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
                 if recorded:
                     print(
@@ -731,13 +553,6 @@ def _run_sweep_phases(  # noqa: C901
                 break
         elif phase == "report":
             if execute_outcome is None:
-                # Match validate/package: a report built with no execute
-                # phase in this sweep silently wrote an empty TSV and exited
-                # 0, which reads as a clean sweep -- see
-                # uat-fail-advance-consistency w1. Standalone `make
-                # uat-report` (tests/uat/_cli.py `_handle_report`) is a
-                # different entry point that reads an existing cells.jsonl
-                # directly and never reaches run_sweep, so it is unaffected.
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "report phase requires execute phase to have run"
@@ -754,15 +569,7 @@ def _run_sweep_phases(  # noqa: C901
                 break
             tsv_path = log_dir / config.report.matrix_summary_tsv
             cells = execute_outcome.results
-            # Wire validator status into the cross-scale check when a
-            # validate phase ran earlier in this sweep. Without this,
-            # cross_scale_clean_pair_count silently degrades to a
-            # passed-only check.
             validator_status_by_path = _validator_status_by_path(validator_rollup_tsv)
-            # Split registry drops out of the compatibility-rule bucket so the
-            # live report labels them under registry_pruned_count (matching the
-            # regenerated report, which reads the same split from the sidecar)
-            # -- uat-report-regen-prune-accounting w2.
             report_compat_pruned_count, report_registry_pruned_count = enumerate_phase.count_pruned_by_kind(
                 getattr(execute_outcome, "compatibility_pruned", ())
             )
@@ -783,16 +590,6 @@ def _run_sweep_phases(  # noqa: C901
             report_summary = summary
             phase_exit_codes[phase] = summary.exit_code()
 
-    # Gate summary artifact: written for EVERY sweep, including dry-run
-    # (verdict "dry_run") and aborted sweeps (verdict "red"), so the
-    # release-gate aggregation (`make uat-gate-check`) always has a
-    # machine-readable per-stage record beside cells.jsonl. Written last:
-    # its completed_at is the sweep-completion timestamp the cross-stage
-    # Docker ordering check keys on. `.astimezone()` attaches the operator
-    # machine's real local UTC offset at capture time, so the age check in
-    # release_readiness_check.py (run later, in CI, in a different timezone)
-    # reads the offset embedded in the ISO string instead of reinterpreting
-    # a naive timestamp against the wrong process's local time (#1162 review).
     completed_at = _dt.datetime.now().astimezone()
     _write_gate_summary_artifact(
         config=config,
@@ -850,11 +647,6 @@ def _emit_abort_artifacts(
         else _compatibility_pruned_for_config(config)
     )
     early_stop_pruned_count = len(getattr(execute_outcome, "pruned", ())) if execute_outcome is not None else 0
-    # When the execute outcome is available, derive the unreachable /
-    # startup-failed counts from it; otherwise (e.g. a mid-sweep
-    # DiskFloorAbort that bypassed the normal return) fall back to the counts
-    # threaded in via the `*_count` parameters so the abort report still
-    # reflects platforms skipped before the abort.
     if skipped_unreachable_count is None:
         skipped_unreachable_count = (
             len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome is not None else 0
@@ -865,8 +657,6 @@ def _emit_abort_artifacts(
         died_mid_platform_count = (
             len(getattr(execute_outcome, "died_mid_platform", ())) if execute_outcome is not None else 0
         )
-    # Same registry/compatibility split as the happy path so an abort report
-    # and its regenerated counterpart agree on the buckets (w1/w2).
     compat_rule_pruned_count, registry_pruned_count = enumerate_phase.count_pruned_by_kind(compatibility_pruned)
     cells_io.write_cells_jsonl(
         log_dir / "cells.jsonl",
@@ -883,8 +673,6 @@ def _emit_abort_artifacts(
         container_engine=container_engine,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
-    # Returned so run_sweep can fold the partial report's accounting into the
-    # gate summary artifact (uat-release-gate-enforcement w1).
     return report_phase.write_report(
         cells,
         output_path=_partial_report_path(log_dir / config.report.matrix_summary_tsv),
@@ -904,24 +692,6 @@ def _emit_abort_artifacts(
 
 
 def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> gate_summary.PhaseAccounting:
-    """Fold sweep results into the gate summary's accounting block.
-
-    Prefers the report phase's `ReportSummary` (complete or partial-abort --
-    both flow through `report_phase.write_report`, the single owner of the
-    accounting math). A sweep that ran execute without a report phase (e.g.
-    `make uat-execute`'s scoped `[preflight, execute]` loop) mirrors
-    write_report's counting on the outcome directly rather than writing a
-    throwaway TSV.
-
-    `unvalidated` is threaded through in both branches so `uat_gate_summary.json`
-    -- the machine-readable artifact a release gate reads -- cannot silently
-    disagree with the human-readable `matrix_summary.tsv` footer's
-    `# UNVALIDATED_CELLS=N` line. Leaving it at the `PhaseAccounting` default
-    of 0 here would have been worse than the original bug: the TSV would
-    honestly show N unvalidated DataFrame cells while the one artifact
-    automation actually consumes asserted zero
-    (unvalidated-results-misclassified-as-schema-violations).
-    """
     if report_summary is not None:
         return gate_summary.PhaseAccounting(
             attempted=report_summary.attempted_count,
@@ -946,21 +716,9 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     timed_out = sum(1 for r in results if r.status == "timed-out")
     row_skipped = sum(1 for r in results if report_phase.is_skipped_status(r.status))
     row_unreachable = sum(1 for r in results if report_phase.is_unreachable_status(r.status))
-    # Mirror the report phase's unvalidated_count math exactly (see
-    # tests.uat.phases.report.write_report): a passed cell whose classifier
-    # verdict is `unvalidated`, cross-cutting and already included in
-    # `passed`/`attempted` above, not a disjoint bucket.
     unvalidated = sum(
         1 for r in results if r.status == "passed" and r.submit_terminal_state == SubmitTerminalState.unvalidated.value
     )
-    # Mirror the sidecar accounting written by the streaming path above:
-    # execute_outcome.compatibility_pruned is a MIXED stream of compatibility-
-    # rule drops and registry/ladder drops, so split it by kind rather than
-    # attributing every pruned row to compatibility. Otherwise a no-report run
-    # (e.g. `make uat-execute`'s scoped [preflight, execute] loop) records
-    # registry drops as compatibility_pruned with registry_pruned=0, which
-    # disagrees with the report-phase regeneration of the same run that reports
-    # registry_pruned_count>0 (uat-report-regen-prune-accounting w1/w2).
     compatibility_pruned, registry_pruned = enumerate_phase.count_pruned_by_kind(
         getattr(execute_outcome, "compatibility_pruned", ())
     )
@@ -988,13 +746,6 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
 
 
 def _artifact_digest(path: Path) -> str | None:
-    """sha256 hex of *path*'s bytes, or None when absent.
-
-    Computed at artifact-write time in the sweep process, so a later
-    tamper of the file on disk produces a different digest at gate-check
-    recomputation time. Absence is an honest value (e.g. an aborted sweep
-    before its accounting sidecar was written), not an error, so it is not
-    treated as a mismatch when recomputation also sees absence."""
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError:
@@ -1002,7 +753,6 @@ def _artifact_digest(path: Path) -> str | None:
 
 
 def _collect_artifact_digests(log_dir: Path) -> dict[str, str | None]:
-    """Digests for the three stage artifacts gate-check binds (w1)."""
     return {
         "cells_jsonl": _artifact_digest(log_dir / "cells.jsonl"),
         "accounting_sidecar": _artifact_digest(log_dir / "cells.jsonl.accounting.json"),
@@ -1026,7 +776,6 @@ def _write_gate_summary_artifact(
     validate_result: Any,
     explorer_smoke_status: str,
 ) -> None:
-    """Serialize the per-sweep gate summary (uat-release-gate-enforcement w1)."""
     summary = gate_summary.GateSummary(
         config_name=config.name,
         source_commit_sha=source_info.commit_sha,
@@ -1095,7 +844,6 @@ def run_sweep_from_path(
     stress_overrides: dict[str, str | float | None] | None = None,
     dry_run_override: bool | None = None,
 ) -> SweepResult:
-    """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
     if stress_overrides:
         platform = stress_overrides.get("platform")

@@ -1,9 +1,6 @@
-"""TPC Common Benchmark Reporting Utilities
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import time
 from pathlib import Path
@@ -19,7 +16,6 @@ def generate_official_benchmark_audit_trail(
     qph_attr: str,
     output_file: Optional[Union[str, Path]] = None,
 ) -> Path:
-    """Write the shared audit trail format used by official TPC benchmarks."""
     if output_file is None:
         if result.config.output_dir:
             output_dir = result.config.output_dir
@@ -59,14 +55,6 @@ def classify_official_scale_run(
     scale_points: frozenset,
     compliance_enum: Any,
 ) -> Any:
-    """Shared official-scale-point compliance shape for the TPC families.
-
-    TPC-H and TPC-DS classify methodology compliance identically: subscale
-    (< 1.0) is unofficial-subscale; an official scale point with ``--official``
-    mode is official; anything else is unofficial-nonstandard. The families
-    differ only in scale points and enum type, so each compliance module keeps
-    a thin typed wrapper around this core instead of a second structural copy.
-    """
     if scale_factor < 1.0:
         return compliance_enum.UNOFFICIAL_SUBSCALE
     if official and scale_factor in scale_points:

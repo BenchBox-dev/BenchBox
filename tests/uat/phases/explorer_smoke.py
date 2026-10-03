@@ -1,14 +1,3 @@
-"""Explorer-smoke phase: validate the packaged corpus, then delegate the browser smoke.
-
-The phase always runs a cheap, no-Node corpus contract over the packaged
-bundles. The heavy path only runs when the explorer build inputs are present on
-the branch (they live on `develop`, not `main`): UAT builds the BenchBox data,
-installs npm dependencies, then hands off to the Results Explorer's
-`uat-external-corpus-smoke` script, which owns the static build and the
-external-corpus Playwright run. UAT no longer issues `npm run build` /
-`npx playwright` itself.
-"""
-
 from __future__ import annotations
 
 import json
@@ -25,10 +14,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 EXPLORER_DIR = REPO_ROOT / "results-explorer"
 EXPLORER_PUBLISH_SCRIPT = REPO_ROOT / "_project" / "scripts" / "explorer_publish.py"
 EXTERNAL_CORPUS_SMOKE_TAG = "@uat-external-corpus"
-# Single delegated entrypoint owned by the Results Explorer: it builds the
-# static app and runs the external-corpus Playwright grep. UAT forwards browser
-# `--project` flags via `npm run <script> -- ...` rather than re-issuing
-# npm/build/playwright itself (see results-explorer/package.json).
 EXPLORER_SMOKE_NPM_SCRIPT = "uat-external-corpus-smoke"
 EXPLORER_BUILD_ARGV = (
     "uv",
@@ -64,13 +49,6 @@ def has_node() -> bool:
 
 
 def explorer_present() -> bool:
-    """Return True only when both explorer build inputs exist on this branch.
-
-    The phase ships on `main`, but `_project/scripts/explorer_publish.py` and
-    `results-explorer/` live only on `develop`. Without this guard a clean
-    `main` checkout false-gates: the heavy build shells out to files that are
-    not there. When absent we skip-with-reason instead of hard-failing.
-    """
     return EXPLORER_PUBLISH_SCRIPT.is_file() and (EXPLORER_DIR / "package.json").is_file()
 
 
@@ -92,7 +70,6 @@ def build_argv(
     output_dir: Path | str = EXPLORER_DIR / "public" / "data",
     build_extra_args: tuple[str, ...] = (),
 ) -> list[str]:
-    """Return the current Explorer publisher argv."""
     return [
         *EXPLORER_BUILD_ARGV,
         "--data-dir",
@@ -104,13 +81,6 @@ def build_argv(
 
 
 def smoke_npm_argv(playwright_browsers: tuple[str, ...] = ("chromium",)) -> list[str]:
-    """Return the delegated Results Explorer smoke command for the requested projects.
-
-    UAT does not own build/playwright mechanics: it calls the explorer's
-    `uat-external-corpus-smoke` script (which builds and runs the
-    external-corpus grep) and forwards browser `--project` flags through npm's
-    `--` argument passthrough.
-    """
     argv = ["npm", "run", EXPLORER_SMOKE_NPM_SCRIPT, "--"]
     for browser in playwright_browsers:
         argv.extend(["--project", browser])
@@ -127,23 +97,8 @@ def run_explorer_smoke(
     playwright_fixture_dir: Path | None = None,
     runner=subprocess.run,
 ) -> ExplorerSmokeResult:
-    """Build the explorer and run a browser smoke against the bundles in bundles_dir.
-
-    Always runs the cheap, no-Node corpus contract on the packaged bundles.
-    Returns a skipped result (never a hard failure) when the explorer build
-    inputs are absent on this branch, or when `node` is not on PATH. Requested
-    Playwright projects are passed through explicitly; if a project/browser is
-    unavailable, the Playwright command fails loudly.
-    """
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    # Minimal always-on gate: validate the packaged corpus regardless of
-    # explorer presence or Node availability. This is the check that has value
-    # on a clean `main` checkout where the heavy browser path cannot run.
-    # Corpus problems are collected into `contract["errors"]` rather than
-    # raised -- a raw RuntimeError propagating out of `run_sweep`'s
-    # explorer_smoke branch (no try there) meant a crash with no abort
-    # artifacts. See uat-fail-advance-consistency w2.
     resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
     contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
     (log_dir / "explorer_corpus_contract.json").write_text(
@@ -237,7 +192,6 @@ def _prepare_data_dir(*, bundles_dir: Path, log_dir: Path) -> Path:
 
 
 def _resolve_bundles_dir(path: Path) -> Path:
-    """Accept either DATA_DIR/bundles, a bare bundles dir, or a package root."""
     if path.name == "bundles":
         return path
     if (path / "bundle").is_dir():
@@ -248,17 +202,10 @@ def _resolve_bundles_dir(path: Path) -> Path:
 
 
 def _default_playwright_fixture_dir(*, log_dir: Path) -> Path:
-    """Return the per-run fixture mount used by the UAT Playwright smoke."""
     return log_dir / "playwright-fixtures" / "data"
 
 
 def _stage_playwright_fixture_dir(*, source_dir: Path, fixture_dir: Path) -> None:
-    """Point Playwright's fixture mount at the UAT-built Explorer data.
-
-    UAT builds a fresh data directory per run, so stage that directory into a
-    per-run fixture mount and pass it to `serve-browser-tests.mjs` via
-    `E2E_FIXTURE_DIR`.
-    """
     source = source_dir.expanduser().resolve()
     fixture = fixture_dir.expanduser()
     if fixture.exists() or fixture.is_symlink():
@@ -312,15 +259,6 @@ def _absolute_path(path: Path) -> Path:
 
 
 def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
-    """Validate the packaged corpus UAT hands to Explorer smoke.
-
-    Returns a contract dict; an empty or malformed corpus is reported via
-    the `"errors"` key (empty list when clean) rather than by raising --
-    `run_explorer_smoke` turns a non-empty `errors` list into a structured
-    `ExplorerSmokeResult(aborted=True, ...)` so the failure flows through the
-    orchestrator's normal abort-artifact machinery instead of an uncaught
-    RuntimeError. See uat-fail-advance-consistency w2.
-    """
     bundle_files = sorted(
         path
         for path in bundles_dir.rglob("*.json")

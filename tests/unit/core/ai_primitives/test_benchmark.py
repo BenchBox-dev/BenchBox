@@ -1,9 +1,6 @@
-"""Tests for AI Primitives benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock
 
@@ -24,11 +21,8 @@ pytestmark = [
 
 
 class TestAIPrimitivesBenchmark:
-    """Tests for AIPrimitivesBenchmark class."""
-
     @pytest.fixture()
     def ai_benchmark(self):
-        """Create a benchmark instance."""
         return AIPrimitivesBenchmark(scale_factor=0.01)
 
     def test_benchmark_creation(self, ai_benchmark):
@@ -56,7 +50,6 @@ class TestAIPrimitivesBenchmark:
         assert ai_benchmark.get_data_source_benchmark() == "tpch"
 
     def test_shared_tpch_schema_contract(self, ai_benchmark):
-        """AI Primitives exposes the schema contract required by SQL adapters."""
         schema = ai_benchmark.get_schema()
         sql = ai_benchmark.get_create_tables_sql(dialect="duckdb")
 
@@ -65,7 +58,6 @@ class TestAIPrimitivesBenchmark:
         assert "CREATE TABLE lineitem" in sql
 
     def test_generate_data_preserves_sharded_tpch_table_mapping(self, monkeypatch, tmp_path):
-        """AI primitives must keep TPC-H table names when TPC-H returns sharded files."""
 
         class FakeTPCHBenchmark:
             def __init__(self, scale_factor, output_dir):
@@ -164,11 +156,8 @@ class TestAIPrimitivesBenchmark:
 
 
 class TestCostEstimation:
-    """Tests for cost estimation in benchmark."""
-
     @pytest.fixture()
     def ai_bm(self):
-        """Create a benchmark instance."""
         return AIPrimitivesBenchmark()
 
     def test_estimate_cost_all_queries(self, ai_bm):
@@ -198,22 +187,17 @@ class TestCostEstimation:
 
         total_cost, estimates = ai_bm.estimate_cost("duckdb")
 
-        # All queries should be skipped
         assert total_cost == 0
         assert len(estimates) == 0
 
 
 class TestQueryExecution:
-    """Tests for query execution."""
-
     @pytest.fixture()
     def ai_bm(self):
-        """Create a benchmark instance."""
         return AIPrimitivesBenchmark()
 
     @pytest.fixture()
     def mock_connection(self):
-        """Create a mock database connection."""
         connection = Mock()
         cursor = Mock()
         cursor.fetchall.return_value = [("result1",), ("result2",)]
@@ -260,16 +244,12 @@ class TestQueryExecution:
 
 
 class TestBenchmarkRun:
-    """Tests for running the benchmark."""
-
     @pytest.fixture()
     def ai_bm(self):
-        """Create a benchmark instance."""
         return AIPrimitivesBenchmark()
 
     @pytest.fixture()
     def mock_connection(self):
-        """Create a mock database connection."""
         connection = Mock()
         cursor = Mock()
         cursor.fetchall.return_value = [("result",)]
@@ -287,7 +267,6 @@ class TestBenchmarkRun:
         assert isinstance(result, AIBenchmarkResult)
         assert result.dry_run is True
         assert result.total_cost_estimated_usd > 0
-        # Connection should not be called in dry run
         mock_connection.execute.assert_not_called()
 
     def test_run_benchmark_unsupported_platform(self, ai_bm, mock_connection):
@@ -325,8 +304,7 @@ class TestBenchmarkRun:
             assert qr.category == "embedding"
 
     def test_run_benchmark_budget_exceeded(self, ai_bm, mock_connection):
-        """Test benchmark aborts when budget would be exceeded."""
-        ai_bm.max_cost_usd = 0.00001  # Very low budget
+        ai_bm.max_cost_usd = 0.00001
 
         with pytest.raises(ValueError, match="exceeds budget"):
             ai_bm.run_benchmark(
@@ -336,8 +314,6 @@ class TestBenchmarkRun:
 
 
 class TestAIQueryResult:
-    """Tests for AIQueryResult dataclass."""
-
     def test_result_creation(self):
 
         result = AIQueryResult(
@@ -368,8 +344,6 @@ class TestAIQueryResult:
 
 
 class TestAIBenchmarkResult:
-    """Tests for AIBenchmarkResult dataclass."""
-
     def test_result_creation(self):
 
         result = AIBenchmarkResult(

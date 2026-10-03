@@ -1,16 +1,3 @@
-"""Connection lifecycle helpers for PlatformAdapter.
-
-Extracted from `benchbox.platforms.base.adapter` per the refactor map
-(`docs/development/adapter-refactor-map.md` Slice 3a). Houses the
-non-abstract connection lifecycle: dependency probes, connection-pool
-fetch, file/server existence checks, drop/recreate decisions, and the
-non-interactive existing-database handler.
-
-The contract abstract methods (`from_config`, `create_connection`,
-`close_connection`) stay on `PlatformAdapter` itself - 43, 38, and 21
-subclass overrides respectively per refactor map §3.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -25,28 +12,12 @@ if TYPE_CHECKING:
 
 
 class ConnectionLifecycleMixin:
-    """Mixin providing connection lifecycle plumbing for `PlatformAdapter`.
-
-    Expects the host class to expose `platform_name`, `logger`, `dry_run`,
-    `force_recreate`, `connection_pool`, `platform_config`, plus the
-    abstract `create_connection` / `close_connection` / `drop_database`
-    methods.
-    """
-
     platform_name: str
     logger: logging.Logger
     connection_pool: Any
     platform_config: dict[str, Any]
 
     def test_connection(self, connection_config: ConnectionConfig | None = None) -> bool:
-        """Test database connectivity.
-
-        Args:
-            connection_config: Optional connection configuration
-
-        Returns:
-            True if connection successful, False otherwise
-        """
         try:
             test_conn = self.create_connection(**(connection_config.__dict__ if connection_config else {}))
             self.close_connection(test_conn)
@@ -57,11 +28,6 @@ class ConnectionLifecycleMixin:
 
     @staticmethod
     def validate_platform_dependencies() -> dict[str, bool]:
-        """Validate platform-specific dependencies are available.
-
-        Returns:
-            Dictionary mapping dependency names to availability status
-        """
         return {
             "duckdb": ConnectionLifecycleMixin._check_import("duckdb"),
             "databricks": ConnectionLifecycleMixin._check_databricks_dependencies(),
@@ -73,7 +39,6 @@ class ConnectionLifecycleMixin:
 
     @staticmethod
     def _check_import(module_name: str) -> bool:
-        """Check if a module can be imported."""
         try:
             __import__(module_name)
             return True
@@ -82,21 +47,11 @@ class ConnectionLifecycleMixin:
 
     @staticmethod
     def _check_databricks_dependencies() -> bool:
-        """Check if Databricks-specific dependencies are available."""
         required_modules = ["databricks.sql", "databricks.sdk"]
         return all(ConnectionLifecycleMixin._check_import(module) for module in required_modules)
 
     @staticmethod
     def require_dependencies(required: list[str], exit_on_missing: bool = True) -> dict[str, bool]:
-        """Require specific dependencies, optionally exit with helpful message if missing.
-
-        Args:
-            required: List of required dependency names
-            exit_on_missing: Whether to exit if dependencies are missing
-
-        Returns:
-            Dictionary mapping dependency names to availability status
-        """
         available_deps = ConnectionLifecycleMixin.validate_platform_dependencies()
         missing_deps = [dep for dep in required if not available_deps.get(dep, False)]
 
@@ -120,7 +75,6 @@ class ConnectionLifecycleMixin:
 
     @staticmethod
     def _get_install_command(dependency: str) -> str | None:
-        """Get installation command for a dependency."""
         install_commands = {
             "duckdb": "uv add duckdb",
             "databricks": "uv add databricks-sql-connector databricks-sdk",
@@ -132,28 +86,14 @@ class ConnectionLifecycleMixin:
         return install_commands.get(dependency)
 
     def get_connection_from_pool(self) -> Any:
-        """Get connection from pool (if supported by platform).
-
-        Returns:
-            Database connection from pool or new connection
-        """
         if self.connection_pool:
             return self.connection_pool.get_connection()
         return self.create_connection(**self.platform_config)
 
     def get_database_path(self, **connection_config) -> str | None:
-        """Get the database file path for file-based databases.
-
-        Override this method in platform adapters that use file-based databases.
-        """
         return None
 
     def check_database_exists(self, **connection_config) -> bool:
-        """Check if database already exists.
-
-        For file-based databases, checks if file exists.
-        For server-based databases, checks if database/schema exists on server.
-        """
         db_path = self.get_database_path(**connection_config)
         if db_path and db_path != ":memory:":
             return Path(db_path).exists()
@@ -161,39 +101,18 @@ class ConnectionLifecycleMixin:
         return self.check_server_database_exists(**connection_config)
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists on server (for server-based databases).
-
-        Override this method in platform adapters for server-based databases.
-        """
         return False
 
     def _validate_database_compatibility(self, **connection_config):
-        """Validate database compatibility for current benchmark and configuration."""
         from benchbox.platforms.base.validation import DatabaseValidator
 
         validator = DatabaseValidator(adapter=self, connection_config=connection_config)
         return validator.validate()
 
     def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
-        """Check whether a managed database has the current benchmark tables.
-
-        Returns:
-            True when the adapter can prove the required tables are present,
-            False when the adapter can prove they are missing or unusable, and
-            None when the adapter does not implement managed table validation.
-        """
         return None
 
     def handle_existing_database(self, **connection_config) -> None:
-        """Handle existing database non-interactively for core/programmatic usage.
-
-        Performs validation of database compatibility and makes automatic decisions:
-        - If force_recreate=True, always recreate
-        - If database is valid, reuse it
-        - If database has issues, recreate it
-        - If skip_database_management=True, skip create/drop management while
-          allowing adapters to opt into table-readiness checks
-        """
         self.log_operation_start("Database validation", "Checking existing database compatibility")
 
         if self.dry_run or getattr(self, "dry_run_mode", False):
@@ -212,8 +131,6 @@ class ConnectionLifecycleMixin:
             self.database_was_reused = True
             return
 
-        # When _validating_database is True, we're inside a validation connection.
-        # We still need to check database existence, but skip validation/recreation logic.
         if getattr(self, "_validating_database", False):
             self.log_very_verbose("Inside validation context - skipping reuse/recreate logic.")
             return
@@ -271,7 +188,6 @@ class ConnectionLifecycleMixin:
             self.log_operation_complete("Database validation", details="Database recreated due to incompatibility")
 
     def _remove_database(self, is_file_based: bool, db_path: str, **connection_config) -> None:
-        """Helper method to remove/delete an existing database."""
         try:
             if is_file_based:
                 db_path_obj = Path(db_path)
@@ -295,18 +211,7 @@ class ConnectionLifecycleMixin:
             raise RuntimeError(f"Could not remove existing database: {e}") from e
 
     def reset_database_in_place(self, **connection_config) -> bool:
-        """Empty a server-side database for reload without dropping it.
-
-        Return True when the database was reset in place, so the caller skips
-        ``drop_database``. The default does nothing and returns False. Override
-        it where dropping objects is costly, for example where dropped tables
-        keep counting against a catalog quota.
-        """
         return False
 
     def drop_database(self, **connection_config) -> None:
-        """Drop/remove database on server (for server-based databases).
-
-        Override this method in platform adapters for server-based databases.
-        """
         raise NotImplementedError("drop_database not implemented for this platform")

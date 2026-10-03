@@ -1,5 +1,3 @@
-"""Share BenchBox's machine-wide Python test lock in the isolated environment."""
-
 import fcntl
 from pathlib import Path
 

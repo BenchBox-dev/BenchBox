@@ -38,13 +38,14 @@ def run_harness(payload: dict[str, Any]) -> dict[str, Any]:
     return json.loads(proc.stdout)
 
 
-def test_create_deployment_success() -> None:
+@pytest.mark.parametrize("artifact_id", [42, "42"])
+def test_create_deployment_success(artifact_id: int | str) -> None:
     payload = {
         "action": "create",
         "effect": {
             "owner": "BenchBox-dev",
             "repo": "BenchBox",
-            "artifact_id": 42,
+            "artifact_id": artifact_id,
             "pages_build_version": VALID_SHA,
         },
         "mock": {

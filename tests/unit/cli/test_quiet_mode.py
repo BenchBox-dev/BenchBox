@@ -10,11 +10,6 @@ import benchbox.cli.main  # noqa: F401
 from benchbox.cli.main import cli
 from benchbox.utils.printing import get_console, quiet_console, set_quiet
 
-# Several __init__.py files re-export names that shadow their submodules
-# (e.g. benchbox.cli.commands exports the Click command ``run``, and
-# benchbox.cli exports the function ``main``).  patch() walks the attribute
-# chain and finds the re-exported object instead of the module, so we grab
-# the real modules via sys.modules.
 _run_mod = sys.modules["benchbox.cli.commands.run"]
 _main_mod = sys.modules["benchbox.cli.main"]
 
@@ -26,7 +21,6 @@ pytestmark = [
 
 def test_quiet_mode_suppresses_decorative_output_generate_phase():
     runner = CliRunner()
-    # Use data-only phase to avoid requiring a live DuckDB execution
     result = runner.invoke(
         cli,
         [
@@ -41,10 +35,8 @@ def test_quiet_mode_suppresses_decorative_output_generate_phase():
         ],
     )
     assert result.exit_code == 0, result.output
-    # Decorative output must be suppressed; only bare filepaths (if any) allowed
     assert "Benchmark completed" not in result.output
     assert "Initializing" not in result.output
-    # Each non-empty line must look like a file path, not a status message
     for line in result.output.splitlines():
         if line.strip():
             assert line.strip().startswith("/") or "benchmark_runs" in line, (
@@ -67,25 +59,15 @@ def test_default_mode_outputs_messages():
         ],
     )
     assert result.exit_code == 0
-    # Expect some visible output (e.g., initialization line)
     assert "Initializing" in result.output or "Data-only" in result.output
 
 
 def test_quiet_flag_suppresses_adapter_run_benchmark_output():
-    """Verify that quiet_console used by PlatformAdapter.run_benchmark suppresses output.
-
-    The adapter prints status messages (Connecting, Validating, Executing, etc.)
-    via quiet_console. When set_quiet(True) is active, all of those calls must
-    be silenced. This test exercises the proxy directly, independent of the CLI
-    runner, to isolate the adapter-level behaviour.
-    """
     set_quiet(True)
     try:
         console = get_console()
-        # In quiet mode, the console writes to a StringIO sink, not stdout
         assert isinstance(console.file, io.StringIO)
 
-        # Simulate the messages the adapter would emit
         adapter_messages = [
             "Connecting to DuckDB...",
             "✅ Database being reused - skipping schema creation and data loading",
@@ -96,7 +78,6 @@ def test_quiet_flag_suppresses_adapter_run_benchmark_output():
         for msg in adapter_messages:
             quiet_console.print(msg)
 
-        # Nothing should have reached the real stdout
         sink = console.file
         assert isinstance(sink, io.StringIO)
     finally:
@@ -104,10 +85,8 @@ def test_quiet_flag_suppresses_adapter_run_benchmark_output():
 
 
 def test_adapter_uses_quiet_console_not_local_console():
-    """Confirm adapter methods reference quiet_console, not Console()."""
     from benchbox.platforms.base import adapter as adapter_module
 
-    # The module should expose quiet_console from printing
     assert hasattr(adapter_module, "quiet_console")
     assert adapter_module.quiet_console is quiet_console
 
@@ -123,7 +102,6 @@ def test_adapter_uses_quiet_console_not_local_console():
     ],
 )
 def test_cli_commands_use_shared_quiet_console(module_path: str, attr_name: str) -> None:
-    """Ensure migrated CLI command modules share centralized quiet-aware console."""
     import importlib
 
     module = importlib.import_module(module_path)
@@ -131,7 +109,6 @@ def test_cli_commands_use_shared_quiet_console(module_path: str, attr_name: str)
 
 
 def test_quiet_console_proxy_delegates_when_not_quiet():
-    """Ensure quiet_console passes output through when quiet mode is off."""
     set_quiet(False)
     try:
         console = get_console()
@@ -143,7 +120,6 @@ def test_quiet_console_proxy_delegates_when_not_quiet():
 
 
 def _invoke_run_quiet_with_export(quiet: bool):
-    """Invoke `benchbox run` with mocked export returning a known filepath."""
     from benchbox.core.schemas import DatabaseConfig
 
     mock_result = Mock()
@@ -202,14 +178,12 @@ def _invoke_run_quiet_with_export(quiet: bool):
 
 
 def test_quiet_mode_emits_result_filepath_to_stdout():
-    """--quiet must print the exported filepath to stdout (machine-readable)."""
     result = _invoke_run_quiet_with_export(quiet=True)
     assert result.exit_code == 0, result.output
     assert "/tmp/result.json" in result.output
 
 
 def test_quiet_mode_suppresses_decorative_output():
-    """--quiet must not emit status messages or formatted labels."""
     result = _invoke_run_quiet_with_export(quiet=True)
     assert result.exit_code == 0, result.output
     assert "Benchmark completed" not in result.output
@@ -217,8 +191,6 @@ def test_quiet_mode_suppresses_decorative_output():
 
 
 def test_normal_mode_does_not_double_print_filepath():
-    """Normal mode must not print the bare filepath before the formatted label line."""
     result = _invoke_run_quiet_with_export(quiet=False)
     assert result.exit_code == 0, result.output
-    # The path should appear once (inside the formatted label), not as a bare extra line
     assert result.output.count("/tmp/result.json") == 1

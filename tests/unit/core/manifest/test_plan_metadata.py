@@ -1,5 +1,3 @@
-"""Tests for plan metadata in manifests."""
-
 from __future__ import annotations
 
 import json
@@ -32,14 +30,11 @@ pytestmark = [
 
 
 def _mock_query_result(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
-    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
     return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 @dataclass
 class MockBenchmarkResults:
-    """Mock benchmark results for testing (matches the real query_results flattened list)."""
-
     run_id: str = "test_run"
     platform: str = "duckdb"
     platform_version: str = "0.9.0"
@@ -47,7 +42,6 @@ class MockBenchmarkResults:
 
 
 def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanDAG:
-    """Create a plan with a specific fingerprint."""
     root = LogicalOperator(
         operator_id="1",
         operator_type=LogicalOperatorType.SCAN,
@@ -64,8 +58,6 @@ def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanD
 
 
 class TestPlanMetadataDataclass:
-    """Tests for PlanMetadata dataclass."""
-
     def test_default_values(self) -> None:
 
         metadata = PlanMetadata()
@@ -125,10 +117,7 @@ class TestPlanMetadataDataclass:
 
 
 class TestManifestV2PlanMetadata:
-    """Tests for ManifestV2 with plan metadata."""
-
     def test_manifest_with_plan_metadata(self) -> None:
-        """Test ManifestV2 includes plan metadata."""
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 1},
@@ -145,7 +134,6 @@ class TestManifestV2PlanMetadata:
         assert manifest.plan_metadata.plan_fingerprints == {"q1": "a" * 64}
 
     def test_manifest_without_plan_metadata(self) -> None:
-        """Test ManifestV2 works without plan metadata."""
         manifest = ManifestV2(
             benchmark="tpch",
             scale_factor=1.0,
@@ -173,7 +161,6 @@ class TestManifestV2PlanMetadata:
             path = Path(tmpdir) / "manifest.json"
             write_manifest(manifest, path)
 
-            # Verify JSON structure
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             assert "plan_metadata" in data
@@ -209,8 +196,6 @@ class TestManifestV2PlanMetadata:
 
 
 class TestCreatePlanMetadataFromResults:
-    """Tests for create_plan_metadata_from_results function."""
-
     def test_creates_metadata_from_results(self) -> None:
 
         plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
@@ -245,7 +230,7 @@ class TestCreatePlanMetadataFromResults:
         results = MockBenchmarkResults(
             query_results=[
                 _mock_query_result("q1", 100.0, plan1),
-                _mock_query_result("q2", 200.0, None),  # No plan
+                _mock_query_result("q2", 200.0, None),
             ],
         )
 
@@ -265,10 +250,7 @@ class TestCreatePlanMetadataFromResults:
 
 
 class TestUpdatePlanVersions:
-    """Tests for update_plan_versions function."""
-
     def test_first_run_sets_version_one(self) -> None:
-        """Test that first run sets all versions to 1."""
         current = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={},
@@ -285,7 +267,7 @@ class TestUpdatePlanVersions:
             plan_versions={"q1": 3},
         )
         current = PlanMetadata(
-            plan_fingerprints={"q1": "a" * 64},  # Same fingerprint
+            plan_fingerprints={"q1": "a" * 64},
             plan_versions={},
         )
 
@@ -300,7 +282,7 @@ class TestUpdatePlanVersions:
             plan_versions={"q1": 3},
         )
         current = PlanMetadata(
-            plan_fingerprints={"q1": "b" * 64},  # Different fingerprint
+            plan_fingerprints={"q1": "b" * 64},
             plan_versions={},
         )
 
@@ -309,13 +291,12 @@ class TestUpdatePlanVersions:
         assert current.plan_versions["q1"] == 4
 
     def test_new_queries_start_at_version_one(self) -> None:
-        """Test that new queries start at version 1."""
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
         )
         current = PlanMetadata(
-            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},  # q2 is new
+            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={},
         )
 
@@ -325,18 +306,13 @@ class TestUpdatePlanVersions:
         assert current.plan_versions["q2"] == 1
 
     def test_new_query_across_fingerprint_version_boundary_starts_at_one(self) -> None:
-        """#1038 review: a brand-new query_id (absent from prev entirely) must
-        always start at version 1, even when its fingerprint_version differs
-        from prev's default - there is no prior recording to be "not
-        comparable" to, so the version-mismatch branch must not apply and
-        fall back to a 0 default (invalid per validate_plan_metadata)."""
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
             plan_fingerprint_versions={"q1": 1},
         )
         current = PlanMetadata(
-            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},  # q2 is new, captured as v2
+            plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={},
             plan_fingerprint_versions={"q1": 1, "q2": 2},
         )
@@ -348,19 +324,15 @@ class TestUpdatePlanVersions:
         assert not validate_plan_metadata(current)
 
     def test_fingerprint_version_boundary_does_not_bump_version(self) -> None:
-        """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes the
-        fingerprint STRING change for the same logical plan (#1028 review).
-        Without the full plan tree to verify equality across encodings, the
-        version must be preserved rather than recording a spurious change."""
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
             plan_fingerprint_versions={"q1": 1},
         )
         current = PlanMetadata(
-            plan_fingerprints={"q1": "b" * 64},  # different string, but...
+            plan_fingerprints={"q1": "b" * 64},
             plan_versions={},
-            plan_fingerprint_versions={"q1": 2},  # ...a different encoding version
+            plan_fingerprint_versions={"q1": 2},
         )
 
         update_plan_versions(prev, current)
@@ -368,9 +340,6 @@ class TestUpdatePlanVersions:
         assert current.plan_versions["q1"] == 3
 
     def test_same_fingerprint_version_still_increments_on_real_change(self) -> None:
-        """A real content change within the SAME fingerprint_version must
-        still increment the version (the boundary exclusion above must not
-        mask genuine plan changes)."""
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
@@ -388,8 +357,6 @@ class TestUpdatePlanVersions:
 
 
 class TestValidatePlanMetadata:
-    """Tests for validate_plan_metadata function."""
-
     def test_valid_metadata(self) -> None:
 
         metadata = PlanMetadata(
@@ -416,7 +383,7 @@ class TestValidatePlanMetadata:
     def test_invalid_fingerprint_characters(self) -> None:
 
         metadata = PlanMetadata(
-            plan_fingerprints={"q1": "g" * 64},  # 'g' is not hex
+            plan_fingerprints={"q1": "g" * 64},
             plan_versions={"q1": 1},
         )
 
@@ -429,7 +396,7 @@ class TestValidatePlanMetadata:
 
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
-            plan_versions={"q1": 0},  # Version must be >= 1
+            plan_versions={"q1": 0},
         )
 
         errors = validate_plan_metadata(metadata)
@@ -441,7 +408,7 @@ class TestValidatePlanMetadata:
 
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
-            plan_versions={"q1": 1},  # Missing q2
+            plan_versions={"q1": 1},
         )
 
         errors = validate_plan_metadata(metadata)
@@ -451,8 +418,6 @@ class TestValidatePlanMetadata:
 
 
 class TestMergePlanMetadata:
-    """Tests for merge_plan_metadata function."""
-
     def test_merge_basic(self) -> None:
 
         base = PlanMetadata(
@@ -479,9 +444,9 @@ class TestMergePlanMetadata:
             platform="duckdb",
         )
         overlay = PlanMetadata(
-            plan_fingerprints={"q1": "b" * 64},  # Override
-            plan_versions={"q1": 2},  # Override
-            platform="datafusion",  # Override
+            plan_fingerprints={"q1": "b" * 64},
+            plan_versions={"q1": 2},
+            platform="datafusion",
         )
 
         merged = merge_plan_metadata(base, overlay)

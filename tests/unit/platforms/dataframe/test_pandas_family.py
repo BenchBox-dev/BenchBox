@@ -1,12 +1,4 @@
-"""Unit tests for Pandas Family adapter base class.
-
-Tests for:
-- PandasFamilyContext
-- PandasFamilyAdapter abstract class
-- Common functionality
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -31,8 +23,6 @@ pytestmark = [
 
 
 class MockPandasAdapter(PandasFamilyAdapter[dict]):
-    """Mock adapter for testing the abstract base class."""
-
     @property
     def platform_name(self) -> str:
         return "MockPandas"
@@ -69,8 +59,6 @@ class MockPandasAdapter(PandasFamilyAdapter[dict]):
 
 
 class TestPandasFamilyContext:
-    """Tests for PandasFamilyContext."""
-
     def test_context_creation(self):
 
         adapter = MockPandasAdapter()
@@ -81,7 +69,6 @@ class TestPandasFamilyContext:
         assert ctx.family == "pandas"
 
     def test_context_col_returns_string(self):
-        """Test that col() returns the column name as string."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -89,7 +76,6 @@ class TestPandasFamilyContext:
         assert result == "amount"
 
     def test_context_lit_returns_value(self):
-        """Test that lit() returns the value unchanged."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -98,7 +84,6 @@ class TestPandasFamilyContext:
         assert ctx.lit(3.14) == 3.14
 
     def test_context_date_sub_returns_descriptor(self):
-        """Test that date_sub() returns an operation descriptor."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -108,7 +93,6 @@ class TestPandasFamilyContext:
         assert result["days"] == 7
 
     def test_context_date_add_returns_descriptor(self):
-        """Test that date_add() returns an operation descriptor."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -118,7 +102,6 @@ class TestPandasFamilyContext:
         assert result["days"] == 30
 
     def test_context_cast_date_returns_descriptor(self):
-        """Test that cast_date() returns an operation descriptor."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -127,7 +110,6 @@ class TestPandasFamilyContext:
         assert result["column"] == "string_col"
 
     def test_context_cast_string_returns_descriptor(self):
-        """Test that cast_string() returns an operation descriptor."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -144,7 +126,6 @@ class TestPandasFamilyContext:
         ctx.register_table("orders", test_df)
 
         assert ctx.table_exists("orders")
-        # get_table now returns UnifiedPandasFrame wrapper
         result = ctx.get_table("orders")
         assert result.native == test_df
 
@@ -162,8 +143,6 @@ class TestPandasFamilyContext:
 
 
 class TestPandasFamilyAdapter:
-    """Tests for PandasFamilyAdapter abstract class."""
-
     def test_adapter_initialization(self):
 
         adapter = MockPandasAdapter()
@@ -228,7 +207,7 @@ class TestPandasFamilyAdapter:
         adapter = MockPandasAdapter()
 
         assert adapter._detect_format(Path("data.csv")) == "csv"
-        assert adapter._detect_format(Path("file.txt")) == "csv"  # default
+        assert adapter._detect_format(Path("file.txt")) == "csv"
 
     def test_date_sub_returns_descriptor(self):
 
@@ -280,14 +259,9 @@ class TestPandasFamilyAdapter:
         assert "execution_time_seconds" in result
 
     def test_execute_query_timing_key_matches_schema_contract(self):
-        """Test that timing key matches what result schema expects.
-
-        Runtime producers should emit canonical `execution_time_seconds`.
-        """
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
-        # Register a test table directly (not via load_table)
         ctx.register_table("orders", {"rows": 100})
 
         def pandas_impl(ctx):
@@ -359,7 +333,7 @@ class TestPandasFamilyAdapter:
         row_count = adapter.load_table(ctx, "orders", [parquet_file])
 
         assert ctx.table_exists("orders")
-        assert row_count == 10  # Mock returns 10
+        assert row_count == 10
 
     def test_load_table_no_files_raises(self):
 
@@ -370,7 +344,6 @@ class TestPandasFamilyAdapter:
             adapter.load_table(ctx, "orders", [])
 
     def test_load_tables_from_data_source_uses_default_loading_contract(self, tmp_path):
-        """Shared loading should work for plain pandas-family subclasses."""
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
         data_file = tmp_path / "orders.tbl"
@@ -393,10 +366,7 @@ class TestPandasFamilyAdapter:
 
 
 class TestPandasFamilyAdapterAbstract:
-    """Tests verifying abstract method requirements."""
-
     def test_abstract_methods_required(self):
-        """Test that abstract methods must be implemented."""
 
         class IncompleteAdapter(PandasFamilyAdapter):
             @property
@@ -408,8 +378,6 @@ class TestPandasFamilyAdapterAbstract:
 
 
 class TestQueryIntegration:
-    """Integration tests for query execution."""
-
     def test_query_with_table_access(self):
 
         adapter = MockPandasAdapter()
@@ -420,7 +388,7 @@ class TestQueryIntegration:
 
         def join_impl(ctx):
             orders = ctx.get_table("orders")
-            _ = ctx.get_table("customers")  # Access to verify registration
+            _ = ctx.get_table("customers")
             return {"rows": orders["rows"], "joined": True}
 
         query = DataFrameQuery(
@@ -444,10 +412,8 @@ class TestQueryIntegration:
         ctx.register_table("orders", {"rows": 100})
 
         def filter_impl(ctx):
-            # Use column access pattern (returns string)
             col = ctx.col("amount")
             threshold = ctx.lit(100)
-            # In real implementation, this would filter
             return {"rows": 75, "filter": f"{col} > {threshold}"}
 
         query = DataFrameQuery(
@@ -465,15 +431,8 @@ class TestQueryIntegration:
 
 
 class TestPandasFamilyContextHelpers:
-    """Tests for PandasFamilyContext helper methods.
-
-    These methods provide platform-agnostic DataFrame operations
-    that work across Pandas, Dask, and cuDF.
-    """
-
     @pytest.fixture
     def adapter(self):
-        """Create a Pandas adapter for testing context helpers."""
         try:
             from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
@@ -483,7 +442,6 @@ class TestPandasFamilyContextHelpers:
 
     @pytest.fixture
     def sample_df(self):
-        """Create a sample DataFrame for testing."""
         import pandas as pd
 
         return pd.DataFrame(
@@ -495,7 +453,6 @@ class TestPandasFamilyContextHelpers:
         )
 
     def test_concat_multiple_dataframes(self, adapter):
-        """Test ctx.concat() combines DataFrames correctly."""
         import pandas as pd
 
         ctx = adapter.create_context()
@@ -506,20 +463,17 @@ class TestPandasFamilyContextHelpers:
 
         result = ctx.concat([df1, df2, df3])
 
-        # Result should be a UnifiedPandasFrame
         assert hasattr(result, "native")
         assert len(result.native) == 6
         assert list(result.native["a"]) == [1, 2, 3, 4, 5, 6]
 
     def test_concat_unwraps_unified_frames(self, adapter, sample_df):
-        """Test ctx.concat() unwraps UnifiedPandasFrame instances."""
         import pandas as pd
 
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
         ctx = adapter.create_context()
 
-        # Wrap one DataFrame as UnifiedPandasFrame
         df1 = pd.DataFrame({"a": [1, 2]})
         df2 = pd.DataFrame({"a": [3, 4]})
         wrapped = UnifiedPandasFrame(df1, adapter)
@@ -529,24 +483,21 @@ class TestPandasFamilyContextHelpers:
         assert len(result.native) == 4
 
     def test_groupby_size_single_column(self, adapter, sample_df):
-        """Test ctx.groupby_size() counts rows per group."""
         ctx = adapter.create_context()
 
         result = ctx.groupby_size(sample_df, "category", name="count")
 
         assert hasattr(result, "native")
         df = result.native
-        assert len(df) == 2  # Two categories: A, B
+        assert len(df) == 2
         assert "category" in df.columns
         assert "count" in df.columns
-        # Category A has 3 rows, B has 2 rows
         a_count = df[df["category"] == "A"]["count"].iloc[0]
         b_count = df[df["category"] == "B"]["count"].iloc[0]
         assert a_count == 3
         assert b_count == 2
 
     def test_groupby_size_multiple_columns(self, adapter):
-        """Test ctx.groupby_size() with multiple grouping columns."""
         import pandas as pd
 
         ctx = adapter.create_context()
@@ -564,10 +515,9 @@ class TestPandasFamilyContextHelpers:
         assert "region" in result.native.columns
         assert "category" in result.native.columns
         assert "n" in result.native.columns
-        assert len(result.native) == 3  # (East,A), (East,B), (West,A)
+        assert len(result.native) == 3
 
     def test_groupby_agg_named_aggregation(self, adapter, sample_df):
-        """Test ctx.groupby_agg() with named aggregation style."""
         ctx = adapter.create_context()
 
         result = ctx.groupby_agg(
@@ -584,7 +534,6 @@ class TestPandasFamilyContextHelpers:
         assert len(df) == 2
 
     def test_groupby_agg_direct_style(self, adapter, sample_df):
-        """Test ctx.groupby_agg() with direct dict style."""
         ctx = adapter.create_context()
 
         result = ctx.groupby_agg(sample_df, "category", {"value": "sum"}, as_index=False)
@@ -592,14 +541,12 @@ class TestPandasFamilyContextHelpers:
         df = result.native
         assert "category" in df.columns
         assert "value" in df.columns
-        # A: 10+30+50=90, B: 20+40=60
         a_sum = df[df["category"] == "A"]["value"].iloc[0]
         b_sum = df[df["category"] == "B"]["value"].iloc[0]
         assert a_sum == 90
         assert b_sum == 60
 
     def test_to_set_from_series(self, adapter):
-        """Test ctx.to_set() converts Series to set."""
         import pandas as pd
 
         ctx = adapter.create_context()
@@ -611,7 +558,6 @@ class TestPandasFamilyContextHelpers:
         assert result == {1, 2, 3}
 
     def test_to_set_from_dataframe(self, adapter):
-        """Test ctx.to_set() extracts first column from DataFrame."""
         import pandas as pd
 
         ctx = adapter.create_context()
@@ -623,7 +569,6 @@ class TestPandasFamilyContextHelpers:
         assert result == {1, 2, 3}
 
     def test_to_set_unwraps_unified_frame(self, adapter):
-        """Test ctx.to_set() unwraps UnifiedPandasFrame."""
         import pandas as pd
 
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
@@ -638,17 +583,15 @@ class TestPandasFamilyContextHelpers:
         assert result == {1, 2, 3}
 
     def test_filter_gt_basic(self, adapter, sample_df):
-        """Test ctx.filter_gt() filters rows where column > threshold."""
         ctx = adapter.create_context()
 
         result = ctx.filter_gt(sample_df, "value", 25)
 
         df = result.native
-        assert len(df) == 3  # values 30, 40, 50 are > 25
+        assert len(df) == 3
         assert all(df["value"] > 25)
 
     def test_filter_gt_with_float_threshold(self, adapter):
-        """Test ctx.filter_gt() with float threshold."""
         import pandas as pd
 
         ctx = adapter.create_context()
@@ -656,10 +599,9 @@ class TestPandasFamilyContextHelpers:
         df = pd.DataFrame({"price": [9.99, 10.00, 10.01, 15.50]})
         result = ctx.filter_gt(df, "price", 10.00)
 
-        assert len(result.native) == 2  # 10.01 and 15.50
+        assert len(result.native) == 2
 
     def test_filter_gt_unwraps_unified_frame(self, adapter, sample_df):
-        """Test ctx.filter_gt() unwraps UnifiedPandasFrame."""
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
         ctx = adapter.create_context()
@@ -667,10 +609,9 @@ class TestPandasFamilyContextHelpers:
         wrapped = UnifiedPandasFrame(sample_df, adapter)
         result = ctx.filter_gt(wrapped, "value", 30)
 
-        assert len(result.native) == 2  # 40 and 50
+        assert len(result.native) == 2
 
     def test_filter_gt_returns_unified_frame(self, adapter, sample_df):
-        """Test ctx.filter_gt() returns UnifiedPandasFrame."""
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
         ctx = adapter.create_context()
@@ -681,14 +622,6 @@ class TestPandasFamilyContextHelpers:
 
 
 class TestLoadBenchmarkIntoContextGuard:
-    """load_benchmark_into_context must refuse benchmark-managed loading.
-
-    A benchmark that owns its DataFrame loading (skip_dataframe_data_loading)
-    interleaves loading with execution and has no discrete preloaded context;
-    the helper must fail loudly rather than invoke the generic loader and return
-    a wrong/empty context (regression for PR #826 review feedback).
-    """
-
     def test_raises_for_benchmark_managed_loading(self, tmp_path):
         class ManagedBenchmark:
             name = "managed"

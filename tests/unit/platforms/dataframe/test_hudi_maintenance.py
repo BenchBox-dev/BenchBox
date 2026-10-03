@@ -1,13 +1,6 @@
-"""Tests for Apache Hudi maintenance operations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests verify the HudiMaintenanceOperations class and its integration
-with PySpark SQL. Since Hudi requires a SparkSession with the hudi-spark-bundle,
-most tests are mocked to avoid heavy dependencies in unit tests.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Check if pyspark is available
 try:
     from pyspark.sql import SparkSession
 
@@ -31,15 +23,12 @@ pytestmark = [
 
 
 class TestHudiMaintenanceAvailability:
-    """Tests for Hudi maintenance availability and configuration."""
-
     def test_hudi_requires_spark_session(self):
 
         from benchbox.core.dataframe.maintenance_interface import (
             get_maintenance_operations_for_platform,
         )
 
-        # Hudi requires SparkSession, so factory returns None with debug message
         result = get_maintenance_operations_for_platform("hudi")
         assert result is None
 
@@ -64,7 +53,6 @@ class TestHudiMaintenanceAvailability:
         assert len(missing) == 0
 
     def test_hudi_notes_mention_pyspark(self):
-        """Test that Hudi capabilities notes mention PySpark requirement."""
         from benchbox.core.dataframe.maintenance_interface import HUDI_CAPABILITIES
 
         assert "PySpark" in HUDI_CAPABILITIES.notes
@@ -72,8 +60,6 @@ class TestHudiMaintenanceAvailability:
 
 
 class TestHudiMaintenanceOperationsInit:
-    """Tests for HudiMaintenanceOperations initialization."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_init_requires_spark_session(self):
 
@@ -141,8 +127,6 @@ class TestHudiMaintenanceOperationsInit:
 
 
 class TestHudiTableIdentifierNormalization:
-    """Tests for table identifier normalization."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_normalize_catalog_path(self):
 
@@ -153,13 +137,11 @@ class TestHudiTableIdentifierNormalization:
         mock_spark = MagicMock(spec=SparkSession)
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
 
-        # Catalog paths should be preserved
         result = ops._normalize_table_identifier("database.table_name")
         assert result == "database.table_name"
 
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_normalize_s3_path(self):
-        """Test normalization of S3 paths."""
         from benchbox.platforms.dataframe.hudi_maintenance import (
             HudiMaintenanceOperations,
         )
@@ -167,7 +149,6 @@ class TestHudiTableIdentifierNormalization:
         mock_spark = MagicMock(spec=SparkSession)
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
 
-        # S3 paths should get backtick quoting
         result = ops._normalize_table_identifier("s3://bucket/path/table")
         assert "`hudi`" in result
         assert "s3://bucket/path/table" in result
@@ -182,15 +163,12 @@ class TestHudiTableIdentifierNormalization:
         mock_spark = MagicMock(spec=SparkSession)
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
 
-        # Local paths should get backtick quoting
         result = ops._normalize_table_identifier("/data/hudi/table")
         assert "`hudi`" in result
         assert "/data/hudi/table" in result
 
 
 class TestHudiInsertOperations:
-    """Tests for Hudi INSERT operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_insert_creates_temp_view(self):
 
@@ -204,7 +182,6 @@ class TestHudiInsertOperations:
 
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
 
-        # Mock _convert_to_spark_df to return our mock DataFrame
         with patch.object(ops, "_convert_to_spark_df", return_value=mock_df):
             result = ops.insert_rows(
                 table_path="test_db.test_table",
@@ -215,7 +192,6 @@ class TestHudiInsertOperations:
         assert result.success is True
         assert result.rows_affected == 3
 
-        # Verify temp view was created and cleaned up
         mock_df.createOrReplaceTempView.assert_called_once()
         mock_spark.catalog.dropTempView.assert_called_once()
 
@@ -241,13 +217,11 @@ class TestHudiInsertOperations:
 
         assert result.success is True
 
-        # Verify INSERT OVERWRITE was used
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("INSERT OVERWRITE" in str(call) for call in sql_calls)
 
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_insert_empty_dataframe(self):
-        """Test inserting empty dataframe returns 0 rows."""
         from benchbox.platforms.dataframe.hudi_maintenance import (
             HudiMaintenanceOperations,
         )
@@ -268,13 +242,10 @@ class TestHudiInsertOperations:
         assert result.success is True
         assert result.rows_affected == 0
 
-        # Verify no SQL was executed
         mock_spark.sql.assert_not_called()
 
 
 class TestHudiDeleteOperations:
-    """Tests for Hudi DELETE operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_delete_with_condition(self):
 
@@ -283,10 +254,9 @@ class TestHudiDeleteOperations:
         )
 
         mock_spark = MagicMock(spec=SparkSession)
-        # Mock count before and after
         mock_spark.sql.return_value.collect.side_effect = [
-            [{"cnt": 10}],  # count before
-            [{"cnt": 7}],  # count after
+            [{"cnt": 10}],
+            [{"cnt": 7}],
         ]
 
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
@@ -297,9 +267,8 @@ class TestHudiDeleteOperations:
         )
 
         assert result.success is True
-        assert result.rows_affected == 3  # 10 - 7
+        assert result.rows_affected == 3
 
-        # Verify DELETE FROM was called
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("DELETE FROM" in str(call) for call in sql_calls)
         assert any("order_date < '2020-01-01'" in str(call) for call in sql_calls)
@@ -312,10 +281,9 @@ class TestHudiDeleteOperations:
         )
 
         mock_spark = MagicMock(spec=SparkSession)
-        # Same count before and after
         mock_spark.sql.return_value.collect.side_effect = [
-            [{"cnt": 10}],  # count before
-            [{"cnt": 10}],  # count after (no change)
+            [{"cnt": 10}],
+            [{"cnt": 10}],
         ]
 
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
@@ -330,8 +298,6 @@ class TestHudiDeleteOperations:
 
 
 class TestHudiUpdateOperations:
-    """Tests for Hudi UPDATE operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_update_rows(self):
 
@@ -340,7 +306,6 @@ class TestHudiUpdateOperations:
         )
 
         mock_spark = MagicMock(spec=SparkSession)
-        # Mock matching count
         mock_spark.sql.return_value.collect.return_value = [{"cnt": 5}]
 
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
@@ -354,7 +319,6 @@ class TestHudiUpdateOperations:
         assert result.success is True
         assert result.rows_affected == 5
 
-        # Verify UPDATE was called with correct SET clause
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("UPDATE" in str(call) for call in sql_calls)
         assert any("SET" in str(call) for call in sql_calls)
@@ -382,8 +346,6 @@ class TestHudiUpdateOperations:
 
 
 class TestHudiMergeOperations:
-    """Tests for Hudi MERGE operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_merge_upsert(self):
 
@@ -409,7 +371,6 @@ class TestHudiMergeOperations:
         assert result.success is True
         assert result.rows_affected == 10
 
-        # Verify MERGE INTO was called
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("MERGE INTO" in str(call) for call in sql_calls)
         assert any("WHEN MATCHED" in str(call) for call in sql_calls)
@@ -436,14 +397,11 @@ class TestHudiMergeOperations:
                 when_matched={"value": "source.value"},
             )
 
-        # Verify temp view was created and cleaned up
         mock_source_df.createOrReplaceTempView.assert_called_once()
         mock_spark.catalog.dropTempView.assert_called_once()
 
 
 class TestHudiDataFrameConversion:
-    """Tests for DataFrame type conversion in Hudi."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_convert_spark_dataframe_passthrough(self):
 
@@ -563,8 +521,6 @@ class TestHudiDataFrameConversion:
 
 
 class TestHudiMaintenanceResultTiming:
-    """Tests for result timing in Hudi operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_result_includes_timing(self):
 
@@ -587,14 +543,10 @@ class TestHudiMaintenanceResultTiming:
 
         assert result.duration is not None
         assert result.duration >= 0
-        # Use <= because mocked operations can complete within the same clock tick
-        # (Windows time.time() has ~15ms resolution)
         assert result.start_time <= result.end_time
 
 
 class TestGetHudiMaintenanceOperations:
-    """Tests for the factory function."""
-
     def test_factory_returns_none_without_spark(self):
 
         from benchbox.platforms.dataframe.hudi_maintenance import (
@@ -629,8 +581,6 @@ class TestGetHudiMaintenanceOperations:
 
 
 class TestHudiWorkingDirectory:
-    """Tests for working directory configuration."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_init_with_working_dir(self, tmp_path):
 
@@ -670,8 +620,6 @@ class TestHudiWorkingDirectory:
 
 
 class TestHudiGCSPathNormalization:
-    """Tests for GCS path normalization."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_normalize_gcs_path(self):
 
@@ -682,15 +630,12 @@ class TestHudiGCSPathNormalization:
         mock_spark = MagicMock(spec=SparkSession)
         ops = HudiMaintenanceOperations(spark_session=mock_spark)
 
-        # GCS paths should get backtick quoting
         result = ops._normalize_table_identifier("gs://bucket/path/table")
         assert "`hudi`" in result
         assert "gs://bucket/path/table" in result
 
 
 class TestHudiMergeOperationsExtended:
-    """Extended tests for Hudi MERGE operations."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_merge_with_only_when_matched(self):
 
@@ -715,7 +660,6 @@ class TestHudiMergeOperationsExtended:
 
         assert result.success is True
 
-        # Verify MERGE INTO was called with WHEN MATCHED but not WHEN NOT MATCHED
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("MERGE INTO" in str(call) for call in sql_calls)
         assert any("WHEN MATCHED" in str(call) for call in sql_calls)
@@ -744,19 +688,15 @@ class TestHudiMergeOperationsExtended:
 
         assert result.success is True
 
-        # Verify MERGE INTO was called with WHEN NOT MATCHED
         sql_calls = [str(call) for call in mock_spark.sql.call_args_list]
         assert any("MERGE INTO" in str(call) for call in sql_calls)
 
 
 class TestHudiPySparkAvailability:
-    """Tests for PySpark availability checking."""
-
     def test_pyspark_available_constant(self):
 
         from benchbox.platforms.dataframe.hudi_maintenance import PYSPARK_AVAILABLE
 
-        # Just verify it's a boolean
         assert isinstance(PYSPARK_AVAILABLE, bool)
 
     def test_module_exports(self):
@@ -769,8 +709,6 @@ class TestHudiPySparkAvailability:
 
 
 class TestHudiInsertWithPartitions:
-    """Tests for INSERT with partition columns."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
     def test_insert_with_partition_columns(self):
 

@@ -1,5 +1,3 @@
-"""Shared helpers for cross-surface gate builders."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -10,21 +8,10 @@ from typing import Any
 
 @dataclass(frozen=True)
 class CrossSurfaceData:
-    """Everything the gate needs to compare a benchmark's two surfaces.
-
-    Returned by a benchmark's ``build`` function on a freshly generated, loaded
-    DuckDB cell. ``reference_sql`` and ``dataframe_query`` are keyed by the SAME
-    query id (the two surfaces are confirmed to correspond 1:1).
-    """
-
     connection: Any
     query_ids: Sequence[Any]
     reference_sql: Callable[[Any], str]
     dataframe_query: Callable[[Any], Any]
-    # The benchmark instance + the directory its data was generated into. The
-    # DataFrame surface is loaded from these via the real production loader,
-    # reading the SAME generated files the DuckDB SQL reference loaded, so the
-    # comparison stays a single bounded cell.
     benchmark: Any
     data_dir: Path
 
@@ -37,13 +24,6 @@ def _assemble_simple_duckdb_cell(
     label: str,
     dataframe_query: Callable[[Any], Any],
 ) -> CrossSurfaceData:
-    """Generate data, load it into an in-memory DuckDB cell, and wire both surfaces.
-
-    Shared assembly for builders whose SQL and DataFrame surfaces share the same
-    query ids (the common TPC-H / TPC-DS / TPC-H Skew shape). Builders with
-    divergent id schemes (NYC Taxi, TSBS DevOps) keep their own assembly plus a
-    builder-local id map.
-    """
     output_dir = Path(output_dir)
     benchmark.generate_data()
 
@@ -60,7 +40,6 @@ def _assemble_simple_duckdb_cell(
 
 
 def _load_duckdb_cell(benchmark: Any, output_dir: Path, table_names: Sequence[str], *, label: str) -> Any:
-    """Create an in-memory DuckDB, build the schema, load the data, and verify it."""
     import duckdb
 
     from benchbox.platforms.duckdb import DuckDBAdapter

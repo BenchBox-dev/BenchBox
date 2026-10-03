@@ -27,6 +27,14 @@ from scripts.publication.assembler import compute_tree_digest
 from scripts.publication.manifest import validate_manifest_dict
 from scripts.publication.verify_live import REQUIRED_ROUTE_CHECKSUMS
 
+CLI_DESCRIPTION = (
+    "Validate the immutable artifact selected for a publication.\n"
+    "\n"
+    "The GitHub artifact ID is the operator-facing selector.  This module validates\n"
+    "the producing workflow, manifest, complete required route coverage, and the\n"
+    "unpacked site tree before the approval gate or journal writer is reached.\n"
+)
+
 EXPECTED_WORKFLOW_NAME = "Publication Control Plane Deployment"
 EXPECTED_WORKFLOW_PATH = ".github/workflows/publication-deploy.yml"
 MAX_CANDIDATE_MEMBERS = 100_000
@@ -410,7 +418,7 @@ def create_candidate_metadata(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     sub = parser.add_subparsers(dest="command", required=True)
 
     create = sub.add_parser("create")

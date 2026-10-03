@@ -20,9 +20,7 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q4_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -33,9 +31,7 @@ def q4_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q4_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - pre-filter orders and lineitem before semi-join
-# ---------------------------------------------------------------------------
 
 
 def q4_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -89,9 +85,7 @@ def q4_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before semi-join
-# ---------------------------------------------------------------------------
 
 
 def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -150,9 +144,7 @@ def q4_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit named steps
-# ---------------------------------------------------------------------------
 
 
 def q4_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -199,9 +191,7 @@ def q4_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - compute late flag before filtering
-# ---------------------------------------------------------------------------
 
 
 def q4_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -252,9 +242,7 @@ def q4_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q4_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -278,9 +266,7 @@ def q4_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q4_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - use inner join instead of semi-join, then deduplicate
-# ---------------------------------------------------------------------------
 
 
 def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -328,9 +314,7 @@ def q4_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - combine date range as a tuple predicate
-# ---------------------------------------------------------------------------
 
 
 def q4_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -376,9 +360,7 @@ def q4_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort
-# ---------------------------------------------------------------------------
 
 
 def q4_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -423,9 +405,7 @@ def q4_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - count using len instead of count aggregation
-# ---------------------------------------------------------------------------
 
 
 def q4_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -455,8 +435,7 @@ def q4_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q4_VARIANTS = build_yaml_variants(__file__, globals(), 4, JOIN_AGG_SUBQUERY)

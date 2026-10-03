@@ -1,11 +1,6 @@
-"""AMPLab Big Data Benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides AMPLab Big Data Benchmark implementation that tests big data processing systems using web analytics workloads.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union

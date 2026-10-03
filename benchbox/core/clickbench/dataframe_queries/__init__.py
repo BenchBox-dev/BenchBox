@@ -1,13 +1,6 @@
-"""ClickBench DataFrame queries for Expression and Pandas families.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides DataFrame implementations of ClickBench analytics queries
-that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas and Dask) platforms.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

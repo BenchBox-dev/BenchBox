@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Backward-compatible wrapper for ``scripts/capture_chart_images.py``."""
 
 from __future__ import annotations
 

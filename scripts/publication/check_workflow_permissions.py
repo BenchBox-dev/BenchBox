@@ -32,6 +32,31 @@ from typing import Any
 
 import yaml
 
+CLI_DESCRIPTION = (
+    "Audit GitHub Actions workflow files for least-privilege permissions.\n"
+    "\n"
+    "This script inspects `.github/workflows/*.yml` files to verify that:\n"
+    "1. No workflow uses wildcard or unconstrained permissions (`write-all` or `read-all`).\n"
+    "2. Dangerous write permissions are scoped to the specific jobs requiring them.\n"
+    "3. The independent publication deployment workflow (`publication-deploy.yml`)\n"
+    "   strictly follows the armed production-deployer least-privilege contract:\n"
+    "   - `build` job has only `contents: read` (no write permissions).\n"
+    "   - `deploy` job alone receives the Pages deployment write capabilities.\n"
+    "   - `verify` job has only `contents: read` (read-only probes).\n"
+    "   - `rollback` has only the bounded Pages deployment capabilities needed to\n"
+    "     restore a cryptographically attested artifact plus `actions: read`.\n"
+    "\n"
+    "Usage:\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py --workflow .github/workflows/publication-deploy.yml\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py --strict\n"
+    "\n"
+    "Exit codes:\n"
+    "  0 - All workflow permission checks passed.\n"
+    "  1 - Permission violations found.\n"
+    "  2 - Invalid usage or unparseable YAML file.\n"
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 TARGET_PUBLICATION_DEPLOY_NAME = "publication-deploy.yml"
@@ -311,7 +336,7 @@ def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

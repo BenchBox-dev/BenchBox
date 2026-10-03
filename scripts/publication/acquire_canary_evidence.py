@@ -26,6 +26,20 @@ from typing import Any, Sequence
 
 from scripts.publication import journal
 
+CLI_DESCRIPTION = (
+    "Acquire and authenticate the current publication evidence bundle.\n"
+    "\n"
+    "Acquires real publication evidence (desired manifest, receipts, and drill records)\n"
+    "for canary verification and drift reconciliation.\n"
+    "\n"
+    "Evidence can be acquired from:\n"
+    "1. The publication journal (refs/heads/publication: state.json + transactions/<id>.json)\n"
+    "2. The durable GitHub Deployment ledger and Actions artifact\n"
+    "\n"
+    "When evidence is unavailable, this tool fails closed (exit 2) unless\n"
+    "--allow-unavailable is set, in which case it records evidence_status: unavailable.\n"
+)
+
 ENVIRONMENT = "independent-publication"
 WORKFLOW_PATH = ".github/workflows/publication-deploy.yml"
 WORKFLOW_NAME = "Publication Control Plane Deployment"
@@ -217,7 +231,7 @@ def acquire(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repository", required=True, help="GitHub repository (owner/repo)")
     parser.add_argument("--output-dir", required=True, type=Path, help="Target evidence directory")
     parser.add_argument("--repo-path", type=Path, default=Path("."), help="Path to local Git repository")

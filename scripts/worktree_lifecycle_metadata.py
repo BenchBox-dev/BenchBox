@@ -1,25 +1,4 @@
 #!/usr/bin/env python3
-"""Minimal durable lifecycle metadata for BenchBox disposable worktrees.
-
-Extends worktree lifecycle operations so every newly created worktree carries
-immutable provenance in per-worktree Git configuration:
-- lifecycle ID (UUID4)
-- creation timestamp (ISO 8601 UTC)
-- branch name
-- base ref and base commit OID
-- initial head commit OID
-- optional controller kind and stable controller ID (e.g. Bossmode)
-
-Separation of Concerns:
-- Immutable provenance is recorded locally at creation time via `git config --worktree`.
-- Mutable lifecycle state (task status, claims, runs, leases, liveness, evaluation)
-  belongs to the controller (e.g. Bossmode) and is NEVER duplicated locally.
-- Non-controller caller-owned worktrees support a non-destructive manual owner-release
-  record (`manual_released_at`, `manual_released_by`).
-- Legacy (uninstrumented) and foreign worktrees evaluate to unknown owner.
-- Zero Deletion Authority: No metadata field alone authorizes deletion. Worktree removal
-  remains strictly gated on explicit checks (clean, attached, unlocked).
-"""
 
 from __future__ import annotations
 
@@ -63,13 +42,11 @@ KNOWN_CONTROLLER_KINDS = {"bossmode", "manual", "none"}
 
 
 class MetadataError(RuntimeError):
-    """Raised when metadata validation or operations fail."""
+    pass
 
 
 @dataclasses.dataclass(frozen=True)
 class WorktreeLifecycleMetadata:
-    """Immutable lifecycle provenance and optional manual release record."""
-
     lifecycle_id: Optional[str]
     created_at: Optional[str]
     branch: Optional[str]
@@ -80,8 +57,8 @@ class WorktreeLifecycleMetadata:
     controller_id: Optional[str] = None
     manual_released_at: Optional[str] = None
     manual_released_by: Optional[str] = None
-    provenance_state: str = "unknown"  # managed | legacy | foreign | malformed | unknown
-    owner_state: str = "unknown"  # controller | caller-owned | released | unknown
+    provenance_state: str = "unknown"
+    owner_state: str = "unknown"
     deletion_authorized: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -118,34 +95,28 @@ def init_metadata(
     controller_kind: Optional[str] = None,
     controller_id: Optional[str] = None,
 ) -> WorktreeLifecycleMetadata:
-    """Publish immutable lifecycle provenance into the worktree git configuration."""
     if not worktree_path.is_dir():
         raise MetadataError(f"Worktree path does not exist or is not a directory: {worktree_path}")
 
-    # Verify worktree is registered and usable
     res = _run_git(["rev-parse", "--is-inside-work-tree"], worktree_path)
     if res.returncode != 0:
         raise MetadataError(f"Path is not a valid git worktree: {worktree_path}")
 
-    # Verify extensions.worktreeConfig is active
     ext_check = _run_git(["config", "--get", "extensions.worktreeConfig"], worktree_path)
     if ext_check.stdout.strip() != "true":
         _run_git(["config", "extensions.worktreeConfig", "true"], worktree_path)
 
-    # Resolve initial head
     head_res = _run_git(["rev-parse", "HEAD"], worktree_path)
     if head_res.returncode != 0 or not head_res.stdout.strip():
         raise MetadataError(f"Could not resolve HEAD in worktree: {worktree_path}")
     initial_head = head_res.stdout.strip()
 
-    # Resolve base OID if not provided
     if not base_oid:
         base_res = _run_git(["rev-parse", base_ref], worktree_path)
         if base_res.returncode != 0 or not base_res.stdout.strip():
             raise MetadataError(f"Could not resolve base ref {base_ref} in worktree: {worktree_path}")
         base_oid = base_res.stdout.strip()
 
-    # Check if metadata already exists (immutability check)
     existing_id = _get_worktree_config("lifecycle-id", worktree_path)
     if existing_id:
         raise MetadataError(f"Worktree already carries immutable lifecycle ID: {existing_id}")
@@ -153,7 +124,6 @@ def init_metadata(
     lifecycle_id = uuid.uuid4().hex
     created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Write immutable provenance fields
     _set_worktree_config("lifecycle-id", lifecycle_id, worktree_path)
     _set_worktree_config("created-at", created_at, worktree_path)
     _set_worktree_config("branch", branch, worktree_path)
@@ -178,7 +148,6 @@ def init_metadata(
 
 
 def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
-    """Read and classify worktree lifecycle metadata."""
     if not worktree_path.is_dir():
         return WorktreeLifecycleMetadata(
             lifecycle_id=None,
@@ -192,7 +161,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
             deletion_authorized=False,
         )
 
-    # Check if this is a usable git worktree
     is_wt = _run_git(["rev-parse", "--is-inside-work-tree"], worktree_path)
     if is_wt.returncode != 0:
         return WorktreeLifecycleMetadata(
@@ -218,7 +186,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
     manual_released_at = _get_worktree_config("manual-released-at", worktree_path)
     manual_released_by = _get_worktree_config("manual-released-by", worktree_path)
 
-    # Case 1: No lifecycle ID -> Legacy worktree
     if not lifecycle_id:
         return WorktreeLifecycleMetadata(
             lifecycle_id=None,
@@ -232,7 +199,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
             deletion_authorized=False,
         )
 
-    # Case 2: Validation of required immutable fields
     missing_required = not all([created_at, branch, base_ref, base_oid, initial_head])
     valid_timestamp = False
     if created_at:
@@ -245,7 +211,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
     valid_oid = bool(base_oid and re.match(r"^[0-9a-f]{40}$|^[0-9a-f]{64}$", base_oid))
     valid_head = bool(initial_head and re.match(r"^[0-9a-f]{40}$|^[0-9a-f]{64}$", initial_head))
 
-    # Check branch matches git current branch or ref
     current_branch_res = _run_git(["branch", "--show-current"], worktree_path)
     current_branch = current_branch_res.stdout.strip()
     branch_matches = (not current_branch) or (current_branch == branch)
@@ -267,7 +232,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
             deletion_authorized=False,
         )
 
-    # Case 3: Foreign controller check
     if controller_kind and controller_kind not in KNOWN_CONTROLLER_KINDS:
         return WorktreeLifecycleMetadata(
             lifecycle_id=lifecycle_id,
@@ -285,7 +249,6 @@ def read_metadata(worktree_path: Path) -> WorktreeLifecycleMetadata:
             deletion_authorized=False,
         )
 
-    # Case 4: Managed worktree
     if manual_released_at:
         owner_state = "released"
     elif controller_kind and controller_kind not in {"none", "manual"}:
@@ -314,7 +277,6 @@ def release_worktree(
     worktree_path: Path,
     released_by: Optional[str] = None,
 ) -> WorktreeLifecycleMetadata:
-    """Record a non-destructive manual owner-release on a caller-owned worktree."""
     meta = read_metadata(worktree_path)
 
     if meta.provenance_state != "managed":
@@ -329,11 +291,9 @@ def release_worktree(
         )
 
     if meta.manual_released_at:
-        # Already released — idempotent
         return meta
 
     if not released_by:
-        # Discover current actor identity
         ident_res = _run_git(["config", "--get", "user.name"], worktree_path)
         released_by = ident_res.stdout.strip() or os.environ.get("USER", "unknown-caller")
 

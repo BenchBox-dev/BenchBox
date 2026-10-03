@@ -1,10 +1,4 @@
-"""Tests for CoffeeShop DataFrame query implementations.
-
-Calls every expression_impl and pandas_impl function with a mock DataFrameContext
-so that the query body lines are covered.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -34,7 +28,7 @@ class _Expr:
     def __le__(self, other):
         return _Expr()
 
-    def __ne__(self, other):  # type: ignore[override]
+    def __ne__(self, other):
         return _Expr()
 
     def __and__(self, other):

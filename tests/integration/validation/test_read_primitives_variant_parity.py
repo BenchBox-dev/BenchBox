@@ -1,5 +1,3 @@
-"""Runtime parity checks for risky read_primitives platform variants."""
-
 from __future__ import annotations
 
 import json
@@ -86,7 +84,6 @@ _CLICKHOUSE_VARIANT_QUERIES = (
 
 @pytest.fixture(scope="session")
 def read_primitives_tpch_parquet_dir(tmp_path_factory):
-    """Generate TPC-H SF=0.01 Parquet data for local parity engines."""
     data_dir = tmp_path_factory.mktemp("read_primitives_variant_tpch_sf001")
     conn = duckdb.connect(":memory:")
     try:
@@ -100,7 +97,6 @@ def read_primitives_tpch_parquet_dir(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def read_primitives_duckdb_conn(read_primitives_tpch_parquet_dir):
-    """DuckDB reference connection loaded from the shared SF=0.01 Parquet data."""
     conn = duckdb.connect(":memory:")
     for table in _TPCH_TABLES:
         parquet_path = read_primitives_tpch_parquet_dir / f"{table}.parquet"
@@ -130,7 +126,6 @@ def read_primitives_contracts():
 
 @pytest.fixture(scope="session")
 def datafusion_ctx(read_primitives_tpch_parquet_dir):
-    """DataFusion context registered with the same SF=0.01 Parquet tables."""
     datafusion = pytest.importorskip("datafusion", reason="datafusion not installed")
     ctx = datafusion.SessionContext()
     for table in _TPCH_TABLES:
@@ -140,7 +135,6 @@ def datafusion_ctx(read_primitives_tpch_parquet_dir):
 
 @pytest.fixture(scope="session")
 def clickhouse_session(read_primitives_tpch_parquet_dir):
-    """ClickHouse-local session backed by the same SF=0.01 Parquet tables."""
     reason = chdb_skip_reason()
     if reason is not None:
         pytest.skip(reason)
@@ -288,7 +282,6 @@ def test_duckdb_reference_outputs_satisfy_declared_contracts(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """DuckDB reference rows should expose parseable nested values for risky families."""
     rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
 
     _assert_shape_contract(rows, read_primitives_contracts[query_id])
@@ -302,7 +295,6 @@ def test_datafusion_variants_match_duckdb_reference(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """DataFusion variants retained in the catalog should match DuckDB reference rows."""
     reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
     comparison_rows = _datafusion_rows(datafusion_ctx, read_primitives_queries_by_dialect["datafusion"][query_id])
     contract = read_primitives_contracts[query_id]
@@ -318,7 +310,6 @@ def test_datafusion_extreme_by_variants_preserve_duckdb_reference_order(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """MAX_BY/MIN_BY fallbacks must not rely on accidental row ordering."""
     reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
     comparison_rows = _datafusion_rows(datafusion_ctx, read_primitives_queries_by_dialect["datafusion"][query_id])
     contract = read_primitives_contracts[query_id]
@@ -333,7 +324,6 @@ def test_redshift_extreme_by_variants_preserve_duckdb_reference_order(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """Redshift MAX_BY/MIN_BY fallbacks are local-SQL-compatible and must stay ordered."""
     benchmark = ReadPrimitivesBenchmark()
     reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
     comparison_rows = _duckdb_rows(
@@ -352,7 +342,6 @@ def test_clickhouse_variants_match_duckdb_reference(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """ClickHouse-local variants retained in the catalog should match DuckDB reference rows."""
     reference_rows = _duckdb_rows(read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"][query_id])
     comparison_rows = _clickhouse_rows(clickhouse_session, read_primitives_queries_by_dialect["clickhouse"][query_id])
     contract = read_primitives_contracts[query_id]
@@ -361,13 +350,6 @@ def test_clickhouse_variants_match_duckdb_reference(
 
 
 def _flatten_named_struct(cell: Any) -> Any:
-    """Flatten ClickHouse's positionally-named Tuple encoding to a plain tuple.
-
-    ClickHouse ``tuple(a, b, c)`` decodes over Arrow as ``{'1': a, '2': b,
-    '3': c}`` while DuckDB ``ROW(a, b, c)`` decodes as ``(a, b, c)``. Both
-    follow SELECT order, so ordering dict values by integer key reproduces the
-    DuckDB shape for comparison.
-    """
     if isinstance(cell, dict) and cell and all(key.isdigit() for key in cell):
         return tuple(cell[str(index)] for index in range(1, len(cell) + 1))
     return cell
@@ -379,7 +361,6 @@ def test_clickhouse_struct_construction_matches_duckdb_reference(
     read_primitives_queries_by_dialect,
     read_primitives_contracts,
 ):
-    """ClickHouse tuple() construction should carry the same fields as DuckDB ROW()."""
     reference_rows = _duckdb_rows(
         read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"]["struct_construction"]
     )
@@ -397,12 +378,6 @@ def test_clickhouse_list_transform_matches_duckdb_reference(
     clickhouse_session,
     read_primitives_queries_by_dialect,
 ):
-    """ClickHouse arrayMap() scaling should match DuckDB list_transform() numerically.
-
-    DuckDB aggregates DECIMAL prices (decoded as Decimal) while ClickHouse
-    decodes them as float64, so comparison is numeric with tolerance rather
-    than exact canonical equality. Arrays are order-insensitive per contract.
-    """
     reference_rows = _duckdb_rows(
         read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"]["list_transform"]
     )
@@ -421,17 +396,7 @@ def test_clickhouse_list_transform_matches_duckdb_reference(
 
 
 def test_bigquery_array_unnest_variant_retained_with_contract(read_primitives_contracts):
-    """The BigQuery array_unnest variant should stay retained with its UNNEST shape.
-
-    BigQuery has no local execution engine in this suite, so runtime parity
-    requires live credentials and stays out of scope here. This locks the
-    retained variant, its UNNEST statement shape, and its result contract so
-    removal or reshaping fails loudly instead of drifting silently.
-    """
     benchmark = ReadPrimitivesBenchmark()
-    # Assert the variant exists first: get_query falls back to the base query
-    # (which also contains UNNEST), so the shape check below cannot catch a
-    # removed bigquery variant on its own.
     assert benchmark.query_manager.has_variant("array_unnest", "bigquery")
     sql = benchmark.query_manager.get_query("array_unnest", dialect="bigquery")
 

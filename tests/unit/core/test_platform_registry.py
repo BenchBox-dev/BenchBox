@@ -1,9 +1,6 @@
-"""Tests for core platform registry functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from pathlib import Path
@@ -51,10 +48,7 @@ KNOWN_PAID_PLATFORM_COST_CLASSES = {
 
 
 class TestPlatformRegistry:
-    """Test core PlatformRegistry functionality."""
-
     def setup_method(self):
-        """Clear registry cache before each test."""
         PlatformRegistry.clear_cache()
 
     @pytest.mark.parametrize("error_type", [None, ImportError, OSError])
@@ -86,12 +80,9 @@ class TestPlatformRegistry:
 
         assert isinstance(metadata, dict)
 
-        # Check that base platforms are present
-        # All platforms are now included if their dependencies can be imported
         base_platforms = {"duckdb", "sqlite"}
         assert base_platforms.issubset(set(metadata.keys()))
 
-        # Check structure of one platform
         duckdb_spec = metadata["duckdb"]
         required_keys = [
             "display_name",
@@ -123,15 +114,12 @@ class TestPlatformRegistry:
             assert PlatformRegistry.get_platform_names() == metadata_names
 
     def test_get_all_platform_metadata_returns_deeply_isolated_copy(self):
-        """Nested mutations must not poison registry decisions or the manifest."""
         metadata1 = PlatformRegistry.get_all_platform_metadata()
         metadata2 = PlatformRegistry.get_all_platform_metadata()
 
-        # Should be equal but not the same object
         assert metadata1 == metadata2
         assert metadata1 is not metadata2
 
-        # Top-level and nested mutations remain isolated from both cache and manifest.
         metadata1["test"] = "modified"
         metadata1["duckdb"]["capabilities"]["supports_sql"] = False
         metadata1["duckdb"]["capabilities"]["default_mode"] = "dataframe"
@@ -156,7 +144,6 @@ class TestPlatformRegistry:
         assert manifest_entry.metadata["libraries"][0]["name"] == "duckdb"
 
     def test_sibling_metadata_getters_return_isolated_nested_lists(self):
-        """PlatformInfo and PlatformCapability must not leak cache-owned lists."""
         info = PlatformRegistry.get_platform_info("duckdb")
         capabilities = PlatformRegistry.get_platform_capabilities("duckdb")
         assert info is not None
@@ -231,7 +218,7 @@ class TestPlatformRegistry:
     def test_detect_library_no_version(self, mock_import):
 
         mock_module = Mock()
-        del mock_module.__version__  # Remove __version__ attribute
+        del mock_module.__version__
         mock_import.return_value = mock_module
 
         lib_spec = {"name": "sqlite3", "required": True}
@@ -244,12 +231,9 @@ class TestPlatformRegistry:
 
     def test_platform_boundary_separation(self):
 
-        # The CLI should only access public methods, not private ones
         metadata = PlatformRegistry.get_all_platform_metadata()
 
-        # Ensure the metadata contains all the information CLI needs
         for _platform_name, platform_spec in metadata.items():
-            # Check that each platform has the required fields
             assert "display_name" in platform_spec
             assert "description" in platform_spec
             assert "category" in platform_spec
@@ -260,7 +244,6 @@ class TestPlatformRegistry:
             assert "supports" in platform_spec
             assert "support_status" in platform_spec
 
-            # Check library specifications have required fields
             for lib_spec in platform_spec["libraries"]:
                 assert "name" in lib_spec
                 assert "required" in lib_spec
@@ -270,11 +253,8 @@ class TestPlatformRegistry:
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         for platform_name in metadata:
-            # get_platform_info should work for all platforms in metadata
             platform_info = PlatformRegistry.get_platform_info(platform_name)
 
-            # If the platform is in our metadata, get_platform_info should return something
-            # (it may be None if adapters aren't registered, but at least it shouldn't crash)
             if platform_info:
                 assert platform_info.name == platform_name
                 assert platform_info.display_name == metadata[platform_name]["display_name"]
@@ -285,7 +265,6 @@ class TestPlatformRegistry:
 
         metadata = PlatformRegistry.get_all_platform_metadata()
 
-        # Verify base platforms are correctly categorized
         base_categories = {
             "duckdb": "analytical",
             "sqlite": "embedded",
@@ -359,7 +338,6 @@ class TestPlatformRegistry:
                 assert "required" in lib_spec
                 assert isinstance(lib_spec["required"], bool)
 
-                # If import_name is specified, it should be different from name or have a good reason
                 if "import_name" in lib_spec:
                     assert isinstance(lib_spec["import_name"], str)
 
@@ -372,7 +350,6 @@ class TestPlatformRegistry:
             assert isinstance(install_cmd, str)
             assert len(install_cmd) > 0, f"{platform_name} should have installation command"
 
-            # Most should be uv add commands or built-in, but pip is allowed for special cases (e.g., cudf)
             assert (
                 install_cmd.startswith("uv add")
                 or install_cmd.startswith("pip install")
@@ -380,7 +357,6 @@ class TestPlatformRegistry:
             ), f"Unexpected install command for {platform_name}: {install_cmd}"
 
     def test_pyspark_dual_mode_metadata(self):
-        """Ensure PySpark advertises dual SQL/DataFrame capabilities."""
         metadata = PlatformRegistry.get_all_platform_metadata()
         pyspark_spec = metadata["pyspark"]
 
@@ -417,7 +393,6 @@ class TestPlatformRegistry:
         assert "clickhouse" not in self_hosted_platforms
 
     def test_known_paid_platforms_expose_cost_class(self):
-        """Prompt safety gates rely on the coarse paid/free registry tag."""
         for platform_name, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
             caps = PlatformRegistry.get_platform_capabilities(platform_name)
             assert caps is not None
@@ -429,7 +404,6 @@ class TestPlatformRegistry:
         assert PlatformRegistry.get_platform_capabilities("sqlite").cost_class == "free"
 
     def test_all_platforms_have_exactly_one_valid_support_status(self):
-        """Every platform metadata entry must carry the accepted support taxonomy."""
         metadata = PlatformRegistry.get_all_platform_metadata()
         valid = set(SUPPORT_STATUS_VALUES)
 
@@ -450,7 +424,6 @@ class TestPlatformRegistry:
         }
 
     def test_support_status_is_distinct_from_dependency_availability(self):
-        """Support status is a product promise, not local optional dependency state."""
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         assert metadata["snowflake"]["support_status"] == "beta"
@@ -467,7 +440,6 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_optional_adapter_diagnostics_available(self, mock_import):
-        """Diagnostics report available adapters without registering them."""
         adapter_cls = object()
         mock_import.return_value = SimpleNamespace(SnowflakeAdapter=adapter_cls)
 
@@ -530,7 +502,6 @@ class TestPlatformRegistry:
         mock_import.assert_not_called()
 
     def test_public_docs_platform_and_benchmark_count_markers_match_registries(self):
-        """README and comparison matrix exact counts must track registry metadata."""
         from benchbox.core.benchmark_registry import get_all_benchmarks, list_public_benchmark_ids
 
         summary = PlatformRegistry.get_platform_count_summary()
@@ -558,7 +529,6 @@ class TestPlatformRegistry:
 
     def test_requires_cloud_storage_for_cloud_platforms(self):
 
-        # Cloud platforms that require cloud storage
         cloud_platforms = ["databricks", "bigquery", "snowflake", "redshift"]
 
         for platform_name in cloud_platforms:
@@ -568,7 +538,6 @@ class TestPlatformRegistry:
 
     def test_requires_cloud_storage_for_local_platforms(self):
 
-        # Local platforms that don't require cloud storage
         local_platforms = ["duckdb", "sqlite", "clickhouse"]
 
         for platform_name in local_platforms:
@@ -583,7 +552,6 @@ class TestPlatformRegistry:
         assert PlatformRegistry.requires_cloud_storage("DATABRICKS")
 
     def test_requires_cloud_storage_unknown_platform(self):
-        """Test that unknown platforms return False for cloud storage requirement."""
         assert not PlatformRegistry.requires_cloud_storage("unknown_platform")
         assert not PlatformRegistry.requires_cloud_storage("nonexistent")
 
@@ -594,7 +562,6 @@ class TestPlatformRegistry:
         assert isinstance(examples, list)
         assert len(examples) > 0
 
-        # Check that examples include expected patterns
         path_prefixes = [example.split("://")[0] + "://" if "://" in example else "" for example in examples]
         assert any("dbfs:" in example for example in examples), "Should include dbfs: examples"
         assert any("s3://" in prefix for prefix in path_prefixes), "Should include S3 examples"
@@ -606,7 +573,6 @@ class TestPlatformRegistry:
         assert isinstance(examples, list)
         assert len(examples) > 0
 
-        # BigQuery should only support GCS
         assert all("gs://" in example for example in examples), "BigQuery examples should all use gs://"
 
     def test_get_cloud_path_examples_snowflake(self):
@@ -616,7 +582,6 @@ class TestPlatformRegistry:
         assert isinstance(examples, list)
         assert len(examples) > 0
 
-        # Snowflake supports multiple cloud providers
         path_strings = " ".join(examples)
         assert "s3://" in path_strings, "Should include S3 examples"
         assert "azure://" in path_strings or "gcs://" in path_strings, "Should include other cloud providers"
@@ -628,7 +593,6 @@ class TestPlatformRegistry:
         assert isinstance(examples, list)
         assert len(examples) > 0
 
-        # Redshift should only support S3
         assert all("s3://" in example for example in examples), "Redshift examples should all use s3://"
 
     def test_get_cloud_path_examples_case_insensitive(self):
@@ -652,38 +616,21 @@ class TestPlatformRegistry:
         assert PlatformRegistry.get_cloud_path_examples("nonexistent") == []
 
     def test_all_expected_platforms_register_successfully(self):
-        """Regression test: Ensure all expected platforms register without circular import issues.
-
-        This test prevents regression from commit b4ab4d79 where adding
-        'from ..cli.exceptions import ConfigurationError' to platform adapters
-        created circular imports that prevented Snowflake, Redshift, and ClickHouse
-        from registering during auto_register_platforms().
-
-        The fix uses lazy imports to break the circular dependency.
-        """
-        # Expected platforms that should always register if dependencies are available
         expected_base_platforms = {"duckdb", "sqlite"}
         expected_cloud_platforms = {"databricks", "bigquery", "snowflake", "redshift", "clickhouse"}
 
         registered = set(PlatformRegistry.get_available_platforms())
 
-        # Base platforms should always be registered (no optional deps)
         assert expected_base_platforms.issubset(registered), (
             f"Base platforms missing: {expected_base_platforms - registered}"
         )
 
-        # Check each cloud platform individually with is_platform_available
-        # (they may not be in get_available_platforms if deps aren't installed,
-        # but they should be checked without ImportError)
         for platform in expected_cloud_platforms:
             try:
-                # This should not raise ImportError due to circular imports
                 is_available = PlatformRegistry.is_platform_available(platform)
-                # If deps are installed, it should be available
                 if is_available:
                     assert platform in registered, f"{platform} reports available but not in registered list"
             except ImportError as e:
-                # If there's an ImportError, it should be about missing deps, not circular imports
                 assert "circular" not in str(e).lower(), (
                     f"{platform} has circular import issue: {e}. "
                     "This likely means a top-level import was added that creates circular dependency. "
@@ -692,24 +639,18 @@ class TestPlatformRegistry:
 
 
 class TestPlatformRegistryBoundaries:
-    """Test platform registry boundaries and CLI integration."""
-
     def test_cli_uses_public_methods_only(self):
-        """Test that CLI should only use public methods."""
-        # Import the CLI platform manager
         from benchbox.cli.platform import PlatformManager
 
         manager = PlatformManager()
 
-        # These calls should work (public API)
-        metadata = manager.platform_registry  # Uses get_all_platform_metadata()
+        metadata = manager.platform_registry
         assert isinstance(metadata, dict)
 
-        # Test detect_library through manager
         lib_spec = {"name": "test", "required": True}
         with patch("benchbox.core.platform_registry.importlib.import_module") as mock_import:
             mock_import.side_effect = ImportError("test")
-            lib_info = manager._detect_library(lib_spec)  # Uses detect_library()
+            lib_info = manager._detect_library(lib_spec)
             assert isinstance(lib_info, LibraryInfo)
             assert not lib_info.installed
 
@@ -720,9 +661,7 @@ class TestPlatformRegistryBoundaries:
         manager = PlatformManager()
         metadata = manager.platform_registry
 
-        # CLI should be able to get all the information it needs
         for platform_name, platform_spec in metadata.items():
-            # All the fields the CLI uses should be present
             cli_required_fields = [
                 "display_name",
                 "description",
@@ -738,36 +677,29 @@ class TestPlatformRegistryBoundaries:
             for field in cli_required_fields:
                 assert field in platform_spec, f"Platform {platform_name} missing {field}"
 
-            # Library specs should have what CLI needs
             for lib_spec in platform_spec["libraries"]:
                 assert "name" in lib_spec
                 assert "required" in lib_spec
 
 
 class TestPlatformDisplayNames:
-    """Verify platform display names are correct and consistent."""
-
     def test_all_display_names_are_non_empty(self):
-        """All registered platforms must have a non-empty display_name."""
         metadata = PlatformRegistry.get_all_platform_metadata()
         empty = [k for k, v in metadata.items() if not v.get("display_name")]
         assert not empty, f"Platforms with empty display_name: {empty}"
 
     def test_fabric_dw_display_name_includes_microsoft(self):
-        """Microsoft Fabric Warehouse display name must include 'Microsoft' prefix."""
         registry = PlatformRegistry()
         info = registry.get_platform_info("fabric_dw")
         assert info.display_name == "Microsoft Fabric Warehouse"
 
     def test_athena_display_name_uses_amazon_not_aws(self):
-        """Amazon Athena display name must use 'Amazon', not 'AWS'."""
         registry = PlatformRegistry()
         info = registry.get_platform_info("athena")
         assert info.display_name == "Amazon Athena"
         assert not info.display_name.startswith("AWS")
 
     def test_dataproc_display_names_use_google_cloud(self):
-        """Google Cloud Dataproc display names must use 'Google Cloud', not 'GCP'."""
         registry = PlatformRegistry()
         for key in ("dataproc", "dataproc-serverless"):
             info = registry.get_platform_info(key)
@@ -775,14 +707,12 @@ class TestPlatformDisplayNames:
             assert "GCP" not in info.display_name, f"{key}: unexpected 'GCP' in '{info.display_name}'"
 
     def test_synapse_display_names_include_analytics(self):
-        """Azure Synapse display names must include full 'Analytics' suffix."""
         registry = PlatformRegistry()
         for key in ("synapse", "synapse-spark"):
             info = registry.get_platform_info(key)
             assert "Analytics" in info.display_name, f"{key}: expected 'Analytics' in '{info.display_name}'"
 
     def test_databricks_sql_display_name_disambiguates_from_dataframe(self):
-        """Databricks SQL display name must be distinct from Databricks DataFrame."""
         registry = PlatformRegistry()
         sql_name = registry.get_platform_info("databricks").display_name
         df_name = registry.get_platform_info("databricks-df").display_name
@@ -791,29 +721,23 @@ class TestPlatformDisplayNames:
 
 
 class TestPlatformAliases:
-    """Verify platform alias resolution works for renamed CLI keys."""
-
     def test_fabric_dw_hyphen_alias_resolves_via_cli_normalizer(self):
-        """fabric-dw (hyphen form) must resolve to fabric_dw canonical key via CLI layer."""
         from benchbox.cli.platform import normalize_platform_name
 
         assert normalize_platform_name("fabric-dw") == "fabric_dw"
 
     def test_fabric_dw_underscore_still_resolves(self):
-        """Legacy fabric_dw underscore form must still resolve (backward compat)."""
         from benchbox.cli.platform import normalize_platform_name
 
         assert normalize_platform_name("fabric_dw") == "fabric_dw"
 
     def test_fabric_dw_hyphen_resolves_via_registry(self):
-        """fabric-dw must resolve to a valid platform via the registry alias layer."""
         registry = PlatformRegistry()
         info = registry.get_platform_info("fabric-dw")
         assert info is not None
         assert info.display_name == "Microsoft Fabric Warehouse"
 
     def test_fabric_dw_and_fabric_hyphen_dw_return_same_platform(self):
-        """fabric_dw and fabric-dw must return the same platform info."""
         registry = PlatformRegistry()
         info_underscore = registry.get_platform_info("fabric_dw")
         info_hyphen = registry.get_platform_info("fabric-dw")

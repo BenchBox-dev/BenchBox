@@ -1,16 +1,9 @@
-"""Integration tests for TPC-DS Throughput Test implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains comprehensive integration tests for the TPC-DS throughput test
-functionality, including concurrent stream execution, proper parameter generation,
-and result validation according to TPC-DS specification.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 import threading
@@ -28,7 +21,6 @@ from benchbox.core.tpcds.throughput_test import (
     TPCDSThroughputTestResult,
 )
 
-# Mark all tests in this file as integration tests
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.slow,
@@ -36,50 +28,40 @@ pytestmark = [
 
 
 class MockConnection:
-    """Mock database connection for testing."""
-
     def __init__(self, query_responses: dict[str, list[dict[str, Any]]] | None = None):
         self.query_responses = query_responses or {}
         self.executed_queries = []
         self.closed = False
 
     def execute(self, query: str, params=None):
-        """Mock query execution."""
         self.executed_queries.append((query, params))
 
-        # Return mock results based on query
         if "SELECT" in query.upper():
-            # Return some mock data
             return [{"col1": "value1", "col2": "value2"}] * 10
 
         return []
 
     def close(self):
-        """Mock connection close."""
         self.closed = True
 
     def commit(self):
-        """Mock transaction commit."""
+        pass
 
     def rollback(self):
-        """Mock transaction rollback."""
+        pass
 
 
 class MockQueryManager:
-    """Mock query manager for testing."""
-
     def __init__(self):
         self.query_calls = []
 
     def get_query(self, query_id: int, **kwargs) -> str:
-        """Mock query generation."""
         self.query_calls.append((query_id, kwargs))
         return f"SELECT * FROM test_table WHERE id = {query_id};"
 
 
 @pytest.fixture
 def mock_connection_factory():
-    """Factory for creating mock database connections."""
 
     def factory():
         return MockConnection()
@@ -89,14 +71,12 @@ def mock_connection_factory():
 
 @pytest.fixture
 def temp_output_dir():
-    """Temporary directory for test outputs."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         yield Path(tmp_dir)
 
 
 @pytest.fixture
 def throughput_test_config():
-    """Basic throughput test configuration."""
     return TPCDSThroughputTestConfig(
         num_streams=2,
         scale_factor=1.0,
@@ -108,30 +88,25 @@ def throughput_test_config():
 
 @pytest.fixture
 def tpcds_benchmark():
-    """TPC-DS benchmark instance for testing."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=tmp_dir, verbose=False)
         yield benchmark
 
 
 class TestThroughputTestConfig:
-    """Test throughput test configuration."""
-
     def test_default_config(self):
 
         config = TPCDSThroughputTestConfig()
 
-        assert config.num_streams == 4  # Default from TPCDSThroughputTestConfig
+        assert config.num_streams == 4
         assert config.scale_factor == 1.0
         assert config.base_seed == 42
-        assert config.stream_timeout == 7200  # Default from TPCDSThroughputTestConfig
+        assert config.stream_timeout == 7200
         assert config.verbose is False
         assert config.max_workers is None
-        assert config.queries_per_stream is None  # Default: execute all queries
+        assert config.queries_per_stream is None
         assert config.enable_preflight is True
-        # Legacy per-stream reporting threshold remains configurable.
         assert config.min_success_rate == 0.70
-        # Opt-in cooperative cancellation must default OFF (behavior-preserving).
         assert config.cancel_on_timeout is False
 
     def test_custom_config(self):
@@ -152,8 +127,6 @@ class TestThroughputTestConfig:
 
 
 class TestThroughputTest:
-    """Test TPC-DS throughput test implementation."""
-
     def test_throughput_test_initialization(self, throughput_test_config, tpcds_benchmark):
 
         test = TPCDSThroughputTest(
@@ -178,10 +151,9 @@ class TestThroughputTest:
             verbose=throughput_test_config.verbose,
         )
 
-        # Test that the config was created with the expected number of streams
         assert test.config.num_streams == throughput_test_config.num_streams
         assert test.config.scale_factor == throughput_test_config.scale_factor
-        assert test.config.base_seed == 42  # Default base seed
+        assert test.config.base_seed == 42
 
     def test_throughput_at_size_calculation(self, throughput_test_config, tpcds_benchmark):
 
@@ -192,12 +164,7 @@ class TestThroughputTest:
             verbose=throughput_test_config.verbose,
         )
 
-        # Test with 2 streams, scale factor 0.1, duration 100 seconds
-        # Expected: 2 * 3600 * 0.1 / 100 = 7.2
-        # The calculation is done in the run method, so let's test that the config is set up correctly
         (throughput_test_config.num_streams * 3600 * throughput_test_config.scale_factor / 100.0)
-        # We can't test the internal calculation method since it's integrated into run(),
-        # so we just verify the config has the right values for calculation
         assert test.config.num_streams == throughput_test_config.num_streams
         assert test.config.scale_factor == throughput_test_config.scale_factor
 
@@ -210,8 +177,6 @@ class TestThroughputTest:
             verbose=throughput_test_config.verbose,
         )
 
-        # Since the throughput calculation is done in the run method and handles zero duration,
-        # we test that the configuration is properly set up
         assert test.config.num_streams > 0
         assert test.config.scale_factor > 0
 
@@ -222,12 +187,11 @@ class TestThroughputTest:
         tpcds_benchmark,
     ):
 
-        # Create test with minimal configuration
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
             connection_factory=mock_connection_factory,
             scale_factor=throughput_test_config.scale_factor,
-            num_streams=1,  # Use just 1 stream for faster test
+            num_streams=1,
             verbose=False,
         )
 
@@ -285,7 +249,6 @@ class TestThroughputTest:
 
         test = TPCDSThroughputTest(throughput_test_config)
 
-        # Create result with failures
         result = TPCDSThroughputTestResult(
             config=throughput_test_config,
             start_time="2023-01-01T00:00:00",
@@ -325,7 +288,6 @@ class TestThroughputTest:
         assert validation is False
 
     def test_validate_results_rejects_partial_run_despite_legacy_threshold(self, tpcds_benchmark):
-        """A lowered reporting threshold cannot make a partial result valid."""
         config = TPCDSThroughputTestConfig(num_streams=2, min_success_rate=0.5)
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
@@ -390,17 +352,11 @@ class TestThroughputTest:
         assert len(result.stream_results) == 2
         assert result.success is True
 
-        # Verify scale factor via canonical config path
         assert result.config.scale_factor == throughput_test_config.scale_factor
 
 
 class TestSuccessGateConfigurable:
-    """Cover the legacy per-stream threshold and strict run-level gate."""
-
     def test_finalize_stream_success_uses_configurable_gate(self, tpcds_benchmark):
-        """3/5 = 60% queries successful: fails against the default 70% gate,
-        passes against a lowered 50% gate -- proving the per-stream gate
-        (previously a second, separate hard-coded 0.7) now reads config."""
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
         def _make_result(min_success_rate: float) -> TPCDSThroughputStreamResult:
@@ -421,7 +377,6 @@ class TestSuccessGateConfigurable:
         assert _make_result(0.50).success is True
 
     def test_run_partial_stream_is_fatal_despite_legacy_success_threshold(self, tpcds_benchmark):
-        """A lowered reporting threshold cannot make a partial run scoreable."""
         connections: list[Mock] = []
 
         def factory() -> Mock:
@@ -463,8 +418,6 @@ class TestSuccessGateConfigurable:
 
 
 class TestCooperativeCancellation:
-    """Cover the opt-in cooperative-cancel wiring in TPCDSThroughputTest (w2)."""
-
     @staticmethod
     def _stream_query(query_id: int, variant: Any = None) -> Mock:
         sq = Mock()
@@ -541,7 +494,7 @@ class TestCooperativeCancellation:
         factory = self._connection_factory(connections)
 
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark, connection_factory=factory, num_streams=1)
-        config = TPCDSThroughputTestConfig(num_streams=1, enable_preflight=False)  # cancel_on_timeout defaults False
+        config = TPCDSThroughputTestConfig(num_streams=1, enable_preflight=False)
         test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
 
         stream_result = test._execute_stream(stream_id=0, seed=1, config=config)
@@ -550,19 +503,6 @@ class TestCooperativeCancellation:
         assert stream_result.success is True
 
     def test_execute_stream_ignores_stale_cancel_event_from_reused_config(self, tpcds_benchmark):
-        """Regression (review follow-up): a config object reused across
-        runs must not let a PRIOR run's already-``set()`` cancel event leak
-        into a later call where ``cancel_on_timeout`` is now False.
-
-        Simulates exactly the state ``StreamRunner.execute()`` leaves on a
-        config object after a run-1 timeout with ``cancel_on_timeout=True``
-        (this stream's ``Event`` set()), then reuses that SAME config
-        object with ``cancel_on_timeout`` flipped to False -- while
-        deliberately leaving ``_stream_cancel_events`` stale/untouched, to
-        isolate ``_execute_stream``'s own independent ``cancel_on_timeout``
-        gate (the belt-and-suspenders fix) from ``StreamRunner.execute()``'s
-        separate reset-to-``{}`` behavior on its own next call.
-        """
         connections: list[Mock] = []
         factory = self._connection_factory(connections)
 
@@ -573,7 +513,6 @@ class TestCooperativeCancellation:
         stale_config._stream_cancel_events[0].set()
         test._pregenerated_queries = {0: [(self._stream_query(1), "SELECT 1"), (self._stream_query(2), "SELECT 2")]}
 
-        # Reuse the SAME config object with cancel_on_timeout now False.
         stale_config.cancel_on_timeout = False
 
         stream_result = test._execute_stream(stream_id=0, seed=1, config=stale_config)
@@ -584,25 +523,16 @@ class TestCooperativeCancellation:
 
 
 class TestBenchmarkIntegration:
-    """Test integration with TPC-DS benchmark class."""
-
     def test_benchmark_run_throughput_test(self, tpcds_benchmark, mock_connection_factory):
 
-        # This test verifies that run_throughput_test exists and can be called
-        # The actual throughput test implementation is tested in other test classes
-
-        # Just verify the method exists and has the correct signature
         assert hasattr(tpcds_benchmark, "run_throughput_test")
         assert callable(tpcds_benchmark.run_throughput_test)
 
-        # We can't easily test the full execution without a real database,
-        # so we just verify the interface is correct by checking it accepts the expected parameters
         import inspect
 
         sig = inspect.signature(tpcds_benchmark.run_throughput_test)
         param_names = list(sig.parameters.keys())
 
-        # Verify expected parameters exist
         assert "connection_factory" in param_names
         assert "num_streams" in param_names
         assert "stream_timeout" in param_names
@@ -610,24 +540,17 @@ class TestBenchmarkIntegration:
 
     def test_benchmark_throughput_test_validation(self, tpcds_benchmark, mock_connection_factory):
 
-        # Test invalid num_streams
         with pytest.raises(ValueError, match="num_streams must be positive"):
             tpcds_benchmark.run_throughput_test(mock_connection_factory, num_streams=0)
 
-        # Test invalid stream_timeout
         with pytest.raises(ValueError, match="stream_timeout must be positive"):
             tpcds_benchmark.run_throughput_test(mock_connection_factory, stream_timeout=0)
-
-        # Note: base_seed validation was removed - negative seeds are technically valid for RNG
 
 
 @pytest.mark.slow
 class TestEndToEndThroughputTest:
-    """End-to-end throughput test scenarios."""
-
     def test_minimal_throughput_test(self, temp_output_dir):
 
-        # Create minimal config
         config = TPCDSThroughputTestConfig(
             num_streams=1,
             scale_factor=1.0,
@@ -635,11 +558,9 @@ class TestEndToEndThroughputTest:
             verbose=False,
         )
 
-        # Mock connection factory
         def connection_factory():
             return MockConnection()
 
-        # Run test with patched stream creation
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create_streams:
             mock_manager = Mock()
             mock_manager.generate_streams.return_value = {
@@ -655,7 +576,6 @@ class TestEndToEndThroughputTest:
             }
             mock_create_streams.return_value = mock_manager
 
-            # Create a mock benchmark with required attributes
             mock_benchmark = Mock()
             mock_benchmark.get_query = Mock(return_value="SELECT 1;")
             mock_benchmark.get_queries = Mock(return_value={"1": "SELECT 1;"})
@@ -684,11 +604,9 @@ class TestEndToEndThroughputTest:
             verbose=False,
         )
 
-        # Mock connection factory
         def connection_factory():
             return MockConnection()
 
-        # Run test with patched stream creation
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create_streams:
             mock_manager = Mock()
             mock_streams = {}
@@ -706,7 +624,6 @@ class TestEndToEndThroughputTest:
             mock_manager.generate_streams.return_value = mock_streams
             mock_create_streams.return_value = mock_manager
 
-            # Create a mock benchmark with required attributes
             mock_benchmark = Mock()
             mock_benchmark.get_query = Mock(return_value="SELECT 1;")
             mock_benchmark.get_queries = Mock(return_value={"1": "SELECT 1;", "2": "SELECT 2;", "3": "SELECT 3;"})

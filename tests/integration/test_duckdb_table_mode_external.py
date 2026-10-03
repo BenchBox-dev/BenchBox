@@ -1,5 +1,3 @@
-"""Integration coverage for DuckDB native vs external table mode parity."""
-
 from __future__ import annotations
 
 import duckdb
@@ -81,7 +79,7 @@ def _run_tpch_duckdb(
 @pytest.mark.integration
 @pytest.mark.duckdb
 def test_tpch_duckdb_external_mode_matches_native_results(tmp_path):
-    """TPC-H SF0.01 query output cardinality should match between native and external mode."""
+
     native_output = tmp_path / "native_data"
     external_output = tmp_path / "external_data"
     native_output.mkdir(parents=True, exist_ok=True)
@@ -107,7 +105,6 @@ def test_tpch_duckdb_external_mode_matches_native_results(tmp_path):
         force_regenerate=True,
     )
 
-    # Build Parquet inputs for external mode from materialized native tables.
     parquet_tables: dict[str, str] = {}
     con = duckdb.connect(str(native_db))
     try:
@@ -141,8 +138,6 @@ def test_tpch_duckdb_external_mode_matches_native_results(tmp_path):
 
     assert native_summary == external_summary
 
-    # Verify external mode actually created views, not materialized base tables.
-    # This guards against the table_mode flag being silently ignored by the runner.
     ext_con = duckdb.connect(str(external_db))
     try:
         table_types = ext_con.execute(
@@ -151,7 +146,7 @@ def test_tpch_duckdb_external_mode_matches_native_results(tmp_path):
         ).fetchall()
         views = {name for name, ttype in table_types if ttype == "VIEW"}
         base_tables = {name for name, ttype in table_types if ttype == "BASE TABLE"}
-        # All benchmark tables should be views in external mode
+
         for table_name in parquet_tables:
             assert table_name in views, (
                 f"Expected '{table_name}' to be a VIEW in external mode, "
@@ -164,11 +159,7 @@ def test_tpch_duckdb_external_mode_matches_native_results(tmp_path):
 @pytest.mark.integration
 @pytest.mark.duckdb
 def test_external_mode_works_on_reused_database(tmp_path):
-    """External mode must create VIEWs even when the database file already exists with native tables.
 
-    This reproduces the bug where --table-mode external was silently ignored
-    because the reuse path skipped create_external_tables entirely.
-    """
     native_dir = tmp_path / "native_data"
     external_dir = tmp_path / "external_data"
     native_dir.mkdir()
@@ -183,7 +174,6 @@ def test_external_mode_works_on_reused_database(tmp_path):
         verbose=False,
     )
 
-    # Step 1: Run in native mode - creates the database file with native tables.
     _run_tpch_duckdb(
         benchmark_instance=benchmark,
         output_dir=native_dir,
@@ -193,7 +183,6 @@ def test_external_mode_works_on_reused_database(tmp_path):
         force_regenerate=True,
     )
 
-    # Confirm native tables exist.
     con = duckdb.connect(str(db_path))
     try:
         native_types = dict(
@@ -204,7 +193,7 @@ def test_external_mode_works_on_reused_database(tmp_path):
         assert any(t == "BASE TABLE" for t in native_types.values()), (
             f"Expected BASE TABLEs after native run, got {native_types}"
         )
-        # Export to Parquet for external mode testing.
+
         parquet_tables: dict[str, str] = {}
         for table_name in sorted(benchmark.tables.keys()):
             parquet_path = external_dir / f"{table_name}.parquet"
@@ -213,8 +202,6 @@ def test_external_mode_works_on_reused_database(tmp_path):
     finally:
         con.close()
 
-    # Step 2: Re-run on the SAME database file in external mode.
-    # The database already exists and will hit the reuse path.
     benchmark_ext = TPCH(
         scale_factor=0.01,
         output_dir=str(external_dir),
@@ -233,7 +220,6 @@ def test_external_mode_works_on_reused_database(tmp_path):
         force_regenerate=False,
     )
 
-    # Step 3: Verify that VIEWs were created (not still only native tables).
     con = duckdb.connect(str(db_path))
     try:
         types_after = dict(
@@ -250,6 +236,5 @@ def test_external_mode_works_on_reused_database(tmp_path):
     finally:
         con.close()
 
-    # Queries should still succeed.
     assert external_result.total_queries >= 1
     assert all(qr["status"] == "SUCCESS" for qr in external_result.query_results)

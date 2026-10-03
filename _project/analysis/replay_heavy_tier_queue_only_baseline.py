@@ -1,30 +1,4 @@
 #!/usr/bin/env python3
-"""Replay the pinned heavy-tier queue-only baseline cohort.
-
-The cohort covers ``pr.yml`` runs with events ``pull_request`` and
-``merge_group`` created in [WINDOW_START, WINDOW_END]. The manifest pins every
-run ID in that window plus the expected per-job aggregates (runner-minutes,
-failure/cancellation counts, p50/p90). The replay re-fetches those runs and
-their jobs read-only from the GitHub API and requires:
-
-1. the live windowed run-ID set to equal the pinned set exactly, and
-2. the recomputed aggregates to match the pinned expected values.
-
-An offline mode recomputes from local runs/jobs JSON snapshots (the same shape
-as the collectors in the handoff evidence directory produce) for manifest
-construction audits without spending API budget::
-
-    uv run -- python _project/analysis/replay_heavy_tier_queue_only_baseline.py --self-test
-    uv run -- python _project/analysis/replay_heavy_tier_queue_only_baseline.py \\
-        --offline --runs-json <runs-pr.yml.json> --jobs-json <jobs-pr.yml.json>
-
-The live replay needs ``gh`` auth and roughly one jobs call per pinned run
-(~1,100 calls); it checks the rate-limit budget first and refuses when the
-remaining budget is below the estimate. Durations come from job
-``started_at``/``completed_at`` timestamps; jobs with conclusion ``None`` or
-``skipped``, or with missing timestamps, are excluded exactly as in the
-baseline collectors.
-"""
 
 from __future__ import annotations
 
@@ -56,9 +30,7 @@ HEAVY_JOBS = (
     "datafusion-integration",
     "clickhouse-integration",
 )
-# Jobs whose failure fails ci-required-result on a code-routed tree today.
 GATING_HEAVY_JOBS = frozenset({"medium-test", "correctness-gate", "plan-capture-gate", "tpch-binary-framing"})
-# continue-on-error samples: red but never blocking.
 SAMPLE_HEAVY_JOBS = frozenset({"postgres-integration", "datafusion-integration", "clickhouse-integration"})
 
 MINUTES_TOLERANCE = 0.5
@@ -95,11 +67,10 @@ CLI_DESCRIPTION = (
 
 
 class ReplayError(RuntimeError):
-    """The pinned cohort could not be replayed exactly."""
+    pass
 
 
 def normalize_job_name(name: str) -> str:
-    """Map matrix-expanded display names to canonical job keys."""
     if name.startswith("TPC-H binary framing"):
         return "tpch-binary-framing"
     if name.startswith("test ("):
@@ -112,14 +83,6 @@ def _timestamp(value: object) -> datetime:
 
 
 def job_minutes(job: dict[str, Any]) -> float | None:
-    """Minutes between started_at and completed_at, or None when excluded.
-
-    Rows with a real conclusion and present, parseable timestamps count even
-    when completed_at precedes started_at by a second: startup-cancelled jobs
-    carry that clock skew (run 32797475819, thirteen jobs at -1s each), and
-    the baseline collectors count them, so excluding them would move the
-    pinned cancellation counts.
-    """
     if job.get("conclusion") in (None, "skipped"):
         return None
     if not job.get("started_at") or not job.get("completed_at"):
@@ -139,7 +102,6 @@ def aggregate(
     jobs: dict[str, list[dict[str, Any]]],
     event: str,
 ) -> dict[str, Any]:
-    """Aggregate per-job stats for one event within the pinned window."""
     per_job: dict[str, dict[str, Any]] = defaultdict(
         lambda: {"ran": 0, "fail": 0, "cancelled": 0, "minutes": 0.0, "success_minutes": []}
     )
@@ -196,7 +158,6 @@ def heavy_failures(
     jobs: dict[str, list[dict[str, Any]]],
     event: str,
 ) -> list[dict[str, Any]]:
-    """Runs in the window/event where a heavy-tier job concluded failure."""
     found = []
     for run_id, run in runs.items():
         if run.get("event") != event:
@@ -225,14 +186,6 @@ def heavy_failures(
 
 
 def check_later_green(runs: dict[str, Any], jobs: dict[str, Any], expected: list[dict[str, Any]]) -> None:
-    """Require each pinned failure to have a later same-branch green run.
-
-    For every heavy-tier failure the manifest pins the earliest later
-    ``pull_request`` run on the same branch whose previously-failed jobs all
-    conclude ``success``, on a different head SHA. This validates the
-    recovery half of the baseline; merge ordering itself is not pinned
-    because run payloads carry no merge timestamps.
-    """
     for entry in expected:
         failed_id = str(entry["failed_run_id"])
         later_id = str(entry["later_run_id"])
@@ -264,7 +217,6 @@ def _assert_close(actual: float, expected: float, tolerance: float, label: str) 
 
 
 def check_against_expected(actual: dict[str, Any], expected: dict[str, Any], event: str) -> None:
-    """Require recomputed aggregates to match the pinned expectations."""
     if actual["runs"] != expected["runs"]:
         raise ReplayError(f"{event} run count differs: expected {expected['runs']!r}, got {actual['runs']!r}")
     _assert_close(actual["total_minutes"], expected["total_minutes"], MINUTES_TOLERANCE, f"{event} total")
@@ -284,7 +236,6 @@ def check_against_expected(actual: dict[str, Any], expected: dict[str, Any], eve
 
 
 def check_failures(actual: list[dict[str, Any]], expected: list[dict[str, Any]], event: str) -> None:
-    """Require the heavy-failure run set to match the pinned run IDs."""
     actual_ids = [(row["run_id"], tuple(row["failed_jobs"])) for row in actual]
     expected_ids = [(int(row["run_id"]), tuple(row["failed_jobs"])) for row in expected]
     if actual_ids != expected_ids:
@@ -302,9 +253,6 @@ def _gh_api(path: str) -> Any:
 
 
 def _rate_limit_remaining() -> int:
-    # Authenticated pool first: an unauthenticated api.github.com request
-    # succeeds but reports the anonymous allowance (tens of requests), which
-    # would always refuse a replay the token pool could afford.
     completed = subprocess.run(
         ["gh", "api", "rate_limit", "--jq", ".resources.core.remaining"],
         check=False,
@@ -324,7 +272,6 @@ def _rate_limit_remaining() -> int:
 
 
 def fetch_live(repo: str, manifest: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Fetch the pinned window's runs and jobs read-only via gh."""
     pinned_pr = {int(run_id) for run_id in manifest["pull_request_run_ids"]}
     pinned_mg = {int(run_id) for run_id in manifest["merge_group_run_ids"]}
     budget = len(pinned_pr) + len(pinned_mg)
@@ -389,7 +336,6 @@ def fetch_live(repo: str, manifest: dict[str, Any]) -> tuple[dict[str, Any], dic
 
 
 def offline_inputs(runs_path: Path, jobs_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Load local runs/jobs snapshots keyed by run ID string."""
     runs_raw = json.loads(runs_path.read_text(encoding="utf-8"))
     jobs_raw = json.loads(jobs_path.read_text(encoding="utf-8"))
     if isinstance(runs_raw, dict):
@@ -402,7 +348,6 @@ def offline_inputs(runs_path: Path, jobs_path: Path) -> tuple[dict[str, Any], di
 
 
 def replay_offline(manifest: dict[str, Any], runs_path: Path, jobs_path: Path) -> dict[str, Any]:
-    """Recompute from local snapshots and check against the manifest."""
     runs, jobs = offline_inputs(runs_path, jobs_path)
     pinned = {str(i) for i in manifest["pull_request_run_ids"]} | {str(i) for i in manifest["merge_group_run_ids"]}
     windowed = {
@@ -420,7 +365,6 @@ def replay_offline(manifest: dict[str, Any], runs_path: Path, jobs_path: Path) -
 
 
 def verify_aggregates(manifest: dict[str, Any], runs: dict[str, Any], jobs: dict[str, Any]) -> dict[str, Any]:
-    """Aggregate both events and check counts, minutes, and failure sets."""
     expected = manifest["expected"]
     actual_pr = aggregate(runs, jobs, "pull_request")
     actual_mg = aggregate(runs, jobs, "merge_group")
@@ -461,7 +405,6 @@ def _expect_replay_error(label: str, action: object) -> None:
 
 
 def self_test() -> None:
-    """Offline unit checks plus negative controls; no network access."""
     if normalize_job_name("TPC-H binary framing (macos-latest)") != "tpch-binary-framing":
         raise ReplayError("tpch name normalization regression")
     if normalize_job_name("test (ubuntu-latest, 3.12)") != "code-test":

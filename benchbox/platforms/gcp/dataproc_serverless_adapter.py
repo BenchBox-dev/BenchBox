@@ -32,6 +32,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import uuid
@@ -69,6 +70,14 @@ except ImportError:
     GOOGLE_CLOUD_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+
+def _script_argument(value: str) -> str:
+    try:
+        decoded = ast.literal_eval(f'"{value}"')
+    except (SyntaxError, ValueError):
+        return value
+    return decoded if isinstance(decoded, str) else value
 
 
 class DataprocBatchState:
@@ -300,23 +309,7 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         batch_id = f"benchbox-{uuid.uuid4().hex[:12]}"
         results_path = f"{self.gcs_staging_dir}/results/{batch_id}"
 
-        # Create PySpark script that runs the query and saves results
-        query_literal = json.dumps(query)
-        job_script = f'''
-from pyspark.sql import SparkSession
-
-spark = SparkSession.builder \\
-    .appName("BenchBox Query") \\
-    .enableHiveSupport() \\
-    .getOrCreate()
-
-spark.sql("USE {self.database}")
-
-result = spark.sql({query_literal})
-result.write.mode("overwrite").json("{results_path}")
-
-spark.stop()
-'''
+        job_script = Path(__file__).with_name("_dataproc_query.py").read_text(encoding="utf-8")
 
         # Upload script to GCS
         script_path = f"{self.gcs_staging_dir}/scripts/{batch_id}.py"
@@ -326,6 +319,7 @@ spark.stop()
         batch = {
             "pyspark_batch": {
                 "main_python_file_uri": script_path,
+                "args": [_script_argument(f"USE {self.database}"), query, _script_argument(results_path)],
             },
             "runtime_config": {
                 "version": self.runtime_version,

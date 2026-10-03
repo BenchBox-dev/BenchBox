@@ -1,16 +1,3 @@
-"""Shared result model for TPC throughput tests.
-
-``ThroughputStreamResult`` is the unified single-stream result type - both
-``TPCHThroughputStreamResult`` and ``TPCDSThroughputStreamResult`` were
-identical dataclasses; this replaces them.  Callers in each spec module
-define a backward-compatibility alias so existing import paths are unchanged.
-
-``ThroughputResult`` is the shared base for the per-test result.  It holds
-every field that TPC-H and TPC-DS share; the spec-specific ``config`` field
-lives on the subclasses in each spec's module, added via ``kw_only=True`` so
-the all-keyword callers are unaffected.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -18,7 +5,6 @@ from typing import Any, Optional
 
 
 def throughput_stream_succeeded(stream: Any) -> bool:
-    """Return whether one stream completed every attempted query successfully."""
     executed = getattr(stream, "queries_executed", None)
     successful = getattr(stream, "queries_successful", None)
     if not isinstance(executed, int) or not isinstance(successful, int) or executed <= 0:
@@ -30,11 +16,6 @@ def throughput_stream_succeeded(stream: Any) -> bool:
 
 
 def throughput_result_succeeded(result: Any, requested_streams: int | None = None) -> bool:
-    """Return whether every requested stream completed successfully.
-
-    This is the product/export validity rule, intentionally stricter than
-    legacy configurable success-rate reporting on individual TPC harnesses.
-    """
     if requested_streams is None:
         requested_streams = getattr(getattr(result, "config", None), "num_streams", None)
     if not isinstance(requested_streams, int) or requested_streams <= 0:
@@ -52,13 +33,6 @@ def throughput_result_succeeded(result: Any, requested_streams: int | None = Non
 
 @dataclass
 class ThroughputStreamResult:
-    """Result of a single concurrent throughput test stream.
-
-    Shared by TPC-H and TPC-DS.  Each spec module exports a
-    backward-compat alias (``TPCHThroughputStreamResult``,
-    ``TPCDSThroughputStreamResult``).
-    """
-
     stream_id: int
     start_time: float
     end_time: float
@@ -73,26 +47,6 @@ class ThroughputStreamResult:
 
 @dataclass
 class ThroughputResult:
-    """Base result dataclass for TPC throughput tests.
-
-    Contains every field shared between TPC-H and TPC-DS.  Spec-specific
-    subclasses add ``config`` as a ``kw_only=True`` field so all-keyword
-    construction still works:
-
-    .. code-block:: python
-
-        @dataclass
-        class TPCHThroughputTestResult(ThroughputResult):
-            config: TPCHThroughputTestConfig = field(kw_only=True)
-
-            @property
-            def scale_factor(self) -> float:
-                return self.config.scale_factor
-
-    All existing field names on ``TPCHThroughputTestResult`` and
-    ``TPCDSThroughputTestResult`` are preserved; no public API changes.
-    """
-
     start_time: str
     end_time: str
     total_time: float
@@ -103,19 +57,11 @@ class ThroughputResult:
     query_throughput: float = 0.0
     success: bool = True
     errors: list[str] = field(default_factory=list)
-    # Outstanding-work ownership state, populated by StreamRunner.execute()
-    # when the timeout deadline elapses with streams still active. All plain
-    # data so results stay serializable; worker-thread handles live
-    # separately (see StreamRunner and containment.await_quiescence).
     outstanding_stream_ids: list[int] = field(default_factory=list)
     cancelled_stream_ids: list[int] = field(default_factory=list)
     outstanding_notes: list[str] = field(default_factory=list)
-    # Last observable cleanup state: "complete" (nothing outstanding),
-    # "outstanding" (timed-out work may still be executing), or "quiesced"
-    # (termination observed after the fact via await_quiescence).
     cleanup_state: str = "complete"
 
     @property
     def has_outstanding_work(self) -> bool:
-        """Whether timed-out work may still be executing and owning resources."""
         return bool(self.outstanding_stream_ids)

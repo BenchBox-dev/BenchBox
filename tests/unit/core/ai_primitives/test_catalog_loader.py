@@ -1,9 +1,6 @@
-"""Tests for AI Primitives catalog loader.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -20,8 +17,6 @@ pytestmark = [
 
 
 class TestAIQuery:
-    """Tests for AIQuery dataclass."""
-
     def test_query_creation(self):
 
         query = AIQuery(
@@ -92,8 +87,6 @@ class TestAIQuery:
 
 
 class TestLoadAICatalog:
-    """Tests for catalog loading functionality."""
-
     def test_load_catalog_success(self):
 
         catalog = load_ai_catalog()
@@ -106,7 +99,6 @@ class TestLoadAICatalog:
 
         catalog = load_ai_catalog()
 
-        # Check for expected query IDs
         expected_queries = [
             "generative_complete_simple",
             "nlp_sentiment_single",
@@ -118,7 +110,6 @@ class TestLoadAICatalog:
             assert query_id in catalog.queries, f"Expected query '{query_id}' not found"
 
     def test_catalog_queries_have_required_fields(self):
-        """Test all queries have required fields."""
         catalog = load_ai_catalog()
 
         for query_id, query in catalog.queries.items():
@@ -139,20 +130,16 @@ class TestLoadAICatalog:
         assert expected_categories.issubset(categories)
 
     def test_catalog_skip_on_includes_unsupported(self):
-        """Test queries skip unsupported platforms."""
         catalog = load_ai_catalog()
 
         unsupported = {"duckdb", "sqlite", "postgresql"}
 
         for query_id, query in catalog.queries.items():
             if query.skip_on:
-                # Check that common unsupported platforms are in skip_on
                 for platform in unsupported:
                     if platform in query.skip_on:
                         break
                 else:
-                    # At least one unsupported platform should be in skip_on
-                    # unless it's a special query
                     pass
 
     def test_catalog_variants_format(self):
@@ -169,8 +156,6 @@ class TestLoadAICatalog:
 
 
 class TestCatalogValidation:
-    """Tests for catalog validation logic."""
-
     def test_catalog_no_duplicates(self):
 
         catalog = load_ai_catalog()

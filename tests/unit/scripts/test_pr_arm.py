@@ -1,5 +1,3 @@
-"""Tests for scripts/pr_arm.py: arm the exact head, refuse on any live hold."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -48,8 +46,6 @@ def _view(**overrides) -> dict:
 
 
 class FakeGh:
-    """Record every command and answer like the real `git` and `gh` would, including their refusals."""
-
     def __init__(self, view: dict | str | None = None, listed: list[int] | str | None = None, **kwargs) -> None:
         self.view = _view() if view is None else view
         self.listed = [7] if listed is None else listed
@@ -69,7 +65,6 @@ class FakeGh:
             body = self.listed if isinstance(self.listed, str) else json.dumps([{"number": n} for n in self.listed])
             return 0, body
         if cmd[:3] == ["gh", "pr", "view"]:
-            # Real gh rejects --repo with no PR argument ("argument required when using the --repo flag").
             assert len(cmd) > 3 and not cmd[3].startswith("-"), f"gh pr view needs a selector: {cmd}"
             body = self.view if isinstance(self.view, str) else json.dumps(self.view)
             return self.view_code, body
@@ -106,7 +101,7 @@ def test_default_resolves_the_current_branch_pr_before_viewing_it() -> None:
     assert listing[listing.index("--head") + 1] == "fix/thing"
     assert listing[listing.index("--base") + 1] == "develop"
     view = next(call for call in gh.calls if call[:3] == ["gh", "pr", "view"])
-    assert view[3] == "7"  # an explicit selector, never a bare `gh pr view --repo`
+    assert view[3] == "7"
 
 
 @pytest.mark.parametrize("listed", [[], [7, 8]])
@@ -148,7 +143,6 @@ def test_refuses_without_merging_when_the_live_pr_says_not_ready(
 def test_an_expected_head_that_is_not_local_head_is_refused_before_any_gh_call(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    # PR head A is pushed, but local HEAD holds an unpushed correction B: HEAD=A must not arm A.
     gh = FakeGh(view=_view(headRefOid="a" * 40), local_head="b" * 40)
     assert _arm(gh, head="a" * 40) == 2
     assert gh.merged() == []
@@ -175,7 +169,7 @@ def test_reports_every_reason_not_just_the_first(capsys: pytest.CaptureFixture[s
     [
         (FakeGh(view="gh: not found", view_code=1), "cannot read the pull request"),
         (FakeGh(view="not json"), "live state could not be verified"),
-        (FakeGh(view="[]"), "live state could not be verified"),  # valid JSON of the wrong shape
+        (FakeGh(view="[]"), "live state could not be verified"),
         (FakeGh(view="{}"), "live state could not be verified"),
         (FakeGh(listed="not json"), "live state could not be verified"),
     ],
@@ -224,10 +218,9 @@ def test_fails_closed_when_a_command_cannot_be_executed(capsys: pytest.CaptureFi
     ],
 )
 def test_only_a_plain_pr_number_may_reach_gh(selector: str, capsys: pytest.CaptureFixture[str]) -> None:
-    """A URL selector makes gh read another repository's PR, so the PR checked could differ from the one armed."""
     gh = FakeGh()
     assert _arm(gh, pr=selector) == 2
-    assert gh.calls == [["git", "rev-parse", "HEAD"]]  # nothing but the local HEAD read happened
+    assert gh.calls == [["git", "rev-parse", "HEAD"]]
     assert gh.merged() == []
     assert "plain PR number" in capsys.readouterr().err
 
@@ -253,7 +246,6 @@ def test_makefile_exposes_pr_arm_through_the_helper_and_declares_it_phony() -> N
 
 
 def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str, str]]:
-    """Run the real `make pr-arm` with a recording `uv` shim; return the shim's argv and PR_ARM_* environment."""
     shim = tmp_path / "uv"
     shim.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD/argv"\nenv | grep "^PR_ARM_" | sort > "$RECORD/env"\n')
     shim.chmod(0o755)
@@ -283,7 +275,7 @@ def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str
         "$(echo injected)",
         "'7'",
         '"7"',
-        "7 ",  # make trims leading blanks off an assignment itself, but keeps trailing ones
+        "7 ",
         "https://github.com/other-org/other-repo/pull/7",
     ],
 )
@@ -292,7 +284,6 @@ def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
     tmp_path: Path, name: str, value: str
 ) -> None:
     argv, env = _make_pr_arm(tmp_path, f"{name}={value}")
-    # The helper gets no extra command-line words, so a value cannot add `--pr 8` or `--repo x/y`.
     assert argv == ["run", "--", "python", "scripts/pr_arm.py"]
     assert env[f"PR_ARM_{name}"] == value
     assert env[f"PR_ARM_{name}_SET"] == "1"
@@ -300,11 +291,6 @@ def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
 
 @pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
 def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path: Path, name: str) -> None:
-    """The recipe has no shell word for the value, so `;` and backticks stay text.
-
-    A `$(shell ...)` typed on the make command line is expanded by make itself for every target in this
-    Makefile; that is the invoker's own input and is deliberately not asserted here.
-    """
     marker = tmp_path / "ran"
     for value in (f"7; touch {marker}", f"7`touch {marker}`", f"7 && touch {marker}", f"7 | touch {marker}"):
         _, env = _make_pr_arm(tmp_path, f"{name}={value}")
@@ -336,11 +322,10 @@ def _make_other_target(tmp_path: Path, target: str, *assignments: str) -> subpro
 def test_making_pr_arm_literal_does_not_change_how_other_targets_see_a_value(
     tmp_path: Path, target: str, variable: str
 ) -> None:
-    """A global `override` would hand `$(cmd)` text to these targets' double-quoted shell recipes."""
     marker = tmp_path / "ran"
     result = _make_other_target(tmp_path, target, f"{variable}=$(touch {marker})")
     assert not marker.exists(), result.stderr
-    assert result.returncode != 0  # each refuses for a missing PR, head or evidence, as before
+    assert result.returncode != 0
 
 
 @pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
@@ -370,7 +355,7 @@ def test_main_passes_the_raw_environment_values_to_arm(monkeypatch: pytest.Monke
     assert seen == [(None, None, pr_arm.REPOSITORY)]
     seen.clear()
     assert pr_arm.main([], env={"PR_ARM_PR": "", "PR_ARM_PR_SET": "1"}) == 0
-    assert seen == [("", None, pr_arm.REPOSITORY)]  # an explicitly empty selector is not an omitted one
+    assert seen == [("", None, pr_arm.REPOSITORY)]
 
 
 @pytest.mark.parametrize("repo", ["other", "a/b/c", "a b/c", "a/b;c", "", "https://github.com/a/b"])

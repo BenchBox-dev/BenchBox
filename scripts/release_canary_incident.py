@@ -1,17 +1,3 @@
-"""Summarize a release-canary run as an owned incident update.
-
-Release readiness blocks on a green, fresh canary, but a red canary used to
-alert nobody: the 2026-09-14 regression stayed red for ten days while further
-regressions piled on top of it. This script turns one canary run into the text
-of an incident issue, so a red run opens (or updates) one owned issue and the
-next green run closes it.
-
-It reads the shard pytest logs uploaded by the canary and the per-job results,
-and writes a JSON document with the state (``red`` or ``green``), the failing
-test IDs, and the issue title, body, and comment. Posting to GitHub stays in
-the workflow.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -47,7 +33,6 @@ _SHARD_INDEX = re.compile(r"shard-(\d+)-pytest\.log$")
 
 
 def parse_failures(log_text: str) -> list[str]:
-    """Return the failing and erroring pytest node IDs in one shard log."""
     failures = []
     for line in log_text.splitlines():
         match = _FAILURE_LINE.match(line.strip())
@@ -57,12 +42,10 @@ def parse_failures(log_text: str) -> list[str]:
 
 
 def is_truncated(log_text: str) -> bool:
-    """Return whether ``--maxfail`` stopped the shard before it finished."""
     return bool(_MAXFAIL_LINE.search(log_text))
 
 
 def collect_failures(artifacts_dir: Path) -> tuple[list[str], list[int]]:
-    """Return failing node IDs across all shard logs and the truncated shards."""
     failures: set[str] = set()
     truncated: set[int] = set()
     for log_path in sorted(artifacts_dir.rglob(SHARD_LOG_GLOB)):
@@ -76,7 +59,6 @@ def collect_failures(artifacts_dir: Path) -> tuple[list[str], list[int]]:
 
 
 def parse_job_results(pairs: Iterable[str]) -> dict[str, str]:
-    """Parse ``name=result`` pairs; a missing result counts as not success."""
     results = {}
     for pair in pairs:
         name, sep, result = pair.partition("=")
@@ -109,7 +91,6 @@ def render(
     last_green_sha: str,
     repo_url: str,
 ) -> dict[str, Any]:
-    """Build the incident update for one canary run."""
     failed_jobs = sorted(name for name, result in job_results.items() if result != "success")
     state = "red" if failed_jobs else "green"
     short_sha = checked_sha[:9] or "unknown"

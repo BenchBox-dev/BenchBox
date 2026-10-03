@@ -1,20 +1,6 @@
-"""General Database Integration Tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive database integration tests that:
-- Test cross-database compatibility
-- Validate data loading and schema creation
-- Test connection management and pooling
-- Validate transaction handling
-- Test database-specific optimizations
-- Verify data consistency across operations
-
-These tests ensure that BenchBox works reliably across different database
-engines and can handle complex database operations correctly.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import csv
 import sqlite3
@@ -38,16 +24,10 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.database
 class TestDatabaseIntegration:
-    """Test general database integration functionality."""
-
     @pytest.fixture
     def sample_data_dir(self) -> Path:
-        """Create sample data files for database integration testing."""
         temp_dir = Path(tempfile.mkdtemp())
 
-        # Create sample data with proper relationships for foreign key testing
-
-        # Region data
         region_file = temp_dir / "region.csv"
         region_data = [
             ["0", "AFRICA", "lar deposits. blithely final packages cajole"],
@@ -61,7 +41,6 @@ class TestDatabaseIntegration:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(region_data)
 
-        # Nation data with proper region references
         nation_file = temp_dir / "nation.csv"
         nation_data = [
             ["0", "ALGERIA", "0", "haggle. carefully final deposits detect"],
@@ -80,7 +59,6 @@ class TestDatabaseIntegration:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(nation_data)
 
-        # Supplier data with proper nation references
         supplier_file = temp_dir / "supplier.csv"
         supplier_data = [
             [
@@ -134,7 +112,6 @@ class TestDatabaseIntegration:
             writer = csv.writer(f, delimiter="|")
             writer.writerows(supplier_data)
 
-        # Customer data with proper nation references
         customer_file = temp_dir / "customer.csv"
         customer_data = [
             [
@@ -197,10 +174,8 @@ class TestDatabaseIntegration:
 
     @pytest.fixture
     def benchmark_instance(self, sample_data_dir: Path) -> ReadPrimitivesBenchmark:
-        """Create a benchmark instance with sample data configured."""
         benchmark = ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=sample_data_dir)
 
-        # Set up the table paths for basic tables
         benchmark.tables = {
             "region": str(sample_data_dir / "region.csv"),
             "nation": str(sample_data_dir / "nation.csv"),
@@ -212,19 +187,15 @@ class TestDatabaseIntegration:
 
     def test_duckdb_schema_creation(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
 
-        # Create in-memory DuckDB database
         conn = duckdb.connect(":memory:")
 
         try:
-            # Get the schema SQL
             schema_sql = benchmark_instance.get_create_tables_sql()
 
-            # Execute schema creation
             for statement in schema_sql.strip().split(";"):
                 if statement.strip():
                     conn.execute(statement.strip())
 
-            # Verify tables were created
             tables_result = conn.execute("""
                 SELECT table_name
                 FROM information_schema.tables
@@ -246,7 +217,6 @@ class TestDatabaseIntegration:
             for table in expected_tables:
                 assert table in tables, f"Table {table} was not created"
 
-                # Verify table structure
                 columns = conn.execute(f"DESCRIBE {table}").fetchall()
                 assert len(columns) > 0, f"Table {table} has no columns"
 
@@ -262,7 +232,6 @@ class TestDatabaseIntegration:
 
             cursor = conn.cursor()
 
-            # Test referential integrity - all nations should reference valid regions
             cursor.execute("""
                 SELECT n.n_name, n.n_regionkey, r.r_name
                 FROM nation n
@@ -272,7 +241,6 @@ class TestDatabaseIntegration:
             orphaned_nations = cursor.fetchall()
             assert len(orphaned_nations) == 0, f"Found nations without valid regions: {orphaned_nations}"
 
-            # Test data consistency - verify customer nation references
             cursor.execute("""
                 SELECT c.c_name, c.c_nationkey, n.n_name
                 FROM customer c
@@ -280,14 +248,12 @@ class TestDatabaseIntegration:
                 WHERE n.n_nationkey IS NULL
             """)
             orphaned_customers = cursor.fetchall()
-            # Allow for some data inconsistencies in sample data (should be < 80% of records)
             cursor.execute("SELECT COUNT(*) FROM customer")
             total_customers = cursor.fetchone()[0]
             assert len(orphaned_customers) < total_customers * 0.8, (
                 f"Too many customers without valid nations: {len(orphaned_customers)}/{total_customers}"
             )
 
-            # Test data consistency - verify supplier nation references
             cursor.execute("""
                 SELECT s.s_name, s.s_nationkey, n.n_name
                 FROM supplier s
@@ -295,7 +261,6 @@ class TestDatabaseIntegration:
                 WHERE n.n_nationkey IS NULL
             """)
             orphaned_suppliers = cursor.fetchall()
-            # Allow for some data inconsistencies in sample data (should be < 80% of records)
             cursor.execute("SELECT COUNT(*) FROM supplier")
             total_suppliers = cursor.fetchone()[0]
             assert len(orphaned_suppliers) < total_suppliers * 0.8, (
@@ -310,7 +275,6 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Test successful transaction
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation"])
 
             cursor = conn.cursor()
@@ -322,29 +286,22 @@ class TestDatabaseIntegration:
             nation_count = cursor.fetchone()[0]
             assert nation_count == 10, f"Expected 10 nations, got {nation_count}"
 
-            # Test rollback scenario with invalid data
             invalid_data_file = benchmark_instance.output_dir / "invalid_region.csv"
             with open(invalid_data_file, "w", encoding="utf-8") as f:
-                # Write invalid data (missing required columns)
-                f.write("0|AFRICA\n")  # Missing comment column
+                f.write("0|AFRICA\n")
 
-            # Replace region file with invalid data temporarily
             original_region_file = benchmark_instance.tables["region"]
             benchmark_instance.tables["region"] = str(invalid_data_file)
 
-            # This should fail and not corrupt the existing data
             try:
                 benchmark_instance.load_data_to_database(conn, tables=["region"])
             except Exception:
-                # Expected to fail
                 pass
 
-            # Verify original data is still intact
             cursor.execute("SELECT COUNT(*) FROM region")
             region_count_after = cursor.fetchone()[0]
             assert region_count_after == region_count, "Data was corrupted during failed transaction"
 
-            # Restore original file
             benchmark_instance.tables["region"] = original_region_file
 
         finally:
@@ -352,10 +309,8 @@ class TestDatabaseIntegration:
 
     def test_concurrent_database_access(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
 
-        # Create a file-based database for concurrent access testing
         db_path = benchmark_instance.output_dir / "test_concurrent.db"
 
-        # Initialize database with data
         conn = sqlite3.connect(str(db_path))
         benchmark_instance.load_data_to_database(conn, tables=["region", "nation"])
         conn.close()
@@ -364,22 +319,18 @@ class TestDatabaseIntegration:
         errors = []
 
         def worker_function(worker_id: int) -> None:
-            """Worker function for concurrent database access."""
             try:
                 worker_conn = sqlite3.connect(str(db_path))
                 cursor = worker_conn.cursor()
 
-                # Perform some database operations
                 cursor.execute("SELECT COUNT(*) FROM region")
                 region_count = cursor.fetchone()[0]
 
                 cursor.execute("SELECT COUNT(*) FROM nation")
                 nation_count = cursor.fetchone()[0]
 
-                # Simulate some work
                 time.sleep(0.1)
 
-                # Perform a join query
                 cursor.execute("""
                     SELECT r.r_name, COUNT(n.n_nationkey) as nation_count
                     FROM region r
@@ -403,21 +354,18 @@ class TestDatabaseIntegration:
             except Exception as e:
                 errors.append({"worker_id": worker_id, "error": str(e)})
 
-        # Create and start multiple worker threads
         threads = []
         for i in range(3):
             thread = threading.Thread(target=worker_function, args=(i,))
             threads.append(thread)
             thread.start()
 
-        # Wait for all threads to complete
         for thread in threads:
             thread.join()
 
         assert len(errors) == 0, f"Concurrent access errors: {errors}"
         assert len(results) == 3, f"Expected 3 results, got {len(results)}"
 
-        # All workers should get consistent results
         for result in results:
             assert result["region_count"] == 5, f"Inconsistent region count: {result}"
             assert result["nation_count"] == 10, f"Inconsistent nation count: {result}"
@@ -428,22 +376,17 @@ class TestDatabaseIntegration:
         connections = []
 
         try:
-            # Create multiple connections
             for i in range(5):
                 conn = duckdb.connect(":memory:")
                 connections.append(conn)
 
-                # Load data into each connection
                 benchmark_instance.load_data_to_database(conn, tables=["region"])
 
-                # Verify data was loaded
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM region")
                 count = cursor.fetchone()[0]
                 assert count == 5, f"Connection {i} has incorrect region count: {count}"
 
-            # Test that connections are independent
-            # Modify data in one connection
             cursor = connections[0].cursor()
             cursor.execute("DELETE FROM region WHERE r_regionkey = 0")
             connections[0].commit()
@@ -452,7 +395,6 @@ class TestDatabaseIntegration:
             modified_count = cursor.fetchone()[0]
             assert modified_count == 4, "Delete operation failed"
 
-            # Other connections should still have original data
             for i, conn in enumerate(connections[1:], 1):
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM region")
@@ -460,7 +402,6 @@ class TestDatabaseIntegration:
                 assert count == 5, f"Connection {i} was affected by changes in another connection"
 
         finally:
-            # Clean up connections
             for conn in connections:
                 conn.close()
 
@@ -473,25 +414,20 @@ class TestDatabaseIntegration:
 
             cursor = conn.cursor()
 
-            # Test numeric data types
             cursor.execute("SELECT c_custkey, c_acctbal FROM customer WHERE c_custkey = 1")
             row = cursor.fetchone()
             assert row is not None, "Expected row from customer table"
 
             custkey, acctbal = row
 
-            # In SQLite, numeric values might be stored as strings from CSV
-            # but should be convertible to numbers
             assert str(custkey).isdigit() or isinstance(custkey, int), f"Customer key is not numeric: {custkey}"
 
-            # Account balance should be numeric
             try:
                 float_balance = float(acctbal)
                 assert float_balance > 0, f"Account balance should be positive: {float_balance}"
             except (ValueError, TypeError):
                 raise AssertionError(f"Account balance is not numeric: {acctbal}") from None
 
-            # Test string data types
             cursor.execute("SELECT c_name, c_mktsegment FROM customer WHERE c_custkey = 1")
             row = cursor.fetchone()
             assert row is not None, "Expected row from customer table"
@@ -510,7 +446,6 @@ class TestDatabaseIntegration:
         try:
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "customer"])
 
-            # Test query that should have consistent performance
             query = """
                 SELECT r.r_name, COUNT(c.c_custkey) as customer_count
                 FROM region r
@@ -523,7 +458,6 @@ class TestDatabaseIntegration:
             execution_times = []
             results = []
 
-            # Run query multiple times
             for i in range(5):
                 start_time = time.time()
                 cursor = conn.cursor()
@@ -534,22 +468,18 @@ class TestDatabaseIntegration:
                 execution_times.append(end_time - start_time)
                 results.append(result)
 
-            # Check result consistency
             first_result = results[0]
             for i, result in enumerate(results[1:], 1):
                 assert result == first_result, f"Query result {i} differs from first result"
 
-            # Check performance consistency
             sum(execution_times) / len(execution_times)
             max_time = max(execution_times)
             min_time = min(execution_times)
 
-            # Performance should be consistent (max time shouldn't be more than 50x min time)
             if min_time > 0:
                 performance_ratio = max_time / min_time
                 assert performance_ratio < 50, f"Performance inconsistency too high: {performance_ratio:.2f}"
 
-            # All execution times should be reasonable
             for i, exec_time in enumerate(execution_times):
                 assert exec_time < 1.0, f"Query {i} took too long: {exec_time:.3f}s"
 
@@ -561,15 +491,12 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Create schema
             schema_sql = benchmark_instance.get_create_tables_sql()
 
-            # Execute schema creation for DuckDB
             for statement in schema_sql.strip().split(";"):
                 if statement.strip():
                     conn.execute(statement.strip())
 
-            # Verify all expected tables exist
             expected_tables = list(TABLES.keys())
             tables_result = conn.execute("""
                 SELECT table_name
@@ -581,11 +508,9 @@ class TestDatabaseIntegration:
             for table_name in expected_tables:
                 assert table_name.lower() in actual_tables, f"Table {table_name} not found"
 
-            # Verify table structures match schema definitions
             for table_name, table_schema in TABLES.items():
                 columns_info = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
 
-                # Check that we have the right number of columns
                 expected_columns = len(table_schema["columns"])
                 actual_columns = len(columns_info)
 
@@ -593,7 +518,6 @@ class TestDatabaseIntegration:
                     f"Table {table_name} has too few columns: {actual_columns} < {expected_columns}"
                 )
 
-                # Check that column names match (case insensitive)
                 actual_column_names = [col[1].lower() for col in columns_info]
                 for expected_col in table_schema["columns"]:
                     expected_name = expected_col["name"].lower()
@@ -609,8 +533,6 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Create a scenario where loading will partially fail
-            # First, load some data successfully
             benchmark_instance.load_data_to_database(conn, tables=["region"])
 
             cursor = conn.cursor()
@@ -618,17 +540,14 @@ class TestDatabaseIntegration:
             initial_count = cursor.fetchone()[0]
             assert initial_count == 5, "Initial data load failed"
 
-            # Now create invalid data file
             invalid_file = benchmark_instance.output_dir / "invalid_nation.csv"
             with open(invalid_file, "w", encoding="utf-8") as f:
-                # Write invalid data (wrong number of columns)
-                f.write("0|ALGERIA|0\n")  # Missing comment column
-                f.write("1|ARGENTINA|1\n")  # Missing comment column
+                f.write("0|ALGERIA|0\n")
+                f.write("1|ARGENTINA|1\n")
 
             original_nation_file = benchmark_instance.tables.get("nation")
             benchmark_instance.tables["nation"] = str(invalid_file)
 
-            # Attempt to load nation data (should fail)
             error_occurred = False
             try:
                 benchmark_instance.load_data_to_database(conn, tables=["nation"])
@@ -637,22 +556,17 @@ class TestDatabaseIntegration:
 
             assert error_occurred, "Expected error did not occur"
 
-            # Verify that existing data is still intact
             cursor.execute("SELECT COUNT(*) FROM region")
             final_count = cursor.fetchone()[0]
             assert final_count == initial_count, "Existing data was corrupted after error"
 
-            # Verify that failed table wasn't created or has no data
             try:
                 cursor.execute("SELECT COUNT(*) FROM nation")
                 nation_count = cursor.fetchone()[0]
-                # If table exists, it should be empty due to failed load
                 assert nation_count == 0, "Failed load left partial data"
             except Exception:
-                # Table doesn't exist, which is also acceptable
                 pass
 
-            # Restore original file for cleanup
             if original_nation_file:
                 benchmark_instance.tables["nation"] = original_nation_file
 
@@ -666,68 +580,52 @@ class TestDatabaseIntegration:
 
         import psutil
 
-        # Get initial memory usage
         process = psutil.Process(os.getpid())
-        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        initial_memory = process.memory_info().rss / 1024 / 1024
 
         connections = []
 
         try:
-            # Create multiple connections and load data
             for _i in range(3):
                 conn = duckdb.connect(":memory:")
                 connections.append(conn)
                 benchmark_instance.load_data_to_database(conn, tables=["region", "nation"])
 
-                # Verify data was loaded
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM region")
                 assert cursor.fetchone()[0] == 5
 
-            # Check memory usage during operations
-            current_memory = process.memory_info().rss / 1024 / 1024  # MB
+            current_memory = process.memory_info().rss / 1024 / 1024
             memory_increase = current_memory - initial_memory
 
-            # Memory increase should be reasonable (less than 50MB for these small operations)
             assert memory_increase < 50, f"Memory usage increased too much: {memory_increase:.2f}MB"
 
         finally:
-            # Clean up connections
             for conn in connections:
                 conn.close()
 
-            # Force garbage collection
             gc.collect()
 
-            # Check memory usage after cleanup
-            final_memory = process.memory_info().rss / 1024 / 1024  # MB
+            final_memory = process.memory_info().rss / 1024 / 1024
             memory_after_cleanup = final_memory - initial_memory
 
-            # Memory should be mostly cleaned up - but GC is unpredictable
-            # Just check that we don't have extreme memory growth for small operations
-            # This is a sanity check rather than a strict assertion on GC behavior
-            # Use 500MB threshold to account for CI environment variations
-            max_acceptable_growth = 500  # MB
+            max_acceptable_growth = 500
             assert memory_after_cleanup < max_acceptable_growth, (
                 f"Excessive memory growth detected: {memory_after_cleanup:.2f}MB > {max_acceptable_growth}MB"
             )
 
     def test_cross_database_compatibility_patterns(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test patterns that should work across different database types."""
         conn = duckdb.connect(":memory:")
 
         try:
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "customer"])
 
-            # Test standard SQL patterns that should work across databases
             cursor = conn.cursor()
 
-            # Test basic SELECT with WHERE
             cursor.execute("SELECT COUNT(*) FROM customer WHERE c_acctbal > 1000")
             high_balance_count = cursor.fetchone()[0]
             assert high_balance_count >= 0
 
-            # Test JOIN operations
             cursor.execute("""
                 SELECT r.r_name, COUNT(n.n_nationkey) as nation_count
                 FROM region r
@@ -739,7 +637,6 @@ class TestDatabaseIntegration:
             join_results = cursor.fetchall()
             assert len(join_results) > 0
 
-            # Test subqueries
             cursor.execute("""
                 SELECT c.c_name
                 FROM customer c
@@ -752,7 +649,6 @@ class TestDatabaseIntegration:
             subquery_results = cursor.fetchall()
             assert len(subquery_results) >= 0
 
-            # Test aggregate functions
             cursor.execute("""
                 SELECT
                     MIN(c_acctbal) as min_balance,
@@ -769,7 +665,6 @@ class TestDatabaseIntegration:
             assert avg_bal >= min_bal and avg_bal <= max_bal
             assert total > 0
 
-            # Test CASE expressions
             cursor.execute("""
                 SELECT
                     c_name,
@@ -784,7 +679,6 @@ class TestDatabaseIntegration:
             case_results = cursor.fetchall()
             assert len(case_results) > 0
 
-            # All results should have valid category
             valid_categories = {"HIGH", "MEDIUM", "LOW"}
             for _name, category in case_results:
                 assert category in valid_categories, f"Invalid category: {category}"
@@ -806,28 +700,23 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load only the specified subset of tables
             benchmark_instance.load_data_to_database(conn, tables=table_subset)
 
             cursor = conn.cursor()
 
-            # Verify that specified tables were loaded
             for table_name in table_subset:
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                 count = cursor.fetchone()[0]
                 assert count > 0, f"Table {table_name} was not loaded or is empty"
 
-            # Verify that non-specified tables either don't exist or are empty
             all_tables = ["region", "nation", "supplier", "customer"]
             for table_name in all_tables:
                 if table_name not in table_subset:
                     try:
                         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                         count = cursor.fetchone()[0]
-                        # If table exists, it should be empty
                         assert count == 0, f"Table {table_name} should not have data"
                     except Exception:
-                        # Table doesn't exist, which is expected
                         pass
 
         finally:
@@ -838,27 +727,20 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load data for query testing
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "customer"])
 
-            # Test executing a simple aggregation query
             result = benchmark_instance.execute_query("aggregation_groupby_small", conn)
 
-            # Should return some results
             assert len(result) > 0, "Query returned no results"
 
-            # Verify result structure
             for row in result:
                 assert len(row) >= 2, "Query results should have at least 2 columns"
-                # First column should be region key (numeric)
                 assert str(row[0]).isdigit() or isinstance(row[0], int), f"Region key should be numeric: {row[0]}"
-                # Second column should be count (numeric)
                 assert isinstance(row[1], (int, str)) and (isinstance(row[1], int) or row[1].isdigit()), (
                     f"Count should be numeric: {row[1]}"
                 )
 
         except Exception as e:
-            # Some queries might not work with limited data, that's okay
             if "no such table" not in str(e).lower():
                 raise e from e
         finally:

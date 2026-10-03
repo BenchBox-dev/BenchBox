@@ -1,22 +1,6 @@
-"""The bundle carries its own tuning truth: requested intent and applied ledger.
-
-Before this, a reader had to stitch three files to answer "what tuning did this
-run request, and what did it actually execute?" -- the bundle's
-``platform.tuning`` summary for the hashes, ``.tuning.json`` for the requested
-configuration, and ``.applied.json`` for the executed statements. Every consumer
-(``validate_submission``, ``validate_corpus``, the explorer pipeline, the loader)
-implemented that stitch separately, and a bundle separated from its companions
-silently lost the answer.
-
-``platform.tuning`` now holds both sub-blocks, and the loader reads them.
-Nothing writes the companions any more, so the inlined block must carry exactly
-what they carried -- including the redaction each received, which differs by
-export mode and is applied outside the main anonymization walk.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for
-details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for
+# details.
 
 from __future__ import annotations
 
@@ -89,14 +73,6 @@ def _tuned_result() -> object:
 
 
 def _export(tmp_path: Path, *, anonymize: bool) -> tuple[dict, dict, dict]:
-    """Export one tuned result.
-
-    Returns the bundle plus the scrubbed requested-tuning and applied-ledger
-    payloads the exporter inlined. Those payloads used to be readable as
-    ``.tuning.json`` / ``.applied.json`` files; nothing writes them now, so they
-    are taken from the same builders the export path uses, which is what the
-    inlined block must still agree with.
-    """
     exporter = ResultExporter(output_dir=tmp_path, anonymize=anonymize)
     result = _tuned_result()
     result.output_filename = "run.json"
@@ -109,7 +85,6 @@ def _export(tmp_path: Path, *, anonymize: bool) -> tuple[dict, dict, dict]:
 
 
 def _write_legacy_companions(tmp_path: Path, tuning: dict | None, applied: dict | None) -> None:
-    """Write the retired companions beside a bundle, as a pre-retirement export did."""
     if tuning is not None:
         (tmp_path / "run.tuning.json").write_text(json.dumps(tuning), encoding="utf-8")
     if applied is not None:
@@ -122,8 +97,6 @@ class TestInlinedBlockMatchesTheScrubbedPayloads:
         bundle, tuning, _applied = _export(tmp_path, anonymize=anonymize)
 
         inlined = bundle["platform"]["tuning"]["requested"]
-        # The payload nests the configuration one level down; the inlined copy
-        # flattens it so the block is not `tuning.requested.requested`.
         assert inlined == tuning["requested"]
         assert bundle["platform"]["tuning"]["source_file"] == tuning["source_file"]
 
@@ -131,35 +104,22 @@ class TestInlinedBlockMatchesTheScrubbedPayloads:
         bundle, _tuning, applied = _export(tmp_path, anonymize=anonymize)
 
         inlined = bundle["platform"]["tuning"]["applied"]
-        # The hash lives on the summary, which owns it; everything else matches
-        # the scrubbed payload exactly.
         assert inlined == {k: v for k, v in applied.items() if k != "applied_ledger_hash"}
         assert bundle["platform"]["tuning"]["applied_ledger_hash"] == applied["applied_ledger_hash"]
 
     def test_hashes_are_not_duplicated_inside_the_sub_blocks(self, tmp_path: Path, anonymize: bool) -> None:
-        """One field, one home: a second copy is a chance for the two to diverge."""
         bundle, _tuning, _applied = _export(tmp_path, anonymize=anonymize)
 
         tuning_block = bundle["platform"]["tuning"]
         assert "applied_ledger_hash" not in tuning_block["applied"]
         assert "requested_config_hash" not in tuning_block["requested"]
         assert "validation_status" not in tuning_block["requested"]
-        # The retired companion's envelope described the file, not the run.
         assert "version" not in tuning_block["requested"]
         assert "run_id" not in tuning_block["requested"]
 
 
 class TestAnonymizedInliningKeepsRedaction:
     def test_public_bundle_never_inlines_raw_ddl_or_identifiers(self, tmp_path: Path) -> None:
-        """The inlined ledger must get the applied-ledger redaction, not the
-        general result anonymizer.
-
-        ``.applied.json`` is scrubbed by a dedicated policy that drops free-text
-        ``statement`` / ``error`` and the ``table`` identifier outright, because
-        no structured scrubber can safely redact arbitrary per-platform SQL. That
-        policy lives outside the main anonymization walk, so inlining the ledger
-        without re-applying it would publish raw DDL in the bundle.
-        """
         bundle, _tuning, applied = _export(tmp_path, anonymize=True)
         raw_bundle_text = (tmp_path / "run.json").read_text(encoding="utf-8")
 
@@ -168,20 +128,14 @@ class TestAnonymizedInliningKeepsRedaction:
         assert "statement" not in applied_block["statements"][0]
         assert applied_block["receipt"]["entries"][0]["statement_redacted"] is True
         assert "table" not in applied_block["receipt"]["entries"][0]
-        # Dropped intents carry adapter-provided text and become count markers.
         assert applied_block["dropped"] == [{"redacted": True}]
 
-        # The strongest form of the check: neither the statement text nor the
-        # qualified table name appears anywhere in the published bundle.
         assert "CREATE INDEX" not in raw_bundle_text
         assert "main.LINEITEM" not in raw_bundle_text
         assert "load-time only" not in raw_bundle_text
-        # And the companion agrees, because both come from one scrub.
         assert "statement" not in applied["statements"][0]
 
     def test_private_bundle_keeps_the_statements_like_the_companion(self, tmp_path: Path) -> None:
-        """A private export has always kept raw statements in `.applied.json`;
-        inlining must not silently change that either way."""
         bundle, _tuning, applied = _export(tmp_path, anonymize=False)
 
         applied_block = bundle["platform"]["tuning"]["applied"]
@@ -191,13 +145,6 @@ class TestAnonymizedInliningKeepsRedaction:
 
 class TestAppliedLedgerWithoutRequestedTuning:
     def test_ledger_hash_survives_when_there_is_no_tuning_summary(self, tmp_path: Path) -> None:
-        """A run can apply tuning without a requested configuration.
-
-        An adapter that executes layout operations off a platform option leaves
-        ``tunings_applied`` empty, so ``_build_tuning_summary`` emits no block at
-        all. The ledger hash then has nowhere to be promoted from, and dropping
-        it would erase the only record of what the run physically applied.
-        """
         benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
         result = build_enhanced_benchmark_result(
             benchmark=benchmark,
@@ -222,8 +169,6 @@ class TestAppliedLedgerWithoutRequestedTuning:
 
 class TestLoaderReadsTheBundleAlone:
     def test_bundle_without_companions_reconstructs_its_tuning(self, tmp_path: Path) -> None:
-        """The point of inlining: a bundle separated from its companions still
-        answers what was requested and what was applied."""
         _export(tmp_path, anonymize=False)
         assert not (tmp_path / "run.tuning.json").exists()
         assert not (tmp_path / "run.applied.json").exists()
@@ -242,19 +187,10 @@ class TestLoaderReadsTheBundleAlone:
         assert result.tunings_applied["table_tunings"]["LINEITEM"]["sorting"][0]["name"] == "l_orderkey"
 
     def test_companion_still_wins_for_a_legacy_bundle(self, tmp_path: Path) -> None:
-        """Nothing writes the companions any more, but readers still accept them.
-
-        A bundle exported before inlining carries the sub-blocks nowhere but its
-        companions, and a republished corpus bundle may ship them alone. Both
-        must keep loading, so this reconstructs that shape rather than relying on
-        the exporter to produce it.
-        """
         _bundle, tuning, applied = _export(tmp_path, anonymize=False)
         bundle_path = tmp_path / "run.json"
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
-        # Strip the inlined sub-blocks to simulate a pre-inlining bundle, and put
-        # the evidence back where that generation kept it.
         del bundle["platform"]["tuning"]["requested"]
         del bundle["platform"]["tuning"]["applied"]
         bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
@@ -268,7 +204,6 @@ class TestLoaderReadsTheBundleAlone:
         assert "table_tunings" in result.tunings_applied
 
     def test_round_trip_export_preserves_the_inlined_tuning(self, tmp_path: Path) -> None:
-        """Load a companion-less bundle and re-export it: the tuning survives."""
         _export(tmp_path, anonymize=False)
         result, _raw = load_result_file(tmp_path / "run.json")
 
@@ -287,14 +222,6 @@ class TestLoaderReadsTheBundleAlone:
 
 class TestCompanionWinsFieldByField:
     def test_a_minimal_companion_does_not_wipe_inlined_fields(self, tmp_path: Path) -> None:
-        """A companion wins per field, not wholesale.
-
-        A stale, hand-authored, or republished companion can carry only
-        ``requested``. Overwriting unconditionally wiped the inlined
-        ``source_file`` and ``validation_status`` with None, losing -- on a bundle
-        that states them -- the template the run used and whether its tuning was
-        verified.
-        """
         _export(tmp_path, anonymize=False)
         _write_legacy_companions(
             tmp_path,
@@ -308,21 +235,12 @@ class TestCompanionWinsFieldByField:
         assert result.tuning_validation_status == "applied_unverified"
         assert result.tuning_config_hash == "a" * 64
         assert result.tuning_source == "auto_discovered"
-        # The companion's own content still wins where it has any.
         assert result.tunings_applied is not None
         assert "LINEITEM" in result.tunings_applied["table_tunings"]
 
 
 class TestBareStringIdentifiersAreHashed:
     def test_string_clause_values_do_not_reach_a_public_bundle(self, tmp_path: Path) -> None:
-        """A first-party tuning config renders columns as ``{"name": ...}`` dicts,
-        which the structural walk hashes. A hand-authored or republished
-        companion may instead write a bare string or a list of strings under a
-        clause key, and those identifiers reached the public artifact verbatim.
-
-        Inlining put them in the primary bundle too, so the clause key -- not the
-        value's shape -- now decides what counts as an identifier.
-        """
         benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
         result = build_enhanced_benchmark_result(
             benchmark=benchmark,
@@ -354,8 +272,6 @@ class TestBareStringIdentifiersAreHashed:
         assert clause["partitioning"].startswith("column_")
 
     def test_non_identifier_clause_values_are_left_alone(self, tmp_path: Path) -> None:
-        """Only clause keys that name columns are treated as identifiers; a
-        column's ``type`` and ``order`` are data and must survive readable."""
         bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
 
         sorting = next(iter(bundle["platform"]["tuning"]["requested"]["table_tunings"].values()))["sorting"][0]
@@ -372,7 +288,6 @@ class TestCompanionsAreRetired:
         assert written == ["run.json"]
 
     def test_plans_companion_is_still_written(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Plans stay a separate file: execution DAGs are large and rarely read."""
         monkeypatch.setattr(exporter_module, "build_plans_payload", lambda _result: {"queries": {"1": {}}})
         result = _tuned_result()
         result.output_filename = "run.json"
@@ -384,22 +299,12 @@ class TestCompanionsAreRetired:
 
 
 class TestInlinedSourceFileKeepsItsPublicForm:
-    """A repo-relative template reference is public provenance, not a private path.
-
-    ``anonymize_tuning_payload`` made this exception while the value lived in a
-    ``.tuning.json`` companion. Inlining moved it under the generic public walk,
-    which hashes on the key name alone -- so a published bundle showed
-    ``path_<hash>`` where the readable reference belonged, and re-anonymizing a
-    stored bundle rewrote it, breaking the corpus fixed point.
-    """
-
     def test_repo_relative_reference_survives_public_export(self, tmp_path: Path) -> None:
         bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
 
         assert bundle["platform"]["tuning"]["source_file"] == "examples/tunings/duckdb/tpch_tuned.yaml"
 
     def test_public_export_is_a_fixed_point_for_the_reference(self, tmp_path: Path) -> None:
-        """Re-anonymizing a published bundle must not rewrite it."""
         from benchbox.core.results.anonymization import AnonymizationConfig, AnonymizationManager
 
         bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
@@ -408,7 +313,6 @@ class TestInlinedSourceFileKeepsItsPublicForm:
         assert manager.anonymize_result_payload(bundle) == bundle
 
     def test_an_absolute_path_is_still_hashed(self, tmp_path: Path) -> None:
-        """The exemption covers a normalized reference, not any path."""
         benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
         result = build_enhanced_benchmark_result(
             benchmark=benchmark,

@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""Bounded read-only audit of registered worktrees and local branches.
-
-Combines live Git structure, exact GitHub PR evidence, structural-branch
-policy, and controller ownership evidence.
-
-Usage:
-    uv run -- python _project/scripts/worktree_audit.py
-    uv run -- python _project/scripts/worktree_audit.py --format json
-    uv run -- python _project/scripts/worktree_audit.py --repo BenchBox-dev/BenchBox
-
-Guarantees:
-- Read-only: never mutates Git state, never prunes, never unlocks, never deletes.
-- Fail-closed: incomplete collection, API errors, missing objects, and ambiguous states resolve to 'unavailable' or 'uncertain'.
-- Zero deletion authority: output is a snapshot report for human inspection.
-"""
 
 from __future__ import annotations
 
@@ -45,9 +30,6 @@ REPORT_AUTHORITY = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Data models
-# ---------------------------------------------------------------------------
 CLI_DESCRIPTION = (
     "Bounded read-only audit of registered worktrees and local branches.\n"
     "\n"
@@ -99,7 +81,7 @@ class IntegrationEvidence:
 
 @dataclasses.dataclass
 class Classification:
-    state: str  # "uncertain" | "verified-integrated" | "unavailable"
+    state: str
     item_classification: str
     reason: str
     signals: List[str]
@@ -114,12 +96,9 @@ class Classification:
 
 
 class GitCollectionError(RuntimeError):
-    """A Git command could not provide a trustworthy collection result."""
+    pass
 
 
-# ---------------------------------------------------------------------------
-# Git interaction helpers (read-only)
-# ---------------------------------------------------------------------------
 def _run_git(args: List[str], cwd: Path, timeout: float = 30.0) -> Tuple[int, str, str]:
     try:
         proc = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout)
@@ -131,7 +110,6 @@ def _run_git(args: List[str], cwd: Path, timeout: float = 30.0) -> Tuple[int, st
 
 
 def get_primary_clone_path(repo_root: Path) -> Optional[Path]:
-    """Resolve the filesystem path of the primary/main clone."""
     code, out, _ = _run_git(["rev-parse", "--git-common-dir"], repo_root)
     if code != 0 or not out:
         return None
@@ -144,7 +122,6 @@ def get_primary_clone_path(repo_root: Path) -> Optional[Path]:
 
 
 def _parse_worktree_porcelain_entries(stdout: str) -> List[Dict[str, Any]]:
-    """Parse raw git worktree list --porcelain stdout into raw entry dictionaries."""
     entries: List[Dict[str, Any]] = []
     current_entry: Dict[str, Any] = {}
 
@@ -187,13 +164,6 @@ def _parse_worktree_porcelain_entries(stdout: str) -> List[Dict[str, Any]]:
 
 
 def get_git_worktrees(repo_root: Path, include_primary: bool = False) -> Tuple[List[WorktreeInfo], Optional[str]]:
-    """Parse `git worktree list --porcelain` into structured WorktreeInfo list.
-
-    By default, filters out the primary clone to report only linked worktrees
-    per the evidence contract specification (§4, §10).
-
-    Returns (worktrees, error_message).
-    """
     code, stdout, stderr = _run_git(["worktree", "list", "--porcelain"], repo_root)
     if code != 0:
         return [], f"Failed to list git worktrees (exit {code}): {stderr or 'unknown error'}"
@@ -253,7 +223,6 @@ def _build_worktree_info(entry: Dict[str, Any]) -> WorktreeInfo:
 
 
 def get_local_branches(repo_root: Path) -> List[Dict[str, Any]]:
-    """Query local branch refs and their upstream tracking status."""
     fmt = "%(refname:lstrip=2)|%(objectname)|%(upstream:short)|%(upstream:track)|%(committerdate:iso8601)"
     code, stdout, _ = _run_git(["for-each-ref", f"--format={fmt}", "refs/heads/"], repo_root)
     if code != 0 or not stdout:
@@ -292,7 +261,6 @@ def is_ancestor(ancestor_sha: str, descendant_sha: str, repo_root: Path) -> bool
 
 
 def get_reflog_shas(branch: str, repo_root: Path) -> Set[str]:
-    """Retrieve historical SHAs for branch from local reflog if available."""
     code, stdout, _ = _run_git(["reflog", "show", "--format=%H", branch], repo_root)
     if code != 0 or not stdout:
         return set()
@@ -300,7 +268,6 @@ def get_reflog_shas(branch: str, repo_root: Path) -> Set[str]:
 
 
 def are_descendants_integrated(pr_head_sha: str, current_head_sha: str, target_tip: str, repo_root: Path) -> bool:
-    """True if all commits on branch between pr_head_sha and current_head_sha are in target_tip."""
     if pr_head_sha.lower() == current_head_sha.lower():
         return True
     code, stdout, _ = _run_git(["rev-list", f"{pr_head_sha}..{current_head_sha}", f"^{target_tip}"], repo_root)
@@ -310,18 +277,13 @@ def are_descendants_integrated(pr_head_sha: str, current_head_sha: str, target_t
 
 
 def is_branch_gone_upstream(branch: str, repo_root: Path) -> bool:
-    """Check if branch tracking ref reports [gone] in Git."""
     code, stdout, _ = _run_git(["for-each-ref", "--format=%(upstream:track)", f"refs/heads/{branch}"], repo_root)
     return code == 0 and "[gone]" in stdout
 
 
-# ---------------------------------------------------------------------------
-# GitHub API interaction helpers
-# ---------------------------------------------------------------------------
 def _github_api_request(
     url: str, token: Optional[str]
 ) -> Tuple[Optional[Any], Optional[Dict[str, str]], Optional[str]]:
-    """Execute authenticated GitHub REST request. Returns (parsed_json, response_headers, error_message)."""
     headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "benchbox-worktree-audit",
@@ -345,7 +307,6 @@ def _github_api_request(
 
 
 def resolve_github_token() -> Optional[str]:
-    """Resolve GitHub token from environment variables or `gh auth token` CLI."""
     for variable in ("GH_TOKEN", "GITHUB_TOKEN"):
         token = os.environ.get(variable, "").strip()
         if token:
@@ -367,7 +328,6 @@ def resolve_github_token() -> Optional[str]:
 
 
 def get_remote_repository_slug(repo_root: Path, preferred_remote: str = "origin") -> Optional[str]:
-    """Extract owner/repo slug from git remote URL as a plausibility check (Spec §3)."""
     code, stdout, _ = _run_git(["remote", "get-url", preferred_remote], repo_root)
     if code != 0 or not stdout:
         code, remotes_out, _ = _run_git(["remote"], repo_root)
@@ -393,10 +353,6 @@ def resolve_repository_identity(
     token: Optional[str],
     remote_slug: Optional[str] = None,
 ) -> Tuple[Optional[int], Optional[str], Optional[str]]:
-    """Resolve repository numeric ID and full name with remote plausibility cross-check.
-
-    Returns (id, full_name, error).
-    """
     encoded_owner = urllib.parse.quote(owner, safe="")
     encoded_repo = urllib.parse.quote(repo, safe="")
     url = f"https://api.github.com/repos/{encoded_owner}/{encoded_repo}"
@@ -408,8 +364,6 @@ def resolve_repository_identity(
         return None, None, "Repository payload missing 'id'"
     full_name = data.get("full_name", f"{owner}/{repo}")
 
-    # Compare stable repository identities so redirects work without accepting
-    # an unrelated same-named fork (Spec §3).
     if remote_slug:
         if "/" not in remote_slug:
             return None, None, f"Invalid GitHub remote repository slug: '{remote_slug}'"
@@ -437,10 +391,8 @@ def resolve_repository_identity(
 
 
 def is_pr_merged(pr: Dict[str, Any]) -> bool:
-    """Return True if PR payload indicates merged state (supports both GET and LIST schemas)."""
     if pr.get("merged") is True:
         return True
-    # GitHub LIST PR endpoint omits 'merged: bool' and provides 'merged_at: timestamp'
     return bool(pr.get("merged_at"))
 
 
@@ -452,10 +404,6 @@ def fetch_prs_for_branch(
     token: Optional[str],
     max_pages: int = 10,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """Fetch PRs for branch, validating repository identity on each and handling pagination.
-
-    Returns (prs_list, error_message).
-    """
     encoded_owner = urllib.parse.quote(owner, safe="")
     encoded_repo = urllib.parse.quote(repo, safe="")
     all_prs: List[Tuple[Any, str]] = []
@@ -513,11 +461,7 @@ def fetch_prs_for_branch(
     return validated_prs, None
 
 
-# ---------------------------------------------------------------------------
-# Core evaluation and classification logic (§5, §6, §7)
-# ---------------------------------------------------------------------------
 def _check_worktree_boundary_states(wt: WorktreeInfo, signals: List[str]) -> Optional[Classification]:
-    """Evaluate filesystem, registration, dirty, locked, detached, and prunable boundary states."""
     if not wt.path_exists or not wt.registered:
         return Classification(
             state="unavailable",
@@ -569,7 +513,6 @@ def _build_integration_evidence_list(
     repo_name: str,
     repo_root: Path,
 ) -> List[IntegrationEvidence]:
-    """Construct structured integration evidence records for PR candidates."""
     evidence_list: List[IntegrationEvidence] = []
     checked_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -609,7 +552,6 @@ def _evaluate_merged_pr_integration(
     signals: List[str],
     repo_root: Path,
 ) -> Classification:
-    """Evaluate structural base, head match, descendant integration, and merge commit reachability."""
     latest_base = latest_pr.get("base", {}).get("ref", "")
     if latest_base not in STRUCTURAL_BASES:
         return Classification(
@@ -681,7 +623,6 @@ def _evaluate_merged_pr_integration(
 
 
 def get_branch_age_days(branch: str, repo_root: Path) -> Optional[float]:
-    """Return age of latest commit on branch in days, or None if unresolvable."""
     code, stdout, _ = _run_git(["log", "-1", "--format=%ct", f"refs/heads/{branch}"], repo_root)
     if code != 0 or not stdout:
         return None
@@ -704,7 +645,6 @@ def evaluate_and_classify_worktree(
     api_error_override: Optional[str] = None,
     repo_identity_error: Optional[str] = None,
 ) -> Tuple[Classification, List[IntegrationEvidence]]:
-    """Evaluate integration evidence and classify worktree according to evidence contract."""
     signals: List[str] = []
     if wt.path_exists and not wt.is_dirty:
         signals.append("clean")
@@ -799,16 +739,12 @@ def evaluate_and_classify_worktree(
     )
 
 
-# ---------------------------------------------------------------------------
-# Audit runner
-# ---------------------------------------------------------------------------
 def audit_worktrees(
     repo_root: Path,
     repo_slug: str = "BenchBox-dev/BenchBox",
     token: Optional[str] = None,
     initial_collection_errors: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Perform read-only inventory and audit across worktrees and local branches."""
     if token is None:
         token = resolve_github_token()
 
@@ -845,7 +781,6 @@ def audit_worktrees(
     unavailable_count = 0
 
     if wt_err:
-        # Collection failure in Git worktree enumeration fails closed to unavailable (Spec §5)
         record = {
             "schema_version": SCHEMA_VERSION,
             "generated_at": generated_at,
@@ -974,7 +909,6 @@ def audit_worktrees(
 
 
 def _write_report_snapshot(report: Dict[str, Any], repo_root: Path) -> Optional[str]:
-    """Persist a collision-resistant report snapshot without overwriting an existing run."""
     report_dir = repo_root / "_project" / "reports" / "worktree-lifecycle"
     try:
         report_dir.mkdir(parents=True, exist_ok=True)
@@ -991,7 +925,6 @@ def _write_report_snapshot(report: Dict[str, Any], repo_root: Path) -> Optional[
 
 
 def render_text_report(report: Dict[str, Any]) -> str:
-    """Render human-readable text table from audit report dictionary."""
     lines: List[str] = []
     lines.append("=== BenchBox Worktree Lifecycle Audit ===")
     lines.append(f"Generated at: {report.get('generated_at')}")
@@ -1034,9 +967,6 @@ def render_text_report(report: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# CLI Entry point
-# ---------------------------------------------------------------------------
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(

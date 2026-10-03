@@ -24,7 +24,7 @@ JOIN_SUBQUERY_SORT = (QueryCategory.JOIN, QueryCategory.SUBQUERY, QueryCategory.
 def load_variant_specs(
     module_file: str, namespace: dict[str, Any]
 ) -> tuple[list[tuple[VariantImpl, VariantImpl]], list[str]]:
-    """Load variant implementation pairs and descriptions from YAML next to a module."""
+
     with Path(module_file).with_suffix(".yaml").open(encoding="utf-8") as handle:
         payload = yaml.safe_load(handle) or {}
 
@@ -47,12 +47,7 @@ def build_variants(
     timeout_seconds: float | None = None,
     skip_platforms: Sequence[str] | None = None,
 ) -> list[DataFrameQuery]:
-    """Build TPC-Havoc DataFrame variants from already-resolved impl pairs.
 
-    Query metadata (expected row counts, timeouts, skipped platforms) is copied
-    from the canonical query by the caller so rebuilt variants keep the same
-    validation surface as the replay builder they replace.
-    """
     return [
         DataFrameQuery(
             query_id=f"Q{query_number}v{variant}",
@@ -76,6 +71,6 @@ def build_yaml_variants(
     query_number: int,
     categories: Sequence[QueryCategory],
 ) -> list[DataFrameQuery]:
-    """Build TPC-Havoc variants from the YAML file next to a query module."""
+
     impl_pairs, descriptions = load_variant_specs(module_file, namespace)
     return build_variants(query_number, impl_pairs, descriptions, categories)

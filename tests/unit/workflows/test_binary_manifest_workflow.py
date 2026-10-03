@@ -1,5 +1,3 @@
-"""Require source and distribution binary verification before queue upload."""
-
 from pathlib import Path
 
 import pytest
@@ -22,19 +20,15 @@ def test_queue_artifact_verifies_exact_distributions_before_upload() -> None:
     upload_index = next(
         index for index, step in enumerate(steps) if step.get("uses", "").startswith("actions/upload-artifact@")
     )
-    # Source check, then build with distribution verification and checksums, then the producer
-    # receipt, then upload: a receipt must never bind bytes that were not verified first.
     assert source_index < build_index < bind_index < upload_index
     build = steps[build_index]["run"]
     assert "scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz" in build
     assert build.index("verify_distribution_binaries.py") < build.index("sha256sum")
     assert "sha256sum -- *.whl *.tar.gz > SHA256SUMS" in build
-    # The receipt step runs the isolated interpreter and is the only step handed the token.
     assert steps[bind_index]["run"].startswith("python -I -S ")
     assert steps[bind_index]["env"] == {"GH_TOKEN": "${{ github.token }}"}
     assert [index for index, step in enumerate(steps) if "GH_TOKEN" in str(step.get("env", {}))] == [bind_index]
     assert jobs["dist-artifact"]["permissions"] == {"contents": "read", "actions": "read"}
-    # One artifact per run attempt, so a re-run cannot be confused with the original producer.
     upload = steps[upload_index]["with"]
     assert upload["name"] == "dist-${{ github.sha }}-attempt-${{ github.run_attempt }}"
     assert "dist/producer-receipt.json" in upload["path"]
@@ -61,17 +55,8 @@ cat dist/SHA256SUMS
 
 
 def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
-    # This job only runs two scripts that import the package, so it needs the runtime dependencies
-    # and not the dev group or the `dev` extra. A cold full sync inside a short limit timed the job
-    # out, and a failed dist-artifact fails the core unit and ejects the merge group. --locked makes
-    # a stale uv.lock fail the job instead of installing older versions than pyproject declares.
-    #
-    # Rather than parse shell, pin the job's shape and the exact text of both scripts. Quoting,
-    # heredocs, extra options and extra commands are then all visible as a diff against this
-    # contract, so changing what the job runs is a deliberate edit to this test.
     job = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["dist-artifact"]
     assert set(job) == {"name", "needs", "if", "runs-on", "permissions", "timeout-minutes", "steps"}
-    # The only token this job holds is read-only, and only the producer-receipt step is handed it.
     assert job["permissions"] == {"contents": "read", "actions": "read"}
     assert job["timeout-minutes"] >= 20
 
@@ -87,16 +72,12 @@ def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
     ]
     runs = {step["name"]: step for step in job["steps"] if "run" in step}
     for name, step in runs.items():
-        # No shell override or working directory can change how a script runs, and the only
-        # environment is the receipt step's read-only token.
         allowed = {"name", "run", "env"} if name == BIND_STEP else {"name", "run"}
         assert set(step) == allowed, step
     assert runs["Verify source bundled binary manifest"]["run"].strip() == VERIFY_SOURCE_RUN
     assert runs["Build wheel and sdist"]["run"] == BUILD_AND_VERIFY_RUN
-    # The receipt step uses the isolated interpreter, never uv, so it installs nothing.
     assert runs[BIND_STEP]["run"].strip() == BIND_RUN
     assert runs[BIND_STEP]["env"] == {"GH_TOKEN": "${{ github.token }}"}
-    # The steps that install tools take no inputs that add dependencies.
     uses = {step["name"]: step for step in job["steps"] if "uses" in step}
     assert uses["Install uv"].keys() <= {"name", "uses"}
     assert uses["Set up Python 3.12"]["with"] == {"python-version": "3.12"}

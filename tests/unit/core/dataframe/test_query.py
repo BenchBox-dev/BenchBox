@@ -1,13 +1,4 @@
-"""Unit tests for DataFrameQuery and QueryRegistry.
-
-Tests for:
-- DataFrameQuery dataclass validation
-- Query family support detection
-- QueryRegistry management
-- Query category filtering
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -27,20 +18,15 @@ pytestmark = [
 ]
 
 
-# Test implementations for queries
 def sample_pandas_impl(ctx: Any) -> Any:
-    """Sample Pandas-family implementation."""
     return ctx.get_table("orders")
 
 
 def sample_expression_impl(ctx: Any) -> Any:
-    """Sample Expression-family implementation."""
     return ctx.get_table("orders")
 
 
 class TestQueryCategory:
-    """Tests for QueryCategory enum."""
-
     def test_all_categories_exist(self):
 
         expected = {
@@ -62,15 +48,12 @@ class TestQueryCategory:
         assert actual == expected
 
     def test_str_returns_value(self):
-        """Test that str() returns the value."""
         assert str(QueryCategory.SCAN) == "scan"
         assert str(QueryCategory.GROUP_BY) == "group_by"
         assert str(QueryCategory.TPCH) == "tpch"
 
 
 class TestDataFrameQuery:
-    """Tests for DataFrameQuery dataclass."""
-
     def test_minimal_query_with_pandas_impl(self):
 
         query = DataFrameQuery(
@@ -111,7 +94,6 @@ class TestDataFrameQuery:
         assert query.has_expression_impl()
 
     def test_query_requires_at_least_one_implementation(self):
-        """Test that query must have at least one implementation."""
         with pytest.raises(ValueError, match="must have at least one implementation"):
             DataFrameQuery(
                 query_id="Q1",
@@ -120,7 +102,6 @@ class TestDataFrameQuery:
             )
 
     def test_query_id_required(self):
-        """Test that query_id is required."""
         with pytest.raises(ValueError, match="query_id cannot be empty"):
             DataFrameQuery(
                 query_id="",
@@ -130,7 +111,6 @@ class TestDataFrameQuery:
             )
 
     def test_query_name_required(self):
-        """Test that query_name is required."""
         with pytest.raises(ValueError, match="query_name cannot be empty"):
             DataFrameQuery(
                 query_id="Q1",
@@ -205,13 +185,11 @@ class TestDataFrameQuery:
             pandas_impl=sample_pandas_impl,
         )
 
-        # Should support all Pandas family
         assert query.supports_platform("pandas")
         assert query.supports_platform("cudf")
         assert query.supports_platform("vaex")
         assert query.supports_platform("dask")
 
-        # Should not support Expression family (no impl)
         assert not query.supports_platform("polars")
         assert not query.supports_platform("pyspark")
 
@@ -224,13 +202,11 @@ class TestDataFrameQuery:
             expression_impl=sample_expression_impl,
         )
 
-        # Should support all Expression family
         assert query.supports_platform("polars")
         assert query.supports_platform("pyspark")
         assert query.supports_platform("datafusion")
         assert query.supports_platform("spark")
 
-        # Should not support Pandas family (no impl)
         assert not query.supports_platform("pandas")
 
     def test_get_impl_for_family(self):
@@ -278,7 +254,6 @@ class TestDataFrameQuery:
             expression_impl=expression_impl,
         )
 
-        # Mock context
         class MockContext:
             pass
 
@@ -336,10 +311,7 @@ class TestDataFrameQuery:
 
 
 class TestQueryRegistry:
-    """Tests for QueryRegistry."""
-
     def create_sample_queries(self) -> list[DataFrameQuery]:
-        """Create sample queries for testing."""
         return [
             DataFrameQuery(
                 query_id="Q1",
@@ -470,11 +442,11 @@ class TestQueryRegistry:
         registry.register_many(queries)
 
         pandas_queries = registry.get_queries_for_platform("pandas")
-        assert len(pandas_queries) == 2  # Q1 and Q2 have pandas impl
+        assert len(pandas_queries) == 2
         assert {q.query_id for q in pandas_queries} == {"Q1", "Q2"}
 
         polars_queries = registry.get_queries_for_platform("polars")
-        assert len(polars_queries) == 2  # Q2 and Q3 have expression impl
+        assert len(polars_queries) == 2
         assert {q.query_id for q in polars_queries} == {"Q2", "Q3"}
 
     def test_get_queries_for_family(self):

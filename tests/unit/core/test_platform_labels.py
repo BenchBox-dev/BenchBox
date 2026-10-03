@@ -1,5 +1,3 @@
-"""Tests asserting CLI and pipeline produce identical platform-label disambiguation."""
-
 from __future__ import annotations
 
 import pytest
@@ -11,15 +9,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class TestPlatformLabelAgreement:
-    """CLI (ResultPlotter) and pipeline (disambiguate_platform_labels) must agree on labels."""
-
     def test_same_platform_different_driver_version_cli_matches_pipeline(self) -> None:
-        """Two results with same platform but different driver_version get identical labels
-        whether rendered via the CLI plotter or the shared disambiguator directly."""
         from _project.scripts.explorer_pipeline.models import DetailResult
         from benchbox.core.visualization.result_plotter import ResultPlotter
 
-        # Pipeline path: DetailResult objects fed directly to disambiguate_platform_labels
         base: dict = {
             "benchmark": "tpch",
             "scale_factor": 0.1,
@@ -44,7 +37,6 @@ class TestPlatformLabelAgreement:
 
         pipeline_labels = disambiguate_platform_labels([d1, d2])  # type: ignore[arg-type]
 
-        # CLI path: NormalizedResult objects fed through ResultPlotter
         cli_results = [
             make_normalized_result(platform="DuckDB", platform_version="1.0.0"),
             make_normalized_result(platform="DuckDB", platform_version="1.2.0"),
@@ -55,7 +47,6 @@ class TestPlatformLabelAgreement:
         assert sorted(pipeline_labels) == cli_labels
 
     def test_single_result_no_suffix_both_paths(self) -> None:
-        """A single result keeps the bare platform name on both paths."""
         from _project.scripts.explorer_pipeline.models import DetailResult
         from benchbox.core.visualization.result_plotter import ResultPlotter
 

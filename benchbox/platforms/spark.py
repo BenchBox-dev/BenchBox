@@ -1,15 +1,6 @@
-"""Apache Spark platform adapter with distributed SQL query engine optimizations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Spark-specific optimizations for analytical workloads,
-including SparkSession configuration, deployment modes, and query optimization.
-
-Apache Spark is the most widely deployed distributed SQL engine, used by
-thousands of organizations for data processing and analytics.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -64,20 +55,14 @@ except ImportError:
     DoubleType = None
 
 
-# Maximum Java version compatible with PySpark's bundled Hadoop.
-# Subject.getSubject() was removed in Java 23 (JEP 411), which breaks
-# Hadoop's UserGroupInformation used during SparkSession initialization.
 _MAX_COMPATIBLE_JAVA_VERSION = 22
 
 _logger = logging.getLogger(__name__)
 _SPARK_AUTO_BROADCAST_THRESHOLD = "spark.sql.autoBroadcastJoinThreshold"
-# Shared AQE key tuple (single source of truth in _spark_helpers); kept as a
-# module alias for existing importers.
 _SPARK_AQE_KEYS = SPARK_AQE_KEYS
 
 
 def _get_java_version(java_home: str | None = None) -> int | None:
-    """Return the major Java version, or None if it cannot be determined."""
     java_bin = "java"
     if java_home:
         java_bin = os.path.join(java_home, "bin", "java")
@@ -89,7 +74,6 @@ def _get_java_version(java_home: str | None = None) -> int | None:
             text=True,
             timeout=10,
         )
-        # Java version string is on stderr, e.g. 'openjdk version "17.0.17"'
         output = result.stderr + result.stdout
         match = re.search(r'"(\d+)[\.\+]', output)
         if match:
@@ -100,15 +84,9 @@ def _get_java_version(java_home: str | None = None) -> int | None:
 
 
 def _find_compatible_java_home() -> str | None:
-    """Try to find a compatible JDK installation (Java 17 or 21 preferred).
-
-    On macOS, uses /usr/libexec/java_home. On Linux, checks common paths.
-    Returns the JAVA_HOME path or None.
-    """
     import platform as _platform
 
     if _platform.system() == "Darwin":
-        # Try preferred versions in order
         for version in ("17", "21", "11"):
             try:
                 result = subprocess.run(
@@ -125,7 +103,6 @@ def _find_compatible_java_home() -> str | None:
             except (OSError, subprocess.TimeoutExpired):
                 continue
     else:
-        # Linux: check common JDK paths
         for base in ("/usr/lib/jvm", "/usr/java"):
             base_path = Path(base)
             if not base_path.exists():
@@ -140,12 +117,6 @@ def _find_compatible_java_home() -> str | None:
 
 
 def _ensure_compatible_java(java_home_override: str | None = None) -> str | None:
-    """Ensure a compatible Java is configured for Spark. Returns JAVA_HOME used.
-
-    If the current Java is incompatible (>= 23), attempts to find and configure
-    a compatible one. Raises RuntimeError if no compatible Java can be found.
-    """
-    # If user explicitly provided java_home, validate and use it
     if java_home_override:
         ver = _get_java_version(java_home_override)
         if ver and ver > _MAX_COMPATIBLE_JAVA_VERSION:
@@ -158,12 +129,10 @@ def _ensure_compatible_java(java_home_override: str | None = None) -> str | None
         _logger.info(f"Using user-specified JAVA_HOME: {java_home_override}")
         return java_home_override
 
-    # Check current Java version
     current_version = _get_java_version()
     if current_version is None or current_version <= _MAX_COMPATIBLE_JAVA_VERSION:
-        return os.environ.get("JAVA_HOME")  # Current Java is fine
+        return os.environ.get("JAVA_HOME")
 
-    # Current Java is too new - try to find a compatible one
     _logger.warning(
         f"System Java {current_version} is incompatible with PySpark "
         f"(requires <= {_MAX_COMPATIBLE_JAVA_VERSION}). "
@@ -188,36 +157,14 @@ def _ensure_compatible_java(java_home_override: str | None = None) -> str | None
 
 
 class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
-    """Apache Spark platform adapter for distributed SQL query execution.
-
-    Spark is a distributed computing framework for large-scale data processing.
-    It supports multiple data sources and provides a unified analytics engine
-    for batch processing, streaming, and machine learning.
-
-    Key Features:
-    - Distributed query execution across multiple executors
-    - Support for local, standalone, and Kubernetes modes
-    - Multiple data formats: Parquet, ORC, CSV, Delta Lake, Iceberg
-    - Adaptive Query Execution (AQE) for dynamic optimization
-    - Catalyst optimizer for query planning
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
-    # Spark's session model is a process-wide singleton: create_connection
-    # goes through SparkSessionManager.get_or_create / builder.getOrCreate,
-    # which returns the SAME shared SparkSession every time, so "independent
-    # connections" cannot exist in this deployment - every handle is a view
-    # over the one session. Streams therefore share it (via _NoCloseProxy,
-    # since a SparkSession has no DB-API cursor) rather than pretending that
-    # reopening the session isolates anything.
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     def __init__(self, **config):
         super().__init__(**config)
 
-        # Check dependencies
         if not SparkSession:
             available, missing = check_platform_dependencies("spark")
             if not available:
@@ -226,47 +173,36 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         self._dialect = "spark"
 
-        # Spark deployment configuration
         self.master = config.get("master") or "local[*]"
         self.app_name = config.get("app_name") or "BenchBox"
-        self.deploy_mode = config.get("deploy_mode")  # client or cluster
+        self.deploy_mode = config.get("deploy_mode")
 
-        # Spark session configuration
         self.warehouse_dir = config.get("warehouse_dir")
         self.database = config.get("database") or "default"
 
-        # Resource configuration
         self.driver_memory = config.get("driver_memory") or "4g"
         self.executor_memory = config.get("executor_memory") or "4g"
         self.executor_cores = config.get("executor_cores") if config.get("executor_cores") is not None else 2
         self.num_executors = config.get("num_executors")
 
-        # Shuffle and optimization settings
         self.shuffle_partitions = (
             config.get("shuffle_partitions") if config.get("shuffle_partitions") is not None else 200
         )
         self.broadcast_threshold = config.get("broadcast_threshold")
         self.adaptive_enabled = config.get("adaptive_enabled") if config.get("adaptive_enabled") is not None else True
 
-        # Table format configuration (parquet, orc, delta, iceberg)
         self.table_format = config.get("table_format") or "parquet"
 
-        # Hive support
         self.enable_hive = config.get("enable_hive") if config.get("enable_hive") is not None else False
 
-        # Extra Spark configuration properties
         self.spark_config = config.get("spark_config") or {}
 
-        # Java home override for compatibility with newer JDKs
         self.java_home = config.get("java_home")
 
-        # Data loading configuration
         self.staging_root = config.get("staging_root")
 
-        # Result cache control - disable by default for accurate benchmarking
         self.disable_cache = config.get("disable_cache") if config.get("disable_cache") is not None else True
 
-        # Store SparkSession reference
         self._spark_session = None
 
     @property
@@ -275,7 +211,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Spark-specific CLI arguments."""
 
         spark_group = parser.add_argument_group("Spark Arguments")
         spark_group.add_argument(
@@ -319,7 +254,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Spark adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         benchmark_name = str(config["benchmark"]).lower()
@@ -355,8 +289,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         ):
             adapter_config["broadcast_threshold"] = -1
 
-        # Default warehouse_dir to benchmark_runs/databases/{benchmark}_{sf}/ so
-        # Spark's Hive metastore lands there instead of ./spark-warehouse in the CWD.
         if not adapter_config.get("warehouse_dir"):
             from benchbox.utils.path_utils import get_benchmark_runs_databases_path
 
@@ -374,14 +306,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Spark platform information.
-
-        Captures comprehensive Spark configuration including:
-        - Spark version
-        - Deployment mode
-        - Resource configuration
-        - Executor/driver settings
-        """
         platform_info = {
             "platform_type": "spark",
             "platform_name": "Apache Spark",
@@ -399,7 +323,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             },
         }
 
-        # Get client library version
         if SparkSession:
             try:
                 import pyspark
@@ -410,18 +333,15 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         else:
             platform_info["client_library_version"] = None
 
-        # Try to get Spark version and extended metadata from session
         if connection:
             try:
                 spark = connection
                 platform_info["platform_version"] = spark.version
 
-                # Get runtime configuration
                 conf = spark.sparkContext.getConf()
                 platform_info["configuration"]["spark_master"] = conf.get("spark.master")
                 platform_info["configuration"]["spark_app_id"] = spark.sparkContext.applicationId
 
-                # Get executor count if available (cluster mode)
                 try:
                     sc = spark.sparkContext
                     executor_ids = sc._jsc.sc().getExecutorIds()
@@ -440,11 +360,9 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         return platform_info
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Spark SQL."""
         return "spark"
 
     def _get_spark_conf(self) -> dict[str, Any]:
-        """Get Spark configuration dictionary."""
         conf = {
             "spark.app.name": self.app_name,
             "spark.driver.memory": self.driver_memory,
@@ -453,26 +371,17 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "spark.sql.shuffle.partitions": str(self.shuffle_partitions),
         }
 
-        # Adaptive Query Execution. Set explicitly in both directions: Spark
-        # enables AQE by default since 3.2.0, so omitting the keys would leave
-        # it on even when adaptive_enabled is False.
         conf.update(spark_aqe_conf_entries(self.adaptive_enabled))
 
-        # Broadcast threshold
         if self.broadcast_threshold is not None:
             conf[_SPARK_AUTO_BROADCAST_THRESHOLD] = str(self.broadcast_threshold)
 
-        # Number of executors (for YARN/K8s)
         if self.num_executors is not None:
             conf["spark.executor.instances"] = str(self.num_executors)
 
-        # Warehouse directory
         if self.warehouse_dir:
             conf["spark.sql.warehouse.dir"] = self.warehouse_dir
 
-        # Register zstd in Hadoop's codec list - the zstd-jni JAR ships
-        # with PySpark but isn't in Hadoop's default codec registry,
-        # causing CODEC_NOT_AVAILABLE when reading zstd-compressed files.
         conf["spark.hadoop.io.compression.codecs"] = (
             "org.apache.hadoop.io.compress.DefaultCodec,"
             "org.apache.hadoop.io.compress.GzipCodec,"
@@ -483,31 +392,23 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "org.apache.hadoop.io.compress.ZStandardCodec"
         )
 
-        # Disable result cache for benchmarking
         if self.disable_cache:
             conf["spark.sql.inMemoryColumnarStorage.enabled"] = "false"
 
-        # Delta Lake support
         if self.table_format == "delta":
             conf["spark.sql.extensions"] = "io.delta.sql.DeltaSparkSessionExtension"
             conf["spark.sql.catalog.spark_catalog"] = "org.apache.spark.sql.delta.catalog.DeltaCatalog"
 
-        # Iceberg support
         if self.table_format == "iceberg":
             conf["spark.sql.extensions"] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
             conf["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkSessionCatalog"
             conf["spark.sql.catalog.spark_catalog.type"] = "hive"
 
-        # Merge user-provided config
         conf.update(self.spark_config)
 
         return conf
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists in Spark.
-
-        Spark databases are equivalent to Hive databases/schemas.
-        """
         try:
             if self._spark_session is None:
                 return False
@@ -521,16 +422,11 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             return False
 
     def drop_database(self, **connection_config) -> None:
-        """Drop database in Spark.
-
-        Uses DROP DATABASE CASCADE to remove all tables.
-        """
         database = connection_config.get("database", self.database)
 
         if not validate_spark_identifier(database):
             raise ValueError(f"Invalid database identifier: {database}")
 
-        # Check if database exists first
         if not self.check_server_database_exists(database=database):
             self.log_verbose(f"Database {database} does not exist - nothing to drop")
             return
@@ -543,24 +439,18 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             raise RuntimeError(f"Failed to drop Spark database {database}: {e}") from e
 
     def create_connection(self, **connection_config) -> Any:
-        """Create optimized Spark session."""
         self.log_operation_start("Spark session")
 
-        # Ensure compatible Java before attempting SparkSession creation
         java_home = _ensure_compatible_java(self.java_home)
         if java_home:
             self.log_verbose(f"Using JAVA_HOME: {java_home}")
 
-        # Build SparkSession first - check_server_database_exists requires an
-        # active session, so handle_existing_database must run after getOrCreate().
         builder = SparkSession.builder.master(self.master)
 
-        # Apply configuration
         spark_conf = self._get_spark_conf()
         for key, value in spark_conf.items():
             builder = builder.config(key, value)
 
-        # Enable Hive support if requested
         if self.enable_hive:
             builder = builder.enableHiveSupport()
 
@@ -572,12 +462,8 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
             self._configure_runtime_logging(spark)
 
-            # Handle existing database using base class method.
-            # This must run after SparkSession is available so that
-            # check_server_database_exists can query the catalog.
             self.handle_existing_database(**connection_config)
 
-            # Create database if needed
             target_database = connection_config.get("database", self.database)
 
             if not self.database_was_reused:
@@ -588,7 +474,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
                     spark.sql(f"CREATE DATABASE IF NOT EXISTS {target_database}")
                     self.logger.info(f"Created database {target_database}")
 
-            # Set current database
             spark.sql(f"USE {target_database}")
 
             self.logger.info(f"Connected to Spark with master {self.master}")
@@ -602,27 +487,11 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             raise
 
     def _configure_runtime_logging(self, spark: Any) -> None:
-        """Reduce Spark log noise for benchmark runs.
-
-        Spark's default WARN output is useful during interactive debugging, but the
-        benchmark path should not flood stderr with spec-compliant WindowExec warnings
-        from global windows used in standard TPC-DS queries like Q44 and Q49.
-        """
         spark_log_level = "WARN" if self.verbose else "ERROR"
         spark.sparkContext.setLogLevel(spark_log_level)
-        # Suppression must follow setLogLevel - setLogLevel resets all log4j2 loggers,
-        # which would undo the WindowExec level override if called after.
         suppress_window_exec_warning(spark)
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Spark-optimized table definitions.
-
-        Spark runs in-process (local mode) so it has filesystem access to
-        ``spark.sql.warehouse.dir`` and can clean per-table orphaned directories
-        directly via ``_remove_orphaned_table_location``.  Remote Spark Connect
-        adapters (Velox/LakeSail) cannot reach that filesystem and use a
-        coarser DB-level purge instead.
-        """
         start_time = mono_time()
 
         spark = connection
@@ -630,10 +499,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         try:
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
-            # Capture table_format once: the bound method re-reads
-            # self.table_format on each call, and pinning the format up front
-            # keeps statement N and N+1 in agreement even if a future hook
-            # mutates the attribute mid-loop.
             fmt = self.table_format
             v1_table = (fmt or "parquet").lower() in {"parquet", "orc"}
             run_spark_schema_creation_loop(
@@ -657,26 +522,15 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         return elapsed_seconds(start_time)
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Spark-specific optimizations based on benchmark type."""
         self.apply_olap_runtime_conf(connection, benchmark_type, "Spark")
 
     def _remove_orphaned_table_location(self, spark: Any, table_name: str) -> None:
-        """Remove orphaned managed-table directory when catalog entry is gone.
-
-        Spark managed tables store data under the warehouse directory. If a
-        prior run was interrupted, the catalog entry may be gone but the
-        physical directory remains, causing LOCATION_ALREADY_EXISTS on retry.
-        """
         try:
             warehouse_dir = spark.conf.get("spark.sql.warehouse.dir", "spark-warehouse")
-            # Resolve relative paths against CWD (Spark's default behavior)
             warehouse_path = Path(warehouse_dir.removeprefix("file:")).resolve()
-            # Strip qualifiers (e.g. spark_catalog.db.tbl) and backticks
             leaf_name = table_name.split(".")[-1].strip("`")
-            # Current database directory
             current_db = spark.catalog.currentDatabase()
             table_dir = (warehouse_path / f"{current_db}.db" / leaf_name).resolve()
-            # Guard: only remove if table_dir is actually inside the warehouse
             if not table_dir.is_relative_to(warehouse_path):
                 self.log_verbose(f"Refusing to remove {table_dir}: outside warehouse {warehouse_path}")
                 return
@@ -687,11 +541,9 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             self.log_verbose(f"Could not remove orphaned location for {table_name}: {e}")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan for analysis."""
         return get_spark_query_plan(connection, query, logger=self.logger)
 
     def close_connection(self, connection: Any) -> None:
-        """Close Spark session."""
         try:
             if connection and hasattr(connection, "stop"):
                 connection.stop()
@@ -700,16 +552,9 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             self.logger.warning(f"Error closing Spark session: {e}")
 
     def test_connection(self) -> bool:
-        """Test connection to Spark.
-
-        Returns:
-            True if connection successful, False otherwise
-        """
         try:
-            # Ensure compatible Java
             _ensure_compatible_java(self.java_home)
 
-            # Create a temporary SparkSession for testing
             builder = SparkSession.builder.master(self.master)
             spark_conf = self._get_spark_conf()
             for key, value in spark_conf.items():
@@ -719,7 +564,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             self._configure_runtime_logging(spark)
 
             try:
-                # Execute simple query to verify
                 spark.sql("SELECT 1").collect()
                 return True
             finally:
@@ -731,13 +575,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     _supported_tuning_type_names = ("PARTITIONING", "SORTING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Spark-specific tuning clauses for CREATE TABLE statements.
-
-        Spark table properties depend on the format:
-        - parquet: PARTITIONED BY
-        - delta: PARTITIONED BY, CLUSTER BY (Z-ORDER)
-        - iceberg: partitioning, sorted_by
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
@@ -746,14 +583,12 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
                 clauses.append(f"PARTITIONED BY ({', '.join(column_names)})")
 
-            # Handle sorting (clustering for Delta Lake)
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns and self.table_format == "delta":
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
@@ -766,12 +601,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         return " ".join(clauses)
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Spark table.
-
-        Spark tuning is primarily handled at table creation time.
-        Post-creation optimization is limited for Parquet/ORC.
-        For Delta Lake, we can use OPTIMIZE with Z-ORDER.
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -783,7 +612,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle Z-ordering for Delta Lake tables
             if self.table_format == "delta":
                 sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
                 if sort_columns:
@@ -805,20 +633,10 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
 
-    # apply_unified_tuning, apply_platform_optimizations, and
-    # apply_constraint_configuration come from SparkLikeAdapterMixin -
-    # bodies were identical (or differed only in the platform name in log
-    # output) across spark / lakesail / velox.
-
     def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables from Spark database."""
         return list_spark_tables(connection)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE TABLE for query optimization.
-
-        Spark uses ANALYZE TABLE to compute statistics for cost-based optimization.
-        """
         analyze_spark_table(connection, table_name, logger=self.logger)
 
 

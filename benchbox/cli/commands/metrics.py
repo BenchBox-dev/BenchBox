@@ -1,5 +1,3 @@
-"""Metrics command group for benchmark performance calculations."""
-
 from __future__ import annotations
 
 import json
@@ -32,22 +30,7 @@ from benchbox.cli.shared import console
     ),
 )
 def metrics_group():
-    """Calculate benchmark performance metrics.
-
-    The metrics command group provides tools for calculating
-    official TPC performance metrics from benchmark results.
-
-    Available subcommands:
-
-    \b
-      qphh    Calculate TPC-H QphH@Size composite metric
-
-    Examples:
-        # Calculate TPC-H QphH metric
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json
-    """
+    pass
 
 
 @metrics_group.command(
@@ -118,44 +101,11 @@ def metrics_group():
 )
 @click.pass_context
 def qphh(ctx, power_results, throughput_results, scale_factor, output_format, output_file):
-    """Calculate TPC-H QphH@Size composite metric.
-
-    Calculate the official TPC-H QphH@Size (Queries per Hour) composite
-    metric from power test and throughput test results according to TPC-H
-    specification.
-
-    Formula: QphH@Size = geometric_mean(Power@Size, Throughput@Size)
-    Where:
-        Power@Size = 3600 × SF / Power_Test_Time
-        Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time
-
-    \b
-    Examples:
-        # Calculate QphH from test results
-        benchbox metrics qphh \\
-          --power-results results/power/results.json \\
-          --throughput-results results/throughput/results.json
-
-    \b
-        # Specify scale factor explicitly
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json \\
-          --scale-factor 100
-
-    \b
-        # Export to JSON
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json \\
-          --format json --output qphh.json
-    """
     result = _compute_qphh_result(power_results, throughput_results, scale_factor)
     _emit_qphh_output(result, output_format, output_file)
 
 
 def _load_result_files(power_results: str, throughput_results: str) -> tuple[dict, dict]:
-    """Load and parse power and throughput result JSON files."""
     try:
         with open(Path(power_results), encoding="utf-8") as f:
             power_data = json.load(f)
@@ -174,12 +124,6 @@ def _load_result_files(power_results: str, throughput_results: str) -> tuple[dic
 
 
 def _resolve_scale_factor(power_data: dict, throughput_data: dict, scale_factor: float | None) -> float:
-    """Auto-detect or validate scale factor from result data.
-
-    Thin CLI wrapper over :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.resolve_scale_factor`.
-    Converts ``ValueError`` to the CLI's console+exit behaviour to keep
-    user-facing messages unchanged.
-    """
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
     try:
@@ -192,21 +136,12 @@ def _resolve_scale_factor(power_data: dict, throughput_data: dict, scale_factor:
 def _derive_tpc_metrics(
     power_data: dict, throughput_data: dict, scale_factor: float
 ) -> tuple[float | None, float | None, float | None, float | None]:
-    """Extract or derive Power@Size and Throughput@Size metrics.
-
-    Thin CLI wrapper over :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.derive_tpc_metrics`.
-    """
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
     return TPCMetricsCalculator.derive_tpc_metrics(power_data, throughput_data, scale_factor)
 
 
 def _compute_qphh_result(power_results: str, throughput_results: str, scale_factor: float | None) -> dict:
-    """Compute the QphH result dictionary from power and throughput result files.
-
-    CLI keeps file I/O and output/error handling; derivation and composition
-    are delegated to :meth:`benchbox.core.results.metrics.TPCMetricsCalculator.compute_qphh_result`.
-    """
     power_data, throughput_data = _load_result_files(power_results, throughput_results)
     from benchbox.core.results.metrics import TPCMetricsCalculator
 
@@ -218,7 +153,6 @@ def _compute_qphh_result(power_results: str, throughput_results: str, scale_fact
 
 
 def _emit_qphh_output(result: dict, output_format: str, output_file: str | None) -> None:
-    """Format and emit QphH result to console or file."""
     if output_format == "text":
         content = _format_text_output(result)
     elif output_format == "json":
@@ -234,7 +168,6 @@ def _emit_qphh_output(result: dict, output_format: str, output_file: str | None)
 
 
 def _format_text_output(result: dict) -> str:
-    """Format QphH calculation as human-readable text."""
     lines = []
 
     lines.append("=" * 70)

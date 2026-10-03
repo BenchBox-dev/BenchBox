@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""Report cyclomatic complexity and govern temporary hard-ceiling exceptions.
-
-Ruff's configured C901 rule and this checker are intentionally separate gates:
-
-* configured Ruff fails when complexity is greater than 18 in Ruff's configured
-  file-discovery scope;
-* this checker scans ``benchbox`` with isolated Ruff, reports scores from 12
-  through 20, and fails on scores greater than 20 unless an exact, current
-  exception exists.
-
-Exception metadata is fail-closed. An entry must pin the target, line, measured
-score, owner, rationale, and a bounded future expiry date. Exceptions never
-hide the advisory band and ``--no-fail`` never suppresses metadata errors.
-"""
 
 from __future__ import annotations
 
@@ -54,7 +40,7 @@ CLI_DESCRIPTION = (
 
 
 class PolicyError(ValueError):
-    """The authoritative complexity policy cannot be loaded safely."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -113,7 +99,6 @@ class ModuleSummary:
 
 
 def _module_key(filepath: str, source_root: str) -> str:
-    """Extract a two-segment module key such as ``benchbox/core``."""
     parts = filepath.replace("\\", "/").split("/")
     try:
         root_index = parts.index(source_root)
@@ -125,7 +110,6 @@ def _module_key(filepath: str, source_root: str) -> str:
 
 
 def _run_ruff(source_root: str) -> RuffScan:
-    """Run isolated Ruff at threshold 1 and validate its output contract."""
     command = [
         sys.executable,
         "-m",
@@ -199,7 +183,6 @@ def _run_ruff(source_root: str) -> RuffScan:
 
 
 def _load_config(pyproject_path: Path) -> dict[str, Any]:
-    """Load ``[tool.benchbox.complexity]`` from pyproject.toml."""
     if not pyproject_path.exists():
         raise PolicyError(f"authoritative policy file is missing: {pyproject_path}")
     try:
@@ -232,7 +215,6 @@ def _parse_exclusions(
     today: date,
     max_exception_days: int,
 ) -> tuple[list[Exclusion], list[str]]:
-    """Parse exception metadata without trusting incomplete entries."""
     errors: list[str] = []
     legacy = config.get("exclude_functions")
     if legacy:
@@ -323,7 +305,6 @@ def _validate_exclusions(
     *,
     max_complexity: int,
 ) -> tuple[set[tuple[str, int]], list[str]]:
-    """Return exact hard-failure exceptions and any stale-pin errors."""
     errors: list[str] = []
     exempt: set[tuple[str, int]] = set()
     seen: set[tuple[str, int]] = set()

@@ -1,9 +1,6 @@
-"""Tests for StarRocks platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from argparse import ArgumentParser
 from pathlib import Path
@@ -21,14 +18,12 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def starrocks_dependencies():
-    """Mock StarRocks dependency check to simulate installed extras."""
     with patch("benchbox.platforms.starrocks.adapter.check_platform_dependencies", return_value=(True, [])):
         yield
 
 
 @pytest.fixture
 def mock_pymysql():
-    """Mock PyMySQL for connection tests."""
     with (
         patch("benchbox.platforms.starrocks.setup.pymysql") as mock_mod,
         patch("benchbox.platforms.starrocks.setup.PYMYSQL_AVAILABLE", True),
@@ -38,10 +33,7 @@ def mock_pymysql():
 
 
 class TestStarRocksAdapter:
-    """Test StarRocks platform adapter functionality."""
-
     def test_initialization_success(self, mock_pymysql):
-        """Test successful adapter initialization."""
         adapter = StarRocksAdapter(
             host="localhost",
             port=9030,
@@ -58,7 +50,6 @@ class TestStarRocksAdapter:
         assert adapter.deployment_mode == "self-hosted"
 
     def test_initialization_missing_driver(self):
-        """Test initialization when PyMySQL is missing."""
         with (
             patch(
                 "benchbox.platforms.starrocks.adapter.check_platform_dependencies",
@@ -71,7 +62,6 @@ class TestStarRocksAdapter:
         assert "Missing dependencies for starrocks platform" in str(excinfo.value)
 
     def test_initialization_env_var_fallbacks(self, mock_pymysql):
-        """Test that env vars are used as fallbacks."""
         with patch.dict(
             "os.environ",
             {
@@ -92,17 +82,14 @@ class TestStarRocksAdapter:
             assert adapter.http_port == 8041
 
     def test_add_cli_arguments(self, mock_pymysql):
-        """Test CLI argument registration."""
         parser = ArgumentParser()
         StarRocksAdapter.add_cli_arguments(parser)
 
-        # Verify key arguments are registered
         args = parser.parse_args(["--host", "myhost", "--port", "9031"])
         assert args.host == "myhost"
         assert args.port == 9031
 
     def test_from_config(self, mock_pymysql):
-        """Test adapter creation from config dict."""
         config = {
             "host": "sr-server",
             "port": 9030,
@@ -118,22 +105,18 @@ class TestStarRocksAdapter:
         assert adapter.database == "bench_db"
 
     def test_platform_name(self, mock_pymysql):
-        """Test platform name property."""
         adapter = StarRocksAdapter()
         assert adapter.platform_name == "StarRocks"
 
     def test_dialect(self, mock_pymysql):
-        """Test dialect property."""
         adapter = StarRocksAdapter()
         assert adapter.dialect == "starrocks"
 
     def test_get_target_dialect(self, mock_pymysql):
-        """Test target dialect for SQL translation."""
         adapter = StarRocksAdapter()
         assert adapter.get_target_dialect() == "starrocks"
 
     def test_create_connection_success(self, mock_pymysql):
-        """Test successful connection creation."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -148,11 +131,9 @@ class TestStarRocksAdapter:
 
         assert isinstance(connection, _StarRocksConnectionWrapper)
         assert connection._conn == mock_conn
-        # Called at least once for the main connection (may also be called for admin ops)
         assert mock_pymysql.connect.call_count >= 1
 
     def test_create_connection_failure(self, mock_pymysql):
-        """Test connection creation failure."""
         mock_pymysql.connect.side_effect = Exception("Connection refused")
 
         adapter = StarRocksAdapter(host="localhost", port=9030)
@@ -160,29 +141,24 @@ class TestStarRocksAdapter:
             adapter.create_connection()
 
     def test_create_connection_pymysql_not_available(self):
-        """Test connection when pymysql is not available."""
         with patch("benchbox.platforms.starrocks.setup.PYMYSQL_AVAILABLE", False):
             adapter = StarRocksAdapter()
             with pytest.raises(ImportError, match="PyMySQL"):
                 adapter.create_connection()
 
     def test_close_connection(self, mock_pymysql):
-        """Test connection closing."""
         mock_conn = Mock()
         adapter = StarRocksAdapter()
         adapter.close_connection(mock_conn)
         mock_conn.close.assert_called_once()
 
     def test_close_connection_error(self, mock_pymysql):
-        """Test connection closing handles errors gracefully."""
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("Close failed")
         adapter = StarRocksAdapter()
-        # Should not raise
         adapter.close_connection(mock_conn)
 
     def test_create_schema(self, mock_pymysql):
-        """Test schema creation."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -197,14 +173,11 @@ class TestStarRocksAdapter:
 
         assert isinstance(schema_time, float)
         assert schema_time >= 0
-        # Should execute at least 2 statements
         assert mock_cursor.execute.call_count >= 2
 
     def test_optimize_table_definition(self, mock_pymysql):
-        """Test table definition optimization for StarRocks."""
         adapter = StarRocksAdapter()
 
-        # Test basic table - should add DUPLICATE KEY and DISTRIBUTED BY
         original = "CREATE TABLE test (id INT, name VARCHAR(100))"
         optimized = adapter._optimize_table_definition(original)
         assert "DUPLICATE KEY" in optimized
@@ -212,7 +185,6 @@ class TestStarRocksAdapter:
         assert "BUCKETS" in optimized
 
     def test_optimize_table_definition_type_conversion(self, mock_pymysql):
-        """Test type conversion in table definitions."""
         adapter = StarRocksAdapter()
 
         original = "CREATE TABLE test (id INTEGER, name STRING, val DOUBLE PRECISION, big HUGEINT)"
@@ -223,7 +195,6 @@ class TestStarRocksAdapter:
         assert "LARGEINT" in optimized
 
     def test_optimize_table_definition_removes_foreign_keys(self, mock_pymysql):
-        """Test that foreign keys are removed from table definitions."""
         adapter = StarRocksAdapter()
 
         original = "CREATE TABLE orders (id INT, cust_id INT, FOREIGN KEY (cust_id) REFERENCES customer(id))"
@@ -231,7 +202,6 @@ class TestStarRocksAdapter:
         assert "FOREIGN KEY" not in optimized
 
     def test_execute_query_success(self, mock_pymysql):
-        """Test successful query execution."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -247,7 +217,6 @@ class TestStarRocksAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     def test_execute_query_failure(self, mock_pymysql):
-        """Test query execution failure."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -263,7 +232,6 @@ class TestStarRocksAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     def test_execute_query_empty_result(self, mock_pymysql):
-        """Test query execution with empty result set."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -277,7 +245,6 @@ class TestStarRocksAdapter:
         assert result["first_row"] is None
 
     def test_configure_for_benchmark(self, mock_pymysql):
-        """Test benchmark configuration."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -285,11 +252,9 @@ class TestStarRocksAdapter:
         adapter = StarRocksAdapter()
         adapter.configure_for_benchmark(mock_conn, "tpch")
 
-        # Should execute SET statements for query_timeout and cache disabling
         assert mock_cursor.execute.call_count >= 1
 
     def test_configure_for_benchmark_non_olap(self, mock_pymysql):
-        """Test benchmark configuration for non-OLAP workload."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -297,11 +262,9 @@ class TestStarRocksAdapter:
         adapter = StarRocksAdapter()
         adapter.configure_for_benchmark(mock_conn, "read_primitives")
 
-        # Should still execute basic settings
         assert mock_cursor.execute.call_count >= 1
 
     def test_get_platform_info_without_connection(self, mock_pymysql):
-        """Test platform info without connection."""
         adapter = StarRocksAdapter(host="myhost", port=9030, database="mydb")
         info = adapter.get_platform_info()
 
@@ -312,7 +275,6 @@ class TestStarRocksAdapter:
         assert info["platform_version"] is None
 
     def test_get_platform_info_with_connection(self, mock_pymysql):
-        """Test platform info with connection."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -324,7 +286,6 @@ class TestStarRocksAdapter:
         assert info["platform_version"] == "3.3.0-starrocks"
 
     def test_get_existing_tables(self, mock_pymysql):
-        """Test retrieving existing tables."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -336,7 +297,6 @@ class TestStarRocksAdapter:
         assert tables == ["lineitem", "orders"]
 
     def test_validate_data_integrity_success(self, mock_pymysql):
-        """Test data integrity validation success."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -350,7 +310,6 @@ class TestStarRocksAdapter:
         assert len(details["accessible_tables"]) == 2
 
     def test_validate_data_integrity_failure(self, mock_pymysql):
-        """Test data integrity validation with inaccessible tables."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -362,25 +321,21 @@ class TestStarRocksAdapter:
         assert status == "FAILED"
 
     def test_sql_translation(self, mock_pymysql):
-        """Test SQL dialect translation."""
         adapter = StarRocksAdapter()
 
         with patch("sqlglot.transpile") as mock_transpile:
             mock_transpile.return_value = ['SELECT * FROM "table"']
             result = adapter.translate_sql("SELECT * FROM table", "duckdb")
             assert result == 'SELECT * FROM "table";'
-            # identify=True for starrocks (not in clickhouse/postgres exclusion list)
             mock_transpile.assert_called_once_with(
                 "SELECT * FROM table", read="duckdb", write="starrocks", identify=True
             )
 
     def test_apply_constraint_configuration(self, mock_pymysql):
-        """Test constraint configuration application."""
         mock_conn = Mock()
 
         adapter = StarRocksAdapter()
 
-        # Should not raise with valid configs
         pk_config = Mock()
         pk_config.enabled = True
         fk_config = Mock()
@@ -389,7 +344,6 @@ class TestStarRocksAdapter:
         adapter.apply_constraint_configuration(pk_config, fk_config, mock_conn)
 
     def test_supports_tuning_type(self, mock_pymysql):
-        """Test tuning type support check."""
         from benchbox.core.tuning.interface import TuningType
 
         adapter = StarRocksAdapter()
@@ -400,14 +354,11 @@ class TestStarRocksAdapter:
         assert adapter.supports_tuning_type(TuningType.CLUSTERING) is False
 
     def test_apply_table_tunings_none(self, mock_pymysql):
-        """Test applying None table tunings."""
         mock_conn = Mock()
         adapter = StarRocksAdapter()
-        # Should not raise
         adapter.apply_table_tunings(None, mock_conn)
 
     def test_extract_first_column(self, mock_pymysql):
-        """Test first column extraction."""
         adapter = StarRocksAdapter()
 
         assert adapter._extract_first_column("CREATE TABLE test (id INT, name VARCHAR)") == "id"
@@ -415,16 +366,13 @@ class TestStarRocksAdapter:
         assert adapter._extract_first_column("NO PARENS") is None
 
     def test_optimize_table_adds_duplicate_key_after_pk_removal(self, mock_pymysql):
-        """Test that DUPLICATE KEY is added when PRIMARY KEY is removed."""
         adapter = StarRocksAdapter()
-        # Table has a PRIMARY KEY that gets stripped; DUPLICATE KEY should be added
         original = "CREATE TABLE test (id INT, name VARCHAR(100), PRIMARY KEY (id))"
         optimized = adapter._optimize_table_definition(original)
         assert "DUPLICATE KEY" in optimized
         assert "DISTRIBUTED BY HASH" in optimized
 
     def test_apply_platform_optimizations_rejects_unsafe_setting(self, mock_pymysql):
-        """Test that SQL injection via setting names is blocked."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -436,13 +384,11 @@ class TestStarRocksAdapter:
 
         adapter.apply_platform_optimizations(platform_config, mock_conn)
 
-        # Only valid_setting should be executed
         calls = [str(c) for c in mock_cursor.execute.call_args_list]
         assert any("valid_setting" in c for c in calls)
         assert not any("DROP" in c for c in calls)
 
     def test_apply_platform_optimizations_rejects_unsafe_value(self, mock_pymysql):
-        """Test that SQL injection via setting values is blocked."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -454,17 +400,14 @@ class TestStarRocksAdapter:
 
         adapter.apply_platform_optimizations(platform_config, mock_conn)
 
-        # No execute calls should be made (value is unsafe)
         mock_cursor.execute.assert_not_called()
 
     def test_drop_database_rejects_invalid_name(self, mock_pymysql):
-        """Test that drop_database rejects invalid database names."""
         adapter = StarRocksAdapter()
         with pytest.raises(ValueError, match="Invalid database name"):
             adapter.drop_database(database="db`; DROP TABLE--")
 
     def test_cursor_closed_on_execute_query_failure(self, mock_pymysql):
-        """Test that cursor is closed even when query execution fails."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -476,7 +419,6 @@ class TestStarRocksAdapter:
         mock_cursor.close.assert_called_once()
 
     def test_cursor_closed_on_schema_creation_failure(self, mock_pymysql):
-        """Test that cursor is closed when schema creation fails mid-statement."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -493,26 +435,20 @@ class TestStarRocksAdapter:
 
 
 class TestStarRocksTlsCertValidation:
-    """Tests for verify_ssl and ca_cert_path TLS options (forward-compat for Stream Load)."""
-
     def test_defaults_verify_ssl_true_no_ca_cert(self):
-        """verify_ssl defaults to True, ca_cert_path defaults to None."""
         adapter = StarRocksAdapter()
         assert adapter.verify_ssl is True
         assert adapter.ca_cert_path is None
 
     def test_verify_ssl_false_stored(self):
-        """verify_ssl=False is accepted and stored on the adapter."""
         adapter = StarRocksAdapter(verify_ssl=False)
         assert adapter.verify_ssl is False
 
     def test_ca_cert_path_stored(self):
-        """ca_cert_path is accepted and stored on the adapter."""
         adapter = StarRocksAdapter(ca_cert_path="/etc/ssl/custom-ca.crt")
         assert adapter.ca_cert_path == "/etc/ssl/custom-ca.crt"
 
     def test_from_config_passes_verify_ssl_and_ca_cert_path(self):
-        """from_config propagates verify_ssl and ca_cert_path to the adapter."""
         config = {
             "host": "localhost",
             "benchmark": "tpch",

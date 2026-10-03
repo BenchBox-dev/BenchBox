@@ -1,9 +1,6 @@
-"""Unit tests for DataFrame tuning types.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -19,8 +16,6 @@ pytestmark = [
 
 
 class TestDataFrameTuningType:
-    """Tests for DataFrameTuningType enum."""
-
     def test_enum_values_exist(self):
 
         assert DataFrameTuningType.THREAD_COUNT.value == "thread_count"
@@ -31,34 +26,28 @@ class TestDataFrameTuningType:
 
     def test_is_compatible_with_platform_polars(self):
 
-        # Compatible with Polars
         assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("polars") is True
         assert DataFrameTuningType.STREAMING_MODE.is_compatible_with_platform("polars") is True
         assert DataFrameTuningType.CHUNK_SIZE.is_compatible_with_platform("polars") is True
 
-        # Not compatible with Polars
         assert DataFrameTuningType.WORKER_COUNT.is_compatible_with_platform("polars") is False
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("polars") is False
 
     def test_is_compatible_with_platform_pandas(self):
 
-        # Compatible with Pandas
         assert DataFrameTuningType.DTYPE_BACKEND.is_compatible_with_platform("pandas") is True
         assert DataFrameTuningType.CHUNK_SIZE.is_compatible_with_platform("pandas") is True
 
-        # Not compatible with Pandas
         assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("pandas") is False
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("pandas") is False
 
     def test_is_compatible_with_platform_datafusion(self):
-        """DataFusion exposes the SessionConfig settings its adapter applies."""
         assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("datafusion") is True
         assert DataFrameTuningType.CHUNK_SIZE.is_compatible_with_platform("datafusion") is True
         assert DataFrameTuningType.STREAMING_MODE.is_compatible_with_platform("datafusion") is False
 
     def test_is_compatible_with_platform_dask(self):
 
-        # Compatible with Dask
         assert DataFrameTuningType.WORKER_COUNT.is_compatible_with_platform("dask") is True
         assert DataFrameTuningType.THREADS_PER_WORKER.is_compatible_with_platform("dask") is True
         assert DataFrameTuningType.MEMORY_LIMIT.is_compatible_with_platform("dask") is True
@@ -66,7 +55,6 @@ class TestDataFrameTuningType:
 
     def test_is_compatible_with_platform_cudf(self):
 
-        # Compatible with cuDF
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("cudf") is True
         assert DataFrameTuningType.GPU_POOL_TYPE.is_compatible_with_platform("cudf") is True
         assert DataFrameTuningType.GPU_SPILL_TO_HOST.is_compatible_with_platform("cudf") is True
@@ -83,18 +71,14 @@ class TestDataFrameTuningType:
 
     def test_compatible_with_multiple_platforms(self):
 
-        # DTYPE_BACKEND should be compatible with Pandas and Dask
         assert DataFrameTuningType.DTYPE_BACKEND.is_compatible_with_platform("pandas") is True
         assert DataFrameTuningType.DTYPE_BACKEND.is_compatible_with_platform("dask") is True
 
-        # GPU_DEVICE should only be compatible with cuDF
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("cudf") is True
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("polars") is False
 
 
 class TestGetAllPlatforms:
-    """Tests for get_all_platforms() function."""
-
     def test_returns_all_platforms(self):
 
         platforms = get_all_platforms()

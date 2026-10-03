@@ -184,9 +184,10 @@ design and the validation matrix contributors must rerun before changing it.
 
 ### Naming Convention
 
-```python
+Naming template and illustrative function signatures:
+
+```text
 def test_<what>_<condition>_<expected_result>():
-    """Optional docstring explaining why this test exists."""
     ...
 
 # Examples:
@@ -195,19 +196,21 @@ def test_connection_timeout_raises_error():
 def test_empty_table_generates_no_rows():
 ```
 
-### Docstrings
+### Test intent
 
-Add docstrings when the test name isn't self-explanatory:
+Use names and assertions that state the behavior being checked. Keep explanatory
+prose in test documentation, following the [comment policy](comment-policy.md).
+Do not add source comments or docstrings.
+
+For example, a TPC-H scale-factor test can name the required customer count:
 
 ```python
-def test_sf10_customer_count():
-    """TPC-H spec requires exactly 1.5M customers at SF=10.
-
-    This is a compliance requirement, not an arbitrary count.
-    Ref: TPC-H Specification v3.0.1, Section 4.2.2
-    """
+def test_tpch_sf10_customer_count_is_1500000():
     assert get_customer_count(scale_factor=10) == 1_500_000
 ```
+
+Record the governing requirement in the relevant test documentation: TPC-H
+Specification v3.0.1, Section 4.2.2 requires 1.5 million customers at SF=10.
 
 ## Coverage vs. Quality
 

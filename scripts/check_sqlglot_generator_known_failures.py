@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate the age-bounded SQLGlot generator known-failure policy."""
 
 from __future__ import annotations
 
@@ -341,7 +340,6 @@ def _validate_known_failure(
 
 
 def validate_policy(value: object, today: date, repo_root: Path = REPO_ROOT) -> list[str]:
-    """Return every policy validation error in deterministic order."""
     errors: list[str] = []
     if not isinstance(value, dict):
         return ["policy: top-level value must be an object"]

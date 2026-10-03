@@ -51,13 +51,11 @@ def _visit_date(series: Any) -> Any:
     return series
 
 
-# =============================================================================
 # Q1: Scan Query - filter rankings by pageRank
-# =============================================================================
 
 
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Filter rankings by pageRank threshold."""
+
     params = get_parameters("Q1")
     threshold = params.get("pagerank_threshold", 1000)
 
@@ -69,7 +67,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Filter rankings by pageRank threshold."""
+
     params = get_parameters("Q1")
     threshold = params.get("pagerank_threshold", 1000)
 
@@ -77,9 +75,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return rankings[rankings["pageRank"] > threshold][["pageURL", "pageRank"]]
 
 
-# =============================================================================
 # Q1a: Aggregation with pageRank filter
-# =============================================================================
 
 
 def q1a_expression_impl(ctx: DataFrameContext) -> Any:
@@ -116,9 +112,7 @@ def q1a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Q2: Join uservisits+rankings with date range
-# =============================================================================
 
 
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -167,9 +161,7 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Q2a: Join with pageRank filter and limit
-# =============================================================================
 
 
 def q2a_expression_impl(ctx: DataFrameContext) -> Any:
@@ -213,9 +205,7 @@ def q2a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Q3: Text search with HAVING
-# =============================================================================
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -272,9 +262,7 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
 
-# =============================================================================
 # Q3a: Document text analysis with CASE WHEN
-# =============================================================================
 
 
 def q3a_expression_impl(ctx: DataFrameContext) -> Any:
@@ -325,9 +313,7 @@ def q3a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Q4: Country/language analytics with HAVING
-# =============================================================================
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -378,9 +364,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
 
-# =============================================================================
 # Q5: Cross-table analytics with join and HAVING
-# =============================================================================
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -438,9 +422,8 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
 
-# =============================================================================
 # Query Registration
-# =============================================================================
+
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

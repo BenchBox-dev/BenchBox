@@ -1,12 +1,9 @@
-"""Integration tests for TPC-H benchmark classes with ultra-simplified implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -20,8 +17,6 @@ pytestmark = [
 
 
 class TestTPCHBenchmarkIntegration:
-    """Test TPCHBenchmark integration with ultra-simplified query manager."""
-
     def test_benchmark_initialization(self):
 
         benchmark = TPCHBenchmark()
@@ -34,7 +29,6 @@ class TestTPCHBenchmarkIntegration:
 
         benchmark = TPCHBenchmark()
 
-        # Test basic query generation
         sql = benchmark.get_query(1)
         assert len(sql) > 50
         assert "select" in sql.lower() or "with" in sql.lower()
@@ -43,31 +37,25 @@ class TestTPCHBenchmarkIntegration:
 
         benchmark = TPCHBenchmark()
 
-        # Test with seed
         sql1 = benchmark.get_query(1, seed=12345)
         sql2 = benchmark.get_query(1, seed=12345)
-        assert sql1 == sql2  # Same seed should produce same result
+        assert sql1 == sql2
 
-        # Test with different seed
         sql3 = benchmark.get_query(1, seed=54321)
-        assert sql1 != sql3  # Different seed should produce different result
+        assert sql1 != sql3
 
-        # Test with scale factor
         sql_sf = benchmark.get_query(1, scale_factor=0.5)
         assert "select" in sql_sf.lower() or "with" in sql_sf.lower()
         assert len(sql_sf) > 50
 
     def test_benchmark_scale_factor_inheritance(self):
 
-        # Create benchmark with specific scale factor
         benchmark = TPCHBenchmark(scale_factor=2.0)
 
-        # Query should work with inherited scale factor
         sql = benchmark.get_query(1)
         assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
-        # Explicit scale factor should override
         sql_override = benchmark.get_query(1, scale_factor=0.1)
         assert "select" in sql_override.lower() or "with" in sql_override.lower()
         assert len(sql_override) > 50
@@ -76,17 +64,14 @@ class TestTPCHBenchmarkIntegration:
 
         benchmark = TPCHBenchmark()
 
-        # Test old-style call with params=None
         sql_old = benchmark.get_query(1, params=None)
         assert "select" in sql_old.lower() or "with" in sql_old.lower()
         assert len(sql_old) > 50
 
-        # Test new-style call with seed
         sql_new = benchmark.get_query(1, seed=12345)
         assert "select" in sql_new.lower() or "with" in sql_new.lower()
         assert len(sql_new) > 50
 
-        # Test mixed call
         sql_mixed = benchmark.get_query(1, params=None, seed=12345, dialect="duckdb")
         assert "select" in sql_mixed.lower() or "with" in sql_mixed.lower()
         assert len(sql_mixed) > 50
@@ -99,17 +84,14 @@ class TestTPCHBenchmarkIntegration:
 
         assert len(queries) == 22
 
-        # Keys should be valid query IDs
         for key in queries:
             assert int(key) in range(1, 23)
 
-        # Values should be SQL strings
         for sql in queries.values():
             assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
 
     def test_benchmark_all_queries_generation(self):
-        """Test that all 22 queries can be generated through benchmark."""
         benchmark = TPCHBenchmark()
 
         for query_id in range(1, 23):
@@ -122,12 +104,10 @@ class TestTPCHBenchmarkIntegration:
 
         benchmark = TPCHBenchmark()
 
-        # Invalid query ID should raise ValueError
         with pytest.raises(ValueError) as exc_info:
             benchmark.get_query(23)
         assert "Query ID must be 1-22" in str(exc_info.value)
 
-        # Same for get_parameterized_query
         with pytest.raises(ValueError):
             benchmark.get_query(0)
 
@@ -143,8 +123,6 @@ class TestTPCHBenchmarkIntegration:
 
 
 class TestTopLevelTPCHIntegration:
-    """Test top-level TPCH class integration."""
-
     def test_tpch_initialization(self):
 
         tpch = TPCH()
@@ -156,12 +134,10 @@ class TestTopLevelTPCHIntegration:
 
         tpch = TPCH()
 
-        # Test basic query generation
         sql = tpch.get_query(1)
         assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
-        # Test with parameters
         sql_with_seed = tpch.get_query(1, seed=12345)
         assert "select" in sql_with_seed.lower() or "with" in sql_with_seed.lower()
         assert len(sql_with_seed) > 50
@@ -170,12 +146,10 @@ class TestTopLevelTPCHIntegration:
 
         tpch = TPCH()
 
-        # Test old-style call
         sql_old = tpch.get_query(1, params=None, dialect="duckdb")
         assert "select" in sql_old.lower() or "with" in sql_old.lower()
         assert len(sql_old) > 50
 
-        # Test new-style call
         sql_new = tpch.get_query(1, seed=12345, dialect="duckdb")
         assert "select" in sql_new.lower() or "with" in sql_new.lower()
         assert len(sql_new) > 50
@@ -197,12 +171,10 @@ class TestTopLevelTPCHIntegration:
 
         tpch = TPCH(scale_factor=0.5)
 
-        # Should use inherited scale factor
         sql = tpch.get_query(1)
         assert "select" in sql.lower() or "with" in sql.lower()
         assert len(sql) > 50
 
-        # Should allow override
         sql_override = tpch.get_query(1, scale_factor=2.0)
         assert "select" in sql_override.lower() or "with" in sql_override.lower()
         assert len(sql_override) > 50
@@ -211,23 +183,20 @@ class TestTopLevelTPCHIntegration:
 
         tpch = TPCH()
 
-        # Test subset of queries for performance
         for query_id in [1, 5, 10, 15, 20]:
             sql = tpch.get_query(query_id, seed=42)
             assert "select" in sql.lower() or "with" in sql.lower()
             assert len(sql) > 50
-            assert ":1" not in sql  # No parameter placeholders
+            assert ":1" not in sql
 
     def test_tpch_deterministic_behavior(self):
 
         tpch = TPCH()
 
-        # Same seed should produce same results
         sql1 = tpch.get_query(1, seed=999)
         sql2 = tpch.get_query(1, seed=999)
         assert sql1 == sql2
 
-        # Different seeds should produce different results
         sql3 = tpch.get_query(1, seed=111)
         assert sql1 != sql3
 
@@ -241,11 +210,8 @@ class TestTopLevelTPCHIntegration:
 
 
 class TestCrossComponentIntegration:
-    """Test integration across multiple components."""
-
     def test_query_consistency_across_interfaces(self):
 
-        # Initialize all interfaces
         TPCH().get_queries()
         benchmark = TPCHBenchmark()
         tpch = TPCH()
@@ -253,11 +219,9 @@ class TestCrossComponentIntegration:
         seed = 12345
         query_id = 1
 
-        # Get query through different interfaces with same seed
         sql_benchmark = benchmark.get_query(query_id, seed=seed)
         sql_tpch = tpch.get_query(query_id, seed=seed)
 
-        # Should be identical
         assert sql_benchmark == sql_tpch
 
     def test_parameter_inheritance_consistency(self):
@@ -266,7 +230,6 @@ class TestCrossComponentIntegration:
         benchmark = TPCHBenchmark(scale_factor=sf)
         tpch = TPCH(scale_factor=sf)
 
-        # Both should work with inherited scale factor
         sql_benchmark = benchmark.get_query(1)
         sql_tpch = tpch.get_query(1)
 
@@ -280,7 +243,6 @@ class TestCrossComponentIntegration:
         benchmark = TPCHBenchmark()
         tpch = TPCH()
 
-        # Both should raise same type of error for invalid query
         with pytest.raises(ValueError):
             benchmark.get_query(0)
 
@@ -292,7 +254,6 @@ class TestCrossComponentIntegration:
         benchmark = TPCHBenchmark()
         tpch = TPCH()
 
-        # Test various parameter combinations work on both
         test_params = [
             {"seed": 123},
             {"scale_factor": 0.5},

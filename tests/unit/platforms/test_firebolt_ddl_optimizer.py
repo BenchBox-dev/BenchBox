@@ -1,14 +1,6 @@
-"""Unit tests for Firebolt DDL optimizer branch coverage.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins _optimize_table_definition transforms not covered elsewhere: bare
-VARCHAR and CHAR(n) to TEXT, DECIMAL precision preservation as NUMERIC,
-non-CREATE passthrough, and double-comma cleanup after constraint removal.
-Existing tests pin VARCHAR(n), PRIMARY KEY and FOREIGN KEY removal.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

@@ -117,7 +117,6 @@ class TestExpressionFamilyCoverage:
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
-        # lit should passthrough UnifiedExpr and wrap strings as literals
         wrapped = ctx.lit("x")
         assert isinstance(wrapped, UnifiedExpr)
         same = ctx.lit(wrapped)
@@ -163,10 +162,7 @@ class TestExpressionFamilyCoverage:
         assert "missing" not in stats
 
     def test_plan_capture_failure_records_real_cause_and_warns_once(self, monkeypatch, caplog):
-        """qpc-05 / F4.4: a DataFrame plan-capture exception must not be
-        swallowed at DEBUG. The real cause is recorded on the (successful) query
-        row and on a per-run plan_capture_errors list, and surfaced ONCE per run
-        at WARNING."""
+
         import logging
 
         import benchbox.platforms.dataframe.expression_family as ef
@@ -186,15 +182,14 @@ class TestExpressionFamilyCoverage:
             result_a, _ = adapter.execute_query_profiled(ctx, q_a, track_memory=False, capture_plan=True)
             result_b, _ = adapter.execute_query_profiled(ctx, q_b, track_memory=False, capture_plan=True)
 
-        # The query itself still succeeds; capture failure is not fatal.
         assert result_a["status"] == "SUCCESS"
-        # Real cause carried on the row, not lost.
+
         assert result_a["plan_capture_error"] == "capture exploded"
         assert result_b["plan_capture_error"] == "capture exploded"
-        # Per-run list accumulates every failure with the real cause.
+
         assert [e["query_id"] for e in adapter.plan_capture_errors] == ["QA", "QB"]
         assert all(e["error"] == "capture exploded" for e in adapter.plan_capture_errors)
-        # WARNING is emitted exactly once per run (further failures go to DEBUG).
+
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "capture exploded" in r.getMessage()]
         assert len(warnings) == 1
 
@@ -226,18 +221,14 @@ class TestExpressionFamilyCoverage:
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
-        # concat uses adapter.concat_dataframes path
         out = ctx.concat([{"rows": 1}, {"rows": 2}])
         assert out.native["rows"] == 1
 
-        # coalesce should return UnifiedExpr regardless of inputs
         expr = ctx.coalesce(ctx.col("a"), "b", 1)
         assert isinstance(expr, UnifiedExpr)
 
 
 class TestContextWindowDelegates:
-    """Test window function delegation through ExpressionFamilyContext."""
-
     def test_window_delegates_all(self):
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
@@ -265,22 +256,18 @@ class TestContextWindowDelegates:
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
-        # union_all delegates to adapter.union_all and returns its result directly
         result = ctx.union_all({"rows": 1}, {"rows": 2})
         assert result["union"] == [{"rows": 1}, {"rows": 2}]
 
-        # rename_columns delegates to adapter.rename_columns and returns result directly
         renamed = ctx.rename_columns({"rows": 1}, {"a": "b"})
         assert renamed["mapping"] == {"a": "b"}
 
 
 class TestContextStandaloneAggFunctions:
-    """Test standalone aggregation functions on ExpressionFamilyContext."""
-
     def test_count_no_column(self):
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
-        # Polars path (default adapter name != PySpark/DataFusion)
+
         expr = ctx.count()
         assert isinstance(expr, UnifiedExpr)
 
@@ -323,7 +310,7 @@ class TestContextStandaloneAggFunctions:
     def test_coalesce_string_columns_polars_path(self):
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
-        # Mix of UnifiedExpr, str, and literal - Polars path
+
         expr = ctx.coalesce(ctx.col("a"), "b", ctx.lit(0))
         assert isinstance(expr, UnifiedExpr)
 
@@ -337,10 +324,7 @@ class TestContextStandaloneAggFunctions:
 
 
 class TestContextElementAndStructAndMap:
-    """Test element(), struct(), and map_from_entries() on ExpressionFamilyContext."""
-
     def test_element_delegates_to_adapter(self):
-        """element() should call adapter.element() and wrap result."""
 
         class ElementAdapter(CoverageExpressionAdapter):
             def element(self):
@@ -354,7 +338,7 @@ class TestContextElementAndStructAndMap:
     def test_struct_polars_path(self):
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
-        # Call struct with a string column and a UnifiedExpr
+
         result = ctx.struct("col_a", ctx.col("col_b"))
         assert isinstance(result, UnifiedExpr)
 
@@ -372,9 +356,6 @@ class TestContextElementAndStructAndMap:
 
 
 class TestAdapterHelperMethods:
-    """Test adapter helper methods: _build_ctas_sort_sql, _log_very_verbose,
-    _load_parquet_files (multi), _load_csv_files (multi), _concat_dataframes."""
-
     def test_build_ctas_sort_sql_returns_none(self):
         adapter = CoverageExpressionAdapter()
         result = adapter._build_ctas_sort_sql("orders", ["col_a"])
@@ -382,12 +363,12 @@ class TestAdapterHelperMethods:
 
     def test_log_very_verbose_no_op_when_off(self):
         adapter = CoverageExpressionAdapter(very_verbose=False)
-        # Should not raise
+
         adapter._log_very_verbose("should not log")
 
     def test_log_very_verbose_when_on(self):
         adapter = CoverageExpressionAdapter(very_verbose=True)
-        # Should not raise
+
         adapter._log_very_verbose("verbose message")
 
     def test_concat_dataframes_single_returns_same(self):
@@ -410,7 +391,7 @@ class TestAdapterHelperMethods:
         f1.touch()
         f2.touch()
         result = adapter._load_parquet_files([f1, f2])
-        # Both files returned as union (concat_dataframes returns first)
+
         assert result is not None
 
     def test_load_csv_files_multi(self, tmp_path):
@@ -423,7 +404,6 @@ class TestAdapterHelperMethods:
         assert result is not None
 
     def test_execute_query_with_collect_branch(self):
-        """Hit the hasattr(result_df, 'collect') branch in execute_query."""
 
         class CollectableDF:
             def collect(self):
@@ -439,10 +419,7 @@ class TestAdapterHelperMethods:
 
         q = DataFrameQuery(query_id="Q_COLLECT", query_name="q", description="d", expression_impl=impl)
         result = adapter.execute_query(ctx, q)
-        # collect() is called - get_row_count will fallback to df.get("rows", 1) which fails
-        # but collect() is a no-op on CollectableDF, so get_row_count gets a CollectableDF
-        # The mock get_row_count calls df.get("rows", 1) which doesn't exist on CollectableDF
-        # This should fail gracefully
+
         assert result["query_id"] == "Q_COLLECT"
 
     def test_element_not_implemented_on_base_adapter(self):
@@ -477,21 +454,18 @@ class TestAdapterHelperMethods:
 
 
 class TestContextWhenPolarsPath:
-    """Tests for the Polars when() path in ExpressionFamilyContext."""
-
     def test_when_polars_default_path(self):
-        """when() with default (Polars) adapter takes the Polars import path."""
+
         from benchbox.platforms.dataframe.unified_frame import UnifiedWhen
 
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
-        # Default platform name is "Polars" (from CoverageExpressionAdapter)
         result = ctx.when(True)
         assert isinstance(result, UnifiedWhen)
 
     def test_when_with_unified_expr_condition(self):
-        """when() unwraps UnifiedExpr conditions before delegating."""
+
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedWhen
 
         adapter = CoverageExpressionAdapter()
@@ -503,8 +477,6 @@ class TestContextWhenPolarsPath:
 
 
 class TestContextWindowLagLeadNtileDelegates:
-    """Test window lag/lead/ntile/percent_rank/cume_dist delegation through context."""
-
     def _make_adapter_with_window_support(self):
         class WindowAdapter(CoverageExpressionAdapter):
             def window_lag(self, column, offset=1, partition_by=None, order_by=None):
@@ -556,11 +528,7 @@ class TestContextWindowLagLeadNtileDelegates:
 
 
 class TestContextStandaloneAggsPolarsWithMockedPlatform:
-    """Test standalone agg functions using mocked PySpark/DataFusion platform name
-    to cover the non-Polars import paths via mock."""
-
     def _make_mock_adapter(self, platform: str):
-        """Make a CoverageExpressionAdapter that reports a specific platform name."""
 
         class MockPlatformAdapter(CoverageExpressionAdapter):
             @property
@@ -573,7 +541,6 @@ class TestContextStandaloneAggsPolarsWithMockedPlatform:
         import sys
         from types import ModuleType
 
-        # Mock pyspark.sql.functions
         mock_f = MagicMock()
         mock_f.count.return_value = "spark_count"
         mock_f.lit.return_value = "spark_lit_1"
@@ -617,8 +584,6 @@ class TestContextStandaloneAggsPolarsWithMockedPlatform:
 
 
 class TestExecuteQueryProfiledWithMemory:
-    """Test execute_query_profiled with track_memory=True to cover lines 1373-1421."""
-
     def test_profiled_with_memory_tracking(self):
         adapter = CoverageExpressionAdapter(verbose=True)
         ctx = adapter.create_context()
@@ -632,13 +597,13 @@ class TestExecuteQueryProfiledWithMemory:
             description="memory tracking",
             expression_impl=lambda c: {"rows": 5},
         )
-        # track_memory=True exercises lines 1373-1421
+
         result, profile = adapter.execute_query_profiled(ctx, q, track_memory=True, capture_plan=False)
         assert result["status"] == "SUCCESS"
         assert profile.query_id == "MEM1"
 
     def test_profiled_no_impl_raises(self):
-        """Cover the 'no implementation' branch (line 1380) in profiled path."""
+
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -648,7 +613,6 @@ class TestExecuteQueryProfiledWithMemory:
             query_id="NOIMPL",
             query_name="no_impl",
             description="no expr impl",
-            # pandas_impl only, no expression_impl
             pandas_impl=lambda c: None,
         )
         result, profile = adapter.execute_query_profiled(ctx, q, track_memory=False, capture_plan=False)
@@ -656,7 +620,7 @@ class TestExecuteQueryProfiledWithMemory:
         assert "no expression implementation" in result["error"]
 
     def test_profiled_failure_stops_memory_tracker(self):
-        """Cover line 1447: memory tracker stop on exception path."""
+
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -673,7 +637,7 @@ class TestExecuteQueryProfiledWithMemory:
         assert "fail" in result["error"]
 
     def test_profiled_with_capture_plan_enabled(self):
-        """Cover lines 1392-1398: capture_plan=True path."""
+
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
         ctx.register_table("data", {"rows": 2})
@@ -690,7 +654,7 @@ class TestExecuteQueryProfiledWithMemory:
         assert result["status"] == "SUCCESS"
 
     def test_profiled_with_unified_lazy_frame_result(self):
-        """Cover line 1388-1389: UnifiedLazyFrame unwrap in profiled path."""
+
         adapter = CoverageExpressionAdapter()
         ctx = adapter.create_context()
         ctx.register_table("data", {"rows": 3})

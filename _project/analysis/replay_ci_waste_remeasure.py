@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Replay the exact 2026-08-31 CI-waste cohort from its pinned manifest."""
 
 from __future__ import annotations
 
@@ -41,7 +40,7 @@ CLI_DESCRIPTION = "Replay the exact 2026-08-31 CI-waste cohort from its pinned m
 
 
 class ReplayError(RuntimeError):
-    """The pinned cohort could not be replayed exactly."""
+    pass
 
 
 def _suite_id(item: dict[str, Any]) -> int | None:

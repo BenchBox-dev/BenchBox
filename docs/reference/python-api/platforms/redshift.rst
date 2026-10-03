@@ -71,57 +71,246 @@ API Reference
 RedshiftAdapter Class
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.redshift.RedshiftAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.redshift.RedshiftAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   Redshift adapter with cursor-based query-result validation.  Its connection
+   and staging settings are validated by the adapter and driver; unsupported
+   external-table or credential configuration can raise ``ValueError``, while
+   unavailable dependencies can raise ``ImportError``.
 
-.. code-block:: python
+   Example::
 
-    RedshiftAdapter(
-        host: str,
-        username: str,
-        password: str,
-        port: int = 5439,
-        database: str = "dev",
-        cluster_identifier: Optional[str] = None,
-        s3_bucket: Optional[str] = None,
-        s3_prefix: str = "benchbox-data",
-        iam_role: Optional[str] = None,
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
-        aws_region: str = "us-east-1",
-        wlm_query_slot_count: int = 1,
-        compression_encoding: str = "AUTO",
-        auto_vacuum: bool = True,
-        auto_analyze: bool = True
-    )
+      adapter = RedshiftAdapter(host="cluster.example", database="benchbox", user="user")
 
-Parameters:
+   The adapter advertises external-table support.  See :doc:`common` for the
+   shared lifecycle.
 
-**Connection**:
-- **host** (str): Cluster endpoint hostname
-- **username** (str): Database user
-- **password** (str): User password
-- **port** (int): Cluster port. Default: 5439
-- **database** (str): Database name. Default: "dev"
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.create_connection(**connection_config) -> Any
 
-**S3 Integration**:
-- **s3_bucket** (str, optional): S3 bucket for data staging
-- **s3_prefix** (str): Prefix in bucket. Default: "benchbox-data"
-- **iam_role** (str, optional): IAM role ARN for COPY
-- **aws_access_key_id** (str, optional): AWS access key
-- **aws_secret_access_key** (str, optional): AWS secret key
-- **aws_region** (str): AWS region. Default: "us-east-1"
+   Create optimized Redshift connection.
 
-**Optimization**:
-- **wlm_query_slot_count** (int): WLM slots. Default: 1
-- **compression_encoding** (str): Compression type. Default: "AUTO"
-- **auto_vacuum** (bool): Auto vacuum tables. Default: True
-- **auto_analyze** (bool): Auto analyze tables. Default: True
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.create_schema(benchmark, connection: Any) -> float
+
+   Create schema using Redshift-optimized table definitions.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
+
+   Upload external-table sources to S3 and register Redshift Spectrum tables.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
+
+   Load data using Redshift COPY command with S3 integration.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
+
+   Execute via the core cursor primitive, then attach Redshift plan fields.
+
+   Enumerated deltas vs ``CursorValidationQueryExecutionMixin`` (all hooks):
+   query tags: none; statistics: ``_get_query_statistics`` / ``pg_last_query_id``;
+   plan capture: post-execute ``_merge_plan_capture_into_result``;
+   rollback: none; result digest: none; cursor ownership: mixin-owned;
+   query rewrite: base adapter; job APIs: none.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.validate_session_cache_control(connection: Any) -> dict[str, Any]
+
+   Validate that session-level cache control settings were successfully applied.
+
+   :param connection: Active Redshift database connection
+
+   :returns:     - validated: bool - Whether validation passed - cache_disabled: bool - Whether cache is actually disabled - settings: dict - Actual session settings - warnings: list[str] - Any validation warnings - errors: list[str] - Any validation errors
+   :rtype: dict with
+
+   :raises ConfigurationError: If cache control validation fails and strict_validation=True
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.gather_statistics(connection: Any, table_names: list[str]) -> tuple[str, int]
+
+   Statistics-phase hook: with auto_analyze, stats were already built during load.
+
+   The S3 load path runs ANALYZE right after each table's COPY when
+   auto_analyze is enabled (the default), so the statistics phase reports
+   that attribution instead of double-building. With auto_analyze
+   disabled, fall back to the explicit per-table ANALYZE default.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.vacuum_table(connection: Any, table_name: str) -> None
+
+   Run VACUUM on table for space reclamation.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.get_query_plan(connection: Any, query: str) -> str | None
+
+   Get query execution plan for analysis.
+
+Static member inventory
+-----------------------
+
+.. py:property:: benchbox.platforms.redshift.RedshiftAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:staticmethod:: benchbox.platforms.redshift.RedshiftAdapter.add_cli_arguments(parser) -> None
+
+   Add Redshift-specific CLI arguments.
+
+.. py:classmethod:: benchbox.platforms.redshift.RedshiftAdapter.from_config(config: dict[str, Any])
+
+   Create Redshift adapter from unified configuration.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get Redshift platform information.
+
+   Captures comprehensive Redshift configuration including:
+   Deployment type (serverless vs provisioned)
+   Capacity configuration (RPUs for serverless, node type/count for provisioned)
+   Redshift version
+   WLM (Workload Management) configuration
+   AWS region
+   Encryption and security settings
+
+   Uses fallback chain: AWS API → SQL queries → hostname parsing
+   Gracefully degrades if permissions are insufficient or AWS credentials unavailable.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.get_normalized_result_metadata(self, *, connection: Any | None=None, platform_info: Mapping[str, Any] | None=None) -> dict[str, Any]
+
+   Return Redshift-specific normalized cloud/runtime metadata.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.get_target_dialect(self) -> str
+
+   Return the target SQL dialect for Redshift.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.check_server_database_exists(self, **connection_config) -> bool
+
+   Check if database exists in Redshift cluster.
+
+   Connects to admin database to query pg_database for the target database.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.drop_database(self, **connection_config) -> None
+
+   Drop database in Redshift cluster.
+
+   Connects to admin database to drop the target database.
+
+   .. rubric:: Notes
+
+   DROP DATABASE must run with autocommit enabled.
+   Redshift doesn't support IF EXISTS for DROP DATABASE, so we check first.
+   If DROP DATABASE fails with SQLSTATE 55006 (database still has active
+   connections), the method terminates backends again and retries on a
+   fresh connection. redshift_connector v2.1.x enters an aborted
+   transaction state after a failed DDL even with autocommit=True,
+   causing any subsequent DDL on the same connection to fail with
+   error 25001. Opening a new connection guarantees clean driver state.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.validate_external_table_requirements(self) -> None
+
+   Validate prerequisites for Redshift external table mode.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply Redshift-specific optimizations based on benchmark type.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.analyze_table(self, connection: Any, table_name: str) -> None
+
+   Run ANALYZE on table for query optimization.
+
+   Raises on failure (does not swallow) so the opt-in statistics phase's
+   gather_statistics() -> run_statistics_phase() caller can detect and
+   record a real failure as status=FAILED. Not reached when auto_analyze
+   is enabled - gather_statistics() overrides to report "auto-on-load"
+   before this method is ever called.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.get_query_plan_parser(self)
+
+   Get Redshift query plan parser.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.close_connection(self, connection: Any) -> None
+
+   Close Redshift connection.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.generate_tuning_clause(self, table_tuning) -> str
+
+   Generate Redshift-specific tuning clauses for CREATE TABLE statements.
+
+   Redshift supports:
+   DISTSTYLE (EVEN | KEY | ALL) DISTKEY (column)
+   SORTKEY (column1, column2, ...) or INTERLEAVED SORTKEY (column1, column2, ...)
+
+   :param table_tuning: The tuning configuration for the table
+
+   :returns: SQL clause string to be appended to CREATE TABLE statement
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.apply_table_tunings(self, table_tuning, connection: Any) -> None
+
+   Apply tuning configurations to a Redshift table.
+
+   Redshift tuning approach:
+   DISTRIBUTION: Handled via DISTSTYLE/DISTKEY in CREATE TABLE
+   SORTING: Handled via SORTKEY in CREATE TABLE
+   Post-creation optimizations via ANALYZE and VACUUM
+
+   :param table_tuning: The tuning configuration to apply
+   :param connection: Redshift connection
+
+   :raises ValueError: If the tuning configuration is invalid for Redshift
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None
+
+   Apply unified tuning configuration to Redshift.
+
+   :param unified_config: Unified tuning configuration to apply
+   :param connection: Redshift connection
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None
+
+   Apply Redshift-specific platform optimizations.
+
+   Redshift optimizations include:
+   Workload Management (WLM) queue configuration
+   Query group settings for resource allocation
+   Compression encoding optimization
+   Statistics collection and maintenance
+
+   :param platform_config: Platform optimization configuration
+   :param connection: Redshift connection
+
+.. py:attribute:: benchbox.platforms.redshift.RedshiftAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.redshift.RedshiftAdapter.supports_external_tables
+
+   Advertises whether the adapter implements external-table creation.
+
+.. py:attribute:: benchbox.platforms.redshift.RedshiftAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:method:: benchbox.platforms.redshift.RedshiftAdapter.apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None
+
+   Logs informational messages for enabled primary-key and foreign-key settings.
+   This hook executes no SQL and does not use ``connection``. Table-creation
+   hooks handle any platform-supported constraint DDL.
+
+.. py:method:: benchbox.core.benchmark_mixins.CursorValidationQueryExecutionMixin.execute_query(self, connection: Any, query: str, query_id: str, benchmark_type: str | None=None, scale_factor: float | None=None, validate_row_count: bool=True, stream_id: int | None=None) -> dict[str, Any]
+
+   Execute query via DBAPI cursor with optional row-count validation.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``RedshiftAdapter(**config)``.
+
+- ``host``, ``username`` and ``password`` supply connection identity;
+  ``cluster_identifier`` is optional. ``port`` defaults to 5439 and
+  ``database`` to ``"dev"``.
+- ``s3_bucket`` and ``iam_role`` are optional loading settings; ``s3_prefix``
+  defaults to ``"benchbox-data"``. An S3 ``staging_root`` overrides the derived
+  bucket/prefix.
+- ``aws_access_key_id`` and ``aws_secret_access_key`` are optional credentials;
+  ``aws_region`` defaults to ``"us-east-1"``.
+- ``wlm_query_slot_count`` defaults to one.
+- ``compupdate`` defaults to ``"PRESET"`` and accepts ``"PRESET"``, ``"ON"``
+  or ``"OFF"`` after uppercasing; other values raise ``ValueError``.
+- ``auto_vacuum`` and ``auto_analyze`` default to ``True``.
 
 Configuration Examples
 ----------------------
@@ -260,7 +449,9 @@ Distribution Keys
 Sort Keys
 ~~~~~~~~~
 
-.. code-block:: python
+Illustrative SQL fragments; supply complete table definitions before execution.
+
+.. code-block:: sql
 
     # Compound sort key (most common)
     CREATE TABLE lineitem (...)

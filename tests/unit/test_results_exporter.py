@@ -1,5 +1,3 @@
-"""Tests for result exporter serialization helpers."""
-
 from __future__ import annotations
 
 import json
@@ -30,8 +28,6 @@ pytestmark = [
 
 
 def _minimal_result(platform: str) -> BenchmarkResults:
-    # Full canonical TPC-H coverage: the submission validator refuses
-    # short query sets, so admission-check fixtures must carry all 22.
     return BenchmarkResults(
         benchmark_name="TPCH",
         platform=platform,
@@ -113,12 +109,6 @@ def test_write_file_preserves_existing_permissions(tmp_path):
 
 
 def test_write_file_skips_permission_preservation_without_fchmod(monkeypatch, tmp_path):
-    """Simulates Windows, where ``os.fchmod`` does not exist.
-
-    ``_write_file`` must not raise ``AttributeError`` when the platform has no
-    ``os.fchmod`` (e.g. Windows); it should simply skip permission
-    preservation and still complete the write.
-    """
     destination = tmp_path / "result.json"
     destination.write_text("old\n", encoding="utf-8")
     destination.chmod(0o640)
@@ -167,12 +157,6 @@ def test_write_file_supports_legacy_cloud_text_api(tmp_path):
 
 
 def test_exporter_serializes_execution_phases(tmp_path):
-    """JSON export should handle execution phases via v2.0 schema.
-
-    In v2.0, execution phases are processed but not exported directly.
-    Instead, relevant data (like errors, table stats) is extracted and
-    placed in appropriate v2.0 sections.
-    """
     exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
 
     phases = ExecutionPhases(
@@ -223,7 +207,6 @@ def test_exporter_serializes_execution_phases(tmp_path):
     with open(json_path, encoding="utf-8") as f:
         payload = json.load(f)
 
-    # Result bundle schema version is result_schema_version
     import benchbox
 
     assert payload["result_schema_version"] == "2.2"
@@ -232,12 +215,10 @@ def test_exporter_serializes_execution_phases(tmp_path):
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"
     assert payload["platform"]["name"] == "duckdb"
-    # Successful phases won't create errors
     assert "errors" not in payload
 
 
 def test_exporter_serializes_statistics_phase(tmp_path):
-    """The opt-in statistics phase exports under phases.statistics with stats_mode."""
     exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
 
     phases = ExecutionPhases(
@@ -276,14 +257,12 @@ def test_exporter_serializes_statistics_phase(tmp_path):
 
 
 def test_exporter_omits_statistics_phase_when_not_run(tmp_path):
-    """Legacy runs (no statistics phase) must not grow a statistics block."""
     payload = _export_payload(tmp_path, _minimal_result("duckdb"))
 
     assert "statistics" not in payload["phases"]
 
 
 def test_canonical_bundle_export_serializes_primary_and_plans(monkeypatch, tmp_path):
-    """Plans are the only companion still written; tuning rides in the bundle."""
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -308,10 +287,6 @@ def test_canonical_bundle_export_serializes_primary_and_plans(monkeypatch, tmp_p
 
 
 def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monkeypatch, tmp_path):
-    """The anonymized bundle's requested-tuning block must pseudonymize
-    list-of-dicts FK shapes and slash-delimited local_table scalars while
-    preserving enabled/action flags.
-    """
     nested_constraints = {
         "version": "2.1",
         "run_id": "cost-duckdb",
@@ -363,11 +338,6 @@ def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monk
 
 
 def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):
-    """qpc-07 w3: the plans companion bypassed anonymization entirely, so
-    raw_explain_output (opaque per-platform EXPLAIN text that can embed
-    absolute paths/hostnames/usernames) leaked verbatim even when
-    anonymize=True. It must be stripped from an anonymized export.
-    """
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -404,8 +374,6 @@ def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch
 
 
 def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymized(monkeypatch, tmp_path):
-    """Companion behavior is unchanged for non-anonymized exports (the common
-    local-dev path): raw_explain_output round-trips verbatim."""
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -442,13 +410,6 @@ def test_canonical_bundle_export_keeps_plans_raw_explain_output_when_not_anonymi
 
 
 def test_canonical_bundle_export_anonymizes_operator_platform_metadata(monkeypatch, tmp_path):
-    """#1024 review: the same raw EXPLAIN text raw_explain_output-stripping
-    guards against also gets copied verbatim into each operator node's
-    structured physical_operator.platform_metadata by many parsers (e.g.
-    Spark FileScan `details`, DuckDB `extra_info`). An anonymized export must
-    strip it there too, at every depth of the logical_root tree, not just
-    the top-level raw_explain_output.
-    """
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -505,8 +466,6 @@ def test_canonical_bundle_export_anonymizes_operator_platform_metadata(monkeypat
 
 
 def test_canonical_bundle_export_keeps_operator_platform_metadata_when_not_anonymized(monkeypatch, tmp_path):
-    """Companion behavior is unchanged for non-anonymized exports: operator
-    platform_metadata round-trips verbatim."""
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -554,11 +513,6 @@ def test_canonical_bundle_export_keeps_operator_platform_metadata_when_not_anony
 
 
 def test_exporter_records_plan_history_when_dir_configured(tmp_path):
-    """qpc-08 w2: `add_run` had zero production callers -- `_export_json_v2`
-    is now the single wired call site, gated behind an opt-in
-    `plan_history_dir` so default export behavior (no history recording) is
-    unchanged.
-    """
     history_dir = tmp_path / "history"
     result = _minimal_result("duckdb")
 
@@ -574,9 +528,6 @@ def test_exporter_records_plan_history_when_dir_configured(tmp_path):
 
 
 def test_exporter_records_plan_history_from_env_var(tmp_path, monkeypatch):
-    """The BENCHBOX_PLAN_HISTORY_DIR env var is an equivalent opt-in to the
-    constructor arg, for callers that can't easily thread a new parameter
-    through (e.g. existing CLI entry points)."""
     history_dir = tmp_path / "history"
     monkeypatch.setenv("BENCHBOX_PLAN_HISTORY_DIR", str(history_dir))
     result = _minimal_result("duckdb")
@@ -587,8 +538,6 @@ def test_exporter_records_plan_history_from_env_var(tmp_path, monkeypatch):
 
 
 def test_exporter_does_not_record_plan_history_by_default(tmp_path):
-    """No plan_history_dir configured (the default) -- no history directory
-    should be created at all."""
     result = _minimal_result("duckdb")
 
     ResultExporter(output_dir=tmp_path / "results", anonymize=False).export_result(result, formats=["json"])
@@ -602,8 +551,6 @@ def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
     assert payload["normalized_cost"]["cost_status"] == "unavailable"
     assert payload["normalized_cost"]["normalized_cost_usd"] is None
     assert "total_usd" not in payload.get("cost", {})
-    # The synthetic result has a validation claim; provide matching phase evidence
-    # before exercising public-submission admission.
     payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
@@ -614,14 +561,11 @@ def test_exporter_preserves_local_zero_total_with_normalized_provenance(tmp_path
     assert payload["normalized_cost"]["cost_status"] == "not_applicable_local"
     assert payload["normalized_cost"]["normalized_cost_usd"] == "0"
     assert payload["cost"]["total_usd"] == 0
-    # The synthetic result has a validation claim; provide matching phase evidence
-    # before exercising public-submission admission.
     payload["phases"]["validation"]["status"] = "PASSED"
     _assert_submission_valid(payload)
 
 
 def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:
-    """Exporter should reject unsupported result types with an actionable error."""
 
     exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
 
@@ -631,5 +575,4 @@ def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:
     with pytest.raises(RuntimeError, match="Failed to export json"):
         exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
 
-    # Error should be logged - check for any error message indicating failure
     assert any("Failed to export" in record.message or "Error" in record.levelname for record in caplog.records)

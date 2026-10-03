@@ -1,9 +1,6 @@
-"""Tests for GCP Dataproc platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,10 +16,8 @@ pytestmark = [
 
 
 class TestDataprocAdapterInitialization:
-    """Test DataprocAdapter initialization."""
-
     def test_missing_project_id_raises_error(self):
-        """Test error when project_id is not provided."""
+
         from benchbox.platforms.gcp import DataprocAdapter
 
         with pytest.raises(ConfigurationError, match="project_id"):
@@ -31,7 +26,7 @@ class TestDataprocAdapterInitialization:
             )
 
     def test_missing_gcs_staging_dir_raises_error(self):
-        """Test error when gcs_staging_dir is not provided."""
+
         from benchbox.platforms.gcp import DataprocAdapter
 
         with pytest.raises(ConfigurationError, match="gcs_staging_dir"):
@@ -40,7 +35,7 @@ class TestDataprocAdapterInitialization:
             )
 
     def test_invalid_gcs_path_raises_error(self):
-        """Test error when gcs_staging_dir has invalid format."""
+
         from benchbox.platforms.gcp import DataprocAdapter
 
         with pytest.raises(ConfigurationError, match="Invalid GCS"):
@@ -50,7 +45,7 @@ class TestDataprocAdapterInitialization:
             )
 
     def test_valid_configuration(self):
-        """Test valid configuration initializes correctly."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -74,7 +69,7 @@ class TestDataprocAdapterInitialization:
             assert adapter.database == "my_benchmark_db"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -98,10 +93,8 @@ class TestDataprocAdapterInitialization:
 
 
 class TestDataprocTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
-        """Test table_format defaults to parquet."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -115,7 +108,7 @@ class TestDataprocTableFormat:
             assert adapter.table_format == "parquet"
 
     def test_table_format_delta(self):
-        """Test table_format can be set to delta."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -130,7 +123,7 @@ class TestDataprocTableFormat:
             assert adapter.table_format == "delta"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -148,10 +141,8 @@ class TestDataprocTableFormat:
 
 
 class TestDataprocAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -179,7 +170,7 @@ class TestDataprocAdapterPlatformInfo:
             assert info["supports_dataframe"] is True
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -196,17 +187,14 @@ class TestDataprocAdapterPlatformInfo:
 
 
 class TestDataprocAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_success(self):
-        """Test successful connection to existing cluster."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.dataproc_v1") as mock_dataproc,
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock cluster client
             mock_cluster_client = MagicMock()
             mock_cluster = MagicMock()
             mock_cluster.status.state.name = "RUNNING"
@@ -230,11 +218,8 @@ class TestDataprocAdapterConnection:
 
 
 class TestDataprocAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self, tmp_path):
-        """Test load_data skips upload when tables exist."""
-        # Create actual source directory to pass validation
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -263,10 +248,8 @@ class TestDataprocAdapterDataLoading:
 
 
 class TestDataprocJobState:
-    """Test job state constants."""
-
     def test_job_state_values(self):
-        """Test DataprocJobState constants are correct."""
+
         from benchbox.platforms.gcp.dataproc_adapter import DataprocJobState
 
         assert DataprocJobState.PENDING == "PENDING"
@@ -277,21 +260,17 @@ class TestDataprocJobState:
 
 
 class TestDataprocAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
-        """Test Dataproc metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Check that dataproc is in the platform metadata
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "dataproc" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test Dataproc metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Access metadata through the public interface
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "dataproc" in all_metadata
         dataproc_meta = all_metadata["dataproc"]
@@ -303,10 +282,8 @@ class TestDataprocAdapterRegistry:
 
 
 class TestDataprocAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -323,7 +300,7 @@ class TestDataprocAdapterTuning:
             assert result == []
 
     def test_apply_primary_keys(self):
-        """Test apply_primary_keys returns empty list."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -342,10 +319,9 @@ class TestDataprocAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark sets benchmark type."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -367,10 +343,8 @@ class TestDataprocAdapterTuning:
 
 
 class TestDataprocAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from benchbox.platforms.gcp import DataprocAdapter
 
         parser = MagicMock()
@@ -382,10 +356,8 @@ class TestDataprocAdapterCLI:
 
 
 class TestDataprocAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -409,7 +381,7 @@ class TestDataprocAdapterFromConfig:
             assert adapter.database == "test_db"
 
     def test_from_config_generates_cluster_name(self):
-        """Test from_config generates cluster name if not provided."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -430,10 +402,8 @@ class TestDataprocAdapterFromConfig:
 
 
 class TestDataprocAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_metrics(self):
-        """Test close logs execution metrics."""
+
         with (
             patch("benchbox.platforms.gcp.dataproc_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.gcp.dataproc_adapter.logger") as mock_logger,
@@ -451,5 +421,4 @@ class TestDataprocAdapterClose:
 
             adapter.close()
 
-            # Verify logging was called
             mock_logger.info.assert_called()

@@ -1,9 +1,6 @@
-"""Database detection and management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,7 +20,6 @@ from benchbox.utils.printing import quiet_console
 from benchbox.utils.runtime_env import ensure_driver_version
 from benchbox.utils.verbosity import VerbositySettings
 
-# Import platform manager for database detection
 from .platform import get_platform_manager
 from .platform_hooks import PlatformHookRegistry, PlatformOptionError
 
@@ -31,7 +27,6 @@ console = quiet_console
 logger = logging.getLogger(__name__)
 
 
-# Platform location categories
 LOCAL_CATEGORIES = {"analytical", "embedded", "distributed", "relational", "timeseries", "dataframe"}
 CLOUD_CATEGORIES = {"cloud"}
 _DRIVER_OPTION_FIELDS = (
@@ -46,19 +41,11 @@ _DRIVER_OPTION_FIELDS = (
 
 @dataclass
 class ExecutionStyleFilter:
-    """Filters for narrowing down platform selection.
-
-    Attributes:
-        execution_mode: Filter by execution mode ('sql', 'dataframe', or 'all')
-        location: Filter by platform location ('local', 'cloud', or 'all')
-    """
-
     execution_mode: Literal["sql", "dataframe", "all"] = "all"
     location: Literal["local", "cloud", "all"] = "all"
 
 
 def _sync_driver_options(config: DatabaseConfig, driver_package: str) -> None:
-    """Persist resolved driver metadata into ``config.options``."""
     if config.options is None:
         config.options = {}
 
@@ -72,7 +59,6 @@ def _sync_driver_options(config: DatabaseConfig, driver_package: str) -> None:
 
 
 def _sync_platform_driver_info(platform_info: Any, config: DatabaseConfig) -> None:
-    """Mirror resolved driver metadata onto a platform info record."""
     if platform_info is None:
         return
     platform_info.driver_version_requested = config.driver_version
@@ -82,8 +68,6 @@ def _sync_platform_driver_info(platform_info: Any, config: DatabaseConfig) -> No
 
 
 class DatabaseManager:
-    """Database detection and configuration management."""
-
     def __init__(self):
         self.console = quiet_console
         self.available_databases = self._detect_databases()
@@ -91,24 +75,20 @@ class DatabaseManager:
         self.verbosity = VerbositySettings.default()
 
     def set_verbosity(self, settings: VerbositySettings) -> None:
-        """Persist verbosity settings for subsequent configuration builds."""
 
         self.verbosity = settings
 
     def _detect_databases(self) -> dict[str, dict[str, Any]]:
-        """Detect available database libraries and their capabilities."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         logger.debug("Starting database detection")
 
-        # Use enhanced platform registry
         databases = {}
         available_platforms = PlatformRegistry.get_available_platforms()
 
         for platform_name in available_platforms:
             platform_info = PlatformRegistry.get_platform_info(platform_name)
             if platform_info and platform_info.available:
-                # Get library version info
                 version_parts = []
                 for lib in platform_info.libraries:
                     if lib.installed and lib.version:
@@ -125,7 +105,6 @@ class DatabaseManager:
                     or platform_info.category in ["analytical", "cloud"],
                 }
 
-                # Special handling for ClickHouse platform family
                 if platform_name in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
                     has_server = any(
                         lib.name == "clickhouse_driver" and lib.installed for lib in platform_info.libraries
@@ -143,15 +122,9 @@ class DatabaseManager:
         return databases
 
     def prompt_execution_style(self) -> ExecutionStyleFilter:
-        """Prompt user to select execution style preferences.
-
-        Returns:
-            ExecutionStyleFilter with user's preferences for mode and location
-        """
         console.print("\n[bold cyan]Execution Style[/bold cyan]")
         console.print("[dim]Choose how you want to run benchmarks to narrow down platform options.[/dim]\n")
 
-        # Execution mode selection
         console.print("[bold]Execution Mode:[/bold]")
         console.print("  1. SQL [dim](Traditional SQL queries - most platforms)[/dim] (Recommended)")
         console.print("  2. DataFrame [dim](Pandas-like operations - Polars, PySpark, etc.)[/dim]")
@@ -166,7 +139,6 @@ class DatabaseManager:
         else:
             execution_mode = "all"
 
-        # Platform location selection
         console.print("\n[bold]Platform Location:[/bold]")
         console.print("  1. Local [dim](DuckDB, SQLite, Polars - runs on your machine)[/dim]")
         console.print("  2. Cloud [dim](BigQuery, Snowflake, Databricks - requires credentials)[/dim]")
@@ -181,7 +153,6 @@ class DatabaseManager:
         else:
             location = "all"
 
-        # Show confirmation
         mode_display = {"sql": "SQL", "dataframe": "DataFrame", "all": "All modes"}[execution_mode]
         location_display = {"local": "Local", "cloud": "Cloud", "all": "All locations"}[location]
         console.print(f"\n[green]✓ Filter: {mode_display} + {location_display}[/green]")
@@ -189,15 +160,6 @@ class DatabaseManager:
         return ExecutionStyleFilter(execution_mode=execution_mode, location=location)
 
     def filter_platforms(self, platforms: list[str], style_filter: ExecutionStyleFilter) -> list[str]:
-        """Filter platform list based on execution style preferences.
-
-        Args:
-            platforms: List of platform names to filter
-            style_filter: User's execution style preferences
-
-        Returns:
-            Filtered list of platform names matching the criteria
-        """
         if style_filter.execution_mode == "all" and style_filter.location == "all":
             return platforms
 
@@ -209,7 +171,6 @@ class DatabaseManager:
             caps = platform_meta.get("capabilities", {})
             category = platform_meta.get("category", "")
 
-            # Check execution mode filter
             mode_ok = True
             if style_filter.execution_mode != "all":
                 if style_filter.execution_mode == "sql":
@@ -217,7 +178,6 @@ class DatabaseManager:
                 elif style_filter.execution_mode == "dataframe":
                     mode_ok = caps.get("supports_dataframe", False)
 
-            # Check location filter
             location_ok = True
             if style_filter.location != "all":
                 if style_filter.location == "local":
@@ -233,34 +193,16 @@ class DatabaseManager:
     def _get_additional_matching_platforms(
         self, enabled_platforms: list[str], style_filter: ExecutionStyleFilter
     ) -> list[str]:
-        """Find platforms that match the filter but aren't enabled.
-
-        Args:
-            enabled_platforms: List of currently enabled platforms
-            style_filter: User's execution style preferences
-
-        Returns:
-            List of platform names that match the filter but aren't enabled
-        """
-        # Get all platforms from registry
         all_platforms = PlatformRegistry.get_platform_names()
 
-        # Filter all platforms with the same criteria
         all_matching = self.filter_platforms(all_platforms, style_filter)
 
-        # Find platforms that match but aren't enabled
         enabled_set = set(enabled_platforms)
         additional = [p for p in all_matching if p not in enabled_set]
 
         return additional
 
     def select_database(self, style_filter: ExecutionStyleFilter | None = None) -> DatabaseConfig:
-        """Interactive database selection with intelligent guidance.
-
-        Args:
-            style_filter: Optional filter to narrow down platform choices.
-                         If None, all enabled platforms are shown.
-        """
         available_platforms = self.platform_manager.get_enabled_platforms()
         if not available_platforms:
             console.print("[red]❌ No database platforms are enabled![/red]")
@@ -270,7 +212,6 @@ class DatabaseManager:
             console.print("• [cyan]benchbox platforms enable duckdb[/cyan] (enable specific platform)")
             raise RuntimeError("No platforms enabled")
 
-        # Apply filter if provided
         if style_filter is not None:
             available_platforms = self.filter_platforms(available_platforms, style_filter)
             if not available_platforms:
@@ -278,14 +219,11 @@ class DatabaseManager:
                 console.print("[dim]Showing all available platforms instead.[/dim]\n")
                 available_platforms = self.platform_manager.get_enabled_platforms()
 
-        # Show platforms in table format
         self._display_platform_table(available_platforms)
 
-        # Show hint about additional platforms that match the filter but aren't enabled
         if style_filter is not None:
             additional_platforms = self._get_additional_matching_platforms(available_platforms, style_filter)
             if additional_platforms:
-                # Format platform names for display
                 platform_names = ", ".join(sorted(additional_platforms)[:5])
                 more_count = len(additional_platforms) - 5 if len(additional_platforms) > 5 else 0
                 more_text = f" (+{more_count} more)" if more_count > 0 else ""
@@ -293,10 +231,8 @@ class DatabaseManager:
                 console.print(f"\n[dim]💡 Additional platforms matching your filter: {platform_names}{more_text}[/dim]")
                 console.print("[dim]   Run [cyan]benchbox platforms enable <name>[/cyan] to add them.[/dim]")
 
-        # Create choice map for selection
         choice_map = {str(i + 1): platform for i, platform in enumerate(available_platforms)}
 
-        # Show recommendation
         if "duckdb" in available_platforms:
             duckdb_idx = available_platforms.index("duckdb") + 1
             console.print(f"\n[green]💡 Recommended:[/green] DuckDB (choice {duckdb_idx}) - Best for getting started")
@@ -308,15 +244,12 @@ class DatabaseManager:
         )
         selected_platform = choice_map[selection]
 
-        # Create DatabaseConfig from platform selection
         platforms_info = self.platform_manager.detect_platforms()
         platform_info = platforms_info[selected_platform]
 
-        # Check for dual-mode platforms (supports both SQL and DataFrame)
         execution_mode: str | None = None
         caps = PlatformRegistry.get_platform_capabilities(selected_platform)
 
-        # If user already filtered by mode, use that preference
         if style_filter is not None and style_filter.execution_mode in ("sql", "dataframe"):
             execution_mode = style_filter.execution_mode
         elif caps and caps.supports_sql and caps.supports_dataframe:
@@ -338,15 +271,6 @@ class DatabaseManager:
         return config
 
     def _prompt_execution_mode(self, platform: str, default_mode: str) -> str:
-        """Prompt for execution mode on platforms that support both SQL and DataFrame.
-
-        Args:
-            platform: Platform name
-            default_mode: Default execution mode for this platform
-
-        Returns:
-            Selected execution mode ('sql' or 'dataframe')
-        """
         from rich.prompt import Prompt
 
         console.print("\n[bold cyan]Execution Mode[/bold cyan]")
@@ -363,11 +287,6 @@ class DatabaseManager:
         return selected_mode
 
     def _display_platform_table(self, enabled_platforms: list[str]) -> None:
-        """Display enabled platforms in a numbered table with detailed descriptions.
-
-        Args:
-            enabled_platforms: List of platform names that are enabled
-        """
         platforms_info = self.platform_manager.detect_platforms()
 
         table = Table(title="Available Database Platforms", show_header=True)
@@ -379,7 +298,6 @@ class DatabaseManager:
         for i, platform_name in enumerate(enabled_platforms, start=1):
             platform_info = platforms_info[platform_name]
 
-            # Capitalize category for display
             category_display = platform_info.category.replace("_", " ").title()
 
             table.add_row(
@@ -392,7 +310,6 @@ class DatabaseManager:
         console.print(table)
 
     def _display_available_databases(self):
-        """Display available databases in a table."""
         table = Table(title="Available Databases")
         table.add_column("ID", style="cyan", width=4)
         table.add_column("Database", style="green")
@@ -419,11 +336,8 @@ class DatabaseManager:
         platform_options: dict[str, Any] | None = None,
         runtime_overrides: dict[str, Any] | None = None,
     ) -> DatabaseConfig:
-        """Build a database configuration using registered platform hooks."""
 
         platform_lower = platform.lower()
-        # Structured/JSON log handlers serialize `extra` in full, so option
-        # values must pass the same redaction as exported result metadata.
         logger.debug(
             "Building database config",
             extra={
@@ -445,10 +359,6 @@ class DatabaseManager:
         overrides = self.verbosity.to_config()
         if runtime_overrides:
             overrides.update(runtime_overrides)
-        # Stash only truly explicit CLI options (minus registered defaults) so builders can
-        # apply them with higher priority than saved credentials but lower than runtime overrides.
-        # parse_options() merges defaults into platform_options, so subtract defaults to isolate
-        # values the user explicitly typed on the command line.
         if platform_options:
             explicit_only = {k: v for k, v in platform_options.items() if defaults.get(k) != v}
             if explicit_only:
@@ -486,8 +396,6 @@ class DatabaseManager:
         else:
             config.driver_version_resolved = config.driver_version
 
-        # The config object carries connection_string, options, and arbitrary
-        # platform extras (extra="allow"), any of which can hold credentials.
         logger.debug(
             "Database configuration built",
             extra={
@@ -499,7 +407,6 @@ class DatabaseManager:
         return config
 
     def test_connection(self, config: DatabaseConfig, system_profile: SystemProfile | None = None) -> bool:
-        """Test database connection via core adapter-backed utility."""
         logger.debug(f"Testing connection for {config.type} (core utility)")
         try:
             return core_check_connection(config, system_profile)
@@ -509,7 +416,6 @@ class DatabaseManager:
             return False
 
     def _display_available_databases_with_recommendations(self):
-        """Display available databases with detailed recommendations."""
         table = Table(title="Available Databases")
         table.add_column("ID", style="cyan", width=4)
         table.add_column("Database", style="green")
@@ -520,10 +426,8 @@ class DatabaseManager:
         table.add_column("Recommendation", style="white")
 
         for i, (db_key, db_info) in enumerate(self.available_databases.items()):
-            # Performance rating
             perf_rating = self._get_performance_rating(db_key)
 
-            # Smart recommendation
             recommendation = self._get_database_recommendation(db_key)
 
             table.add_row(
@@ -538,33 +442,27 @@ class DatabaseManager:
 
         console.print(table)
 
-        # Additional guidance
         console.print("\n[bold cyan]Selection Guide:[/bold cyan]")
         console.print("• [green]DuckDB[/green]: Best for analytics, fast in-memory processing")
         console.print("• [yellow]PostgreSQL[/yellow]: Full-featured OLTP/OLAP, requires setup")
         console.print("• [blue]SQLite[/blue]: Simple file-based, limited analytics performance")
 
     def _get_recommended_database(self) -> str:
-        """Get the recommended database based on available options."""
         db_choices = list(self.available_databases.keys())
 
-        # Priority order: DuckDB > PostgreSQL > SQLite
         priority_order = ["duckdb", "postgresql", "sqlite3"]
 
         for preferred in priority_order:
             if preferred in db_choices:
                 return preferred
 
-        # Fallback to first available
         return db_choices[0] if db_choices else "sqlite3"
 
     def _get_performance_rating(self, db_key: str) -> str:
-        """Get performance rating for a database."""
         ratings = {"duckdb": "Excellent", "postgresql": "Very Good", "sqlite3": "Basic"}
         return ratings.get(db_key, "Unknown")
 
     def _get_database_recommendation(self, db_key: str) -> str:
-        """Get specific recommendation for each database."""
         recommendations = {
             "duckdb": "Best choice",
             "postgresql": "🏢 Production ready",

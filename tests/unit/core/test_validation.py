@@ -1,7 +1,3 @@
-"""
-Test cases for core validation functionality.
-"""
-
 import json
 from unittest.mock import Mock, patch
 
@@ -22,10 +18,7 @@ pytestmark = [
 
 
 class TestValidationResult:
-    """Test cases for ValidationResult dataclass."""
-
     def test_validation_result_valid(self):
-        """Test ValidationResult with valid state."""
         result = ValidationResult(
             is_valid=True,
             errors=[],
@@ -39,7 +32,6 @@ class TestValidationResult:
         assert result.details == {"key": "value"}
 
     def test_validation_result_invalid(self):
-        """Test ValidationResult with invalid state."""
         result = ValidationResult(is_valid=False, errors=["Error 1", "Error 2"], warnings=[], details={})
 
         assert not result.is_valid
@@ -49,10 +41,7 @@ class TestValidationResult:
 
 
 class TestValidationSummary:
-    """Test cases for ValidationSummary dataclass."""
-
     def test_validation_summary(self):
-        """Test ValidationSummary creation."""
         summary = ValidationSummary(
             total_validations=5,
             passed_validations=3,
@@ -67,10 +56,7 @@ class TestValidationSummary:
 
 
 class TestBenchmarkExpectations:
-    """Test cases for BenchmarkExpectations dataclass."""
-
     def test_benchmark_expectations_creation(self):
-        """Test BenchmarkExpectations creation."""
         expectations = BenchmarkExpectations(
             expected_table_count=25,
             critical_tables=["customer", "item"],
@@ -86,7 +72,6 @@ class TestBenchmarkExpectations:
         assert expectations.validation_thresholds == {"min_file_size_bytes": 10}
 
     def test_benchmark_expectations_defaults(self):
-        """Test BenchmarkExpectations with defaults."""
         expectations = BenchmarkExpectations()
 
         assert expectations.expected_table_count == 0
@@ -97,27 +82,21 @@ class TestBenchmarkExpectations:
 
 
 class TestDataValidationEngine:
-    """Test cases for DataValidationEngine."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.engine = DataValidationEngine()
 
     def test_init(self):
-        """Test engine initialization."""
         assert isinstance(self.engine, DataValidationEngine)
         assert hasattr(self.engine, "BENCHMARK_EXPECTATIONS")
 
     def test_benchmark_expectations_registry(self):
-        """Test that benchmark expectations registry is properly configured."""
-        # Check TPCDS expectations
+
         assert "tpcds" in self.engine.BENCHMARK_EXPECTATIONS
         tpcds_exp = self.engine.BENCHMARK_EXPECTATIONS["tpcds"]
         assert tpcds_exp.expected_table_count == 25
         assert "customer" in tpcds_exp.critical_tables
         assert "store_sales" in tpcds_exp.fact_tables
 
-        # Check TPCH expectations
         assert "tpch" in self.engine.BENCHMARK_EXPECTATIONS
         tpch_exp = self.engine.BENCHMARK_EXPECTATIONS["tpch"]
         assert tpch_exp.expected_table_count == 8
@@ -125,7 +104,6 @@ class TestDataValidationEngine:
         assert "lineitem" in tpch_exp.fact_tables
 
     def test_validate_preflight_conditions_success(self, tmp_path):
-        """Test successful preflight validation."""
         result = self.engine.validate_preflight_conditions(
             benchmark_type="tpcds", scale_factor=1.0, output_dir=tmp_path
         )
@@ -138,7 +116,6 @@ class TestDataValidationEngine:
         assert result.details["scale_factor"] == 1.0
 
     def test_validate_preflight_conditions_invalid_benchmark(self, tmp_path):
-        """Test preflight validation with invalid benchmark type."""
         result = self.engine.validate_preflight_conditions(
             benchmark_type="invalid_benchmark", scale_factor=1.0, output_dir=tmp_path
         )
@@ -148,7 +125,6 @@ class TestDataValidationEngine:
         assert "Unsupported benchmark type" in result.errors[0]
 
     def test_validate_preflight_conditions_invalid_scale(self, tmp_path):
-        """Test preflight validation with invalid scale factor."""
         result = self.engine.validate_preflight_conditions(benchmark_type="tpcds", scale_factor=0, output_dir=tmp_path)
 
         assert isinstance(result, ValidationResult)
@@ -156,21 +132,18 @@ class TestDataValidationEngine:
         assert "Scale factor must be positive" in result.errors[0]
 
     def test_validate_preflight_conditions_missing_directory(self, tmp_path):
-        """Test preflight validation with missing output directory."""
         missing_dir = tmp_path / "nonexistent" / "nested" / "path"
 
         result = self.engine.validate_preflight_conditions(
             benchmark_type="tpcds", scale_factor=1.0, output_dir=missing_dir
         )
 
-        # Should create directory and pass
         assert isinstance(result, ValidationResult)
         assert result.is_valid
         assert missing_dir.exists()
 
     def test_validate_generated_data_success(self, tmp_path):
-        """Test successful data validation with valid manifest."""
-        # Create a valid manifest file (flat list format expected by validation engine)
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpcds",
@@ -186,7 +159,6 @@ class TestDataValidationEngine:
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest_data, f)
 
-        # Create corresponding data files
         for table_name, file_list in manifest_data["tables"].items():
             for file_info in file_list:
                 (tmp_path / file_info["path"]).write_text("x" * file_info["size_bytes"])
@@ -194,11 +166,10 @@ class TestDataValidationEngine:
         result = self.engine.validate_generated_data(manifest_path)
 
         assert isinstance(result, ValidationResult)
-        # May have warnings due to missing tables, but should not error on file validation
+
         assert result.details["benchmark_type"] == "tpcds"
 
     def test_validate_generated_data_missing_manifest(self, tmp_path):
-        """Test data validation with missing manifest file."""
         missing_manifest = tmp_path / "missing_manifest.json"
 
         result = self.engine.validate_generated_data(missing_manifest)
@@ -208,7 +179,6 @@ class TestDataValidationEngine:
         assert "Manifest file not found" in result.errors[0]
 
     def test_validate_generated_data_invalid_json(self, tmp_path):
-        """Test data validation with invalid JSON manifest."""
         manifest_path = tmp_path / "_datagen_manifest.json"
         manifest_path.write_text("invalid json")
 
@@ -219,7 +189,6 @@ class TestDataValidationEngine:
         assert "Failed to parse manifest" in result.errors[0]
 
     def test_validate_table_count(self):
-        """Test table count validation."""
         manifest_data = {"tables": {"table1": [], "table2": [], "table3": []}}
         expectations = BenchmarkExpectations(expected_table_count=3)
 
@@ -229,7 +198,6 @@ class TestDataValidationEngine:
         assert not warnings
 
     def test_validate_table_count_insufficient(self):
-        """Test table count validation with insufficient tables."""
         manifest_data = {"tables": {"table1": [], "table2": []}}
         expectations = BenchmarkExpectations(expected_table_count=5)
 
@@ -239,7 +207,6 @@ class TestDataValidationEngine:
         assert "Expected 5 tables, found 2" in errors[0]
 
     def test_validate_critical_tables(self):
-        """Test critical table validation."""
         manifest_data = {"tables": {"customer": [], "item": [], "store_sales": []}}
         expectations = BenchmarkExpectations(critical_tables=["customer", "item", "store_sales"])
 
@@ -248,7 +215,6 @@ class TestDataValidationEngine:
         assert not errors
 
     def test_validate_critical_tables_missing(self):
-        """Test critical table validation with missing tables."""
         manifest_data = {"tables": {"customer": [], "item": []}}
         expectations = BenchmarkExpectations(critical_tables=["customer", "item", "store_sales"])
 
@@ -258,8 +224,7 @@ class TestDataValidationEngine:
         assert "Missing critical tables: store_sales" in errors[0]
 
     def test_validate_file_sizes(self, tmp_path):
-        """Test file size validation."""
-        # Create test files
+
         (tmp_path / "large_file.dat").write_text("x" * 1000)
         (tmp_path / "small_file.dat").write_text("x" * 5)
 
@@ -274,11 +239,10 @@ class TestDataValidationEngine:
         errors, warnings = self.engine._validate_file_sizes(manifest_data, expectations, tmp_path)
 
         assert len(warnings) >= 1
-        # Should have warnings about small file size
+
         assert any("small_table" in warning for warning in warnings)
 
     def test_validate_row_counts(self):
-        """Test row count validation."""
         manifest_data = {
             "tables": {
                 "good_table": [{"row_count": 100}],
@@ -294,20 +258,15 @@ class TestDataValidationEngine:
 
 
 class TestDatabaseValidationEngine:
-    """Test cases for DatabaseValidationEngine."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.engine = DatabaseValidationEngine()
 
     def test_init(self):
-        """Test engine initialization."""
         assert isinstance(self.engine, DatabaseValidationEngine)
 
     @patch("benchbox.core.validation.DatabaseValidationEngine._get_table_list")
     @patch("benchbox.core.validation.DatabaseValidationEngine._get_table_row_count")
     def test_validate_loaded_data_success(self, mock_row_count, mock_table_list):
-        """Test successful database validation."""
         mock_connection = Mock()
         mock_table_list.return_value = ["customer", "item", "store_sales", "date_dim"]
         mock_row_count.return_value = 100
@@ -321,7 +280,6 @@ class TestDatabaseValidationEngine:
 
     @patch("benchbox.core.validation.DatabaseValidationEngine._get_table_list")
     def test_validate_loaded_data_connection_error(self, mock_table_list):
-        """Test database validation with connection error."""
         mock_connection = Mock()
         mock_table_list.side_effect = Exception("Connection failed")
 
@@ -332,22 +290,18 @@ class TestDatabaseValidationEngine:
         assert "Database validation failed" in result.errors[0]
 
     def test_get_table_list_duckdb_style(self):
-        """Test table list retrieval for DuckDB-style query."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [("customer",), ("item",), ("store_sales",)]
 
-        # Mock the first query to fail, second to succeed (DuckDB style)
         mock_cursor.execute.side_effect = [Exception("No info schema"), None]
 
         tables = self.engine._get_table_list(mock_connection)
 
-        # Should fallback to DuckDB SHOW TABLES
         assert tables == ["customer", "item", "store_sales"]
 
     def test_get_table_row_count(self):
-        """Test row count retrieval."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -359,23 +313,21 @@ class TestDatabaseValidationEngine:
         mock_cursor.execute.assert_called_once_with("SELECT COUNT(*) FROM customer")
 
     def test_validate_loaded_data_missing_tables(self):
-        """Test database validation with missing tables."""
         mock_connection = Mock()
 
         with patch.object(self.engine, "_get_table_list") as mock_table_list:
-            mock_table_list.return_value = ["customer", "item"]  # Missing store_sales
+            mock_table_list.return_value = ["customer", "item"]
 
             result = self.engine.validate_loaded_data(
                 connection=mock_connection, benchmark_type="tpcds", scale_factor=1.0
             )
 
             assert isinstance(result, ValidationResult)
-            # Should have errors for missing tables
+
             assert not result.is_valid
             assert any("Missing tables" in error for error in result.errors)
 
     def test_validate_loaded_data_unknown_benchmark(self):
-        """Test database validation with unknown benchmark type."""
         mock_connection = Mock()
 
         result = self.engine.validate_loaded_data(
@@ -385,24 +337,18 @@ class TestDatabaseValidationEngine:
         )
 
         assert isinstance(result, ValidationResult)
-        # Should still validate but with warnings
+
         assert "No validation expectations" in result.warnings[0]
 
 
-# Integration tests
 class TestValidationIntegration:
-    """Integration tests for validation components."""
-
     def test_data_and_database_engines_together(self, tmp_path):
-        """Test data and database validation engines working together."""
         data_engine = DataValidationEngine()
         db_engine = DatabaseValidationEngine()
 
-        # Test preflight validation
         preflight_result = data_engine.validate_preflight_conditions("tpcds", 1.0, tmp_path)
         assert preflight_result.is_valid
 
-        # Test database validation with mock connection
         mock_connection = Mock()
         with patch.object(db_engine, "_get_table_list") as mock_table_list:
             mock_table_list.return_value = ["customer", "item", "store_sales"]

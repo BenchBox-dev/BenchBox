@@ -1,14 +1,3 @@
-"""Seed data loader for the CoffeeShop benchmark.
-
-Provides helper functions to load the canonical location and product
-metadata used by the reference generator implementation. The raw CSV
-files are vendored under ``benchbox/data/coffeeshop/`` and are derived
-from the original `coffeeshopdatageneratorv2` project.
-
-The loader converts the CSV rows into lightweight dataclasses and caches
-results so subsequent calls do not reparse the files.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -20,8 +9,6 @@ from importlib import resources
 
 @dataclass(frozen=True)
 class LocationSeed:
-    """Represents a single coffee shop location with region metadata."""
-
     record_id: int
     location_id: str
     city: str
@@ -32,8 +19,6 @@ class LocationSeed:
 
 @dataclass(frozen=True)
 class ProductSeed:
-    """Represents a canonical coffee shop product offering."""
-
     record_id: int
     product_id: int
     name: str
@@ -46,7 +31,6 @@ class ProductSeed:
 
 
 def _read_csv(package: str, resource: str) -> Iterable[dict[str, str]]:
-    """Yield dictionaries for each row in a packaged CSV resource."""
 
     with resources.files(package).joinpath(resource).open("r", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
@@ -55,12 +39,6 @@ def _read_csv(package: str, resource: str) -> Iterable[dict[str, str]]:
 
 @lru_cache(maxsize=1)
 def load_location_seeds() -> list[LocationSeed]:
-    """Load all location seed records.
-
-    Returns:
-        List of :class:`LocationSeed` instances representing the reference
-        store footprint with region assignments.
-    """
 
     package = "benchbox.data.coffeeshop"
     rows = []
@@ -80,11 +58,6 @@ def load_location_seeds() -> list[LocationSeed]:
 
 @lru_cache(maxsize=1)
 def load_product_seeds() -> list[ProductSeed]:
-    """Load all product seed records.
-
-    Returns:
-        List of :class:`ProductSeed` instances with pricing windows.
-    """
 
     package = "benchbox.data.coffeeshop"
     rows = []

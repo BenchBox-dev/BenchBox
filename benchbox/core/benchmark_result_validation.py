@@ -1,5 +1,3 @@
-"""Shared benchmark result creation and validation helpers."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,14 +11,11 @@ if TYPE_CHECKING:
 
 
 class BenchmarkResultValidationMixin:
-    """Shared result creation and core data-validation helpers for benchmark bases."""
-
     scale_factor: float
     output_dir: Any
 
     @property
     def benchmark_name(self) -> str:  # pragma: no cover - provided by concrete bases
-        """Return the concrete benchmark name used for result metadata."""
         return getattr(self, "_name", type(self).__name__)
 
     def create_enhanced_benchmark_result(
@@ -34,7 +29,6 @@ class BenchmarkResultValidationMixin:
         duration_seconds: Optional[float] = None,
         **kwargs: Any,
     ) -> BenchmarkResults:
-        """Create a BenchmarkResults object with standardized fields."""
         if hasattr(self, "_impl") and hasattr(self._impl, "create_enhanced_benchmark_result"):
             return self._impl.create_enhanced_benchmark_result(
                 platform=platform,
@@ -77,7 +71,6 @@ class BenchmarkResultValidationMixin:
         phases: Optional[dict[str, dict[str, Any]]] = None,
         **overrides: Any,
     ) -> BenchmarkResults:
-        """Create a minimal BenchmarkResults instance for error and interrupt paths."""
 
         metadata: dict[str, Any] = {
             "result_type": "minimal",
@@ -109,11 +102,9 @@ class BenchmarkResultValidationMixin:
         self,
         phases: Optional[dict[str, dict[str, Any]]],
     ) -> Optional[dict[str, dict[str, Any]]]:
-        """Normalize minimal-result phase payloads for each base surface."""
         return phases
 
     def _resolve_output_dir(self, output_dir: Optional[Union[str, Path]] = None) -> Union[Path, Any]:
-        """Resolve and cache the benchmark output directory handler."""
 
         candidate = output_dir if output_dir is not None else getattr(self, "output_dir", None)
         if candidate is None:
@@ -132,7 +123,6 @@ class BenchmarkResultValidationMixin:
         output_dir: Optional[Union[str, Path]] = None,
         benchmark_name: Optional[str] = None,
     ) -> ValidationResult:
-        """Run preflight validation for this benchmark."""
 
         from benchbox.core.validation import DataValidationEngine
 
@@ -147,7 +137,6 @@ class BenchmarkResultValidationMixin:
         manifest_path: Optional[Union[str, Path]] = None,
         benchmark_name: Optional[str] = None,
     ) -> ValidationResult:
-        """Validate generated manifest for this benchmark."""
 
         from benchbox.core.validation import DataValidationEngine, ValidationResult as CoreValidationResult
 
@@ -174,7 +163,6 @@ class BenchmarkResultValidationMixin:
         *,
         benchmark_name: Optional[str] = None,
     ) -> ValidationResult:
-        """Validate post-load database state for this benchmark."""
 
         from benchbox.core.validation import DatabaseValidationEngine
 

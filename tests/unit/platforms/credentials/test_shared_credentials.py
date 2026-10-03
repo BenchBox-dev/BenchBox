@@ -1,9 +1,6 @@
-"""Tests for benchbox.platforms.credentials.shared.prompt_default_output_location.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, call, patch
 
@@ -99,8 +96,7 @@ class TestValidCloudPathConfirmed:
 
 class TestInvalidPathThenValid:
     def test_invalid_path_user_declines_then_retries_with_valid(self, monkeypatch):
-        # First Confirm: wants it; Prompt: bad path; is_cloud_path: False; second Confirm: False (don't proceed)
-        # Second Prompt: valid path; is_cloud_path: True; final Confirm: True
+
         confirm_sequence = iter([True, False, True])
         prompt_sequence = iter(["bad-path", "gs://bucket/path"])
 
@@ -128,7 +124,7 @@ class TestInvalidPathThenValid:
 
 class TestInvalidPathUserProceedsAnyway:
     def test_non_cloud_path_accepted_with_warning(self, monkeypatch):
-        # wants it → True; prompt → "not-a-cloud-path"; is_cloud: False; proceed anyway → True; confirm → True
+
         confirm_sequence = iter([True, True, True])
         monkeypatch.setattr(
             "benchbox.platforms.credentials.shared.Confirm.ask",
@@ -148,7 +144,6 @@ class TestInvalidPathUserProceedsAnyway:
         args["credentials"] = creds
         prompt_default_output_location(**args)
 
-        # Warning shown about not looking like cloud path
         console_calls = [str(c) for c in args["console"].print.call_args_list]
         assert any("Warning" in c or "doesn't look" in c for c in console_calls)
         assert creds["default_output_location"] == "not-a-cloud-path"
@@ -156,14 +151,14 @@ class TestInvalidPathUserProceedsAnyway:
 
 class TestBucketSuggestedDefault:
     def test_bucket_shown_in_suggested_default(self, monkeypatch):
-        # User says yes to configure, gets shown examples, then enters empty path (skips)
+
         monkeypatch.setattr(
             "benchbox.platforms.credentials.shared.Confirm.ask",
             lambda *a, **k: True,
         )
         monkeypatch.setattr(
             "benchbox.platforms.credentials.shared.Prompt.ask",
-            lambda *a, **k: "",  # empty → skips
+            lambda *a, **k: "",
         )
         monkeypatch.setattr(
             "benchbox.utils.cloud_storage.is_cloud_path",
@@ -171,7 +166,7 @@ class TestBucketSuggestedDefault:
         )
         args = _make_args(bucket="my-bucket")
         prompt_default_output_location(**args)
-        # The bucket name should appear in one of the example lines shown to the user
+
         all_calls = " ".join(str(c) for c in args["console"].print.call_args_list)
         assert "my-bucket" in all_calls
 

@@ -1,18 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Multi-extension comparison orchestration tests.
-
-Runs the same benchmark workload across pg_duckdb and pg_mooncake, collects
-results, and produces a comparison report. Requires both Docker services running:
-
-    make test-docker-up-pg-extensions
-
-These tests are intentionally slow and serial - each benchmark run creates real
-tables, loads data, and executes queries against live PostgreSQL instances.
-"""
 
 import os
 import time
@@ -59,7 +47,6 @@ PG_EXTENSIONS = {
 
 
 def _check_extension_available(platform_config: dict) -> bool:
-    """Check if a pg extension Docker service is reachable."""
     import socket
 
     host = os.getenv(platform_config["host_env"], "localhost")
@@ -80,7 +67,6 @@ def _run_benchmark_via_adapter(
     scale: float = 0.01,
     queries: list[str] | None = None,
 ) -> dict | None:
-    """Run a benchmark for a single platform via adapter API and return a result dict."""
     if queries is None:
         queries = ["Q1", "Q6"]
 
@@ -89,7 +75,6 @@ def _run_benchmark_via_adapter(
     port = int(os.getenv(config["port_env"], str(config["default_port"])))
     skip_unless_docker_service(host, port, platform=platform)
 
-    # Lazy import to avoid ImportError when platform deps aren't installed
     import importlib
 
     module = importlib.import_module(config["adapter_module"])
@@ -137,9 +122,6 @@ def _run_benchmark_via_adapter(
             )
     finally:
         try:
-            # Drop tables by unqualified name - relies on the adapter landing tables
-            # in the default search_path (public).  No schema is set before create_schema,
-            # so the DROP will find the tables as long as that invariant holds.
             cursor = connection.cursor()
             for table in ["lineitem", "orders", "customer", "part", "partsupp", "supplier", "nation", "region"]:
                 cursor.execute(f"DROP TABLE IF EXISTS {table}")
@@ -168,7 +150,6 @@ def _run_benchmark_via_adapter(
 
 @pytest.fixture(scope="module")
 def available_extensions() -> list[str]:
-    """Return list of available pg extension platforms."""
     available = []
     for platform, config in PG_EXTENSIONS.items():
         if _check_extension_available(config):
@@ -183,7 +164,6 @@ def available_extensions() -> list[str]:
 
 @pytest.fixture(scope="module")
 def comparison_results(available_extensions, tmp_path_factory) -> dict[str, dict]:
-    """Run benchmarks across all available extensions and collect results."""
     data_dir = tmp_path_factory.mktemp("pg_extension_comparison")
     results = {}
 
@@ -198,8 +178,6 @@ def comparison_results(available_extensions, tmp_path_factory) -> dict[str, dict
 
 
 class TestPgExtensionComparisonOrchestration:
-    """Test that multi-extension comparison orchestration works."""
-
     def test_all_extensions_produce_results(self, comparison_results, available_extensions):
 
         for platform in available_extensions:
@@ -220,10 +198,7 @@ class TestPgExtensionComparisonOrchestration:
 
 
 class TestPgExtensionComparisonReport:
-    """Test comparison report generation from orchestrated results."""
-
     def test_generate_comparison_table(self, comparison_results):
-        """Generate a text comparison table from results."""
         rows = []
         for platform, result in comparison_results.items():
             duration = result.get("duration_seconds", 0)
@@ -243,8 +218,6 @@ class TestPgExtensionComparisonReport:
             assert row["queries"] > 0
 
     def test_query_level_comparison(self, comparison_results):
-        """Compare individual query timings across extensions."""
-        # Collect per-query timings from each platform
         query_timings: dict[str, dict[str, float]] = {}
 
         for platform, result in comparison_results.items():
@@ -256,6 +229,5 @@ class TestPgExtensionComparisonReport:
                             query_timings[qid] = {}
                         query_timings[qid][platform] = query.get("duration_seconds", 0)
 
-        # At least one query should have timings from multiple platforms
         multi_platform_queries = {qid: timings for qid, timings in query_timings.items() if len(timings) >= 2}
         assert len(multi_platform_queries) > 0, "Expected at least one query with results from multiple platforms"

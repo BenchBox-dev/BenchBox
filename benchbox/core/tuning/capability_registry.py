@@ -1,59 +1,6 @@
-"""Single capability registry for tuning-type rendering across platforms.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Per ADR-3 (`docs/development/tuning-adr-003-baseline-and-single-renderer.md`)
-and the `tuning-renderer-consolidation-and-baseline-policy-20260712` TODO,
-this module is the ONE place that answers, for a canonical platform type and
-a `TuningType`: *how does BenchBox actually apply this tuning, if at all?*
-
-It is built by reading the other capability sources that already exist in
-the codebase -- `benchbox.core.tuning.ddl_generator.get_ddl_generator`
-(which generator, if any, a platform resolves to and what tuning types that
-generator supports), `benchbox.core.tuning.interface._PLATFORM_COMPATIBILITY_MAP`
-(the historical compatibility map), and direct inspection of adapter/mixin
-source (`benchbox/platforms/<platform>/*.py`) -- rather than inventing new
-policy. `interface.py`'s compatibility map and `platform_capabilities.py`'s
-workload-profile mapping now derive their platform-set data from this
-module (see the constants they import below) instead of maintaining
-independent copies.
-
-Scope note: this registry intentionally does NOT change
-`TuningType.is_compatible_with_platform` behavior. `_INTERFACE_KNOWN_PLATFORMS`
-below reproduces the exact nine-platform set `interface.py` has always used
-(pinned by `tests/unit/core/tuning/test_platform_identity_keys.py`); platforms
-like `starrocks` and `doris` get real registry entries here (for rendering
-lookups and the `benchbox tuning platforms` CLI table) without becoming
-"known" for the hard-error-vs-warning compatibility distinction, because
-that distinction is deliberately lenient for platforms the interface map has
-no opinion on (see `TuningType.is_known_platform`'s docstring). A candidate
-correction was investigated during this consolidation (Databricks
-`DISTRIBUTION` looked, at first read, like a dead compatibility entry -- no
-adapter code renders a literal DISTRIBUTED-BY clause for it) but shipped
-examples (`examples/tunings/databricks/tpch_tuned.yaml`,
-`tpcds_tuned.yaml`, etc.) set `distribution:` columns that the Z-ORDER
-workload-profile mapping (`platform_capabilities.py::_map_databricks`) folds
-into ZORDER locality upstream of the adapter. Removing the compatibility
-entry would newly hard-error those shipped configs, so it was left
-unchanged. No `is_compatible_with_platform` behavior changes ship in this
-TODO; this module is a consolidation of *lookup*, not a correctness pass.
-
-Coverage note (`tuning-capability-registry-coverage-20260716`): the
-trino/presto/athena/firebolt/azure-synapse/timescaledb/questdb/pg-duckdb/
-pg-mooncake entries below extend this same non-"known" (starrocks/doris
-style) treatment to the platforms that were previously undocumented
-allowlist gaps in `test_capability_source_drift.py`. Every one of those 9
-entries is `rendered_via="none"`: a repo-wide search found no call site for
-any of these platforms' `generate_tuning_clause()` adapter override outside
-its own definition and direct unit tests, so real execution never applies
-the dry-run-preview generator's tuned clause -- it either does nothing, or
-(azure_synapse/timescaledb/questdb) runs a separate mechanism driven by a
-fixed platform default or a hardcoded per-table-name map rather than the
-configured `TableTuning` columns. See the per-platform entries for exact
-file:line evidence and the renderer-migration follow-up each implies.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -62,28 +9,11 @@ from typing import Literal
 
 from benchbox.core.tuning.interface import TuningType
 
-# Where/how a tuning type is actually rendered for a platform, today:
-#   "ddl"       - part of the CREATE TABLE statement (inline clause or table
-#                 property) at schema-creation time.
-#   "post_load" - a statement run after data load (CTAS reorder, OPTIMIZE,
-#                 ZORDER, etc.).
-#   "session"   - a session-level SET statement.
-#   "none"      - no *tuned* rendering of this TuningType exists yet, even
-#                 though the type is accepted as compatible; a documented
-#                 gap, not silent scope. This does NOT mean the platform
-#                 emits no clause at all: some adapters emit a real, fixed
-#                 clause regardless of the tuned configuration (e.g. Azure
-#                 Synapse's DISTRIBUTION always gets a WITH (DISTRIBUTION =
-#                 ...) clause, just never one derived from TableTuning
-#                 columns) -- see each entry's mechanism notes for what, if
-#                 anything, is actually emitted.
 RenderedVia = Literal["ddl", "post_load", "session", "none"]
 
 
 @dataclass(frozen=True)
 class TuningCapability:
-    """One platform+tuning-type capability entry."""
-
     rendered_via: RenderedVia
     mechanism_id: str
     notes: str = ""
@@ -111,12 +41,6 @@ _CONSTRAINT_NOTE = "Rendered as an inline column/table constraint clause at CREA
 
 
 def _constraint_entries() -> dict[TuningType, TuningCapability]:
-    """Shared entries for the four schema-constraint tuning types.
-
-    Every platform below renders these the same way: inline at CREATE TABLE
-    time. Returned as a fresh dict per call so callers can safely merge it
-    into a larger per-platform dict literal.
-    """
     return {
         _T.PRIMARY_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
         _T.FOREIGN_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
@@ -125,25 +49,6 @@ def _constraint_entries() -> dict[TuningType, TuningCapability]:
     }
 
 
-# Platform aliases: alternate canonical keys (deployment variants, format
-# aliases) that resolve to the same capability entry. Mirrors
-# `get_ddl_generator`'s alias table so this registry does not silently miss
-# a platform key that already has a real generator.
-#
-# Most alternate spellings never need an entry here: `resolve_platform_key`
-# normalizes underscores to hyphens BEFORE consulting this dict, so
-# "azure_synapse"/"azure-synapse" and "pg_duckdb"/"pg-duckdb" already collapse
-# onto the same canonical (hyphenated) key without help. Two kinds of entry
-# genuinely need to be listed explicitly:
-#   1. A short alias that isn't an underscore/hyphen variant of its canonical
-#      key at all -- e.g. Azure Synapse's "synapse".
-#   2. An alias key that itself contains an underscore -- because
-#      normalization runs first, an underscore in the DICT KEY here can never
-#      match (the input would already have been folded to a hyphen before
-#      lookup); the key must be written hyphenated. "fabric-warehouse" below
-#      was originally stored as "fabric_warehouse" and consequently never
-#      matched any input -- fixed here alongside "clickhouse-cloud", which
-#      get_ddl_generator registers but this dict never listed at all.
 PLATFORM_ALIASES: dict[str, str] = {
     "clickhouse-local": "clickhouse",
     "clickhouse-server": "clickhouse",
@@ -156,27 +61,6 @@ PLATFORM_ALIASES: dict[str, str] = {
 }
 
 
-# Per-platform, per-tuning-type capability entries. Only platforms with an
-# entry in `interface._PLATFORM_COMPATIBILITY_MAP` (the historical
-# compatibility map) or explicitly named in the renderer-consolidation TODO
-# (`starrocks`, `doris`) are covered; the DDL generator registry additionally
-# covers ~10 more SQL platforms (redshift, snowflake, etc. below).
-#
-# Honesty correction (`tuning-registry-mixin-honesty`): the postgresql,
-# snowflake, redshift, bigquery and mysql entries below previously claimed
-# `_ddl("adapter_mixin:<X>Adapter.generate_tuning_clause", ...)`, but that
-# mixin has no production call site anywhere -- create_schema builds DDL from
-# `benchmark.get_create_tables_sql(tuning_config=...)`, which reads
-# tuning_config only for PK/FK constraint flags, never the partition/cluster/
-# distribution/sort columns (see e.g. core/tpch/benchmark.py:423-426). Those
-# entries now describe reality: snowflake renders CLUSTERING/PARTITIONING
-# post-load via a real ALTER TABLE ... CLUSTER BY in apply_table_tunings,
-# while postgresql/redshift/bigquery/mysql render nothing at execution
-# (rendered_via="none"; their generators/*.py DDL generators, where present,
-# feed dry-run preview only) -- the same preview-only reality PR #1198
-# recorded for the 9 coverage platforms below. The set of compatible tuning
-# types per platform is unchanged, so is_compatible_with_platform behavior is
-# preserved.
 PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
     "duckdb": {
         _T.SORTING: _post_load(
@@ -381,9 +265,6 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
         ),
         **_constraint_entries(),
     },
-    # Explicitly named by the renderer-consolidation TODO even though absent
-    # from interface.py's historical compatibility map (see module docstring
-    # for why that stays true after this consolidation).
     "starrocks": {
         _T.PARTITIONING: _ddl(
             "starrocks_ddl_generator",
@@ -421,37 +302,6 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
         _T.SORTING: _ddl("doris_ddl_generator", "See PARTITIONING entry."),
         _T.DISTRIBUTION: _ddl("doris_ddl_generator", "See PARTITIONING entry."),
     },
-    # ------------------------------------------------------------------
-    # `tuning-capability-registry-coverage-20260716`: the 9 platforms below
-    # have real `core.tuning.generators` DDL generators (reachable via
-    # `get_ddl_generator`) but were undocumented allowlist gaps in
-    # `tests/unit/core/tuning/test_capability_source_drift.py` until now.
-    # None of them are in `_INTERFACE_KNOWN_PLATFORMS` (same treatment as
-    # starrocks/doris above -- registry entries for rendering-mechanism
-    # lookups and the `benchbox tuning platforms` CLI table, without
-    # affecting the hard-error-vs-warning compatibility distinction).
-    #
-    # For every one of these 9, the finding is the same shape: the
-    # dry-run/CLI-preview generator computes a real, tuning-config-derived
-    # clause, but nothing in the adapter's execution path (create_schema /
-    # apply_table_tunings / apply_unified_tuning) consumes it. Several of
-    # these adapters define their own `generate_tuning_clause` override (the
-    # per-adapter-mixin ADR-3 rendering universe used by e.g. Snowflake in
-    # this same registry) that structurally *would* render the tuned clause
-    # correctly -- but a repo-wide search for `.generate_tuning_clause(` call
-    # sites (outside its own definitions and unit tests that invoke it
-    # directly) turns up none for any of these 9 platforms: the method is
-    # defined but never invoked from `create_schema` or anywhere else. Real
-    # execution instead falls through to whatever `_optimize_table_definition`
-    # (or, for azure_synapse/timescaledb/questdb, a platform-specific
-    # post-processing step) does -- which is either nothing, or a fixed
-    # engine default/hardcoded per-table-name mapping unrelated to the
-    # configured `TableTuning` columns. `rendered_via="none"` throughout
-    # records that dry-run-only reality honestly, per this TODO's
-    # must_preserve, the same way #1180 recorded the starrocks/databricks
-    # gaps above. Wiring each adapter's `generate_tuning_clause` (or
-    # `get_ddl_generator`) into its real `create_schema` path is the
-    # renderer-migration follow-up noted per platform below.
     "trino": {
         _T.PARTITIONING: _none(
             "trino_ddl_generator:preview_only",
@@ -736,12 +586,6 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
 }
 
 
-# The exact platform-key set `interface.py`'s compatibility map has always
-# used. Pinned by tests/unit/core/tuning/test_platform_identity_keys.py --
-# `starrocks`/`doris` are deliberately excluded (see module docstring): they
-# get registry entries above for rendering-mechanism lookups, but keeping
-# them out of the "known" set preserves the existing warn-not-error
-# treatment for platforms interface.py has no compatibility opinion on.
 _INTERFACE_KNOWN_PLATFORMS: frozenset[str] = frozenset(
     {
         "duckdb",
@@ -758,53 +602,15 @@ _INTERFACE_KNOWN_PLATFORMS: frozenset[str] = frozenset(
 
 
 def interface_compatibility_map() -> dict[str, frozenset[TuningType]]:
-    """Build `interface._PLATFORM_COMPATIBILITY_MAP`'s data from this registry.
-
-    Returns the same shape (canonical platform key -> frozenset of compatible
-    `TuningType`s) `interface.py` has always hand-maintained, but computed
-    from `PLATFORM_TUNING_CAPABILITIES` so the two can no longer drift.
-    Restricted to `_INTERFACE_KNOWN_PLATFORMS` -- see module docstring.
-    """
     return {platform: frozenset(PLATFORM_TUNING_CAPABILITIES[platform]) for platform in _INTERFACE_KNOWN_PLATFORMS}
 
 
 def resolve_platform_key(platform: str) -> str:
-    """Normalize a platform identifier to its canonical registry key.
-
-    Applies the same case-folding, underscore-to-hyphen normalization, and
-    `PLATFORM_ALIASES` lookup that `get_capability` uses to resolve a
-    platform string to the key `PLATFORM_TUNING_CAPABILITIES` is keyed by.
-    Exposed standalone (rather than inlined only in `get_capability`) so
-    callers -- including tests that need to check "does this identifier
-    resolve to a registry entry" without also needing a `TuningType` -- reuse
-    the exact resolution logic instead of re-deriving an approximation of it
-    (see `tests/unit/core/tuning/test_capability_source_drift.py`, which used
-    to hand-roll a partial version of this normalization and missed aliases
-    like "synapse" that aren't simple underscore/hyphen variants of their
-    canonical key).
-
-    Note this does not guarantee the returned key has a registry entry --
-    callers that need that should check membership in
-    `known_registry_platforms()` (or `PLATFORM_TUNING_CAPABILITIES`) too.
-    """
     platform_key = platform.lower().replace("_", "-")
     return PLATFORM_ALIASES.get(platform_key, platform_key)
 
 
 def get_capability(platform: str, tuning_type: TuningType) -> TuningCapability | None:
-    """Look up the rendering capability for a platform + tuning type.
-
-    Args:
-        platform: Canonical platform type key (case-insensitive); aliases in
-            `PLATFORM_ALIASES` are resolved first.
-        tuning_type: The tuning type to look up.
-
-    Returns:
-        The `TuningCapability`, or None if the platform has no registry
-        entry, or has an entry but no opinion on this specific tuning type
-        (equivalent to "not compatible" -- distinct from an explicit `"none"`
-        rendered_via, which means "compatible, but not rendered yet").
-    """
     platform_key = resolve_platform_key(platform)
     entries = PLATFORM_TUNING_CAPABILITIES.get(platform_key)
     if entries is None:
@@ -813,15 +619,9 @@ def get_capability(platform: str, tuning_type: TuningType) -> TuningCapability |
 
 
 def known_registry_platforms() -> frozenset[str]:
-    """All canonical platform keys with at least one registry entry (broader than interface.py's set)."""
     return frozenset(PLATFORM_TUNING_CAPABILITIES)
 
 
-# Platforms whose logical-workload-tuning-candidate mapping
-# (`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`) is
-# implemented. Derived here (rather than redeclared in that module) so the
-# "which platforms does the TPC template mapper know about" fact has one
-# owner; see platform_capabilities.py.
 WORKLOAD_PROFILE_MAPPED_PLATFORMS: frozenset[str] = frozenset(
     {"databricks", "duckdb", "bigquery", "redshift", "snowflake"}
 )

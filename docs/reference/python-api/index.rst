@@ -47,6 +47,8 @@ Core APIs
 
    base
    benchmarks
+   dataframe-query
+   dataframe-runtime
    results
    result-analysis
 
@@ -56,6 +58,7 @@ Platform Adapters
 .. toctree::
    :maxdepth: 1
 
+   platforms/common
    platforms/duckdb
    platforms/datafusion
    platforms/sqlite

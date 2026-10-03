@@ -1,5 +1,3 @@
-"""Optional dependencies for StarRocks platform support."""
-
 try:
     import pymysql
     from pymysql.cursors import DictCursor as PyMySQLDictCursor

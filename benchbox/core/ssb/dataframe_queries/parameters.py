@@ -1,13 +1,6 @@
-"""SSB DataFrame query parameters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Default parameter values for SSB queries, matching the SSB specification defaults.
-SSB does not use seed-derived parameter substitution (unlike TPC-H/TPC-DS),
-so these are static defaults only.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

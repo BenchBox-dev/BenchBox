@@ -1,5 +1,3 @@
-"""Tests for default normalized platform runtime metadata helpers."""
-
 from __future__ import annotations
 
 import json
@@ -81,9 +79,6 @@ def test_embedded_platform_maps_to_local_process_runtime() -> None:
 
 
 def test_platform_raw_config_excludes_internal_tuning_keys_and_reprs() -> None:
-    """w1/w2 regression: platform.raw_config must never carry internal
-    bookkeeping keys (e.g. tuning_config) or a Python repr() string for an
-    unserializable value - see tuning-repr-serialization-leak-fix-20260712."""
 
     class _TuningConfig:
         def __repr__(self) -> str:  # pragma: no cover - guards against leakage

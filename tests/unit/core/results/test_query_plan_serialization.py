@@ -1,13 +1,3 @@
-"""
-Integration tests for query plan serialization within BenchmarkResults.
-
-Tests verify that:
-- Query plans serialize correctly in BenchmarkResults
-- Schema v2.0 exports query plans to companion files
-- Backward compatibility is maintained (plans are optional)
-- QueryExecution with plans serializes properly
-"""
-
 from dataclasses import asdict
 from datetime import datetime
 
@@ -31,10 +21,7 @@ pytestmark = [
 
 
 class TestQueryPlanInQueryExecution:
-    """Test QueryExecution with query plans."""
-
     def test_query_execution_without_plan(self) -> None:
-        """Test that QueryExecution works without a plan (backward compat)."""
         qe = QueryExecution(
             query_id="q01",
             stream_id="power",
@@ -78,7 +65,6 @@ class TestQueryPlanInQueryExecution:
         assert qe.plan_fingerprint == plan.plan_fingerprint
 
     def test_query_execution_serialization_with_plan(self) -> None:
-        """Test that QueryExecution with plan serializes via asdict()."""
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -100,7 +86,6 @@ class TestQueryPlanInQueryExecution:
             plan_fingerprint=plan.plan_fingerprint,
         )
 
-        # asdict() should handle nested dataclasses
         result = asdict(qe)
 
         assert result["query_id"] == "q01"
@@ -111,10 +96,7 @@ class TestQueryPlanInQueryExecution:
 
 
 class TestQueryPlanInBenchmarkResults:
-    """Test BenchmarkResults with query plans."""
-
     def test_benchmark_results_without_plans(self) -> None:
-        """Test BenchmarkResults without plans (backward compat)."""
         results = make_benchmark_results(
             benchmark_name="tpch",
             platform="duckdb",
@@ -129,7 +111,6 @@ class TestQueryPlanInBenchmarkResults:
         assert results.plan_comparison_summary is None
 
     def test_benchmark_results_with_plan_statistics(self) -> None:
-        """Test BenchmarkResults with plan capture statistics."""
         results = make_benchmark_results(
             benchmark_name="tpch",
             platform="duckdb",
@@ -138,7 +119,7 @@ class TestQueryPlanInBenchmarkResults:
             duration_seconds=10.0,
             total_queries=22,
             successful_queries=22,
-            query_plans_captured=15,  # Captured plans for 15 queries
+            query_plans_captured=15,
         )
 
         assert results.query_plans_captured == 15
@@ -171,14 +152,7 @@ class TestQueryPlanInBenchmarkResults:
 
 
 class TestSchemaV2ExportWithPlans:
-    """Test that schema v2.0 export correctly handles query plan data.
-
-    In v2.0, query plans are exported to a separate companion file (.plans.json).
-    The main result file only contains a summary of plans captured.
-    """
-
     def test_schema_v2_export_without_plans(self) -> None:
-        """Test schema v2.0 export with no query plans."""
         results = make_benchmark_results(
             benchmark_id="tpch",
             benchmark_name="tpch",
@@ -201,10 +175,8 @@ class TestSchemaV2ExportWithPlans:
 
         payload = build_result_payload(results)
 
-        # v2.x schema version
         assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
-        # Should have compact queries array
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
 
@@ -224,12 +196,10 @@ class TestSchemaV2ExportWithPlans:
 
         plans_payload = build_plans_payload(results)
 
-        # Should return None when no plans
         assert plans_payload is None
 
     def test_schema_v2_plans_companion_with_plans(self) -> None:
 
-        # Create a query plan
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -267,7 +237,6 @@ class TestSchemaV2ExportWithPlans:
 
         plans_payload = build_plans_payload(results)
 
-        # Should have plans payload
         assert plans_payload is not None
         assert plans_payload["version"] == "2.2"
         assert plans_payload["run_id"] == "test_006"
@@ -275,12 +244,6 @@ class TestSchemaV2ExportWithPlans:
         assert "q01" in plans_payload["queries"]
 
     def test_schema_v2_plans_companion_uses_to_dict_not_asdict(self) -> None:
-        """build_plans_payload must serialize QueryPlanDAG via its to_dict()
-        (depth-guarded, internal-field-free) rather than plain dataclasses.asdict()
-        (qpc-07 / F1.5): QueryPlanDAG is a dataclass, so checking is_dataclass()
-        before hasattr(to_dict) always wins and bypasses to_dict() entirely,
-        leaking the internal fingerprint_integrity field into the companion file.
-        """
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -320,15 +283,10 @@ class TestSchemaV2ExportWithPlans:
 
         assert plans_payload is not None
         plan_dict = plans_payload["queries"]["q01"]["plan"]
-        # fingerprint_integrity is a dataclass field asdict() would include but
-        # to_dict() deliberately omits (internal verification state, not part
-        # of the plan's serialized contract).
         assert "fingerprint_integrity" not in plan_dict
         assert plan_dict == plan.to_dict()
 
     def test_companion_entry_plan_format_dag_for_structured_plan(self) -> None:
-        """qpc-06 w4 / F3.2: a structured QueryPlanDAG entry is tagged
-        plan_format='dag' so consumers know "plan" is a rehydratable DAG."""
         root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
         plan = QueryPlanDAG(query_id="q01", platform="duckdb", logical_root=root)
         results = make_benchmark_results(
@@ -360,9 +318,6 @@ class TestSchemaV2ExportWithPlans:
         assert payload["queries"]["q01"]["plan_format"] == "dag"
 
     def test_companion_entry_plan_format_text_for_textonly_plan(self) -> None:
-        """qpc-06 w4 / F3.2: a text-only DataFrame plan (no logical_root) is
-        tagged plan_format='text' so a consumer does not mis-read it as a DAG
-        or blindly call QueryPlanDAG.from_dict on it."""
         from benchbox.core.dataframe.profiling import QueryPlan
 
         text_plan = QueryPlan(
@@ -397,15 +352,9 @@ class TestSchemaV2ExportWithPlans:
         assert payload is not None
         entry = payload["queries"]["q01"]
         assert entry["plan_format"] == "text"
-        # The text blob is preserved but is NOT a DAG (no logical_root).
         assert "logical_root" not in entry["plan"]
 
     def test_schema_v2_plans_companion_multi_stream_keys_per_stream(self) -> None:
-        """A query_id captured in more than one stream must not collapse to one
-        last-writer-wins entry: capture_query_plan's contract is one plan record
-        per (query_id, stream_id), so each stream's plan must survive under its
-        own key.
-        """
 
         def _plan(fingerprint: str) -> QueryPlanDAG:
             root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
@@ -445,7 +394,6 @@ class TestSchemaV2ExportWithPlans:
         plans_payload = build_plans_payload(results)
 
         assert plans_payload is not None
-        # Top-level count is unique query IDs, not per-stream row count.
         assert plans_payload["plans_captured"] == 1
         queries = plans_payload["queries"]
         assert "q06" not in queries, "bare query_id key must not be used once ambiguous across streams"
@@ -453,12 +401,6 @@ class TestSchemaV2ExportWithPlans:
         assert queries["q06#1"]["fingerprint"] == "b" * 64
 
     def test_schema_v2_plans_companion_cross_phase_same_stream_id_disambiguated(self) -> None:
-        """A power row and a throughput row can share the SAME query_id AND
-        stream_id (each phase's stream counter independently starts at 0). The
-        stream_id-only composite key from the multi-stream fix would then
-        collide again (both rows landing on "q06#0"), so a cross-phase
-        collision must fall back to a further test_type-qualified key.
-        """
 
         def _plan(fingerprint: str) -> QueryPlanDAG:
             root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
@@ -507,8 +449,6 @@ class TestSchemaV2ExportWithPlans:
         assert queries["q06#0:throughput"]["fingerprint"] == "b" * 64
 
     def test_schema_v2_export_complex_plan(self) -> None:
-        """Test schema v2.0 export with complex query plan tree."""
-        # Build: Join(orders, lineitem) -> [Scan(orders), Scan(lineitem)]
         scan_orders = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -563,7 +503,6 @@ class TestSchemaV2ExportWithPlans:
             ],
         )
 
-        # Main payload should have compact queries
         payload = build_result_payload(results)
         assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
@@ -571,7 +510,6 @@ class TestSchemaV2ExportWithPlans:
         assert payload["queries"][0]["id"] == "01"
         assert payload["queries"][0]["ms"] == 350.0
 
-        # Plans companion should have full plan structure
         plans_payload = build_plans_payload(results)
         assert plans_payload is not None
         assert "q01" in plans_payload["queries"]
@@ -582,11 +520,8 @@ class TestSchemaV2ExportWithPlans:
 
 
 class TestBackwardCompatibility:
-    """Test backward compatibility with existing code."""
-
     def test_existing_code_without_plans_still_works(self) -> None:
 
-        # Simulate old code creating QueryExecution without plans
         qe = QueryExecution(
             query_id="q01",
             stream_id="power",
@@ -594,18 +529,15 @@ class TestBackwardCompatibility:
             execution_time_ms=150,
             status="SUCCESS",
             rows_returned=4,
-            cost=0.00012,  # Old field that exists
+            cost=0.00012,
         )
 
-        # Should serialize without errors
         result = asdict(qe)
         assert result["query_id"] == "q01"
         assert result["cost"] == 0.00012
         assert result["query_plan"] is None
 
     def test_schema_v2_with_and_without_plans(self) -> None:
-        """Test that schema v2.0 works with and without plans."""
-        # Without plans
         results_no_plans = make_benchmark_results(
             benchmark_id="tpch",
             benchmark_name="tpch",
@@ -627,7 +559,6 @@ class TestBackwardCompatibility:
         plans_payload_none = build_plans_payload(results_no_plans)
         assert plans_payload_none is None
 
-        # With plans
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -662,13 +593,10 @@ class TestBackwardCompatibility:
         plans_payload = build_plans_payload(results_with_plans)
         assert plans_payload is not None
 
-        # Both main payloads should have same required fields
         assert set(payload_no_plans.keys()) == set(payload_with_plans.keys())
 
 
 class TestSchemaV2Validation:
-    """Test schema v2.0 validation and edge cases."""
-
     def test_validator_rejects_missing_version(self) -> None:
 
         from benchbox.core.results.schema import SchemaV2ValidationError, SchemaV2Validator
@@ -695,7 +623,7 @@ class TestSchemaV2Validation:
 
         validator = SchemaV2Validator()
         payload = {
-            "version": "1.1",  # Wrong version
+            "version": "1.1",
             "run": {"id": "test", "timestamp": "2025-01-01T00:00:00", "total_duration_ms": 1000, "query_time_ms": 500},
             "benchmark": {"id": "test", "name": "Test", "scale_factor": 1.0},
             "platform": {"name": "Test"},
@@ -718,7 +646,7 @@ class TestSchemaV2Validation:
         validator = SchemaV2Validator()
         payload = {
             "version": "2.0",
-            "run": {"id": "test"},  # Missing required fields
+            "run": {"id": "test"},
             "benchmark": {"id": "test", "name": "Test", "scale_factor": 1.0},
             "platform": {"name": "Test"},
             "summary": {
@@ -747,7 +675,7 @@ class TestSchemaV2Validation:
                 "timing": {"total_ms": 0, "avg_ms": 0, "min_ms": 0, "max_ms": 0},
             },
             "queries": [],
-            "unexpected_key": {},  # Unexpected
+            "unexpected_key": {},
         }
 
         with pytest.raises(SchemaV2ValidationError) as exc:
@@ -755,7 +683,6 @@ class TestSchemaV2Validation:
         assert "unexpected keys" in str(exc.value)
 
     def test_validator_accepts_valid_payload(self) -> None:
-        """Test that validator accepts a valid v2.0 payload."""
         from benchbox.core.results.schema import SchemaV2Validator
 
         validator = SchemaV2Validator()
@@ -771,7 +698,6 @@ class TestSchemaV2Validation:
             "queries": [{"id": "1", "ms": 500.0, "rows": 10}],
         }
 
-        # Should not raise
         validator.validate(payload)
 
     def test_empty_query_list_handled(self) -> None:
@@ -798,7 +724,6 @@ class TestSchemaV2Validation:
         assert payload["queries"] == []
 
     def test_normalized_cost_exported_and_validated(self) -> None:
-        """Schema v2 payload carries the normalized cost block for explorer ingestion."""
         results = make_benchmark_results(
             benchmark_id="cost_test",
             benchmark_name="Cost Test",
@@ -884,11 +809,6 @@ class TestSchemaV2Validation:
         assert payload["execution"]["driver_version_actual"] == "1.0.1"
 
     def test_timing_computed_from_queries(self) -> None:
-        """Test that timing statistics are computed from query results.
-
-        This is the 'single source of truth' principle - timing comes from queries,
-        not from separate fields that could be inconsistent.
-        """
         results = make_benchmark_results(
             benchmark_id="timing_test",
             benchmark_name="Timing Test",
@@ -899,9 +819,8 @@ class TestSchemaV2Validation:
             duration_seconds=10.0,
             total_queries=3,
             successful_queries=3,
-            # These old fields should be IGNORED - timing comes from queries
-            total_execution_time=999.0,  # Wrong value - should be ignored
-            average_query_time=333.0,  # Wrong value - should be ignored
+            total_execution_time=999.0,
+            average_query_time=333.0,
             query_results=[
                 {"query_id": "1", "execution_time_ms": 100, "rows_returned": 4, "status": "SUCCESS"},
                 {"query_id": "2", "execution_time_ms": 200, "rows_returned": 8, "status": "SUCCESS"},
@@ -911,7 +830,6 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
-        # Timing should be computed from queries: 100 + 200 + 300 = 600ms
         assert payload["summary"]["timing"]["total_ms"] == 600.0
         assert payload["summary"]["timing"]["avg_ms"] == 200.0
         assert payload["summary"]["timing"]["min_ms"] == 100.0
@@ -919,7 +837,6 @@ class TestSchemaV2Validation:
 
 
 def _chain_plan(depth: int) -> QueryPlanDAG:
-    """Build a single-chain plan `depth` operators deep for truncation tests."""
     root = None
     for level in reversed(range(depth)):
         root = LogicalOperator(
@@ -960,8 +877,6 @@ def _results_with_plan(plan: QueryPlanDAG, platform_options: dict | None) -> obj
 
 
 class TestCompanionMaxDepth:
-    """The persisted companion honors the run's configured plan_max_depth."""
-
     def test_companion_truncates_at_configured_depth(self) -> None:
         import json
 

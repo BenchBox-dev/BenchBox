@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""Audit skip/xfail markers across the tests/ tree.
-
-Walks every .py file under tests/, extracts every ``@pytest.mark.skip``,
-``@pytest.mark.skipif``, ``@pytest.mark.xfail`` decorator and every inline
-``pytest.skip(...)`` / ``pytest.xfail(...)`` call, and emits a CSV with:
-
-    file, line, marker_type, condition, reason
-
-``reason`` is the text of the ``reason=`` keyword if present, otherwise
-``<none>``. Use ``--missing-only`` to restrict to markers lacking a reason.
-"""
 
 from __future__ import annotations
 

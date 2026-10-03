@@ -1,17 +1,3 @@
-"""Fast-lane unit tests for benchbox.core.throughput (StreamRunner + result models).
-
-Mirrors the mocking style used in ``tests/integration/test_tpch_throughput_test.py``
-(fake benchmark/config objects, no real database or benchmark work) but targets
-``StreamRunner`` directly. Most cases stay fully deterministic; a few
-(``TestStreamRunnerTimeoutDetectionAndLeakSurfacing``,
-``TestStreamRunnerCooperativeCancellation``,
-``TestStreamRunnerNonBlockingShutdown``) use small real sleeps with generous
-margins to exercise genuine multi-threaded timeout/wall-clock behavior
-end-to-end rather than mocking time itself -- the fuller, slower-margin
-real-DuckDB oracle for this remains
-``tests/integration/test_throughput_real_duckdb.py``.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -35,17 +21,12 @@ pytestmark = [
 
 @dataclass
 class _FakeConfig:
-    """Minimal stand-in satisfying the structural ``_RunnerConfig`` protocol."""
-
     num_streams: int = 1
     max_workers: Optional[int] = None
     base_seed: int = 42
     stream_timeout: float = 0
     scale_factor: float = 1.0
     verbose: bool = False
-    # Opt-in, default OFF -- deliberately NOT part of the structural
-    # _RunnerConfig protocol (see runner.py); included here so tests can
-    # exercise both the enabled and disabled paths.
     cancel_on_timeout: bool = False
 
 
@@ -85,8 +66,6 @@ def _make_stream_result(
 
 
 class TestStreamRunnerExecute:
-    """Cover StreamRunner.execute()'s aggregation/bookkeeping paths."""
-
     def test_all_streams_succeed(self) -> None:
         config = _FakeConfig(num_streams=3)
         result = _make_result()
@@ -142,7 +121,6 @@ class TestStreamRunnerExecute:
         assert "stream blew up" in result.errors[0]
 
     def test_zero_queries_stream_is_failed_and_visible(self) -> None:
-        """A stream with no executions is dead, not a successful measurement."""
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -166,7 +144,6 @@ class TestStreamRunnerExecute:
         assert result.stream_results[0].success is False
 
     def test_single_stream_fallback_when_max_workers_unset(self) -> None:
-        """config.max_workers=None falls back to config.num_streams (single-thread case)."""
         config = _FakeConfig(num_streams=1, max_workers=None)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -192,8 +169,6 @@ class TestStreamRunnerExecute:
 
 
 class TestStreamRunnerComputeMetrics:
-    """Cover StreamRunner.compute_metrics()'s pure aggregation math."""
-
     def test_computes_throughput_from_stream_results(self) -> None:
         config = _FakeConfig(num_streams=3, scale_factor=1.0)
         result = _make_result()
@@ -207,7 +182,6 @@ class TestStreamRunnerComputeMetrics:
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
-        # TTT spans from the earliest stream start to the latest stream end.
         assert result.total_time == 3600.0
         expected_throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
             total_queries=66,
@@ -234,7 +208,6 @@ class TestStreamRunnerComputeMetrics:
         assert result.throughput_at_size == 0.0
 
     def test_falls_back_to_elapsed_time_when_no_streams_ran(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """No stream_results (e.g. all streams raised before producing a result)."""
         monkeypatch.setattr(
             "benchbox.core.throughput.runner.elapsed_seconds",
             lambda start: 7.5,
@@ -253,7 +226,6 @@ class TestStreamRunnerComputeMetrics:
         assert result.errors == ["Stream 0 execution failed: worker died"]
 
     def test_zero_total_time_suppresses_throughput_metric(self) -> None:
-        """A degenerate timing window cannot produce a scored metric."""
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         result.throughput_at_size = -1.0
@@ -271,8 +243,6 @@ class TestStreamRunnerComputeMetrics:
 
 
 class TestThroughputResultAggregation:
-    """Cover the plain dataclass shape/defaults in result.py."""
-
     def test_defaults(self) -> None:
         result = _make_result()
         assert result.stream_results == []
@@ -296,19 +266,6 @@ class TestThroughputResultAggregation:
 
 
 class TestStreamRunnerTimeoutDetectionAndLeakSurfacing:
-    """Cover execute()'s per-stream timeout detection (w1).
-
-    ``execute()`` used to enforce the per-stream timeout via
-    ``future.result(timeout=...)`` inside a ``concurrent.futures.
-    as_completed()`` loop -- a no-op, since as_completed() only yields a
-    future once it is already done(), so .result(timeout=...) on it can
-    never raise TimeoutError. These tests use a real (but small) sleep
-    exceeding a tiny ``stream_timeout`` so the fixed code path -- timeout
-    passed to as_completed() itself, with a fallback loop classifying any
-    still-not-done() future as leaked -- is exercised end-to-end rather than
-    mocked, proving detection is no longer dead code.
-    """
-
     SLOW_STREAM_SLEEP = 0.1
     TINY_TIMEOUT = 0.01
 
@@ -330,14 +287,10 @@ class TestStreamRunnerTimeoutDetectionAndLeakSurfacing:
         assert "leaked" in result.errors[0].lower()
         assert "cannot forcibly cancel" in result.errors[0].lower()
 
-        # Always surfaced via logger.warning -- NOT gated on config.verbose
-        # (verbose=False above) -- a leaked stream must never be silent.
         logger.warning.assert_called_once_with(result.errors[0])
         logger.error.assert_not_called()
 
     def test_fast_stream_within_timeout_is_not_flagged_as_leaked(self) -> None:
-        """Sanity check: a stream that finishes well within its timeout is
-        processed normally, with no leaked/timeout annotation at all."""
 
         def fast_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             return _make_stream_result(stream_id)
@@ -355,24 +308,10 @@ class TestStreamRunnerTimeoutDetectionAndLeakSurfacing:
 
 
 class TestStreamRunnerCooperativeCancellation:
-    """Cover execute()'s opt-in cooperative-cancellation wiring (w2).
-
-    ``config.cancel_on_timeout`` defaults to False/absent, which must
-    preserve today's behavior exactly (no cancel-event machinery at all).
-    When enabled, a per-stream ``threading.Event`` is attached to
-    ``config._stream_cancel_events`` and set() when that stream's own
-    timeout fires -- never a hard thread-kill.
-    """
-
     SLOW_STREAM_SLEEP = 0.1
     TINY_TIMEOUT = 0.01
 
     def test_disabled_by_default_no_cancel_events_attached(self) -> None:
-        """cancel_on_timeout defaults False -- execute() must still
-        explicitly reset ``_stream_cancel_events`` to an empty dict (not
-        leave it unset, and never leave a stale dict from a prior call on a
-        reused config object -- see
-        TestStreamRunnerCancelEventsResetAcrossReusedConfig below)."""
         config = _FakeConfig(num_streams=2)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -383,8 +322,6 @@ class TestStreamRunnerCooperativeCancellation:
         assert getattr(config, "_stream_cancel_events", None) == {}
 
     def test_enabled_but_streams_finish_normally_leaves_events_unset(self) -> None:
-        """Opt-in cooperative cancellation must not affect the normal
-        (no-timeout) path: events exist but are never set()."""
         config = _FakeConfig(num_streams=2, cancel_on_timeout=True, stream_timeout=5)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -399,9 +336,6 @@ class TestStreamRunnerCooperativeCancellation:
         assert all(not event.is_set() for event in cancel_events.values())
 
     def test_timeout_signals_that_streams_own_cancel_event_only(self) -> None:
-        """Only the timed-out stream's event is set -- never a hard thread
-        kill, and never every stream's event (a single slow stream must not
-        cancel unrelated healthy streams)."""
 
         def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             time.sleep(self.SLOW_STREAM_SLEEP)
@@ -419,18 +353,6 @@ class TestStreamRunnerCooperativeCancellation:
         assert "cooperative cancellation has been signalled" in result.errors[0]
 
     def test_stale_cancel_events_reset_when_reusing_config_with_cancel_disabled(self) -> None:
-        """Regression (review follow-up): a SET Event from a prior
-        execute() call on this same config object must not survive into a
-        later execute() call that has cooperative cancel disabled.
-
-        Reproduces: call 1 has cancel_on_timeout=True and its one stream
-        times out, so its Event ends up set(). Call 2 reuses the SAME
-        config object with cancel_on_timeout=False -- execute() must
-        explicitly reset ``_stream_cancel_events`` to ``{}`` rather than
-        leaving call 1's stale, already-set dict in place (which a spec's
-        presence-only lookup would otherwise treat as this call's own
-        cancellation state).
-        """
 
         def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             time.sleep(self.SLOW_STREAM_SLEEP)
@@ -445,8 +367,6 @@ class TestStreamRunnerCooperativeCancellation:
         stale_cancel_events = getattr(config, "_stream_cancel_events", None)
         assert stale_cancel_events is not None and stale_cancel_events[0].is_set()
 
-        # Reuse the SAME config object; cooperative cancel now disabled and
-        # no timeout pressure. A fresh dict must replace the stale one.
         config.cancel_on_timeout = False
         config.stream_timeout = 5
         result2 = _make_result()
@@ -464,28 +384,10 @@ class TestStreamRunnerCooperativeCancellation:
 
 
 class TestStreamRunnerNonBlockingShutdown:
-    """Cover execute()'s non-blocking shutdown (w1/w3): a hung stream must
-    not hold execute() hostage for its own lifetime.
-
-    ``execute()`` used to run inside a ``with ThreadPoolExecutor(...)``
-    block whose implicit ``shutdown(wait=True)`` at ``__exit__`` blocked
-    the method's return until every submitted thread finished -- including
-    a leaked one. It now manages the pool manually and calls
-    ``shutdown(wait=False)`` in a ``finally``, so it returns once its own
-    timeout/accounting window closes, abandoning (never killing) any
-    still-running thread. These tests use a real, but generous margin
-    (hang sleep >> timeout, by 20x+) so wall-clock assertions are not
-    flake-prone on a loaded CI box.
-    """
-
     TINY_TIMEOUT = 0.05
-    # Deliberately >> TINY_TIMEOUT so a passing assertion that execute()
-    # returned near the timeout (and not near the hang) has a wide margin.
     HANG_SLEEP = 2.0
 
     def test_execute_returns_near_timeout_not_after_full_hang(self) -> None:
-        """The headline w1 fix: execute()'s wall-clock is bounded by
-        stream_timeout, not by how long the hung stream actually sleeps."""
 
         def hung_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             time.sleep(self.HANG_SLEEP)
@@ -499,16 +401,9 @@ class TestStreamRunnerNonBlockingShutdown:
         StreamRunner.execute(hung_stream_fn, config, result, logger)
         elapsed = time.monotonic() - start
 
-        # Bounded by the timeout window plus classification overhead --
-        # nowhere near the full 2s hang. A generous 1s ceiling still leaves
-        # a 20x margin over TINY_TIMEOUT for CI scheduling jitter while
-        # remaining far short of HANG_SLEEP.
         assert elapsed < 1.0, f"execute() blocked for {elapsed:.3f}s -- did not return near the timeout"
 
     def test_leaked_stream_from_non_blocking_path_still_surfaced_in_errors(self) -> None:
-        """The non-blocking shutdown must not regress leak surfacing: the
-        abandoned stream is still logged and recorded in result.errors,
-        exactly as under the old (blocking) behavior."""
 
         def hung_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             time.sleep(self.HANG_SLEEP)
@@ -528,9 +423,6 @@ class TestStreamRunnerNonBlockingShutdown:
         logger.warning.assert_called_once_with(result.errors[0])
 
     def test_healthy_all_streams_complete_path_unaffected(self) -> None:
-        """Non-blocking shutdown must be a pure no-op on the healthy path:
-        every future is already done() before shutdown() runs, so timing
-        and accounting for a normal (no-timeout) run are unchanged."""
         config = _FakeConfig(num_streams=4, stream_timeout=5)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -544,9 +436,6 @@ class TestStreamRunnerNonBlockingShutdown:
         assert stream_fn.call_count == 4
 
     def test_cooperative_cancel_with_real_set_event_still_cancels(self) -> None:
-        """Composition with #1106: a genuine, timeout-set threading.Event
-        must still signal cancellation under the new non-blocking shutdown
-        -- the executor lifecycle change must not disturb this wiring."""
 
         def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             cancel_event = cfg._stream_cancel_events[stream_id]  # type: ignore[attr-defined]
@@ -565,9 +454,6 @@ class TestStreamRunnerNonBlockingShutdown:
         assert cancel_events[0].is_set()
 
     def test_cooperative_cancel_disabled_by_default_never_cancels(self) -> None:
-        """Composition with #1106: cancel_on_timeout defaults False, so no
-        cancel-event machinery is attached at all, even on a hung stream,
-        under the new non-blocking shutdown."""
 
         def hung_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             time.sleep(self.HANG_SLEEP)
@@ -583,24 +469,6 @@ class TestStreamRunnerNonBlockingShutdown:
         assert getattr(config, "_stream_cancel_events", None) == {}
 
     def test_mock_truthy_config_healthy_path_unaffected(self) -> None:
-        """Composition with #1106, at the StreamRunner boundary: an
-        unconfigured ``Mock()`` config's ``cancel_on_timeout`` attribute is
-        truthy-by-default (``bool(Mock()) is True``), so ``execute()``'s own
-        ``bool(getattr(config, "cancel_on_timeout", False))`` read treats it
-        as opted-in and *does* populate ``_stream_cancel_events`` -- that
-        alone is harmless bookkeeping. The actual protection against a
-        stale/mock-truthy value causing a *spurious cancellation* is the
-        stricter ``is True`` identity gate in each spec's
-        ``_resolve_cancel_event`` (``benchbox/core/tpch/throughput_test.py``,
-        ``benchbox/core/tpcds/throughput_test.py`` -- out of this module's
-        scope, exercised by ``tests/unit/tpch/test_tpch_compliance.py`` and
-        ``tests/integration/test_throughput_corrections.py``). What this
-        test pins down is that the non-blocking shutdown change does not
-        disturb that composition: on a healthy (no-timeout) run, a
-        Mock-truthy ``cancel_on_timeout`` still yields a normal, fully
-        successful result with no event ever set() -- nothing times out, so
-        no cancellation signal fires regardless of the flag's truthiness.
-        """
         stream_fn = Mock(side_effect=lambda stream_id, seed, cfg: _make_stream_result(stream_id))
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -612,8 +480,6 @@ class TestStreamRunnerNonBlockingShutdown:
         config.stream_timeout = 5
         config.scale_factor = 1.0
         config.verbose = False
-        # Deliberately NOT setting cancel_on_timeout -- an unconfigured Mock
-        # attribute access returns a truthy child Mock by default.
 
         StreamRunner.execute(stream_fn, config, result, logger)
 
@@ -624,20 +490,13 @@ class TestStreamRunnerNonBlockingShutdown:
         assert all(not event.is_set() for event in cancel_events.values())
 
     def test_queued_stream_never_starts_after_max_workers_throttled_timeout(self) -> None:
-        """#1141 review: with max_workers < num_streams, a future can still
-        be QUEUED (never dispatched to a worker) at the timeout deadline -
-        distinct from a leaked RUNNING future. Without cancel_futures=True,
-        that queued stream would start executing once the sole worker frees
-        up (when the hung stream 0 finally returns), well after execute()
-        has already returned and counted stream 1 as timed out too - extra
-        DB work overlapping with whatever runs next."""
         started = threading.Event()
 
         def stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
             if stream_id == 0:
-                time.sleep(self.HANG_SLEEP)  # occupies the sole worker past the timeout
+                time.sleep(self.HANG_SLEEP)
             else:
-                started.set()  # only reachable if stream 1 was ever dispatched
+                started.set()
             return _make_stream_result(stream_id)
 
         config = _FakeConfig(num_streams=2, max_workers=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=False)
@@ -649,7 +508,4 @@ class TestStreamRunnerNonBlockingShutdown:
         assert result.streams_executed == 2
         assert len(result.errors) == 2
 
-        # Wait well past HANG_SLEEP (when the sole worker frees up) - a
-        # cancelled queued future must never be dispatched, even once a
-        # worker becomes free.
         assert not started.wait(timeout=self.HANG_SLEEP + 1.0)

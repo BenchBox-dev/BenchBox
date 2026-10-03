@@ -1,5 +1,3 @@
-"""Unit coverage for durable remote benchmark job coordination."""
-
 from __future__ import annotations
 
 import json
@@ -198,12 +196,10 @@ def test_expired_lease_recovery_records_unknown_instead_of_requeueing(tmp_path: 
     assert recovered is not None and recovered.state == "unknown"
     assert recovered.error_code == "unknown_outcome"
     assert recovered.completed_at is not None
-    # An unknown job is terminal: no worker may claim it for automatic retry.
     assert repository.claim("worker-b") is None
     assert repository.fail_attempt(submitted.execution_id, "worker-b", "late-report") is None
     assert repository.begin_publication(submitted.execution_id, "lost-worker") is False
     assert repository.complete(submitted.execution_id, "lost-worker", tmp_path / "stale.json") is False
-    # The operator resubmits with a new idempotency key instead of retrying in place.
     resubmitted, created = repository.submit("tenant-a", _request(), idempotency_key="retry-after-unknown")
     assert created is True
     assert resubmitted.execution_id != submitted.execution_id
@@ -385,8 +381,6 @@ def test_retention_removes_artifact_before_terminal_metadata(tmp_path: Path) -> 
 
 
 class TestDurableJobWindowsDirectoryFsync:
-    """Windows cannot open directories with ``os.open``; file durability must remain."""
-
     def test_windows_directories_are_not_opened(self, tmp_path: Path, monkeypatch) -> None:
         directory = tmp_path / "stage"
         directory.mkdir()
@@ -472,9 +466,6 @@ def test_renew_trusts_ownership_not_wall_clock(tmp_path: Path) -> None:
             "UPDATE mcp_benchmark_jobs SET lease_expires_at = ? WHERE execution_id = ?",
             (time.time() - 1.0, submitted.execution_id),
         )
-    # A wall-clock lapse alone never evicts a healthy owner; lapse detection
-    # belongs to the recovery-side monotonic observation mechanism, so a host
-    # clock step cannot falsely end an attempt.
     assert repository.renew(submitted.execution_id, "worker-a") is True
     with repository._connect() as connection:
         connection.execute(
@@ -506,8 +497,6 @@ def test_stale_attempt_never_publishes_after_mid_run_lease_loss(tmp_path: Path, 
     with ThreadPoolExecutor(max_workers=1) as pool:
         running = pool.submit(anyio.run, worker._run_job, claimed)
         assert entered.wait(timeout=10)
-        # Impair the heartbeat at the repository seam: renewals are refused
-        # from here on, exactly as a fencing takeover refuses them.
         monkeypatch.setattr(repository, "renew", lambda execution_id, worker_id: False)
         anyio.run(anyio.sleep, 0.08)
         with repository._connect() as connection:
@@ -611,7 +600,6 @@ def test_retry_is_allowed_only_for_quiescent_owner_reports(tmp_path: Path) -> No
     claimed = repository.claim("worker-a")
     assert claimed is not None
     assert repository.fail_attempt(submitted.execution_id, "worker-b", "impostor") is None
-    # The owner finished its own attempt, so requeueing is proven safe.
     assert repository.fail_attempt(submitted.execution_id, "worker-a", "transient") == "queued"
 
     retried = repository.claim("worker-b")
@@ -620,7 +608,6 @@ def test_retry_is_allowed_only_for_quiescent_owner_reports(tmp_path: Path) -> No
     artifact = tmp_path / "response.json"
     artifact.write_text("{}", encoding="utf-8")
     assert repository.complete(submitted.execution_id, "worker-b", artifact)
-    # Terminal and unknown jobs refuse further reports: no silent retry.
     assert repository.fail_attempt(submitted.execution_id, "worker-b", "late") is None
 
     lost, _ = repository.submit("tenant-a", _request())
@@ -670,8 +657,6 @@ def test_quiescence_attestation_survives_a_later_recovery_fence(tmp_path: Path) 
     second, _ = repository.submit("tenant-b", _request())
     assert repository.claim("worker-a") is not None
 
-    # The executor returned after its heartbeat failed, but before recovery
-    # durably fenced the attempt.
     assert repository.attest_quiescence(first.execution_id, "worker-a") is True
     worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
     worker.recover_expired()
@@ -846,7 +831,6 @@ def test_claim_enforces_global_running_bound_including_unknown(tmp_path: Path) -
     worker.recover_expired()
     lost = repository.get(first.execution_id)
     assert lost is not None and lost.state == "unknown"
-    # The unproven attempt still holds the single running slot.
     assert repository.claim("worker-b") is None
     summary = repository.capacity_summary()
     assert summary["outstanding"] == 1
@@ -875,11 +859,8 @@ def test_claim_serves_least_recently_served_principal_first(tmp_path: Path) -> N
         claimed = repository.claim(worker)
         assert claimed is not None
         order.append(claimed.principal_id)
-    # The noisy principal wins the opening tie by oldest job, then the
-    # never-served quiet principal jumps ahead of the backlog.
     assert order[:2] == ["tenant-noisy", "tenant-quiet"]
     assert set(order[2:]) == {"tenant-noisy"}
-    # Each principal's own jobs still run oldest-first.
     noisy_claimed = [
         job.execution_id
         for job in (repository.get(execution_id) for execution_id in noisy)
@@ -963,8 +944,6 @@ def test_exhausted_unreported_attempt_recovers_unknown_not_failed(tmp_path: Path
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
     recovered = repository.get(submitted.execution_id)
-    # An exhausted budget proves nothing about termination: without an owner
-    # report the outcome stays unknown so no client treats it as safe to retry.
     assert recovered is not None and recovered.state == "unknown"
     assert recovered.error_code == "unknown_outcome"
 

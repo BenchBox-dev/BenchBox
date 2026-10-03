@@ -1,5 +1,3 @@
-"""CLI command to pre-download TPC answer files to the local cache."""
-
 from __future__ import annotations
 
 import sys
@@ -53,26 +51,6 @@ from benchbox.cli.shared import console
     help="Print the cache directory path and exit. With --benchmark tpch/tpcds prints that benchmark's subdirectory; with 'all' (default) prints the parent cache directory.",
 )
 def download_answers(benchmark: str, force: bool, show_cache_dir: bool) -> None:
-    """Pre-download TPC answer files for offline validation.
-
-    Answer files are required for row-count validation of TPC-H and TPC-DS
-    benchmark results. They are included in source distributions but not in
-    wheel installs. This command downloads them on-demand to a local cache.
-
-    The cache directory is $XDG_CACHE_HOME/benchbox/answers/ (or
-    ~/.cache/benchbox/answers/ if XDG_CACHE_HOME is not set).
-
-    Set BENCHBOX_ANSWERS_URL to override the default download URL.
-    Set BENCHBOX_NO_DOWNLOAD=1 to disable all automatic downloads.
-
-    \b
-    Examples:
-        benchbox download-answers                        # Download both TPC-H and TPC-DS
-        benchbox download-answers --benchmark tpch       # TPC-H only
-        benchbox download-answers --benchmark tpcds      # TPC-DS only
-        benchbox download-answers --force                # Re-download even if cached
-        benchbox download-answers --show-cache-dir       # Print cache location
-    """
     from benchbox.core.expected_results.download import (
         download_all_answers,
         download_tpcds_answers,
@@ -105,7 +83,6 @@ def download_answers(benchmark: str, force: bool, show_cache_dir: bool) -> None:
     failed = False
 
     if benchmark_lower == "all":
-        # Use download_all_answers to fetch the checksum manifest only once
         console.print("[bold]Downloading TPC-H and TPC-DS answer files...[/bold]")
         results = download_all_answers(force=force)
         for key, label in [("tpch", "TPC-H"), ("tpcds", "TPC-DS")]:

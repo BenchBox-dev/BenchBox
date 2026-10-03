@@ -1,34 +1,3 @@
-"""Reclaim disk used by BenchBox on the Apple ``container`` engine.
-
-This is the Apple-``container`` mode of the UAT cleanup flow (the Docker mode
-lives in :mod:`tests.uat.docker_cleanup`). Apple ``container`` backs the
-``make ci-linux`` CI-parity machine and the ``CONTAINER_ENGINE=mocker`` local
-test-docker stacks, and its store under
-``~/Library/Application Support/com.apple.container`` grows without bound: image
-snapshots, mocker compose leftovers, and the buildkit builder's writable cache.
-
-``mocker`` is a Docker-compatible CLI but does NOT faithfully implement the JSON
-inventory verbs the Docker flow relies on (``image ls --format json`` echoes the
-format string; ``volume ls -q`` is empty), so this mode speaks the native
-``container`` CLI whose JSON is structured differently (image name under
-``configuration.name``; compose labels under ``configuration.labels``; the
-builder tagged ``com.apple.container.resource.role=builder``).
-
-Ownership + breadth are controlled by a three-rung mode ladder, widest last:
-
-* ``owned``  -- BenchBox-owned only: ``benchbox/*`` / ``local/benchbox*`` images
-  and mocker compose leftovers tagged with the UAT project prefix.
-* ``images`` -- ``owned`` plus every other non-system image (re-pullable shared
-  bases: postgres, ubuntu, uv, questdb, ...). The image store, minus the builder.
-* ``max``    -- ``images`` plus stopped-container prune, volume prune, and a
-  builder-cache reclaim (``container builder delete``; the builder is recreated
-  on the next build). The full reclaim.
-
-The system builder container/image are never removed except by the explicit
-``max`` builder reclaim, and truly destructive host commands (``rm -rf`` of the
-store, ``container system stop``) are refused outright.
-"""
-
 from __future__ import annotations
 
 import json
@@ -40,15 +9,6 @@ from typing import Callable, Literal
 from tests.uat import docker_assets
 from tests.uat.docker_cleanup import COMPOSE_PROJECT_LABEL, DEFAULT_UAT_PROJECT_PREFIX
 
-# mocker-created containers/networks label the compose project under its own
-# key, NOT the Docker-compatible `com.docker.compose.project` -- live-verified
-# in uat-container-engine-routing w0/w4: `container ls --format json` on a
-# `mocker compose up` container shows
-# `{"com.mocker.compose.project": "...", "com.mocker.compose.service": "..."}`
-# with no `com.docker.compose.project` key at all. Checking only the Docker
-# key silently misclassified every mocker-managed container as "shared"
-# (never reclaimed, even in `owned` mode) -- this was caught by the
-# w-verification live smoke, not by design review.
 MOCKER_COMPOSE_PROJECT_LABEL = "com.mocker.compose.project"
 
 ContainerResourceKind = Literal["image", "container", "volume", "network"]
@@ -58,34 +18,20 @@ ContainerRunner = Callable[..., docker_assets.DockerCommandResult]
 CONTAINER_BIN = "container"
 CONTAINER_CLEANUP_MODES: tuple[str, ...] = ("owned", "images", "max")
 
-# On-disk store the engine manages. Reported for context; never removed directly
-# (resources are reclaimed through the CLI, which keeps the store consistent).
 CONTAINER_STORAGE_PATH = Path("~/Library/Application Support/com.apple.container")
 
-# Image name prefixes that mark a BenchBox-published image regardless of
-# compose labels (native images carry no compose project label). Deliberately
-# NOT a bare "benchbox-" prefix: that pattern also matches an unrelated local
-# dev image/container a developer happens to name "benchbox-experiment", which
-# would then be reclaimed even by the narrowest `owned` mode. `max` mode still
-# reclaims such a resource -- it treats every non-system resource as a target
-# regardless of name (see _partition_targets) -- so nothing is lost, only the
-# `owned`-mode overreach is removed (uat-container-engine-routing w6).
 _OWNED_IMAGE_PREFIXES: tuple[str, ...] = ("benchbox/", "local/benchbox")
 
-# The buildkit builder identifies itself with this role label; its image repo is
-# the container-builder-shim. Both are engine infrastructure, not workload.
 _BUILDER_ROLE_LABEL = "com.apple.container.resource.role"
 _BUILDER_IMAGE_MARKER = "container-builder-shim"
 
 
 class ContainerCleanupError(RuntimeError):
-    """Raised when Apple ``container`` inventory or cleanup commands fail."""
+    pass
 
 
 @dataclass(frozen=True)
 class ContainerResource:
-    """One Apple ``container`` resource discovered by the inventory."""
-
     kind: ContainerResourceKind
     identifier: str
     name: str
@@ -98,7 +44,6 @@ class ContainerResource:
         return self.name or self.identifier
 
     def cleanup_command(self) -> tuple[str, ...]:
-        """Return the native command that removes this single resource."""
         if self.kind == "image":
             return (CONTAINER_BIN, "image", "rm", self.display_name)
         if self.kind == "container":
@@ -113,9 +58,7 @@ class ContainerResource:
 
 @dataclass(frozen=True)
 class ContainerFootprint:
-    """Parsed ``container system df`` totals (human-unit strings, as reported)."""
-
-    rows: tuple[tuple[str, str, str], ...] = ()  # (type, size, reclaimable)
+    rows: tuple[tuple[str, str, str], ...] = ()
 
     def as_lines(self) -> list[str]:
         if not self.rows:
@@ -125,8 +68,6 @@ class ContainerFootprint:
 
 @dataclass(frozen=True)
 class ContainerCommandResult:
-    """A planned/executed cleanup command and its result."""
-
     argv: tuple[str, ...]
     result: docker_assets.DockerCommandResult | None = None
 
@@ -143,8 +84,6 @@ class ContainerCommandResult:
 
 @dataclass(frozen=True)
 class ContainerCleanupReport:
-    """Inventory, ownership split, and the planned/executed cleanup commands."""
-
     project_prefix: str
     mode: str
     apply: bool
@@ -162,11 +101,6 @@ def reclaim_container_usage(
     apply: bool = False,
     runner: ContainerRunner | None = None,
 ) -> ContainerCleanupReport:
-    """Inventory Apple ``container`` resources and reclaim them per ``mode``.
-
-    Non-``apply`` runs mutate nothing; they return the plan. ``apply`` executes
-    the plan and re-reads the disk footprint so the caller can show before/after.
-    """
     if mode not in CONTAINER_CLEANUP_MODES:
         raise ContainerCleanupError(
             f"Unknown container cleanup mode {mode!r}; valid: {', '.join(CONTAINER_CLEANUP_MODES)}"
@@ -205,7 +139,6 @@ def reclaim_container_usage(
 
 
 def format_container_cleanup_report(report: ContainerCleanupReport) -> str:
-    """Render a human-readable Apple ``container`` cleanup summary."""
     lines = [
         "Apple container cleanup report",
         f"engine store: {CONTAINER_STORAGE_PATH}",
@@ -255,11 +188,6 @@ def _format_resource_lines(resources: tuple[ContainerResource, ...], *, include_
     return lines
 
 
-# --------------------------------------------------------------------------
-# Ownership classification and mode -> command planning
-# --------------------------------------------------------------------------
-
-
 def _is_owned_image_name(name: str, project_prefix: str) -> bool:
     lowered = name.lower()
     if lowered.startswith(project_prefix.lower()):
@@ -268,12 +196,6 @@ def _is_owned_image_name(name: str, project_prefix: str) -> bool:
 
 
 def _compose_project_label(labels: dict[str, object]) -> str | None:
-    """Read the compose project label, checking mocker's own key first.
-
-    Prefers `com.mocker.compose.project` (see MOCKER_COMPOSE_PROJECT_LABEL) --
-    a resource created by `mocker compose` never carries the Docker key, and
-    the two are not expected to coexist.
-    """
     value = labels.get(MOCKER_COMPOSE_PROJECT_LABEL) or labels.get(COMPOSE_PROJECT_LABEL)
     return str(value) if value else None
 
@@ -281,17 +203,6 @@ def _compose_project_label(labels: dict[str, object]) -> str | None:
 def _partition_targets(
     resources: tuple[ContainerResource, ...], mode: str
 ) -> tuple[tuple[ContainerResource, ...], tuple[ContainerResource, ...]]:
-    """Split resources into (targets to remove, retained) for ``mode``.
-
-    Widening is asymmetric by kind:
-
-    * ``system`` resources are never per-resource targets (the builder is handled
-      by an explicit ``max`` reclaim command, not resource removal).
-    * ``owned`` resources are targets in every mode.
-    * ``shared`` images widen in at ``images`` (and ``max``); ``shared``
-      containers/volumes widen in only at ``max``, where the prune sweep clears
-      them.
-    """
     targets: list[ContainerResource] = []
     retained: list[ContainerResource] = []
     for resource in resources:
@@ -305,9 +216,7 @@ def _partition_targets(
 
 
 def _plan_commands(targets: tuple[ContainerResource, ...], mode: str) -> list[tuple[str, ...]]:
-    """Build the ordered cleanup command plan for the selected targets/mode."""
     commands: list[tuple[str, ...]] = []
-    # Remove containers before their images so image removal is not blocked.
     commands.extend(_grouped_removals(targets, "container", (CONTAINER_BIN, "rm", "-f"), key=lambda r: r.identifier))
     commands.extend(_grouped_removals(targets, "volume", (CONTAINER_BIN, "volume", "rm"), key=lambda r: r.display_name))
     commands.extend(
@@ -315,9 +224,6 @@ def _plan_commands(targets: tuple[ContainerResource, ...], mode: str) -> list[tu
     )
     commands.extend(_grouped_removals(targets, "image", (CONTAINER_BIN, "image", "rm"), key=lambda r: r.display_name))
     if mode == "max":
-        # Widest reclaim: stopped-container + volume/network prune sweep any
-        # non-system leftovers, then drop the builder's writable cache
-        # (recreated on build).
         commands.append((CONTAINER_BIN, "prune"))
         commands.append((CONTAINER_BIN, "volume", "prune"))
         commands.append((CONTAINER_BIN, "network", "prune"))
@@ -346,14 +252,8 @@ def _grouped_removals(
 
 
 def _is_forbidden(argv: tuple[str, ...]) -> bool:
-    """Refuse host-destructive commands even if a caller constructs them."""
     joined = " ".join(argv)
     return "rm -rf" in joined or "system stop" in joined or "system kill" in joined
-
-
-# --------------------------------------------------------------------------
-# Native `container` CLI inventory (JSON schema differs from Docker's)
-# --------------------------------------------------------------------------
 
 
 def _inventory_resources(run: ContainerRunner, project_prefix: str) -> tuple[ContainerResource, ...]:
@@ -372,11 +272,6 @@ def _list_images(run: ContainerRunner, project_prefix: str) -> list[ContainerRes
         row = row if isinstance(row, dict) else {}
         config = row.get("configuration") if isinstance(row, dict) else None
         config = config if isinstance(config, dict) else {}
-        # Current `container image ls --format json` renders ImageResource rows
-        # with the reference at the top-level `displayReference` field (see
-        # upstream ImageList.swift); `configuration.name` is empty on those
-        # rows. Fall back to `configuration.name` for older/other CLI versions
-        # that still populate it there.
         name = str(row.get("displayReference") or config.get("name") or "")
         identifier = str(row.get("id") or row.get("digest") or "")
         created_at = str(config.get("creationDate") or "")
@@ -458,14 +353,6 @@ def _list_volumes(run: ContainerRunner, project_prefix: str) -> list[ContainerRe
 
 
 def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
-    """Inventory Apple ``container`` networks (uat-container-engine-routing w5).
-
-    ``container network ls --format json`` was verified to exist and produce
-    structured JSON (see w0 notes); the built-in default network is marked
-    with a ``com.apple.container.resource.role=builtin`` label (or, on older
-    CLI versions without that label, is named ``default``) and is treated as
-    a system resource, mirroring the builder image/container check above.
-    """
     rows = _run_json_array(run, [CONTAINER_BIN, "network", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -480,13 +367,6 @@ def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerR
         if labels.get(_BUILDER_ROLE_LABEL) == "builtin" or name == "default":
             category: ContainerCategory = "system"
         elif _is_owned(project, project_prefix) or _is_owned(name, project_prefix):
-            # Name fallback uses _is_owned (separator-aware: exact match or
-            # `<prefix>-`/`<prefix>_` boundary), not _is_owned_image_name
-            # (bare startswith, meant for image repo names like
-            # "benchbox/foo"). A network without a compose project label
-            # named e.g. "benchbox-uatfoo" must NOT match prefix
-            # "benchbox-uat" -- that's a different, unrelated network, and
-            # `MODE=owned APPLY=1` would otherwise delete it (#1158 review).
             category = "owned"
         else:
             category = "shared"
@@ -503,22 +383,15 @@ def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerR
 
 
 def _read_footprint(run: ContainerRunner) -> ContainerFootprint:
-    """Parse ``container system df`` into (type, size, reclaimable) rows.
-
-    Best-effort: a missing/failed command yields an empty footprint rather than
-    aborting the whole cleanup.
-    """
     result = run([CONTAINER_BIN, "system", "df"])
     if not result.succeeded or not result.stdout.strip():
         return ContainerFootprint()
     rows: list[tuple[str, str, str]] = []
     lines = result.stdout.splitlines()
-    for line in lines[1:]:  # skip header
-        # Columns: TYPE(1-2 words) TOTAL ACTIVE SIZE <unit> RECLAIMABLE <unit> [(pct)]
+    for line in lines[1:]:
         parts = line.split()
         if len(parts) < 5:
             continue
-        # Find the first purely-numeric field: that is TOTAL; everything before is TYPE.
         num_idx = next((i for i, tok in enumerate(parts) if tok.isdigit()), None)
         if num_idx is None or num_idx == 0 or len(parts) < num_idx + 6:
             continue

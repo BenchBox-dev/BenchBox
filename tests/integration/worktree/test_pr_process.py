@@ -1,12 +1,3 @@
-"""PR-process incident replays: whole-workflow scenarios with fake hosted events.
-
-Each scenario drives the real landing/validation/attribution helpers against
-temporary repositories and scripted `gh` stand-ins. Every scenario asserts
-the guarded outcome AND the absence of the incident's failure mode: no
-wrong-PR mutation, no stranded authorized commit, no omitted required check,
-no duplicate action, no falsely clean result.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -44,8 +35,6 @@ OTHER = "b" * 40
 
 
 class FakeRun:
-    """Scripted gh stand-in; any unscripted call is a wrong-PR mutation."""
-
     def __init__(self, responses: list[tuple[int, object]]) -> None:
         self.responses = list(responses)
         self.calls: list[list[str]] = []
@@ -117,7 +106,7 @@ def _evidence(head: str, **over) -> object:
 
 
 def test_two_writers_second_blocked_without_mutation(tmp_path: Path) -> None:
-    """Concurrent writer B's unpublished work blocks ready; no hosted call happens."""
+
     repo, head = _repo(tmp_path / "r")
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []
     (repo / "b-edit.txt").write_text("writer B concurrent edit")
@@ -128,7 +117,7 @@ def test_two_writers_second_blocked_without_mutation(tmp_path: Path) -> None:
 
 
 def test_comment_before_push_blocks_on_dispositions(tmp_path: Path) -> None:
-    """Review feedback arriving before the push keeps dispositions incomplete."""
+
     repo, head = _repo(tmp_path / "r")
     failures = landing.ready_failures(
         _identity(repo, head),
@@ -140,7 +129,7 @@ def test_comment_before_push_blocks_on_dispositions(tmp_path: Path) -> None:
 
 
 def test_restart_after_push_invalidates_expected_head(tmp_path: Path) -> None:
-    """A push between evaluation and enqueue refuses arming with zero calls."""
+
     run = FakeRun([])
     with pytest.raises(landing.LandingError, match="moved"):
         landing.enqueue_pr(run, "o/r", 1, HEAD, OTHER)
@@ -154,7 +143,7 @@ def test_superseded_head_never_enqueues(tmp_path: Path) -> None:
 
 
 def test_protected_hold_survives_withdraw_and_ready(tmp_path: Path) -> None:
-    """Durable holds are never added, removed, or bypassed by the helper."""
+
     run = FakeRun(
         [(0, {"number": 1, "state": "OPEN", "autoMergeRequest": None, "labels": [{"name": "no-auto-merge"}]})]
     )
@@ -170,7 +159,7 @@ def test_protected_hold_survives_withdraw_and_ready(tmp_path: Path) -> None:
 
 
 def test_base_advance_detected_not_repaired(tmp_path: Path) -> None:
-    """A moved integration base is reported; nothing auto-refreshes."""
+
     repo, _ = _repo(tmp_path / "r")
     record = bi.record_start(repo, "batch-t", ["A"])
     assert bi.verify_base(repo, record)["moved"] is False
@@ -196,14 +185,14 @@ def test_transient_failure_retry_bounded_then_escalated(tmp_path: Path) -> None:
 
 
 def test_missing_check_evidence_never_clean(tmp_path: Path) -> None:
-    """Omitted required checks fail; an empty evidence list is not green."""
+
     repo, head = _repo(tmp_path / "r")
     failures = landing.ready_failures(_identity(repo, head), head, _evidence(head, check_runs=[]), repo)
     assert len([f for f in failures if "no check run observed" in f]) == len(landing.REQUIRED_CONTEXTS)
 
 
 def test_substantive_post_merge_regression_clears_innocent_sha(tmp_path: Path) -> None:
-    """A cleared blamed SHA gets advisory, never a revert."""
+
     del tmp_path
     assert post_merge.attribution_action(["tests/unit/foo.py::test_x"], ["other/part.py"]) == "advisory"
 
@@ -216,7 +205,7 @@ def test_wrong_pr_branch_never_mutates() -> None:
 
 
 def test_all_green_control_arms_exactly_once(tmp_path: Path) -> None:
-    """Control: the clean path enqueues with a single hosted mutation."""
+
     repo, head = _repo(tmp_path / "r")
     run = FakeRun([(0, "")])
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []

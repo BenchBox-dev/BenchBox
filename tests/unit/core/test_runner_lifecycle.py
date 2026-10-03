@@ -1,5 +1,3 @@
-"""Unit tests for core lifecycle runner."""
-
 import json
 import logging
 import time
@@ -96,7 +94,6 @@ def test_data_only_mode_returns_result_without_adapter():
 
     assert isinstance(res, BenchmarkResults)
     assert res.platform == "data_only"
-    # No adapter interaction
 
 
 @pytest.mark.unit
@@ -210,7 +207,6 @@ def test_load_only_mode_invokes_adapter_load(tmp_path):
 
 @pytest.mark.unit
 def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
-    """--phases load,statistics runs the adapter statistics hook after load."""
     from benchbox.core.results.models import StatisticsGatheringPhase
 
     cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="load_only")
@@ -265,8 +261,6 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
             collect_per_table_timing=False,
         ):
             self.statistics_calls.append((benchmark_name, table_names))
-            # A substantial ANALYZE duration (5s) so an omission from
-            # duration_seconds would be obvious, not lost in rounding.
             return StatisticsGatheringPhase(
                 duration_ms=5000, status="COMPLETED", stats_mode="explicit", tables_analyzed=1
             )
@@ -291,10 +285,6 @@ def test_load_only_mode_runs_statistics_phase_when_requested(tmp_path):
         "stats_mode": "explicit",
         "tables_analyzed": 1,
     }
-    # P2 regression: the load-only result's duration_seconds must fold in the
-    # statistics phase's own wall-clock (schema 0.1s + load 0.5s + stats 5.0s),
-    # not just schema_time + load_time -- otherwise a load,statistics run
-    # underreports duration and disagrees with phases.statistics.duration_ms.
     assert captured_kwargs["duration_seconds"] == pytest.approx(5.6)
 
 
@@ -812,7 +802,6 @@ def test_postload_validation_invoked(tmp_path):
 
 @pytest.mark.unit
 def test_run_benchmark_lifecycle_propagates_verbosity(tmp_path):
-    """Verbosity settings should reach both benchmark and adapter."""
 
     class StubBenchmark(VerbosityMixin):
         def __init__(self):
@@ -883,7 +872,6 @@ def test_run_benchmark_lifecycle_propagates_verbosity(tmp_path):
 
 @pytest.mark.unit
 def test_run_benchmark_lifecycle_propagates_capture_plans(tmp_path):
-    """capture_plans and strict_plan_capture must be forwarded to the adapter via RunConfig."""
 
     class StubBenchmark(VerbosityMixin):
         def __init__(self):
@@ -947,7 +935,6 @@ def test_run_benchmark_lifecycle_propagates_capture_plans(tmp_path):
 
 @pytest.mark.unit
 def test_manifest_reuse_accepts_data_source_alias(tmp_path):
-    """Manifest reuse should work when benchmark declares a data-source alias."""
 
     data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
@@ -1019,7 +1006,6 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
 @pytest.mark.unit
 def test_no_regenerate_respects_alias_manifest(tmp_path):
-    """no_regenerate should pass when shared manifest is valid."""
 
     data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
@@ -1297,8 +1283,6 @@ def test_representative_benchmarks_standard_path(benchmark_id: str, tmp_path: Pa
 @pytest.mark.unit
 @pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops"])
 def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp_path: Path) -> None:
-    """Runner must pass benchmark_name (canonical slug from BenchmarkConfig.name)
-    to the SQL adapter so it never has to sniff identity from benchmark internals."""
     cfg = BenchmarkConfig(
         name=benchmark_id,
         display_name=benchmark_id.upper(),
@@ -1333,13 +1317,11 @@ def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp
             platform_adapter=SlugCapturingAdapter(),
         )
 
-    # The canonical benchmark slug must reach the adapter via benchmark_name kwarg.
     assert received_kwargs.get("benchmark_name") == benchmark_id
 
 
 @pytest.mark.unit
 def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
-    """When table_mode=external with load+execute, adapter.table_mode must be set."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1356,7 +1338,7 @@ def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
     class DummyAdapter:
         platform_name = "duckdb"
         supports_external_tables = True
-        table_mode = "native"  # default
+        table_mode = "native"
 
         def __init__(self):
             self.run_benchmark_called = False
@@ -1401,7 +1383,6 @@ def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
 
 @pytest.mark.unit
 def test_standard_path_propagates_conversion_settings_to_adapter(tmp_path: Path) -> None:
-    """Conversion settings should be included in adapter run_config kwargs."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1463,7 +1444,6 @@ def test_standard_path_propagates_conversion_settings_to_adapter(tmp_path: Path)
 
 @pytest.mark.unit
 def test_unsupported_table_format_fails_fast(tmp_path):
-    """Platform that doesn't support the requested table format should fail immediately."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1498,7 +1478,6 @@ def test_unsupported_table_format_fails_fast(tmp_path):
 
 @pytest.mark.unit
 def test_bigquery_external_delta_without_biglake_connection_fails_fast(tmp_path):
-    """BigQuery external Delta should fail before execution when BigLake config is missing."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -1534,7 +1513,6 @@ def test_bigquery_external_delta_without_biglake_connection_fails_fast(tmp_path)
 
 @pytest.mark.unit
 def test_snowflake_external_iceberg_without_volume_fails_fast(tmp_path):
-    """Snowflake external Iceberg should fail before execution when external volume config is missing."""
     cfg = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",

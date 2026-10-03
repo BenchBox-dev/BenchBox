@@ -1,13 +1,3 @@
-"""Lock the cross-surface applicability finding (benchmark-cross-surface-equivalence-gate w2).
-
-The sweep distinguishes dual-surface benchmarks that ship comparable DataFrame
-*queries* (cross-surface gateable) from those that only support DataFrame
-*loading* (`supports_dataframe=True` but no DataFrame query surface -> need a w2
-fallback oracle). These tests pin the current gateable set and keep the committed
-artifact honest. Marked ``medium`` because resolving applicability instantiates
-every candidate benchmark.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -36,11 +26,6 @@ pytestmark = [
     pytest.mark.medium,
 ]
 
-# Benchmarks that ship NO DataFrame query registry, so the cross-surface gate
-# cannot reach them - they need a w2 fallback oracle (differential second-engine
-# or curated expected-results). This is the stable, meaningful invariant: if a
-# benchmark gains a DataFrame query registry it should drop off this list (and
-# become gateable), and a new benchmark without one should be added deliberately.
 _W2_FALLBACK_BENCHMARKS = {"metadata_primitives", "tpcdi", "transaction_primitives", "write_primitives"}
 
 
@@ -50,73 +35,27 @@ def rows() -> list[dict]:
 
 
 def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
-    """Only benchmarks with no DataFrame query registry are dispatched to a w2 fallback.
-
-    Registry detection (not the production resolver) is the gate-applicability
-    signal: e.g. coffeeshop ships a registry and was gated in #842, even though the
-    resolver returned zero for it.
-    """
     no_surface = {r["benchmark"] for r in rows if r["status"] == NO_DF_QUERY_SURFACE}
     assert no_surface == _W2_FALLBACK_BENCHMARKS, f"w2-fallback set changed: {sorted(no_surface)}"
 
 
-# Benchmarks whose DataFrame registry has ZERO verbatim id overlap with the SQL
-# ids: there is no VERIFIED SQL<->DataFrame query correspondence, so they are
-# `candidate-unverified` (honest M2 classification), NOT gateable. Wiring a gate
-# would require guessing an id mapping, which the campaign TODO forbids. (amplab,
-# clickbench, joinorder_synthetic were previously here; all are now enforced
-# cross-surface gates, so they no longer appear among the unguarded candidates.
-# tpcds_obt was previously here; its id correspondence was then explicitly
-# abandoned, so it is `abandoned` instead. datavault was previously here too;
-# it is now an enforced cross-surface gate.)
-# tpcds is a STAGED gate (registered but not CI-enforced): its
-# expression/pandas implementations are separately handwritten per query, but
-# the verbatim id overlap is still zero, so it stays candidate-unverified
-# until the mapping is verified.
 _CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpcds"}
 
-# Benchmarks that cannot land as a routine-PR gate because they reject the
-# bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
-# perform downloader-backed network fetches at the bounded scale.
-# joinorder accepts only SF=1.0 (IMDb 2013 manifest; joinorder_synthetic is the
-# already-enforced scaled stand-in). tpcds_obt requires SF>=1.0 too, but its
-# id correspondence was explicitly abandoned, so it is `abandoned` instead.
 _NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder"}
 
-# Benchmarks whose SQL<->DataFrame id correspondence was investigated and
-# explicitly abandoned: the verdict is recorded in the sweep classifier, so a
-# later bounded-scale fix cannot re-invite investigation as
-# `candidate-unverified`.
 _ABANDONED_BENCHMARKS = {"tpcds_obt"}
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """A verified verbatim overlap is gateable; a zero-overlap registry is not.
-
-    flightdata was the prior example here; it is now an enforced cross-surface
-    gate, so it no longer appears among the candidates the sweep drills into
-    (like h2odb before it). joinorder also carried a verbatim overlap, but it
-    rejects the bounded SF=0.01 cell, so it is `not-cheaply-gateable`, not
-    gateable. No remaining candidate has a verified overlap at a bounded
-    scale, so the gateable set is currently empty.
-    """
     by_id = {r["benchmark"]: r["status"] for r in rows}
     assert "flightdata" not in by_id, "flightdata graduated to enforced GATES and must leave the candidates"
     assert by_id.get("joinorder") == NOT_CHEAPLY_GATEABLE
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert gateable == set(), f"unexpected gateable candidates: {sorted(gateable)}"
-    # datavault graduated to enforced GATES, so it no longer appears among the
-    # candidates the sweep drills into.
     assert "datavault" not in by_id
 
 
 def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
-    """An unverified id mapping is never counted as gateable coverage (M2 honesty).
-
-    Each of these ships a DataFrame query registry but with ZERO verbatim id
-    overlap, so a gate would require guessing the SQL<->DataFrame mapping. They
-    must be classified `candidate-unverified`, never `gateable`.
-    """
     unverified = {r["benchmark"] for r in rows if r["status"] == CANDIDATE_UNVERIFIED}
     assert unverified == _CANDIDATE_UNVERIFIED_BENCHMARKS, f"candidate-unverified set changed: {sorted(unverified)}"
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
@@ -124,14 +63,6 @@ def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
 
 
 def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
-    """A benchmark that cannot run as one cheap bounded cell is never gateable.
-
-    joinorder accepts only SF=1.0 (canonical IMDb 2013 manifest fetch), so it
-    cannot land as a routine-PR gate no matter its id overlap.
-    joinorder_synthetic (already CI-enforced) is joinorder's scaled stand-in.
-    tpcds_obt also rejects the bounded scale, but its id correspondence was
-    explicitly abandoned, so it is `abandoned` instead (see below).
-    """
     by_id = {r["benchmark"]: r for r in rows}
     not_cheaply = {r["benchmark"] for r in rows if r["status"] == NOT_CHEAPLY_GATEABLE}
     assert not_cheaply == _NOT_CHEAPLY_GATEABLE_BENCHMARKS, f"not-cheaply-gateable set changed: {sorted(not_cheaply)}"
@@ -144,13 +75,6 @@ def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
 
 
 def test_abandoned_correspondences_stay_abandoned(rows):
-    """An explicitly abandoned id correspondence is never re-invited.
-
-    tpcds_obt's DataFrame Q1..Q17 denote OBT-native analytics while its SQL
-    ids denote TPC-DS queries; the abandon verdict is recorded in the sweep
-    classifier with its reason, so even a future bounded-scale fix must not
-    flip it to `candidate-unverified`.
-    """
     by_id = {r["benchmark"]: r for r in rows}
     abandoned = {r["benchmark"] for r in rows if r["status"] == ABANDONED}
     assert abandoned == _ABANDONED_BENCHMARKS, f"abandoned set changed: {sorted(abandoned)}"
@@ -164,23 +88,16 @@ def test_abandoned_correspondences_stay_abandoned(rows):
 
 
 def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
-    """Downloader-backed benchmarks are network-fetch; bounded-offline ones are not."""
     from _project.scripts.cross_surface_applicability_sweep import _data_provenance
 
     assert _data_provenance("nyctaxi") == "network-fetch"
     assert _data_provenance("joinorder") == "manifest-fetch"
-    # flightdata ships a downloader but always synthesizes below SF=0.1.
     assert _data_provenance("flightdata") == "generated"
     assert _data_provenance("tpch") == "generated"
 
 
 def test_staged_gates_are_marked_not_unguarded(rows):
-    """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
-    # flightdata and datavault both graduated to enforced GATES, so neither is
-    # a candidate anymore, and tpch, tpch_skew, nyctaxi, and tsbs_devops are
-    # enforced too. tpcds is the only staged gate: registered in
-    # STAGED_GATES but not CI-enforced, so it is drilled here and marked staged.
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
     staged = {r["benchmark"] for r in rows if r.get("staged")}
@@ -189,7 +106,6 @@ def test_staged_gates_are_marked_not_unguarded(rows):
 
 
 def test_no_candidate_is_silently_dropped(rows):
-    """Every candidate is classified into a known status."""
     assert rows, "applicability sweep produced no candidates"
     for r in rows:
         assert r["status"] in {
@@ -203,7 +119,6 @@ def test_no_candidate_is_silently_dropped(rows):
 
 
 def test_committed_artifact_is_current(rows):
-    """The checked-in sweep artifact must match a fresh run."""
     assert ARTIFACT.exists(), f"missing {ARTIFACT}"
     assert ARTIFACT.read_text(encoding="utf-8") == render_markdown(rows), (
         "cross-surface applicability artifact is stale; run `make cross-surface-applicability-report` and commit"

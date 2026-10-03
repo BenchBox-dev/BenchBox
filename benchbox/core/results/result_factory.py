@@ -1,5 +1,3 @@
-"""Shared benchmark-result construction helpers for benchmark base classes."""
-
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -18,7 +16,6 @@ from benchbox.core.results.query_normalizer import normalize_query_result
 def _build_platform_input(
     platform: str, execution_metadata: dict[str, Any], kwargs: dict[str, Any]
 ) -> PlatformInfoInput:
-    """Build the normalized platform info input for the result builder."""
     platform_info = kwargs.get("platform_info", {}) or {}
     return PlatformInfoInput(
         name=platform,
@@ -32,7 +29,6 @@ def _build_platform_input(
 
 
 def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]) -> None:
-    """Populate builder run-config fields from execution metadata when present."""
     run_cfg = execution_metadata.get("run_config") if isinstance(execution_metadata, dict) else None
     if not isinstance(run_cfg, dict):
         return
@@ -59,7 +55,6 @@ def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]
 
 
 def total_ms_or_zero(timing: Any) -> int:
-    """Extract total_ms from a per-table timing entry, degrading to 0."""
     if not isinstance(timing, dict):
         return 0
     raw_ms = timing.get("total_ms", 0)
@@ -72,7 +67,6 @@ def total_ms_or_zero(timing: Any) -> int:
 
 
 def _add_table_statistics(builder: ResultBuilder, kwargs: dict[str, Any]) -> None:
-    """Attach per-table row counts and load timings to the builder."""
     table_statistics = kwargs.get("table_statistics", {}) or {}
     raw_timings = kwargs.get("per_table_timings")
     per_table_timings: dict[str, Any] = raw_timings if isinstance(raw_timings, dict) else {}
@@ -85,7 +79,6 @@ def _apply_phase_data(
     builder: ResultBuilder,
     phases: dict[str, dict[str, Any]] | ExecutionPhases | None,
 ) -> None:
-    """Attach phase execution details to the builder."""
     phases_obj = phases if isinstance(phases, ExecutionPhases) else None
     if phases_obj:
         builder.set_execution_phases(phases_obj)
@@ -113,7 +106,6 @@ def _apply_optional_builder_data(
     duration_seconds: float | None,
     kwargs: dict[str, Any],
 ) -> None:
-    """Attach optional metadata blocks and timing details to the builder."""
     if kwargs.get("data_loading_time") is not None:
         builder.set_loading_time(float(kwargs.get("data_loading_time", 0.0)) * 1000)
     if duration_seconds is not None:
@@ -170,7 +162,6 @@ def build_enhanced_benchmark_result(
     duration_seconds: Optional[float] = None,
     **kwargs: Any,
 ) -> Any:
-    """Build a standardized BenchmarkResults object from benchmark execution data."""
 
     execution_metadata = execution_metadata or {}
     benchmark_name = benchmark.benchmark_name

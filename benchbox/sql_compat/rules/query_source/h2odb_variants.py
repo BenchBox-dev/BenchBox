@@ -1,11 +1,3 @@
-"""H2O DB query variant rules for Phase.QUERY_SOURCE.
-
-Q9 uses PERCENTILE_CONT … WITHIN GROUP (ORDER BY …) which is not supported
-by SQLite, ClickHouse, StarRocks, or BigQuery. Each platform requires a
-platform-native rewrite. The SQL constants below are also imported by
-H2OBenchmark.get_queries() as the legacy-path fallback (OFF/SHADOW modes).
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,7 +13,6 @@ from benchbox.sql_compat.registry import REGISTRY
 _B = "h2odb"
 _P = Phase.QUERY_SOURCE
 
-# ClickHouse: quantile() replaces PERCENTILE_CONT … WITHIN GROUP (ORDER BY …)
 CLICKHOUSE_Q9_SQL = """
 SELECT
     passenger_count,
@@ -32,7 +23,6 @@ GROUP BY passenger_count
 ORDER BY passenger_count;
 """
 
-# StarRocks: PERCENTILE_APPROX(expr, p) replaces ANSI WITHIN GROUP syntax
 STARROCKS_Q9_SQL = """
 SELECT
     passenger_count,
@@ -53,10 +43,6 @@ GROUP BY "passenger_count"
 ORDER BY "passenger_count";
 """
 
-# BigQuery: no WITHIN GROUP ordered-set aggregates; PERCENTILE_CONT is a
-# window function taking (value_expression, percentile) with the grouping
-# expressed as PARTITION BY. DISTINCT collapses the per-row window output to
-# one row per passenger_count.
 BIGQUERY_Q9_SQL = """
 SELECT DISTINCT
     passenger_count,
@@ -66,9 +52,6 @@ FROM trips
 ORDER BY passenger_count;
 """
 
-# MySQL/SingleStore: PERCENTILE_CONT WITHIN GROUP is supported but SQLGlot adds a
-# multi-expression WITHIN GROUP ORDER BY (NULL-sort CASE) that SingleStore rejects.
-# Bypass translation by providing the query verbatim.
 MYSQL_Q9_SQL = """
 SELECT
     passenger_count,

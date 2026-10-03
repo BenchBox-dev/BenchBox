@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/phases/report.py."""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -36,8 +34,6 @@ def test_render_row_matches_header_columns():
 
 
 def test_report_header_appends_throughput_check_last():
-    """w5: the new column must be appended, not inserted -- existing positional
-    TSV consumers rely on the pre-existing column order (spec Section 6)."""
     columns = report.REPORT_HEADER.split("\t")
     assert columns[-1] == "throughput_check"
     assert columns[:-1] == [
@@ -126,21 +122,8 @@ def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
     assert summary.exit_code() == 2
 
 
-# ---------------------------------------------------------------------------
-# w3: failed cells must not read as submission-ready.
-#
-# terminal_state() used to fall through to `cell.submit_terminal_state`
-# (default "submittable") for any failed cell with a resolved result_path,
-# which reads identically to a genuinely submission-ready cell. Give failed
-# cells an explicit "failed:<submit_state>" token instead -- it preserves the
-# submit-classification detail and cannot be confused with a real
-# submit-ready state.
-# ---------------------------------------------------------------------------
-
-
 def test_terminal_state_failed_cell_with_result_path_is_not_submittable():
     cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
-    # No submit-refusal fired -- submit_terminal_state defaults to "submittable".
     assert cell.submit_terminal_state == "submittable"
     assert report.terminal_state(cell) == "failed:submittable"
 
@@ -156,13 +139,11 @@ def test_terminal_state_failed_cell_preserves_submit_refusal_reason():
 
 
 def test_terminal_state_timed_out_cell_with_result_path_stays_timeout():
-    """A timed-out cell that happens to have a resolved result_path is still 'timeout'."""
     cell = _cell("duckdb", "tpch", 0.01, status="timed-out", result="/tmp/r.json")
     assert report.terminal_state(cell) == "timeout"
 
 
 def test_terminal_state_failed_cell_without_result_path_is_unchanged():
-    """The pre-existing no_json_nonzero/no_json_exit_0 tokens are untouched by w3."""
     cell = _cell("duckdb", "tpch", 0.01, status="failed")
     assert report.terminal_state(cell) == "no_json_nonzero"
 
@@ -179,7 +160,7 @@ def test_cross_scale_clean_counts_full_ladder():
         _cell("duckdb", "tpch", 0.01, status="passed"),
         _cell("duckdb", "tpch", 0.1, status="passed"),
         _cell("duckdb", "tpch", 1.0, status="passed"),
-        _cell("sqlite", "tpch", 0.01, status="passed"),  # missing 0.1 and 1.0
+        _cell("sqlite", "tpch", 0.01, status="passed"),
     ]
     n = report.cross_scale_clean_pair_count(cells, rungs=[0.01, 0.1, 1.0])
     assert n == 1
@@ -250,10 +231,6 @@ def test_cross_scale_validator_status_normalizes_lookup_paths(tmp_path: Path, mo
     assert n == 0
 
 
-# ---------------------------------------------------------------------------
-# Release-gate re-run ordering check.
-# ---------------------------------------------------------------------------
-
 _NATIVE_LOG = """2026-05-30T01:00:00 [report] native+dataframe stage complete
 """
 
@@ -268,7 +245,6 @@ _DOCKER_LOG_EARLY = """2026-05-30T00:30:00 [docker] platform=cedardb action=up s
 
 def test_parse_docker_up_events_extracts_timestamp_and_platform():
     events = report.parse_docker_up_events(_DOCKER_LOG_OK)
-    # Only `action=up` lines are returned (the `action=down` line is ignored).
     assert [p for _, p in events] == ["lakesail", "clickhouse-server"]
     assert all(isinstance(ts, _dt.datetime) for ts, _ in events)
 
@@ -295,14 +271,6 @@ def test_release_gate_ordering_flags_docker_up_before_native_completion():
 
 
 def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
-    """orchestrator.py's completed_at is offset-aware (datetime.now().astimezone(),
-    #1162). ``_DOCKER_LOG_OK``/``_DOCKER_LOG_EARLY`` above use naive timestamps
-    to exercise the legacy-log fallback path (pre-#1202-follow-up
-    append_lifecycle_log() output, or any hand-written fixture); comparing a
-    naive timestamp against an aware boundary used to raise TypeError, so
-    parse_docker_up_events must normalize the naive side and the comparison
-    (and any real violation) must still work.
-    """
     aware_boundary = _dt.datetime(2026, 5, 30, 1, 0, 0).astimezone()
 
     no_violation = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=aware_boundary)
@@ -316,16 +284,6 @@ def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
 
 
 def test_release_gate_ordering_uses_boundary_offset_for_naive_docker_timestamps():
-    """Regression for #1179: a valid PDT run must not be flagged as a violation
-    just because the checker process runs under a different timezone (e.g.
-    UTC). astimezone() previously attached the *checker process's* current
-    local offset to the naive Docker timestamp instead of the producer's --
-    for a boundary completed at 2026-05-30T01:00:00-07:00 (PDT) and a Docker
-    naive timestamp of 2026-05-30T02:00:00 (also PDT wall-clock, i.e.
-    genuinely after the boundary), a checker running under UTC would wrongly
-    attach +00:00 to the naive timestamp instead of -07:00, making it appear
-    to be hours *before* the boundary instant and firing a false violation.
-    """
     pdt = _dt.timezone(_dt.timedelta(hours=-7))
     boundary = _dt.datetime(2026, 5, 30, 1, 0, 0, tzinfo=pdt)
 
@@ -335,16 +293,6 @@ def test_release_gate_ordering_uses_boundary_offset_for_naive_docker_timestamps(
 
 
 def test_release_gate_ordering_respects_each_events_own_offset_across_dst():
-    """A boundary and a later Docker event can carry genuinely different UTC
-    offsets when a sweep straddles a DST transition (fall-back: PDT -07:00 ->
-    PST -08:00). Once each event carries its own real offset (#1202
-    follow-up: append_lifecycle_log() now writes datetime.now().astimezone()
-    instead of naive datetime.now()), the comparison must use that offset
-    directly rather than reusing the boundary's -- the boundary's fixed
-    offset would misread the later, different-offset event's wall-clock time
-    (2026-11-01T01:15:00-08:00, genuinely after the boundary) as 45 minutes
-    *before* a boundary of 2026-11-01T01:30:00-07:00, a false violation.
-    """
     pdt = _dt.timezone(_dt.timedelta(hours=-7))
     boundary = _dt.datetime(2026, 11, 1, 1, 30, 0, tzinfo=pdt)
     docker_log = (
@@ -358,11 +306,6 @@ def test_release_gate_ordering_respects_each_events_own_offset_across_dst():
 
 
 def test_append_lifecycle_log_writes_offset_aware_timestamp(tmp_path: Path):
-    """Regression for the #1202 follow-up: append_lifecycle_log() must write
-    an offset-aware timestamp (parseable straight through by
-    parse_docker_up_events with no naive-timestamp fallback needed), not
-    plain datetime.now().
-    """
     execute.append_lifecycle_log(tmp_path, "[docker] platform=duckdb action=up status=ok")
 
     line = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8").strip()

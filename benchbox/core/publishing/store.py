@@ -1,12 +1,6 @@
-"""Persistent publication metadata store for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Replaces the in-memory ArtifactManager with a durable JSON-backed store
-located at ~/.benchbox/published.json. State survives process restart.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,20 +17,12 @@ from benchbox.utils.clock import utc_now
 logger = logging.getLogger(__name__)
 
 
-# Default store location: user-level, shared across projects.
-# Computed lazily so that tests can override HOME before instantiation.
 def _default_store_path() -> Path:
     return Path.home() / ".benchbox" / "published.json"
 
 
 @dataclass
 class PublicationRecord:
-    """A single publication entry in the persistent store.
-
-    Each record tracks one publish operation: what was published, where it
-    went, and a truthful reference for the backend (file URI or cloud URI).
-    """
-
     pub_id: str
     """Unique publication ID (12-char hex derived from source path + timestamp)."""
 
@@ -87,28 +73,10 @@ class PublicationRecord:
 
 @dataclass
 class PublicationStore:
-    """Durable JSON-backed store for publication metadata.
-
-    Reads and writes ``~/.benchbox/published.json`` atomically. All mutating
-    methods flush the file to disk before returning, so state is not lost on
-    process exit.
-
-    Usage::
-
-        store = PublicationStore()
-        rec = store.add(source_path, destination, reference, label, benchmark, platform, scale_factor)
-        store.list_all()       # list[PublicationRecord]
-        store.remove(pub_id)   # remove record only (does not delete files)
-    """
-
     store_path: Path = field(default_factory=_default_store_path)
 
     def __post_init__(self) -> None:
         self.store_path = Path(self.store_path)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def add(
         self,
@@ -123,31 +91,12 @@ class PublicationStore:
         manifest_hash: str | None = None,
         data_archive_hash: str | None = None,
     ) -> PublicationRecord:
-        """Add or update a publication record.
-
-        If the same ``source_path`` has already been published to the same
-        ``destination``, the existing record is updated in place (idempotent).
-        Otherwise a new record is created.
-
-        Args:
-            source_path: Absolute path to the schema-v2 result bundle.
-            destination: Target directory or cloud URI prefix.
-            reference: Durable reference URI for the published artifact.
-            label: Trust/provenance label.
-            benchmark: Benchmark name (informational).
-            platform: Platform name (informational).
-            scale_factor: Scale factor (informational).
-
-        Returns:
-            The created or updated PublicationRecord.
-        """
         records = self._load()
 
         source_str = str(Path(source_path).resolve())
         existing = self._find_by_source_and_dest(records, source_str, destination)
 
         if existing is not None:
-            # Update in place - idempotent republish
             existing.reference = reference
             existing.label = label
             existing.published_at = _now_iso()
@@ -182,29 +131,16 @@ class PublicationStore:
         return record
 
     def list_all(self) -> list[PublicationRecord]:
-        """Return all publication records, newest first."""
         records = self._load()
         return sorted(records, key=lambda r: r.published_at, reverse=True)
 
     def get(self, pub_id: str) -> PublicationRecord | None:
-        """Return a single record by pub_id, or None if not found."""
         for record in self._load():
             if record.pub_id == pub_id:
                 return record
         return None
 
     def remove(self, pub_id: str) -> bool:
-        """Remove a publication record.
-
-        Does NOT delete the underlying artifact files - only removes the
-        metadata entry from the store.
-
-        Args:
-            pub_id: ID of the record to remove.
-
-        Returns:
-            True if the record was found and removed, False otherwise.
-        """
         records = self._load()
         before = len(records)
         records = [r for r in records if r.pub_id != pub_id]
@@ -213,12 +149,7 @@ class PublicationStore:
         self._save(records)
         return True
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
     def _load(self) -> list[PublicationRecord]:
-        """Load records from disk. Returns empty list if file doesn't exist."""
         if not self.store_path.exists():
             return []
         try:
@@ -230,10 +161,8 @@ class PublicationStore:
             return []
 
     def _save(self, records: list[PublicationRecord]) -> None:
-        """Atomically save records to disk."""
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps([r.to_dict() for r in records], indent=2, ensure_ascii=False)
-        # Write to a temp file then rename for atomicity
         tmp_path = self.store_path.with_suffix(".json.tmp")
         try:
             tmp_path.write_text(payload, encoding="utf-8")
@@ -258,29 +187,16 @@ def _now_iso() -> str:
 
 
 def _generate_pub_id(source_path: str) -> str:
-    """Generate a 12-char hex publication ID from source path + current time."""
     combined = f"{source_path}:{_now_iso()}"
     return hashlib.sha256(combined.encode()).hexdigest()[:12]
 
 
 def build_reference(destination: str, bundle_filename: str) -> str:
-    """Build a truthful, durable reference for the published artifact.
-
-    Args:
-        destination: The storage destination (local path or cloud URI).
-        bundle_filename: The filename of the published bundle.
-
-    Returns:
-        - Local path: ``file:///abs/path/to/bundle.json``
-        - Cloud URI (s3://, gs://, abfss://, dbfs://): full cloud URI
-    """
     from benchbox.utils.cloud_storage import is_cloud_path
 
     if is_cloud_path(destination):
-        # Cloud URI: strip trailing slash and append filename
         base = destination.rstrip("/")
         return f"{base}/{bundle_filename}"
 
-    # Local filesystem: produce a file:// URI
     abs_path = Path(destination).resolve() / bundle_filename
     return abs_path.as_uri()

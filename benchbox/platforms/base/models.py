@@ -1,11 +1,3 @@
-"""Dataclasses describing platform adapter configuration and results.
-
-Phase result dataclasses (``TableGenerationStats``, ``DataGenerationPhase``,
-``PowerTestPhase``, etc.) are re-exported from ``benchbox.core.results.models``
-to keep a single source of truth. ``ConnectionConfig`` and
-``DatabaseValidationResult`` remain platform-adapter-specific and live here.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,7 +21,7 @@ from benchbox.core.results.models import (
     ValidationPhase,
 )
 
-try:  # Optional import for type checking without runtime requirement
+try:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 except ImportError:  # pragma: no cover - fallback for minimal installs
     UnifiedTuningConfiguration = None
@@ -37,8 +29,6 @@ except ImportError:  # pragma: no cover - fallback for minimal installs
 
 @dataclass
 class ConnectionConfig:
-    """Connection configuration for database platforms."""
-
     host: str | None = None
     port: int | None = None
     database: str | None = None
@@ -76,8 +66,6 @@ class ConnectionConfig:
 
 @dataclass
 class DatabaseValidationResult:
-    """Result of compatibility checks for an existing database."""
-
     is_valid: bool
     can_reuse: bool
     issues: list[str]

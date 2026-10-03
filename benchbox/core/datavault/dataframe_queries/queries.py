@@ -49,14 +49,12 @@ def _strip_audit_columns_pandas(frame: Any) -> Any:
     return frame.drop(columns=drop) if drop else frame
 
 
-# =============================================================================
 # Q1: Pricing Summary Report
 # Tables: link_lineitem, sat_lineitem
-# =============================================================================
 
 
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Pricing Summary Report (Expression)."""
+
     params = get_parameters("Q1")
     col, lit = ctx.col, ctx.lit
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
@@ -88,7 +86,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Pricing Summary Report (Pandas)."""
+
     params = get_parameters("Q1")
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
 
@@ -114,16 +112,14 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.reset_index().sort_values(["l_returnflag", "l_linestatus"])
 
 
-# =============================================================================
 # Q2: Minimum Cost Supplier
 # Tables: hub_part, sat_part, link_part_supplier, hub_supplier, sat_supplier,
 #         sat_partsupp, link_supplier_nation, hub_nation, sat_nation,
 #         link_nation_region, hub_region, sat_region
-# =============================================================================
 
 
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Minimum Cost Supplier (Expression)."""
+
     params = get_parameters("Q2")
     col, lit = ctx.col, ctx.lit
     size = params.get("size", 15)
@@ -178,7 +174,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Minimum Cost Supplier (Pandas)."""
+
     params = get_parameters("Q2")
     size = params.get("size", 15)
     type_suffix = params.get("type_suffix", "BRASS")
@@ -229,15 +225,13 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Q3: Shipping Priority
 # Tables: hub_customer, sat_customer, link_order_customer, hub_order,
 #         sat_order, link_lineitem, sat_lineitem
-# =============================================================================
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Shipping Priority (Expression)."""
+
     params = get_parameters("Q3")
     col, lit = ctx.col, ctx.lit
     segment = params.get("segment", "BUILDING")
@@ -275,7 +269,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Shipping Priority (Pandas)."""
+
     params = get_parameters("Q3")
     segment = params.get("segment", "BUILDING")
     order_date = params.get("order_date", date(1995, 3, 15))
@@ -305,14 +299,12 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["revenue", "o_orderdate"], ascending=[False, True]).head(10)
 
 
-# =============================================================================
 # Q4: Order Priority Checking
 # Tables: hub_order, sat_order, link_lineitem, sat_lineitem
-# =============================================================================
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Order Priority Checking (Expression)."""
+
     params = get_parameters("Q4")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1993, 7, 1))
@@ -344,7 +336,7 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Order Priority Checking (Pandas)."""
+
     params = get_parameters("Q4")
     start_date = params.get("start_date", date(1993, 7, 1))
     end_date = params.get("end_date", date(1993, 10, 1))
@@ -368,16 +360,14 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("o_orderpriority")
 
 
-# =============================================================================
 # Q5: Local Supplier Volume
 # Tables: hub_region, sat_region, link_nation_region, hub_nation, sat_nation,
 #         link_customer_nation, hub_customer, link_order_customer, hub_order,
 #         sat_order, link_lineitem, sat_lineitem, link_supplier_nation, hub_supplier
-# =============================================================================
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Local Supplier Volume (Expression)."""
+
     params = get_parameters("Q5")
     col, lit = ctx.col, ctx.lit
     region = params.get("region", "ASIA")
@@ -427,7 +417,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Local Supplier Volume (Pandas)."""
+
     params = get_parameters("Q5")
     region = params.get("region", "ASIA")
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -462,14 +452,12 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("revenue", ascending=False)
 
 
-# =============================================================================
 # Q6: Forecasting Revenue Change
 # Tables: link_lineitem, sat_lineitem
-# =============================================================================
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Forecasting Revenue Change (Expression)."""
+
     params = get_parameters("Q6")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -504,7 +492,7 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q6: Forecasting Revenue Change (Pandas)."""
+
     params = get_parameters("Q6")
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
@@ -534,16 +522,14 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"revenue": [(df["l_extendedprice"] * df["l_discount"]).sum()]})
 
 
-# =============================================================================
 # Q7: Volume Shipping
 # Tables: link_lineitem, sat_lineitem, hub_supplier, link_supplier_nation,
 #         hub_nation(x2), sat_nation(x2), hub_order, link_order_customer,
 #         hub_customer, link_customer_nation
-# =============================================================================
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Volume Shipping (Expression)."""
+
     params = get_parameters("Q7")
     col, lit = ctx.col, ctx.lit
     nation1 = params.get("nation1", "FRANCE")
@@ -595,7 +581,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: Volume Shipping (Pandas)."""
+
     params = get_parameters("Q7")
     nation1 = params.get("nation1", "FRANCE")
     nation2 = params.get("nation2", "GERMANY")
@@ -631,13 +617,11 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["supp_nation", "cust_nation", "l_year"])
 
 
-# =============================================================================
 # Q8: National Market Share
-# =============================================================================
 
 
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q8: National Market Share (Expression)."""
+
     params = get_parameters("Q8")
     col, lit = ctx.col, ctx.lit
     target_nation = params.get("nation", "BRAZIL")
@@ -699,7 +683,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q8: National Market Share (Pandas)."""
+
     params = get_parameters("Q8")
     target_nation = params.get("nation", "BRAZIL")
     target_region = params.get("region", "AMERICA")
@@ -744,13 +728,11 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["o_year", "mkt_share"]].sort_values("o_year")
 
 
-# =============================================================================
 # Q9: Product Type Profit Measure
-# =============================================================================
 
 
 def q9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Product Type Profit Measure (Expression)."""
+
     params = get_parameters("Q9")
     col, lit = ctx.col, ctx.lit
     color = params.get("color", "green")
@@ -786,7 +768,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q9: Product Type Profit Measure (Pandas)."""
+
     params = get_parameters("Q9")
     color = params.get("color", "green")
 
@@ -816,13 +798,11 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["n_name", "o_year"], ascending=[True, False])
 
 
-# =============================================================================
 # Q10: Returned Item Reporting
-# =============================================================================
 
 
 def q10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Returned Item Reporting (Expression)."""
+
     params = get_parameters("Q10")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1993, 10, 1))
@@ -861,7 +841,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Returned Item Reporting (Pandas)."""
+
     params = get_parameters("Q10")
     start_date = params.get("start_date", date(1993, 10, 1))
     end_date = params.get("end_date", date(1994, 1, 1))
@@ -894,13 +874,11 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("revenue", ascending=False).head(20)
 
 
-# =============================================================================
 # Q11: Important Stock Identification
-# =============================================================================
 
 
 def q11_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Important Stock Identification (Expression)."""
+
     params = get_parameters("Q11")
     col, lit = ctx.col, ctx.lit
     nation = params.get("nation", "GERMANY")
@@ -938,7 +916,7 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q11_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q11: Important Stock Identification (Pandas)."""
+
     params = get_parameters("Q11")
     nation = params.get("nation", "GERMANY")
     fraction = params.get("fraction", 0.0001)
@@ -964,13 +942,11 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("value", ascending=False)
 
 
-# =============================================================================
 # Q12: Shipping Modes and Order Priority
-# =============================================================================
 
 
 def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Shipping Modes and Order Priority (Expression)."""
+
     params = get_parameters("Q12")
     col, lit = ctx.col, ctx.lit
     shipmode1 = params.get("shipmode1", "MAIL")
@@ -1010,7 +986,7 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q12: Shipping Modes and Order Priority (Pandas)."""
+
     params = get_parameters("Q12")
     shipmode1 = params.get("shipmode1", "MAIL")
     shipmode2 = params.get("shipmode2", "SHIP")
@@ -1040,13 +1016,11 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("l_shipmode")
 
 
-# =============================================================================
 # Q13: Customer Distribution
-# =============================================================================
 
 
 def q13_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Customer Distribution (Expression)."""
+
     params = get_parameters("Q13")
     col = ctx.col
     word1 = params.get("word1", "special")
@@ -1070,7 +1044,7 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Customer Distribution (Pandas)."""
+
     params = get_parameters("Q13")
     word1 = params.get("word1", "special")
     word2 = params.get("word2", "requests")
@@ -1091,13 +1065,11 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["custdist", "c_count"], ascending=[False, False])
 
 
-# =============================================================================
 # Q14: Promotion Effect
-# =============================================================================
 
 
 def q14_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Promotion Effect (Expression)."""
+
     params = get_parameters("Q14")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1995, 9, 1))
@@ -1136,7 +1108,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Promotion Effect (Pandas)."""
+
     params = get_parameters("Q14")
     start_date = params.get("start_date", date(1995, 9, 1))
     end_date = params.get("end_date", date(1995, 10, 1))
@@ -1171,13 +1143,11 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_pct]})
 
 
-# =============================================================================
 # Q15: Top Supplier
-# =============================================================================
 
 
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Top Supplier (Expression)."""
+
     params = get_parameters("Q15")
     col, lit = ctx.col, ctx.lit
     start_date = params.get("start_date", date(1996, 1, 1))
@@ -1223,7 +1193,7 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q15: Top Supplier (Pandas)."""
+
     params = get_parameters("Q15")
     start_date = params.get("start_date", date(1996, 1, 1))
     end_date = params.get("end_date", date(1996, 4, 1))
@@ -1248,13 +1218,11 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]].sort_values("s_suppkey")
 
 
-# =============================================================================
 # Q16: Parts/Supplier Relationship
-# =============================================================================
 
 
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Parts/Supplier Relationship (Expression)."""
+
     params = get_parameters("Q16")
     col, lit = ctx.col, ctx.lit
     brand = params.get("brand", "Brand#45")
@@ -1284,7 +1252,7 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Parts/Supplier Relationship (Pandas)."""
+
     params = get_parameters("Q16")
     brand = params.get("brand", "Brand#45")
     type_prefix = params.get("type_prefix", "MEDIUM POLISHED")
@@ -1306,13 +1274,11 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
 
 
-# =============================================================================
 # Q17: Small-Quantity-Order Revenue
-# =============================================================================
 
 
 def q17_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Small-Quantity-Order Revenue (Expression)."""
+
     params = get_parameters("Q17")
     col, lit = ctx.col, ctx.lit
     brand = params.get("brand", "Brand#23")
@@ -1349,7 +1315,7 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Small-Quantity-Order Revenue (Pandas)."""
+
     params = get_parameters("Q17")
     brand = params.get("brand", "Brand#23")
     container = params.get("container", "MED BOX")
@@ -1380,13 +1346,11 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"avg_yearly": [df["l_extendedprice"].sum() / 7.0]})
 
 
-# =============================================================================
 # Q18: Large Volume Customer
-# =============================================================================
 
 
 def q18_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Large Volume Customer (Expression)."""
+
     params = get_parameters("Q18")
     col, lit = ctx.col, ctx.lit
     quantity = params.get("quantity", 300)
@@ -1420,7 +1384,7 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q18_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q18: Large Volume Customer (Pandas)."""
+
     params = get_parameters("Q18")
     quantity = params.get("quantity", 300)
 
@@ -1447,13 +1411,11 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     return df[cols].sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True]).head(100)
 
 
-# =============================================================================
 # Q19: Discounted Revenue
-# =============================================================================
 
 
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Discounted Revenue (Expression)."""
+
     params = get_parameters("Q19")
     col, lit = ctx.col, ctx.lit
 
@@ -1516,7 +1478,7 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q19: Discounted Revenue (Pandas)."""
+
     params = get_parameters("Q19")
 
     ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
@@ -1571,13 +1533,11 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"revenue": [(filtered["l_extendedprice"] * (1 - filtered["l_discount"])).sum()]})
 
 
-# =============================================================================
 # Q20: Potential Part Promotion
-# =============================================================================
 
 
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Potential Part Promotion (Expression)."""
+
     params = get_parameters("Q20")
     col, lit = ctx.col, ctx.lit
     color = params.get("color", "forest")
@@ -1630,7 +1590,7 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Potential Part Promotion (Pandas)."""
+
     params = get_parameters("Q20")
     color = params.get("color", "forest")
     start_date = params.get("start_date", date(1994, 1, 1))
@@ -1668,13 +1628,11 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["s_name", "s_address"]].sort_values("s_name")
 
 
-# =============================================================================
 # Q21: Suppliers Who Kept Orders Waiting
-# =============================================================================
 
 
 def q21_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Suppliers Who Kept Orders Waiting (Expression)."""
+
     params = get_parameters("Q21")
     col, lit = ctx.col, ctx.lit
     nation = params.get("nation", "SAUDI ARABIA")
@@ -1721,7 +1679,7 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q21_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q21: Suppliers Who Kept Orders Waiting (Pandas)."""
+
     params = get_parameters("Q21")
     nation = params.get("nation", "SAUDI ARABIA")
 
@@ -1758,13 +1716,11 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values(["numwait", "s_name"], ascending=[False, True]).head(100)
 
 
-# =============================================================================
 # Q22: Global Sales Opportunity
-# =============================================================================
 
 
 def q22_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Global Sales Opportunity (Expression)."""
+
     params = get_parameters("Q22")
     col, lit = ctx.col, ctx.lit
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
@@ -1799,7 +1755,7 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Global Sales Opportunity (Pandas)."""
+
     params = get_parameters("Q22")
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
 
@@ -1826,9 +1782,8 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("cntrycode")
 
 
-# =============================================================================
 # Registration
-# =============================================================================
+
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

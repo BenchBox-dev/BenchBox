@@ -1,5 +1,3 @@
-"""Tests for scripts/ci_units.py and the .github/ci-units.yml ownership map."""
-
 from __future__ import annotations
 
 import json
@@ -50,7 +48,6 @@ def test_single_unit_ownership(paths: list[str], expected: set[str], rules: dict
 @pytest.mark.parametrize(
     ("paths", "extra"),
     [
-        # Producer-owned contracts widen the consumer units.
         (["benchbox/core/results/schema.py"], {"explorer", "results-data"}),
         (["benchbox/cli/main.py"], {"docs"}),
         (["benchbox/core/platform_registry.py"], {"docs", "landing"}),
@@ -64,7 +61,6 @@ def test_widened_triggers(paths: list[str], extra: set[str], rules: dict[str, li
 
 
 def test_independent_units_do_not_pull_core(rules: dict[str, list[str]]) -> None:
-    """Docs, landing, explorer, and results-data changes must not require core."""
     for path in ("docs/index.rst", "landing/script.js", "results-explorer/src/db.ts", "results-data/README.md"):
         assert "core" not in needed([path], rules), path
 
@@ -141,7 +137,6 @@ def test_cli_reads_changed_file_and_writes_json(tmp_path: Path) -> None:
 
 
 def test_cli_diff_failure_runs_every_unit(tmp_path: Path) -> None:
-    """A base ref that cannot be diffed must fail closed, not run nothing."""
     out = tmp_path / "out"
     subprocess.run(
         [

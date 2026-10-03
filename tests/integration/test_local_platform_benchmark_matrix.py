@@ -1,13 +1,3 @@
-"""Stress matrix: run real local benchmarks and validate result JSON completeness.
-
-This suite is intentionally heavy and marked ``stress`` so it is opt-in.
-It executes real benchmark runs for each local SQL platform x benchmark pair,
-then validates:
-1) run completed successfully with no failed queries
-2) expected benchmark workload was fully executed (query cardinality check)
-3) row counts match stored expected results when available
-"""
-
 from __future__ import annotations
 
 import json
@@ -66,9 +56,6 @@ LOCAL_DATAFRAME_PLATFORMS: tuple[str, ...] = (
     "datafusion-df",
     "cudf-df",
 )
-# Platform/benchmark combos known to fail at runtime (not test bugs).
-# dask-df/tpcds: fixed by materializing Dask Series before .isin() calls.
-# pyspark-df/tpcds: guarded by is_dataframe_available JVM check (skips without Java).
 _DATAFRAME_XFAIL_COMBINATIONS: dict[tuple[str, str], str] = {}
 DATAFRAME_BENCHMARKS: tuple[str, ...] = tuple(
     benchmark
@@ -77,17 +64,12 @@ DATAFRAME_BENCHMARKS: tuple[str, ...] = tuple(
 )
 SERVICE_LOCAL_PLATFORMS: tuple[str, ...] = ("postgresql", "timescaledb", "trino", "presto", "firebolt")
 
-# 20 minutes per matrix case: enough for heavy SF=1 workloads in stress mode.
 MATRIX_CASE_TIMEOUT = 1200.0
 MAINTENANCE_TIMEOUT = 1500.0
 CORRECTNESS_GATE_QUERY_IDS_ENV = "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS"
 
 
 def _select_scale(benchmark_name: str, platform_name: str | None = None) -> float:
-    """Choose the smallest valid scale for smoke-like matrix coverage.
-
-    TPC-H/TPC-DS are pinned to SF=1.0 so stored answer-set validations can run.
-    """
     if benchmark_name == "tpch":
         if platform_name in {"sqlite", "datafusion"}:
             return 0.01
@@ -101,7 +83,6 @@ def _select_scale(benchmark_name: str, platform_name: str | None = None) -> floa
 
 
 def _load_result_payload(work_dir: Path, benchmark_name: str) -> tuple[Path, dict]:
-    """Load the latest result payload for a benchmark/platform run."""
     results_dir = work_dir / "benchmark_runs" / "results"
     result_path = find_latest_result(results_dir, benchmark=benchmark_name)
     assert result_path is not None, f"No result JSON found in {results_dir} for {benchmark_name}"
@@ -114,7 +95,6 @@ def _measurement_queries(payload: dict) -> list[dict]:
 
 
 def _query_subset_from_env() -> tuple[str, ...]:
-    """Return a CLI query subset for the bounded correctness gate."""
     raw = os.environ.get(CORRECTNESS_GATE_QUERY_IDS_ENV, "").strip()
     if not raw:
         return ()
@@ -130,7 +110,6 @@ def _maintenance_matrix_enabled() -> bool:
 
 
 def _local_sql_case_enabled(platform_name: str, benchmark_name: str) -> bool:
-    """Return whether a local SQL matrix case should run in default CI mode."""
     if os.environ.get("BENCHBOX_FULL_LOCAL_SQL_MATRIX", "").strip().lower() in {"1", "true", "yes", "on"}:
         return True
     return benchmark_name in LOCAL_SQL_STABLE_MATRIX.get(platform_name, set())
@@ -208,8 +187,6 @@ def _service_platform_options(platform_name: str) -> list[str]:
 
 
 def _phases_for_benchmark(benchmark_name: str, platform_name: str | None = None) -> list[str]:
-    """Select phases to validate for a benchmark."""
-    # DataFrame platforms generate data inline during load; there is no separate generate phase.
     is_dataframe = platform_name is not None and platform_name.endswith("-df")
     phases = ["load", "power"] if is_dataframe else ["generate", "load", "power"]
     metadata = get_benchmark_metadata(benchmark_name) or {}
@@ -235,7 +212,6 @@ def _phase_keys_for_name(phase_name: str) -> tuple[str, ...]:
 
 
 def _validate_phase_coverage(payload: dict, requested_phases: list[str]) -> None:
-    """Validate requested phases were executed and marked as run."""
     config_phases = payload.get("config", {}).get("phases", [])
     if isinstance(config_phases, list):
         assert config_phases == requested_phases, (
@@ -262,7 +238,6 @@ def _validate_phase_coverage(payload: dict, requested_phases: list[str]) -> None
 
 
 def _validate_completion(payload: dict, benchmark_name: str, expected_query_count: int | None = None) -> None:
-    """Validate that all expected benchmark work completed."""
     summary = payload.get("summary", {})
     query_summary = summary.get("queries", {})
 
@@ -290,7 +265,6 @@ def _validate_completion(payload: dict, benchmark_name: str, expected_query_coun
         _canonical_query_id(query.get("id")) for query in measured if query.get("status") == "SUCCESS"
     }
 
-    # Ensure the benchmark's defined workload cardinality actually executed.
     if expected_query_count > 0:
         assert len(unique_measurement_ids) == expected_query_count, (
             f"{benchmark_name}: expected {expected_query_count} unique measurement queries, "
@@ -299,15 +273,6 @@ def _validate_completion(payload: dict, benchmark_name: str, expected_query_coun
 
 
 def _expected_result_queries(payload: dict, expected_query_ids: set[str] | None) -> list[dict]:
-    """Select result rows suitable for stored expected-results validation.
-
-    Stored answer sets exist for stream 0 only (the power run executed with the
-    reference qgen seed); streams > 0 use derived seeds and are timed but not
-    answer-validated (per the TPC-H spec). So for the bounded gate we validate the
-    stream-0 executions, not the throughput measurement rows counted by
-    ``_validate_completion`` -- both run the same queries, but only stream 0 is
-    answer-backed.
-    """
     if not expected_query_ids:
         return _measurement_queries(payload)
 
@@ -325,17 +290,6 @@ def _stored_value_digest(
     scale_factor: float,
     stream_id: int,
 ) -> str | None:
-    """Return the stored reference VALUE digest for a query, or None if none exists.
-
-    A value digest is valid ONLY at the scale it was computed for. The expected-
-    results registry applies a scale-INDEPENDENT fallback for some queries (e.g.
-    TPC-H Q1, whose row count is constant across scales): at SF != 1 it returns the
-    SF=1 ``ExpectedQueryResult``. That object's row count is scale-independent, but
-    its VALUE digest is not (the aggregates sum over different data). So honor the
-    digest only when the stored object's own scale matches the run scale, otherwise
-    a run at SF != 1 with digest emission on would compare an emitted SF!=1 digest
-    against the SF=1 reference and fail spuriously.
-    """
     expected = validator.registry.get_expected_result(benchmark_name, str(query_id), scale_factor, stream_id)
     if expected is None or expected.value_digest is None:
         return None
@@ -350,17 +304,6 @@ def _validate_against_expected_results(
     scale_factor: float,
     expected_query_ids: set[str] | None = None,
 ) -> None:
-    """Validate query row counts AND value digests against stored expected results.
-
-    Row counts are validated for every benchmark/scale with stored answers (the
-    historical behavior). Where a query also has a stored reference VALUE digest
-    (TPC-H at SF=1 with the pinned seed today), the emitted full-result digest is
-    asserted to match it IN ADDITION to the row count, so a wrong-but-same-
-    cardinality answer is caught. Both checks share the same strict arming: under
-    ``BENCHBOX_STRICT_EXPECTED_RESULTS`` every configured query must produce a
-    non-SKIP row-count validation AND, where a reference digest exists, a matched
-    value digest -- a missing/unevaluated digest disarms RED, never green.
-    """
     from benchbox.core.results.result_digest import digests_match
 
     validator = QueryValidator()
@@ -396,37 +339,19 @@ def _validate_against_expected_results(
                 f"actual={validation.actual_row_count}, mode={validation.validation_mode.value}"
             )
 
-        # Value-digest oracle: in addition to the row count, compare the emitted
-        # full-result digest to the stored reference digest where one exists.
         stored_digest = _stored_value_digest(validator, benchmark_name, query["id"], scale_factor, stream_id)
         if stored_digest is not None:
             digest_reference_count += 1
             emitted_digest = query.get("digest")
             if emitted_digest is not None:
-                # A digest comparison actually happened (armed), whether or not it
-                # matched -- this counts toward strict coverage below.
                 digest_evaluated += 1
                 if not digests_match(stored_digest, emitted_digest):
-                    # A wrong VALUE at the same cardinality: always RED, regardless
-                    # of strict arming -- the headline gap this oracle closes.
                     failures.append(
                         f"{benchmark_name} query {validation.query_id}: VALUE DIGEST mismatch "
                         f"expected={stored_digest}, actual={emitted_digest} (row count matched -- a "
                         f"wrong-but-same-cardinality answer)"
                     )
-            # emitted_digest is None: the runner did not emit a digest (e.g. flag
-            # unset). Under strict arming the digest-coverage assertion below turns
-            # this RED; non-strict callers keep the additive row-count-only behavior.
 
-    # Strict mode: when enabled, every configured expected-results check must
-    # actually evaluate (non-SKIP). This is deliberately NOT gated on benchmark
-    # name or scale factor. The previous `benchmark_name == "tpch" and
-    # scale_factor >= 1.0` guard meant a future CI speedup that retargeted the
-    # gate (a different benchmark, or SF<1) would silently disarm the oracle:
-    # every configured query would SKIP, `checked` would be 0, and the assertion
-    # was never reached. Now strict mode fails whenever a configured subset does
-    # not fully evaluate, regardless of benchmark/scale. The default non-strict
-    # matrix still skips unsupported expected-results validation (see callers).
     if strict:
         configured = set(expected_query_ids or ())
         if configured:
@@ -441,10 +366,6 @@ def _validate_against_expected_results(
                 f"strict expected-results: no {benchmark_name} queries (sf={scale_factor}) were validated "
                 f"against stored expected results"
             )
-        # Value-digest arming: where reference digests exist for the configured
-        # queries, every one must evaluate to a MATCHED digest. A missing or
-        # unevaluated digest disarms the value oracle and must fail RED, exactly
-        # like the row-count arming above -- never a silent value-skip.
         if digest_reference_count:
             assert digest_evaluated == digest_reference_count, (
                 f"strict value-digest: evaluated {digest_evaluated} of {digest_reference_count} configured "
@@ -466,13 +387,11 @@ def test_local_platform_benchmark_matrix(
     platform_name: str,
     benchmark_name: str,
 ) -> None:
-    """Run a real benchmark and validate emitted result JSON for full completion."""
     if not is_platform_available(platform_name):
         pytest.skip(f"{platform_name} dependencies not available")
     if not _local_sql_case_enabled(platform_name, benchmark_name):
         pytest.skip(f"{platform_name}/{benchmark_name} is excluded from default stable local SQL matrix")
 
-    # Use loose mode for TPC-DS to avoid seed-specific exact-match instability.
     if benchmark_name == "tpcds":
         monkeypatch.setenv("BENCHBOX_QUERY_VALIDATION_MODE", "loose")
         get_registry().clear_cache()
@@ -497,11 +416,6 @@ def test_local_platform_benchmark_matrix(
     ]
     if query_subset:
         command.extend(["--queries", ",".join(query_subset)])
-        # The bounded correctness gate validates emitted cardinalities against the
-        # stored TPC-H answer files. Those answers correspond to the reference qgen
-        # seed, so pin it to make stream-0 expected-results validation deterministic
-        # and EXACT. Without it, query parameters drift and only structurally-fixed
-        # (single-row) queries would coincidentally match.
         gate_seed = get_reference_seed(scale_factor) if benchmark_name == "tpch" else None
         if gate_seed is not None:
             command.extend(["--seed", str(gate_seed)])
@@ -525,7 +439,6 @@ def test_local_platform_benchmark_matrix(
 
 
 def _load_duckdb_from_generated_files(datagen_dir: Path):
-    """Load the generated TPC-H ``.tbl`` files (the files SQLite loaded) into an in-memory DuckDB."""
     import duckdb
     import zstandard
 
@@ -543,7 +456,6 @@ def _load_duckdb_from_generated_files(datagen_dir: Path):
             raw = chunk.read_bytes()
             if chunk.suffix == ".zst":
                 raw = zstandard.ZstdDecompressor().stream_reader(__import__("io").BytesIO(raw)).read()
-            # dbgen rows end with a trailing delimiter; drop it so columns line up.
             lines = [line[:-1] if line.endswith(b"|") else line for line in raw.splitlines() if line]
             staged = scratch / f"{table.name}.{index}.csv"
             staged.write_bytes(b"\n".join(lines) + b"\n")
@@ -555,7 +467,6 @@ def _load_duckdb_from_generated_files(datagen_dir: Path):
 @pytest.mark.integration
 @pytest.mark.stress
 def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
-    """SQLite SF=0.01 Q1/Q6/Q14 at a fixed seed: exact measurements and row values match DuckDB."""
     import sqlite3
 
     from benchbox.core.tpch.benchmark import TPCHBenchmark
@@ -571,7 +482,6 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
     case_dir = tmp_path / "sqlite_tpch_value_parity"
     case_dir.mkdir()
     output_dir = case_dir / "benchmark_runs"
-    # Case-owned output under pytest tmp guarantees a fresh database.
     db_path = output_dir / "databases" / "tpch_sf001" / "tpch_sf001_notuning_noconstraints.sqlite"
     assert not output_dir.exists(), "case requires fresh output"
 
@@ -595,7 +505,6 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
             "--non-interactive",
         ],
         cwd=case_dir,
-        # Keep results and generated data inside this case, not an inherited output directory.
         env={"BENCHBOX_OUTPUT_DIR": str(output_dir)},
         timeout=MATRIX_CASE_TIMEOUT,
     )
@@ -605,7 +514,6 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
     _validate_phase_coverage(payload, ["generate", "load", "power"])
     check_measurement_multiset(payload.get("queries", []), expected_measurement_multiset())
 
-    # Reopen the generated database and prove every table was populated.
     assert db_path.is_file(), "SQLite database was not created at the fresh path"
     raw = sqlite3.connect(str(db_path))
     try:
@@ -634,7 +542,6 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
 
             check_rows_match(duckdb_rows, sqlite_rows, query_id)
 
-            # Same cardinality, wrong value: the comparison must reject it.
             corrupted = [tuple(row) for row in sqlite_rows]
             first = list(corrupted[0])
             column = next(i for i, v in enumerate(first) if isinstance(v, (int, float)) and not isinstance(v, bool))
@@ -658,7 +565,6 @@ def test_local_platform_maintenance_phase_matrix(
     platform_name: str,
     benchmark_name: str,
 ) -> None:
-    """Smoke maintenance phase for local SQL platforms on TPC benchmarks."""
     if not _maintenance_matrix_enabled():
         pytest.skip("Set BENCHBOX_ENABLE_MAINTENANCE_MATRIX=1 to enable maintenance stress matrix tests")
     if not is_platform_available(platform_name):
@@ -711,7 +617,6 @@ def test_local_dataframe_platform_benchmark_matrix(
     platform_name: str,
     benchmark_name: str,
 ) -> None:
-    """Run real local DataFrame benchmarks and validate completion + phases."""
     if platform_name == "cudf-df" and not is_gpu_available():
         pytest.skip("cudf-df requires NVIDIA GPU with CUDA")
     if not is_dataframe_available(platform_name):
@@ -763,7 +668,6 @@ def test_service_local_platform_tpch_matrix(
     tmp_path: Path,
     platform_name: str,
 ) -> None:
-    """Run TPCH on local service-backed platforms when services are available."""
     if not _service_matrix_enabled():
         pytest.skip("Set BENCHBOX_SERVICE_LOCAL_MATRIX=1 to enable service-backed local matrix tests")
     if not is_platform_available(platform_name):

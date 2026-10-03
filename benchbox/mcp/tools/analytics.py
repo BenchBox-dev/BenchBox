@@ -1,11 +1,6 @@
-"""Analytics tools for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides tools for result comparison, regression detection, and performance trends.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,8 +20,6 @@ from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
 
-# Keep the historical private names available to local parity tests and
-# downstream callers while keeping one implementation in the core layer.
 _classify_query_changes = _core_analytics._classify_query_changes
 _compute_group_stats = _core_analytics._compute_group_stats
 _extract_keyed_timings = _core_analytics._extract_keyed_timings
@@ -40,7 +33,6 @@ _resolve_date_group_key = _core_analytics._resolve_date_group_key
 _resolve_group_key = _core_analytics._resolve_group_key
 _resolve_timestamp_str = _core_analytics._resolve_timestamp_str
 
-# Tool annotations for read-only analytics tools
 ANALYTICS_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read-only analytics tool",
     read_only_hint=True,
@@ -51,7 +43,6 @@ ANALYTICS_READONLY_ANNOTATIONS = ToolAnnotations(
 
 
 def _resolve_validation_directory(directory: str, results_dir: Path, *, tenant_scoped: bool) -> Path | dict[str, Any]:
-    """Resolve a validation directory while containing remote tenants."""
     candidate = Path(directory)
     if tenant_scoped and candidate.is_absolute():
         return make_error(ErrorCode.VALIDATION_ERROR, "Absolute validation directories are not allowed")
@@ -71,14 +62,6 @@ def register_analytics_tools(
     results_dir: PathProvider,
     anonymize_results: bool = False,
 ) -> None:
-    """Register analytics tools with the MCP server.
-
-    Args:
-        mcp: Server to register on.
-        results_dir: Provider for the server-owned result root.
-        anonymize_results: True when the server runs under a remote security
-            policy; see ``register_benchmark_tools``.
-    """
     tenant_scoped = not isinstance(results_dir, Path)
 
     @mcp.tool(
@@ -96,22 +79,6 @@ def register_analytics_tools(
         group_by: str = "platform",
         limit: int = 10,
     ) -> dict[str, Any]:
-        """Analyze benchmark results.
-
-        Args:
-            analysis: Analysis type: 'compare', 'regressions', 'trends', 'aggregate'
-            file1: Baseline result file (for 'compare')
-            file2: Comparison result file (for 'compare')
-            platform: Filter by platform name
-            benchmark: Filter by benchmark name
-            threshold_percent: Change threshold for regressions (default: 10%)
-            metric: Metric for trends: geometric_mean, p50, p95, p99, total_time
-            group_by: Grouping for aggregate: platform, benchmark, date
-            limit: Max runs to analyze (default: 10)
-
-        Returns:
-            Analysis results based on the selected type.
-        """
         configured_results_dir = resolve_path_provider(results_dir)
         analysis_lower = analysis.lower()
 
@@ -151,16 +118,6 @@ def register_analytics_tools(
         query_id: str,
         format: str = "tree",
     ) -> dict[str, Any]:
-        """Get query execution plan from benchmark results.
-
-        Args:
-            result_file: Result file containing query plans
-            query_id: Query identifier (e.g., '1', 'Q1', 'q05')
-            format: Output format: 'tree', 'json', 'summary'
-
-        Returns:
-            Query plan in the requested format.
-        """
         valid_formats = ["tree", "json", "summary"]
         format_lower = format.lower()
         if format_lower not in valid_formats:
@@ -204,19 +161,6 @@ def register_analytics_tools(
         directory: str = "",
         verbose: bool = False,
     ) -> dict[str, Any]:
-        """Validate integrity, completeness, and believability of result JSON files.
-
-        Provide result_file (single file path) or directory (batch mode).
-        Returns structured check results with PASS/WARN/FAIL status per check.
-
-        Args:
-            result_file: Path to a single result JSON file
-            directory: Path to a directory of result JSON files
-            verbose: Include PASS checks in output (default: WARN+FAIL only)
-
-        Returns:
-            Validation report with per-check status and overall result.
-        """
         from benchbox.core.results.integrity_validator import (
             validate_directory as _validate_directory,
             validate_file as _validate_file,
@@ -290,7 +234,6 @@ def register_analytics_tools(
 
 
 def _find_query_execution(data: dict[str, Any], normalized_id: str) -> dict | None:
-    """Find a query execution result by normalized query ID."""
     for query_result in data.get("queries", []):
         qid = query_result.get("id", "")
         if normalize_query_id(qid) == normalized_id:
@@ -299,7 +242,6 @@ def _find_query_execution(data: dict[str, Any], normalized_id: str) -> dict | No
 
 
 def _resolve_plans_path(file_path: Path) -> Path | None:
-    """Resolve the plans file path for a result file."""
     plans_path = file_path.with_suffix("").with_suffix(".plans.json")
     if not plans_path.exists():
         plans_path = Path(str(file_path).replace(".json", ".plans.json"))
@@ -307,7 +249,6 @@ def _resolve_plans_path(file_path: Path) -> Path | None:
 
 
 def _format_plan_response(query_plan: dict, format_lower: str, normalized_id: str, runtime_ms: Any) -> dict[str, Any]:
-    """Format a query plan into the requested output format."""
     response: dict[str, Any] = {
         "status": "success",
         "query_id": normalized_id,
@@ -325,7 +266,6 @@ def _format_plan_response(query_plan: dict, format_lower: str, normalized_id: st
 
 
 def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, format_lower: str) -> dict[str, Any]:
-    """Core implementation for getting a query plan."""
     with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
 
@@ -376,14 +316,8 @@ def _compare_results_impl(
     *,
     anonymize: bool,
 ) -> dict[str, Any]:
-    """Compare two benchmark runs (transport wrapper; core owns assembly)."""
     from benchbox.core.results.analytics import compare_results as _core_compare
 
-    # egress-reviewed: local stdio serves a same-trust-boundary agent that
-    # needs real paths/hostnames to act on results; secrets are already
-    # redacted at capture time by sanitize_platform_options, and exception
-    # text is scrubbed in mcp/errors.py. Remote/tenant mode is a different
-    # trust boundary, so the caller sets anonymize=True there.
     path1 = resolve_result_file_path(file1, results_dir)
     path2 = resolve_result_file_path(file2, results_dir)
 
@@ -421,7 +355,6 @@ def _detect_regressions_impl(
     lookback_runs: int,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Detect performance regressions across recent runs (transport wrapper)."""
     from benchbox.core.results.analytics import detect_regressions as _core_detect
 
     return _core_detect(results_dir, platform, benchmark, threshold_percent, lookback_runs)
@@ -434,11 +367,9 @@ def _get_performance_trends_impl(
     limit: int,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Get performance trends over multiple benchmark runs (transport wrapper)."""
     from benchbox.core.results.analytics import get_performance_trends as _core_trends
 
     result = _core_trends(results_dir, platform, benchmark, metric, limit)
-    # Map core error sentinel to MCP error envelope for invalid-metric case.
     if "error" in result and result.get("error_code") == "VALIDATION_ERROR":
         return make_error(
             ErrorCode.VALIDATION_ERROR,
@@ -454,7 +385,6 @@ def _aggregate_results_impl(
     group_by: str,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Aggregate multiple benchmark results (transport wrapper; core owns assembly)."""
     from benchbox.core.results.analytics import aggregate_results as _core_aggregate
 
     result = _core_aggregate(results_dir, platform, benchmark, group_by)
@@ -468,7 +398,6 @@ def _aggregate_results_impl(
 
 
 def _extract_plan_summary(plan: dict) -> dict[str, Any]:
-    """Extract summary statistics from a query plan."""
     summary = {
         "operator_count": 0,
         "estimated_rows": None,
@@ -505,7 +434,6 @@ def _update_plan_summary(summary: dict[str, Any], node: dict[str, Any]) -> None:
 
 
 def _format_plan_tree(plan: dict, indent: int = 0) -> str:
-    """Format a query plan as a readable tree string."""
     lines = []
     prefix = "  " * indent
 

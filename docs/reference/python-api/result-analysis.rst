@@ -47,21 +47,72 @@ API Reference
 Result Exporter
 ~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.exporter.ResultExporter
-   :members:
+.. py:class:: benchbox.core.results.exporter.ResultExporter(output_dir: str | Path | None=None, anonymize: bool=True, anonymization_config: AnonymizationConfig | None=None, console: Console | None=None, plan_history_dir: str | Path | None=None)
+
+   Export and compare benchmark results using the maintained result schema. JSON,
+   CSV and HTML are supported. Omitted output_dir uses the configured results
+   directory; explicit local output directories are created. Anonymization defaults
+   to True. With no explicit anonymization_config, soft-read BENCHBOX_MACHINE_ID_SALT
+   through AnonymizationConfig.from_public_environ; an unset salt permits private
+   or local exports. Public submission separately requires its public salt.
+
+   :param output_dir: Optional local or supported cloud output directory.
+   :param anonymize: Apply result anonymization; defaults to True.
+   :param anonymization_config: Explicit policy, overriding the environment-derived default.
+   :param console: Optional Rich console; otherwise create one.
+   :param plan_history_dir: Optional plan-history directory, otherwise BENCHBOX_PLAN_HISTORY_DIR. When both are unset, plan history is not recorded.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.export_result(result: ResultLike, formats: list[str] | None=None) -> dict[str, Path]
+
+   Export a BenchmarkResults object or supported result-like input. formats=None
+   means ["json"]. Return a mapping from format names to output paths. Unknown
+   formats or failed exports raise ResultExportError; earlier successful files may
+   already have been written when another format fails. JSON validates the schema,
+   converts datetime values and writes applicable tuning or plan companions.
+
+   :param result: Result to export.
+   :param formats: Requested formats: json, csv and/or html.
+   :returns: Paths of successfully exported formats.
+   :raises ResultExportError: An unknown format or an export failure.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.list_results() -> list[dict[str, Any]]
+
+   List supported result-schema JSON files in the output directory, newest
+   ISO-timestamp strings first. Skip companion and submission files and files
+   that cannot be loaded. Each metadata entry contains file, version, benchmark,
+   platform, scale_factor, execution_id, timestamp, duration in seconds, queries
+   and status.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.show_results_summary() -> None
+
+   Print a summary table for up to ten newest exported results, or an empty-directory message.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.load_result_from_file(filepath: Path) -> dict[str, Any] | None
+
+   Parse a JSON file and return a wrapper with data, version, result_schema_version
+   and filepath; return None on loading failure. Read the schema version from
+   result_schema_version or version, falling back to unknown. This method does not
+   reconstruct BenchmarkResults or validate the loaded schema.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.compare_results(baseline_path: Path, current_path: Path) -> dict[str, Any]
+
+   Compare saved baseline and current results across supported schema layouts.
+   Return performance_changes, per-query comparisons, summary and a
+   generation_compatibility block with status, compatible, warning and stamped
+   provenance. Loading failure returns an error dictionary. A positive performance
+   change means the current duration increased; a negative change means it fell.
+   Review generation compatibility before interpreting performance differences.
+
+.. py:method:: benchbox.core.results.exporter.ResultExporter.export_comparison_report(comparison: dict[str, Any], output_path: PathLike | None=None) -> PathLike
+
+   Write comparison results to an HTML report and return its path. Omitted
+   output_path creates a timestamped comparison_report file in the output directory.
+   Use the dictionary returned by compare_results, including compatibility warnings.
+
 
 Export benchmark results to multiple formats with anonymization support.
 
 **Constructor**:
-
-.. code-block:: python
-
-    ResultExporter(
-        output_dir: str | Path | None = None,
-        anonymize: bool = True,
-        anonymization_config: AnonymizationConfig | None = None,
-        console: Console | None = None
-    )
 
 **Parameters**:
 
@@ -171,16 +222,57 @@ Export benchmark results to multiple formats with anonymization support.
 Timing Collector
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.timing.TimingCollector
-   :members:
+.. py:class:: benchbox.core.results.timing.TimingCollector(enable_detailed_timing: bool=True)
+
+   Collect complete-query durations and optional detailed phases in seconds.
+   enable_detailed_timing=False disables phase measurements, while complete query
+   measurements still run. Completed records accumulate until cleared.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.time_query(query_id: str, query_name: Optional[str]=None)
+
+   Return a context manager yielding a mutable execution dictionary. Measure
+   elapsed seconds, record the query's wall-clock start timestamp, and append a
+   completed QueryTiming on exit. Exceptions derived from Exception mark the
+   record ERROR, retain the error message and re-raise. Active execution state is
+   removed after completion. Repeated or nested uses of a query ID have separate
+   execution tokens.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.time_phase(query_id: str, phase_name: str)
+
+   Return a context manager yielding no value. With detailed timing enabled and
+   an active query execution, record elapsed seconds under phase_name on exit,
+   including exceptional exit. A repeated phase name replaces its earlier value.
+   With detailed timing disabled or no active query, the context is a no-op.
+   Standard parse, optimize, execute and fetch names populate corresponding fields.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.record_metric(query_id: str, metric_name: str, value: Any)
+
+   Store a metric on the active execution for query_id; no active execution is a
+   no-op. Context-local execution is preferred, otherwise the latest active token
+   for that query ID is used. Standard metrics include rows_returned,
+   bytes_processed, tables_accessed, thread_id, connection_id, cpu_time,
+   memory_peak, warning_count and platform_metrics.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.get_completed_timings() -> list[QueryTiming]
+
+   Return a shallow copy of the completed-record list; QueryTiming objects themselves remain shared.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.clear_completed_timings()
+
+   Clear the completed-record list without clearing active execution state.
+
+.. py:method:: benchbox.core.results.timing.TimingCollector.get_timing_summary() -> dict[str, Any]
+
+   Return {} with no completed records. With no successful records, return only
+   total_queries and successful_queries=0. Otherwise return successful/failed
+   counts and total, average, median, minimum, maximum and sample standard
+   deviation of successful execution times in seconds. One successful observation
+   has a zero standard deviation.
+
 
 Collect detailed timing information during query execution.
 
 **Constructor**:
-
-.. code-block:: python
-
-    TimingCollector(enable_detailed_timing: bool = True)
 
 **Parameters**:
 
@@ -266,16 +358,57 @@ Collect detailed timing information during query execution.
 Timing Analyzer
 ~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.timing.TimingAnalyzer
-   :members:
+.. py:class:: benchbox.core.results.timing.TimingAnalyzer(timings: list[QueryTiming])
+
+   Analyze a list of QueryTiming records. Statistical timing methods use records
+   whose status is SUCCESS; status breakdown still includes every input record.
+   The successful-record subset is selected during construction.
+
+.. py:method:: benchbox.core.results.timing.TimingAnalyzer.get_basic_statistics() -> dict[str, Any]
+
+   Return count, total_time, mean, median, min, max, stdev and variance for
+   successful execution times in seconds. No successes yields {}; one observation
+   has zero sample standard deviation and variance. Variance uses squared seconds.
+
+.. py:method:: benchbox.core.results.timing.TimingAnalyzer.get_percentiles(percentiles: list[float] | None=None) -> dict[float, float]
+
+   Return linearly interpolated execution-time percentiles in seconds. Omitted
+   percentiles means [50, 75, 90, 95, 99]. Ignore requested values outside 0 to 100.
+   No successful records yields {}; a singleton returns its one value.
+
+.. py:method:: benchbox.core.results.timing.TimingAnalyzer.analyze_query_performance() -> dict[str, Any]
+
+   Return basic_stats, percentiles, status_breakdown, timing_phases and
+   throughput_metrics. Phase summaries use recorded successful phase timings;
+   throughput summaries use successful records with a nonzero rows_per_second.
+
+.. py:method:: benchbox.core.results.timing.TimingAnalyzer.identify_outliers(method: str='iqr', factor: float=1.5) -> list[QueryTiming]
+
+   Return successful QueryTiming records outside the selected threshold. iqr uses
+   quartiles and bounds Q1-factor*IQR and Q3+factor*IQR; the default factor is 1.5.
+   zscore uses absolute deviation divided by sample standard deviation, strictly
+   greater than factor; zero standard deviation returns no outliers. No successful
+   records returns []. IQR requires at least two successful observations.
+
+   :raises ValueError: An unknown method when successful records are present.
+   :raises statistics.StatisticsError: IQR with only one successful observation.
+
+.. py:method:: benchbox.core.results.timing.TimingAnalyzer.compare_query_performance(baseline_timings: list[QueryTiming]) -> dict[str, Any]
+
+   Compare current and baseline successful timing statistics. Missing successes
+   on either side returns an error dictionary. Mean, median, min and max changes
+   are whole percentages: 15.0 means 15 percent slower, unlike the fractional
+   thresholds in PerformanceHistory. Negative changes are improvements. Mean
+   changes above 10 percent flag regression; above 25 is major and above 50 is
+   critical. Changes below -10 percent flag improvement. Comparison is of aggregate
+   statistics, without matching query identities.
+
+   :raises ZeroDivisionError: A compared baseline mean, median, min or max is zero.
+
 
 Analyze timing data to provide insights and statistics.
 
 **Constructor**:
-
-.. code-block:: python
-
-    TimingAnalyzer(timings: list[QueryTiming])
 
 **Parameters**:
 
@@ -402,8 +535,135 @@ Analyze timing data to provide insights and statistics.
 Query Timing
 ~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.timing.QueryTiming
-   :members:
+.. py:class:: benchbox.core.results.timing.QueryTiming(query_id: str, query_name: Optional[str] = None, execution_sequence: int = 0, execution_time: float = 0.0, parse_time: Optional[float] = None, optimization_time: Optional[float] = None, execution_only_time: Optional[float] = None, fetch_time: Optional[float] = None, timing_breakdown: dict[str, float] = <factory>, rows_returned: int = 0, bytes_processed: Optional[int] = None, tables_accessed: list[str] = <factory>, timestamp: datetime = <factory>, thread_id: Optional[str] = None, connection_id: Optional[str] = None, rows_per_second: Optional[float] = None, bytes_per_second: Optional[float] = None, cpu_time: Optional[float] = None, memory_peak: Optional[int] = None, status: str = 'SUCCESS', error_message: Optional[str] = None, warning_count: int = 0, platform_metrics: dict[str, Any] = <factory>)
+
+   Dataclass for one timing record. query_id is required; all other fields have
+   the defaults shown below. Execution and phase timings use seconds. During
+   construction, positive execution_time and rows_returned compute rows_per_second;
+   positive execution_time with bytes_processed computes bytes_per_second.
+
+.. py:method:: benchbox.core.results.timing.QueryTiming.to_dict() -> dict[str, Any]
+
+   Return a serialization dictionary. The execution_time field becomes
+   execution_time_seconds, timestamp becomes an ISO 8601 string, and phase timings
+   remain seconds. This is a timing-analysis dictionary, not the compact schema-v2
+   query-row layout.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.query_id
+   :type: str
+
+   Query identifier. Required constructor argument.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.query_name
+   :type: Optional[str]
+
+   Optional human-readable query name. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.execution_sequence
+   :type: int
+
+   Execution sequence number. Default: ``0``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.execution_time
+   :type: float
+
+   Complete query duration in seconds. Default: ``0.0``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.parse_time
+   :type: Optional[float]
+
+   Optional parsing duration in seconds. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.optimization_time
+   :type: Optional[float]
+
+   Optional optimization duration in seconds. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.execution_only_time
+   :type: Optional[float]
+
+   Optional execution phase duration in seconds. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.fetch_time
+   :type: Optional[float]
+
+   Optional result-fetch duration in seconds. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.timing_breakdown
+   :type: dict[str, float]
+
+   Named phase durations in seconds. Default: a new empty dictionary per instance.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.rows_returned
+   :type: int
+
+   Number of returned rows. Default: ``0``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.bytes_processed
+   :type: Optional[int]
+
+   Optional processed byte count. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.tables_accessed
+   :type: list[str]
+
+   Names of accessed tables. Default: a new empty list per instance.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.timestamp
+   :type: datetime
+
+   Query timestamp; TimingCollector records its UTC wall-clock start. Default: the local datetime when the instance is created.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.thread_id
+   :type: Optional[str]
+
+   Optional execution thread identifier. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.connection_id
+   :type: Optional[str]
+
+   Optional connection identifier. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.rows_per_second
+   :type: Optional[float]
+
+   Rows returned divided by positive execution time when calculated. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.bytes_per_second
+   :type: Optional[float]
+
+   Bytes processed divided by positive execution time when calculated. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.cpu_time
+   :type: Optional[float]
+
+   Optional CPU time in seconds. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.memory_peak
+   :type: Optional[int]
+
+   Optional peak memory metric supplied by the producer; no unit conversion is performed. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.status
+   :type: str
+
+   Query status, commonly SUCCESS, ERROR, TIMEOUT or CANCELLED. Default: ``'SUCCESS'``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.error_message
+   :type: Optional[str]
+
+   Optional execution failure message. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.warning_count
+   :type: int
+
+   Number of recorded warnings. Default: ``0``.
+
+.. py:attribute:: benchbox.core.results.timing.QueryTiming.platform_metrics
+   :type: dict[str, Any]
+
+   Producer-supplied platform metrics. Default: a new empty dictionary per instance.
+
 
 Detailed timing information for a single query execution.
 
@@ -457,16 +717,43 @@ Detailed timing information for a single query execution.
 Anonymization Manager
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.anonymization.AnonymizationManager
-   :members:
+.. py:class:: benchbox.core.results.anonymization.AnonymizationManager(config: Optional[AnonymizationConfig]=None)
+
+   Anonymize result metadata and text using an AnonymizationConfig. With
+   config=None, construct a default configuration. The manager caches its generated
+   machine pseudonym for reuse.
+
+.. py:method:: benchbox.core.results.anonymization.AnonymizationManager.get_anonymous_machine_id() -> str
+
+   Return a cached machine_<16-hex-character> pseudonym. Prefer an OS machine ID,
+   then a hardware fingerprint, and use a restricted-environment fallback when
+   needed. Apply an optional configured salt before SHA-256 hashing. Fallback
+   identity may vary between runs; no raw machine ID is returned.
+
+.. py:method:: benchbox.core.results.anonymization.AnonymizationManager.anonymize_result_payload(payload: dict[str, Any]) -> dict[str, Any]
+
+   Return a key-aware anonymized result mapping. Redact secret-like values and
+   pseudonymize stable infrastructure identities so exports can be grouped without
+   exposing account, endpoint, storage or container identifiers.
+
+.. py:method:: benchbox.core.results.anonymization.AnonymizationManager.anonymize_tuning_payload(payload: dict[str, Any]) -> dict[str, Any]
+
+   Anonymize a tuning companion while preserving normalized source provenance.
+   Handle table/column identifiers that generic result walking cannot identify.
+   Retain a validated repository-relative source reference; path-hash other
+   source_file values from legacy or user-authored companions.
+
+.. py:method:: benchbox.core.results.anonymization.AnonymizationManager.remove_pii(text: str) -> str
+
+   Apply configured regular expressions case-insensitively to text, replacing
+   PII-pattern matches with [REDACTED], then applying custom sanitizer replacements.
+   Return empty text unchanged. This performs configured pattern matching, not an
+   exhaustive guarantee that every sensitive value is detected.
+
 
 Manage anonymization of benchmark results for privacy-preserving sharing.
 
 **Constructor**:
-
-.. code-block:: python
-
-    AnonymizationManager(config: AnonymizationConfig | None = None)
 
 **Parameters**:
 
@@ -558,8 +845,34 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
 Anonymization Config
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.core.results.anonymization.AnonymizationConfig
-   :members:
+.. py:class:: benchbox.core.results.anonymization.AnonymizationConfig(machine_id_salt: Optional[str] = None, pii_patterns: list[str] = <factory>, custom_sanitizers: dict[str, str] = <factory>)
+
+   Dataclass of anonymization settings. machine_id_salt defaults to None;
+   pii_patterns has fresh IPv4/email/SSN-like patterns per instance, and
+   custom_sanitizers defaults to a fresh empty mapping.
+
+.. py:classmethod:: benchbox.core.results.anonymization.AnonymizationConfig.from_public_environ(*, environ: Optional[dict[str, str]]=None, require_salt: bool=False) -> 'AnonymizationConfig'
+
+   Construct a configuration from BENCHBOX_MACHINE_ID_SALT in the supplied
+   mapping, or the process environment when environ=None. require_salt=True raises
+   MissingPublicPseudonymSaltError when salt is unset; False permits empty salt
+   for private/local use. Whitespace-only values are treated as unset.
+
+.. py:attribute:: benchbox.core.results.anonymization.AnonymizationConfig.machine_id_salt
+   :type: Optional[str]
+
+   Optional salt for machine pseudonyms. Default: ``None``.
+
+.. py:attribute:: benchbox.core.results.anonymization.AnonymizationConfig.pii_patterns
+   :type: list[str]
+
+   Regular expressions to redact from text. Default: fresh configured IPv4/email/SSN-like regex patterns per instance.
+
+.. py:attribute:: benchbox.core.results.anonymization.AnonymizationConfig.custom_sanitizers
+   :type: dict[str, str]
+
+   Regular expressions mapped to custom replacement strings. Default: a new empty dictionary per instance.
+
 
 Configuration for result anonymization.
 
@@ -610,7 +923,14 @@ Class docstrings do not provide listing descriptions. Custom callers that
 previously used a class docstring should move their short description to this
 attribute.
 
-.. autofunction:: benchbox.core.results.display.display_results
+.. py:function:: benchbox.core.results.display.display_results(result_data: dict[str, Any], verbosity: int=0) -> None
+
+   Print a flat result-summary dictionary. Read benchmark, scale_factor,
+   platform and success; optionally display query counts and successful execution
+   times. With verbosity > 0 and total_duration present, print total/setup
+   seconds. Additional verbosity levels do not select another output format.
+   This input is not the exported nested schema-v2 payload.
+
 
 Display benchmark results in standardized format.
 

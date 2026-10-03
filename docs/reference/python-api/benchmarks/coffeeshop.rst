@@ -22,6 +22,8 @@ Class
 
       Return a mapping for ``dim_locations``, ``dim_products``, and ``order_lines`` keyed by table name.
 
+      The facade annotation says ``list[dict]``, but the delegated implementation returns a table-name mapping.
+
    .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config=None) -> str
 
       Return CREATE TABLE SQL for the selected dialect. ``tuning_config`` supplies constraint settings.

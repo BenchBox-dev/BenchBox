@@ -1,9 +1,6 @@
-"""Tests for Snowflake credential setup with default values.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -18,8 +15,6 @@ pytestmark = [
 
 
 class TestSnowflakeCredentialDefaults:
-    """Test Snowflake credential setup shows existing values as defaults."""
-
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
     @patch("benchbox.platforms.credentials.snowflake._prompt_default_output_location")
     @patch("benchbox.platforms.credentials.snowflake.prompt_secure_field")
@@ -34,7 +29,6 @@ class TestSnowflakeCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
@@ -47,33 +41,30 @@ class TestSnowflakeCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # User declines auto-detection, provides same values
-        mock_confirm.return_value = False  # Skip auto-detection
+        mock_confirm.return_value = False
         mock_prompt_default.side_effect = [
-            "myorg-account123",  # account
-            "JOEHARRIS76",  # username
-            "MY_WAREHOUSE",  # warehouse
-            "MY_DATABASE",  # database
-            "MY_SCHEMA",  # schema
-            "MY_ROLE",  # role
+            "myorg-account123",
+            "JOEHARRIS76",
+            "MY_WAREHOUSE",
+            "MY_DATABASE",
+            "MY_SCHEMA",
+            "MY_ROLE",
         ]
-        mock_prompt_secure.return_value = "secret_password"  # password (preserved)
+        mock_prompt_secure.return_value = "secret_password"
 
         mock_validate.return_value = (True, None)
         console = Mock()
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify prompts were called with existing values as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] == "myorg-account123"  # account
-        assert calls[1][1]["current_value"] == "JOEHARRIS76"  # username
-        assert calls[2][1]["current_value"] == "MY_WAREHOUSE"  # warehouse
-        assert calls[3][1]["current_value"] == "MY_DATABASE"  # database
-        assert calls[4][1]["current_value"] == "MY_SCHEMA"  # schema
-        assert calls[5][1]["current_value"] == "MY_ROLE"  # role
+        assert calls[0][1]["current_value"] == "myorg-account123"
+        assert calls[1][1]["current_value"] == "JOEHARRIS76"
+        assert calls[2][1]["current_value"] == "MY_WAREHOUSE"
+        assert calls[3][1]["current_value"] == "MY_DATABASE"
+        assert calls[4][1]["current_value"] == "MY_SCHEMA"
+        assert calls[5][1]["current_value"] == "MY_ROLE"
 
-        # Verify secure field was called with existing password
         mock_prompt_secure.assert_called_once_with("Password", current_value="secret_password", console=console)
 
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
@@ -90,19 +81,17 @@ class TestSnowflakeCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User provides new values
-        mock_confirm.return_value = False  # Skip auto-detection
+        mock_confirm.return_value = False
         mock_prompt_default.side_effect = [
-            "newaccount",  # account
-            "newuser",  # username
-            "COMPUTE_WH",  # warehouse
-            "BENCHBOX",  # database
-            "PUBLIC",  # schema
-            "",  # role
+            "newaccount",
+            "newuser",
+            "COMPUTE_WH",
+            "BENCHBOX",
+            "PUBLIC",
+            "",
         ]
         mock_prompt_secure.return_value = "newpassword"
 
@@ -111,16 +100,14 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify prompts were called with None as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] is None  # account
-        assert calls[1][1]["current_value"] is None  # username
-        assert calls[2][1]["current_value"] is None  # warehouse
-        assert calls[3][1]["current_value"] is None  # database
-        assert calls[4][1]["current_value"] is None  # schema
-        assert calls[5][1]["current_value"] is None  # role
+        assert calls[0][1]["current_value"] is None
+        assert calls[1][1]["current_value"] is None
+        assert calls[2][1]["current_value"] is None
+        assert calls[3][1]["current_value"] is None
+        assert calls[4][1]["current_value"] is None
+        assert calls[5][1]["current_value"] is None
 
-        # Verify secure field was called with None
         mock_prompt_secure.assert_called_once_with("Password", current_value=None, console=console)
 
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
@@ -137,7 +124,6 @@ class TestSnowflakeCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: existing credentials with password
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
@@ -157,7 +143,6 @@ class TestSnowflakeCredentialDefaults:
             "PUBLIC",
             "",
         ]
-        # User enters empty string, existing password should be preserved
         mock_prompt_secure.return_value = "existing_secret"
 
         mock_validate.return_value = (True, None)
@@ -165,7 +150,6 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify the saved credentials still have the password
         saved_creds = mock_manager.set_platform_credentials.call_args[0][1]
         assert saved_creds["password"] == "existing_secret"
 
@@ -183,7 +167,6 @@ class TestSnowflakeCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
@@ -203,7 +186,6 @@ class TestSnowflakeCredentialDefaults:
             "PUBLIC",
             "",
         ]
-        # User provides new password
         mock_prompt_secure.return_value = "new_password"
 
         mock_validate.return_value = (True, None)
@@ -211,7 +193,6 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify the saved credentials have the new password
         saved_creds = mock_manager.set_platform_credentials.call_args[0][1]
         assert saved_creds["password"] == "new_password"
 
@@ -229,23 +210,21 @@ class TestSnowflakeCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: only some credentials exist
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
             "username": "JOEHARRIS76",
-            # password, warehouse, database missing
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
         mock_confirm.return_value = False
         mock_prompt_default.side_effect = [
-            "myorg-account123",  # existing
-            "JOEHARRIS76",  # existing
-            "COMPUTE_WH",  # new (uses default_if_none)
-            "BENCHBOX",  # new (uses default_if_none)
-            "PUBLIC",  # new
-            "",  # new
+            "myorg-account123",
+            "JOEHARRIS76",
+            "COMPUTE_WH",
+            "BENCHBOX",
+            "PUBLIC",
+            "",
         ]
         mock_prompt_secure.return_value = "new_password"
 
@@ -254,11 +233,9 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify existing values were used as defaults
         calls = mock_prompt_default.call_args_list
         assert calls[0][1]["current_value"] == "myorg-account123"
         assert calls[1][1]["current_value"] == "JOEHARRIS76"
-        # Missing fields should have None as current_value but have default_if_none
         assert calls[2][1]["current_value"] is None
         assert calls[2][1]["default_if_none"] == "COMPUTE_WH"
 
@@ -275,8 +252,6 @@ class TestSnowflakeCredentialDefaults:
         mock_output_location,
         mock_validate,
     ):
-        """Test that optional fields (schema, role) show existing values."""
-        # Setup: credentials with optional fields
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
@@ -305,10 +280,9 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify optional fields were called with existing values
         calls = mock_prompt_default.call_args_list
-        assert calls[4][1]["current_value"] == "CUSTOM_SCHEMA"  # schema
-        assert calls[5][1]["current_value"] == "CUSTOM_ROLE"  # role
+        assert calls[4][1]["current_value"] == "CUSTOM_SCHEMA"
+        assert calls[5][1]["current_value"] == "CUSTOM_ROLE"
 
     @patch("benchbox.platforms.credentials.snowflake._auto_detect_snowflake")
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
@@ -326,17 +300,12 @@ class TestSnowflakeCredentialDefaults:
         mock_auto_detect,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "account": "old_account",
             "username": "old_user",
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
-
-        # NOTE: With existing credentials, auto-detection is skipped
-        # This test verifies that existing credentials flow directly to manual prompts
-        # Auto-detection is no longer offered when credentials exist
 
         mock_prompt_default.side_effect = [
             "old_account",
@@ -352,9 +321,7 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify Confirm.ask was NOT called (no auto-detection prompt)
         mock_confirm.assert_not_called()
-        # Verify auto-detect was NOT called
         mock_auto_detect.assert_not_called()
 
     @patch("benchbox.platforms.credentials.snowflake._auto_detect_snowflake")
@@ -373,7 +340,6 @@ class TestSnowflakeCredentialDefaults:
         mock_auto_detect,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "account": "myorg-account123",
@@ -398,11 +364,9 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify no auto-detection prompt was shown
         mock_confirm.assert_not_called()
         mock_auto_detect.assert_not_called()
 
-        # Verify "updating configuration" message was displayed
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Existing credentials found" in console_output
         assert "updating configuration" in console_output
@@ -423,11 +387,9 @@ class TestSnowflakeCredentialDefaults:
         mock_auto_detect,
     ):
 
-        # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User declines auto-detection
         mock_confirm.return_value = False
         mock_prompt_default.side_effect = [
             "newaccount",
@@ -443,10 +405,8 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Verify auto-detection prompt WAS shown
         mock_confirm.assert_called_once_with("🔍 Attempt auto-detection from environment variables?", default=True)
 
-        # Verify "updating configuration" message was NOT displayed
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Existing credentials found" not in console_output
 
@@ -465,7 +425,6 @@ class TestSnowflakeCredentialDefaults:
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User accepts auto-detection, and it succeeds
         mock_confirm.return_value = True
         mock_auto_detect.return_value = {
             "account": "auto-account",
@@ -481,14 +440,12 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # Credentials should be saved with auto-detected values
         saved_creds = mock_manager.set_platform_credentials.call_args[0][1]
         assert saved_creds["account"] == "auto-account"
         assert saved_creds["username"] == "auto-user"
         assert saved_creds["warehouse"] == "AUTO_WH"
         assert saved_creds["database"] == "AUTO_DB"
 
-        # Verify the console printed auto-detected values
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "auto-account" in console_output
         assert "auto-user" in console_output
@@ -525,21 +482,13 @@ class TestSnowflakeCredentialDefaults:
 
         setup_snowflake_credentials(mock_manager, console)
 
-        # output_location should NOT be called on failure
         mock_output_location.assert_not_called()
 
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Validation failed" in console_output
 
 
-# ---------------------------------------------------------------------------
-# _prompt_default_output_location direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestPromptDefaultOutputLocation:
-    """Test _prompt_default_output_location paths."""
-
     def _make_manager(self):
         mgr = Mock()
         mgr.credentials_path = "/fake/path"
@@ -564,7 +513,6 @@ class TestPromptDefaultOutputLocation:
 
         mgr = self._make_manager()
         console = Mock()
-        # wants default=True, confirm=True
         mock_confirm.side_effect = [True, True]
         mock_prompt.return_value = "@~/benchbox"
 
@@ -583,7 +531,6 @@ class TestPromptDefaultOutputLocation:
 
         mgr = self._make_manager()
         console = Mock()
-        # wants default=True, invalid path → proceed anyway=True, confirm=True
         mock_confirm.side_effect = [True, True, True]
         mock_prompt.return_value = "not-a-valid-path"
         mock_is_cloud.return_value = False
@@ -601,11 +548,8 @@ class TestPromptDefaultOutputLocation:
 
         mgr = self._make_manager()
         console = Mock()
-        # wants default=True; 1st path invalid, user declines → retry; 2nd path valid, user confirms
         mock_confirm.side_effect = [True, False, True]
         mock_prompt.side_effect = ["bad-path", "@~/good"]
-        # The prompt now validates with is_cloud_path alone; that classifier
-        # accepts stage paths directly, so '@~/good' is valid on the retry.
         mock_is_cloud.side_effect = [False, True]
 
         creds = {"account": "acct"}
@@ -629,14 +573,7 @@ class TestPromptDefaultOutputLocation:
         assert creds["default_output_location"] == "s3://my-bucket/data"
 
 
-# ---------------------------------------------------------------------------
-# validate_snowflake_credentials error translation tests
-# ---------------------------------------------------------------------------
-
-
 class TestValidateSnowflakeErrorTranslation:
-    """Test that connection errors produce user-friendly messages."""
-
     def _make_mgr_with_creds(self):
         mgr = Mock()
         mgr.get_platform_credentials.return_value = {
@@ -700,14 +637,7 @@ class TestValidateSnowflakeErrorTranslation:
         assert "network timeout" in err
 
 
-# ---------------------------------------------------------------------------
-# _auto_detect_snowflake direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestAutoDetectSnowflake:
-    """Test _auto_detect_snowflake reads from environment variables."""
-
     def _console(self):
         from unittest.mock import MagicMock
 
@@ -780,14 +710,7 @@ class TestAutoDetectSnowflake:
         assert result["account"] == "myorg-account123"
 
 
-# ---------------------------------------------------------------------------
-# validate_snowflake_credentials direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestValidateSnowflakeCredentials:
-    """Test validate_snowflake_credentials success/failure paths."""
-
     def _make_cred_manager(self, creds=None):
         from unittest.mock import MagicMock
 

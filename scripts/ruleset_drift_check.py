@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compare live GitHub rulesets with the repository admin runbook."""
 
 from __future__ import annotations
 
@@ -16,8 +15,6 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 
-# Make the sibling _project/scripts source-of-truth importable regardless of
-# how this module is loaded (script, package import, or out-of-tree test).
 sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
 from ruleset_review_enforcement import (  # noqa: E402
@@ -30,16 +27,8 @@ from ruleset_review_enforcement import (  # noqa: E402
 
 CLI_DESCRIPTION = "Compare live GitHub rulesets with the repository admin runbook."
 
-# Findings with this prefix are surfaced (rendered, included in the JSON
-# `findings` list) exactly like any other drift finding, but do NOT flip the
-# exit code / `status` field to failed. They are reserved for explicit
-# migration overrides and human-confirmation advisories (see
-# `tag_creation_findings`).
 WARNING_PREFIX = "WARNING (non-blocking): "
 
-# The develop-squash-only ruleset (id 15611785) requires current-base status
-# checks and code-owner review. The runbook parser and comparison below enforce
-# both policies; the explicit review override remains available for fixtures.
 DEVELOP_REVIEW_RULE_ENFORCED = True
 
 PYPI_ENVIRONMENT = "pypi"
@@ -61,7 +50,6 @@ class ExpectedRuleset:
 
 
 def environment_protection_findings(live: dict[str, Any]) -> list[str]:
-    """Return blocking drift findings for the real-PyPI environment gate."""
     findings: list[str] = []
     if live.get("name") != PYPI_ENVIRONMENT:
         findings.append(f"pypi environment: name is {live.get('name')!r}, expected {PYPI_ENVIRONMENT!r}")
@@ -161,7 +149,6 @@ def _other_properties(section: str, name: str) -> dict[str, str]:
 
 
 def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
-    """Extract expected ruleset state from docs/operations/repo-admin-settings.md."""
     expected: dict[str, ExpectedRuleset] = {}
     for name in ("develop-squash-only", "release-only"):
         section = _section_for_ruleset(runbook_text, name)
@@ -219,13 +206,6 @@ def compare_ruleset(
     require_bypass_actor_visibility: bool = False,
     enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED,
 ) -> list[str]:
-    """Return human-readable drift findings for one ruleset.
-
-    For ``develop-squash-only`` only, applies the shared
-    ``review_enforcement_findings`` predicate to the already-fetched live
-    payload. The live default is blocking; callers may explicitly pass
-    ``enforce_review_rule=False`` for migration fixtures.
-    """
     findings: list[str] = []
     if live.get("enforcement") != "active":
         findings.append(f"{expected.name}: enforcement is {live.get('enforcement')!r}, expected 'active'")
@@ -282,21 +262,6 @@ def tag_creation_findings(
     enforce_tag_rule: bool = TAG_RULESET_ENFORCED,
     require_bypass_actor_visibility: bool = False,
 ) -> list[str]:
-    """Findings for the ``v*`` tag-creation ruleset (release-flow hardening).
-
-    Delegates entirely to ``ruleset_review_enforcement.tag_protection_findings``/
-    ``tag_bypass_advisory`` (single source of truth, shared with the standalone
-    ``--rulesets-file`` CLI documented in ``docs/operations/repo-admin-settings.md``).
-    Unlike the per-name ``compare_ruleset`` checks above, this scans ALL fetched
-    rulesets (not one by expected name) because the tag-creation ruleset has no
-    fixed expected name — any ruleset with ``target: "tag"`` that covers
-    ``refs/tags/v*`` with a ``creation`` rule counts.
-
-    ``enforce_tag_rule`` defaults to the live-enforced ``TAG_RULESET_ENFORCED``
-    setting, so a missing or incomplete tag ruleset is blocking in normal
-    canary execution. Callers may explicitly pass ``False`` for a migration
-    fixture that must retain the former warning-only behavior.
-    """
     findings: list[str] = []
     protection_findings = tag_protection_findings(
         all_live_rulesets,
@@ -340,12 +305,6 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
-# Approved native merge-queue parameters for refs/heads/develop, per
-# _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
-# amendment: ALLGREEN, 60-minute timeout; 2026-10-02 amendment: 90-minute timeout
-# to prevent runner-starvation ejections during peak contention; builds reduced to 2
-# and merges to 3 with the unit-check cutover). One expected-policy source;
-# protected-setting changes are reported for operator action, never silently repaired.
 APPROVED_MERGE_QUEUE: dict[str, object] = {
     "merge_method": "SQUASH",
     "grouping_strategy": "ALLGREEN",
@@ -378,14 +337,6 @@ def _approved_queue_summary() -> str:
 
 
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
-    """Validate the live merge_queue rule against the approved parameters.
-
-    A missing rule is blocking when the payload is otherwise well-formed
-    (other rules visible proves the API is not redacting): an absent queue
-    rule invalidates queue-aware publication policy. Only an empty or
-    unreadable payload stays a non-blocking warning; present-but-different
-    parameters are blocking findings for operator action.
-    """
     findings: list[str] = []
     rule = _rule_by_type(live, "merge_queue")
     if rule is None:
@@ -415,13 +366,6 @@ def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
 
 
 def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None) -> list[str]:
-    """Return every finding that prevents queue-aware stale publication.
-
-    The local landing path needs more than the queue parameter object: required
-    checks, strict current-base enforcement, and the no-bypass/review
-    protections must still be visible on the same develop ruleset. A warning
-    or an unreadable payload is therefore never a verified queue.
-    """
     if live is None:
         return [f"{expected.name}: live ruleset is missing; queue-aware publication is unverified"]
     findings = compare_ruleset(
@@ -434,12 +378,10 @@ def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None
 
 
 def queue_policy_verified(expected: ExpectedRuleset, live: dict[str, Any] | None) -> bool:
-    """Return true only for a complete, visible, approved queue configuration."""
     return not queue_policy_findings(expected, live)
 
 
 def blocking_findings(findings: list[str]) -> list[str]:
-    """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
 
 

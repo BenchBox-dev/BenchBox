@@ -21,13 +21,44 @@ if str(REPO_ROOT) not in sys.path:
 from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT
 from benchbox.cli.shared import console
 
+EXPLORER_PUBLISH_HELP = "Manage the Results Explorer static build pipeline."
 
-@click.group()
+
+EXPLORER_BUILD_HELP = (
+    "Build the results explorer static dataset from schema-v2 bundles.\n"
+    "\n"
+    "Scans DATA_DIR/bundles/ for result JSON files, transforms them into the\n"
+    "explorer read model, and writes the output to OUTPUT_DIR:\n"
+    "\n"
+    "\x08\n"
+    "- results.duckdb          DuckDB-WASM queryable snapshot\n"
+    "- bundles/{id}.json       copied source bundles for download/audit links\n"
+    "\n"
+    "Examples:\n"
+    "\n"
+    "\x08\n"
+    "  uv run -- python _project/scripts/explorer_publish.py build \\\n"
+    "    --data-dir results-data/ \\\n"
+    "    --output results-explorer/public/data/\n"
+    "\n"
+    "\x08\n"
+    "  uv run -- python _project/scripts/explorer_publish.py build \\\n"
+    "    --data-dir results-data/ \\\n"
+    "    --output results-explorer/public/data/ \\\n"
+    "    --trust-label community-submission \\\n"
+    "    --visibility public-self-reported"
+)
+
+
+EXPLORER_BUILD_CONTRACT_HELP = "Emit the stable contract metadata for explorer-build integrations."
+
+
+@click.group(help=EXPLORER_PUBLISH_HELP)
 def explorer_publish() -> None:
     """Manage the Results Explorer static build pipeline."""
 
 
-@explorer_publish.command("build")
+@explorer_publish.command("build", help=EXPLORER_BUILD_HELP)
 @click.option(
     "--data-dir",
     required=True,
@@ -109,7 +140,7 @@ def explorer_build(
         raise SystemExit(1) from exc
 
 
-@explorer_publish.command("build-contract", hidden=True)
+@explorer_publish.command("build-contract", hidden=True, help=EXPLORER_BUILD_CONTRACT_HELP)
 def explorer_build_contract() -> None:
     """Emit the stable contract metadata for explorer-build integrations."""
 

@@ -69,68 +69,253 @@ API Reference
 DatabricksAdapter Class
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.databricks.DatabricksAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.databricks.DatabricksAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   Databricks SQL adapter.  It accepts connection configuration such as the
+   server host, HTTP path, access token, catalog, and schema.  ``table_format``
+   accepts ``"delta"`` or ``"hudi"``; Hudi table type accepts ``"cow"`` or
+   ``"mor"``.  Invalid values raise ``ValueError``; missing driver dependencies
+   raise ``ImportError``; incomplete required configuration raises
+   ``ConfigurationError``.
 
-.. code-block:: python
+   Example::
 
-    DatabricksAdapter(
-        server_hostname: str,
-        http_path: str,
-        access_token: str,
-        catalog: str = "main",
-        schema: str = "benchbox",
-        uc_catalog: Optional[str] = None,
-        uc_schema: Optional[str] = None,
-        uc_volume: Optional[str] = None,
-        staging_root: Optional[str] = None,
-        enable_delta_optimization: bool = True,
-        delta_auto_optimize: bool = True,
-        delta_auto_compact: bool = True,
-        cluster_size: str = "Medium",
-        auto_terminate_minutes: int = 30,
-        create_catalog: bool = False
-    )
+      adapter = DatabricksAdapter(server_hostname="host", http_path="/sql/path", access_token="token")
 
-Parameters:
+   The adapter advertises external-table support.  See :doc:`common` for the
+   shared lifecycle.
 
-**Connection (Required)**:
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.create_connection(**connection_config) -> Any
 
-- **server_hostname** (str): Databricks workspace hostname (without ``https://``)
-- **http_path** (str): SQL Warehouse HTTP path (e.g., /sql/1.0/warehouses/{warehouse_id})
-- **access_token** (str): Personal access token for authentication
+   Create optimized Databricks SQL connection.
 
-**Unity Catalog**:
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.create_schema(benchmark, connection: Any) -> float
 
-- **catalog** (str): Catalog name for benchmark tables. Default: "main"
-- **schema** (str): Schema name for benchmark tables. Default: "benchbox"
-- **uc_catalog** (str, optional): Unity Catalog for staging volumes
-- **uc_schema** (str, optional): Schema within UC catalog for volumes
-- **uc_volume** (str, optional): Volume name for data staging
+   Create schema using Databricks Delta Lake tables.
 
-**Data Staging**:
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-- **staging_root** (str, optional): Explicit staging location (dbfs:/Volumes/... or s3://...)
+   Load data using Databricks COPY INTO from UC Volumes or cloud storage.
 
-**Delta Lake Optimization**:
+   This implementation avoids temporary views and uses COPY INTO for robust ingestion.
 
-- **enable_delta_optimization** (bool): Enable Delta Lake optimizations. Default: True
-- **delta_auto_optimize** (bool): Enable auto-optimize on writes. Default: True
-- **delta_auto_compact** (bool): Enable auto-compaction. Default: True
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-**Cluster Settings**:
+   Register Databricks external tables via USING PARQUET LOCATION.
 
-- **cluster_size** (str): SQL Warehouse size hint. Default: "Medium"
-- **auto_terminate_minutes** (int): Auto-termination timeout. Default: 30
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
 
-**Schema Management**:
+   Execute query with detailed timing and profiling.
 
-- **create_catalog** (bool): Create catalog if it doesn't exist. Default: False
+   Accepts either a DB-API connection or an already-open cursor: the TPC
+   power harness passes a per-stream cursor through the facade, which has
+   no ``cursor()`` method of its own.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.reset_database_in_place(**connection_config) -> bool
+
+   Truncate the schema's tables instead of dropping the schema.
+
+   Unity Catalog keeps dropped tables recoverable for about seven days,
+   and they count against the metastore table quota until then, so a
+   drop-and-recreate on every reload exhausts small quotas. Schema
+   creation replaces tables with ``CREATE OR REPLACE``, which does not add
+   to the quota. Tables created with ``IF NOT EXISTS`` keep their
+   structure and start empty. Returns False, and the caller drops the
+   schema as before, when the schema is absent or any table cannot be
+   truncated.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.drop_database(**connection_config) -> None
+
+   Drop schema in Databricks catalog.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.analyze_table(connection: Any, table_name: str) -> None
+
+   Run ANALYZE TABLE for better query optimization.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.optimize_table(connection: Any, table_name: str) -> None
+
+   Optimize Delta Lake table.
+
+   Hudi tables skip Delta OPTIMIZE (recorded as a skipped layout
+   operation): Hudi file management runs through its own
+   cleaner/clustering table configurations.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.vacuum_table(connection: Any, table_name: str, hours: int = 168) -> None
+
+   Vacuum Delta Lake table to remove old files.
+
+   Hudi tables skip Delta VACUUM (recorded as a skipped layout
+   operation): retention runs through Hudi cleaner table
+   configurations, and Delta RETAIN syntax is not valid for them.
+
+Static member inventory
+-----------------------
+
+.. py:property:: benchbox.platforms.databricks.DatabricksAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:staticmethod:: benchbox.platforms.databricks.DatabricksAdapter.add_cli_arguments(parser) -> None
+
+   Add Databricks-specific CLI arguments.
+
+.. py:classmethod:: benchbox.platforms.databricks.DatabricksAdapter.from_config(config: dict[str, Any])
+
+   Create Databricks adapter from unified configuration.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get Databricks platform information.
+
+   Captures comprehensive Databricks configuration including:
+   Runtime/Spark version
+   Warehouse/cluster size and configuration
+   Compute tier and pricing information (best effort)
+   Photon acceleration status
+   Auto-scaling configuration
+
+   Gracefully degrades if SDK is unavailable or permissions are insufficient.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.get_normalized_result_metadata(self, *, connection: Any | None=None, platform_info: Mapping[str, Any] | None=None) -> dict[str, Any]
+
+   Return Databricks-specific normalized workspace and warehouse metadata.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.get_target_dialect(self) -> str
+
+   Return the target SQL dialect for Databricks.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.preprocess_operation_sql(self, query_id: str, operation: Any) -> str | None
+
+   Rewrite operation write SQL for Databricks-only dialect gaps.
+
+   Respects catalog ``databricks`` overrides (including skip ``None``):
+   rewrites the override when present, otherwise the default write SQL.
+
+   ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
+   VARCHAR requires a length parameter; verified live with
+   DATATYPE_MISSING_SIZE on batch inserts)
+   ``unnest(generate_series(a, b))`` -> ``explode(sequence(a, b))``
+   (Databricks has neither function; verified live with
+   UNRESOLVED_ROUTINE ``unnest``)
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.check_server_database_exists(self, **connection_config) -> bool
+
+   Check if schema exists in Databricks catalog.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.validate_external_table_requirements(self) -> None
+
+   Validate required staging configuration for external table mode.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply Databricks-specific configurations including cache control.
+
+   Applies result cache control first, then any user-provided custom Spark configurations.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.new_stream_connection(self, connection: Any, *, benchmark_type: str | None=None) -> Any
+
+   Opens a stream-specific Databricks connection so concurrent benchmark streams do not share one cursor.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.get_query_plan(self, connection: Any, query: str) -> str | None
+
+   Get the Spark physical plan via ``EXPLAIN EXTENDED`` over the SQL cursor.
+
+   Databricks runs Spark SQL, so the plan text is parsed by
+   SparkQueryPlanParser. Returns ``None`` on any failure so capture degrades
+   gracefully.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.get_query_plan_parser(self)
+
+   Return the Spark plan parser (Databricks runs Spark SQL).
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.close_connection(self, connection: Any) -> None
+
+   Close Databricks connection.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.generate_tuning_clause(self, table_tuning) -> str
+
+   Generate Databricks-specific tuning clauses for CREATE TABLE statements.
+
+   Databricks supports:
+   USING DELTA (Delta Lake format) or USING HUDI (Apache Hudi)
+   PARTITIONED BY (column1, column2, ...)
+   CLUSTER BY (column1, column2, ...) for Delta Lake 2.0+
+   Z-ORDER optimization
+
+   CLUSTER BY / Z-ORDER are Delta-only: Hudi tables get USING HUDI,
+   record-key TBLPROPERTIES, and PARTITIONED BY, with clustering omitted
+   (Hudi manages file layout via its own cleaner/clustering configs).
+
+   :param table_tuning: The tuning configuration for the table
+
+   :returns: SQL clause string to be appended to CREATE TABLE statement
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.apply_table_tunings(self, table_tuning, connection: Any) -> None
+
+   Apply tuning configurations to a Databricks Delta Lake table.
+
+   Databricks tuning approach:
+   PARTITIONING: Handled via PARTITIONED BY in CREATE TABLE
+   CLUSTERING: Handled via CLUSTER BY in CREATE TABLE or ALTER TABLE
+   DISTRIBUTION: Achieved through Z-ORDER clustering and OPTIMIZE
+   Delta Lake optimization and maintenance
+
+   :param table_tuning: The tuning configuration to apply
+   :param connection: Databricks connection
+
+   :raises ValueError: If the tuning configuration is invalid for Databricks
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None
+
+   Apply unified tuning configuration to Databricks.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None
+
+   Apply Databricks-specific platform optimizations.
+
+   Databricks optimizations include:
+   Spark configuration tuning (adaptive query execution, join strategies)
+   Delta Lake optimization settings (auto-optimize, auto-compact)
+   Cluster autoscaling and resource allocation
+   Unity Catalog performance settings
+
+   :param platform_config: Platform optimization configuration
+   :param connection: Databricks connection
+
+.. py:attribute:: benchbox.platforms.databricks.DatabricksAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:attribute:: benchbox.platforms.databricks.DatabricksAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.databricks.DatabricksAdapter.supports_external_tables
+
+   Advertises whether the adapter implements external-table creation.
+
+.. py:method:: benchbox.platforms.databricks.DatabricksAdapter.apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None
+
+   Logs informational messages for enabled primary-key and foreign-key settings.
+   This hook executes no SQL and does not use ``connection``. Table-creation
+   hooks handle any platform-supported constraint DDL.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``DatabricksAdapter(**config)``.
+
+- ``server_hostname`` (alias ``host``), ``http_path`` and ``access_token``
+  (alias ``token``) identify the endpoint and credentials.
+- ``catalog`` defaults to ``"main"`` and ``schema`` to ``"benchbox"``.
+- ``uc_catalog``, ``uc_schema``, ``uc_volume`` and ``staging_root`` are optional
+  Unity Catalog/staging settings.
+- ``enable_delta_optimization``, ``delta_auto_optimize`` and
+  ``delta_auto_compact`` each default to ``True``.
+- ``cluster_size`` is optional requested metadata; it has no inferred size
+  default and does not establish observed warehouse capacity.
+- ``auto_terminate_minutes`` defaults to 30; ``create_catalog`` defaults to
+  ``False``.
 
 Configuration Examples
 ----------------------
@@ -496,9 +681,9 @@ Warehouse Selection
 
 2. **Use Serverless SQL Warehouses** for variable workloads:
 
-   - Faster start times
-   - Better resource utilization
-   - Automatic scaling
+   Faster start times
+   Better resource utilization
+   Automatic scaling
 
 Data Staging
 ~~~~~~~~~~~~

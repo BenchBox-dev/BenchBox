@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from collections import defaultdict
 
 from comment_payloads import command_words, inline_source_index
@@ -40,6 +41,8 @@ class PythonBindings:
         while scope is not None:
             values = self.bindings.get((scope, node.id), [])
             if values:
+                if all(isinstance(value, str) for value in values) and len(set(values)) == 1:
+                    return True, values[0]
                 return True, values[0] if len(values) == 1 else None
             scope = self.scope(scope)
         return False, None
@@ -107,6 +110,118 @@ class PythonBindings:
             ):
                 return command, "bash", self.literal(command)
         return None
+
+    def html_path(self, node: ast.AST, seen: frozenset[tuple[ast.AST | None, str]] = frozenset()) -> bool:
+        if isinstance(node, ast.Name):
+            scope = self.scope(node)
+            while scope is not None and (scope, node.id) not in self.bindings:
+                scope = self.scope(scope)
+            key = (scope, node.id)
+            if key in seen or key not in self.bindings:
+                return False
+            values = self.bindings[key]
+            parameter = isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+                argument.arg == node.id
+                and argument.annotation is not None
+                and self.actor(argument.annotation) == "pathlib.Path"
+                for argument in [*scope.args.posonlyargs, *scope.args.args, *scope.args.kwonlyargs]
+            )
+            anchored = parameter or any(
+                isinstance(value, ast.AST) and self.html_path(value, seen | {key}) for value in values
+            )
+
+            def derived(value: ast.AST) -> bool:
+                if isinstance(value, ast.Name) and value.id == node.id and self.scope(value) is scope:
+                    return anchored
+                if (
+                    isinstance(value, ast.Call)
+                    and isinstance(value.func, ast.Attribute)
+                    and value.func.attr in {"resolve", "absolute"}
+                    and not value.args
+                    and not value.keywords
+                ):
+                    return derived(value.func.value)
+                return self.html_path(value, seen | {key})
+
+            return anchored and all(
+                parameter if value is None else isinstance(value, ast.AST) and derived(value) for value in values
+            )
+        if isinstance(node, ast.Call):
+            if self.actor(node.func) == "pathlib.Path":
+                return True
+            return (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in {"resolve", "absolute"}
+                and not node.args
+                and not node.keywords
+                and self.html_path(node.func.value, seen)
+            )
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return self.literal(node.right) is not None and self.html_path(node.left, seen)
+        if isinstance(node, ast.Attribute) and node.attr == "parent":
+            return self.html_path(node.value, seen)
+        return False
+
+    def html_non_path(self, node: ast.AST) -> bool:
+        node = self.dereference(node)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return self.html_non_path(node.left)
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            return False
+        scope = self.scope(node.func)
+        while scope is not None and (scope, node.func.id) not in self.bindings:
+            scope = self.scope(scope)
+        if self.bindings.get((scope, node.func.id)) != [None]:
+            return False
+        return any(
+            isinstance(definition, ast.ClassDef)
+            and definition.name == node.func.id
+            and self.scope(definition) is scope
+            and not definition.bases
+            and not definition.keywords
+            and not definition.decorator_list
+            and {method.name for method in definition.body if isinstance(method, ast.FunctionDef)}
+            == {"__truediv__", "write_text"}
+            and all(
+                isinstance(method, ast.FunctionDef)
+                and not method.decorator_list
+                and not method.args.defaults
+                and not method.args.kwonlyargs
+                and method.args.vararg is None
+                and method.args.kwarg is None
+                and len(method.args.args) == 2
+                and len(method.body) == 1
+                and isinstance(method.body[0], ast.Return)
+                and isinstance(method.body[0].value, ast.Name)
+                and method.body[0].value.id == method.args.args[0 if method.name == "__truediv__" else 1].arg
+                for method in definition.body
+            )
+            for definition in self.parents
+        )
+
+    def html_payload(self, node: ast.Call) -> ast.AST | None:
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "write_text":
+            return None
+        target = self.dereference(node.func.value)
+        leaf = None
+        if isinstance(target, ast.BinOp) and isinstance(target.op, ast.Div):
+            leaf = self.literal(target.right)
+        elif isinstance(target, ast.Call) and self.actor(target.func) == "pathlib.Path" and len(target.args) == 1:
+            leaf = self.literal(target.args[0])
+        if leaf is None or not leaf.lower().endswith((".html", ".htm")):
+            return None
+        if not self.html_path(node.func.value):
+            return None if self.html_non_path(node.func.value) else node
+        data = [kw.value for kw in node.keywords if kw.arg == "data"]
+        if (
+            any(isinstance(argument, ast.Starred) for argument in node.args)
+            or any(keyword.arg is None for keyword in node.keywords)
+            or len(node.args) > 4
+            or len(data) > 1
+            or (node.args and data)
+        ):
+            return node
+        return node.args[0] if node.args else data[0] if data else node
 
     def path_kind(self, node: ast.AST, seen: frozenset[ast.AST] = frozenset()) -> str | None:
         node = self.dereference(node)
@@ -223,3 +338,28 @@ class PythonBindings:
         if index is not None:
             return args[index], language or "unsupported", self.literal(args[index])
         return None
+
+
+def python_html_sources(source: str, tree: ast.AST | None = None) -> list[tuple[int, str | None, str]]:
+    tree = ast.parse(source) if tree is None else tree
+    bindings = PythonBindings(tree)
+    result = []
+    for node in ast.walk(tree):
+        expression = bindings.html_payload(node) if isinstance(node, ast.Call) else None
+        if expression is None:
+            continue
+        origin = bindings.dereference(expression)
+        segment = ast.get_source_segment(source, origin) or ""
+        quoted = re.fullmatch(r"""[rRuU]*(?P<quote>["']{3}|["'])(?P<body>.*)(?P=quote)""", segment, re.S)
+        text = (
+            origin.value
+            if isinstance(origin, ast.Constant)
+            and isinstance(origin.value, str)
+            and quoted is not None
+            and quoted.group("body") == origin.value
+            else None
+        )
+        result.append(
+            (origin.lineno if text is not None else node.lineno, text, "html-output:" + ast.unparse(node.func.value))
+        )
+    return result

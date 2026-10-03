@@ -1,9 +1,6 @@
-"""Benchmark selection and configuration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from typing import Any, Optional
@@ -15,9 +12,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from benchbox.cli.system import SystemProfiler  # Now direct import
-
-# Import from core registry - single source of truth for benchmark metadata
+from benchbox.cli.system import SystemProfiler
 from benchbox.core.benchmark_registry import (
     BENCHMARK_ORDER,
     CATEGORY_ORDER,
@@ -44,9 +39,6 @@ _SUPPORT_STATUS_LABELS = {
 
 
 class BenchmarkManager:
-    """Benchmark selection and configuration management with intelligent guidance."""
-
-    # Category and benchmark ordering imported from core registry
     CATEGORY_ORDER = CATEGORY_ORDER
     BENCHMARK_ORDER = BENCHMARK_ORDER
 
@@ -55,27 +47,19 @@ class BenchmarkManager:
         self.verbosity = VerbositySettings.default()
 
     def set_verbosity(self, settings: VerbositySettings) -> None:
-        """Persist verbosity settings for generated benchmark configs."""
 
         self.verbosity = settings
 
     def _get_available_benchmarks(self) -> dict[str, dict[str, Any]]:
-        """Get information about available benchmarks with consistent typing.
-
-        Returns all benchmark metadata from the core registry, including
-        internal benchmarks that remain directly runnable by ID.
-        """
         return get_all_benchmarks()
 
     def _is_public_benchmark(self, benchmark_id: str, benchmark_info: dict[str, Any]) -> bool:
-        """Return whether a benchmark belongs on public interactive surfaces."""
         surface = benchmark_info.get("surface")
         if surface is None:
             surface = get_benchmark_surface(benchmark_id)
         return str(surface) == "public"
 
     def _get_public_benchmarks(self) -> dict[str, dict[str, Any]]:
-        """Return benchmarks shown in interactive selection and listing UIs."""
         return {
             bench_id: bench_info
             for bench_id, bench_info in self.benchmarks.items()
@@ -83,24 +67,13 @@ class BenchmarkManager:
         }
 
     def _support_status_label(self, benchmark_info: dict[str, Any]) -> str:
-        """Return the user-facing product support label for a benchmark."""
         status = str(benchmark_info["support_status"])
         return _SUPPORT_STATUS_LABELS.get(status, status.replace("_", "-"))
 
     def validate_scale_factor(self, benchmark_id: str, scale_factor: float) -> None:
-        """Validate scale factor against benchmark requirements.
-
-        Args:
-            benchmark_id: The benchmark identifier (e.g., "tpcds", "tpch")
-            scale_factor: The requested scale factor
-
-        Raises:
-            ValueError: If scale factor violates benchmark constraints
-        """
         core_validate_scale_factor(benchmark_id, scale_factor)
 
     def list_available_benchmarks(self):
-        """Display all available benchmarks categorized."""
         categories = {}
         for bench_id, bench_info in self._get_public_benchmarks().items():
             category = bench_info["category"]
@@ -127,15 +100,6 @@ class BenchmarkManager:
     def _filter_benchmarks(
         self, category: Optional[str] = None, search_term: Optional[str] = None
     ) -> dict[str, dict[str, Any]]:
-        """Filter benchmarks by category or search term.
-
-        Args:
-            category: Category name to filter by (e.g., "TPC Standards", "Academic Benchmarks")
-            search_term: Search term to match against name, description, or category (case-insensitive)
-
-        Returns:
-            Filtered dictionary of benchmarks
-        """
         filtered = self._get_public_benchmarks()
 
         if category:
@@ -157,23 +121,12 @@ class BenchmarkManager:
     def _display_all_benchmarks(
         self, filter_category: Optional[str] = None, search_term: Optional[str] = None
     ) -> dict[str, dict[str, Any]]:
-        """Display all benchmarks in a unified table with optional filtering.
-
-        Args:
-            filter_category: Optional category to filter by
-            search_term: Optional search term to filter by
-
-        Returns:
-            Dictionary of displayed benchmarks (for selection)
-        """
-        # Apply filters
         benchmarks_to_show = self._filter_benchmarks(category=filter_category, search_term=search_term)
 
         if not benchmarks_to_show:
             console.print("[yellow]No benchmarks match the current filters.[/yellow]")
             return benchmarks_to_show
 
-        # Build the unified table
         title = "Available Benchmarks"
         if filter_category:
             title += f" - {filter_category}"
@@ -189,11 +142,9 @@ class BenchmarkManager:
         table.add_column("Complexity", style="magenta", width=10)
         table.add_column("Description", style="white", width=50)
 
-        # Sort benchmarks for consistent display: by category, then by name
         sorted_benchmarks = sorted(benchmarks_to_show.items(), key=lambda x: (x[1]["category"], x[1]["display_name"]))
 
         for i, (bench_id, bench_info) in enumerate(sorted_benchmarks, start=1):
-            # Determine query count display
             if bench_info["num_queries"] > 0:
                 query_text = str(bench_info["num_queries"])
             else:
@@ -211,7 +162,6 @@ class BenchmarkManager:
 
         console.print(table)
 
-        # Show helpful controls
         console.print()
         controls = Text()
         controls.append("Controls: ", style="bold")
@@ -233,20 +183,11 @@ class BenchmarkManager:
         return benchmarks_to_show
 
     def _show_benchmark_preview(self, benchmark_id: str, benchmark_info: dict[str, Any]) -> None:
-        """Display detailed preview of a specific benchmark.
-
-        Args:
-            benchmark_id: Internal benchmark identifier
-            benchmark_info: Benchmark metadata dictionary
-        """
-        # Create preview panel
         preview_text = Text()
 
-        # Basic information
         preview_text.append(f"{benchmark_info['display_name']}\n", style="bold green")
         preview_text.append(f"{benchmark_info['description']}\n\n", style="white")
 
-        # Category and classification
         preview_text.append("Category: ", style="cyan")
         preview_text.append(f"{benchmark_info['category']}\n", style="white")
 
@@ -256,7 +197,6 @@ class BenchmarkManager:
         preview_text.append("Complexity: ", style="cyan")
         preview_text.append(f"{benchmark_info['complexity']}\n", style="white")
 
-        # Query information
         if benchmark_info["num_queries"] > 0:
             preview_text.append("Queries: ", style="cyan")
             preview_text.append(f"{benchmark_info['num_queries']} queries\n", style="white")
@@ -264,7 +204,6 @@ class BenchmarkManager:
             preview_text.append("Workload: ", style="cyan")
             preview_text.append(f"{benchmark_info['query_description']}\n", style="white")
 
-        # Scale factors
         preview_text.append("Supported Scale Factors: ", style="cyan")
         scale_str = ", ".join(str(s) for s in benchmark_info["scale_options"])
         preview_text.append(f"{scale_str}\n", style="white")
@@ -272,32 +211,24 @@ class BenchmarkManager:
         preview_text.append("Default Scale: ", style="cyan")
         preview_text.append(f"{benchmark_info['default_scale']}\n", style="white")
 
-        # Features
         preview_text.append("\nFeatures:\n", style="cyan")
         if benchmark_info.get("supports_streams"):
             preview_text.append("  ✓ Concurrent streams supported\n", style="green")
         else:
             preview_text.append("  - Concurrent streams not supported\n", style="dim")
 
-        # Estimated resources
         preview_text.append("\nEstimated Resources:\n", style="cyan")
         time_low, time_high = benchmark_info["estimated_time_range"]
         preview_text.append("  Runtime: ", style="white")
         preview_text.append(f"{time_low}-{time_high} minutes (at default scale)\n", style="yellow")
 
-        # Get memory estimate for default scale
         est_mem = self._estimate_memory_usage(benchmark_id, benchmark_info["default_scale"])
         preview_text.append("  Memory: ", style="white")
         preview_text.append(f"~{est_mem:.1f} GB (at SF={benchmark_info['default_scale']})\n", style="yellow")
 
-        # Show panel
         console.print(Panel(preview_text, title=f"Preview: {benchmark_id}", border_style="cyan"))
 
-        # Note: Query preview is available via separate command
-        # Not prompted here to avoid interactive issues in tests
-
     def _show_benchmark_selection_help(self) -> None:
-        """Show help for benchmark selection interface."""
         help_text = Text()
         help_text.append("Benchmark Selection Help\n\n", style="bold cyan")
 
@@ -333,14 +264,7 @@ class BenchmarkManager:
         console.print()
 
     def _show_sample_queries(self, benchmark_id: str, limit: int = 3) -> None:
-        """Show sample queries from a benchmark.
-
-        Args:
-            benchmark_id: Benchmark identifier
-            limit: Maximum number of queries to show
-        """
         try:
-            # Load benchmark to get queries
             from benchbox.core.benchmark_loader import get_core_benchmark_class
 
             benchmark_class = get_core_benchmark_class(benchmark_id)
@@ -355,11 +279,9 @@ class BenchmarkManager:
                 f"\n[bold cyan]Sample Queries (showing {min(limit, len(benchmark.queries))} of {len(benchmark.queries)})[/bold cyan]\n"
             )
 
-            # Show first few queries
             for i, query_id in enumerate(list(benchmark.queries.keys())[:limit], 1):
                 query_sql = benchmark.queries[query_id]
 
-                # Truncate long queries
                 if len(query_sql) > 500:
                     query_sql = query_sql[:500] + "\n... (truncated)"
 
@@ -371,33 +293,15 @@ class BenchmarkManager:
             console.print(f"[yellow]Could not load sample queries: {e}[/yellow]")
 
     def select_benchmark(self) -> BenchmarkConfig:
-        """Interactive benchmark selection with two-phase Category > Benchmark flow.
-
-        Phase 1: Select benchmark category (TPC, Primitives, etc.)
-        Phase 2: Select specific benchmark within that category
-
-        Returns:
-            Configured BenchmarkConfig with user selections
-        """
-        # Phase 1: Category Selection
         selected_category = self._prompt_category_selection()
 
-        # Phase 2: Benchmark Selection within Category
         benchmark_id, benchmark_info = self._prompt_benchmark_in_category(selected_category)
 
-        # Show confirmation
         console.print(f"\n[green]✓ Selected: {benchmark_info['display_name']} ({benchmark_info['category']})[/green]")
 
-        # Configuration
         return self._configure_benchmark(benchmark_id, benchmark_info)
 
     def _prompt_category_selection(self) -> str:
-        """Display category selection table and prompt for choice.
-
-        Returns:
-            Selected category name
-        """
-        # Build category info with counts, ordered by popularity
         categories_info = {}
         public_benchmarks = self._get_public_benchmarks()
         for bench_info in public_benchmarks.values():
@@ -407,7 +311,6 @@ class BenchmarkManager:
             categories_info[category]["count"] += 1
             categories_info[category]["benchmarks"].append(bench_info["display_name"])
 
-        # Category descriptions
         descriptions = {
             "TPC": "Official industry standards for comparing databases",
             "Academic": "Research benchmarks from academia",
@@ -418,14 +321,11 @@ class BenchmarkManager:
             "Real World": "Real-world datasets for realistic testing",
         }
 
-        # Order categories by popularity
         ordered_categories = [c for c in self.CATEGORY_ORDER if c in categories_info]
-        # Add any categories not in the order (future-proofing)
         for cat in categories_info:
             if cat not in ordered_categories:
                 ordered_categories.append(cat)
 
-        # Build table
         table = Table(title="Benchmark Categories", show_header=True)
         table.add_column("ID", style="cyan bold", width=3, justify="right")
         table.add_column("Category", style="green bold", width=14)
@@ -444,7 +344,6 @@ class BenchmarkManager:
         console.print(table)
         console.print()
 
-        # Prompt for selection (default to TPC which is first/most popular)
         choice_map = {str(i + 1): cat for i, cat in enumerate(ordered_categories)}
         valid_choices = list(choice_map.keys())
 
@@ -452,35 +351,22 @@ class BenchmarkManager:
         return choice_map[selection]
 
     def _prompt_benchmark_in_category(self, category: str) -> tuple[str, dict[str, Any]]:
-        """Display benchmarks in a category and prompt for choice.
-
-        Args:
-            category: The category to show benchmarks for
-
-        Returns:
-            Tuple of (benchmark_id, benchmark_info)
-        """
-        # Filter benchmarks by category
         category_benchmarks = {
             bench_id: info for bench_id, info in self._get_public_benchmarks().items() if info["category"] == category
         }
 
-        # Sort by popularity order (if defined), then alphabetically
         popularity_order = self.BENCHMARK_ORDER.get(category, [])
 
         def sort_key(item: tuple[str, dict[str, Any]]) -> tuple[int, str]:
             bench_id, info = item
-            # Primary: position in popularity order (or high number if not listed)
             try:
                 position = popularity_order.index(bench_id)
             except ValueError:
                 position = 999
-            # Secondary: display name
             return (position, info["display_name"])
 
         sorted_benchmarks = sorted(category_benchmarks.items(), key=sort_key)
 
-        # Build table
         table = Table(title=f"{category} Benchmarks", show_header=True)
         table.add_column("ID", style="cyan bold", width=3, justify="right")
         table.add_column("Name", style="green bold", width=18)
@@ -489,7 +375,6 @@ class BenchmarkManager:
         table.add_column("Description", style="white", width=45)
 
         for i, (_bench_id, bench_info) in enumerate(sorted_benchmarks, start=1):
-            # Determine query count display
             query_text = str(bench_info["num_queries"]) if bench_info["num_queries"] > 0 else "-"
 
             table.add_row(
@@ -503,7 +388,6 @@ class BenchmarkManager:
         console.print(table)
         console.print()
 
-        # Prompt for selection (default to first/most popular)
         choice_map = {str(i + 1): bench_id for i, (bench_id, _) in enumerate(sorted_benchmarks)}
         valid_choices = list(choice_map.keys())
 
@@ -512,7 +396,6 @@ class BenchmarkManager:
         return benchmark_id, category_benchmarks[benchmark_id]
 
     def _display_benchmark_categories(self):
-        """Display benchmark categories."""
         categories = {}
         for bench_info in self._get_public_benchmarks().values():
             category = bench_info["category"]
@@ -545,7 +428,6 @@ class BenchmarkManager:
         console.print(table)
 
     def _select_category(self, categories: list[str]) -> str:
-        """Select benchmark category."""
         console.print("\n[bold]Available Categories:[/bold]")
 
         choice_map = {str(i + 1): cat for i, cat in enumerate(categories)}
@@ -557,7 +439,6 @@ class BenchmarkManager:
         return choice_map[selection]
 
     def _select_specific_benchmark(self, available_benchmarks: dict[str, dict[str, Any]]) -> str:
-        """Select specific benchmark."""
         if len(available_benchmarks) == 1:
             benchmark_id = list(available_benchmarks.keys())[0]
             console.print(f"\n[green]✅ Selected {available_benchmarks[benchmark_id]['display_name']}[/green]")
@@ -594,20 +475,15 @@ class BenchmarkManager:
         return choice_map[selection]
 
     def _configure_benchmark(self, benchmark_id: str, benchmark_info: dict[str, Any]) -> BenchmarkConfig:
-        """Configure selected benchmark with intelligent guidance."""
         console.print(f"\n[bold]Configuring {benchmark_info['display_name']}[/bold]")
 
         system_profile = self._get_system_profile()
 
-        # Step-by-step configuration
         scale_factor = self._prompt_scale(benchmark_id, benchmark_info, system_profile)
         concurrency = self._prompt_concurrency(benchmark_info, system_profile)
-        queries = None  # Users should use smaller scales or different benchmarks for faster tests
+        queries = None
         compress_data, compression_type, compression_level = self._prompt_compression()
 
-        # Final summary - execution type is derived from the phases selected in the
-        # following prompt_phases() call (see run.py phase->execution-type mapping),
-        # so it is not displayed here.
         self._display_configuration_summary(
             benchmark_id,
             benchmark_info,
@@ -644,12 +520,11 @@ class BenchmarkManager:
         benchmark_info: dict[str, Any],
         system_profile: dict[str, Any],
     ) -> float:
-        """Prompt for scale factor with smart recommendations."""
         scale_options = benchmark_info["scale_options"]
         recommended_scale = self._get_recommended_scale(benchmark_info, system_profile)
 
         if len(scale_options) > 1:
-            while True:  # Loop until valid scale factor is chosen
+            while True:
                 console.print("\n[bold cyan]Scale Factor Selection[/bold cyan]")
                 console.print(f"Available options: {scale_options}")
                 console.print(f"• [green]Recommended for your system: {recommended_scale}[/green]")
@@ -660,9 +535,8 @@ class BenchmarkManager:
 
                 try:
                     self._validate_scale_choice(scale_factor, benchmark_id, benchmark_info, system_profile)
-                    break  # Validation passed, exit loop
+                    break
                 except ValueError:
-                    # User declined risky scale factor, prompt again
                     continue
         else:
             scale_factor = scale_options[0]
@@ -671,7 +545,6 @@ class BenchmarkManager:
         return scale_factor
 
     def _prompt_concurrency(self, benchmark_info: dict[str, Any], system_profile: dict[str, Any]) -> int:
-        """Prompt for concurrency with smart defaults."""
         if not benchmark_info.get("supports_streams", False):
             return 1
 
@@ -694,7 +567,6 @@ class BenchmarkManager:
         return concurrency
 
     def _prompt_compression(self) -> tuple[bool, str, Optional[int]]:
-        """Prompt for data compression options."""
         console.print("\n[bold cyan]Data Compression Options[/bold cyan]")
         if not Confirm.ask("Enable data compression?", default=False):
             return False, "zstd", None
@@ -722,7 +594,6 @@ class BenchmarkManager:
         compression_type: str,
         compression_level: Optional[int],
     ):
-        """Display final configuration summary."""
         console.print("\n[bold green]Configuration Summary[/bold green]")
 
         table = Table(show_header=False, box=None)
@@ -748,7 +619,6 @@ class BenchmarkManager:
             level_str = f" (level {compression_level})" if compression_level else ""
             table.add_row("Compression:", f"{compression_type}{level_str}")
 
-        # Estimated resources and time
         est_memory = self._estimate_memory_usage(benchmark_id, scale_factor)
         est_time = self._estimate_execution_time(benchmark_id, scale_factor)
 
@@ -759,7 +629,6 @@ class BenchmarkManager:
         console.print()
 
     def _get_system_profile(self) -> dict[str, Any]:
-        """Get basic system profile for recommendations."""
         try:
             profiler = SystemProfiler()
             profile = profiler.get_system_profile()
@@ -773,7 +642,6 @@ class BenchmarkManager:
             return {"memory_gb": 8, "cpu_cores": 4, "architecture": "unknown"}
 
     def _get_recommended_scale(self, benchmark_info: dict[str, Any], system_profile: dict[str, Any]) -> float:
-        """Get recommended scale factor based on system resources."""
         memory_gb = system_profile["memory_gb"]
         scale_options = benchmark_info["scale_options"]
 
@@ -791,7 +659,6 @@ class BenchmarkManager:
         scale_options: list[float],
         system_profile: dict[str, Any],
     ):
-        """Display resource estimates for different scale factors."""
         table = Table(title="Scale Factor Resource Estimates")
         table.add_column("Scale", style="cyan")
         table.add_column("Est. Memory", style="yellow")
@@ -823,12 +690,10 @@ class BenchmarkManager:
         console.print(table)
 
     def _estimate_memory_usage(self, benchmark_id: str, scale: float) -> float:
-        """Estimate memory usage for a given benchmark and scale."""
         base = float(self.benchmarks[benchmark_id]["base_memory_gb"])
         return base * scale
 
     def _estimate_execution_time(self, benchmark_id: str, scale: float) -> float:
-        """Estimate execution time in minutes for full benchmark."""
         low, high = self.benchmarks[benchmark_id]["estimated_time_range"]
         base_avg = (low + high) / 2
         return base_avg * (0.5 + 0.5 * scale)
@@ -840,10 +705,8 @@ class BenchmarkManager:
         benchmark_info: dict[str, Any],
         system_profile: dict[str, Any],
     ):
-        """Validate scale factor choice and provide warnings."""
         from rich.prompt import Confirm
 
-        # Check benchmark-specific minimum scale requirements when present.
         min_scale = benchmark_info.get("min_scale")
         if min_scale is not None and scale_factor < min_scale:
             console.print(
@@ -863,7 +726,6 @@ class BenchmarkManager:
             console.print("[yellow]This is likely to cause out-of-memory errors during execution[/yellow]")
             console.print(f"[dim]Recommended scale for your system: {recommended_scale}[/dim]")
 
-            # Require explicit confirmation for risky scale factors
             if not Confirm.ask("\n[bold]Do you want to proceed with this scale factor anyway?[/bold]", default=False):
                 console.print("[green]Scale factor selection cancelled. Please choose a safer value.[/green]")
                 raise ValueError(f"Scale factor {scale_factor} exceeds safe memory limits")
@@ -875,23 +737,12 @@ class BenchmarkManager:
 
 
 def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
-    """Prompt user to select benchmark phases in interactive mode.
-
-    Provides preset options for common workflows and custom phase selection.
-
-    Args:
-        default_phases: Default phases if user accepts defaults
-
-    Returns:
-        List of phases to run
-    """
     if default_phases is None:
         default_phases = ["power"]
 
     console.print("\n[bold cyan]Benchmark Phases[/bold cyan]")
     console.print("Select which phases to run:")
 
-    # Preset options for common workflows
     presets = {
         "1": ("Quick Test (power only)", ["power"]),
         "2": ("Full Benchmark (generate, load, power)", ["generate", "load", "power"]),
@@ -904,8 +755,7 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
     for key, (label, _) in presets.items():
         console.print(f"  {key}. {label}")
 
-    # Find default choice
-    default_choice = "1"  # Default to Quick Test
+    default_choice = "1"
     for key, (_, phases) in presets.items():
         if phases == default_phases:
             default_choice = key
@@ -919,7 +769,6 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
         console.print(f"[green]✓ {selected_label}: {', '.join(selected_phases)}[/green]")
         return selected_phases
 
-    # Custom selection
     valid_phases = list(VALID_PHASES)
     unique_phases = _prompt_custom_phases(valid_phases)
 
@@ -928,7 +777,6 @@ def prompt_phases(default_phases: list[str] | None = None) -> list[str]:
 
 
 def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
-    """Display phase menu and parse user input (numbers or names) into deduplicated phase list."""
     console.print("\n[bold]Available phases:[/bold]")
     console.print(
         f"[dim]Enter phase numbers (1-{len(valid_phases)}) or phase names - not query numbers. "
@@ -962,7 +810,6 @@ def _prompt_custom_phases(valid_phases: list[str]) -> list[str]:
 
 
 def _parse_phase_input(raw: str, valid_phases: list[str]) -> list[str]:
-    """Parse comma-separated phase input (numeric indices or names) into a deduplicated list."""
     seen: set[str] = set()
     result: list[str] = []
     for item in raw.split(","):
@@ -981,11 +828,6 @@ def _parse_phase_input(raw: str, valid_phases: list[str]) -> list[str]:
 
 
 def prompt_force_regeneration() -> str | None:
-    """Prompt for force regeneration options.
-
-    Returns:
-        Force mode ('all', 'datagen', 'upload') or None to not force
-    """
     from rich.prompt import Confirm, Prompt
 
     console.print("\n[bold cyan]Force Regeneration[/bold cyan]")
@@ -1009,23 +851,8 @@ def prompt_force_regeneration() -> str | None:
 
 
 def prompt_official_mode(benchmark_id: str, scale_factor: float) -> tuple[bool, float | None]:
-    """Prompt for TPC-compliant official mode.
-
-    In official mode:
-    - Scale factor must be TPC-allowed (1, 10, 30, 100, etc.)
-    - Seed is required for reproducibility
-    - Results are TPC-compliant
-
-    Args:
-        benchmark_id: Benchmark identifier (tpch, tpcds, etc.)
-        scale_factor: Currently selected scale factor
-
-    Returns:
-        Tuple of (official_mode_enabled, adjusted_scale_factor or None)
-    """
     from rich.prompt import Confirm, FloatPrompt
 
-    # Only TPC benchmarks support official mode
     if not benchmark_id.lower().startswith("tpc"):
         return False, None
 
@@ -1035,14 +862,12 @@ def prompt_official_mode(benchmark_id: str, scale_factor: float) -> tuple[bool, 
     if not Confirm.ask("Enable TPC-compliant official mode?", default=False):
         return False, None
 
-    # Validate scale factor
     tpc_allowed_scales = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
 
     if scale_factor not in tpc_allowed_scales:
         console.print(f"\n[yellow]⚠️  Scale factor {scale_factor} is not TPC-compliant.[/yellow]")
         console.print(f"[dim]Allowed scale factors: {sorted(tpc_allowed_scales)}[/dim]")
 
-        # Find nearest allowed scale factor
         if scale_factor < 1:
             nearest = 1
         else:
@@ -1063,15 +888,10 @@ def prompt_official_mode(benchmark_id: str, scale_factor: float) -> tuple[bool, 
             return True, new_scale
 
     console.print(f"[green]✓ TPC Official Mode enabled (scale factor {scale_factor} is compliant)[/green]")
-    return True, None  # No scale adjustment needed
+    return True, None
 
 
 def prompt_seed() -> int | None:
-    """Prompt for RNG seed for reproducible benchmark runs.
-
-    Returns:
-        Seed value if specified, None for random seed
-    """
     import random
 
     from rich.prompt import Confirm, IntPrompt
@@ -1083,7 +903,6 @@ def prompt_seed() -> int | None:
         console.print("[dim]Using random seed (non-reproducible)[/dim]")
         return None
 
-    # Suggest a random seed the user can accept or modify
     suggested_seed = random.randint(1, 999999)
     seed = IntPrompt.ask("Enter seed value", default=suggested_seed)
 
@@ -1092,11 +911,6 @@ def prompt_seed() -> int | None:
 
 
 def prompt_validation_mode() -> str | None:
-    """Prompt for result validation mode.
-
-    Returns:
-        Validation mode ('exact', 'loose', 'range', 'disabled', 'full') or None for default
-    """
     from rich.prompt import Confirm, Prompt
 
     console.print("\n[bold cyan]Result Validation[/bold cyan]")
@@ -1123,17 +937,8 @@ def prompt_validation_mode() -> str | None:
 
 
 def prompt_capture_plans(platform: str) -> bool:
-    """Prompt for query execution plan capture.
-
-    Args:
-        platform: Platform name to check support
-
-    Returns:
-        True if plan capture should be enabled
-    """
     from rich.prompt import Confirm
 
-    # Platforms that support plan capture
     supported_platforms = {"duckdb", "postgresql", "datafusion", "polars", "spark", "pyspark"}
 
     platform_lower = platform.lower()
@@ -1153,17 +958,6 @@ def prompt_capture_plans(platform: str) -> bool:
 
 
 def prompt_output_location(default_output: str | None = None) -> str | None:
-    """Prompt for custom output location.
-
-    For local platforms, allows users to specify custom output directories
-    for organizing results, using faster storage, or avoiding disk space issues.
-
-    Args:
-        default_output: Default output path (typically benchmark_runs/)
-
-    Returns:
-        Custom output path or None to use default
-    """
     from pathlib import Path
 
     from rich.prompt import Confirm, Prompt
@@ -1183,10 +977,8 @@ def prompt_output_location(default_output: str | None = None) -> str | None:
         console.print("[dim]Using default output location[/dim]")
         return None
 
-    # Expand user path and validate
     expanded_path = Path(custom_path).expanduser().resolve()
 
-    # Check if parent directory exists (we'll create the output dir)
     if not expanded_path.parent.exists():
         console.print(f"[yellow]⚠️  Parent directory doesn't exist: {expanded_path.parent}[/yellow]")
         if Confirm.ask("Create directory?", default=True):
@@ -1206,36 +998,19 @@ def prompt_output_location(default_output: str | None = None) -> str | None:
 
 
 def get_platform_format_recommendation(platform: str) -> tuple[str | None, str]:
-    """Get recommended data format for a platform.
-
-    Args:
-        platform: Platform name
-
-    Returns:
-        Tuple of (recommended_format or None, explanation)
-    """
     platform_lower = platform.lower()
 
-    # Platform-specific format recommendations
     recommendations = {
-        # Databricks: Delta Lake is native
         "databricks": ("delta", "Delta Lake is Databricks' native format"),
-        # Snowflake/Redshift/BigQuery: Iceberg support
         "snowflake": ("iceberg", "Iceberg has native Snowflake support"),
         "redshift": ("iceberg", "Iceberg has native Redshift support"),
         "bigquery": ("iceberg", "Iceberg has native BigQuery support"),
-        # DuckDB: Excellent Parquet/Delta support
         "duckdb": ("parquet", "DuckDB has excellent Parquet performance"),
-        # ClickHouse: Native Parquet support
         "clickhouse": ("parquet", "ClickHouse has native Parquet support"),
-        # Spark: Delta Lake is common
         "spark": ("delta", "Delta Lake integrates well with Spark"),
         "pyspark": ("delta", "Delta Lake integrates well with Spark"),
-        # DataFusion: Parquet is native
         "datafusion": ("parquet", "DataFusion has native Parquet support"),
-        # Polars: Parquet is preferred
         "polars": ("parquet", "Polars has excellent Parquet performance"),
-        # Athena/Presto/Trino: All three work well
         "athena": ("parquet", "Parquet is efficient for Athena"),
         "presto": ("parquet", "Parquet is efficient for Presto"),
         "trino": ("iceberg", "Iceberg has native Trino support"),
@@ -1244,24 +1019,14 @@ def get_platform_format_recommendation(platform: str) -> tuple[str | None, str]:
     if platform_lower in recommendations:
         return recommendations[platform_lower]
 
-    # Platforms that don't support open table formats
     no_format_support = {"sqlite", "postgresql", "mysql", "sqlite3"}
     if platform_lower in no_format_support:
         return (None, "This platform uses its native storage format")
 
-    # Default fallback
     return ("parquet", "Parquet is a widely compatible format")
 
 
 def prompt_table_mode(default_mode: str = "native") -> str:
-    """Prompt for table mode selection in interactive runs.
-
-    Args:
-        default_mode: Default mode to preselect ("native" or "external")
-
-    Returns:
-        Selected table mode ("native" or "external")
-    """
     from rich.prompt import Prompt
 
     normalized_default = default_mode.strip().lower() if default_mode else "native"
@@ -1284,28 +1049,16 @@ def prompt_table_mode(default_mode: str = "native") -> str:
 
 
 def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
-    """Prompt for table format selection with platform-aware recommendations.
-
-    Args:
-        platform: Selected platform name
-
-    Returns:
-        Tuple of (format or None for CSV, compression or None)
-        Format can be: 'parquet', 'vortex', 'delta', 'iceberg', or None for CSV
-    """
     from rich.prompt import Confirm, Prompt
 
-    # Get platform recommendation
     recommended_format, recommendation_reason = get_platform_format_recommendation(platform)
 
-    # Check if platform supports open table formats
     if recommended_format is None:
         return None, None
 
     console.print("\n[bold cyan]Data Format Selection[/bold cyan]")
     console.print("[dim]Choose a data format for benchmark data generation.[/dim]")
 
-    # Check if user wants non-default format
     if not Confirm.ask("Configure data format? (default: CSV)", default=False):
         console.print("[dim]Using CSV format (default)[/dim]")
         return None, None
@@ -1317,15 +1070,13 @@ def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
     console.print("  4. Delta Lake - ACID transactions, time travel, schema evolution")
     console.print("  5. Apache Iceberg - Open standard, multi-engine support")
 
-    # Show platform recommendation
     format_display = {"parquet": "Parquet", "vortex": "Vortex", "delta": "Delta Lake", "iceberg": "Iceberg"}
     if recommended_format:
         display_name = format_display.get(recommended_format, recommended_format)
         console.print(f"\n[green]💡 Recommended for {platform.title()}: {display_name}[/green]")
         console.print(f"[dim]   {recommendation_reason}[/dim]")
 
-    # Get format choice - set default based on recommendation
-    default_choice = "1"  # CSV default
+    default_choice = "1"
     if recommended_format == "parquet":
         default_choice = "2"
     elif recommended_format == "vortex":
@@ -1344,7 +1095,6 @@ def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
         console.print("[green]✓ Using CSV format[/green]")
         return None, None
 
-    # Prompt for compression (for Parquet, Vortex, Delta, Iceberg)
     compression = None
     if selected_format in {"parquet", "vortex", "delta", "iceberg"}:
         console.print("\n[bold cyan]Compression[/bold cyan]")
@@ -1357,18 +1107,15 @@ def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
             "iceberg": ["zstd", "snappy", "gzip", "none"],
         }
 
-        # Default compression by format
         default_compression = {"parquet": "snappy", "vortex": "zstd", "delta": "snappy", "iceberg": "zstd"}
 
         options = compression_options.get(selected_format, ["snappy", "zstd", "none"])
         default = default_compression.get(selected_format, "snappy")
 
-        # Display numbered list
         for i, opt in enumerate(options, start=1):
             marker = "(default)" if opt == default else ""
             console.print(f"  {i}. {opt} {marker}")
 
-        # Build choice map and prompt
         choice_map = {str(i + 1): opt for i, opt in enumerate(options)}
         default_choice = str(options.index(default) + 1)
         valid_choices = list(choice_map.keys())
@@ -1379,7 +1126,6 @@ def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
         if compression == "none":
             compression = None
 
-    # Build format string
     format_display_name = format_display.get(selected_format, selected_format)
     if compression:
         console.print(f"[green]✓ Format: {format_display_name} with {compression} compression[/green]")
@@ -1390,11 +1136,6 @@ def prompt_table_format(platform: str) -> tuple[str | None, str | None]:
 
 
 def prompt_verbose_output() -> int:
-    """Prompt for verbose output level.
-
-    Returns:
-        Verbosity level: 0 (normal), 1 (verbose), 2 (very verbose/debug)
-    """
     from rich.prompt import Confirm, Prompt
 
     console.print("\n[bold cyan]Output Verbosity[/bold cyan]")
@@ -1421,10 +1162,6 @@ _SENTINEL = object()
 
 
 def _prompt_single_option(name: str, spec: Any) -> Any:
-    """Prompt the user for a single platform option value based on its type.
-
-    Returns the parsed value, or ``_SENTINEL`` if no value was provided.
-    """
     from rich.prompt import Confirm, Prompt
 
     description = spec.help or f"Configure {name}"
@@ -1468,7 +1205,6 @@ def _prompt_single_option(name: str, spec: Any) -> Any:
                 return None
         return None
 
-    # String option (default)
     default_str = str(spec.default) if spec.default is not None else ""
     value = Prompt.ask(f"Enter {name}", default=default_str)
     if value.strip():
@@ -1479,24 +1215,12 @@ def _prompt_single_option(name: str, spec: Any) -> Any:
 
 
 def prompt_platform_options(platform: str) -> dict[str, Any]:
-    """Prompt for platform-specific configuration options.
-
-    Dynamically prompts based on the platform's registered option specs.
-
-    Args:
-        platform: Platform name
-
-    Returns:
-        Dictionary of configured platform options
-    """
     from rich.prompt import Confirm
 
     from benchbox.cli.platform_hooks import PlatformHookRegistry
 
-    # Get available options for this platform
     specs = PlatformHookRegistry.list_option_specs(platform.lower())
 
-    # Filter out driver-related options (handled separately)
     configurable_specs = {
         name: spec for name, spec in specs.items() if name not in {"driver_version", "driver_auto_install"}
     }
@@ -1518,7 +1242,6 @@ def prompt_platform_options(platform: str) -> dict[str, Any]:
         if result is not _SENTINEL:
             options[name] = result
 
-    # Show configured options
     if options:
         console.print("\n[green]✓ Platform options configured:[/green]")
         for name, value in options.items():
@@ -1530,22 +1253,12 @@ def prompt_platform_options(platform: str) -> dict[str, Any]:
 
 
 def prompt_query_subset(benchmark_id: str, num_queries: int) -> list[str] | None:
-    """Prompt user to optionally select a query subset.
-
-    Args:
-        benchmark_id: Benchmark identifier (tpch, tpcds, etc.)
-        num_queries: Total number of queries in the benchmark
-
-    Returns:
-        List of query IDs to run, or None for all queries
-    """
     console.print("\n[bold cyan]Query Selection[/bold cyan]")
     console.print(f"The benchmark has {num_queries} queries.")
 
     if not Confirm.ask("Run all queries?", default=True):
         console.print("\n[dim]Enter query IDs separated by commas (e.g., 'Q1,Q6,Q17' or '1,6,17')[/dim]")
 
-        # Show query range for reference
         if benchmark_id.lower() == "tpch":
             console.print("[dim]TPC-H queries: Q1-Q22[/dim]")
         elif benchmark_id.lower() == "tpcds":
@@ -1555,7 +1268,6 @@ def prompt_query_subset(benchmark_id: str, num_queries: int) -> list[str] | None
 
         query_input = Prompt.ask("Queries")
         if query_input.strip():
-            # Parse query input - normalize to Q-prefixed format
             queries = []
             for q in query_input.split(","):
                 q = q.strip().upper()

@@ -1,23 +1,6 @@
-"""ClickBench data generation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides functionality to generate synthetic web analytics data
-that mimics the ClickBench dataset structure and distributions.
-
-The generated data represents web analytics logs with realistic patterns for:
-- User sessions and behavior
-- Browser and device information
-- Referrer and search data
-- Geographic and demographic attributes
-- Technical performance metrics
-
-Note: The actual ClickBench benchmark uses a specific dataset with 99,997,497 records
-derived from real web analytics data. This generator creates similar synthetic data
-for testing and development purposes.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import random
 from datetime import datetime, timedelta

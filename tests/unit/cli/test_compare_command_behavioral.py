@@ -1,20 +1,6 @@
-"""Tests for compare command behavioral coverage.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers CLI-level behavior for the `benchbox compare` command including:
-- --list-platforms flag
-- Conflicting argument detection (platforms + files)
-- Non-interactive mode with missing arguments
-- Threshold parsing (_parse_threshold)
-- Regression detection (_check_regression)
-- Multi-file comparison warning
-- --run flag deprecation warning
-- Output format dispatch
-- ResultFileMetadata edge cases
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,12 +17,6 @@ from click.testing import CliRunner
 
 from benchbox.cli.app import cli
 
-# benchbox.cli.commands.__init__ re-exports `compare` (a Click Command) under
-# the same name as the compare submodule.  On Python 3.10 mock's string-based
-# patch() resolves the target via getattr(benchbox.cli.commands, "compare"),
-# which returns the Command object, not the submodule.  Seeding sys.modules
-# here via __import__ and using patch.object() avoids the ambiguity on all
-# Python versions.
 __import__("benchbox.cli.commands.compare")
 _compare_module = _sys.modules["benchbox.cli.commands.compare"]
 
@@ -47,14 +27,11 @@ pytestmark = [
 
 
 class TestListPlatformsFlag:
-    """Test --list-platforms flag behavior."""
-
     @patch("benchbox.platforms.list_available_platforms", return_value=["duckdb", "sqlite"])
     @patch(
         "benchbox.platforms.list_available_dataframe_platforms", return_value={"polars-df": True, "pandas-df": False}
     )
     def test_list_platforms_shows_sql_and_dataframe_platforms(self, mock_df, mock_sql):
-        """--list-platforms should display SQL and DataFrame platforms."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--list-platforms"])
 
@@ -68,7 +45,6 @@ class TestListPlatformsFlag:
     @patch("benchbox.platforms.list_available_platforms", return_value=["duckdb"])
     @patch("benchbox.platforms.list_available_dataframe_platforms", return_value={"pandas-df": False})
     def test_list_platforms_shows_not_installed(self, mock_df, mock_sql):
-        """--list-platforms should show not-installed platforms separately."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--list-platforms"])
 
@@ -78,10 +54,7 @@ class TestListPlatformsFlag:
 
 
 class TestConflictingArguments:
-    """Test detection of conflicting platform and file arguments."""
-
     def test_platforms_and_files_together_rejected(self):
-        """Specifying both -p and file arguments should error."""
         runner = CliRunner()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as tmp_file:
             json.dump({"test": "data"}, tmp_file)
@@ -90,7 +63,6 @@ class TestConflictingArguments:
         try:
             result = runner.invoke(cli, ["compare", "-p", "duckdb", file_path])
 
-            # Should fail with a conflict error
             assert result.exit_code != 0
             assert "Cannot specify both" in result.output
         finally:
@@ -98,10 +70,7 @@ class TestConflictingArguments:
 
 
 class TestNonInteractiveNoArgs:
-    """Test non-interactive mode with missing arguments."""
-
     def test_non_interactive_no_platforms_no_files_errors(self):
-        """Non-interactive mode with no arguments should error."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--non-interactive"])
 
@@ -111,8 +80,6 @@ class TestNonInteractiveNoArgs:
 
 
 class TestParseThreshold:
-    """Test _parse_threshold helper for regression threshold parsing."""
-
     def test_percentage_format(self):
         from benchbox.cli.commands.compare import _parse_threshold
 
@@ -170,8 +137,6 @@ class TestParseThreshold:
 
 
 class TestCheckRegression:
-    """Test _check_regression logic for detecting performance regressions."""
-
     def test_no_regression_within_threshold(self):
         from benchbox.cli.commands.compare import _check_regression
 
@@ -184,7 +149,7 @@ class TestCheckRegression:
             ],
         }
 
-        assert _check_regression(comparison, 0.10) is False  # 10% threshold
+        assert _check_regression(comparison, 0.10) is False
 
     def test_regression_detected_in_overall_metrics(self):
         from benchbox.cli.commands.compare import _check_regression
@@ -196,7 +161,7 @@ class TestCheckRegression:
             "query_comparisons": [],
         }
 
-        assert _check_regression(comparison, 0.10) is True  # 25% > 10% threshold
+        assert _check_regression(comparison, 0.10) is True
 
     def test_regression_detected_in_query_comparisons(self):
         from benchbox.cli.commands.compare import _check_regression
@@ -205,11 +170,11 @@ class TestCheckRegression:
             "performance_changes": {},
             "query_comparisons": [
                 {"query_id": "q1", "change_percent": 2.0},
-                {"query_id": "q2", "change_percent": 50.0},  # regression
+                {"query_id": "q2", "change_percent": 50.0},
             ],
         }
 
-        assert _check_regression(comparison, 0.10) is True  # 50% > 10% threshold
+        assert _check_regression(comparison, 0.10) is True
 
     def test_no_regression_empty_comparison(self):
         from benchbox.cli.commands.compare import _check_regression
@@ -234,27 +199,22 @@ class TestCheckRegression:
         assert _check_regression(comparison, 0.0) is True
 
     def test_non_dict_metric_data_skipped(self):
-        """Non-dict entries in performance_changes should be safely skipped."""
         from benchbox.cli.commands.compare import _check_regression
 
         comparison = {
             "performance_changes": {
-                "total_time": "not a dict",  # malformed
+                "total_time": "not a dict",
             },
             "query_comparisons": [],
         }
 
-        # Should not raise, should return False
         assert _check_regression(comparison, 0.10) is False
 
 
 class TestMultiFileComparisonWarning:
-    """Test that providing more than 2 files produces a warning."""
-
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_three_files_shows_warning(self, mock_exporter_class, mock_load):
-        """Providing 3 files should warn about only comparing first 2."""
         runner = CliRunner()
 
         mock_baseline = MagicMock(benchmark_name="TPC-H", platform="DuckDB", scale_factor=0.01)
@@ -289,12 +249,9 @@ class TestMultiFileComparisonWarning:
 
 
 class TestRunFlagDeprecation:
-    """Test --run flag deprecation warning."""
-
     @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     @patch.object(_compare_module, "_run_platform_comparison")
     def test_run_flag_shows_deprecation_warning(self, mock_platform_comparison):
-        """Using the deprecated --run flag should show a deprecation warning."""
         runner = CliRunner()
         result = runner.invoke(
             cli,
@@ -305,10 +262,7 @@ class TestRunFlagDeprecation:
 
 
 class TestCompareOutputFormats:
-    """Test compare output format handling."""
-
     def test_compare_help_shows_all_format_choices(self):
-        """Help should list all supported output formats."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -320,10 +274,7 @@ class TestCompareOutputFormats:
 
 
 class TestCompareHelpOptions:
-    """Test compare help output completeness."""
-
     def test_compare_help_shows_run_mode_options(self):
-        """Help should include run-mode options."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -336,7 +287,6 @@ class TestCompareHelpOptions:
         assert "--list-platforms" in result.output
 
     def test_compare_help_shows_file_mode_options(self):
-        """Help should include file-mode options."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -347,7 +297,6 @@ class TestCompareHelpOptions:
         assert "--plan-threshold" in result.output
 
     def test_compare_help_shows_mode_descriptions(self):
-        """Help should describe the automatic mode detection."""
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -358,12 +307,9 @@ class TestCompareHelpOptions:
 
 
 class TestCheckRegressionThresholdFunction:
-    """Test _check_regression_threshold exit behavior."""
-
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_no_regression_shows_pass_message(self, mock_exporter_class, mock_load):
-        """When no regression is found, a pass message should appear."""
         runner = CliRunner()
 
         mock_baseline = MagicMock(benchmark_name="TPC-H", platform="DuckDB", scale_factor=0.01)
@@ -400,10 +346,7 @@ class TestCheckRegressionThresholdFunction:
 
 
 class TestResultFileMetadataShortPath:
-    """Test ResultFileMetadata.short_path edge cases."""
-
     def test_short_path_with_deep_nested_file(self):
-        """Short path should truncate deeply nested paths."""
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -416,14 +359,12 @@ class TestResultFileMetadataShortPath:
             execution_id="abc",
         )
 
-        # Should show only last 3 parts
         short = meta.short_path
         assert "result.json" in short
         parts = Path(short).parts
         assert len(parts) == 3
 
     def test_short_path_with_shallow_file(self):
-        """Short path for a shallow file should return full path."""
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -436,15 +377,11 @@ class TestResultFileMetadataShortPath:
             execution_id="abc",
         )
 
-        # Should return full path since it's already short
         assert meta.short_path == str(Path("ab/result.json"))
 
 
 class TestDisplayResultsTable:
-    """Test _display_results_table rendering."""
-
     def test_display_results_table_renders_rows(self):
-        """Should render a table with the correct number of rows."""
         from benchbox.cli.commands.compare import ResultFileMetadata, _display_results_table
 
         results = [
@@ -472,14 +409,12 @@ class TestDisplayResultsTable:
             _display_results_table(results)
 
         mock_console.print.assert_called_once()
-        # The argument should be a Table
         from rich.table import Table
 
         table_arg = mock_console.print.call_args[0][0]
         assert isinstance(table_arg, Table)
 
     def test_display_results_table_uses_benchmark_colors(self):
-        """Known benchmarks should get styled with colors."""
         from benchbox.cli.commands.compare import ResultFileMetadata, _display_results_table
 
         results = [
@@ -497,13 +432,10 @@ class TestDisplayResultsTable:
         with patch.object(_compare_module, "console") as mock_console:
             _display_results_table(results)
 
-        # Should complete without error - color application is internal
         mock_console.print.assert_called_once()
 
 
 class TestValidateRegressionThreshold:
-    """Test _validate_regression_threshold behavior."""
-
     def test_returns_none_when_no_threshold(self):
         from benchbox.cli.commands.compare import _validate_regression_threshold
 
@@ -516,7 +448,6 @@ class TestValidateRegressionThreshold:
         assert result == pytest.approx(0.15)
 
     def test_invalid_threshold_exits(self):
-        """Invalid threshold should call sys.exit(1)."""
         from benchbox.cli.commands.compare import _validate_regression_threshold
 
         with pytest.raises(SystemExit) as exc_info:
@@ -526,11 +457,8 @@ class TestValidateRegressionThreshold:
 
 
 class TestComparePlatformRunMode:
-    """Test compare command platform run mode validation."""
-
     @patch.object(_compare_module, "_run_platform_comparison")
     def test_single_platform_in_run_mode_errors(self, mock_comparison):
-        """Run mode with only one platform should fail."""
         mock_comparison.side_effect = SystemExit(1)
 
         runner = CliRunner()
@@ -540,17 +468,13 @@ class TestComparePlatformRunMode:
 
 
 class TestCompareHelperFunctions:
-    """Target helper branches that are awkward to reach through the CLI alone."""
-
     def test_build_execution_map_keeps_first_execution_per_query(self):
         from benchbox.cli.commands.compare import _build_execution_map
 
         results = SimpleNamespace(
             query_results=[
-                # "power" phase
                 {"query_id": "Q1", "execution_time_ms": 10.0},
                 {"query_id": "Q2", "execution_time_ms": 20.0},
-                # "throughput" phase
                 {"query_id": "Q1", "execution_time_ms": 99.0},
                 {"query_id": "Q3", "execution_time_ms": 30.0},
             ]
@@ -652,8 +576,6 @@ class TestCompareHelperFunctions:
 
 
 class TestQuerySeverityAndChange:
-    """Tests for _query_severity_and_change branches."""
-
     def _sev(self, improved, change_pct):
         from benchbox.cli.commands.compare import _query_severity_and_change
 
@@ -688,8 +610,6 @@ class TestQuerySeverityAndChange:
 
 
 class TestPlanStatusLabel:
-    """Tests for _plan_status_label branches."""
-
     def _label(self, identical, similarity, is_regression):
         from benchbox.cli.commands.compare import _plan_status_label
 
@@ -712,8 +632,6 @@ class TestPlanStatusLabel:
 
 
 class TestFormatTextComparison:
-    """Tests for _format_text_comparison and its sub-functions."""
-
     def _make_comparison(self):
         return {
             "baseline_file": "/tmp/baseline.json",

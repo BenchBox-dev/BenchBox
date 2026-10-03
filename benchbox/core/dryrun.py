@@ -1,13 +1,6 @@
-"""Core dry run functionality for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides dry run capabilities that allow users to preview
-benchmark configurations, generated queries, and execution plans without
-actually executing the benchmark.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from pathlib import Path
@@ -29,7 +22,6 @@ from benchbox.platforms import get_platform_adapter
 
 
 def _extract_df_write_tuning(write_config: Any) -> dict[str, Any]:
-    """Extract write-time physical layout configuration from DataFrame tuning."""
     write_dict: dict[str, Any] = {}
 
     if write_config.sort_by:
@@ -59,7 +51,6 @@ def _extract_df_write_tuning(write_config: Any) -> dict[str, Any]:
 
 
 def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
-    """Build DDL preview entry with tuning summary and clauses for a single table."""
     tuning_summary: dict[str, Any] = {}
     _clause_fields = [
         ("sort_by", "sort_by"),
@@ -73,13 +64,6 @@ def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
         if value:
             tuning_summary[key] = value
 
-    # Delegate clause assembly to TuningClauses.get_inline_clauses() (already used by
-    # generate_create_table_ddl) rather than re-deriving it here: each DDL generator
-    # formats its own clause text (e.g. DuckDB's sort_by already reads "ORDER BY ...",
-    # Redshift's distribute_by already reads "DISTSTYLE ... DISTKEY (...)"), so
-    # reconstructing labels from bare field values here duplicated - and, for fields
-    # like distribution_key/distribution_style that TuningClauses doesn't define,
-    # mismatched - that logic.
     inline_clauses = tuning_clauses.get_inline_clauses() if hasattr(tuning_clauses, "get_inline_clauses") else []
 
     return {
@@ -89,19 +73,11 @@ def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
 
 
 class DryRunQueryExtractionError(RuntimeError):
-    """Raised when adapter-backed dry-run query rendering cannot be trusted."""
+    pass
 
 
 class DryRunExecutor:
-    """Handles dry run execution and output generation."""
-
     def __init__(self, output_dir: Optional[Path] = None):
-        """Initialize dry run executor.
-
-        Args:
-            output_dir: Directory to save dry run output files.
-                       If None, creates a temporary directory.
-        """
         if output_dir:
             self.output_dir = Path(output_dir)
         else:
@@ -117,7 +93,6 @@ class DryRunExecutor:
         system_profile: SystemProfile,
         database_config: Optional[DatabaseConfig],
     ) -> DryRunResult:
-        """Execute a detailed dry run of the benchmark."""
         execution_mode = self._resolve_execution_mode(database_config)
 
         result = DryRunResult(
@@ -141,7 +116,7 @@ class DryRunExecutor:
                 platform_config = self._get_platform_config(
                     database_config, system_profile, benchmark_config, benchmark=benchmark
                 )
-                platform_config["dry_run"] = True  # Suppress DB validation during dry run
+                platform_config["dry_run"] = True
                 result.platform_config = platform_config
 
                 try:
@@ -176,7 +151,6 @@ class DryRunExecutor:
             if benchmark_config.options.get("tuning_enabled", False):
                 result.tuning_config = self._extract_tuning_config(benchmark, benchmark_config, platform_type)
 
-            # Extract DDL with tuning clauses for dry-run preview
             if execution_mode == "sql" and database_config:
                 try:
                     ddl_preview, post_load = self._extract_ddl_preview(benchmark, benchmark_config, database_config)
@@ -198,7 +172,6 @@ class DryRunExecutor:
 
     @staticmethod
     def _resolve_execution_mode(database_config: Optional[DatabaseConfig]) -> str:
-        """Resolve execution mode from database config or platform default."""
         from benchbox.core.platform_registry import PlatformRegistry
         from benchbox.platforms.adapter_factory import is_dataframe_mode
 
@@ -222,7 +195,6 @@ class DryRunExecutor:
         return "sql"
 
     def save_dry_run_results(self, result: DryRunResult, filename_prefix: str = "dryrun") -> dict[str, Path]:
-        """Save dry run results to files."""
         if not self.output_dir:
             return {}
 
@@ -239,7 +211,6 @@ class DryRunExecutor:
     def _save_json_and_yaml(
         self, result: DryRunResult, prefix: str, timestamp: str, saved_files: dict[str, Path]
     ) -> None:
-        """Save JSON and YAML representations of the dry run result."""
         json_path = self.output_dir / f"{prefix}_{timestamp}.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(result.model_dump(), f, indent=2, default=str)
@@ -253,7 +224,6 @@ class DryRunExecutor:
         saved_files["yaml"] = yaml_path
 
     def _save_queries(self, result: DryRunResult, prefix: str, timestamp: str, saved_files: dict[str, Path]) -> None:
-        """Save query files with appropriate format based on execution mode."""
         is_dataframe = result.execution_mode == "dataframe"
         suffix = "dataframe_queries" if is_dataframe else "queries"
         ext = ".py" if is_dataframe else ".sql"
@@ -273,7 +243,6 @@ class DryRunExecutor:
     def _save_ddl_and_post_load(
         self, result: DryRunResult, prefix: str, timestamp: str, saved_files: dict[str, Path]
     ) -> None:
-        """Save DDL preview and post-load statements."""
         if result.ddl_preview:
             ddl_path = self.output_dir / f"{prefix}_ddl_{timestamp}.sql"
             with open(ddl_path, "w", encoding="utf-8") as f:
@@ -304,7 +273,6 @@ class DryRunExecutor:
             saved_files["post_load"] = post_load_path
 
     def _save_schema(self, result: DryRunResult, prefix: str, timestamp: str, saved_files: dict[str, Path]) -> None:
-        """Save schema with appropriate format based on execution mode."""
         if result.execution_mode == "dataframe" and result.dataframe_schema:
             schema_path = self.output_dir / f"{prefix}_schema_{timestamp}.py"
             with open(schema_path, "w", encoding="utf-8") as f:
@@ -322,7 +290,6 @@ class DryRunExecutor:
         return {}
 
     def _get_benchmark_instance(self, config: BenchmarkConfig, system_profile: SystemProfile):
-        """Get benchmark instance from configuration."""
         from benchbox import (
             H2ODB,
             SSB,
@@ -368,7 +335,6 @@ class DryRunExecutor:
             "verbose": False,
         }
 
-        # Add any additional config options
         if hasattr(config, "options") and config.options:
             benchmark_config.update(config.options)
 
@@ -389,8 +355,6 @@ class DryRunExecutor:
         benchmark_name = getattr(benchmark_config, "name", None) if benchmark_config else None
         scale_factor = getattr(benchmark_config, "scale_factor", None) if benchmark_config else None
 
-        # For benchmarks that share another benchmark's data (e.g., read_primitives → tpch),
-        # use the data source name for database naming so the existing database is reused.
         if benchmark is not None:
             data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
             if data_source:
@@ -412,7 +376,6 @@ class DryRunExecutor:
             if test_execution_type == "load_only":
                 return {}
 
-            # Check for unsupported maintenance+dataframe combination BEFORE mode dispatch
             if execution_mode == "dataframe" and test_execution_type in ("maintenance", "combined"):
                 return {
                     "_maintenance_not_supported": (
@@ -429,22 +392,15 @@ class DryRunExecutor:
                     )
                 }
 
-            # Check execution mode - DataFrame mode uses different extraction
             if execution_mode == "dataframe":
                 return self._extract_dataframe_queries(benchmark_config, benchmark, platform_type)
 
-            # Use BenchmarkConfig.name as the authoritative benchmark slug -
-            # the same source the runner propagates to adapters. Benchmark object
-            # internals (_name, class name) are not routing inputs on this path.
             benchmark_id = normalize_benchmark_id(benchmark_config.name)
 
-            # Handle TPC-H with maintenance or combined phases
             if benchmark_id == "tpch":
                 if test_execution_type == "maintenance":
-                    # Maintenance-only: just maintenance operations (no standard queries)
                     return self._extract_tpch_maintenance_operations(benchmark, benchmark_config)
                 elif test_execution_type == "combined":
-                    # Combined: standard queries (Q1-Q22) + maintenance operations
                     queries = self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
                     maintenance_ops = self._extract_tpch_maintenance_operations(benchmark, benchmark_config)
                     queries.update(maintenance_ops)
@@ -454,13 +410,10 @@ class DryRunExecutor:
                         benchmark, benchmark_config, test_execution_type, platform_adapter
                     )
 
-            # Handle TPC-DS with maintenance or combined phases
             if benchmark_id == "tpcds":
                 if test_execution_type == "maintenance":
-                    # Maintenance-only: just maintenance operations (no standard queries)
                     return self._extract_tpcds_maintenance_operations(benchmark, benchmark_config)
                 elif test_execution_type == "combined":
-                    # Combined: standard queries (Q1-Q99) + maintenance operations
                     queries = self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
                     maintenance_ops = self._extract_tpcds_maintenance_operations(benchmark, benchmark_config)
                     queries.update(maintenance_ops)
@@ -484,7 +437,6 @@ class DryRunExecutor:
         test_execution_type: str,
         platform_adapter=None,
     ) -> dict[str, str]:
-        """Return the benchmark's queries for test modes without opening a platform connection."""
         return self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
 
     def _extract_standard_queries(
@@ -522,7 +474,6 @@ class DryRunExecutor:
         if hasattr(benchmark, "get_queries"):
             queries = benchmark.get_queries()
             if queries:
-                # Convert integer keys to strings for Pydantic serialization
                 if queries and isinstance(next(iter(queries.keys())), int):
                     return {str(k): v for k, v in queries.items()}
                 return queries
@@ -530,7 +481,6 @@ class DryRunExecutor:
         if hasattr(benchmark, "get_all_queries"):
             queries = benchmark.get_all_queries()
             if queries:
-                # Convert integer keys to strings for Pydantic serialization
                 if isinstance(next(iter(queries.keys())), int):
                     return {str(k): v for k, v in queries.items()}
                 return queries
@@ -545,28 +495,19 @@ class DryRunExecutor:
         return {}
 
     def _extract_tpch_maintenance_operations(self, benchmark, benchmark_config: BenchmarkConfig) -> dict[str, str]:
-        """Extract TPC-H maintenance operation SQL for dry-run preview.
-
-        Uses TPCHMaintenanceTest.get_maintenance_operations_sql() to generate
-        actual SQL using the same code paths as real execution.
-        """
         try:
             from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
 
             scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
 
-            # Create maintenance test instance (doesn't need real connection for SQL generation)
             maintenance_test = TPCHMaintenanceTest(
-                connection_factory=lambda: None,  # Not used for SQL generation
+                connection_factory=lambda: None,
                 scale_factor=scale_factor,
                 verbose=False,
             )
 
-            # Get SQL statements using same generation logic as actual execution
             operations = maintenance_test.get_maintenance_operations_sql(pair_id=0, placeholder="?")
 
-            # Flatten to dict format expected by dry-run output
-            # RF1 and RF2 each have multiple statements; join them
             result = {}
             for op_id, statements in operations.items():
                 result[op_id] = "\n\n".join(statements)
@@ -577,29 +518,20 @@ class DryRunExecutor:
             return {"_maintenance_error": f"-- Failed to extract maintenance operations: {e}"}
 
     def _extract_tpcds_maintenance_operations(self, benchmark, benchmark_config: BenchmarkConfig) -> dict[str, str]:
-        """Extract TPC-DS maintenance operation SQL for dry-run preview.
-
-        Uses TPCDSMaintenanceTest.get_maintenance_operations_sql() to generate
-        actual SQL using the same code paths as real execution.
-        """
         try:
             from benchbox.core.tpcds.maintenance_test import TPCDSMaintenanceTest
 
             scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
 
-            # Create maintenance test instance (doesn't need real connection for SQL generation)
             maintenance_test = TPCDSMaintenanceTest(
                 benchmark=benchmark,
-                connection_factory=lambda: None,  # Not used for SQL generation
+                connection_factory=lambda: None,
                 scale_factor=scale_factor,
                 verbose=False,
             )
 
-            # Get SQL statements using same generation logic as actual execution
             operations = maintenance_test.get_maintenance_operations_sql(placeholder="?")
 
-            # Flatten to dict format expected by dry-run output
-            # Each operation category may have multiple statements; join them
             result = {}
             for op_id, statements in operations.items():
                 if isinstance(statements, list):
@@ -618,17 +550,6 @@ class DryRunExecutor:
         benchmark_instance,
         platform_type: Optional[str] = None,
     ) -> dict[str, str]:
-        """Extract DataFrame queries as Python source code.
-
-        Args:
-            benchmark_config: Benchmark configuration
-            benchmark_instance: Instantiated benchmark object
-            platform_type: Platform identifier (e.g., "polars", "pandas", "dask")
-                          Used to determine which query family to extract.
-
-        Returns:
-            Dict mapping query_id to Python source code of the implementation
-        """
         import inspect
 
         from benchbox.core.dataframe.query_resolution import get_dataframe_queries_for_benchmark
@@ -637,10 +558,8 @@ class DryRunExecutor:
             DataFrameFamily,
         )
 
-        # Determine family from platform type
-        family = "expression"  # default
+        family = "expression"
         if platform_type:
-            # Normalize platform type (e.g., "polars-df" -> "polars")
             normalized_type = platform_type.replace("-df", "").lower()
             if normalized_type in DATAFRAME_PLATFORMS:
                 platform_info = DATAFRAME_PLATFORMS[normalized_type]
@@ -655,7 +574,6 @@ class DryRunExecutor:
                 impl = query.expression_impl if family == "expression" else query.pandas_impl
 
                 if impl is None:
-                    # Try the other family as fallback
                     impl = query.pandas_impl if family == "expression" else query.expression_impl
                     if impl is None:
                         continue
@@ -664,13 +582,11 @@ class DryRunExecutor:
                     source = inspect.getsource(impl)
                     result[query_id] = source
                 except (OSError, TypeError):
-                    # Fallback: show function name + docstring
                     result[query_id] = f"# Could not extract source for {query_id}\n# {query.description}"
 
             return result
 
         except Exception as e:
-            # Return empty dict with warning - the result object will capture this
             return {"_error": f"# Failed to extract DataFrame queries: {e}"}
 
     def _generate_schema_sql(self, benchmark, config: BenchmarkConfig) -> Optional[str]:
@@ -703,11 +619,6 @@ class DryRunExecutor:
             raise Exception(f"Schema SQL generation failed: {e}") from e
 
     def _generate_external_schema_sql(self, benchmark, config: BenchmarkConfig) -> Optional[str]:
-        """Generate CREATE VIEW preview for external table mode.
-
-        Shows the scan expressions that will be used at runtime (e.g.
-        ``iceberg_scan()``, ``delta_scan()``, ``read_parquet()``).
-        """
         table_format = config.options.get("table_format") or getattr(config, "table_format", None)
 
         scan_fn_map = {
@@ -718,14 +629,12 @@ class DryRunExecutor:
         }
         scan_fn = scan_fn_map.get(table_format or "parquet", "read_parquet")
 
-        # Try to get table names from schema
         schema: dict | None = None
         if hasattr(benchmark, "get_schema"):
             raw = benchmark.get_schema()
             if isinstance(raw, dict):
                 schema = raw
             elif isinstance(raw, list):
-                # Some benchmarks return list[dict] with "name" keys
                 schema = {t["name"]: t for t in raw if isinstance(t, dict) and "name" in t}
 
         if not schema:
@@ -739,18 +648,12 @@ class DryRunExecutor:
         return "\n".join(lines)
 
     def _generate_dataframe_schema(self, benchmark, config: BenchmarkConfig) -> Optional[str]:
-        """Generate Polars-native schema representation for DataFrame mode.
-
-        Parses the SQL schema and converts it to Python code with Polars type definitions.
-        """
         import re
 
-        # First get the SQL schema to parse
         sql_schema = self._generate_schema_sql(benchmark, config)
         if not sql_schema:
             return None
 
-        # SQL to Polars type mapping
         type_mapping = {
             "INTEGER": "pl.Int64",
             "INT": "pl.Int64",
@@ -775,12 +678,9 @@ class DryRunExecutor:
         }
 
         def sql_type_to_polars(sql_type: str) -> str:
-            """Convert SQL type to Polars type string."""
-            # Remove precision/scale info: DECIMAL(15,2) -> DECIMAL
             base_type = re.sub(r"\([^)]*\)", "", sql_type).strip().upper()
-            return type_mapping.get(base_type, "pl.Utf8")  # Default to string
+            return type_mapping.get(base_type, "pl.Utf8")
 
-        # Parse CREATE TABLE statements
         tables = {}
         current_table = None
         current_columns = []
@@ -788,16 +688,13 @@ class DryRunExecutor:
         for line in sql_schema.split("\n"):
             line = line.strip()
 
-            # Match CREATE TABLE
             table_match = re.match(r"CREATE TABLE\s+(\w+)\s*\(", line, re.IGNORECASE)
             if table_match:
                 current_table = table_match.group(1)
                 current_columns = []
                 continue
 
-            # Match column definition
             if current_table and line and not line.startswith(")"):
-                # Parse: column_name TYPE [NOT NULL] [,]
                 col_match = re.match(r"(\w+)\s+([A-Z]+(?:\([^)]*\))?)", line, re.IGNORECASE)
                 if col_match:
                     col_name = col_match.group(1)
@@ -805,12 +702,10 @@ class DryRunExecutor:
                     polars_type = sql_type_to_polars(col_type)
                     current_columns.append((col_name, polars_type))
 
-            # End of table definition
             if current_table and line.startswith(")"):
                 tables[current_table] = current_columns
                 current_table = None
 
-        # Generate Python code
         benchmark_name = config.name.upper().replace("-", "_")
         lines = [
             '"""',
@@ -827,7 +722,6 @@ class DryRunExecutor:
             "",
         ]
 
-        # Generate schema dict for each table
         for table_name, columns in tables.items():
             lines.append(f"{table_name.upper()}_SCHEMA = {{")
             for col_name, polars_type in columns:
@@ -835,7 +729,6 @@ class DryRunExecutor:
             lines.append("}")
             lines.append("")
 
-        # Generate a combined SCHEMAS dict
         lines.append("")
         lines.append("# All table schemas")
         lines.append("SCHEMAS = {")
@@ -844,7 +737,6 @@ class DryRunExecutor:
         lines.append("}")
         lines.append("")
 
-        # Add helper function
         lines.extend(
             [
                 "",
@@ -863,12 +755,10 @@ class DryRunExecutor:
         try:
             tuning_dict: dict[str, Any] = {}
 
-            # Extract unified SQL tuning configuration
             unified_config = config.options.get("unified_tuning_configuration")
             if unified_config:
                 tuning_dict = self._extract_unified_tuning(unified_config, platform)
 
-            # Extract DataFrame tuning configuration (runtime + write)
             df_tuning_config = config.options.get("df_tuning_config")
             if df_tuning_config:
                 df_tuning_dict = self._extract_df_tuning(df_tuning_config)
@@ -886,11 +776,6 @@ class DryRunExecutor:
         except Exception:
             return None
 
-    # Platform-specific fields to include in platform_optimizations, keyed by the
-    # platform (lowercased database_config.type) that they are relevant to. These
-    # fields carry a non-empty default (e.g. databricks_clustering_strategy defaults
-    # to "none") so they must be gated on platform rather than on truthiness alone,
-    # or they show up as "enabled" for every platform.
     _PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS: dict[str, str] = {
         "databricks_clustering_strategy": "databricks",
         "physical_rendering_id": "databricks",
@@ -898,7 +783,6 @@ class DryRunExecutor:
 
     @staticmethod
     def _extract_unified_tuning(unified_config: Any, platform: Optional[str] = None) -> dict[str, Any]:
-        """Extract constraints, platform optimizations, and table tunings from unified config."""
         platform_key = (platform or "").lower()
 
         tuning_dict: dict[str, Any] = {
@@ -945,10 +829,8 @@ class DryRunExecutor:
 
     @staticmethod
     def _extract_df_tuning(df_tuning_config: Any) -> dict[str, Any]:
-        """Extract DataFrame tuning configuration (parallelism, memory, execution, write)."""
         df_tuning_dict: dict[str, Any] = {}
 
-        # (section_attr, [(field_attr, include_if_not_none)]) - truthy fields emit True.
         _SECTIONS: list[tuple[str, list[tuple[str, bool]]]] = [
             ("parallelism", [("thread_count", True), ("worker_count", True)]),
             ("memory", [("memory_limit", True), ("chunk_size", True), ("spill_to_disk", False)]),
@@ -1037,19 +919,11 @@ class DryRunExecutor:
         config: BenchmarkConfig,
         database_config: DatabaseConfig,
     ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
-        """Extract DDL preview with tuning clauses for each table.
-
-        Returns:
-            Tuple of (ddl_preview, post_load_statements):
-            - ddl_preview: Dict mapping table_name -> {ddl: str, tuning_summary: dict}
-            - post_load_statements: Dict mapping table_name -> list of post-load SQL
-        """
         from benchbox.core.tuning.ddl_generator import get_ddl_generator
 
         ddl_preview: dict[str, dict[str, Any]] = {}
         post_load_statements: dict[str, list[str]] = {}
 
-        # Get the DDL generator for this platform
         try:
             generator = get_ddl_generator(database_config.type)
         except Exception:
@@ -1059,16 +933,9 @@ class DryRunExecutor:
         if not unified_config:
             return ddl_preview, post_load_statements
 
-        # Benchmark classes expose table names via get_schema() (see
-        # _generate_external_schema_sql below for the same pattern); no benchmark
-        # implements a get_tables() method, so that check always short-circuited
-        # this preview to empty.
         if not hasattr(benchmark, "get_schema"):
             return ddl_preview, post_load_statements
 
-        # get_schema() is a dict on core benchmark classes but some public wrapper
-        # classes (e.g. JoinOrder) return a DDL string instead - normalize the same
-        # way _generate_external_schema_sql() does rather than assuming a mapping.
         raw_schema = benchmark.get_schema()
         if isinstance(raw_schema, dict):
             tables = list(raw_schema.keys())
@@ -1077,9 +944,6 @@ class DryRunExecutor:
         else:
             return ddl_preview, post_load_statements
 
-        # Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
-        # templates key tables uppercase (e.g. "LINEITEM"); look up case-insensitively
-        # like profile_validation.extract_template_columns does.
         table_tunings_by_upper = {str(key).upper(): value for key, value in unified_config.table_tunings.items()}
 
         for table_name in tables:
@@ -1100,7 +964,6 @@ class DryRunExecutor:
         return ddl_preview, post_load_statements
 
     def _get_execution_context(self, benchmark_config: BenchmarkConfig, query_count: int) -> str:
-        """Describe the execution context represented by a dry-run preview."""
         test_execution_type = getattr(benchmark_config, "test_execution_type", "standard")
         benchmark_name = getattr(benchmark_config, "name", "").lower()
 
@@ -1132,15 +995,6 @@ def preview_benchmark_run(  # noqa: C901
     queries: str | None,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Core-owned dry-run preview for a benchmark run (shared by MCP and CLI).
-
-    Mirrors the previous ``benchbox.mcp.tools.benchmark._dry_run_impl``
-    behaviour -- validates platform/benchmark, resolves execution mode,
-    builds :class:`BenchmarkConfig` / :class:`DatabaseConfig`, calls
-    :class:`DryRunExecutor`, and shapes the response dict.  Transport layers
-    (MCP, CLI) should call this and add only transport-specific error wrapping
-    if needed.
-    """
     import logging as _logging
 
     from benchbox.core.benchmark_registry import get_all_benchmarks
@@ -1172,7 +1026,6 @@ def preview_benchmark_run(  # noqa: C901
         elif not platform_info.available:
             warnings.append(f"Platform '{platform}' dependencies not installed: {platform_info.installation_command}")
 
-        # Resolve mode — core-owned; do not import from MCP (avoids circular dep).
         resolved_mode: str
         if mode is not None:
             m_lower = mode.lower()
@@ -1204,7 +1057,6 @@ def preview_benchmark_run(  # noqa: C901
         elif platform_lower.endswith("-df"):
             resolved_mode = "dataframe"
         else:
-            # Default from registry, fall back to sql.
             try:
                 resolved_mode = PlatformRegistry.get_default_mode(base_platform)
             except Exception:

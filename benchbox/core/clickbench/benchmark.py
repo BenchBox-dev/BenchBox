@@ -1,11 +1,6 @@
-"""ClickBench (ClickHouse Analytics Benchmark) implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides ClickBench benchmark implementation that tests analytical database performance using web analytics data.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
@@ -67,11 +62,9 @@ class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGen
     def translate_query_text(self, query: str, dialect: str) -> str:
 
         try:
-            import sqlglot  # type: ignore[import-untyped]
+            import sqlglot
 
-            translated = sqlglot.transpile(  # type: ignore[attr-defined]
-                query, read="clickhouse", write=dialect.lower()
-            )[0]
+            translated = sqlglot.transpile(query, read="clickhouse", write=dialect.lower())[0]
             if dialect.lower() == "snowflake":
                 translated = _rewrite_snowflake_regex_groups(translated)
             return translated

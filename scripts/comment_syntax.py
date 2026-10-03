@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 import yaml
-from comment_execution import PythonBindings
-from comment_payloads import nested_sources, shell_payloads
+from comment_execution import PythonBindings, python_html_sources
+from comment_payloads import nested_sources, shell_payloads, sql_template_sources, static_html_template
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
 
@@ -155,6 +155,8 @@ def language(path: str) -> str | None:
     if not PurePosixPath(path).suffix and path.startswith(OWNED_ROOTS):
         return "unsupported"
     suffix = PurePosixPath(path).suffix.lower()
+    if path.startswith("docs/_templates/") and suffix in {".html", ".htm"}:
+        return "html+jinja"
     if suffix not in LANGUAGES and suffix not in DATA_SUFFIXES and path.startswith(OWNED_ROOTS):
         return "unsupported"
     return LANGUAGES.get(suffix)
@@ -288,7 +290,7 @@ def _python_sql_context(node: ast.AST, parent: ast.AST | None, grandparent: ast.
     return False
 
 
-def python_findings(path: str, source: str) -> list[Finding]:
+def python_findings(path: str, source: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     tree = ast.parse(source)
     result: list[Finding] = []
     scopes: list[tuple[int, int, str]] = []
@@ -346,6 +348,25 @@ def python_findings(path: str, source: str) -> list[Finding]:
             symbol = next((name for start, end, name in reversed(scopes) if start <= token.start[0] <= end), "")
             result.append(Finding(path, token.start[0], "comment", token.string, symbol))
     result.extend(python_executable_findings(path, tree, scopes))
+    for line, text, symbol in python_html_sources(source, tree):
+        if text is None:
+            result.append(
+                Finding(
+                    path, line, "payload-error", "unresolved HTML output source", symbol, python_consumer_digest(tree)
+                )
+            )
+        else:
+            result.extend(
+                Finding(
+                    path,
+                    line + finding.line - 1,
+                    finding.kind,
+                    finding.text,
+                    f"{symbol}:{finding.symbol}",
+                    finding.payload or text,
+                )
+                for finding in scan(path + ".html", text, "html", js_results)
+            )
     return result
 
 
@@ -422,9 +443,13 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
         return {javascript_key(path, source): source}
     result = {}
     try:
+        if lang == "python":
+            for _, text, _ in python_html_sources(source):
+                if text is not None:
+                    result.update(javascript_requests(path + ".html", text, "html"))
         for _, child_path, text, child_lang, _ in nested_sources(path, source, lang):
             result.update(javascript_requests(child_path, text, child_lang))
-    except (ValueError, KeyError, TypeError, yaml.YAMLError):
+    except (SyntaxError, ValueError, KeyError, TypeError, yaml.YAMLError):
         return {}
     return result
 
@@ -454,16 +479,44 @@ def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]
     return result
 
 
+def sql_findings(path: str, source: str, lang: str) -> list[Finding]:
+    if lang == "sql":
+        return [
+            Finding(path, source[:offset].count("\n") + 1, "comment", text) for offset, text in sql_comments(source)
+        ]
+    result = [
+        Finding(path, line_map[offset], "comment", text, "template-sql", rendered)
+        for rendered, line_map in sql_template_sources(source)
+        for offset, text in sql_comments(rendered)
+    ]
+    result.extend(
+        Finding(path, source[:offset].count("\n") + 1, "comment", text.rstrip("\r\n"), "template-comment", source)
+        for offset, token, text in get_lexer_by_name("jinja").get_tokens_unprocessed(source)
+        if token in Comment and token not in Comment.Preproc
+    )
+    return result
+
+
+def template_coverage(path: str, source: str, lang: str) -> list[Finding]:
+    if lang != "html+jinja":
+        return []
+    try:
+        if "{#" in source:
+            raise ValueError("unresolved HTML template comment expansion")
+        static_html_template(source)
+    except ValueError as exc:
+        return [Finding(path, 1, "coverage-error", str(exc))]
+    return []
+
+
 def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     try:
         if source.startswith("#!"):
             lang = source_language(path, source) or lang
         if lang == "python":
-            return python_findings(path, source)
-        if lang == "sql":
-            return [
-                Finding(path, source[:offset].count("\n") + 1, "comment", text) for offset, text in sql_comments(source)
-            ]
+            return python_findings(path, source, js_results)
+        if lang in {"sql", "sql+jinja"}:
+            return sql_findings(path, source, lang)
         if lang == "javascript":
             return javascript_findings(path, source, js_results)
         nested = [
@@ -471,6 +524,7 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             for start, child_path, text, child_lang, symbol in nested_sources(path, source, lang)
             for f in scan(child_path, text, child_lang, js_results)
         ]
+        nested.extend(template_coverage(path, source, lang))
         if lang in {"notebook", "examples"}:
             return nested
         if lang == "bash":

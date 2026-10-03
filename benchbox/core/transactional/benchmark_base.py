@@ -1,12 +1,3 @@
-"""Shared benchmark base class for transactional benchmark families.
-
-``TransactionalBenchmarkBase[ResultT]`` consolidates the near-identical
-``TransactionPrimitivesBenchmark`` and ``WritePrimitivesBenchmark`` classes.
-Subclasses inherit the shared property/data/catalog/query API and only need
-to implement their spec-specific ``execute_operation``, ``setup``,
-``is_setup``, and schema methods.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -28,14 +19,8 @@ from benchbox.core.transactional.operations_registry_base import OperationsRegis
 
 ResultT = TypeVar("ResultT")
 _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
-# Dialects whose driver rollback() is a no-op under autocommit, so an explicit
-# SQL ROLLBACK is needed to close a transaction opened by catalog BEGIN SQL.
 _SQL_ROLLBACK_AFTER_ERROR_DIALECTS = frozenset({"databricks"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
-# The catalog writes integer series as ``(SELECT unnest(generate_series(a, b)) AS n) t``.
-# Snowflake and BigQuery have neither function (verified live: "Unknown functions
-# GENERATE_SERIES, UNNEST" and "Unexpected keyword UNNEST"); rewrite the whole
-# derived-table body into each engine's series generator.
 _UNNEST_SERIES_SELECT_RE = re.compile(
     r"SELECT\s+unnest\(\s*generate_series\(\s*(?P<lo>[^,()]+?)\s*,\s*(?P<hi>[^,()]+?)\s*\)\s*\)\s+AS\s+(?P<alias>\w+)",
     re.IGNORECASE,
@@ -52,39 +37,17 @@ _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
 
 
 def _sql_escape(value: Any) -> str:
-    """Escape a value for embedding in a single-quoted SQL string literal."""
     return str(value).replace("'", "''")
 
 
 class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, OperationExecutor, Generic[ResultT]):
-    """Base class shared by transaction_primitives and write_primitives families.
+    _benchmark_label: str
+    _staging_tables: dict[str, Any]
 
-    Provides the shared property/data-generation/catalog/query API.  Subclasses
-    must supply:
-
-    - ``_benchmark_label`` class variable - human-readable name used in log
-      messages (e.g. "Transaction Primitives").
-    - ``_staging_tables`` class variable - the ``STAGING_TABLES`` mapping
-      imported from the spec module; used by ``get_benchmark_info``.
-    - ``operations_manager``, ``data_generator``, ``tables`` instance attributes
-      assigned in ``__init__``.
-    - Concrete ``execute_operation`` (abstract via :class:`OperationExecutor`).
-    - Concrete ``setup`` and ``is_setup`` (abstract below; schema-specific SQL).
-    """
-
-    _benchmark_label: str  # e.g. "Transaction Primitives"
-    _staging_tables: dict[str, Any]  # STAGING_TABLES from the spec module
-
-    # Declared without default so type-checkers know they exist;
-    # assigned by each subclass __init__.
     operations_manager: OperationsRegistryBase[Any]
     data_generator: Any
     tables: dict[str, Path]
     _setup_dialect: str = "standard"
-
-    # ------------------------------------------------------------------
-    # Abstract hooks implemented spec-locally
-    # ------------------------------------------------------------------
 
     @abstractmethod
     def setup(
@@ -93,47 +56,21 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         force: bool = False,
         dialect: str = "standard",
     ) -> dict[str, Any]:
-        """Create and populate staging tables.  Schema-specific; stay spec-local."""
+        pass
 
     @abstractmethod
     def is_setup(self, connection: DatabaseConnection) -> bool:
-        """Return True when staging tables are present and populated."""
+        pass
 
-    # ------------------------------------------------------------------
-    # Data source
-    # ------------------------------------------------------------------
-
-    # Both transactional families reuse TPC-H data; GeneratorOutputDirMixin
-    # keeps data_generator (and its nested tpch_generator) in sync with
-    # output_dir.
     DATA_SOURCE_BENCHMARK = "tpch"
 
-    # ------------------------------------------------------------------
-    # Data generation (identical modulo the label string)
-    # ------------------------------------------------------------------
-
     def generate_data(self, tables: Optional[list[str]] = None) -> list[Union[str, Path]]:
-        """Generate data for this benchmark (reuses TPC-H base data).
-
-        Args:
-            tables: Optional list of tables to generate. If None, generates all.
-
-        Returns:
-            List of paths to generated data files
-        """
         self.log_verbose(f"Generating {self._benchmark_label} data at scale factor {self.scale_factor}...")
         self.tables = self.data_generator.generate()
         self.log_verbose(f"Base TPC-H data available: {len(self.tables)} tables")
         return list(self.tables.values())
 
     def ensure_auxiliary_data_files(self) -> None:
-        """Ensure auxiliary data files (bulk load test files) exist.
-
-        Called by the runner when reusing data from a manifest to guarantee
-        bulk load test files are present even if they were not generated during
-        the original data-generation run.  Uses file locking to prevent
-        concurrent generation conflicts.
-        """
         self.log_verbose("Checking for auxiliary data files (bulk load files)...")
 
         bulk_files_exist = self.data_generator.check_bulk_load_files_exist()
@@ -157,61 +94,19 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         else:
             self.log_verbose("✅ Bulk load files already exist")
 
-    # ------------------------------------------------------------------
-    # Operation catalog access (satisfies OperationExecutor abstract methods)
-    # ------------------------------------------------------------------
-
     def get_all_operations(self) -> dict[str, Any]:
-        """Get all available operations.
-
-        Returns:
-            Dictionary mapping operation IDs to operation objects
-        """
         return self.operations_manager.get_all_operations()
 
     def get_operation_categories(self) -> list[str]:
-        """Get list of available operation categories.
-
-        Returns:
-            List of category names
-        """
         return self.operations_manager.get_operation_categories()
 
     def get_operation(self, operation_id: str) -> Any:
-        """Get a specific operation by ID.
-
-        Args:
-            operation_id: Operation identifier
-
-        Returns:
-            Operation object
-
-        Raises:
-            ValueError: If operation_id is invalid
-        """
         return self.operations_manager.get_operation(operation_id)
 
     def get_operations_by_category(self, category: str) -> dict[str, Any]:
-        """Get operations filtered by category.
-
-        Args:
-            category: Category name (e.g., 'insert', 'update', 'delete')
-
-        Returns:
-            Dictionary mapping operation IDs to operation objects
-        """
         return self.operations_manager.get_operations_by_category(category)
 
-    # ------------------------------------------------------------------
-    # Benchmark info / query API
-    # ------------------------------------------------------------------
-
     def get_benchmark_info(self) -> dict[str, Any]:
-        """Get information about the benchmark.
-
-        Returns:
-            Dictionary containing benchmark metadata
-        """
         return {
             "name": self._name,
             "version": self._version,
@@ -224,48 +119,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         }
 
     def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
-        """Get write SQL for a specific operation.
-
-        Args:
-            query_id: Operation identifier
-            **kwargs: Additional parameters (unused for write/transaction operations)
-
-        Returns:
-            Write SQL string
-
-        Raises:
-            ValueError: If query_id is invalid
-        """
         operation = self.operations_manager.get_operation(str(query_id))
         return operation.write_sql
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all write operations SQL.
-
-        Args:
-            dialect: Target SQL dialect (not yet implemented for write operations)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL
-        """
         operations = self.operations_manager.get_all_operations()
         return {op_id: op.write_sql for op_id, op in operations.items()}
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Get write operations SQL filtered by category.
-
-        Args:
-            category: Operation category (insert, update, delete, ddl, transaction)
-
-        Returns:
-            Dictionary mapping operation IDs to write SQL for the category
-        """
         operations = self.operations_manager.get_operations_by_category(category)
         return {op_id: op.write_sql for op_id, op in operations.items()}
-
-    # ------------------------------------------------------------------
-    # execute_operation preamble helper
-    # ------------------------------------------------------------------
 
     def _prepare_operation(
         self,
@@ -273,25 +136,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         connection: DatabaseConnection,
         **kwargs: Any,
     ) -> tuple[Any, Optional[str], Optional[str]]:
-        """Validate connection, look up operation, auto-setup staging tables if needed.
-
-        Both ``execute_operation`` implementations open with identical preamble
-        logic.  Subclasses call this helper and then continue with their
-        spec-specific SQL execution paths.
-
-        Args:
-            operation_id: ID of the operation to execute
-            connection: Database connection
-            **kwargs: Forwarded kwargs; reads ``platform_key``,
-                ``platform_fallback_key`` and ``sql_override``
-
-        Returns:
-            (operation, platform_key, fallback_key, sql_override) tuple
-
-        Raises:
-            ValueError: If connection is None or lacks an ``execute`` method
-            RuntimeError: If staging table auto-setup fails
-        """
         if not connection:
             raise ValueError("Connection is None")
         if not hasattr(connection, "execute"):
@@ -303,14 +147,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
         operation = self.operations_manager.get_operation(operation_id)
 
-        # Seed the quoting dialect before the reuse probe: is_setup()
-        # quotes staging probes through _setup_dialect, which setup() only
-        # copies from platform_key afterwards. On a fresh benchmark object
-        # against an already-initialized cloud database the probe would
-        # otherwise use the default "standard" quoting (double-quoted
-        # source-case names), miss backticked UPPERCASE tables on BigQuery
-        # or quoted-uppercase tables on Snowflake, and rerun setup —
-        # including lock/table DDL a reuse principal may not run.
         if platform_key:
             self._setup_dialect = platform_key
         if operation.requires_setup and not self.is_setup(connection):
@@ -330,16 +166,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         platform_key: str | None,
         fallback_key: str | None = None,
     ) -> tuple[bool, Any]:
-        """Resolve a platform override with shared-dialect fallback.
-
-        Engines sharing a SQL dialect but carrying their own capability
-        identity (e.g. DuckLake on the DuckDB dialect) consult their own key
-        first so engine-true rules win; a missing engine entry falls back to
-        the shared dialect's entry instead of silently dropping to the catalog
-        default (which would execute SQL the engine rejects, e.g. DuckDB's
-        unsupported SAVEPOINT syntax on DuckLake). Returns ``(found, value)``;
-        a found ``None`` means explicitly unsupported (skip).
-        """
         if overrides:
             if platform_key and platform_key in overrides:
                 return True, overrides[platform_key]
@@ -348,7 +174,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return False, None
 
     def _rewrite_transactional_sql_for_platform(self, sql: str, platform_key: str | None) -> str:
-        """Apply narrow transactional catalog rewrites for the active SQL dialect."""
         dialect = (platform_key or "").lower()
         template = _SERIES_SELECT_TEMPLATES.get(dialect)
         if template is not None:
@@ -361,15 +186,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)
 
     def _rollback_connection_after_error(self, connection: DatabaseConnection) -> None:
-        """Clear aborted transaction state after an operation error.
-
-        Catalog operations open transactions with explicit ``BEGIN TRANSACTION``
-        SQL. Under autocommit, a DB-API ``rollback()`` is a no-op on some
-        drivers (Databricks SQL), so a statement that fails between BEGIN and
-        COMMIT leaves the SQL transaction open and every later statement on the
-        session fails. Issue a SQL ROLLBACK as well; engines with no open
-        transaction treat it as a no-op or raise, and either is ignored.
-        """
         try:
             if hasattr(connection, "rollback"):
                 connection.rollback()
@@ -381,89 +197,20 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
             except Exception as exc:
                 self.log_verbose(f"SQL ROLLBACK after operation error was not needed or failed: {exc}")
 
-    # ------------------------------------------------------------------
-    # Staging provenance manifest
-    #
-    # Shared by transaction_primitives and write_primitives is_setup()/
-    # setup() overrides -- implemented ONCE here so the two families cannot
-    # drift the way the plain-COUNT is_setup checks did (see TODO
-    # transactional-staging-reuse-ignores-provenance). A staging set left
-    # over from a different scale/spec/source cannot silently satisfy
-    # is_setup() for the current run: setup() records this run's provenance
-    # in a single-row-per-benchmark manifest table, and is_setup() requires
-    # an exact match. A missing manifest (every pre-existing database, since
-    # no prior code ever wrote one) is NOT treated as "probably fine" -- it
-    # returns False and forces one self-healing rebuild.
-    # ------------------------------------------------------------------
-
-    #: In-database table recording the provenance (benchmark, scale, spec
-    #: version, source digest) of the staging data the most recent setup()
-    #: produced. Keyed by ``benchmark`` so transaction_primitives and
-    #: write_primitives sharing one physical database do not clobber each
-    #: other's row.
-    #:
-    #: The ``_v3`` generation is load-bearing, not cosmetic, as was the
-    #: ``_v2`` bump before it. The first release of this manifest wrote a row
-    #: unconditionally at the end of ``setup()``, including on the path that
-    #: skipped repopulation because the staging tables were already non-empty.
-    #: Those rows are *internally consistent* -- correct scale, correct spec
-    #: version, and a digest of the live source tables -- while the staging
-    #: data they describe is stale; the ``_v2`` name made them unmatchable so
-    #: those databases rebuilt once. The ``_v2`` generation in turn can certify
-    #: staging tables created before the Databricks catalogManaged DDL
-    #: requirement: again internally consistent rows describing plain
-    #: (non-catalog-managed) Delta tables that Databricks multi-statement
-    #: transactions cannot write
-    #: (TRANSACTION_NOT_SUPPORTED.WRITE_NON_CATALOG_MANAGED_TABLE). Reusing the
-    #: ``_v2`` name would therefore match them, ``is_setup()`` would
-    #: short-circuit, ``CREATE TABLE IF NOT EXISTS`` would leave the legacy
-    #: tables in place, and every affected database would keep failing its
-    #: transaction operations. A new name makes them unmatchable, so those
-    #: databases take the missing-manifest path and rebuild once with the
-    #: catalogManaged DDL.
     _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v3"
 
-    #: Superseded manifest tables, dropped on rebuild so a database does not
-    #: carry a stale generation's rows around indefinitely. Never read.
     _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = (
         "benchbox_staging_manifest_v2",
         "benchbox_staging_manifest",
     )
 
     def _quote_identifier(self, identifier: str) -> str:
-        """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
         return quote_identifier_for_dialect(identifier, getattr(self, "_setup_dialect", "standard"))
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
-        """Check if a table exists in the database.
-
-        Uses a platform-agnostic approach that attempts to query the table
-        with LIMIT 0, which should work across most SQL databases without
-        requiring INFORMATION_SCHEMA access.
-
-        Args:
-            connection: Database connection
-            table_name: Name of table to check (will be quoted for safety)
-
-        Returns:
-            True if table exists, False otherwise
-
-        Note:
-            This method catches exceptions to distinguish between:
-            - Table doesn't exist (expected, returns False)
-            - Other errors (logged, returns False for safety)
-
-        Security:
-            Table name is quoted using _quote_identifier() to prevent SQL injection.
-        """
         return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
     def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
-        """Remove superseded manifest generations during a rebuild.
-
-        Best-effort: a failure here leaves harmless cruft, never an incorrect
-        reuse decision, because the superseded names are never read.
-        """
         for legacy in self._LEGACY_STAGING_MANIFEST_TABLES:
             try:
                 connection.execute(f"DROP TABLE IF EXISTS {self._quote_identifier(legacy)}")
@@ -471,13 +218,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 pass
 
     def _staging_provenance_key(self) -> tuple[str, str, str]:
-        """Return ``(benchmark_id, scale, spec_version)`` identifying this run's staging provenance.
-
-        ``scale`` is normalised through ``float`` so a benchmark constructed
-        with ``scale_factor=1`` and one constructed with ``scale_factor=1.0``
-        agree. Without it the two stringify differently ("1" vs "1.0"), never
-        match each other's manifest, and each pays a full staging rebuild.
-        """
         benchmark_id = getattr(self, "_benchmark_label", self.__class__.__name__)
         try:
             scale = str(float(self.scale_factor))
@@ -486,27 +226,6 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return str(benchmark_id), scale, str(getattr(self, "_version", "unknown"))
 
     def _staging_source_digest(self, connection: DatabaseConnection, source_tables: list[str]) -> str:
-        """Fingerprint the live TPC-H source tables backing this benchmark's staging data.
-
-        INVARIANT: no benchmark operation may mutate ``source_tables``. Both
-        operation catalogues read orders/lineitem/customer and write only to
-        their own staging tables, which is what keeps the digest stable for the
-        duration of a run. ``is_setup()`` legitimately goes False mid-run when
-        an operation empties a staging table it gates on; the manifest still
-        matching at that moment is what limits the response to repopulating
-        that one table. Add an operation that writes to a source table and
-        every subsequent operation instead pays a full drop-and-repopulate of
-        the whole staging set.
-
-        Hashes ordered ``table:row_count`` pairs so a manifest written against
-        one data volume cannot match a differently-provisioned database even
-        when ``scale_factor`` happens to read the same (e.g. a reused
-        directory whose actual row counts diverge from the label). A table
-        access failure counts as ``count=0`` rather than aborting -- mirrors
-        :func:`benchbox.core.primitives_benchmark_utils.table_exists`'s
-        fail-closed philosophy, so a partially loaded source cannot produce a
-        stable-looking digest.
-        """
         parts = []
         for table in source_tables:
             try:
@@ -524,23 +243,10 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _manifest_text_type(self) -> str:
-        """Return the unbounded text column type for the staging manifest DDL.
-
-        Databricks SQL rejects ``VARCHAR`` without a length, and BigQuery has
-        no ``VARCHAR`` at all; both spell the type ``STRING``. Other engines
-        accept a bare ``VARCHAR``.
-        """
         dialect = (getattr(self, "_setup_dialect", None) or "standard").lower()
         return "STRING" if dialect in ("databricks", "bigquery") else "VARCHAR"
 
     def _write_staging_manifest(self, connection: DatabaseConnection, source_tables: list[str]) -> None:
-        """Persist this setup()'s staging provenance so a later is_setup() can require an exact match.
-
-        Called from inside the subclass's own ``setup()`` -- the same
-        connection/lock discipline as the staging tables themselves, so a
-        write failure here raises like any other setup step and rolls back
-        via ``_rollback_connection_after_error`` in ``_prepare_operation``.
-        """
         benchmark_id, scale, spec_version = self._staging_provenance_key()
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
@@ -568,28 +274,14 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
             raise RuntimeError(f"Failed to insert staging manifest entry: {err}")
 
     def _invalidate_staging_manifest(self, connection: DatabaseConnection) -> None:
-        """Remove this benchmark's manifest row before rebuilding staging in place.
-
-        A rebuild that replaces tables in place leaves earlier tables populated
-        if it fails part-way. Without this, the old manifest row would still
-        match and a later setup() would reuse the half-rebuilt staging set.
-        """
         benchmark_id, _scale, _spec = self._staging_provenance_key()
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
         try:
             connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
         except Exception as e:
-            # A missing manifest table already means "no reusable staging".
             self.log_verbose(f"Staging manifest not cleared ({e})")
 
     def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
-        """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
-
-        A missing manifest table (never written -- true of every pre-existing
-        database) or any read error is NOT reuse-eligible: it returns False
-        and forces one rebuild rather than assuming a legacy database is
-        fine, which is the exact bug this manifest replaces.
-        """
         benchmark_id, scale, spec_version = self._staging_provenance_key()
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
@@ -609,26 +301,12 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         except Exception:
             return False
 
-    # ------------------------------------------------------------------
-    # run_benchmark (identical across both families)
-    # ------------------------------------------------------------------
-
     def run_benchmark(
         self,
         connection: DatabaseConnection,
         operation_ids: Optional[list[str]] = None,
         categories: Optional[list[str]] = None,
     ) -> list[ResultT]:
-        """Run the full benchmark suite (or a subset) and return results.
-
-        Args:
-            connection: Database connection
-            operation_ids: Optional list of specific operations to run
-            categories: Optional list of categories to run
-
-        Returns:
-            List of OperationResult objects
-        """
         if operation_ids:
             operations = {op_id: self.get_operation(op_id) for op_id in operation_ids}
         elif categories:

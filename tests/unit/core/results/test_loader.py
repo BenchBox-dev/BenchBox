@@ -1,5 +1,3 @@
-"""Unit tests for result file loading and reconstruction (schema v2.0)."""
-
 from __future__ import annotations
 
 import json
@@ -28,8 +26,6 @@ pytestmark = [
 
 
 class TestFindLatestResult:
-    """Tests for find_latest_result() function."""
-
     def test_find_latest_result_empty_directory(self, tmp_path):
 
         result = find_latest_result(tmp_path)
@@ -138,14 +134,12 @@ class TestFindLatestResult:
         assert result is None
 
     def test_find_latest_result_skips_companion_files(self, tmp_path):
-        """Test that companion files (.plans.json, .tuning.json) are skipped."""
         result_file = tmp_path / "result.json"
         plans_file = tmp_path / "result.plans.json"
         tuning_file = tmp_path / "result.tuning.json"
 
         write_v2_result_file(result_file, version="2.0")
 
-        # Write companion files (shouldn't be returned)
         with open(plans_file, "w", encoding="utf-8") as f:
             json.dump({"version": "2.0", "plans_captured": 1}, f)
         with open(tuning_file, "w", encoding="utf-8") as f:
@@ -155,13 +149,11 @@ class TestFindLatestResult:
         assert result == result_file
 
     def test_find_latest_result_skips_v1_files(self, tmp_path):
-        """Test that v1.x schema files are skipped."""
         v2_result = tmp_path / "v2_result.json"
         v1_result = tmp_path / "v1_result.json"
 
         write_v2_result_file(v2_result, version="2.0", timestamp="2025-01-01T10:00:00")
 
-        # Create a v1.x file (should be skipped)
         v1_data = {
             "schema_version": "1.0",
             "benchmark": {"id": "tpch", "name": "TPC-H"},
@@ -175,10 +167,7 @@ class TestFindLatestResult:
 
 
 class TestLoadResultFile:
-    """Tests for load_result_file() function."""
-
     def test_load_result_file_success(self, tmp_path):
-        """Test successfully loading a valid v2.0 result file."""
         result_file = tmp_path / "result.json"
         write_v2_result_file(
             result_file,
@@ -197,25 +186,6 @@ class TestLoadResultFile:
         assert raw_data["version"] == "2.0"
 
     def test_load_result_file_loads_companion_with_extra_dots_in_basename(self, tmp_path):
-        """qpc-07 w4: exercise BOTH companion-path defects at once so a revert of
-        either half of the fix fails this test.
-
-        The result lives in a parent directory whose name itself contains
-        ``.json`` (``bundle.json``) and has a scale-factor basename with an extra
-        dot (``result_sf0.1.json``). This defeats both old code paths:
-
-        * ``main_file.with_suffix("").with_suffix(suffix)`` reads ``.1`` as a
-          second suffix and strips it, corrupting the basename to
-          ``result_sf0.plans.json``; and
-        * the ``str(main_file).replace(".json", suffix)`` fallback rewrites the
-          FIRST ``.json`` in the whole path -- here the ``bundle.json`` parent
-          directory -- producing ``bundle.plans.json/result_sf0.1.plans.json``.
-
-        Neither corrupted path exists, so only the exact-basename swap
-        (``name[:-len(".json")] + suffix`` via ``with_name``) resolves the real
-        companion. (With a plain ``tmp_path`` parent the buggy fallback happens
-        to rescue the extra-dot basename, which is why the parent name matters.)
-        """
         bundle_dir = tmp_path / "bundle.json"
         bundle_dir.mkdir()
         result_file = bundle_dir / "result_sf0.1.json"
@@ -243,11 +213,8 @@ class TestLoadResultFile:
                 },
                 f,
             )
-        # The corrupted paths both buggy branches used to compute must NOT
-        # exist, so a false pass (loader stumbling onto the right file some
-        # other way) can't mask the regression.
-        assert not (bundle_dir / "result_sf0.plans.json").exists()  # double-with_suffix corruption
-        assert not (tmp_path / "bundle.plans.json").exists()  # str.replace-hits-parent corruption
+        assert not (bundle_dir / "result_sf0.plans.json").exists()
+        assert not (tmp_path / "bundle.plans.json").exists()
 
         result, _raw_data = load_result_file(result_file)
 
@@ -260,9 +227,6 @@ class TestLoadResultFile:
             load_result_file(Path("/nonexistent/file.json"))
 
     def test_corrupt_plans_companion_sets_plans_load_error(self, tmp_path, caplog):
-        """qpc-05 / F4.3: a .plans.json that exists but is corrupt must surface
-        as result.plans_load_error (and a WARNING), NOT be swallowed and later
-        reported as 'no plans captured'."""
         import logging
 
         result_file = tmp_path / "r.json"
@@ -272,7 +236,6 @@ class TestLoadResultFile:
             platform="DuckDB",
             queries=[{"id": "1", "ms": 100.0, "rows": 4}],
         )
-        # A companion that exists but is not valid JSON.
         (tmp_path / "r.plans.json").write_text("{ not valid json", encoding="utf-8")
 
         with caplog.at_level(logging.WARNING, logger="benchbox.core.results.loader"):
@@ -283,8 +246,6 @@ class TestLoadResultFile:
         assert any("could not be loaded" in rec.getMessage() for rec in caplog.records)
 
     def test_no_plans_companion_leaves_plans_load_error_none(self, tmp_path):
-        """A run with no .plans.json at all is NOT an error: plans_load_error
-        stays None so consumers say 'no plans captured', not 'failed to load'."""
         result_file = tmp_path / "r.json"
         write_v2_result_file(
             result_file,
@@ -308,7 +269,6 @@ class TestLoadResultFile:
             load_result_file(result_file)
 
     def test_load_result_file_unsupported_schema_v1(self, tmp_path):
-        """Test loading v1.x schema version raises UnsupportedSchemaError."""
         result_file = tmp_path / "old_schema.json"
 
         data = {
@@ -352,7 +312,6 @@ class TestLoadResultFile:
         version,
         message,
     ):
-        """Unsupported versions should name the strict runtime loader policy."""
         result_file = tmp_path / "unsupported_schema.json"
         data = {
             "benchmark": {"id": "tpch", "name": "TPC-H"},
@@ -372,8 +331,6 @@ class TestLoadResultFile:
 
 
 class TestReconstructBenchmarkResults:
-    """Tests for reconstruct_benchmark_results() function."""
-
     def test_rejects_row_count_validation_before_schema_2_2(self):
         data = make_v2_result_dict(
             version="2.1",
@@ -402,7 +359,6 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[0]["row_count_validation"] == evidence
 
     def test_reconstruct_minimal_result(self):
-        """Test reconstructing result with minimal required fields."""
         data = make_v2_result_dict(
             version="2.0",
             benchmark_name="TPC-H Benchmark",
@@ -444,7 +400,6 @@ class TestReconstructBenchmarkResults:
                 {"id": "2", "ms": 50.0, "rows": 100},
             ],
         )
-        # Add fields not covered by the shared factory
         data["benchmark"]["mode"] = "power_test"
         data["platform"]["variant"] = "in-memory"
         data["summary"]["timing"].update(
@@ -476,31 +431,24 @@ class TestReconstructBenchmarkResults:
 
         result = reconstruct_benchmark_results(data)
 
-        # Core fields
         assert result.benchmark_name == "TPC-H Benchmark"
         assert result.platform == "DuckDB"
         assert result.scale_factor == 10.0
         assert result.execution_id == "test123"
 
-        # Query metrics
         assert result.total_queries == 22
         assert result.successful_queries == 22
         assert result.failed_queries == 0
         assert len(result.query_results) == 2
 
-        # Timing metrics (converted from ms to seconds)
         assert result.total_execution_time == 5.0
         assert abs(result.average_query_time - 0.22727) < 0.0001
         assert result.data_loading_time == 1.0
 
-        # TPC metrics
         assert result.power_at_size == 1234.5
         assert result.throughput_at_size == 5678.9
         assert result.qph_at_size == 9012.3
-        # Note: geometric_mean_ms is now in summary.timing, not tpc_metrics
-        # The loader extracts it from summary.timing
 
-        # Metadata
         assert result.validation_status == "passed"
         assert result.test_execution_type == "power_test"
 
@@ -556,17 +504,6 @@ class TestReconstructBenchmarkResults:
         assert result.timestamp.day == 28
 
     def test_round_trip_preserves_values(self):
-        """Test that values survive export→import without corruption.
-
-        Note: In v2.0, timing statistics are COMPUTED from query results,
-        not stored separately. This test verifies:
-        1. Non-computed values (data_loading_time) round-trip correctly
-        2. Computed values (total_execution_time, average_query_time) are
-           correctly derived from queries in both export and import
-        """
-        # Create query results that will produce known timing statistics
-        # Total: 100 + 200 + 300 + 400 = 1000ms = 1.0s
-        # Average: 1000 / 4 = 250ms = 0.25s
         query_results = [
             {"query_id": "1", "execution_time_ms": 100, "rows_returned": 4, "status": "SUCCESS"},
             {"query_id": "2", "execution_time_ms": 200, "rows_returned": 8, "status": "SUCCESS"},
@@ -592,17 +529,11 @@ class TestReconstructBenchmarkResults:
         exported = build_result_payload(original)
         reimported = reconstruct_benchmark_results(exported)
 
-        # Verify computed values derived from queries
-        # total_ms should be 1000 (sum of query times)
         assert abs(reimported.total_execution_time - 1.0) < 0.01
-        # average should be 250ms = 0.25s
         assert abs(reimported.average_query_time - 0.25) < 0.01
 
-        # Verify non-computed values round-trip correctly
         assert abs(reimported.data_loading_time - 1.456) < 0.01
 
-        # Verify geometric mean is computed correctly
-        # geometric_mean(100, 200, 300, 400) ≈ 213.4ms
         assert reimported.geometric_mean_execution_time is not None
         assert abs(reimported.geometric_mean_execution_time - 0.2134) < 0.01
 
@@ -665,10 +596,6 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[1]["stream_id"] == 2
 
     def test_reconstruct_query_results_multi_stream_plans_reattach_per_stream(self):
-        """A query_id captured in multiple streams is keyed in .plans.json as
-        "{query_id}#{stream_id}" (build_plans_payload); the loader must resolve
-        each row to its OWN stream's plan, not the other stream's or none at all.
-        """
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -704,12 +631,6 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[1]["plan_fingerprint"] == "b" * 64
 
     def test_reconstruct_query_results_cross_phase_same_stream_id_reattach(self):
-        """A power row and a throughput row sharing the same query_id AND
-        stream_id (independent per-phase stream counters) are keyed in
-        .plans.json as "{query_id}#{stream_id}:{test_type}"; the loader must
-        resolve each row to its OWN phase's plan using the compact entry's
-        test_type field, not the other phase's.
-        """
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -751,8 +672,6 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[1]["plan_fingerprint"] == "b" * 64
 
     def test_reconstruct_query_results_single_stream_bare_key_still_works(self):
-        """A query_id captured in exactly one stream is keyed bare (no "#stream"
-        suffix); this must keep working unchanged (the common case)."""
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -811,11 +730,6 @@ class TestReconstructBenchmarkResults:
         assert failed_query[0]["error_type"] == "QueryError"
 
     def test_reconstruct_does_not_duplicate_current_format_failure(self):
-        """A current-format bundle duplicates a failure into BOTH queries[]
-        (status="FAILED") and errors[] (see schema.py _build_query_results_section).
-        The loader must reconstruct exactly one row for it, not a phantom
-        second row synthesized from errors[] (qpc-02 / F1.4).
-        """
         data = make_v2_result_dict(
             version="2.1",
             benchmark_id="test",
@@ -856,10 +770,6 @@ class TestReconstructBenchmarkResults:
         assert failed_rows[0]["error_message"] == "Syntax error"
 
     def test_reconstruct_attaches_distinct_error_to_each_repeated_failure(self):
-        """#1022 review: a query_id that fails more than once (e.g. across
-        iterations) must have EACH failing row get its own error detail from
-        errors[], in write order - not every repeat sharing the first error
-        seen for that query_id (the old dict.setdefault behavior)."""
         data = make_v2_result_dict(
             version="2.1",
             benchmark_id="test",
@@ -895,10 +805,6 @@ class TestReconstructBenchmarkResults:
         assert failed_rows[1]["error_message"] == "iteration 2 ran out of memory"
 
     def test_reconstruct_legacy_failure_not_suppressed_by_successful_same_id_row(self):
-        """#1022 review: a legacy-shape error whose query_id ALSO appears
-        elsewhere in queries[] as a successful (different-iteration) row must
-        still be synthesized as a standalone FAILED row - the old check
-        ("query_id anywhere in queries[]") incorrectly suppressed it."""
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -913,7 +819,6 @@ class TestReconstructBenchmarkResults:
             failed_queries=1,
             total_ms=100,
             queries=[
-                # Legacy shape: only successful queries appear here, no status key.
                 {"id": "1", "ms": 100.0, "rows": 4},
             ],
             errors=[
@@ -931,10 +836,6 @@ class TestReconstructBenchmarkResults:
         assert failed_rows[0]["error_message"] == "iteration 2 failed"
 
     def test_reconstruct_preserves_warmup_iteration_zero_and_stream_zero(self):
-        """iter/stream of 0 are falsy and must not be dropped by a truthy `if`
-        check (qpc-02 / F1.4): warmup rows (iter=0) and the first stream
-        (stream=0) must survive reconstruction.
-        """
         data = make_v2_result_dict(
             version="2.1",
             benchmark_id="test",
@@ -971,19 +872,11 @@ class TestReconstructBenchmarkResults:
 
 
 class TestExportLoadReexportRoundtrip:
-    """Byte-equality property test (qpc-02): export -> load -> re-export must
-    reproduce both the main result file and the .plans.json companion
-    exactly, for a fixture spanning warmup rows (iter 0), a failure, and a
-    stream > 0 row.
-    """
-
     def test_export_load_reexport_roundtrip_byte_identical(self):
         root = LogicalOperator(operator_type=LogicalOperatorType.SCAN, operator_id="scan_1", table_name="lineitem")
         plan = QueryPlanDAG(query_id="2", platform="duckdb", logical_root=root)
 
         query_results = [
-            # Warmup row: iteration 0 and stream 0 are both falsy -- must not
-            # be dropped by the loader.
             {
                 "query_id": "1",
                 "status": "SUCCESS",
@@ -1002,8 +895,6 @@ class TestExportLoadReexportRoundtrip:
                 "stream_id": 0,
                 "run_type": "measurement",
             },
-            # Second stream, with a captured plan whose capture_time_ms is
-            # exactly 0.0 (also falsy -- must not be dropped either).
             {
                 "query_id": "2",
                 "status": "SUCCESS",
@@ -1016,8 +907,6 @@ class TestExportLoadReexportRoundtrip:
                 "plan_fingerprint": plan.plan_fingerprint,
                 "plan_capture_time_ms": 0.0,
             },
-            # A FAILED query, duplicated into errors[] the way
-            # build_result_payload's _build_query_results_section does.
             {
                 "query_id": "3",
                 "status": "FAILED",
@@ -1048,12 +937,6 @@ class TestExportLoadReexportRoundtrip:
         plans_payload = build_plans_payload(original)
         assert plans_payload is not None
 
-        # Guard the schema.py `if capture_time is not None:` fix (F1.5): a
-        # capture time of exactly 0.0 is falsy, so a truthy check would drop
-        # it from the plans payload entirely. Byte-equality alone cannot catch
-        # that regression -- both the export and re-export would omit the field
-        # symmetrically and still compare equal -- so assert the 0.0 actually
-        # survives the initial export here.
         assert plans_payload["queries"]["2"]["capture_time_ms"] == 0.0
 
         reimported = reconstruct_benchmark_results(exported, plans_data=plans_payload)
@@ -1066,18 +949,7 @@ class TestExportLoadReexportRoundtrip:
 
 
 class TestTuningProvenanceLoaderFidelity:
-    """Loader-side tests for the tuning-bundle-provenance-and-config-export
-    TODO's ADR-1 fields (requested_config_hash, tuning_source) - see
-    _extract_tuning_info() in benchbox/core/results/loader.py.
-    """
-
     def test_legacy_summary_only_bundle_reconstructs_yaml_sentinel(self):
-        """Pre-ADR-1 bundles recorded only platform.tuning.source ("yaml"/
-        "auto") with no .tuning.json companion carrying a real source_file.
-        _extract_tuning_info must still reconstruct the old "yaml" sentinel
-        for tuning_source_file in that summary-only case (no companion data),
-        matching this function's pre-existing (pre-ADR-1) behavior.
-        """
         data = make_v2_result_dict(
             benchmark_id="tpch",
             platform="duckdb",
@@ -1102,8 +974,6 @@ class TestTuningProvenanceLoaderFidelity:
         assert result.tuning_source_file is None
 
     def test_tuning_source_survives_reconstruct_and_reexport_roundtrip(self):
-        """tuning_source (ADR-1) must round-trip through
-        reconstruct_benchmark_results() -> build_result_payload() unchanged."""
         original = make_benchmark_results(
             benchmark_id="tpch",
             benchmark_name="tpch",
@@ -1137,13 +1007,9 @@ class TestTuningProvenanceLoaderFidelity:
         assert exported["platform"]["tuning"]["tuning_source"] == "auto_discovered"
         assert tuning_companion is not None
 
-        # tuning_source is readable from the summary block alone (no companion
-        # needed for that one field).
         reimported_summary_only = reconstruct_benchmark_results(exported)
         assert reimported_summary_only.tuning_source == "auto_discovered"
 
-        # Full fidelity (tunings_applied/requested structure) needs the
-        # .tuning.json companion, exactly like the .plans.json roundtrip above.
         reimported = reconstruct_benchmark_results(exported, tuning_data=tuning_companion)
         assert reimported.tuning_source == "auto_discovered"
 
@@ -1152,14 +1018,6 @@ class TestTuningProvenanceLoaderFidelity:
         assert canonical_json_text(exported) == canonical_json_text(re_exported)
 
     def test_requested_constraints_survive_reconstruct_and_reexport_roundtrip(self):
-        """schema.py's _requested_tuning_sections groups primary_keys/foreign_keys/
-        unique_constraints/check_constraints under the companion's
-        requested["constraints"] key on export. _extract_tuning_info must expand
-        that back to the flat UnifiedTuningConfiguration.to_dict() shape
-        tunings_applied is documented to carry (builder.py), or a load ->
-        re-export cycle silently drops every constraint and its
-        platform.tuning.counts entry.
-        """
         original = make_benchmark_results(
             benchmark_id="tpch",
             benchmark_name="tpch",
@@ -1213,8 +1071,6 @@ class TestTuningProvenanceLoaderFidelity:
 
 
 class TestResultSchemaVersionLoading:
-    """Tests for result_schema_version and backwards-compatible version loading."""
-
     def test_load_result_file_with_result_schema_version_and_no_version(self, tmp_path: Path):
         data = make_v2_result_dict(version="2.2")
         del data["version"]

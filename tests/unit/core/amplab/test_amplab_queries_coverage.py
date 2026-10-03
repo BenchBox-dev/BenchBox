@@ -1,17 +1,6 @@
-"""Coverage tests for AMPLab DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets the implementation functions in:
-  benchbox/core/amplab/dataframe_queries/queries.py
-
-Verifies that:
-- Each query function is callable and executes without error on a mock context
-- Registration via _register_all_queries() produces correct query objects
-- Category assignments match query semantics
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,13 +15,10 @@ pytestmark = [
 
 
 def _make_mock_ctx() -> MockExpr:
-    """Create a mock DataFrameContext backed by MockExpr."""
     return MockExpr()
 
 
 class TestAMPLabQueryFunctionCallable:
-    """Tests that each query implementation function exists and is callable."""
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -63,8 +49,6 @@ class TestAMPLabQueryFunctionCallable:
 
 
 class TestAMPLabExpressionImplExecution:
-    """Tests that expression_impl functions execute without error on mock context."""
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -88,13 +72,6 @@ class TestAMPLabExpressionImplExecution:
 
 
 class TestAMPLabPandasImplExecution:
-    """Tests that pandas_impl functions execute (or exercise code paths) on mock context.
-
-    Some pandas_impl functions call numpy with mock objects, which numpy cannot
-    process as arrays. We allow ValueError/TypeError from numpy internals while
-    still verifying that the function body is entered and code paths are covered.
-    """
-
     @pytest.mark.parametrize(
         "func_name",
         [
@@ -117,14 +94,10 @@ class TestAMPLabPandasImplExecution:
             result = func(ctx)
             assert result is not None
         except (ValueError, TypeError):
-            # numpy operations on mock data raise ValueError/TypeError;
-            # the important thing is that we entered the function body (covered).
             pass
 
 
 class TestAMPLabQueryRegistration:
-    """Tests for _register_all_queries registration output."""
-
     def test_all_query_ids_are_strings(self) -> None:
         from benchbox.core.amplab.dataframe_queries import AMPLAB_DATAFRAME_QUERIES
 
@@ -207,14 +180,6 @@ class TestAMPLabQueryRegistration:
 
 
 class TestAMPLabColumnCaseSensitivity:
-    """Verify AMPLab column names are mixed-case and SQL queries reference them exactly.
-
-    AMPLab uses camelCase column names (pageURL, pageRank, sourceIP, etc.). SQL queries
-    must reference these with matching case. Platforms that normalize identifiers to
-    lowercase (e.g. DataFusion with enable_ident_normalization=true) would break all
-    column lookups - removing that normalization is what makes AMPLab work on DataFusion.
-    """
-
     MIXED_CASE_COLUMNS = [
         "pageURL",
         "pageRank",

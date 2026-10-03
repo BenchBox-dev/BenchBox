@@ -1,5 +1,3 @@
-"""Regression tests for scripts/check_doc_relative_links.py."""
-
 from __future__ import annotations
 
 import sys

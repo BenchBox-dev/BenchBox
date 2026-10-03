@@ -1,12 +1,6 @@
-"""Performance tests for TPC benchmark helpers using DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains performance tests for TPC benchmark helpers with real
-DuckDB database operations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 import time
@@ -26,14 +20,10 @@ pytestmark = [
 
 
 class TestTPCPerformanceDuckDB:
-    """Performance tests using real DuckDB connections."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
 
     def test_tpc_metrics_calculation_performance(self):
-        """Test performance of TPC metrics calculations."""
         start_time = time.time()
 
         for i in range(1000):
@@ -47,19 +37,15 @@ class TestTPCPerformanceDuckDB:
 
         calculation_time = time.time() - start_time
 
-        # Should complete 1000 calculations quickly
         assert calculation_time < 1.0, f"Metrics calculation too slow: {calculation_time:.4f}s"
         print(f"Metrics calculation time: {calculation_time:.4f}s")
 
     def test_duckdb_connection_performance(self):
-        """Test DuckDB connection and basic query performance."""
-        # Test multiple connection creation/teardown cycles
         start_time = time.time()
 
         for _i in range(100):
             conn = duckdb.connect(":memory:")
             try:
-                # Simple query for performance testing
                 result = conn.execute("SELECT 1 as test_value").fetchall()
                 assert result == [(1,)]
             finally:
@@ -67,24 +53,19 @@ class TestTPCPerformanceDuckDB:
 
         connection_time = time.time() - start_time
 
-        # Should handle 100 connection cycles quickly
         assert connection_time < 5.0, f"DuckDB connection performance too slow: {connection_time:.4f}s"
         print(f"DuckDB connection cycles time: {connection_time:.4f}s")
 
     def test_benchmark_initialization_performance(self):
-        """Test benchmark initialization performance."""
         start_time = time.time()
 
-        # Test TPC-H benchmark initialization
         TPCHBenchmark(scale_factor=0.01, output_dir=self.temp_dir)
         tpch_time = time.time() - start_time
 
-        # Test TPC-DS benchmark initialization
         tpcds_start = time.time()
         TPCDSBenchmark(scale_factor=1.0, output_dir=self.temp_dir)
         tpcds_time = time.time() - tpcds_start
 
-        # Benchmark initialization should be fast
         assert tpch_time < 2.0, f"TPC-H init too slow: {tpch_time:.4f}s"
         assert tpcds_time < 2.0, f"TPC-DS init too slow: {tpcds_time:.4f}s"
 
@@ -92,22 +73,17 @@ class TestTPCPerformanceDuckDB:
         print(f"TPC-DS init time: {tpcds_time:.4f}s")
 
     def test_memory_usage_with_duckdb(self):
-        """Test memory usage when working with DuckDB."""
-        # Get initial memory usage
         process = psutil.Process()
-        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        initial_memory = process.memory_info().rss / 1024 / 1024
 
-        # Create benchmark and database operations
         TPCHBenchmark(scale_factor=0.01, output_dir=self.temp_dir)
 
         connections = []
         try:
-            # Create multiple DuckDB connections and perform operations
             for _i in range(10):
                 conn = duckdb.connect(":memory:")
                 connections.append(conn)
 
-                # Create some tables and insert data
                 conn.execute("""
                     CREATE TABLE test_table (
                         id INTEGER,
@@ -116,36 +92,29 @@ class TestTPCPerformanceDuckDB:
                     )
                 """)
 
-                # Insert some test data
                 for j in range(100):
                     conn.execute(
                         "INSERT INTO test_table VALUES (?, ?, ?)",
                         [j, f"name_{j}", float(j * 1.5)],
                     )
 
-                # Query the data
                 result = conn.execute("SELECT COUNT(*) FROM test_table").fetchone()
                 assert result[0] == 100
 
-            # Check memory usage after operations
-            final_memory = process.memory_info().rss / 1024 / 1024  # MB
+            final_memory = process.memory_info().rss / 1024 / 1024
             memory_increase = final_memory - initial_memory
 
-            # Memory increase should be reasonable (< 100MB for small operations)
             assert memory_increase < 100.0, f"Memory usage too high: {memory_increase:.2f} MB"
             print(f"Memory increase: {memory_increase:.2f} MB")
 
         finally:
-            # Clean up connections
             for conn in connections:
                 conn.close()
 
     def test_query_execution_performance(self):
-        """Test query execution performance with DuckDB."""
         conn = duckdb.connect(":memory:")
 
         try:
-            # Create test schema
             conn.execute("""
                 CREATE TABLE customer (
                     c_custkey INTEGER,
@@ -159,7 +128,6 @@ class TestTPCPerformanceDuckDB:
                 )
             """)
 
-            # Insert test data
             start_time = time.time()
             for i in range(1000):
                 conn.execute(
@@ -181,7 +149,6 @@ class TestTPCPerformanceDuckDB:
 
             insert_time = time.time() - start_time
 
-            # Test query performance
             query_start = time.time()
             result = conn.execute("""
                 SELECT c_mktsegment, COUNT(*), AVG(c_acctbal)
@@ -192,10 +159,8 @@ class TestTPCPerformanceDuckDB:
 
             query_time = time.time() - query_start
 
-            # Verify results
             assert len(result) > 0
 
-            # Performance should be reasonable
             assert insert_time < 5.0, f"Insert performance too slow: {insert_time:.4f}s"
             assert query_time < 1.0, f"Query performance too slow: {query_time:.4f}s"
 
@@ -207,16 +172,13 @@ class TestTPCPerformanceDuckDB:
             conn.close()
 
     def test_concurrent_operations_performance(self):
-        """Test concurrent DuckDB operations performance."""
         import concurrent.futures
 
         def worker_task(worker_id: int) -> float:
-            """Worker task for concurrent testing."""
             conn = duckdb.connect(":memory:")
             start_time = time.time()
 
             try:
-                # Create table and insert data
                 conn.execute(f"""
                     CREATE TABLE worker_{worker_id} (
                         id INTEGER,
@@ -230,7 +192,6 @@ class TestTPCPerformanceDuckDB:
                         [i, float(i * worker_id)],
                     )
 
-                # Execute some queries
                 result = conn.execute(f"SELECT COUNT(*), AVG(value) FROM worker_{worker_id}").fetchone()
                 assert result[0] == 100
 
@@ -239,7 +200,6 @@ class TestTPCPerformanceDuckDB:
             finally:
                 conn.close()
 
-        # Test concurrent operations
         start_time = time.time()
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -249,7 +209,6 @@ class TestTPCPerformanceDuckDB:
         total_time = time.time() - start_time
         avg_worker_time = sum(worker_times) / len(worker_times)
 
-        # Concurrent operations should complete reasonably quickly
         assert total_time < 10.0, f"Concurrent operations too slow: {total_time:.4f}s"
         assert avg_worker_time < 5.0, f"Average worker time too slow: {avg_worker_time:.4f}s"
 
@@ -257,13 +216,11 @@ class TestTPCPerformanceDuckDB:
         print(f"Average worker time: {avg_worker_time:.4f}s")
 
     def test_benchmark_schema_creation_performance(self):
-        """Test benchmark schema creation performance with DuckDB."""
         benchmark = TPCHBenchmark(scale_factor=0.01, output_dir=self.temp_dir)
 
         conn = duckdb.connect(":memory:")
 
         try:
-            # Test schema creation performance
             start_time = time.time()
 
             schema_sql = benchmark.get_create_tables_sql()
@@ -273,7 +230,6 @@ class TestTPCPerformanceDuckDB:
 
             schema_time = time.time() - start_time
 
-            # Verify tables were created
             tables = conn.execute("""
                 SELECT table_name
                 FROM information_schema.tables
@@ -295,7 +251,6 @@ class TestTPCPerformanceDuckDB:
             for table in expected_tables:
                 assert table in table_names, f"Table {table} not created"
 
-            # Schema creation should be fast
             assert schema_time < 2.0, f"Schema creation too slow: {schema_time:.4f}s"
             print(f"Schema creation time: {schema_time:.4f}s")
 

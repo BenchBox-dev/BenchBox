@@ -1,5 +1,3 @@
-"""Tests for the PR review follow-up orchestrator."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -50,10 +48,6 @@ class RecordingRunner:
         self.commands: list[list[str]] = []
         self.inputs: list[str | None] = []
         self.responses = responses or {}
-        # Per-call queue keyed by argv tuple. Earlier entries are consumed first;
-        # once exhausted, the runner falls back to `responses` then to a 0-rc
-        # default. Patch 2 needs this so the same argv (`git commit -m ...`) can
-        # return rc=1 once and rc=0 the next time.
         self.scripted = {key: list(values) for key, values in (scripted or {}).items()}
         self.cwd = Path.cwd()
 
@@ -104,7 +98,6 @@ def _comment(
 
 
 def _write_fake_codex_launcher(directory: Path) -> tuple[Path, list[str]]:
-    """Write a fake Codex command and return its PATH entry and execution prefix."""
     directory.mkdir(parents=True, exist_ok=True)
     bash_shim = directory / "codex"
     bash_shim.write_text(
@@ -149,8 +142,6 @@ def _write_fake_codex_launcher(directory: Path) -> tuple[Path, list[str]]:
 
 
 class FakeCodexCommandRunner(pr_review_followups.CommandRunner):
-    """Execute only the test's fake Codex command through its portable prefix."""
-
     def __init__(self, cwd: Path, codex_launcher: Path, codex_prefix: Sequence[str]) -> None:
         super().__init__(cwd)
         self.codex_launcher = codex_launcher.resolve()
@@ -165,7 +156,6 @@ class FakeCodexCommandRunner(pr_review_followups.CommandRunner):
 
 @pytest.fixture
 def logical_codex_command(monkeypatch) -> None:
-    """Keep mocked-runner tests independent of host-specific launcher discovery."""
     monkeypatch.setattr(pr_review_followups, "_executor_command", lambda: "codex")
 
 
@@ -293,11 +283,6 @@ def test_pending_comments_skip_action_marker_replies_and_post_merge_comments() -
 
 
 def test_action_marker_match_requires_html_comment_at_start_of_line() -> None:
-    """Substring matching let unrelated quotes silently kill future sweeps.
-
-    The strict matcher only accepts the marker inside an HTML comment that
-    starts at the beginning of a line — the shape `build_reply_body` posts.
-    """
     quoted_marker_reply = _comment(
         2,
         user_login="joeharris76",
@@ -325,8 +310,6 @@ def test_action_marker_match_requires_html_comment_at_start_of_line() -> None:
         author_logins={"chatgpt-codex-connector[bot]"},
     )
 
-    # comment 1 is still pending because the quoted-marker reply doesn't
-    # match; comment 3 is skipped because the real marker reply does.
     assert [item.comment.id for item in pending] == [1]
 
 
@@ -823,8 +806,6 @@ def test_reply_body_contains_skip_marker_and_disposition() -> None:
     assert "comment_id=11" in body
     assert "Disposition: fixed" in body
     assert "Future sweeps skip comments" in body
-    # The reply body itself must match the strict marker matcher so the
-    # *next* sweep recognizes its own previous reply.
     assert pr_review_followups.ACTION_MARKER_REGEX.search(body)
 
 
@@ -939,11 +920,6 @@ def test_check_executor_version_surfaces_missing_binary(logical_codex_command) -
 
 
 def test_run_executor_for_comment_uses_config_override_for_approval_policy(logical_codex_command) -> None:
-    """The legacy `--ask-for-approval` flag was dropped in codex-cli >= 0.20.
-
-    The orchestrator must use `-c approval_policy=<mode>` so it works against
-    current and future codex releases.
-    """
     pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(50), replies=())
     runner = RecordingRunner()
 
@@ -963,7 +939,7 @@ def test_run_executor_for_comment_uses_config_override_for_approval_policy(logic
     assert "--ask-for-approval" not in executor_argv
     assert "-c" in executor_argv
     assert "approval_policy=never" in executor_argv
-    assert result.disposition == "no-current-action"  # RecordingRunner produces no diff
+    assert result.disposition == "no-current-action"
 
 
 def test_run_executor_for_comment_treats_clean_local_commit_as_fixed(logical_codex_command) -> None:
@@ -1009,9 +985,6 @@ def test_commit_message_for_result_includes_pr_and_comment_id() -> None:
 
 
 def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
-    """A crash between the executor run and the reply must not leave a phantom
-    actioned thread on GitHub. The order is: executor → commit → reply.
-    """
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
@@ -1023,8 +996,6 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     subprocess.run(["git", "-C", str(repo_root), "commit", "-q", "-m", "init"], check=True)
     subprocess.run(["git", "-C", str(repo_root), "branch", "-M", "develop"], check=True)
     subprocess.run(["git", "-C", str(repo_root), "checkout", "-q", "-b", "chore/test"], check=True)
-    # Pretend origin/develop is the same SHA as the seed commit so
-    # local_commit_count returns 0 at start.
     head = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -1064,7 +1035,6 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
 
     def trace_reply(runner, *, repo, result, branch):
         side_effect_log.append("reply")
-        # Don't actually call gh; just record.
 
     def trace_finalize(runner, **kwargs):
         side_effect_log.append("finalize")
@@ -1090,7 +1060,6 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     assert rc == 0
     assert side_effect_log == ["commit", "reply", "finalize"]
 
-    # Per-comment commit landed before reply ran.
     log_out = subprocess.run(
         ["git", "-C", str(repo_root), "log", "--oneline"],
         check=True,
@@ -1338,11 +1307,6 @@ def test_run_action_loop_does_not_duplicate_inflight_usage_limit_retry(monkeypat
     ]
 
 
-# ---------------------------------------------------------------------------
-# Patch 1 — reply_to_comment retries transient gh api failures
-# ---------------------------------------------------------------------------
-
-
 def _reply_args(repo: str, pr_number: int, comment_id: int) -> tuple[str, ...]:
     return (
         "gh",
@@ -1354,7 +1318,6 @@ def _reply_args(repo: str, pr_number: int, comment_id: int) -> tuple[str, ...]:
 
 
 def test_reply_to_comment_retries_transient_gh_failure_then_succeeds() -> None:
-    """A flaky `gh api` (network drop, 5xx) must be retried, not crash the sweep."""
     transient = subprocess.CompletedProcess(
         [],
         1,
@@ -1401,7 +1364,6 @@ def test_reply_to_comment_retries_transient_gh_failure_then_succeeds() -> None:
 
 
 def test_reply_to_comment_does_not_retry_permanent_4xx() -> None:
-    """A 404 (comment deleted upstream) must fail loud on the first attempt."""
     permanent = subprocess.CompletedProcess(
         [],
         1,
@@ -1439,7 +1401,6 @@ def test_reply_to_comment_does_not_retry_permanent_4xx() -> None:
 
 
 def test_is_transient_gh_failure_classification() -> None:
-    """Sanity-check the discriminator covers the flagged classes and nothing else."""
     assert pr_review_followups._is_transient_gh_failure("error connecting to api.github.com")
     assert pr_review_followups._is_transient_gh_failure("check your internet connection or https://githubstatus.com")
     assert pr_review_followups._is_transient_gh_failure("gh: HTTP 503: Service Unavailable")
@@ -1449,13 +1410,7 @@ def test_is_transient_gh_failure_classification() -> None:
     assert not pr_review_followups._is_transient_gh_failure("")
 
 
-# ---------------------------------------------------------------------------
-# Patch 2 — commit_changes_for_result retries when a hook auto-fixes paths
-# ---------------------------------------------------------------------------
-
-
 def test_commit_changes_for_result_retries_after_hook_autofix() -> None:
-    """ruff-format reformats a staged file, commit aborts, second commit succeeds."""
     pending = pr_review_followups.PendingComment(
         pr=_pr(), comment=_comment(55, body="[P1] Add the missing test"), replies=()
     )
@@ -1483,9 +1438,7 @@ def test_commit_changes_for_result_retries_after_hook_autofix() -> None:
         scripted={
             ("git", "diff", "--name-only"): [diff_name],
             ("git", "diff", "--cached", "--name-only"): [
-                # First call: from git_changed_paths — nothing pre-staged.
                 diff_cached_name_empty,
-                # Second call: post-stage_paths to verify staged content.
                 diff_cached_after_stage,
             ],
             ("git", "ls-files", "--others", "--exclude-standard"): [ls_files],
@@ -1505,7 +1458,6 @@ def test_commit_changes_for_result_retries_after_hook_autofix() -> None:
 
 
 def test_commit_changes_for_result_does_not_retry_genuine_hook_failure() -> None:
-    """If the hook fails without auto-fixing the staged paths, fail loud."""
     pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(56, body="[P1] do something"), replies=())
     result = pr_review_followups.ActionResult(pending=pending, disposition="fixed", summary="ok")
     expected_message = pr_review_followups.commit_message_for_result(result)
@@ -1516,8 +1468,6 @@ def test_commit_changes_for_result_does_not_retry_genuine_hook_failure() -> None
     diff_cached_empty = subprocess.CompletedProcess([], 0, "", "")
     ls_files = subprocess.CompletedProcess([], 0, "", "")
     diff_cached_after_stage = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
-    # Genuine pre-commit failure (e.g. a test runner detected a real bug):
-    # commit fails, but porcelain shows no fresh work-tree mods.
     commit_failure = subprocess.CompletedProcess(
         [], 1, "", "test-runner..............................................................Failed\n"
     )
@@ -1550,15 +1500,7 @@ def test_porcelain_paths_with_worktree_mods_parses_added_modified_and_renamed() 
 
     paths = pr_review_followups._porcelain_paths_with_worktree_mods(porcelain)
 
-    # AM, " M", "??" all have non-space work-tree column -> included.
-    # "M  " has a space work-tree column -> excluded (purely staged).
-    # "R  " rename has space work-tree column -> excluded.
     assert paths == {"tests/unit/example.py", "docs/notes.md", "new_file.txt"}
-
-
-# ---------------------------------------------------------------------------
-# Patch 3 — --resume skips comments already committed locally
-# ---------------------------------------------------------------------------
 
 
 def test_resume_skips_comments_already_committed_locally(monkeypatch, tmp_path) -> None:
@@ -1577,7 +1519,6 @@ def test_resume_skips_comments_already_committed_locally(monkeypatch, tmp_path) 
     ).stdout.strip()
     subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
     subprocess.run(["git", "-C", str(repo_root), "checkout", "-q", "-b", "fix/pr-review-resume"], check=True)
-    # A per-comment commit from a prior crashed sweep: PR #999, comment 12345.
     (repo_root / "fix.txt").write_text("prior fix\n")
     subprocess.run(["git", "-C", str(repo_root), "add", "fix.txt"], check=True)
     subprocess.run(

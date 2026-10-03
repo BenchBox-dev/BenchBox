@@ -1,9 +1,3 @@
-"""
-Tests for parser registry functionality.
-
-Tests parser registration, version-based selection, and global registry.
-"""
-
 import pytest
 
 from benchbox.core.query_plans.parsers.base import QueryPlanParser
@@ -21,10 +15,7 @@ pytestmark = [
 ]
 
 
-# Mock parser classes for testing
 class MockParserV1(QueryPlanParser):
-    """Mock parser version 1."""
-
     def __init__(self):
         super().__init__("mock")
         self.version = "v1"
@@ -34,8 +25,6 @@ class MockParserV1(QueryPlanParser):
 
 
 class MockParserV2(QueryPlanParser):
-    """Mock parser version 2."""
-
     def __init__(self):
         super().__init__("mock")
         self.version = "v2"
@@ -45,8 +34,6 @@ class MockParserV2(QueryPlanParser):
 
 
 class MockParserV3(QueryPlanParser):
-    """Mock parser version 3."""
-
     def __init__(self):
         super().__init__("mock")
         self.version = "v3"
@@ -56,8 +43,6 @@ class MockParserV3(QueryPlanParser):
 
 
 class TestParserRegistry:
-    """Test ParserRegistry class."""
-
     def test_empty_registry(self) -> None:
 
         registry = ParserRegistry()
@@ -79,17 +64,14 @@ class TestParserRegistry:
         registry.register("testdb", "2.0.0", MockParserV2)
         registry.register("testdb", "3.0.0", MockParserV3)
 
-        # Version 1.5 should use V1 parser
         parser = registry.get_parser("testdb", "1.5.0")
         assert parser is not None
         assert parser.version == "v1"
 
-        # Version 2.5 should use V2 parser
         parser = registry.get_parser("testdb", "2.5.0")
         assert parser is not None
         assert parser.version == "v2"
 
-        # Version 3.0+ should use V3 parser
         parser = registry.get_parser("testdb", "3.0.0")
         assert parser is not None
         assert parser.version == "v3"
@@ -103,7 +85,6 @@ class TestParserRegistry:
         registry = ParserRegistry()
         registry.register("testdb", "2.0.0", MockParserV2)
 
-        # Version 1.0 is too old
         parser = registry.get_parser("testdb", "1.0.0")
         assert parser is None
 
@@ -124,7 +105,6 @@ class TestParserRegistry:
         registry.register("testdb", "1.0.0", MockParserV1)
         registry.register("testdb", "2.0.0", MockParserV2)
 
-        # Should return parser with highest version requirement
         parser = registry.get_parser("testdb")
         assert parser is not None
         assert parser.version == "v2"
@@ -135,7 +115,6 @@ class TestParserRegistry:
         registry.register("testdb", "1.0.0", MockParserV1)
         registry.register("testdb", "2.0.0", MockParserV2)
 
-        # Invalid version should fall back to latest parser
         parser = registry.get_parser("testdb", "invalid-version")
         assert parser is not None
         assert parser.version == "v2"
@@ -185,7 +164,6 @@ class TestParserRegistry:
         registry.register("testdb", "0.10.0", MockParserV2)
         registry.register("testdb", "1.0.0", MockParserV3)
 
-        # 0.10.0 > 0.9.0 (not lexicographic comparison)
         parser = registry.get_parser("testdb", "0.9.5")
         assert parser is not None
         assert parser.version == "v1"
@@ -200,14 +178,10 @@ class TestParserRegistry:
 
 
 class TestGlobalRegistry:
-    """Test global registry functionality."""
-
     def setup_method(self) -> None:
-        """Reset global registry before each test."""
         reset_global_registry()
 
     def teardown_method(self) -> None:
-        """Reset global registry after each test."""
         reset_global_registry()
 
     def test_get_parser_registry(self) -> None:
@@ -258,12 +232,6 @@ class TestGlobalRegistry:
         assert parser.platform_name == "sqlite"
 
     def test_clickhouse_deployment_mode_keys_resolve(self) -> None:
-        """ClickHouse parser resolves for the concrete platform identifiers.
-
-        The platform identifiers are clickhouse-local / clickhouse-server /
-        clickhouse-cloud, not the legacy "clickhouse" key, so a direct
-        get_parser_for_platform() lookup must work for every deployment mode.
-        """
         for platform in (
             "clickhouse",
             "clickhouse-local",
@@ -284,13 +252,10 @@ class TestGlobalRegistry:
         registry1 = get_parser_registry()
         reset_global_registry()
         registry2 = get_parser_registry()
-        # Should be a new instance
         assert registry1 is not registry2
 
 
 class TestParserRegistryVersionSelection:
-    """Test version selection edge cases."""
-
     def test_exact_version_match(self) -> None:
 
         registry = ParserRegistry()
@@ -306,11 +271,8 @@ class TestParserRegistryVersionSelection:
         registry.register("testdb", "1.0.0", MockParserV1)
         registry.register("testdb", "2.0.0", MockParserV2)
 
-        # Pre-release version 2.0.0-beta should use V1 parser
-        # (pre-releases are < the release version)
         parser = registry.get_parser("testdb", "2.0.0-beta")
         assert parser is not None
-        # packaging considers 2.0.0-beta < 2.0.0, so V1 is selected
         assert parser.version == "v1"
 
     def test_version_with_build_metadata(self) -> None:
@@ -318,23 +280,19 @@ class TestParserRegistryVersionSelection:
         registry = ParserRegistry()
         registry.register("testdb", "1.0.0", MockParserV1)
 
-        # Build metadata is ignored in version comparison
         parser = registry.get_parser("testdb", "1.0.0+build123")
         assert parser is not None
         assert parser.version == "v1"
 
     def test_short_version_string(self) -> None:
-        """Test handling of short version strings like '1' or '1.0'."""
         registry = ParserRegistry()
         registry.register("testdb", "1.0.0", MockParserV1)
         registry.register("testdb", "2.0.0", MockParserV2)
 
-        # "1" should be interpreted as "1.0.0"
         parser = registry.get_parser("testdb", "1")
         assert parser is not None
         assert parser.version == "v1"
 
-        # "2" should be interpreted as "2.0.0"
         parser = registry.get_parser("testdb", "2")
         assert parser is not None
         assert parser.version == "v2"

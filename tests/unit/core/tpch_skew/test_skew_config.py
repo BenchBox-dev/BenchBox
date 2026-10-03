@@ -1,9 +1,6 @@
-"""Tests for TPC-H Skew configuration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -24,8 +21,6 @@ pytestmark = [
 
 
 class TestSkewType:
-    """Tests for SkewType enum."""
-
     def test_all_types_defined(self):
 
         assert SkewType.ATTRIBUTE.value == "attribute"
@@ -35,8 +30,6 @@ class TestSkewType:
 
 
 class TestSkewPreset:
-    """Tests for SkewPreset enum."""
-
     def test_all_presets_defined(self):
 
         presets = [
@@ -60,8 +53,6 @@ class TestSkewPreset:
 
 
 class TestAttributeSkewConfig:
-    """Tests for AttributeSkewConfig."""
-
     def test_default_values(self):
 
         config = AttributeSkewConfig()
@@ -93,8 +84,6 @@ class TestAttributeSkewConfig:
 
 
 class TestJoinSkewConfig:
-    """Tests for JoinSkewConfig."""
-
     def test_default_values(self):
 
         config = JoinSkewConfig()
@@ -123,8 +112,6 @@ class TestJoinSkewConfig:
 
 
 class TestTemporalSkewConfig:
-    """Tests for TemporalSkewConfig."""
-
     def test_default_values(self):
 
         config = TemporalSkewConfig()
@@ -140,8 +127,6 @@ class TestTemporalSkewConfig:
 
 
 class TestSkewConfiguration:
-    """Tests for SkewConfiguration."""
-
     def test_default_configuration(self):
 
         config = SkewConfiguration()
@@ -200,8 +185,6 @@ class TestSkewConfiguration:
 
 
 class TestGetPresetConfig:
-    """Tests for get_preset_config function."""
-
     def test_none_preset(self):
 
         config = get_preset_config(SkewPreset.NONE)
@@ -244,9 +227,7 @@ class TestGetPresetConfig:
 
         config = get_preset_config(SkewPreset.REALISTIC)
         assert config.skew_factor == 0.6
-        # Should have temporal skew enabled
         assert config.enable_temporal_skew is True
-        # Should have 80/20 brand skew
         assert config.attribute_skew.part_brand_skew == 0.8
 
     def test_seed_propagation(self):
@@ -259,5 +240,4 @@ class TestGetPresetConfig:
         for preset in SkewPreset:
             config = get_preset_config(preset)
             warnings = config.validate()
-            # None of the presets should have critical warnings
             assert not any("must be" in w for w in warnings)

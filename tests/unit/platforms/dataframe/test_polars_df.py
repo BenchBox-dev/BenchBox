@@ -1,13 +1,4 @@
-"""Unit tests for Polars DataFrame adapter.
-
-Tests for:
-- PolarsDataFrameAdapter initialization
-- Expression methods (col, lit, date operations)
-- Data loading (CSV, Parquet)
-- Query execution
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,7 +15,6 @@ pytestmark = [
 ]
 
 
-# Check if Polars is available
 try:
     import polars as pl
 
@@ -39,8 +29,6 @@ except ImportError:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsDataFrameAdapter:
-    """Tests for PolarsDataFrameAdapter."""
-
     def test_initialization(self):
 
         adapter = PolarsDataFrameAdapter()
@@ -90,10 +78,7 @@ class TestPolarsDataFrameAdapter:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsExpressionMethods:
-    """Tests for Polars expression methods."""
-
     def test_col(self):
-        """Test col() creates a Polars column expression."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.col("amount")
@@ -101,7 +86,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_lit_integer(self):
-        """Test lit() with integer value."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.lit(100)
@@ -109,7 +93,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_lit_string(self):
-        """Test lit() with string value."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.lit("test")
@@ -117,7 +100,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_lit_float(self):
-        """Test lit() with float value."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.lit(3.14)
@@ -125,7 +107,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_cast_date(self):
-        """Test cast_date() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.cast_date(adapter.col("date_str"))
@@ -133,7 +114,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_cast_string(self):
-        """Test cast_string() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.cast_string(adapter.col("number"))
@@ -141,7 +121,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_date_sub(self):
-        """Test date_sub() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.date_sub(adapter.col("date"), 7)
@@ -149,7 +128,6 @@ class TestPolarsExpressionMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_date_add(self):
-        """Test date_add() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.date_add(adapter.col("date"), 30)
@@ -159,10 +137,7 @@ class TestPolarsExpressionMethods:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsAggregationMethods:
-    """Tests for Polars aggregation helper methods."""
-
     def test_sum(self):
-        """Test sum() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.sum("amount")
@@ -170,7 +145,6 @@ class TestPolarsAggregationMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_mean(self):
-        """Test mean() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.mean("amount")
@@ -178,7 +152,6 @@ class TestPolarsAggregationMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_count(self):
-        """Test count() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.count()
@@ -186,7 +159,6 @@ class TestPolarsAggregationMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_min(self):
-        """Test min() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.min("amount")
@@ -194,7 +166,6 @@ class TestPolarsAggregationMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_max(self):
-        """Test max() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.max("amount")
@@ -202,7 +173,6 @@ class TestPolarsAggregationMethods:
         assert isinstance(expr, pl.Expr)
 
     def test_when(self):
-        """Test when() conditional method."""
         adapter = PolarsDataFrameAdapter()
 
         when_expr = adapter.when(adapter.col("amount") > 100)
@@ -210,7 +180,6 @@ class TestPolarsAggregationMethods:
         assert when_expr is not None
 
     def test_concat_str(self):
-        """Test concat_str() method."""
         adapter = PolarsDataFrameAdapter()
 
         expr = adapter.concat_str("first_name", "last_name", separator=" ")
@@ -220,8 +189,6 @@ class TestPolarsAggregationMethods:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsWindowFunctions:
-    """Tests for Polars window-function helpers."""
-
     def test_window_functions_without_partitions(self):
 
         adapter = PolarsDataFrameAdapter()
@@ -285,13 +252,10 @@ class TestPolarsWindowFunctions:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsDataLoading:
-    """Tests for Polars data loading methods."""
-
     def test_read_csv_basic(self, tmp_path):
 
         adapter = PolarsDataFrameAdapter()
 
-        # Create a test CSV file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id,name,amount\n1,Alice,100\n2,Bob,200\n")
 
@@ -307,7 +271,6 @@ class TestPolarsDataLoading:
 
         adapter = PolarsDataFrameAdapter()
 
-        # Create a pipe-delimited file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id|name|amount\n1|Alice|100\n2|Bob|200\n")
 
@@ -320,7 +283,6 @@ class TestPolarsDataLoading:
 
         adapter = PolarsDataFrameAdapter()
 
-        # Create a headerless CSV
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("1,Alice,100\n2,Bob,200\n")
 
@@ -334,13 +296,6 @@ class TestPolarsDataLoading:
         assert df.columns == ["id", "name", "amount"]
 
     def test_read_csv_empty_string_follows_null_marker(self, tmp_path):
-        """Empty text fields stay '' when null_marker is None, NULL when '' (w6).
-
-        Mirrors the pandas adapter and the SQL dialect: ClickBench keeps '' (the
-        cross-surface Q6/Q17/Q18 contract), JoinOrder treats empty as NULL. Without
-        this, Polars' raw-CSV path maps empty -> null and reintroduces the bug under
-        prefer_parquet=False.
-        """
         import polars as pl
 
         adapter = PolarsDataFrameAdapter()
@@ -358,7 +313,7 @@ class TestPolarsDataLoading:
         ).collect()
         assert nulled["s"].to_list() == ["a", None, "b"]
         assert nulled["s"].null_count() == 1
-        assert nulled.schema["n"] == pl.Int64  # numeric column unaffected
+        assert nulled.schema["n"] == pl.Int64
 
     def test_read_csv_respects_n_rows(self, tmp_path):
 
@@ -375,7 +330,6 @@ class TestPolarsDataLoading:
 
         adapter = PolarsDataFrameAdapter()
 
-        # Create a test Parquet file
         parquet_path = tmp_path / "test.parquet"
         test_df = pl.DataFrame(
             {
@@ -514,14 +468,11 @@ class TestPolarsDataLoading:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsQueryExecution:
-    """Tests for query execution with Polars."""
-
     def test_simple_select_query(self):
 
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Register test data
         test_df = pl.LazyFrame(
             {
                 "id": [1, 2, 3],
@@ -575,7 +526,7 @@ class TestPolarsQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # 150 and 200
+        assert result["rows_returned"] == 2
 
     def test_groupby_query(self):
 
@@ -608,7 +559,7 @@ class TestPolarsQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # Two categories
+        assert result["rows_returned"] == 2
 
     def test_join_query(self):
 
@@ -664,7 +615,6 @@ class TestPolarsQueryExecution:
 
         def helper_impl(ctx):
             data = ctx.get_table("data")
-            # Use context helpers
             threshold = ctx.lit(15)
             return data.filter(ctx.col("value") > threshold)
 
@@ -678,19 +628,16 @@ class TestPolarsQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # 20 and 30
+        assert result["rows_returned"] == 2
 
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsTableLoading:
-    """Tests for table loading functionality."""
-
     def test_load_table_parquet(self, tmp_path):
 
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         parquet_path = tmp_path / "orders.parquet"
         pl.DataFrame(
             {
@@ -709,7 +656,6 @@ class TestPolarsTableLoading:
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         csv_path = tmp_path / "customers.csv"
         csv_path.write_text("id,name\n1,Alice\n2,Bob\n")
 
@@ -723,7 +669,6 @@ class TestPolarsTableLoading:
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         for name, rows in [("orders", 5), ("customers", 3), ("products", 10)]:
             path = tmp_path / f"{name}.parquet"
             pl.DataFrame({"id": list(range(rows))}).write_parquet(path)
@@ -737,8 +682,6 @@ class TestPolarsTableLoading:
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
 class TestPolarsScalarExtraction:
-    """Tests for Polars scalar extraction optimization."""
-
     def test_scalar_single_value_dataframe(self):
 
         adapter = PolarsDataFrameAdapter()
@@ -758,7 +701,6 @@ class TestPolarsScalarExtraction:
         assert result == 2
 
     def test_scalar_from_lazyframe(self):
-        """Test scalar extraction from LazyFrame (auto-collects)."""
         adapter = PolarsDataFrameAdapter()
 
         lf = pl.LazyFrame({"value": [100]})
@@ -803,7 +745,6 @@ class TestPolarsScalarExtraction:
         assert result == "hello"
 
     def test_scalar_via_context(self):
-        """Test scalar extraction via context (integration)."""
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -821,21 +762,14 @@ class TestPolarsScalarExtraction:
         assert df.to_dict(as_series=False) == {"total": [99], "label": ["ok"]}
 
     def test_scalar_multiple_rows_raises(self):
-        """Test that scalar extraction on multi-row DataFrame raises.
-
-        Polars' .item() method already validates exactly one value exists,
-        so it raises ValueError for multi-row DataFrames.
-        """
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"value": [1, 2, 3]})
 
-        # Polars raises ValueError with message about item count
         with pytest.raises(ValueError):
             adapter.scalar(df)
 
     def test_scalar_two_rows_raises(self):
-        """Test that scalar extraction on 2-row DataFrame raises."""
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [1, 2], "b": [3, 4]})
@@ -845,11 +779,8 @@ class TestPolarsScalarExtraction:
 
 
 class TestPolarsNotAvailable:
-    """Tests for behavior when Polars is not installed."""
-
     def test_polars_available_flag(self):
 
         from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE
 
-        # This just tests that the flag exists and is boolean
         assert isinstance(POLARS_AVAILABLE, bool)

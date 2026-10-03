@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Bring up a UAT local platform stack with an explicit health probe."""
 
 from __future__ import annotations
 
@@ -18,7 +17,6 @@ DOCUMENT_ONLY_PLATFORMS = frozenset()
 
 
 def automated_platforms() -> tuple[str, ...]:
-    """Return platforms with UAT-managed Docker startup support."""
     return tuple(
         sorted(
             platform
@@ -89,10 +87,6 @@ def main(argv: list[str] | None = None) -> int:
     spec = docker_assets.docker_platform_spec(platform)
     try:
         docker_assets.validate_managed_start_allowed(spec)
-        # Resolved once, up front, so the operator sees which engine ran this
-        # bring-up before any compose output -- and a missing binary fails
-        # here with a clear message instead of a raw traceback out of
-        # compose_up_command() below (uat-container-engine-routing w1).
         print(f"resolved container CLI: {docker_assets.resolve_container_cli()}")
     except docker_assets.DockerAssetError as exc:
         print(f"platform {platform!r} cannot be UAT-managed: {exc}", file=sys.stderr)
@@ -106,9 +100,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"UAT bring-up failed for {platform}: {exc}", file=sys.stderr)
         return 2
 
-    # An operator-supplied `--project-name` bypasses compose_project_name()'s budget
-    # entirely, so validate it up front -- a clear, actionable error here beats an
-    # oversized-container-id failure minutes into `compose up`/`pull`/`build`.
     try:
         docker_assets.validate_project_name_budget(spec, project_name)
     except docker_assets.DockerAssetError as exc:

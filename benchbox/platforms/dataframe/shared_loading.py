@@ -1,5 +1,3 @@
-"""Shared data-loading logic for DataFrame platform families."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,13 +16,6 @@ from benchbox.core.dataframe.schema_utils import (
 
 @runtime_checkable
 class LoadableAdapter(Protocol):
-    """Contract required by :func:`load_tables_from_data_source_impl`.
-
-    Both DataFrame family base classes and the SQL
-    :class:`~benchbox.platforms.base.adapter.PlatformAdapter` satisfy this
-    protocol.
-    """
-
     platform_name: str
     table_mode: str
     platform_config: dict[str, Any]
@@ -50,12 +41,6 @@ def resolve_dataframe_csv_dialect(
     format_type: str,
     default_has_header: bool,
 ) -> tuple[str | None, bool]:
-    """Resolve CSV null/header semantics for DataFrame direct CSV loads.
-
-    This mirrors the SQL loader's dialect resolver whenever a manifest or
-    benchmark instance is available. Only ad-hoc loads with neither input fall
-    back to the historical file-extension heuristic.
-    """
     if data_source is not None:
         from benchbox.platforms.base.data_loading import NO_BENCHMARK, resolve_csv_dialect
 
@@ -82,7 +67,6 @@ def _declared_column_types(
     table_name: str,
     column_names: list[str] | None,
 ) -> dict[str, str]:
-    """Return declared SQL types keyed by the requested column names."""
     if benchmark is None or not column_names:
         return {}
 
@@ -109,7 +93,6 @@ def declared_string_columns(
     table_name: str,
     column_names: list[str] | None,
 ) -> list[str]:
-    """Return declared string/text columns for a benchmark table."""
     from benchbox.core.dataframe.data_loader import SchemaMapper
 
     return [
@@ -124,7 +107,6 @@ def declared_temporal_columns(
     table_name: str,
     column_names: list[str] | None,
 ) -> dict[str, str]:
-    """Return declared date/timestamp columns and their normalized Arrow types."""
     from benchbox.core.dataframe.data_loader import SchemaMapper
 
     temporal_columns: dict[str, str] = {}
@@ -140,33 +122,6 @@ def resolve_empty_string_restore_columns(
     null_marker: str | None,
     available_columns: Iterable[str],
 ) -> list[str]:
-    """Return declared string columns whose empty CSV fields must be restored to ``""``.
-
-    This is the single shared decision step behind every DataFrame adapter's
-    empty-string/null CSV coercion (see :func:`dialect_preserves_empty_strings`):
-    when the resolved CSV dialect keeps empty fields as empty strings, many
-    reader libraries still surface an empty text field as null/NaN regardless
-    of dialect. Declared string columns need ``""`` restored post-read so the
-    DataFrame surface matches the SQL reference (e.g. DuckDB, which keeps
-    ``""``).
-
-    Returns an empty list -- meaning "no coercion needed" -- when the dialect
-    maps empty fields to SQL NULL (``null_marker == ""``, e.g. the TPC-style
-    ``.tbl``/``.dat`` marker / JoinOrder, so existing NULLs must be preserved)
-    or when there are no declared string columns for this table.
-
-    Args:
-        string_columns: Declared string/text columns for this table (from
-            :func:`declared_string_columns` or an equivalent per-family lookup).
-        null_marker: The resolved CSV dialect's null marker.
-        available_columns: The columns actually present in the loaded frame
-            (membership is re-checked here because a declared column can be
-            absent, e.g. when column_names was not supplied).
-
-    Returns:
-        The subset of ``string_columns`` that are present in
-        ``available_columns`` and need empty-field restoration, or ``[]``.
-    """
     if not dialect_preserves_empty_strings(null_marker) or not string_columns:
         return []
     available = set(available_columns)
@@ -178,28 +133,6 @@ def coerce_empty_string_columns(
     string_columns: list[str] | None,
     null_marker: str | None,
 ) -> Any:
-    """Restore ``""`` for empty CSV fields in declared string columns.
-
-    Shared coercion step for DataFrame libraries whose column objects share
-    Pandas' ``.fillna()`` and per-column assignment semantics (Pandas, cuDF,
-    Dask). Delegates the empty-vs-null decision to
-    :func:`resolve_empty_string_restore_columns` so all four adapters apply
-    the identical guard and the identical restore action instead of each
-    carrying its own copy.
-
-    Column-by-column assignment (not a single ``df[cols] = ...`` batch
-    assignment) is used because multi-column assignment support differs
-    across dask/cudf/pandas; looping is the common denominator that
-    behaves identically -- and produces the same final values -- on all four.
-
-    Args:
-        df: The loaded DataFrame (Pandas/cuDF/Dask).
-        string_columns: Declared string/text columns for this table.
-        null_marker: The resolved CSV dialect's null marker.
-
-    Returns:
-        ``df``, mutated in place for the restored columns.
-    """
     for column in resolve_empty_string_restore_columns(string_columns, null_marker, df.columns):
         df[column] = df[column].fillna("")
     return df
@@ -211,21 +144,6 @@ def load_tables_from_data_source_impl(
     data_dir: Path,
     schema_info: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    """Shared implementation for ``load_tables_from_data_source``.
-
-    Both :class:`ExpressionFamilyAdapter` and :class:`PandasFamilyAdapter`
-    have identical loading logic. This function centralises it so that each
-    adapter delegates with a single call.
-
-    Args:
-        adapter: The adapter instance (must satisfy :class:`LoadableAdapter`).
-        ctx: The family-specific context with registered tables.
-        data_dir: Directory containing data files.
-        schema_info: Optional schema information with column names.
-
-    Returns:
-        Dictionary mapping table name to row count.
-    """
     from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
     resolver = DataSourceResolver(
@@ -260,11 +178,6 @@ def load_tables_from_data_source_impl(
 
         table_formats = getattr(data_source, "table_formats", {}) or {}
         format_hint = table_formats.get(table_name) or table_formats.get(table_name.lower())
-        # Only pass a proper DataSource so load_table can call resolve_csv_dialect safely.
-        # No real benchmark is available here; NO_BENCHMARK is used inside load_table() as a
-        # fallback.  That is intentional: when table_metadata is absent, resolve_csv_dialect()
-        # falls through to path (c) which derives the correct null_marker from the file extension
-        # (.tbl/.dat → null_marker="", everything else → None).
         typed_ds = data_source if isinstance(data_source, DataSource) else None
         row_count = adapter.load_table(
             ctx,

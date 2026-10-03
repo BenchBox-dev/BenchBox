@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/_cli.py main dispatch."""
-
 from __future__ import annotations
 
 import json
@@ -52,7 +50,6 @@ def test_main_no_args_uses_cell_parser(capsys):
 
 
 def test_main_bare_flags_route_to_cell(monkeypatch):
-    """Backward-compat: `python -m tests.uat._cli --platform=...` is the uat-cell make target."""
     calls: list[tuple[str, str, float]] = []
 
     def fake_cell(args):
@@ -188,7 +185,6 @@ def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
 
 
 def test_subcommands_table_covers_all_make_targets():
-    """The parser must cover every make uat-* target's subcommand."""
     expected = {
         "cell",
         "docker-cleanup",
@@ -232,9 +228,6 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
 
 
 def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monkeypatch, capsys):
-    """w3: _handle_stress routes through run_sweep_from_path(stress_overrides=...)
-    instead of hand-duplicating the platform/benchmark/scale override logic.
-    """
     calls: list[tuple[Path, dict]] = []
 
     class StubResult:
@@ -375,9 +368,6 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
     rc = _cli.main(["execute", "--config", str(config_path)])
 
     assert rc == 0
-    # free_space_checks_enabled is True even though "preflight" is absent from
-    # `phases:` -- the disk gate is always-on for execute-bearing runs,
-    # decoupled from phase-list membership (uat-disk-gate-always-on w1).
     assert captured == {
         "docker_manage_platforms": True,
         "docker_platform_switch": "volumes",
@@ -388,15 +378,6 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
 
 
 def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_path, monkeypatch, capsys):
-    """uat-execute-path-unification w2 parity requirement.
-
-    Post-unification, both `make uat-execute` and `make uat-sweep` share
-    `orchestrator.run_sweep`, so byte-identical cells.jsonl is largely a
-    given. What this test actually pins is that `_handle_execute`'s
-    config-scoping (phases narrowed to `[preflight?, execute]`, cleanup
-    override applied) is cell-output-neutral, and it guards against a
-    future change quietly re-diverging the two entry points.
-    """
     from tests.uat.config import load_config
     from tests.uat.orchestrator import run_sweep
     from tests.uat.runner import CellResult
@@ -448,12 +429,6 @@ def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_pa
 
 
 def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, capsys):
-    """#1146 review: a `dry_run: true` config never invokes run_execute, so
-    `result.execute_outcome` stays None -- but that's not an abort. Before
-    this fix, `_handle_execute` treated a None outcome as *always* an abort
-    and hardcoded exit 2, so `make uat-execute` on a dry-run config failed
-    even though the (no-op) phase loop succeeded.
-    """
     config_path = tmp_path / "uat.yaml"
     _write_uat_config(
         config_path,
@@ -479,17 +454,6 @@ def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, 
     assert summary["aborted"] is False
     assert summary["abort_reason"] is None
     assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# unvalidated-results-misclassified-as-schema-violations: `report`'s JSON
-# stdout is a third machine-readable surface built from the same
-# ReportSummary as matrix_summary.tsv's `# UNVALIDATED_CELLS=` footer and
-# uat_gate_summary.json's accounting.unvalidated (see tests/uat/phases/report.py
-# and tests/uat/orchestrator.py::_accounting_for_gate_summary). It must not be
-# the one surface that silently omits the count while "passed" quietly
-# includes never-validated cells with no adjacent disclosure.
-# ---------------------------------------------------------------------------
 
 
 def test_report_json_includes_unvalidated_count(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -529,15 +493,8 @@ def test_report_json_includes_unvalidated_count(tmp_path: Path, capsys: pytest.C
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["passed"] == 2
-    # Already counted in "passed"/"attempted" above -- not a disjoint bucket.
     assert payload["attempted"] == 2
-    # The one assertion this test exists for: present, and not 0.
     assert payload["unvalidated"] == 1
-
-
-# ---------------------------------------------------------------------------
-# uat-release-gate-enforcement w3: gate-check subcommand.
-# ---------------------------------------------------------------------------
 
 
 def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **overrides) -> Path:
@@ -565,10 +522,6 @@ def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **ove
         "explorer_smoke_status": "ran",
         "verdict": "green",
     }
-    # Pre-compute digests for stable seed bytes so the stored GateSummary
-    # already matches what _cli recomputes from the stage dirs at gate-check
-    # time. Using actual bytes (not the hex string itself) avoids the
-    # mismatch where sha256(b"a"*64) != "a"*64.
     if "artifact_digests" not in overrides:
         import hashlib
 
@@ -579,13 +532,8 @@ def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **ove
         }
         kwargs["artifact_digests"] = {k: hashlib.sha256(v).hexdigest() for k, v in seeds.items()}
     kwargs.update(overrides)
-    # Allow tests that explicitly want an old-evidence shape to pass artifact_digests=None.
     stage_dir = tmp_path / f"stage{index}"
     stage_dir.mkdir(exist_ok=True)
-    # Seed the artifact files BEFORE writing the summary, then write the
-    # summary that matches them — except when the test will overwrite a file
-    # after _write_stage returns (e.g. green test writes lifecycle docker
-    # lines), in which case the caller patches the stored digests after.
     if kwargs.get("artifact_digests") is not None:
         for key, file_name in (
             ("cells_jsonl", "cells.jsonl"),
@@ -597,10 +545,6 @@ def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **ove
             if hex_digest is None:
                 target.unlink(missing_ok=True)
             else:
-                # Write seed bytes whose digest matches the summary entry.
-                # For lifecycle_log the green test overwrites this right after,
-                # so we plant placeholder bytes; the test's update_digests call
-                # will fix the stored digest to match the final bytes.
                 if key == "cells_jsonl":
                     target.write_bytes(f"cells-stage{index}\n".encode())
                 elif key == "accounting_sidecar":
@@ -612,7 +556,6 @@ def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **ove
 
 
 def _patch_lifecycle_digest_to_absent(stage_dir: Path) -> None:
-    """Patched: lifecycle absence is honest provenance (orchestrator's None)."""
     from tests.uat import gate_summary
 
     summary_path = stage_dir / gate_summary.GATE_SUMMARY_FILENAME
@@ -626,12 +569,6 @@ def _patch_lifecycle_digest_to_absent(stage_dir: Path) -> None:
 
 
 def _update_digests(stage_dir: Path) -> None:
-    """Fix the stored GateSummary's lifecycle_log digest to match the actual file bytes.
-
-    The seed written by _write_stage is overwritten by the green test's docker lines,
-    so the artifact_digests etched at sweep time must be refreshed to the final bytes
-    or gate-check's recomputation would HOLD on a fresh test artifact that is meant to be green.
-    """
     import hashlib
 
     from tests.uat import gate_summary
@@ -677,8 +614,6 @@ def test_gate_check_flags_docker_up_before_stage1_completion(tmp_path: Path, cap
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
-    # Stage-2 Docker stack came up BEFORE stage 1 completed: the contamination
-    # the 2026-05-28/29 evidence had.
     (s2 / "uat_lifecycle.log").write_text(
         "2026-07-10T09:00:00 [docker] platform=starrocks action=up status=ok\n", encoding="utf-8"
     )
@@ -698,7 +633,6 @@ def test_gate_check_flags_stage3_docker_up_before_stage2_completion(tmp_path: Pa
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
-    # After stage 1, but stage 3's stack overlapped stage 2's window.
     (s3 / "uat_lifecycle.log").write_text(
         "2026-07-10T11:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
     )
@@ -752,7 +686,6 @@ def test_gate_check_missing_stage_summary_is_a_hard_error(tmp_path: Path, capsys
 
 
 def test_gate_check_same_run_dir_passed_thrice_is_red(tmp_path: Path):
-    """R1(a) at the CLI: pointing all three STAGEn args at one run dir must HOLD."""
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
 
     output = tmp_path / "evidence.json"
@@ -767,14 +700,11 @@ def test_gate_check_same_run_dir_passed_thrice_is_red(tmp_path: Path):
 
 
 def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
-    """C1: a Docker stage (2/3) with no uat_lifecycle.log cannot verify ordering -- HOLD, not silent pass."""
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
-    # Stage 2 must be absent for the ordering C1 HOLD. Remove its seeded file and fix its digest.
     (s2 / "uat_lifecycle.log").unlink(missing_ok=True)
     _patch_lifecycle_digest_to_absent(s2)
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
-    # Stage 3 has a log; stage 2 does not. Stage 1 never needs one.
     (s3 / "uat_lifecycle.log").write_text(
         "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
     )
@@ -795,14 +725,7 @@ def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
     )
 
 
-# ---- provenance-binding (uat-evidence-provenance-binding) ----
-
-
 def test_gate_check_rejects_unknown_sha(tmp_path: Path, capsys):
-    """sha='unknown' (git failure swallowed at sweep start) must not pass locally.
-
-    The task's anti-pattern is 'don't keep APPROVing sha=unknown locally because CI fails closed later'.
-    """
     s1 = _write_stage(
         tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00", source_commit_sha="unknown"
     )
@@ -819,15 +742,9 @@ def test_gate_check_rejects_unknown_sha(tmp_path: Path, capsys):
 
 
 def test_gate_check_rejects_digest_mismatch(tmp_path: Path, capsys):
-    """Edited cells.jsonl after sweep must make gate-check HOLD with a mismatch HOLD.
-
-    Complements the unknown-SHA test: the same checksum-on-stage-dirs recomputation
-    that gate-check does should HOLD on a tampered artifact (integrity against drift).
-    """
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
-    # Tamper s1's cells.jsonl after _write_stage etched the digest.
     (s1 / "cells.jsonl").write_text('{"tampered": true}\n', encoding="utf-8")
     output = tmp_path / "evidence.json"
     rc = _cli.main(
@@ -841,7 +758,6 @@ def test_gate_check_rejects_digest_mismatch(tmp_path: Path, capsys):
 
 
 def test_gate_check_rejects_old_evidence_without_digests(tmp_path: Path, capsys):
-    """Older evidence without digests must HOLD with a regenerate message, not crash."""
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00", artifact_digests=None)
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00", artifact_digests=None)
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00", artifact_digests=None)
@@ -855,23 +771,11 @@ def test_gate_check_rejects_old_evidence_without_digests(tmp_path: Path, capsys)
 
 
 @pytest.mark.slow
-# The pinned sweep runs in about 30 seconds. A generous ceiling so a future
-# widening of the matrix fails in five minutes with a traceback instead of
-# hanging a canary shard for an hour and being killed with no diagnosis.
 @pytest.mark.timeout(300)
 def test_completeness_gate_digest_provenance(tmp_path: Path):
-    """End-to-end: a real sweep-produced GateSummary carries cell/sidecar/lifecycle digests."""
     from tests.uat import orchestrator
     from tests.uat.config import validate_config
 
-    # Minimal execute so cells.jsonl + sidecar + gap_summary are written.
-    #
-    # The include filters are load-bearing, not decoration. Without them
-    # `platforms.include` is `()` with `include_was_specified=False`, which
-    # means no filter at all -- so `run_sweep` walks the FULL platform matrix
-    # rather than the "local-only platform" this comment used to claim. That
-    # is what hung Release Canary shard 4/6: 53 minutes with no output before
-    # the runner killed it, while the other five shards finished in 13-21.
     cfg = validate_config(
         {
             "name": "digest-provenance-e2e",
@@ -882,7 +786,6 @@ def test_completeness_gate_digest_provenance(tmp_path: Path):
     )
     log_dir = tmp_path / "logs"
     orchestrator.run_sweep(cfg, log_dir_override=log_dir)
-    # The summary written by orchestrator should carry digests.
     from tests.uat.gate_summary import read_gate_summary
 
     summary = read_gate_summary(log_dir / "uat_gate_summary.json")

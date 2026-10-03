@@ -1,5 +1,3 @@
-"""Fast-test coverage for UAT Docker compose lifecycle helpers."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -19,7 +17,7 @@ def test_docker_specs_cover_matrix_docker_group_only():
     specs = docker_assets.docker_platform_specs()
     assert set(specs) == set(matrix.PLATFORM_GROUPS["docker"])
     assert "duckdb" not in specs
-    assert "firebolt" not in specs  # compose exists, but UAT docker group does not include it
+    assert "firebolt" not in specs
 
 
 def test_compose_down_commands_are_project_scoped_and_targeted():
@@ -100,30 +98,7 @@ def test_compose_project_name_sanitizes_and_bounds_length():
     )
 
 
-# --------------------------------------------------------------------------
-# uat-compose-project-name-overflows-container-id-limit-20260805
-#
-# The constrained identifier is the derived CONTAINER id
-# (<project>-<service>-<replica>), which mocker caps at 64 chars -- not the
-# project name alone (compose's own ceiling is 63). The project-name budget
-# must derive from the container-id limit and the platform's longest started
-# service name, with headroom for a multi-digit replica suffix.
-# --------------------------------------------------------------------------
-
-
 def test_docker_platform_services_populated_and_match_compose_files():
-    """w0: every registered spec declares its compose services explicitly, and
-    those tuples match the compose file's non-profile-gated declared services
-    exactly -- the services a plain `docker compose up` starts without an
-    explicit `--profile` selection.
-
-    This is an equality check for every platform, with no per-platform
-    exemption list: lakesail declares exactly one service, so a `<=` subset
-    exemption for it would never actually be exercised (vacuous). velox's
-    documented host-run-only subset (see its spec.notes) is expressed in the
-    compose file itself -- velox-runner carries `profiles: [runner]`, so it is
-    excluded from "declared" here the same way `docker compose up` (no
-    `--profile`) would exclude it, rather than via a hardcoded name check."""
     specs = docker_assets.docker_platform_specs()
     assert not [platform for platform, spec in specs.items() if not spec.services]
 
@@ -134,20 +109,15 @@ def test_docker_platform_services_populated_and_match_compose_files():
             services = (data.get("services") or {}) if isinstance(data, dict) else {}
             for name, definition in services.items():
                 if isinstance(definition, dict) and definition.get("profiles"):
-                    continue  # profile-gated: not started by a plain `docker compose up`
+                    continue
                 declared.append(name)
         assert set(spec.services) == set(declared), (platform, spec.services, declared)
 
 
 def test_compose_project_name_container_name_budget_derives_from_service_len():
-    """w1: the project budget tightens for a platform with a longer service
-    name, and loosens back toward the compose ceiling for a short one -- it
-    must not be a fixed magic-number cut regardless of which service starts."""
     long_config = "x" * 80
-    short_service_name = docker_assets.compose_project_name(long_config, "cedardb")  # service "cedardb", len 7
-    long_service_name = docker_assets.compose_project_name(
-        long_config, "lakesail"
-    )  # service "lakesail-connect", len 16
+    short_service_name = docker_assets.compose_project_name(long_config, "cedardb")
+    long_service_name = docker_assets.compose_project_name(long_config, "lakesail")
 
     assert len(long_service_name) < len(short_service_name)
     assert len(short_service_name) <= 63
@@ -155,27 +125,13 @@ def test_compose_project_name_container_name_budget_derives_from_service_len():
 
 
 def _longest_declared_service_name(spec: docker_assets.DockerPlatformSpec) -> str:
-    """Return the longest compose service name for `spec`, parsed straight from its
-    compose YAML files -- deliberately NOT from `spec.services`.
-
-    Finding 3 (uat-compose-project-name-budget-review-20260806): reading the
-    registry here would make `test_container_name_budget_fits_every_config_and_platform`
-    red only when the registry itself is broken/empty (pre-fix `spec.services` is
-    empty, so `max()` raises `ValueError: max() arg is an empty sequence`), never
-    when a container id actually overflows. Parsing the compose file directly keeps
-    this guard's failure mode pinned to the overflow assertion, independent of the
-    registry it audits. Filtering matches
-    `test_docker_platform_services_populated_and_match_compose_files`: a
-    profile-gated service (e.g. velox-runner) is not started by a plain
-    `docker compose up` and must not count toward the budget.
-    """
     longest = ""
     for compose_file in spec.compose_files:
         data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
         services = (data.get("services") or {}) if isinstance(data, dict) else {}
         for name, definition in services.items():
             if isinstance(definition, dict) and definition.get("profiles"):
-                continue  # profile-gated: not started by a plain `docker compose up`
+                continue
             if len(name) > len(longest):
                 longest = name
     assert longest, f"no non-profile-gated service found in {spec.compose_files}"
@@ -184,24 +140,6 @@ def _longest_declared_service_name(spec: docker_assets.DockerPlatformSpec) -> st
 
 @pytest.mark.parametrize("replica_index", ["1", "10"])
 def test_container_name_budget_fits_every_config_and_platform(replica_index):
-    """The enumerating guard (w2): every checked-in UAT config crossed with
-    every registered Docker platform must yield a container id
-    (<project>-<longest-started-service>-<replica>) within mocker's 64-char
-    limit -- including a double-digit replica index, not just index 1.
-
-    Finding 1 (uat-compose-project-name-budget-review-20260806): calls
-    `compose_project_name` with each config's *actual*
-    `cleanup.docker_project_prefix`, not the three-arg default -- five
-    checked-in configs (release-gate-02/03, uat-enabled-platforms-full,
-    uat-lakesail-failing-benchmarks, uat-throughput-postgresql-nightly)
-    declare a non-default prefix, and the real production caller
-    (`tests/uat/phases/execute.py::_start_docker_platform_if_needed`) always
-    passes `config.cleanup.docker_project_prefix` explicitly. A prior version
-    of this rung asserted a property of names production never generates and
-    let `budget = ... if prefix == "benchbox-uat" else _PROJECT_NAME_MAX_LEN`
-    survive as a mutant. A deliberately over-long prefix is layered in too, so
-    the guard is not limited to the exact checked-in prefix set.
-    """
     config_dir = docker_assets.REPO_ROOT / "tests" / "uat" / "configs"
     config_paths = sorted(config_dir.glob("*.yaml"))
     assert config_paths, "expected at least one checked-in UAT config"
@@ -225,17 +163,8 @@ def test_container_name_budget_fits_every_config_and_platform(replica_index):
     assert not overflows, f"{len(overflows)} (config, platform, prefix) pairs overflow: {overflows[:5]}"
 
 
-# --------------------------------------------------------------------------
-# Finding 4 (uat-compose-project-name-budget-review-20260806): compose_project_name()
-# always returns a name within budget, but an operator-supplied project name (e.g.
-# `--project-name` on scripts/uat-bring-up/uat_bring_up.py) never goes through it.
-# The budget must be enforced at the _compose_base_command chokepoint every
-# UAT-managed compose verb routes through, not just at the generator.
-# --------------------------------------------------------------------------
-
-
 def test_validate_project_name_budget_rejects_operator_supplied_overflow():
-    spec = docker_assets.docker_platform_spec("lakesail")  # longest service "lakesail-connect", len 16
+    spec = docker_assets.docker_platform_spec("lakesail")
     budget = docker_assets._project_name_budget("lakesail")
     over_budget_name = "x" * (budget + 1)
 
@@ -245,7 +174,7 @@ def test_validate_project_name_budget_rejects_operator_supplied_overflow():
     assert "lakesail" in str(excinfo.value)
 
     within_budget_name = "x" * budget
-    docker_assets.validate_project_name_budget(spec, within_budget_name)  # must not raise
+    docker_assets.validate_project_name_budget(spec, within_budget_name)
 
 
 @pytest.mark.parametrize(
@@ -260,8 +189,6 @@ def test_validate_project_name_budget_rejects_operator_supplied_overflow():
     ids=["up", "pull", "build", "down", "ps"],
 )
 def test_every_compose_command_rejects_operator_supplied_project_name_overflow(command_fn):
-    """Every consumer of _compose_base_command (up/pull/build/down/ps) is covered
-    from the one chokepoint -- not just compose_project_name()'s generator."""
     spec = docker_assets.docker_platform_spec("lakesail")
     budget = docker_assets._project_name_budget("lakesail")
     over_budget_name = "x" * (budget + 1)
@@ -319,15 +246,6 @@ def test_path_mirrored_compose_environment_points_at_benchmark_runs_dir(platform
     ),
 )
 def test_compose_environment_raises_for_relative_benchmark_runs_dir(platform, relative_dir):
-    """must_preserve: compose_environment() is the single choke point every
-    UAT-managed bring-up path funnels through (tests/uat/phases/execute.py's
-    up AND down, scripts/uat-bring-up/uat_bring_up.py) -- the Makefile's
-    require_data_dir_if_mounted only guards `make test-docker-up-*`
-    directly, so a relative --benchmark-runs-dir / benchmark_runs_dir_template
-    reached compose unguarded through those Python entry points until this
-    check moved here. lakesail/velox mount BENCHBOX_DATA_DIR at the SAME
-    absolute path on host and in container, so a relative value silently
-    breaks every file load."""
     spec = docker_assets.docker_platform_spec(platform)
 
     with pytest.raises(docker_assets.DockerAssetError, match="absolute"):
@@ -336,8 +254,6 @@ def test_compose_environment_raises_for_relative_benchmark_runs_dir(platform, re
 
 @pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
 def test_compose_environment_ignores_relative_dir_for_non_path_mirroring_platforms(platform):
-    """Only lakesail/velox reference BENCHBOX_DATA_DIR; ClickHouse separately
-    requires its explicit memory request, while other platforms return no env."""
     spec = docker_assets.docker_platform_spec(platform)
 
     expected = {docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR: "4g"} if platform == "clickhouse-server" else {}
@@ -373,15 +289,6 @@ def test_compose_environment_error_names_platform_and_the_offending_value(platfo
 
 @pytest.mark.parametrize("platform", ["lakesail", "velox"])
 def test_compose_environment_raises_for_missing_benchmark_runs_dir(platform):
-    """must_preserve: a `None` benchmark_runs_dir must NOT fall through to
-    compose_environment() returning `{}` for lakesail/velox the way it does
-    for every other platform. run_docker_command() fills an empty/omitted
-    `env` with `os.environ.copy()` (tests/uat/docker_assets.py), so `{}`
-    here would let the child compose process silently inherit whatever
-    ambient BENCHBOX_DATA_DIR happens to be set (or unset) in the caller's
-    shell -- exactly the same silent-no-mount failure mode the relative-path
-    guard closes, just reached by omitting the argument instead of passing
-    a relative one."""
     spec = docker_assets.docker_platform_spec(platform)
 
     with pytest.raises(docker_assets.DockerAssetError, match="benchmark_runs_dir"):
@@ -393,8 +300,6 @@ def test_compose_environment_raises_for_missing_benchmark_runs_dir(platform):
 
 @pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
 def test_compose_environment_returns_empty_for_missing_dir_on_non_path_mirroring_platforms(platform):
-    """Only lakesail/velox reference BENCHBOX_DATA_DIR; a missing directory
-    must not raise for other platforms (ClickHouse still returns its memory env)."""
     spec = docker_assets.docker_platform_spec(platform)
 
     expected = {docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR: "4g"} if platform == "clickhouse-server" else {}
@@ -509,16 +414,6 @@ def test_connection_registries_do_not_duplicate_derived_values():
     )
 
 
-# --------------------------------------------------------------------------
-# resolve_container_cli() -- uat-container-engine-routing w1
-#
-# The autouse `isolate_container_cli_resolution` fixture (tests/uat/conftest.py)
-# defaults every test to a clean cache + BENCHBOX_CONTAINER_CLI=docker + a
-# stubbed `_which_container_cli` that reports everything present. These tests
-# override that within their own body to exercise the real resolution logic.
-# --------------------------------------------------------------------------
-
-
 def test_resolve_container_cli_env_override_wins_over_platform_default(monkeypatch):
     monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "podman")
     monkeypatch.setattr(docker_assets, "_current_platform", lambda: "darwin")
@@ -555,7 +450,6 @@ def test_resolve_container_cli_darwin_falls_back_to_docker_without_mocker(monkey
 
 
 def test_resolve_container_cli_non_darwin_never_probes_mocker(monkeypatch):
-    """must_preserve: a docker-only Linux host stays byte-identical -- no mocker `which()` probe off darwin."""
     monkeypatch.delenv(docker_assets.CONTAINER_CLI_ENV_VAR, raising=False)
     monkeypatch.setattr(docker_assets, "_current_platform", lambda: "linux")
     probed: list[str] = []
@@ -597,7 +491,7 @@ def test_resolve_container_cli_is_memoized_across_calls(monkeypatch):
     try:
         assert docker_assets.resolve_container_cli() == "docker"
         assert docker_assets.resolve_container_cli() == "docker"
-        assert calls == ["docker"]  # resolved once, memoized on the second call
+        assert calls == ["docker"]
     finally:
         docker_assets.resolve_container_cli.cache_clear()
 
@@ -615,11 +509,6 @@ def test_compose_commands_use_the_resolved_engine_binary(monkeypatch):
 
 
 def test_command_has_forbidden_prune_matches_compose_engines_but_exempts_apple_container():
-    """The forbidden-prune guard covers every compose engine argv[0] (docker,
-    mocker, an override) -- but NOT the Apple-native `container` CLI, whose
-    max-mode prunes are a deliberate documented operator action guarded by
-    container_cleanup._is_forbidden instead. Blocking those here broke
-    `make uat-docker-cleanup ENGINE=container MODE=max APPLY=1` outright."""
     assert docker_assets.command_has_forbidden_prune(["mocker", "system", "prune"])
     assert docker_assets.command_has_forbidden_prune(["mocker", "volume", "prune"])
     assert docker_assets.command_has_forbidden_prune(["docker", "image", "prune", "-f"])
@@ -627,28 +516,14 @@ def test_command_has_forbidden_prune_matches_compose_engines_but_exempts_apple_c
     assert docker_assets.command_has_forbidden_prune(["/usr/local/bin/docker", "system", "prune"])
     assert not docker_assets.command_has_forbidden_prune(["mocker", "compose", "up"])
     assert not docker_assets.command_has_forbidden_prune(["docker", "volume", "ls"])
-    # Apple-native container CLI: max-mode prunes must pass through.
     assert not docker_assets.command_has_forbidden_prune(["container", "volume", "prune"])
     assert not docker_assets.command_has_forbidden_prune(["container", "network", "prune"])
     assert not docker_assets.command_has_forbidden_prune(["container", "builder", "delete", "--force"])
 
 
 def test_command_has_forbidden_prune_is_robust_to_repeated_tokens():
-    # Pairwise scan, not index arithmetic: a repeated token earlier in argv
-    # must not confuse adjacency detection.
     assert docker_assets.command_has_forbidden_prune(["docker", "volume", "volume", "prune"])
     assert not docker_assets.command_has_forbidden_prune(["docker", "prune", "volume", "ls"])
-
-
-# --------------------------------------------------------------------------
-# sweep_leaked_mocker_volumes() -- uat-container-engine-routing w3
-#
-# Exact-name matching against compose-declared volume keys. mocker 0.5.4
-# joins <project>-<key> with a HYPHEN (live-verified: scratch project
-# `sepcheck` + key `checkvol` -> `sepcheck-checkvol`); docker compose joins
-# with `_`. Both joiners are matched exactly; a name-prefix scan is never
-# used because it would also match a sibling project (`p` vs `p-ha`).
-# --------------------------------------------------------------------------
 
 
 def _spec_with_volume_keys(tmp_path: Path, keys: tuple[str, ...]) -> docker_assets.DockerPlatformSpec:
@@ -680,10 +555,7 @@ def test_sweep_leaked_mocker_volumes_removes_exact_declared_names_only(tmp_path,
             return docker_assets.DockerCommandResult(
                 argv_tuple,
                 0,
-                "DRIVER   VOLUME NAME\n"
-                "local    p-pgdata\n"  # mocker joiner
-                "local    p_other\n"  # docker-compose joiner (future-proofing)
-                "local    unrelated-project_data\n",
+                "DRIVER   VOLUME NAME\nlocal    p-pgdata\nlocal    p_other\nlocal    unrelated-project_data\n",
                 "",
             )
         return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
@@ -701,10 +573,6 @@ def test_sweep_leaked_mocker_volumes_removes_exact_declared_names_only(tmp_path,
 
 
 def test_sweep_leaked_mocker_volumes_never_touches_hyphen_sibling_project(tmp_path, monkeypatch):
-    """REQUIRED-2 regression: a sweep of project `p` must NOT match volumes
-    of sibling project `p-ha` -- under mocker's `-` joiner, `p-ha-data` and
-    `p-ha_data` both start with `p-`, so any prefix scan would delete a
-    sibling's data. Exact compose-declared-name matching cannot."""
     monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
     monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
     docker_assets.resolve_container_cli.cache_clear()
@@ -718,10 +586,7 @@ def test_sweep_leaked_mocker_volumes_never_touches_hyphen_sibling_project(tmp_pa
             return docker_assets.DockerCommandResult(
                 argv_tuple,
                 0,
-                "DRIVER   VOLUME NAME\n"
-                "local    p-data\n"  # project p's own volume
-                "local    p-ha_data\n"  # sibling project p-ha (docker joiner)
-                "local    p-ha-data\n",  # sibling project p-ha (mocker joiner)
+                "DRIVER   VOLUME NAME\nlocal    p-data\nlocal    p-ha_data\nlocal    p-ha-data\n",
                 "",
             )
         return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
@@ -754,7 +619,7 @@ def test_sweep_leaked_mocker_volumes_is_noop_on_docker_engine(tmp_path, monkeypa
         docker_assets.resolve_container_cli.cache_clear()
 
     assert removed == ()
-    assert calls == []  # docker already removes named volumes on `down -v`; no probe needed
+    assert calls == []
 
 
 def test_sweep_leaked_mocker_volumes_is_noop_on_dry_run(tmp_path, monkeypatch):
@@ -800,45 +665,24 @@ def test_sweep_leaked_mocker_volumes_swallows_individual_removal_failure(tmp_pat
     finally:
         docker_assets.resolve_container_cli.cache_clear()
 
-    # One volume's rm failure does not abort the rest of the sweep.
     assert removed == ("benchbox-uat-demo-cache",)
 
 
 @pytest.mark.parametrize(
     ("platform", "expected_service_names"),
     [
-        # The validated mocker failure is specifically databend's `minio`
-        # service exiting under mocker (AGENTS.md) -- `minio` is the
-        # load-bearing token in that guidance, not just "three services".
         ("databend", frozenset({"minio", "minio-setup", "databend"})),
-        # all-in-one FE+BE image -- single container, unaffected by mocker.
         ("doris", frozenset({"doris"})),
-        # all-in-one image -- single container, unaffected by mocker.
         ("starrocks", frozenset({"starrocks"})),
     ],
 )
 def test_multi_service_platform_service_names_match_documented_guidance(platform, expected_service_names):
-    """Pin the compose service *identities* AGENTS.md and uat-framework.md cite.
-
-    Guards against the mocker multi-service guidance drifting out of sync
-    with the compose files it describes, the way it silently did once before
-    (commit fd29aa77c0 compressed the specific databend/minio caveat into a
-    vague, unverifiable claim). A count-only assertion would stay green even
-    if databend's `minio` service were renamed to something else, so this
-    pins the actual service names, not just how many there are.
-    """
     spec = docker_assets.docker_platform_spec(platform)
     service_names: set[str] = set()
     for compose_file in spec.compose_files:
         data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
         service_names.update(data.get("services", {}).keys())
     assert service_names == expected_service_names
-
-
-# ---------------------------------------------------------------------------
-# compose_declared_memory_limits: static compose-file parsing for the
-# free-memory gate's log decoration.
-# ---------------------------------------------------------------------------
 
 
 def _spec_for_compose(tmp_path: Path, body: str) -> docker_assets.DockerPlatformSpec:
@@ -875,26 +719,14 @@ def test_compose_declared_memory_limits_empty_when_nothing_declared(tmp_path: Pa
 @pytest.mark.parametrize(
     "body",
     [
-        # `limits:` present with NO children -> yaml gives an explicit None.
-        # `.get("limits", {})` returns that None (a default applies only when
-        # the key is ABSENT), and `None.get("memory")` raises AttributeError.
         "services:\n  db:\n    deploy:\n      resources:\n        limits:\n",
-        # Same trap one level up.
         "services:\n  db:\n    deploy:\n      resources:\n",
         "services:\n  db:\n    deploy:\n",
-        # Non-mapping values where a mapping is expected.
         "services:\n  db:\n    deploy:\n      resources:\n        limits: 2G\n",
         "services:\n  db:\n    deploy:\n      resources:\n        limits:\n          - memory\n",
     ],
 )
 def test_compose_declared_memory_limits_survives_degenerate_limits_blocks(tmp_path: Path, body: str):
-    """Regression: this helper only decorates a log line, but it ran inside a
-    `try` catching just (OSError, yaml.YAMLError) and its caller
-    (`execute.py::_describe_platform_vm_request`) caught only
-    DockerAssetError -- so an AttributeError here propagated out of
-    run_execute and aborted an entire sweep. No compose file in the repo
-    triggers it today; one `limits:` with no children would have.
-    """
     spec = _spec_for_compose(tmp_path, body)
     assert docker_assets.compose_declared_memory_limits(spec) == {}
 
@@ -968,15 +800,7 @@ def test_compose_stats_command_targets_first_service():
     assert argv[-3:] == ["--format", "{{json .}}", "benchbox-uat-clickhouse-server-clickhouse-1"]
 
 
-# ---------------------------------------------------------------------------
-# compose ps readiness parsing.
-# ---------------------------------------------------------------------------
-
-
 def test_compose_ps_command_passes_all_so_stopped_containers_are_listed():
-    """Without `-a`, a container that started and then died is simply absent
-    from the output and the readiness check passes on an empty table -- the
-    exact state the check exists to detect."""
     spec = docker_assets.docker_platform_spec("postgresql")
     argv = docker_assets.compose_ps_command(spec, "benchbox-uat-smoke-postgresql")
     assert argv[-2:] == ["ps", "-a"]
@@ -1007,8 +831,6 @@ def test_compose_ps_unhealthy_services_passes_a_serving_container(status: str):
 
 
 def test_compose_ps_unhealthy_services_ignores_state_words_in_the_name_column():
-    """A container NAME containing a state word must not false-positive; only
-    the status/command columns are considered."""
     stdout = "NAME               IMAGE     COMMAND   STATUS\nbenchbox-Created   img       cmd       Up 5 seconds\n"
     assert docker_assets.compose_ps_unhealthy_services(stdout) == ()
 
@@ -1033,10 +855,6 @@ def test_compose_ps_unhealthy_services_reports_every_bad_row():
     ],
 )
 def test_compose_ps_service_rows_is_empty_for_no_service_rows(stdout: str):
-    """Header-only and blank output carry no services. The caller treats this
-    as NOT ready: `ps -a` finding nothing for a project that was just `up`'d
-    means the containers are gone, which is not a state to run a whole cell
-    list against."""
     assert docker_assets.compose_ps_service_rows(stdout) == ()
 
 

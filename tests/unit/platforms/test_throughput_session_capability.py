@@ -1,19 +1,6 @@
-"""Unit tests for the throughput session capability contract.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers ``resolve_stream_connection_capability`` and
-``require_throughput_stream_capability``
-(``benchbox/platforms/base/connection_wrappers.py``): declaration detection
-through the MRO, fail-closed rejection of UNSUPPORTED adapters and of
-INDEPENDENT declarations without an override, and the benchmark_type
-threading for per-stream tuning parity. Real-engine behavior (session
-isolation, overlap, cleanup) is proven in
-``tests/integration/test_throughput_session_isolation.py``; the manifest-wide
-resolution pin lives in ``test_throughput_session_capability_sweep.py``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -37,8 +24,6 @@ pytestmark = [
 
 
 class _BareAdapter(PlatformAdapter):
-    """Minimal concrete adapter with no capability declaration."""
-
     @staticmethod
     def add_cli_arguments(parser) -> None:
         pass
@@ -106,7 +91,7 @@ class _UnsupportedAdapter(_BareAdapter):
 
 
 class _ChildOfIndependent(_IndependentAdapter):
-    """Deliberate inheritance: reuses the proven parent override unchanged."""
+    pass
 
 
 class TestResolveStreamConnectionCapability:
@@ -176,11 +161,9 @@ class TestRequireThroughputStreamCapability:
         assert "power/single-stream" in message
 
     def test_independent_without_override_fails_before_submission(self):
-        """The base raises on first stream; require_* must fail even earlier."""
         adapter = _IndependentWithoutOverride()
         with pytest.raises(RuntimeError, match="does not override new_stream_connection"):
             require_throughput_stream_capability(adapter, platform_name="HalfWired")
-        # And the underlying seam still raises if reached directly.
         with pytest.raises(NotImplementedError):
             adapter.new_stream_connection(Mock())
 
@@ -190,7 +173,6 @@ class TestRequireThroughputStreamCapability:
         assert handle.benchmark_type == "olap"
 
     def test_legacy_positional_override_signature_keeps_working(self):
-        """Pre-existing overrides without the keyword must not break."""
         adapter = _IndependentAdapter()
         handle = adapter.new_stream_connection(Mock())
         assert handle.benchmark_type is None
@@ -205,8 +187,6 @@ class TestRequireThroughputStreamCapability:
 
 
 class TestMySQLWireStreamOverride:
-    """The mixin override must connect fresh without repeating one-time setup."""
-
     def test_doris_stream_opens_fresh_connection_with_tuning(self, monkeypatch):
         pytest.importorskip("pymysql")
         import benchbox.platforms.doris as doris_module
@@ -217,8 +197,6 @@ class TestMySQLWireStreamOverride:
         stream_connection = Mock()
         stream_cursor = Mock()
         stream_connection.cursor.return_value = stream_cursor
-        # Doris.configure_for_benchmark validates the cache disable via SHOW;
-        # report it already off so the mock path stays quiet.
         stream_cursor.fetchone.return_value = ("enable_sql_cache", "false")
         mock_pymysql.connect.return_value = stream_connection
 
@@ -231,26 +209,18 @@ class TestMySQLWireStreamOverride:
         ):
             result = adapter.new_stream_connection(shared_connection, benchmark_type="olap")
 
-        # One-time setup never repeats per stream (handle_existing_database
-        # carries the force_recreate drop path - running it per stream could
-        # destroy the benchmark database mid-throughput).
         handle.assert_not_called()
         create.assert_not_called()
         exists.assert_not_called()
         mock_pymysql.connect.assert_called_once()
-        # Benchmark tuning is reapplied per stream (dimension 4): the cache
-        # disable and the olap memory limit must both be issued.
         executed = [str(call) for call in stream_cursor.execute.call_args_list]
         assert any("enable_sql_cache" in call for call in executed), executed
         assert any("exec_mem_limit" in call for call in executed), executed
-        # The shared connection is never touched and the stream handle is a
-        # wrapped per-stream connection, not a cursor of the shared one.
         shared_connection.cursor.assert_not_called()
         assert result is not stream_connection
         assert result is not shared_connection
 
     def test_stream_without_benchmark_type_skips_tuning_replay(self, monkeypatch):
-        """Callers that pass no benchmark type keep the previous behavior."""
         pytest.importorskip("pymysql")
         import benchbox.platforms.doris as doris_module
         from benchbox.platforms.doris import DorisAdapter
@@ -299,17 +269,12 @@ class TestQuestDBStreamOverride:
         result = adapter.new_stream_connection(Mock(), benchmark_type="olap")
 
         assert result is stream_connection
-        # Dimension 3: autocommit is required over the PG wire and defaults
-        # off on a vanilla psycopg connection.
         assert stream_connection.autocommit is True
         executed = [str(call) for call in stream_cursor.execute.call_args_list]
         assert any("SELECT 1" in call for call in executed), executed
-        # Dimension 4: QuestDB's own benchmark tuning is reapplied per stream.
         assert any("cairo.sql.parallel.filter.enabled" in call for call in executed), executed
 
     def test_stream_without_benchmark_type_restores_autocommit_only(self, monkeypatch):
-        """The wire-required autocommit is unconditional; tuning replays only
-        when the caller supplies a benchmark type."""
         import benchbox.platforms.questdb as questdb_module
         from benchbox.platforms.questdb import QuestDBAdapter
 
@@ -332,11 +297,6 @@ class TestQuestDBStreamOverride:
 
 class TestTimescaleDBStreamHook:
     def test_hook_delegates_to_parent_path(self, monkeypatch):
-        """TimescaleDB adds only extension setup (one-time, not per stream)
-        above the PostgreSQL path, so the hook explicitly delegates instead
-        of silently inheriting: equivalence was checked for this subclass.
-        Tuning parity comes from the virtual configure_for_benchmark
-        dispatch, not from this hook."""
         import benchbox.platforms.postgresql as postgresql_module
         from benchbox.platforms.timescaledb import TimescaleDBAdapter
 

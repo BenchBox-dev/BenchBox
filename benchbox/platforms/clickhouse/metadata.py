@@ -1,5 +1,3 @@
-"""Metadata helpers for the ClickHouse adapter."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -9,15 +7,12 @@ from .deployment_mode import resolve_clickhouse_deployment_mode
 
 
 class ClickHouseMetadataMixin:
-    """Provide metadata and configuration helpers for ClickHouse."""
-
     @property
     def platform_name(self) -> str:
         return f"ClickHouse ({self.deployment_mode.title()})"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add ClickHouse-specific CLI arguments."""
         ch_group = parser.add_argument_group("ClickHouse Arguments")
         ch_group.add_argument(
             "--data-path", type=str, default="/tmp/benchbox_ch_local", help="Path for local mode data"
@@ -31,7 +26,6 @@ class ClickHouseMetadataMixin:
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create ClickHouse adapter from unified configuration."""
         platform_options = config.get("options")
         if isinstance(platform_options, dict):
             config = {**platform_options, **config}
@@ -42,9 +36,6 @@ class ClickHouseMetadataMixin:
             "data_path": config.get("data_path", "/tmp/benchbox_ch_local"),
         }
 
-        # Generate a persistent database_path for local mode (same pattern as DuckDB).
-        # Without this, get_database_path returns None → ClickHouseLocalClient uses an
-        # in-memory session → data is lost between runs and reuse detection never fires.
         if deployment_mode == "local":
             if config.get("database_path"):
                 adapter_config["database_path"] = config["database_path"]
@@ -65,7 +56,6 @@ class ClickHouseMetadataMixin:
                 data_dir.mkdir(parents=True, exist_ok=True)
                 adapter_config["database_path"] = db_path
 
-        # Pass through other relevant config
         for key in [
             "host",
             "port",
@@ -88,50 +78,26 @@ class ClickHouseMetadataMixin:
         return cls(**adapter_config)
 
     def get_database_path(self, **connection_config) -> str | None:
-        """Get database path for local mode persistence.
-
-        Priority:
-        1. connection_config["database_path"] if provided and not None
-        2. self.database_path (set during from_config)
-        3. None (falls through to check_server_database_exists → returns False)
-        """
         if self.deployment_mode == "local":
-            # Use the database_path provided by orchestrator (already includes benchmark, scale, tuning info)
             db_path = connection_config.get("database_path")
             if db_path:
-                # Convert .duckdb extension to .chdb for ClickHouse
                 if db_path.endswith(".duckdb"):
                     db_path = db_path.replace(".duckdb", ".chdb")
                 elif not db_path.endswith(".chdb"):
                     db_path += ".chdb"
                 return db_path
 
-            # Fall back to instance database_path computed during from_config
             if getattr(self, "database_path", None):
                 return self.database_path
 
             return None
 
-        # Server mode doesn't use file-based databases
         return None
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for ClickHouse."""
         return "clickhouse"
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get ClickHouse platform information.
-
-        Captures comprehensive ClickHouse configuration including:
-        - ClickHouse version
-        - Server settings and configuration
-        - MergeTree engine settings
-        - Build options and compilation flags
-        - Table compression settings
-
-        Supports both server and local (chDB) modes.
-        Gracefully degrades if permissions are insufficient for system table queries.
-        """
         platform_info = self._build_base_platform_info()
         self._apply_clickhouse_mode_configuration(platform_info)
         platform_info["client_library_version"] = self._detect_clickhouse_client_version()
@@ -158,7 +124,6 @@ class ClickHouseMetadataMixin:
             "connection_mode": self.deployment_mode,
             "configuration": {
                 "deployment_mode": self.deployment_mode,
-                # Temporary compatibility alias - remove once all consumers read deployment_mode
                 "mode": self.deployment_mode,
                 "result_cache_enabled": not getattr(self, "disable_result_cache", True),
             },

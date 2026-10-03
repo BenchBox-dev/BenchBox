@@ -21,9 +21,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q7_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -34,9 +32,7 @@ def q7_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter lineitem by date before joining
-# ---------------------------------------------------------------------------
 
 
 def q7_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -121,9 +117,7 @@ def q7_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns from each table
-# ---------------------------------------------------------------------------
 
 
 def q7_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -174,9 +168,7 @@ def q7_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit named step DataFrames
-# ---------------------------------------------------------------------------
 
 
 def q7_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -222,9 +214,7 @@ def q7_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add volume before groupby
-# ---------------------------------------------------------------------------
 
 
 def q7_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -269,9 +259,7 @@ def q7_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q7_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -306,9 +294,7 @@ def q7_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - join lineitem→supplier instead of supplier→lineitem
-# ---------------------------------------------------------------------------
 
 
 def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -354,9 +340,7 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
 q7_v7_pandas_impl = make_variant_delegate(q7_v2_pandas_impl, name="q7_v7_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - combine nation pair filter into compound expression
-# ---------------------------------------------------------------------------
 
 
 def q7_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -367,9 +351,7 @@ def q7_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q7_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort
-# ---------------------------------------------------------------------------
 
 
 def q7_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -448,9 +430,7 @@ def q7_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - volume = price - price*disc
-# ---------------------------------------------------------------------------
 
 
 def q7_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -533,8 +513,7 @@ def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q7_VARIANTS = build_yaml_variants(__file__, globals(), 7, JOIN_AGG_FILTER)

@@ -1,11 +1,6 @@
-"""Tests for ParadeDB platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the ParadeDBAdapter for pg_analytics extension support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -24,15 +19,10 @@ pytestmark = [
 
 @pytest.fixture()
 def paradedb_stubs(monkeypatch):
-    """Patch psycopg objects so tests don't require the real driver.
 
-    Must patch both paradedb and postgresql modules since ParadeDBAdapter
-    inherits from PostgreSQLAdapter which checks for psycopg in its __init__.
-    """
     mock_psycopg = Mock()
     mock_psycopg.__version__ = "3.1.0"
 
-    # Patch both modules - parent checks in postgresql module
     monkeypatch.setattr(paradedb_module, "psycopg", mock_psycopg)
     monkeypatch.setattr(postgresql_module, "psycopg", mock_psycopg)
 
@@ -40,10 +30,8 @@ def paradedb_stubs(monkeypatch):
 
 
 class TestParadeDBAdapter:
-    """Unit tests for ParadeDB adapter wiring and SQL handling."""
-
     def test_initialization_defaults(self, paradedb_stubs):
-        """Adapter should initialize with ParadeDB defaults when stubs are present."""
+
         adapter = ParadeDBAdapter()
 
         assert adapter.platform_name == "paradedb"
@@ -55,7 +43,7 @@ class TestParadeDBAdapter:
         assert adapter.schema == "public"
 
     def test_initialization_with_config(self, paradedb_stubs):
-        """Adapter should accept custom ParadeDB configuration."""
+
         adapter = ParadeDBAdapter(
             host="paradedb.example.com",
             port=5433,
@@ -73,14 +61,14 @@ class TestParadeDBAdapter:
         assert adapter.schema == "analytics"
 
     def test_dialect_is_postgres(self, paradedb_stubs):
-        """ParadeDB should use PostgreSQL dialect (compatible)."""
+
         adapter = ParadeDBAdapter()
 
         assert adapter.get_target_dialect() == POSTGRES_DIALECT
         assert adapter.get_target_dialect() == "postgres"
 
     def test_from_config_basic(self, paradedb_stubs):
-        """from_config should create adapter with correct settings."""
+
         config = {
             "host": "paradedb.local",
             "port": 5433,
@@ -94,7 +82,7 @@ class TestParadeDBAdapter:
         assert adapter.database == "test_analytics"
 
     def test_create_connection_verifies_extension(self, paradedb_stubs):
-        """create_connection should verify pg_analytics is installed."""
+
         adapter = ParadeDBAdapter()
 
         mock_conn = Mock()
@@ -111,7 +99,7 @@ class TestParadeDBAdapter:
         assert any(PARADEDB_EXTENSION in sql for sql in executed)
 
     def test_create_connection_creates_missing_extension(self, paradedb_stubs):
-        """create_connection should CREATE EXTENSION when pg_analytics is absent."""
+
         adapter = ParadeDBAdapter()
 
         mock_conn = Mock()
@@ -127,7 +115,7 @@ class TestParadeDBAdapter:
         assert any("CREATE EXTENSION" in sql and PARADEDB_EXTENSION in sql for sql in executed)
 
     def test_create_connection_raises_when_extension_unavailable(self, paradedb_stubs):
-        """create_connection should raise when pg_analytics cannot be installed."""
+
         adapter = ParadeDBAdapter()
 
         mock_conn = Mock()
@@ -141,7 +129,7 @@ class TestParadeDBAdapter:
                 adapter.create_connection()
 
     def test_platform_info_reports_version(self, paradedb_stubs):
-        """get_platform_info should include the pg_analytics version."""
+
         adapter = ParadeDBAdapter()
 
         mock_conn = Mock()
@@ -155,7 +143,7 @@ class TestParadeDBAdapter:
         assert info["paradedb_version"] == "0.9.0"
 
     def test_no_extension_conflicts_declared(self):
-        """ParadeDB bundles no shared native libs: no conflicts_with entries."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         assert PlatformRegistry.get_platform_conflicts("paradedb") == []

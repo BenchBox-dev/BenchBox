@@ -1,5 +1,3 @@
-"""Contract tests for the public-site visual baseline workflow."""
-
 from __future__ import annotations
 
 import os
@@ -60,7 +58,6 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     capture = next(step for step in steps if step.get("name") == "Capture public site")
     run = next(step for step in steps if step.get("name") == "Compare public site with exact base")
 
-    # Capture before waiting so a follower's own tree is ready when the base appears.
     assert names.index("Capture public site") < names.index(
         "Download visual baseline for base or site-equivalent ancestor"
     )
@@ -97,9 +94,6 @@ def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
     )
     wait = download["env"]["PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS"]
     assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
-    # The wait holds a runner, so it must leave room for capture and compare
-    # inside the job timeout, and build (about 15 minutes) plus this job must
-    # leave runner-queueing slack inside the 60-minute merge-queue timeout.
     assert 600 / 60 + 10 <= visual["timeout-minutes"] <= 30
 
 
@@ -117,8 +111,6 @@ def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_s
     assert download["env"]["PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES"] == (
         "${{ needs.visual-inputs.outputs.baseline_candidates }}"
     )
-    # The compare step checks the downloaded manifest against the SHA the
-    # lookup actually used, which the download step publishes.
     assert compare["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ steps.baseline.outputs.baseline_sha }}"
 
 
@@ -159,8 +151,6 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
     result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
-    # The base, then non-site ancestors, then the last commit that changed a
-    # site input (identical site inputs from that commit onward); nothing older.
     assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
 
 
@@ -170,7 +160,6 @@ def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> No
     upload = next(step for step in steps if step.get("name") == "Upload merge-queue candidate visual baseline")
     assert upload["if"] == "github.event_name == 'merge_group'"
     assert upload["with"]["name"] == "public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}"
-    # Default success() gating: no candidate after a failed or skipped comparison.
     assert "always()" not in upload["if"] and "failure()" not in upload["if"]
     assert names.index("Compare public site with exact base") < names.index(
         "Upload merge-queue candidate visual baseline"
@@ -178,7 +167,6 @@ def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> No
 
 
 def _candidate_producers() -> list[tuple[Path, str]]:
-    """Workflows that run on merge_group and upload a candidate baseline, with that job's name."""
     producers = []
     for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -193,11 +181,6 @@ def _candidate_producers() -> list[tuple[Path, str]]:
 
 
 def _lookup_constants_and_trusted_paths() -> tuple[dict[str, str], set[str]]:
-    """The lookup's string constants and the workflow paths in its merge-queue trusted list.
-
-    Membership is read from the exported list itself, so a path that is only declared as a constant,
-    or appears in a comment, does not count as trusted.
-    """
     lookup = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
         encoding="utf-8"
     )
@@ -209,10 +192,6 @@ def _lookup_constants_and_trusted_paths() -> tuple[dict[str, str], set[str]]:
 
 
 def test_the_lookup_trusts_every_workflow_that_publishes_a_merge_queue_candidate() -> None:
-    # The lookup only trusts candidates from named workflow paths. When validation moved into CI
-    # the list was not updated, so every follower ignored a candidate that already existed and
-    # waited out its deadline. A workflow that runs on merge_group and uploads a candidate must be
-    # trusted, and the job the lookup reads for an unfinished leader must be the job that uploads.
     constants, trusted = _lookup_constants_and_trusted_paths()
     producers = _candidate_producers()
     assert producers, "no merge_group workflow uploads a candidate baseline"
@@ -253,7 +232,6 @@ def test_public_results_capture_waits_for_data_before_digesting() -> None:
 
 
 def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
-    """docs.yml captures protected-develop baselines on push; ci.yml runs the comparison."""
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
     assert "pull_request" not in triggers

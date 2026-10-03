@@ -14,7 +14,7 @@ BenchBox provides lightweight performance monitoring primitives for recording ru
 
 - **Multiple Metric Types**: Counters, gauges, and timing measurements
 - **Statistical Analysis**: Mean, median, percentiles (P90, P95, P99)
-- **Snapshot System**: Immutable snapshots with timestamps
+- **Snapshot System**: Frozen snapshot records with timestamps and mutable nested mappings
 - **Performance History**: Persistent storage with rolling window
 - **Regression Detection**: Automatic detection with configurable thresholds
 - **Trend Analysis**: Identify improving, degrading, or stable trends
@@ -49,9 +49,55 @@ API Reference
 PerformanceMonitor Class
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.monitoring.performance.PerformanceMonitor
-   :members:
-   :inherited-members:
+.. py:class:: benchbox.monitoring.performance.PerformanceMonitor()
+
+   Record counters, gauges, timings in seconds and metadata. A new monitor starts empty.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.increment_counter(name: str, value: int=1) -> None
+
+   Add value to the named counter, creating it from zero when absent.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.get_counter(name: str) -> int
+
+   Return the named counter, or zero when it has not been recorded.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.set_gauge(name: str, value: float) -> None
+
+   Store the latest float value for a gauge, replacing its previous value.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.record_timing(name: str, duration_seconds: float) -> None
+
+   Append a duration in seconds to the named timing series. Values are converted to float.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.time_operation(name: str)
+
+   Return a context manager that yields no value and records elapsed seconds
+   on exit using a monotonic performance counter. Recording occurs in finally,
+   including when the body raises; the exception continues to propagate.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.set_metadata(key: str, value: Any) -> None
+
+   Attach a value under the metadata key, replacing any previous value.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.update_metadata(items: dict[str, Any]) -> None
+
+   Update metadata from the supplied mapping, replacing overlapping keys.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.snapshot() -> PerformanceSnapshot
+
+   Return a timestamped snapshot with copies of the counters, gauges and metadata
+   mappings and summarized timing series. The timestamp is an ISO 8601 UTC string.
+   Snapshot dataclasses are frozen, but their nested dictionaries and metadata
+   values are not deeply immutable.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.summary() -> dict[str, Any]
+
+   Create a fresh snapshot and return its plain dictionary representation, including timing-statistic dictionaries.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceMonitor.reset() -> None
+
+   Clear all counters, gauges, timing observations and metadata.
+
 
 **Constructor**:
 
@@ -218,9 +264,43 @@ Clear all recorded metrics and metadata.
 PerformanceSnapshot Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Immutable snapshot of recorded metrics.
+Frozen snapshot of recorded metrics; nested mappings remain mutable.
 
-.. autoclass:: benchbox.monitoring.performance.PerformanceSnapshot
+.. py:class:: benchbox.monitoring.performance.PerformanceSnapshot(timestamp: str, counters: dict[str, int], gauges: dict[str, float], timings: dict[str, TimingStats], metadata: dict[str, Any] = <factory>)
+
+   Frozen dataclass of a timestamp and recorded metrics. timestamp, counters,
+   gauges and timings are required; metadata defaults to a fresh empty dictionary.
+   Freezing prevents field reassignment but does not freeze nested mappings.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceSnapshot.to_dict() -> dict[str, Any]
+
+   Return timestamp, copied counters and gauges, timing-statistic dictionaries and a copied metadata mapping. Nested metadata values remain shared.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceSnapshot.timestamp
+   :type: str
+
+   ISO 8601 timestamp; monitor snapshots use UTC. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceSnapshot.counters
+   :type: dict[str, int]
+
+   Named integer counter values. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceSnapshot.gauges
+   :type: dict[str, float]
+
+   Named latest float values in producer-chosen units. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceSnapshot.timings
+   :type: dict[str, TimingStats]
+
+   Named TimingStats values summarizing recorded seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceSnapshot.metadata
+   :type: dict[str, Any]
+
+   Caller-supplied metadata mapping. Default: a new empty dictionary per instance.
+
 
 **Fields**:
 
@@ -239,7 +319,63 @@ TimingStats Class
 
 Aggregate timing statistics for a metric.
 
-.. autoclass:: benchbox.monitoring.performance.TimingStats
+.. py:class:: benchbox.monitoring.performance.TimingStats(count: int, minimum: float, maximum: float, mean: float, median: float, p90: float, p95: float, p99: float, total: float)
+
+   Frozen dataclass of timing statistics. All nine arguments are required.
+   Durations are seconds, including percentiles and total; count is a number of
+   observations. Monitor percentiles use linear interpolation between adjacent
+   sorted observations. Empty series summarize to zeros; a single observation
+   supplies every percentile.
+
+.. py:method:: benchbox.monitoring.performance.TimingStats.to_dict() -> dict[str, float]
+
+   Return a dictionary of all statistic fields.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.count
+   :type: int
+
+   Number of timing observations. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.minimum
+   :type: float
+
+   Smallest timing observation in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.maximum
+   :type: float
+
+   Largest timing observation in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.mean
+   :type: float
+
+   Arithmetic mean of timing observations in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.median
+   :type: float
+
+   Median timing observation in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.p90
+   :type: float
+
+   Linearly interpolated 90th percentile in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.p95
+   :type: float
+
+   Linearly interpolated 95th percentile in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.p99
+   :type: float
+
+   Linearly interpolated 99th percentile in seconds. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.TimingStats.total
+   :type: float
+
+   Sum of timing observations in seconds. Required constructor argument.
+
 
 **Fields**:
 
@@ -258,16 +394,54 @@ PerformanceHistory Class
 
 Persist performance snapshots and detect regressions.
 
-.. autoclass:: benchbox.monitoring.performance.PerformanceHistory
+.. py:class:: benchbox.monitoring.performance.PerformanceHistory(storage_path: Path, max_entries: int=50)
+
+   Persist a bounded window of snapshots in a JSON file. The parent directory is
+   created on construction. Existing entries are loaded; missing, unreadable or
+   invalid JSON history starts empty. record compares against the latest entry
+   and persists the updated window. Use a positive max_entries for a bounded
+   history; the implementation does not validate this argument.
+
+   :param storage_path: JSON history file.
+   :param max_entries: Maximum retained snapshots; defaults to 50.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceHistory.record(snapshot: PerformanceSnapshot, regression_thresholds: dict[str, float] | None=None, prefer_lower_metrics: list[str] | None=None) -> list[PerformanceRegressionAlert]
+
+   Compare the snapshot with the most recently recorded entry, append it, retain
+   the configured history window and write the JSON history. Return matching
+   regression alerts. No earlier baseline means no alerts.
+
+   :param snapshot: Snapshot to compare and persist.
+   :param regression_thresholds: Per-metric fractional thresholds, such as 0.15 for 15 percent. Only named metrics are checked; None or an empty mapping produces no alerts.
+   :param prefer_lower_metrics: Metrics for which increasing values are regressions. For other named metrics, decreasing values are regressions.
+   :returns: Regression alerts; their change_percent and threshold_percent values are fractions.
+
+   The change is (current - baseline) / abs(baseline), and the comparison is strict:
+   an increase greater than the threshold alerts for lower-is-better metrics; a
+   decrease beyond the negative threshold alerts for other metrics. Missing
+   metrics are skipped. A zero baseline yields a zero change and does not alert.
+   Counters take precedence over gauges, then timing means when a name overlaps.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceHistory.trend(metric: str, window: int=10) -> str
+
+   Compare the averages of the first and second halves of the latest available
+   window. window values below two are raised to two. Return insufficient_data
+   with fewer than two values, degrading for a fractional increase greater than
+   0.1, improving for a decrease below -0.1, or stable otherwise.
+
+   These labels always treat larger values as worse. They do not use record's
+   prefer_lower_metrics setting and must be interpreted appropriately for metrics
+   such as throughput.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceHistory.metric_history(metric: str) -> list[float]
+
+   Return recorded numeric values for a metric in history order, skipping entries
+   without that metric. Counters take precedence over timing means, then gauges
+   when a name overlaps. Timing values are seconds; gauge and counter units are
+   chosen by their producer.
+
 
 **Constructor**:
-
-.. code-block:: python
-
-    PerformanceHistory(
-        storage_path: Path,
-        max_entries: int = 50
-    )
 
 **Parameters**:
 
@@ -281,7 +455,7 @@ Persist snapshot and return any regression alerts.
 **Parameters**:
 
 - **snapshot** (PerformanceSnapshot): Snapshot to persist
-- **regression_thresholds** (dict[str, float] | None): Per-metric thresholds (as percentages)
+- **regression_thresholds** (dict[str, float] | None): Per-metric fractional thresholds (0.15 means 15 percent)
 - **prefer_lower_metrics** (list[str] | None): Metrics where higher values indicate regressions
 
 **Returns**: List of ``PerformanceRegressionAlert`` objects
@@ -353,14 +527,54 @@ PerformanceRegressionAlert Class
 
 Represents a detected performance regression.
 
-.. autoclass:: benchbox.monitoring.performance.PerformanceRegressionAlert
+.. py:class:: benchbox.monitoring.performance.PerformanceRegressionAlert(metric: str, baseline: float, current: float, change_percent: float, threshold_percent: float, direction: str)
+
+   Frozen dataclass of a detected regression. All six arguments are required.
+   change_percent and threshold_percent are fractions: 0.15 represents 15 percent.
+   baseline and current retain the metric's own unit. direction is increase for
+   lower-is-better metrics or decrease for other configured metrics.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceRegressionAlert.to_dict() -> dict[str, Any]
+
+   Return all alert fields as a dictionary, preserving fractional change and threshold values.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.metric
+   :type: str
+
+   Name of the metric that exceeded its configured threshold. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.baseline
+   :type: float
+
+   Metric value in the preceding snapshot. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.current
+   :type: float
+
+   Metric value in the newly recorded snapshot. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.change_percent
+   :type: float
+
+   Signed relative change as a fraction, not a whole percentage number. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.threshold_percent
+   :type: float
+
+   Configured fractional regression threshold. Required constructor argument.
+
+.. py:attribute:: benchbox.monitoring.performance.PerformanceRegressionAlert.direction
+   :type: str
+
+   increase for a lower-is-better regression, or decrease for another configured metric. Required constructor argument.
+
 
 **Fields**:
 
 - **metric** (str): Metric name
 - **baseline** (float): Baseline value
 - **current** (float): Current value
-- **change_percent** (float): Change as percentage (e.g., 0.15 = 15%)
+- **change_percent** (float): Relative change as a fraction (e.g., 0.15 = 15%)
 - **threshold_percent** (float): Threshold that was exceeded
 - **direction** (str): "increase" or "decrease"
 
@@ -369,13 +583,42 @@ PerformanceTracker Class
 
 Simplified file-backed metric recorder.
 
-.. autoclass:: benchbox.monitoring.performance.PerformanceTracker
+.. py:class:: benchbox.monitoring.performance.PerformanceTracker(storage_path: Path | None=None)
+
+   Persist independently named metric observations for trend and anomaly analysis.
+   When storage_path is None, use benchbox_performance_history.json in the system
+   temporary directory. Construction creates the parent directory and loads
+   existing history; missing, unreadable or invalid JSON history starts empty.
+   This format differs from PerformanceHistory's snapshot history.
+
+   :param storage_path: Optional JSON file for metric observations.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceTracker.record_metric(metric_name: str, value: float, timestamp: datetime | None=None) -> None
+
+   Append a float value and ISO timestamp to the metric's history and persist the
+   JSON file. Omitted timestamps use the current UTC time; supply timezone-aware
+   timestamps when using get_trend's UTC cutoff.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceTracker.get_trend(metric_name: str, days: int=30) -> dict[str, Any]
+
+   Analyze entries within the last days days. With no metric history, return
+   trend=unknown, recent_values=[], average=0. With fewer than two recent entries,
+   return insufficient_data and the recent entry dictionaries. Otherwise return
+   numeric recent_values with average, min, max and sample std_dev.
+
+   Trend labels use a strict 10 percent split-half increase as degrading and a
+   strict 10 percent decrease as improving, independent of whether higher values
+   are desirable for the metric.
+
+.. py:method:: benchbox.monitoring.performance.PerformanceTracker.detect_anomalies(metric_name: str, threshold_multiplier: float=2.0) -> list[dict[str, Any]]
+
+   Return historical entries whose absolute deviation from the all-history mean
+   exceeds threshold_multiplier times the sample standard deviation. Fewer than
+   ten entries yields an empty list. Each result contains timestamp, value,
+   deviation and threshold in the metric's own units.
+
 
 **Constructor**:
-
-.. code-block:: python
-
-    PerformanceTracker(storage_path: Path | None = None)
 
 **Parameters**:
 

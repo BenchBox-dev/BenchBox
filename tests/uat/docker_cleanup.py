@@ -1,12 +1,3 @@
-"""Recover abandoned UAT-owned Docker resources and report everything else.
-
-The execute phase cleans a UAT-managed compose project in-process, but a hard
-kill or host reboot can leave compose-labelled resources behind. This module is
-the explicit recovery path: remove resources with a UAT project prefix, and
-report non-UAT Docker usage with enough detail for a human to decide what to
-remove.
-"""
-
 from __future__ import annotations
 
 import json
@@ -24,13 +15,11 @@ DEFAULT_UAT_PROJECT_PREFIX = "benchbox-uat"
 
 
 class DockerCleanupError(RuntimeError):
-    """Raised when Docker inventory or cleanup commands fail."""
+    pass
 
 
 @dataclass(frozen=True)
 class DockerUsageResource:
-    """One Docker resource discovered by the recovery inventory."""
-
     kind: DockerResourceKind
     identifier: str
     name: str
@@ -44,7 +33,6 @@ class DockerUsageResource:
         return self.name or self.identifier
 
     def cleanup_command(self) -> tuple[str, ...]:
-        """Return the manual cleanup command for this single resource, using the resolved engine binary."""
         cli = docker_assets.resolve_container_cli()
         if self.kind == "container":
             return (cli, "rm", "-f", self.identifier)
@@ -60,8 +48,6 @@ class DockerUsageResource:
 
 @dataclass(frozen=True)
 class CleanupCommandResult:
-    """A cleanup command and its Docker result."""
-
     argv: tuple[str, ...]
     result: docker_assets.DockerCommandResult | None = None
 
@@ -78,8 +64,6 @@ class CleanupCommandResult:
 
 @dataclass(frozen=True)
 class DockerCleanupReport:
-    """Inventory plus recovery-command results."""
-
     project_prefix: str
     apply: bool
     uat_owned: tuple[DockerUsageResource, ...]
@@ -95,32 +79,9 @@ def recover_abandoned_uat_docker_usage(
     apply: bool = False,
     runner: DockerRunner | None = None,
 ) -> DockerCleanupReport:
-    """Inventory Docker resources, clean UAT-owned resources when requested, and report the rest.
-
-    UAT ownership is determined only by Docker Compose's project label with the
-    configured UAT prefix. Non-UAT resources are never mutated by this function;
-    their cleanup commands are reported for manual operator review.
-
-    Engine-dependent inventory (uat-container-engine-routing w1/w3): when the
-    resolved engine is mocker, the Docker-shaped JSON inventory this function
-    otherwise relies on is not usable -- ``container``/``image ls --format
-    json`` echo the literal string ``json`` instead of JSON, and ``volume
-    inspect`` takes a single name and returns a lowercase, non-Docker schema
-    (live-validated in w0; see container_cleanup.py's module docstring for the
-    same finding). Rather than crash, this falls back to mocker's one
-    faithful plain-text verb (`mocker volume ls`) to find leaked named
-    volumes, and reports (via `inventory_note`) that container/image/network
-    inventory is unavailable on this engine -- use `ENGINE=container` for
-    full native inventory on macOS.
-    """
     run = runner or docker_assets.run_docker_command
     cli = docker_assets.resolve_container_cli()
     inventory_note: str | None = None
-    # Gate on `!= "mocker"` rather than `== "docker"`: mocker is the one
-    # engine KNOWN to break the Docker-shaped JSON inventory; a
-    # BENCHBOX_CONTAINER_CLI override pointing at some other
-    # docker-compatible binary should take the full inventory path, not
-    # silently degrade to the volume-only fallback.
     if cli != "mocker":
         resources = tuple(_inventory_resources(run, cli))
     else:
@@ -157,7 +118,6 @@ def recover_abandoned_uat_docker_usage(
 
 
 def _mocker_volume_resources(run: DockerRunner, project_prefix: str) -> list[DockerUsageResource]:
-    """Named volumes matching `project_prefix`, listed via mocker's one faithful plain-text verb."""
     names = docker_assets.list_mocker_volumes_matching(project_prefix, runner=run)
     return [
         DockerUsageResource(
@@ -165,8 +125,6 @@ def _mocker_volume_resources(run: DockerRunner, project_prefix: str) -> list[Doc
             identifier=name,
             name=name,
             created_at="",
-            # Inferred from the name-prefix match, not a compose label --
-            # mocker's volume listing carries no label data (see docstring).
             project=project_prefix,
         )
         for name in names
@@ -174,7 +132,6 @@ def _mocker_volume_resources(run: DockerRunner, project_prefix: str) -> list[Doc
 
 
 def format_cleanup_report(report: DockerCleanupReport) -> str:
-    """Render a human-readable recovery/report summary."""
     lines = [
         "Docker UAT cleanup report",
         f"engine: {report.engine}",

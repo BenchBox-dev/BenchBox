@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Validate checked-in TPC tuned templates against the logical tuning profile."""
 
 from __future__ import annotations
 

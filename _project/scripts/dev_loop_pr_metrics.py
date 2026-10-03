@@ -1,56 +1,4 @@
 #!/usr/bin/env python3
-"""Per-PR dev-loop CI-failure baseline metrics for merged `develop` PRs.
-
-Dev PRs land via squash auto-merge once the required checks are green, so a
-merged PR's HEAD-SHA check runs are *always* green (see
-`_project/scripts/detect_orphaned_commits.py`'s module docstring for the
-related squash-merge mechanics). That makes head-SHA check-run status useless
-as a CI-failure signal. The real failure cost shows up upstream of the merge:
-fix-forward pushes after a PR is opened, PRs that touch the shared fast-test
-guard file (`_project/config/fast_test_lane_policy.json`, a frequent
-composition-conflict hotspot), and whether the PR's *first* required-lane
-workflow run ("CI", `.github/workflows/ci.yml`; "Develop PR", the retired
-`pr.yml`, for older PRs) went green
-without a fix-forward push.
-
-This script computes, per merged `develop` PR in a trailing window:
-
-  - pushes_after_open: commits on the PR after its first commit (a proxy for
-    fix-forward pushes; the initial push that opened the PR is not a "push
-    after open").
-  - open_to_merge_seconds: PR created_at -> merged_at wall time.
-  - touched_fast_test_lane_policy: whether the PR's file list includes
-    _project/config/fast_test_lane_policy.json.
-  - first_pass_green: whether the PR's FIRST required-lane ("CI" or, for older
-    PRs, "Develop PR") workflow run on its head branch concluded "success" -- i.e. the
-    required lane went green without a fix-forward push. Uses per-branch
-    Actions run history (event=pull_request), not the always-green head-SHA
-    check runs.
-  - fast_test_job_seconds: wall time of the "test (ubuntu-latest, 3.12)" job
-    within that first "Develop PR" run (used to compute the window's average
-    / p95 fast-test job wall time).
-
-Runtime data source, in order of preference: the `gh` CLI (`gh api ...`) when
-on PATH; otherwise a raw GitHub REST call via `urllib` authenticated with
-$GITHUB_TOKEN / $GH_TOKEN; otherwise this prints a "SKIPPED: no GitHub API
-access" notice and exits 0 (mirrors the `|| true` graceful-degradation
-pattern the existing `dev-loop-metrics` Make target uses for `gh run list`,
-Makefile ~line 1520). This script performs read-only GitHub API calls; it
-never mutates PRs, branches, or workflow state.
-
-Usage:
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 28 --json
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py --collect-durations
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline LIFECYCLE --process-baseline PROCESS
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit AUDIT --baseline LIFECYCLE
-    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-process-acceptance ACCEPTANCE --process-baseline PROCESS
-
---collect-durations is a separate, local-machine-only mode: it runs the fast
-test lane under `pytest --durations=20` and prints the slowest tests. It does
-not touch the GitHub API and is not part of the default run (see the module
-TODO context: dev-loop-metrics-ci-failure-baseline-2).
-"""
 
 from __future__ import annotations
 
@@ -74,32 +22,15 @@ DEFAULT_REPO = "BenchBox-dev/BenchBox"
 FAST_LANE_POLICY_PATH = "_project/config/fast_test_lane_policy.json"
 REQUIRED_LANE_WORKFLOW_NAMES = ("CI", "Develop PR")
 FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
-# medium-test is the other required lane and the one that runs closest to its
-# timeout, so its wall time is tracked here to make the next resize proactive
-# rather than a reaction to a cancelled job (see ci.yml medium-test).
 MEDIUM_TEST_JOB_NAME = "medium-test"
 MEDIUM_SHARD_JOB_NAMES = ("medium-test (shard 0)", "medium-test (shard 1)")
 API_RETRY_ATTEMPTS = 3
-# Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
-# keys stay unchanged so current consumers keep working.
 EVENT_FANOUT_SCHEMA = "event_fanout_v1"
-# Complete-lifecycle baseline schema: every synchronize head plus every run
-# attempt per PR, with expired/unobservable evidence as explicit missingness
-# instead of silent exclusion (ci-baseline w1/w2).
 LIFECYCLE_SCHEMA = "ci_lifecycle_baseline_v1"
-# Machine-readable refresh-audit block embedded in the exact-refresh Markdown
-# audit; the validator recomputes it from the shared lifecycle baseline.
 REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
-# Final integrated acceptance record: binds the frozen preregistration,
-# incident replays, prospective cohort, and efficiency targets. The validator
-# exits non-zero listing gaps until every dimension passes; incomplete stays
-# incomplete, never provisionally green.
 PROCESS_ACCEPTANCE_SCHEMA = "pr_process_acceptance_v1"
 DEFAULT_ACCEPTANCE_PUBLISHED_REF = "origin/develop"
 BATCH_DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
-# Full-required reasons that must stay separate counters: gate-timing loss vs
-# prior-head identity/binding failure. Conflating them hides which mechanism
-# to fix; the refresh-audit validator rejects reports that merge them.
 REFRESH_REASON_TIMING = "prior_check_not_success"
 REFRESH_REASON_IDENTITY = "prior_check_unbound"
 REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
@@ -110,8 +41,6 @@ REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "landing",
     "tooling",
 )
-# Contexts required before the six-unit CI. PRs merged in the baseline window
-# were green under these names, so historical measurement keeps resolving them.
 LEGACY_REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "tooling",
@@ -186,18 +115,12 @@ CLI_DESCRIPTION = (
 
 
 def resolve_required_contexts(check_runs: list[dict]) -> tuple[str, ...]:
-    """The required-context set that applies to one head's check runs.
-
-    A head that carries a ``core`` check ran the six-unit CI. Anything else is
-    measured against the contexts that were required when it ran.
-    """
 
     if any(run.get("name") == "core" for run in check_runs):
         return REQUIRED_CONTEXT_NAMES
     return LEGACY_REQUIRED_CONTEXT_NAMES
 
 
-# Public GitHub-hosted standard runners are free for public repositories.
 PUBLIC_STANDARD_RUNNER_USD = 0.0
 _SETUP_STEP_PREFIXES: tuple[str, ...] = (
     "Set up job",
@@ -229,15 +152,11 @@ class PrMetrics:
     event_fanout: dict | None = None
 
 
-# ---------------------------------------------------------------------------
-# GitHub API access -- gh CLI, then urllib+token, else graceful skip.
-# ---------------------------------------------------------------------------
 def _gh_available() -> bool:
     return shutil.which("gh") is not None
 
 
 def _gh_api(path: str) -> object | None:
-    """GET *path* via the `gh api` CLI, retrying transient CLI/API failures."""
     for attempt in range(API_RETRY_ATTEMPTS):
         try:
             proc = subprocess.run(
@@ -257,15 +176,11 @@ def _gh_api(path: str) -> object | None:
                 pass
 
         if attempt + 1 < API_RETRY_ATTEMPTS:
-            # Keep retries bounded while allowing transient 5xx, transport,
-            # and CLI startup failures to recover before the collector fails
-            # closed rather than publishing understated metrics.
             time.sleep(0.5 * (attempt + 1))
     return None
 
 
 def _urllib_api(path: str, token: str) -> object | None:
-    """GET https://api.github.com{path} via urllib. Returns None on failure."""
     req = urllib.request.Request(
         f"https://api.github.com{path}",
         headers={
@@ -286,8 +201,6 @@ def _urllib_api(path: str, token: str) -> object | None:
                 return None
             if attempt == API_RETRY_ATTEMPTS - 1:
                 return None
-        # TimeoutError/OSError: read-path timeouts are NOT URLError subclasses;
-        # they must still resolve to the graceful-skip contract, never a crash.
         except (urllib.error.URLError, TimeoutError, OSError):
             if attempt == API_RETRY_ATTEMPTS - 1:
                 return None
@@ -295,16 +208,10 @@ def _urllib_api(path: str, token: str) -> object | None:
 
 
 class ApiFailure(RuntimeError):
-    """A GitHub API page fetch failed, so any list built from it is incomplete.
-
-    Raised instead of returning a short list, so a partial API outage surfaces
-    as a skipped/partial report rather than as understated exact metrics.
-    """
+    pass
 
 
 class GitHubClient:
-    """Thin GET-only GitHub API client: gh CLI first, urllib+token fallback."""
-
     def __init__(self, repo: str, use_gh: bool, token: str | None) -> None:
         self.repo = repo
         self.use_gh = use_gh
@@ -323,24 +230,12 @@ class GitHubClient:
         item_key: str | None = None,
         stop: Callable[[dict], bool] | None = None,
     ) -> list[dict]:
-        """GET pages of a list endpoint (raw list or {item_key: [...]}).
-
-        `stop` halts pagination once any item on the current page satisfies
-        it, so windowed queries do not download the whole collection.
-        """
         items: list[dict] = []
         page = 1
         sep = "&" if "?" in path else "?"
         while True:
             data = self.get(f"{path}{sep}per_page=100&page={page}")
             if data is None:
-                # A failed page (rate limit, timeout, transient `gh api` error)
-                # must not read as "no more items". Callers derive exact metrics
-                # from this list, so silently returning the partial (usually
-                # empty) accumulation would record real-looking values such as
-                # pushes_after_open=0 or touched_fast_test_lane_policy=False for
-                # a run that simply could not read GitHub -- understating the
-                # very CI-failure metrics this baseline exists to track.
                 raise ApiFailure(f"GitHub API page fetch failed: {path} (page {page})")
             batch = data.get(item_key, []) if item_key else data
             if not isinstance(batch, list) or not batch:
@@ -355,7 +250,6 @@ class GitHubClient:
 
 
 def _gh_auth_token() -> str | None:
-    """Read the authenticated gh token without writing it to output or disk."""
     if not _gh_available():
         return None
     try:
@@ -373,12 +267,7 @@ def _gh_auth_token() -> str | None:
 
 
 def make_client(repo: str) -> GitHubClient | None:
-    """Return a usable GitHubClient, or None if no API access is available."""
     if _gh_available():
-        # Prefer one token lookup plus direct GETs over spawning `gh api` for
-        # every paginated request. The latter is correct but too slow for the
-        # event-fanout window and can fail closed on an isolated subprocess
-        # startup/transport hiccup. The token remains in memory only.
         gh_token = _gh_auth_token()
         if gh_token:
             probe = _urllib_api(f"/repos/{repo}", gh_token)
@@ -395,15 +284,11 @@ def make_client(repo: str) -> GitHubClient | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Metric collection
-# ---------------------------------------------------------------------------
 def _iso_to_dt(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def fetch_merged_prs(client: GitHubClient, since: datetime) -> list[dict]:
-    """Merged develop PRs with merged_at >= since, newest first."""
     prs = client.get_paginated(
         f"/repos/{client.repo}/pulls?state=closed&base=develop&sort=updated&direction=desc",
         stop=lambda pr: _iso_to_dt(pr["updated_at"]) < since,
@@ -414,10 +299,6 @@ def fetch_merged_prs(client: GitHubClient, since: datetime) -> list[dict]:
         if not merged_at:
             continue
         if _iso_to_dt(merged_at) < since:
-            # Results are sorted by `updated`, not `merged_at`; a closed-but-
-            # never-merged PR can be more recently updated than an older
-            # merge. Filter rather than break, but stop once even `updated`
-            # itself has aged out (nothing later in the page can be newer).
             if _iso_to_dt(pr["updated_at"]) < since:
                 break
             continue
@@ -426,22 +307,11 @@ def fetch_merged_prs(client: GitHubClient, since: datetime) -> list[dict]:
 
 
 def pushes_after_open(client: GitHubClient, number: int, created_at: str) -> int:
-    """Count commits that landed on the PR *after* it was opened (fix-forward proxy).
-
-    `len(commits) - 1` counted every pre-open local commit beyond the first as a
-    fix-forward push even when nothing was pushed after the PR existed. The
-    repo's review-followup flow deliberately opens a PR over several
-    pre-existing per-comment commits (`_project/scripts/pr_review_followups.py`),
-    so those PRs alone would inflate the fix-forward rate. Compare each commit's
-    timestamp against the PR's `created_at` instead.
-    """
     commits = client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
     opened = _iso_to_dt(created_at)
     after = 0
     for entry in commits:
         commit = entry.get("commit") or {}
-        # Prefer committer date: a rebase/amend rewrites it, which is what
-        # "landed on the PR" means here; author date can predate the push.
         stamp = (commit.get("committer") or {}).get("date") or (commit.get("author") or {}).get("date")
         if not stamp:
             continue
@@ -459,7 +329,6 @@ def touched_fast_test_lane_policy(client: GitHubClient, number: int) -> bool:
 
 
 def _partitioned_medium_seconds(jobs: list[dict]) -> float | None:
-    """Measure the complete collection-to-last-shard wall time, excluding censored runs."""
     names = ("medium-collect", *MEDIUM_SHARD_JOB_NAMES)
     selected = [job for job in jobs if job.get("name") in names or str(job.get("name")).startswith("medium-test (")]
     if len(selected) != len(names) or {job.get("name") for job in selected} != set(names):
@@ -490,7 +359,6 @@ def _partitioned_medium_seconds(jobs: list[dict]) -> float | None:
 def first_pass_green_and_job_seconds(
     client: GitHubClient, head_ref: str
 ) -> tuple[bool | None, float | None, float | None]:
-    """First CI run on head_ref: (green?, fast-test seconds, complete medium-lane seconds)."""
     runs = client.get_paginated(
         f"/repos/{client.repo}/actions/runs?branch={head_ref}&event=pull_request",
         item_key="workflow_runs",
@@ -513,9 +381,6 @@ def first_pass_green_and_job_seconds(
         ):
             started = _iso_to_dt(job["started_at"])
             completed = _iso_to_dt(job["completed_at"])
-            # Cancelled, failed, and in-progress jobs may expose partial
-            # timestamps. They are censored observations, not completed lane
-            # runtimes, so keep them out of the p95 distribution.
             seconds_by_job.setdefault(name, (completed - started).total_seconds())
     medium_seconds = seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
     if any(str(job.get("name")).startswith("medium-test (") or job.get("name") == "medium-collect" for job in jobs):
@@ -524,7 +389,6 @@ def first_pass_green_and_job_seconds(
 
 
 def event_fanout_for_pr(client: GitHubClient, pr: dict) -> dict:
-    """Measure all same-head workflow, job, and check-run fan-out for a PR."""
 
     head_sha = str((pr.get("head") or {}).get("sha") or "")
     if not head_sha:
@@ -577,12 +441,10 @@ def _pct(values: list[float], p: int) -> float | None:
 
 MEDIUM_TEST_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _MEDIUM_TEST_TIMEOUT_RE = re.compile(r"(?ms)^  medium-test:\s*$.*?^\s{4}timeout-minutes:\s*(\d+)\s*$")
-# Warn once p95 eats into the headroom the timeout was sized to provide.
 MEDIUM_TEST_BUDGET_WARN_FRACTION = 0.75
 
 
 def _medium_test_timeout_minutes() -> int:
-    """Read the medium-test timeout from the workflow that enforces it."""
     workflow = MEDIUM_TEST_WORKFLOW_PATH.read_text(encoding="utf-8")
     match = _MEDIUM_TEST_TIMEOUT_RE.search(workflow)
     if match is None:
@@ -600,7 +462,6 @@ def _elapsed_seconds(started_at: object, completed_at: object) -> float | None:
 
 
 def latest_named_check_runs(check_runs: list[dict], name: str) -> dict | None:
-    """Latest check run for *name* by started_at. Missing stamp sorts oldest."""
 
     matches = [run for run in check_runs if run.get("name") == name]
     if not matches:
@@ -622,11 +483,6 @@ def required_gate_seconds(
     check_runs: list[dict],
     required: tuple[str, ...] | None = None,
 ) -> float | None:
-    """Wall from first required-check start to last required success.
-
-    Missing, skipped, cancelled, or failed required contexts return None.
-    Reruns: only the latest same-named check counts.
-    """
 
     required = required or resolve_required_contexts(check_runs)
     latest: list[dict] = []
@@ -657,22 +513,11 @@ def merge_unblock_seconds(
     check_runs: list[dict],
     required: tuple[str, ...] | None = None,
 ) -> float | None:
-    """Time until every live required context is latest-success.
-
-    On this repository that is the merge-unblock instant under strict
-    current-base checks. Documentation and other fan-out workflows are not
-    required contexts and do not belong here.
-    """
 
     return required_gate_seconds(check_runs, required)
 
 
 def queue_delay_seconds(required_gate_end: datetime | None, merged_at: str | None) -> float | None:
-    """Wait after required-gate green until squash merge.
-
-    There is no GitHub merge queue today. This is residual auto-merge /
-    human-arm delay, not queue-service time.
-    """
 
     if required_gate_end is None or not merged_at:
         return None
@@ -698,11 +543,6 @@ def required_gate_end(check_runs: list[dict], required: tuple[str, ...] | None =
 
 
 def all_workflow_seconds(runs: list[dict]) -> float | None:
-    """Earliest run start to last completed run on the same head SHA.
-
-    In-progress or missing timestamps make the event incomplete (None).
-    Cancelled runs still close the window if they have completion stamps.
-    """
 
     starts: list[datetime] = []
     ends: list[datetime] = []
@@ -729,11 +569,6 @@ def _is_setup_step(name: object) -> bool:
 
 
 def job_setup_execution_seconds(job: dict) -> tuple[float | None, float | None, float | None]:
-    """Return (setup, execution, total) seconds for a completed job.
-
-    Cancelled, failed, or incomplete jobs return (None, None, None) so they
-    cannot enter completed-run runner-minute totals.
-    """
 
     if job.get("conclusion") != "success" or job.get("status") not in {None, "completed"}:
         return None, None, None
@@ -757,12 +592,6 @@ def job_setup_execution_seconds(job: dict) -> tuple[float | None, float | None, 
 
 
 def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
-    """Split completed/cancelled/failed runner-minutes from incomplete observations.
-
-    Failed jobs burned runners too: excluding them understates consumed
-    compute, so they get their own bucket instead of vanishing into
-    `incomplete` (reserved for jobs with no usable conclusion or duration).
-    """
 
     completed = 0.0
     cancelled = 0.0
@@ -831,7 +660,6 @@ def event_fanout_metrics(
     merged_at: str | None = None,
     required: tuple[str, ...] | None = None,
 ) -> dict:
-    """Correlate one synchronize head SHA's workflows into fan-out metrics."""
 
     gate = required_gate_seconds(check_runs, required)
     unblock = merge_unblock_seconds(check_runs, required)
@@ -854,12 +682,6 @@ def event_fanout_metrics(
 
 
 def retrieval_identities(runs: list[dict], jobs: list[dict], check_runs: list[dict]) -> dict[str, list[dict]]:
-    """Slim retrieval identities so aggregates stay replayable.
-
-    Only IDs, names, conclusions, and attempts — enough to re-fetch the
-    exact runs/jobs/checks behind any number. Full payloads would bloat the
-    baseline without adding replay power.
-    """
     return {
         "runs": [
             {"id": run.get("id"), "attempt": run.get("run_attempt"), "name": str(run.get("name") or "")}
@@ -888,13 +710,6 @@ def retrieval_identities(runs: list[dict], jobs: list[dict], check_runs: list[di
 
 
 def fetch_cohort_pr_numbers(client: GitHubClient, since_iso: str, until_iso: str) -> list[int]:
-    """Every merged develop PR number in [since, until] via date-bounded search.
-
-    The pulls list endpoint paginates by recency of update, so a single page
-    silently drops in-window merges pushed past the page edge by later
-    activity. Search by merged-date range enumerates the cohort completely;
-    a short page against total_count fails closed instead of understating.
-    """
 
     import urllib.parse
 
@@ -914,17 +729,10 @@ def fetch_cohort_pr_numbers(client: GitHubClient, since_iso: str, until_iso: str
 
 
 def pr_history_commits(client: GitHubClient, number: int) -> list[dict]:
-    """Current-history commits of the PR (each entry carries parent SHAs)."""
     return client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
 
 
 def pr_nontip_shas(commits: list[dict]) -> set[str]:
-    """Current-history SHAs that have a child in the same history.
-
-    A multi-commit push lists every commit, but only the tip ever ran CI: a
-    non-tip commit with no observable runs was never a synchronize head, so
-    it must not inflate the missing-artifact count.
-    """
     by_sha = {str(c.get("sha") or ""): c for c in commits if isinstance(c, dict)}
     children: set[str] = set()
     for commit in by_sha.values():
@@ -936,14 +744,6 @@ def pr_nontip_shas(commits: list[dict]) -> set[str]:
 
 
 def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
-    """Every current-history commit SHA of the PR, oldest first.
-
-    Force-pushed-away tips are NOT recoverable from the issue timeline
-    (verified: `committed` events mirror current history and
-    `head_ref_force_pushed` carries no before-SHA), so orphan-tip recovery
-    runs as a separate branch-runs pass documented in the baseline report
-    instead of pretending the timeline covers it.
-    """
 
     heads: list[str] = []
     for commit in pr_history_commits(client, number):
@@ -954,16 +754,6 @@ def pr_synchronize_heads(client: GitHubClient, number: int) -> list[str]:
 
 
 def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
-    """All-head fan-out for one PR, with explicit missing-artifact entries.
-
-    Returns heads (every synchronize SHA in push order), per_head fan-out
-    keyed by SHA, attempts per SHA, missing entries for heads with no
-    observable runs (expired retention or never scheduled -- censored, never
-    silently dropped), and totals that validators recompute from per-head
-    data. Speculative merge_group and post-merge runs are intentionally out
-    of scope here: runs are queried per authored head SHA, so queue-generated
-    speculative heads never enter these totals.
-    """
 
     number = pr["number"]
     commits = pr_history_commits(client, number)
@@ -1050,7 +840,6 @@ def lifecycle_for_pr(client: GitHubClient, pr: dict) -> dict:
 
 
 def _medium_budget_warning(p95_seconds: float | None) -> str | None:
-    """Return a resize warning when medium-test p95 approaches its timeout."""
     if p95_seconds is None:
         return None
     timeout_minutes = _medium_test_timeout_minutes()
@@ -1085,19 +874,10 @@ def summarize(metrics: list[PrMetrics]) -> dict:
         "fast_test_job_seconds_p95": _pct(fast_job, 95),
         "medium_test_job_seconds_avg": statistics.fmean(medium_job) if medium_job else None,
         "medium_test_job_seconds_p95": _pct(medium_job, 95),
-        # Warn while there is still room to act, rather than after a job is
-        # cancelled: a cancelled run never reports a true wall time, so the
-        # observed p95 is censored by the timeout itself and looks healthy
-        # right up to the moment the lane starts failing.
         "medium_test_budget_warning": _medium_budget_warning(_pct(medium_job, 95)),
     }
 
 
-# ---------------------------------------------------------------------------
-# Local report validators: recompute frozen report numbers from the same
-# data instead of trusting selected manual sums. These validate local JSON /
-# Markdown reports; they are not CI gates and they fetch nothing.
-# ---------------------------------------------------------------------------
 def _sha256_bytes(data: bytes) -> str:
     import hashlib
 
@@ -1105,13 +885,6 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def validate_lifecycle_baseline(lifecycle: dict, process: dict, process_digest: str) -> list[str]:
-    """Check a ci_lifecycle_baseline_v1 report against the frozen process baseline.
-
-    Verifies immutable identity completeness (every synchronize head present
-    exactly once across per_head/missing), recomputed all-head/run-attempt
-    totals, explicit missingness, and that the preregistered process criteria
-    are unchanged. Returns a list of failure strings; empty means valid.
-    """
 
     errors: list[str] = []
     if not isinstance(lifecycle, dict) or lifecycle.get("schema") != LIFECYCLE_SCHEMA:
@@ -1145,7 +918,6 @@ def validate_lifecycle_baseline(lifecycle: dict, process: dict, process_digest: 
 
 
 def _check_lifecycle_cohort(lifecycle: dict, prs: list) -> list[str]:
-    """Reconcile the declared cohort with the exact PR and gap identities."""
     errors: list[str] = []
     cohort = lifecycle.get("cohort")
     gaps = lifecycle.get("collection_gaps")
@@ -1202,7 +974,6 @@ def _check_lifecycle_cohort(lifecycle: dict, prs: list) -> list[str]:
 
 
 def _check_lifecycle_entry(entry: dict) -> list[str]:
-    """Identity completeness and recomputed totals for one lifecycle PR entry."""
 
     errors: list[str] = []
     number = entry.get("number")
@@ -1249,7 +1020,6 @@ def _check_lifecycle_totals(
     missing: list,
     totals: dict,
 ) -> list[str]:
-    """Recompute one entry's integer counts and runner-minute totals."""
 
     errors: list[str] = []
     statuses = [m.get("status") if isinstance(m, dict) else None for m in missing]
@@ -1285,12 +1055,6 @@ def _load_refresh_audit_block(audit_text: str) -> tuple[dict | None, str | None]
 
 
 def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple[str, ...]) -> list[str]:
-    """Recompute an exact-refresh audit block from the shared lifecycle baseline.
-
-    Rejects omitted/duplicate observation identities, changed windows,
-    unknown denominators, unknown reason codes, and conflated timing vs
-    identity reasons. Returns a list of failure strings; empty means valid.
-    """
 
     errors: list[str] = []
     block, block_error = _load_refresh_audit_block(audit_text)
@@ -1330,7 +1094,6 @@ def validate_refresh_audit(audit_text: str, lifecycle: dict, reason_codes: tuple
 
 
 def _check_audit_observations(observations: list, reason_codes: tuple[str, ...], errors: list[str]) -> dict[str, int]:
-    """Validate observation identities/codes; return recomputed reason counts."""
 
     seen: set[tuple] = set()
     recomputed: dict[str, int] = {}
@@ -1354,13 +1117,10 @@ def _check_audit_observations(observations: list, reason_codes: tuple[str, ...],
 
 
 def _check_audit_counts(block: dict, observations: list, recomputed: dict[str, int], errors: list[str]) -> None:
-    """Recompute reason counts and the timing-only share from observations."""
 
     claimed_counts = block.get("reason_counts") or {}
     for required_key in (REFRESH_REASON_TIMING, REFRESH_REASON_IDENTITY):
         if required_key not in claimed_counts:
-            # Counters must be reported separately even when zero so a later
-            # reader can tell timing loss from identity failure.
             errors.append(f"reason_counts must report {required_key!r} separately (zero allowed), not conflate it")
     comparable = {
         key: value
@@ -1384,7 +1144,6 @@ def _check_audit_missing(
     observations: list,
     errors: list[str],
 ) -> None:
-    """Every denominator head must be observed or explicitly missing."""
 
     observed_pairs = {(o.get("pr"), o.get("head_sha")) for o in observations if isinstance(o, dict)}
     missing = block.get("missing") or []
@@ -1399,7 +1158,6 @@ def _check_audit_missing(
 
 
 def run_validate_lifecycle_baseline(lifecycle_path: str, process_path: str) -> int:
-    """CLI entry: exit 0 only on a fully reconciled lifecycle report."""
 
     try:
         lifecycle = json.loads(Path(lifecycle_path).read_text(encoding="utf-8"))
@@ -1451,12 +1209,6 @@ def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
 
 
 def _commit_parents(commit: str) -> list[str] | None:
-    """Parent SHAs for *commit*, or None when the probe itself fails.
-
-    One successful command distinguishes "no such parent" (an empty entry)
-    from a failed probe (indeterminate), so a transient Git failure can
-    never read as a proven single-parent freeze.
-    """
     try:
         proc = subprocess.run(
             ["git", "rev-list", "--parents", "-1", commit],
@@ -1525,7 +1277,6 @@ def _commit_diff_names(base: str, commit: str) -> list[str] | None:
 
 
 def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:
-    """Registration SHAs pinned by the acceptance record stored at *commit*."""
     raw = _git_show_bytes(commit, acceptance_relpath)
     if raw is None:
         return set()
@@ -1547,15 +1298,6 @@ def validate_process_acceptance(
     acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
     published_ref: str = DEFAULT_ACCEPTANCE_PUBLISHED_REF,
 ) -> list[str]:
-    """Check the final acceptance record against the frozen preregistration.
-
-    Binds criteria version + content digest, proves the frozen file existed
-    verbatim at the recorded registration commit (freeze precedes dependent
-    implementation and the durable anchor predates the candidate branch),
-    rejects unreported cohort changes, and requires every incident replay,
-    cohort dimension, and efficiency target to pass.
-    Returns failure strings; empty means accepted.
-    """
 
     errors: list[str] = []
     if not isinstance(acceptance, dict) or acceptance.get("schema") != PROCESS_ACCEPTANCE_SCHEMA:
@@ -1581,24 +1323,6 @@ def _check_acceptance_binding(
     acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
     published_ref: str = DEFAULT_ACCEPTANCE_PUBLISHED_REF,
 ) -> list[str]:
-    """Criteria binding plus freeze-before-implementation proof.
-
-    The durable registration commit must be an ancestor of both HEAD and the
-    published protected base while
-    original_commit preserves the freeze-only boundary (they coincide when
-    no squash merge orphaned the freeze); both pointers must be full commit
-    SHAs (refs are movable) and both pinned copies must match
-    the bound digest so dropping either pointer fails closed. The original
-    commit must also be the freeze-only child of the baseline's bound
-    base_commit_at_freeze and change nothing else, so a bundled squash
-    commit cannot stand in as its own freeze proof. When the pointers
-    differ, the original SHA must additionally be anchored by published
-    history (a pointer pinned in the durable commit's own acceptance
-    record); a same-commit registration needs no indirection proof because
-    its ancestry, content, and diff already establish the freeze. Finally
-    the original must predate the durable commit, so a commit fabricated
-    after observing results cannot serve as the freeze.
-    """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
     if binding.get("criteria_version") != process.get("criteria_version"):
@@ -1646,7 +1370,6 @@ def _check_original_freeze(
     process_relpath: str,
     acceptance_relpath: str,
 ) -> list[str]:
-    """Digest, freeze-only, history-anchor, and ordering proof for the original freeze commit."""
     errors: list[str] = []
     original_frozen = _git_show_bytes(original, process_relpath)
     if original_frozen is None:
@@ -1664,7 +1387,6 @@ def _check_original_freeze(
 
 
 def _check_freeze_only_child(original: str, base_freeze: str, process_relpath: str) -> list[str]:
-    """The original must be the freeze-only child of the bound base: nothing but the baseline changes."""
     parent = _commit_parent(original)
     if parent is None:
         return [f"original registration commit {original[:12]} parent not resolvable in this tree"]
@@ -1687,7 +1409,6 @@ def _check_freeze_only_child(original: str, base_freeze: str, process_relpath: s
 
 
 def _check_history_anchor(original: str, reg_commit: str, acceptance_relpath: str) -> list[str]:
-    """A reconciled freeze SHA must be pinned by the durable commit's own acceptance record."""
     pinned = _pinned_registration_pointers(reg_commit, acceptance_relpath)
     if not pinned:
         return [
@@ -1703,7 +1424,6 @@ def _check_history_anchor(original: str, reg_commit: str, acceptance_relpath: st
 
 
 def _check_freeze_ordering(original: str, reg_commit: str) -> list[str]:
-    """The freeze must predate the durable integration commit."""
     original_ts = _commit_timestamp(original)
     reg_ts = _commit_timestamp(reg_commit)
     if original_ts is None or reg_ts is None:
@@ -1717,12 +1437,6 @@ def _check_freeze_ordering(original: str, reg_commit: str) -> list[str]:
 
 
 def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
-    """Cohort sufficiency with unreported-change rejection.
-
-    Required minimums are floors from the frozen baseline (stronger is
-    allowed, weaker is tampering); the strata set must equal the frozen set
-    exactly (no dropped or invented strata).
-    """
     errors: list[str] = []
     required_cohort = ((acceptance.get("cohort") or {}).get("required")) or {}
     observed_cohort = ((acceptance.get("cohort") or {}).get("observed")) or {}
@@ -1767,7 +1481,6 @@ def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
 
 
 def _check_delivery_receipts(deliveries: list, frozen_cohort: dict, min_deliveries: int) -> list[str]:
-    """Validate distinct, reachable delivery receipts and dependency evidence."""
     errors: list[str] = []
     batch_requirements = frozen_cohort.get("batch_deliveries") or {}
     if not isinstance(batch_requirements, dict):
@@ -1931,11 +1644,6 @@ def _check_delivery_dependencies(
 
 
 def _check_acceptance_replays(acceptance: dict, process: dict) -> list[str]:
-    """Every recorded incident replay must pass, on the frozen scenario set.
-
-    The scenario set must equal the preregistered set exactly: no dropped
-    hard replays, no invented easy ones.
-    """
     replays = acceptance.get("incident_replays") or []
     if not replays:
         return ["no incident replays recorded"]
@@ -1953,11 +1661,6 @@ def _check_acceptance_replays(acceptance: dict, process: dict) -> list[str]:
 
 
 def _check_acceptance_efficiency(acceptance: dict, process: dict) -> list[str]:
-    """Frozen avoidable-action reduction target with safety and p95 guards.
-
-    The reduction threshold comes from the frozen baseline, never from the
-    acceptance document under test.
-    """
     errors: list[str] = []
     efficiency = acceptance.get("efficiency") or {}
     baseline_actions = efficiency.get("baseline_avoidable_actions")
@@ -1981,7 +1684,6 @@ def _check_acceptance_efficiency(acceptance: dict, process: dict) -> list[str]:
 
 
 def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> int:
-    """CLI entry: exit 0 only on a fully satisfied acceptance record."""
 
     try:
         acceptance = json.loads(Path(acceptance_path).read_text(encoding="utf-8"))
@@ -2019,7 +1721,6 @@ def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> 
 
 
 def run_validate_refresh_audit(audit_path: str, baseline_path: str) -> int:
-    """CLI entry: exit 0 only on a fully reconciled refresh audit block."""
 
     try:
         audit_text = Path(audit_path).read_text(encoding="utf-8")
@@ -2047,7 +1748,6 @@ def run_validate_refresh_audit(audit_path: str, baseline_path: str) -> int:
 
 
 def load_refresh_reason_codes() -> tuple[str, ...]:
-    """Reason codes owned by scripts/pr_refresh_certification.py (single source)."""
 
     import importlib.util
 
@@ -2063,9 +1763,6 @@ def load_refresh_reason_codes() -> tuple[str, ...]:
     return tuple(str(code) for code in codes)
 
 
-# ---------------------------------------------------------------------------
-# --collect-durations: local-machine-only pytest --durations mode.
-# ---------------------------------------------------------------------------
 DURATIONS_PYTEST_CMD = [
     "uv",
     "run",
@@ -2094,9 +1791,6 @@ def run_collect_durations() -> int:
     return proc.returncode
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
@@ -2204,9 +1898,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     since = datetime.now(timezone.utc) - timedelta(days=args.days)
-    # A mid-run API failure makes every derived metric understate reality (see
-    # ApiFailure), so report the run as skipped instead of publishing a
-    # partial-but-valid-looking baseline. Mirrors the no-API-access branch above.
     try:
         prs = fetch_merged_prs(client, since)
         metrics = [collect_pr_metrics(client, pr, include_event_fanout=args.event_fanout) for pr in prs]

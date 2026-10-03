@@ -1,13 +1,6 @@
-"""Core tuning interface classes for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module defines the core interfaces for database table tuning configurations,
-including enums, dataclasses, and management classes that support serialization,
-validation, and platform-specific tuning optimizations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import hashlib
 import json
@@ -18,49 +11,28 @@ from typing import Any, Literal, Optional
 
 
 class TuningType(Enum):
-    """Enumeration of supported database tuning types.
-
-    This enum defines the different types of database optimizations that can be
-    applied to tables across different platforms.
-    """
-
-    # Table-level performance tunings
     PARTITIONING = "partitioning"
     CLUSTERING = "clustering"
     DISTRIBUTION = "distribution"
     SORTING = "sorting"
 
-    # Schema constraint tunings
     PRIMARY_KEYS = "primary_keys"
     FOREIGN_KEYS = "foreign_keys"
     UNIQUE_CONSTRAINTS = "unique_constraints"
     CHECK_CONSTRAINTS = "check_constraints"
 
-    # Platform-specific optimizations
-    Z_ORDERING = "z_ordering"  # Databricks Delta Lake
-    LIQUID_CLUSTERING = "liquid_clustering"  # Databricks Delta Lake
-    AUTO_OPTIMIZE = "auto_optimize"  # Databricks
-    AUTO_COMPACT = "auto_compact"  # Databricks
-    BLOOM_FILTERS = "bloom_filters"  # Various platforms
-    MATERIALIZED_VIEWS = "materialized_views"  # Query acceleration
+    Z_ORDERING = "z_ordering"
+    LIQUID_CLUSTERING = "liquid_clustering"
+    AUTO_OPTIMIZE = "auto_optimize"
+    AUTO_COMPACT = "auto_compact"
+    BLOOM_FILTERS = "bloom_filters"
+    MATERIALIZED_VIEWS = "materialized_views"
 
     def __str__(self) -> str:
-        """Return the string representation of the tuning type."""
         return self.value
 
     @classmethod
     def from_string(cls, value: str) -> "TuningType":
-        """Create a TuningType from a string value.
-
-        Args:
-            value: The string representation of the tuning type
-
-        Returns:
-            The corresponding TuningType enum value
-
-        Raises:
-            ValueError: If the value is not a valid tuning type
-        """
         value_lower = value.lower()
         for tuning_type in cls:
             if tuning_type.value == value_lower:
@@ -68,47 +40,12 @@ class TuningType(Enum):
         raise ValueError(f"Invalid tuning type: {value}")
 
     def is_compatible_with_platform(self, platform: str) -> bool:
-        """Check if this tuning type is compatible with the given platform.
-
-        Args:
-            platform: The canonical platform type key (e.g., 'duckdb',
-                'snowflake') -- not a human display string.
-
-        Returns:
-            True if the tuning type is supported by the platform
-        """
         platform_lower = platform.lower()
         return self in _PLATFORM_COMPATIBILITY_MAP.get(platform_lower, frozenset())
 
     @classmethod
     def is_known_platform(cls, platform: str) -> bool:
-        """Check whether `platform` has an explicit entry in the compatibility map.
-
-        A platform absent from the map (e.g. 'starrocks', 'doris', or a
-        first-class ClickHouse deployment key like 'clickhouse-local' that
-        doesn't literally match the 'clickhouse' map key) is not necessarily
-        incompatible with a tuning type -- the map simply has no opinion on
-        it. Callers use this to distinguish "genuinely unsupported on a known
-        platform" (hard error) from "no compatibility data for this platform"
-        (warning; see UnifiedTuningConfiguration.validate_for_platform_detailed).
-        """
         return platform.lower() in _KNOWN_COMPATIBILITY_PLATFORMS
-
-
-# Platform compatibility mapping, keyed by canonical platform type keys.
-# Derived from benchbox.core.tuning.capability_registry -- the single
-# capability registry introduced by the tuning-renderer-consolidation TODO --
-# rather than hand-maintained here, so this map and the registry's
-# per-platform capability entries can no longer drift apart. The import is
-# deferred to function scope (see _platform_compatibility_map below) to avoid
-# a module import cycle: capability_registry imports TuningType from this
-# module.
-#
-# Per the tuning-platform-identity-canonical-keys TODO: do not add new
-# platforms here as a side effect of fixing lookup keys -- new platforms are
-# added to capability_registry.PLATFORM_TUNING_CAPABILITIES and, if they
-# should participate in the hard-error-vs-warning distinction below, to
-# capability_registry._INTERFACE_KNOWN_PLATFORMS.
 
 
 def _platform_compatibility_map() -> dict[str, frozenset[TuningType]]:
@@ -120,18 +57,9 @@ def _platform_compatibility_map() -> dict[str, frozenset[TuningType]]:
 _PLATFORM_COMPATIBILITY_MAP: dict[str, frozenset[TuningType]] = _platform_compatibility_map()
 
 
-# Canonical platform keys with an explicit entry in the compatibility map.
-# Derived from the map so the two can never diverge; callers use it (via
-# TuningType.is_known_platform) to ask "is this platform known to the map at
-# all" without constructing a throwaway TuningType instance.
 _KNOWN_COMPATIBILITY_PLATFORMS = frozenset(_PLATFORM_COMPATIBILITY_MAP)
 
 
-# Schema-constraint tuning types. Their absence from a platform's compatibility
-# map entry is downgraded to a warning (not an error) even for known
-# platforms: constraints default to enabled=True on UnifiedTuningConfiguration,
-# so treating every platform-specific constraint gap as a hard error would
-# make the default configuration fail validation on many real platforms.
 _CONSTRAINT_TUNING_TYPES = frozenset(
     {
         TuningType.PRIMARY_KEYS,
@@ -142,56 +70,33 @@ _CONSTRAINT_TUNING_TYPES = frozenset(
 )
 
 
-# Type aliases for TuningColumn options
 SortOrderType = Literal["ASC", "DESC"]
 NullsPositionType = Literal["FIRST", "LAST", "DEFAULT"]
 
 
 @dataclass
 class TuningColumn:
-    """Represents a column used in table tuning configurations.
-
-    This dataclass defines a column that participates in table tuning,
-    including its name, type, ordering, and optional platform-specific settings.
-
-    Attributes:
-        name: Column name (valid SQL identifier).
-        type: SQL data type (e.g., 'DATE', 'INTEGER', 'VARCHAR(255)').
-        order: Position in tuning configuration (1-based, must be unique within a tuning type).
-        sort_order: Sort direction for sorting/clustering (ASC or DESC). Default: ASC.
-        nulls_position: Position of NULL values in sort order. Default: DEFAULT (platform-specific).
-        compression: Platform-specific compression/encoding (e.g., 'lzo', 'zstd', 'az64' for Redshift).
-    """
-
     name: str
-    type: str  # SQL data type (e.g., 'DATE', 'INTEGER', 'VARCHAR(255)')
+    type: str
     order: int
 
-    # Optional fields with defaults
     sort_order: SortOrderType = "ASC"
     nulls_position: NullsPositionType = "DEFAULT"
     compression: Optional[str] = None
 
     def __post_init__(self) -> None:
-        """Validate the tuning column configuration after initialization."""
         self._validate_name()
         self._validate_order()
         self._validate_sort_order()
         self._validate_nulls_position()
 
     def _validate_name(self) -> None:
-        """Validate the column name format.
-
-        Raises:
-            ValueError: If the column name is invalid
-        """
         if not self.name:
             raise ValueError("Column name cannot be empty")
 
         if not isinstance(self.name, str):
             raise ValueError("Column name must be a string")
 
-        # Check for valid SQL identifier format (alphanumeric and underscore)
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", self.name):
             raise ValueError(
                 f"Invalid column name format: '{self.name}'. "
@@ -200,11 +105,6 @@ class TuningColumn:
             )
 
     def _validate_order(self) -> None:
-        """Validate the column order value.
-
-        Raises:
-            ValueError: If the order is invalid
-        """
         if not isinstance(self.order, int):
             raise ValueError("Column order must be an integer")
 
@@ -212,39 +112,20 @@ class TuningColumn:
             raise ValueError("Column order must be a positive integer")
 
     def _validate_sort_order(self) -> None:
-        """Validate the sort order value.
-
-        Raises:
-            ValueError: If the sort order is invalid
-        """
         if self.sort_order not in ("ASC", "DESC"):
             raise ValueError(f"Invalid sort_order: '{self.sort_order}'. Must be 'ASC' or 'DESC'.")
 
     def _validate_nulls_position(self) -> None:
-        """Validate the nulls position value.
-
-        Raises:
-            ValueError: If the nulls position is invalid
-        """
         if self.nulls_position not in ("FIRST", "LAST", "DEFAULT"):
             raise ValueError(f"Invalid nulls_position: '{self.nulls_position}'. Must be 'FIRST', 'LAST', or 'DEFAULT'.")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the tuning column to a dictionary for serialization.
-
-        Only includes non-default values for optional fields to keep
-        YAML files clean.
-
-        Returns:
-            Dictionary representation of the tuning column
-        """
         result = {
             "name": self.name,
             "type": self.type,
             "order": self.order,
         }
 
-        # Only include optional fields if they differ from defaults
         if self.sort_order != "ASC":
             result["sort_order"] = self.sort_order
         if self.nulls_position != "DEFAULT":
@@ -256,17 +137,6 @@ class TuningColumn:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TuningColumn":
-        """Create a TuningColumn from a dictionary.
-
-        Args:
-            data: Dictionary containing column configuration
-
-        Returns:
-            New TuningColumn instance
-
-        Raises:
-            ValueError: If the dictionary is missing required fields
-        """
         required_fields = {"name", "type", "order"}
         missing_fields = required_fields - data.keys()
         if missing_fields:
@@ -282,7 +152,6 @@ class TuningColumn:
         )
 
 
-# Type aliases for advanced configuration options
 PartitionStrategyType = Literal["RANGE", "LIST", "HASH", "DATE"]
 PartitionGranularityType = Literal["HOURLY", "DAILY", "MONTHLY", "YEARLY"]
 SortKeyStyleType = Literal["COMPOUND", "INTERLEAVED", "AUTO"]
@@ -298,19 +167,6 @@ DatabricksPhysicalRenderingType = Literal[
 
 @dataclass
 class PartitioningConfig:
-    """Advanced partitioning configuration.
-
-    Extends basic column-based partitioning with strategy and granularity
-    options needed for platforms like BigQuery, Redshift, and Trino.
-
-    Attributes:
-        columns: List of partition columns.
-        strategy: Partitioning strategy (RANGE, LIST, HASH, DATE). Default: RANGE.
-        granularity: For DATE strategy, the time granularity. Default: None.
-        bucket_count: For HASH strategy, number of buckets. Default: None.
-        range_boundaries: For RANGE strategy, explicit boundary values. Default: None.
-    """
-
     columns: list[TuningColumn]
     strategy: PartitionStrategyType = "RANGE"
     granularity: Optional[PartitionGranularityType] = None
@@ -318,18 +174,15 @@ class PartitioningConfig:
     range_boundaries: Optional[list[Any]] = None
 
     def __post_init__(self) -> None:
-        """Validate the partitioning configuration."""
         self._validate_strategy()
         self._validate_bucket_count()
 
     def _validate_strategy(self) -> None:
-        """Validate the partitioning strategy."""
         valid_strategies = ("RANGE", "LIST", "HASH", "DATE")
         if self.strategy not in valid_strategies:
             raise ValueError(f"Invalid strategy: '{self.strategy}'. Must be one of {valid_strategies}.")
 
     def _validate_bucket_count(self) -> None:
-        """Validate bucket count for HASH strategy."""
         if (
             self.strategy == "HASH"
             and self.bucket_count is not None
@@ -338,12 +191,10 @@ class PartitioningConfig:
             raise ValueError("bucket_count must be a positive integer for HASH strategy")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         result: dict[str, Any] = {
             "columns": [col.to_dict() for col in self.columns],
         }
 
-        # Only include non-default values
         if self.strategy != "RANGE":
             result["strategy"] = self.strategy
         if self.granularity is not None:
@@ -357,7 +208,6 @@ class PartitioningConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PartitioningConfig":
-        """Create from dictionary."""
         columns = [TuningColumn.from_dict(col) for col in data.get("columns", [])]
         return cls(
             columns=columns,
@@ -370,38 +220,22 @@ class PartitioningConfig:
 
 @dataclass
 class SortKeyConfig:
-    """Advanced sort key configuration.
-
-    Extends basic sorting with style options needed for platforms like Redshift.
-
-    Attributes:
-        columns: List of sort key columns.
-        style: Sort key style (COMPOUND, INTERLEAVED, AUTO). Default: COMPOUND.
-            - COMPOUND: Best for queries using all leading columns (Redshift default).
-            - INTERLEAVED: Best for queries filtering on any column subset.
-            - AUTO: Let the platform decide (Redshift AUTO).
-    """
-
     columns: list[TuningColumn]
     style: SortKeyStyleType = "COMPOUND"
 
     def __post_init__(self) -> None:
-        """Validate the sort key configuration."""
         self._validate_style()
 
     def _validate_style(self) -> None:
-        """Validate the sort key style."""
         valid_styles = ("COMPOUND", "INTERLEAVED", "AUTO")
         if self.style not in valid_styles:
             raise ValueError(f"Invalid style: '{self.style}'. Must be one of {valid_styles}.")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         result: dict[str, Any] = {
             "columns": [col.to_dict() for col in self.columns],
         }
 
-        # Only include non-default values
         if self.style != "COMPOUND":
             result["style"] = self.style
 
@@ -409,7 +243,6 @@ class SortKeyConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SortKeyConfig":
-        """Create from dictionary."""
         columns = [TuningColumn.from_dict(col) for col in data.get("columns", [])]
         return cls(
             columns=columns,
@@ -419,25 +252,14 @@ class SortKeyConfig:
 
 @dataclass
 class ClusteringConfig:
-    """Advanced clustering configuration.
-
-    Extends basic clustering with bucket count for hash-based clustering.
-
-    Attributes:
-        columns: List of clustering columns.
-        bucket_count: Number of buckets for hash-based clustering. Default: None.
-    """
-
     columns: list[TuningColumn]
     bucket_count: Optional[int] = None
 
     def __post_init__(self) -> None:
-        """Validate the clustering configuration."""
         if self.bucket_count is not None and (not isinstance(self.bucket_count, int) or self.bucket_count <= 0):
             raise ValueError("bucket_count must be a positive integer")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         result: dict[str, Any] = {
             "columns": [col.to_dict() for col in self.columns],
         }
@@ -449,7 +271,6 @@ class ClusteringConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ClusteringConfig":
-        """Create from dictionary."""
         columns = [TuningColumn.from_dict(col) for col in data.get("columns", [])]
         return cls(
             columns=columns,
@@ -459,13 +280,6 @@ class ClusteringConfig:
 
 @dataclass
 class TableTuning:
-    """Represents the complete tuning configuration for a database table.
-
-    This dataclass holds all tuning configurations (partitioning, clustering,
-    distribution, and sorting) for a single table, along with validation
-    methods and serialization support.
-    """
-
     table_name: str
     partitioning: Optional[list[TuningColumn]] = None
     clustering: Optional[list[TuningColumn]] = None
@@ -473,24 +287,17 @@ class TableTuning:
     sorting: Optional[list[TuningColumn]] = None
 
     def __post_init__(self) -> None:
-        """Validate the table tuning configuration after initialization."""
         self._validate_table_name()
         self._validate_column_lists()
         self.validate()
 
     def _validate_table_name(self) -> None:
-        """Validate the table name format.
-
-        Raises:
-            ValueError: If the table name is invalid
-        """
         if not self.table_name:
             raise ValueError("Table name cannot be empty")
 
         if not isinstance(self.table_name, str):
             raise ValueError("Table name must be a string")
 
-        # Check for valid SQL identifier format
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", self.table_name):
             raise ValueError(
                 f"Invalid table name format: '{self.table_name}'. "
@@ -499,7 +306,6 @@ class TableTuning:
             )
 
     def _validate_column_lists(self) -> None:
-        """Validate that all column lists contain valid TuningColumn objects."""
         for tuning_type, columns in self._get_tuning_columns().items():
             if columns is not None:
                 for i, column in enumerate(columns):
@@ -507,7 +313,6 @@ class TableTuning:
                         raise ValueError(f"{tuning_type} column at index {i} must be a TuningColumn instance")
 
     def _get_tuning_columns(self) -> dict[str, Optional[list[TuningColumn]]]:
-        """Get a mapping of tuning types to their column lists."""
         return {
             "partitioning": self.partitioning,
             "clustering": self.clustering,
@@ -516,39 +321,21 @@ class TableTuning:
         }
 
     def validate(self) -> list[str]:
-        """Validate the table tuning configuration for conflicts and issues.
-
-        Returns:
-            List of validation error messages (empty if no errors)
-        """
         errors = []
 
-        # Check for empty tuning (at least one tuning type should be specified)
         if not self.has_any_tuning():
             errors.append("Table tuning must specify at least one tuning configuration")
 
-        # Check for duplicate column orders within each tuning type
         errors.extend(self._validate_column_orders())
 
-        # Check for column conflicts between tuning types
         errors.extend(self._detect_column_conflicts())
 
         return errors
 
     def has_any_tuning(self) -> bool:
-        """Check if any tuning configuration is specified.
-
-        Returns:
-            True if at least one tuning type has columns configured
-        """
         return any(columns is not None and len(columns) > 0 for columns in self._get_tuning_columns().values())
 
     def _validate_column_orders(self) -> list[str]:
-        """Validate that column orders are unique within each tuning type.
-
-        Returns:
-            List of validation error messages
-        """
         errors = []
 
         for tuning_type, columns in self._get_tuning_columns().items():
@@ -561,20 +348,13 @@ class TableTuning:
         return errors
 
     def _detect_column_conflicts(self) -> list[str]:
-        """Detect conflicts between different tuning types.
-
-        Returns:
-            List of validation error messages
-        """
         errors = []
 
-        # Get all column names used in each tuning type
         tuning_columns = {}
         for tuning_type, columns in self._get_tuning_columns().items():
             if columns is not None:
                 tuning_columns[tuning_type] = {col.name for col in columns}
 
-        # Check for columns used in multiple tuning types
         all_columns = {}
         for tuning_type, column_names in tuning_columns.items():
             for col_name in column_names:
@@ -582,7 +362,6 @@ class TableTuning:
                     all_columns[col_name] = []
                 all_columns[col_name].append(tuning_type)
 
-        # Report conflicts
         for col_name, tuning_types in all_columns.items():
             if len(tuning_types) > 1:
                 errors.append(f"Column '{col_name}' is used in multiple tuning types: {tuning_types}")
@@ -590,14 +369,6 @@ class TableTuning:
         return errors
 
     def get_columns_by_type(self, tuning_type: TuningType) -> list[TuningColumn]:
-        """Get columns for a specific tuning type.
-
-        Args:
-            tuning_type: The type of tuning to get columns for
-
-        Returns:
-            List of tuning columns for the specified type (empty if none)
-        """
         type_mapping = {
             TuningType.PARTITIONING: self.partitioning,
             TuningType.CLUSTERING: self.clustering,
@@ -609,11 +380,6 @@ class TableTuning:
         return columns if columns is not None else []
 
     def get_all_columns(self) -> set[str]:
-        """Get all column names used in any tuning configuration.
-
-        Returns:
-            Set of all column names used in tuning
-        """
         all_columns = set()
         for columns in self._get_tuning_columns().values():
             if columns is not None:
@@ -621,11 +387,6 @@ class TableTuning:
         return all_columns
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the table tuning to a dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the table tuning
-        """
         result = {"table_name": self.table_name}
 
         for tuning_type, columns in self._get_tuning_columns().items():
@@ -636,21 +397,9 @@ class TableTuning:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TableTuning":
-        """Create a TableTuning from a dictionary.
-
-        Args:
-            data: Dictionary containing table tuning configuration
-
-        Returns:
-            New TableTuning instance
-
-        Raises:
-            ValueError: If the dictionary is missing required fields
-        """
         if "table_name" not in data:
             raise ValueError("Missing required field: table_name")
 
-        # Convert column dictionaries back to TuningColumn objects
         kwargs = {"table_name": data["table_name"]}
 
         for tuning_type in ["partitioning", "clustering", "distribution", "sorting"]:
@@ -662,29 +411,15 @@ class TableTuning:
 
 @dataclass
 class BenchmarkTunings:
-    """Manages tuning configurations for all tables in a benchmark.
-
-    This class serves as a container and manager for table tuning configurations
-    across an entire benchmark, providing validation, conflict detection, and
-    serialization capabilities.
-    """
-
     benchmark_name: str
     table_tunings: dict[str, TableTuning] = field(default_factory=dict)
-    # Schema constraint configuration
     enable_primary_keys: bool = True
     enable_foreign_keys: bool = True
 
     def __post_init__(self) -> None:
-        """Validate the benchmark tunings configuration after initialization."""
         self._validate_benchmark_name()
 
     def _validate_benchmark_name(self) -> None:
-        """Validate the benchmark name format.
-
-        Raises:
-            ValueError: If the benchmark name is invalid
-        """
         if not self.benchmark_name:
             raise ValueError("Benchmark name cannot be empty")
 
@@ -692,23 +427,13 @@ class BenchmarkTunings:
             raise ValueError("Benchmark name must be a string")
 
     def add_table_tuning(self, table_tuning: TableTuning) -> None:
-        """Add a table tuning configuration to the benchmark.
-
-        Args:
-            table_tuning: The table tuning configuration to add
-
-        Raises:
-            ValueError: If the table tuning is invalid or conflicts with existing ones
-        """
         if not isinstance(table_tuning, TableTuning):
             raise ValueError("table_tuning must be a TableTuning instance")
 
-        # Validate the table tuning
         errors = table_tuning.validate()
         if errors:
             raise ValueError(f"Invalid table tuning for '{table_tuning.table_name}': {errors}")
 
-        # Check for conflicts with existing tunings
         if table_tuning.table_name in self.table_tunings:
             raise ValueError(
                 f"Table tuning already exists for '{table_tuning.table_name}'. "
@@ -718,18 +443,9 @@ class BenchmarkTunings:
         self.table_tunings[table_tuning.table_name] = table_tuning
 
     def update_table_tuning(self, table_tuning: TableTuning) -> None:
-        """Update an existing table tuning configuration.
-
-        Args:
-            table_tuning: The updated table tuning configuration
-
-        Raises:
-            ValueError: If the table tuning is invalid
-        """
         if not isinstance(table_tuning, TableTuning):
             raise ValueError("table_tuning must be a TableTuning instance")
 
-        # Validate the table tuning
         errors = table_tuning.validate()
         if errors:
             raise ValueError(f"Invalid table tuning for '{table_tuning.table_name}': {errors}")
@@ -737,74 +453,38 @@ class BenchmarkTunings:
         self.table_tunings[table_tuning.table_name] = table_tuning
 
     def get_table_tuning(self, table_name: str) -> Optional[TableTuning]:
-        """Get the tuning configuration for a specific table.
-
-        Args:
-            table_name: The name of the table
-
-        Returns:
-            The table tuning configuration, or None if not found
-        """
         return self.table_tunings.get(table_name)
 
     def remove_table_tuning(self, table_name: str) -> bool:
-        """Remove the tuning configuration for a specific table.
-
-        Args:
-            table_name: The name of the table
-
-        Returns:
-            True if the table tuning was removed, False if it didn't exist
-        """
         if table_name in self.table_tunings:
             del self.table_tunings[table_name]
             return True
         return False
 
     def get_table_names(self) -> list[str]:
-        """Get a list of all table names with tuning configurations.
-
-        Returns:
-            Sorted list of table names
-        """
         return sorted(self.table_tunings.keys())
 
     def disable_primary_keys(self) -> None:
-        """Disable primary key constraints for all tables."""
         self.enable_primary_keys = False
 
     def disable_foreign_keys(self) -> None:
-        """Disable foreign key constraints for all tables."""
         self.enable_foreign_keys = False
 
     def enable_all_constraints(self) -> None:
-        """Enable both primary key and foreign key constraints."""
         self.enable_primary_keys = True
         self.enable_foreign_keys = True
 
     def disable_all_constraints(self) -> None:
-        """Disable both primary key and foreign key constraints."""
         self.enable_primary_keys = False
         self.enable_foreign_keys = False
 
     def get_constraint_status(self) -> dict[str, bool]:
-        """Get the current constraint configuration status.
-
-        Returns:
-            Dictionary with constraint types and their enabled status
-        """
         return {
             "primary_keys": self.enable_primary_keys,
             "foreign_keys": self.enable_foreign_keys,
         }
 
     def validate_all(self) -> dict[str, list[str]]:
-        """Validate all table tuning configurations in the benchmark.
-
-        Returns:
-            Dictionary mapping table names to lists of validation errors
-            (empty lists for tables with no errors)
-        """
         validation_results = {}
 
         for table_name, table_tuning in self.table_tunings.items():
@@ -813,27 +493,12 @@ class BenchmarkTunings:
         return validation_results
 
     def has_valid_tunings(self) -> bool:
-        """Check if all table tunings are valid.
-
-        Returns:
-            True if all table tunings are valid
-        """
         validation_results = self.validate_all()
         return all(len(errors) == 0 for errors in validation_results.values())
 
     def get_configuration_hash(self) -> str:
-        """Generate a hash of the entire tuning configuration.
-
-        This hash can be used to detect changes in tuning configuration
-        and validate database compatibility.
-
-        Returns:
-            SHA-256 hash of the serialized tuning configuration
-        """
-        # Create a consistent serialization for hashing
         config_dict = self.to_dict()
 
-        # Sort keys for consistent hashing
         import json
 
         config_json = json.dumps(config_dict, sort_keys=True, separators=(",", ":"))
@@ -841,11 +506,6 @@ class BenchmarkTunings:
         return hashlib.sha256(config_json.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the benchmark tunings to a dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the benchmark tunings
-        """
         return {
             "benchmark_name": self.benchmark_name,
             "table_tunings": {
@@ -857,21 +517,9 @@ class BenchmarkTunings:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BenchmarkTunings":
-        """Create a BenchmarkTunings from a dictionary.
-
-        Args:
-            data: Dictionary containing benchmark tunings configuration
-
-        Returns:
-            New BenchmarkTunings instance
-
-        Raises:
-            ValueError: If the dictionary is missing required fields
-        """
         if "benchmark_name" not in data:
             raise ValueError("Missing required field: benchmark_name")
 
-        # Extract constraint settings with defaults
         enable_primary_keys = data.get("enable_primary_keys", True)
         enable_foreign_keys = data.get("enable_foreign_keys", True)
 
@@ -889,43 +537,33 @@ class BenchmarkTunings:
         return benchmark_tunings
 
     def __len__(self) -> int:
-        """Return the number of table tunings in the benchmark."""
         return len(self.table_tunings)
 
     def __contains__(self, table_name: str) -> bool:
-        """Check if a table has tuning configuration."""
         return table_name in self.table_tunings
 
     def __iter__(self):
-        """Iterate over table names with tuning configurations."""
         return iter(self.table_tunings)
 
 
 @dataclass
 class ConstraintConfiguration:
-    """Base class for constraint configurations."""
-
     enabled: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {"enabled": self.enabled}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ConstraintConfiguration":
-        """Create from dictionary."""
         return cls(enabled=data.get("enabled", True))
 
 
 @dataclass
 class PrimaryKeyConfiguration(ConstraintConfiguration):
-    """Configuration for primary key constraints."""
-
     enforce_uniqueness: bool = True
     nullable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {
             "enabled": self.enabled,
             "enforce_uniqueness": self.enforce_uniqueness,
@@ -934,7 +572,6 @@ class PrimaryKeyConfiguration(ConstraintConfiguration):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PrimaryKeyConfiguration":
-        """Create from dictionary."""
         return cls(
             enabled=data.get("enabled", True),
             enforce_uniqueness=data.get("enforce_uniqueness", True),
@@ -944,14 +581,11 @@ class PrimaryKeyConfiguration(ConstraintConfiguration):
 
 @dataclass
 class ForeignKeyConfiguration(ConstraintConfiguration):
-    """Configuration for foreign key constraints."""
-
     enforce_referential_integrity: bool = True
-    on_delete_action: str = "RESTRICT"  # RESTRICT, CASCADE, SET NULL, SET DEFAULT
+    on_delete_action: str = "RESTRICT"
     on_update_action: str = "RESTRICT"
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {
             "enabled": self.enabled,
             "enforce_referential_integrity": self.enforce_referential_integrity,
@@ -961,7 +595,6 @@ class ForeignKeyConfiguration(ConstraintConfiguration):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ForeignKeyConfiguration":
-        """Create from dictionary."""
         return cls(
             enabled=data.get("enabled", True),
             enforce_referential_integrity=data.get("enforce_referential_integrity", True),
@@ -972,17 +605,13 @@ class ForeignKeyConfiguration(ConstraintConfiguration):
 
 @dataclass
 class UniqueConstraintConfiguration(ConstraintConfiguration):
-    """Configuration for unique constraints."""
-
     ignore_nulls: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {"enabled": self.enabled, "ignore_nulls": self.ignore_nulls}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "UniqueConstraintConfiguration":
-        """Create from dictionary."""
         return cls(
             enabled=data.get("enabled", True),
             ignore_nulls=data.get("ignore_nulls", False),
@@ -991,13 +620,10 @@ class UniqueConstraintConfiguration(ConstraintConfiguration):
 
 @dataclass
 class CheckConstraintConfiguration(ConstraintConfiguration):
-    """Configuration for check constraints."""
-
     enforce_on_insert: bool = True
     enforce_on_update: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {
             "enabled": self.enabled,
             "enforce_on_insert": self.enforce_on_insert,
@@ -1006,7 +632,6 @@ class CheckConstraintConfiguration(ConstraintConfiguration):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "CheckConstraintConfiguration":
-        """Create from dictionary."""
         return cls(
             enabled=data.get("enabled", True),
             enforce_on_insert=data.get("enforce_on_insert", True),
@@ -1016,15 +641,10 @@ class CheckConstraintConfiguration(ConstraintConfiguration):
 
 @dataclass
 class PlatformOptimizationConfiguration:
-    """Configuration for platform-specific optimizations."""
-
     z_ordering_enabled: bool = False
     z_ordering_columns: list[str] = field(default_factory=list)
     liquid_clustering_enabled: bool = False
     liquid_clustering_columns: list[str] = field(default_factory=list)
-    # No clustering is requested unless stated: pair z_ordering_enabled/columns
-    # with databricks_clustering_strategy="z_order" (via from_dict inference or
-    # enable_platform_optimization), since "none" rejects layout fields.
     databricks_clustering_strategy: DatabricksClusteringStrategyType = "none"
     physical_rendering_id: Optional[DatabricksPhysicalRenderingType] = None
     sorted_ingestion_mode: SortedIngestionModeType = "off"
@@ -1036,7 +656,6 @@ class PlatformOptimizationConfiguration:
     materialized_views_enabled: bool = False
 
     def __post_init__(self) -> None:
-        """Validate strategy fields for deterministic tuning behavior."""
         valid_modes = {"off", "auto", "force"}
         valid_methods = {"auto", "ctas", "z_order", "hilbert", "liquid_clustering", "vacuum_sort"}
         valid_dbx_strategies = {"z_order", "liquid_clustering", "liquid_clustering_auto", "none"}
@@ -1106,10 +725,6 @@ class PlatformOptimizationConfiguration:
                 "or 'liquid_clustering_auto' for CLUSTER BY AUTO."
             )
 
-        # physical_rendering_id, when set, must agree with the resolved clustering strategy. The reporter
-        # (resolve_physical_rendering_id) prefers this field while the executor
-        # (_resolve_databricks_clustering_strategy) reads the strategy/flags, so a mismatch would let result JSON
-        # claim a rendering identity the adapter never applied.
         if self.physical_rendering_id == "databricks_liquid_auto" and (
             self.databricks_clustering_strategy != "liquid_clustering_auto"
         ):
@@ -1130,7 +745,6 @@ class PlatformOptimizationConfiguration:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         result = {
             "z_ordering_enabled": self.z_ordering_enabled,
             "z_ordering_columns": self.z_ordering_columns,
@@ -1151,7 +765,6 @@ class PlatformOptimizationConfiguration:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PlatformOptimizationConfiguration":
-        """Create from dictionary."""
         sorted_ingestion_mode = data.get("sorted_ingestion_mode", data.get("deep_sort_mode", "off"))
         sorted_ingestion_method = data.get("sorted_ingestion_method", data.get("deep_sort_method", "auto"))
         strategy = data.get("databricks_clustering_strategy")
@@ -1180,22 +793,12 @@ class PlatformOptimizationConfiguration:
         )
 
 
-# Platform-specific "effective layout" validators: cross-field checks that
-# need the *entire* tuning config (not just one tuning type against one
-# platform's compatibility set -- see validate_for_platform_detailed above).
-# Per the tuning-renderer-consolidation TODO's w4, this module stays a pure
-# data model; platform-specific validation logic lives in the platform layer
-# (e.g. benchbox.platforms.databricks.tuning_validation) and is reached
-# through this small dispatch hook instead of being implemented here. Maps
-# canonical platform key -> "module.path:function_name"; the function must
-# accept a UnifiedTuningConfiguration and return a list of error strings.
 _PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS: dict[str, str] = {
     "databricks": "benchbox.platforms.databricks.tuning_validation:validate_effective_layout",
 }
 
 
 def _get_effective_layout_validator(platform_key: str):
-    """Resolve the effective-layout validator callable for a platform key, if any."""
     target = _PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS.get(platform_key)
     if target is None:
         return None
@@ -1209,67 +812,39 @@ def _get_effective_layout_validator(platform_key: str):
 
 @dataclass
 class UnifiedTuningConfiguration:
-    """Unified configuration that consolidates all tuning options.
-
-    This class provides a single interface for managing all types of database tunings:
-    - Table-level performance tunings (partitioning, clustering, distribution, sorting)
-    - Schema constraints (primary keys, foreign keys, unique constraints, check constraints)
-    - Platform-specific optimizations (Z-ordering, auto-optimize, bloom filters, etc.)
-    """
-
-    # Schema constraints
     primary_keys: PrimaryKeyConfiguration = field(default_factory=PrimaryKeyConfiguration)
     foreign_keys: ForeignKeyConfiguration = field(default_factory=ForeignKeyConfiguration)
     unique_constraints: UniqueConstraintConfiguration = field(default_factory=UniqueConstraintConfiguration)
     check_constraints: CheckConstraintConfiguration = field(default_factory=CheckConstraintConfiguration)
 
-    # Platform-specific optimizations
     platform_optimizations: PlatformOptimizationConfiguration = field(default_factory=PlatformOptimizationConfiguration)
 
-    # Table tunings
     table_tunings: dict[str, TableTuning] = field(default_factory=dict)
 
     def enable_all_constraints(self) -> None:
-        """Enable all schema constraints."""
         self.primary_keys.enabled = True
         self.foreign_keys.enabled = True
         self.unique_constraints.enabled = True
         self.check_constraints.enabled = True
 
     def disable_all_constraints(self) -> None:
-        """Disable all schema constraints."""
         self.primary_keys.enabled = False
         self.foreign_keys.enabled = False
         self.unique_constraints.enabled = False
         self.check_constraints.enabled = False
 
     def enable_primary_keys(self) -> None:
-        """Enable primary key constraints."""
         self.primary_keys.enabled = True
 
     def disable_primary_keys(self) -> None:
-        """Disable primary key constraints."""
         self.primary_keys.enabled = False
 
     def enable_foreign_keys(self) -> None:
-        """Enable foreign key constraints."""
         self.foreign_keys.enabled = True
 
     def disable_foreign_keys(self) -> None:
-        """Disable foreign key constraints."""
         self.foreign_keys.enabled = False
 
-    # Table-layout tuning types recorded through table_tunings entries.
-    # The wizard confirms these choices per platform (Snowflake clustering,
-    # BigQuery partitioning/clustering, Redshift distribution/sort keys,
-    # DuckDB and ClickHouse partitioning/sorting) but historically routed them
-    # through this method, which only stored platform-optimization flags and
-    # silently dropped them. Callers may pass explicit `columns` (a list of
-    # TuningColumn, or of names that resolve to UNKNOWN-typed columns) to
-    # record a real table entry; without columns the choice is still
-    # recorded as an enabled type via a benchmark-aware default entry built
-    # from the packaged tuned templates, so a confirmed choice is never
-    # silently lost.
     _TABLE_LAYOUT_TYPES = frozenset(
         {
             TuningType.PARTITIONING,
@@ -1287,29 +862,9 @@ class UnifiedTuningConfiguration:
         table_name: Optional[str] = None,
         **kwargs,
     ) -> None:
-        """Enable a specific platform optimization.
-
-        Table-layout types (partitioning, clustering, distribution, sorting)
-        are recorded as entries in ``table_tunings`` so the choice persists
-        in ``to_dict()`` and ``get_enabled_tuning_types()``. When ``columns``
-        are given they are used verbatim (TuningColumn objects) or resolved
-        from plain names with ``UNKNOWN`` type; otherwise a benchmark-aware
-        default entry is built from the packaged tuned template for
-        ``benchmark`` (falling back to the TPC-H layout).
-
-        Args:
-            optimization_type: The type of optimization to enable
-            benchmark: Benchmark name used to resolve default table layouts
-            columns: Optional TuningColumn list (or plain column names)
-            table_name: Optional table to attach the layout to
-            **kwargs: Additional configuration parameters
-        """
         if optimization_type in self._TABLE_LAYOUT_TYPES:
             self._enable_table_layout(optimization_type, benchmark=benchmark, columns=columns, table_name=table_name)
             return
-        # `columns` is an explicit named parameter (used by the table-layout
-        # path above); platform optimizations historically read it from
-        # kwargs, so honor both spellings here.
         column_values = columns if columns is not None else kwargs.get("columns")
         if optimization_type == TuningType.Z_ORDERING:
             self.platform_optimizations.z_ordering_enabled = True
@@ -1339,16 +894,6 @@ class UnifiedTuningConfiguration:
         columns: Optional[list[Any]] = None,
         table_name: Optional[str] = None,
     ) -> None:
-        """Record a table-layout choice as a ``table_tunings`` entry.
-
-        Explicit ``columns`` (TuningColumn objects, ``{"name": ...}`` dicts,
-        or plain names resolved with ``UNKNOWN`` type) attach to ``table_name``
-        (or the benchmark default table). Without columns, the default layout
-        for ``benchmark`` is applied from the packaged tuned template,
-        falling back to the TPC-H layout. Existing entries merge: the new
-        layout type overwrites that slot on the target table while other
-        slots are preserved.
-        """
         slot = layout_type.value
         resolved_columns = self._resolve_layout_columns(columns)
         if resolved_columns:
@@ -1357,17 +902,12 @@ class UnifiedTuningConfiguration:
             return
         targets = self._default_layout_targets(layout_type, benchmark, table_name)
         if not targets:
-            # No template for this benchmark carries a usable layout (e.g. a
-            # benchmark with no packaged template at all): decline to invent a
-            # foreign table entry rather than persisting a choice the adapter
-            # cannot apply.
             return
         for target_table, entry_columns in targets.items():
             self._record_layout_slot(target_table, slot, list(entry_columns))
 
     @staticmethod
     def _resolve_layout_columns(columns: Optional[list[Any]]) -> list[TuningColumn]:
-        """Normalize caller-supplied layout columns to TuningColumn objects."""
         if not columns:
             return []
         resolved: list[TuningColumn] = []
@@ -1385,7 +925,6 @@ class UnifiedTuningConfiguration:
 
     @staticmethod
     def _read_template_table_tunings(benchmark: str) -> dict[str, Any]:
-        """Load the packaged duckdb tuned template's table tunings for a benchmark."""
         from benchbox.core.tuning.packaged_templates import packaged_template_path
 
         template = packaged_template_path("duckdb", benchmark.lower())
@@ -1404,7 +943,6 @@ class UnifiedTuningConfiguration:
 
     @staticmethod
     def _first_template_column(entry: Any) -> list[TuningColumn]:
-        """First layout column of a template table entry, reordered to 1."""
         if isinstance(entry, dict):
             for slot in ("partitioning", "clustering", "distribution", "sorting"):
                 raw = entry.get(slot) or []
@@ -1415,7 +953,6 @@ class UnifiedTuningConfiguration:
         return []
 
     def _record_layout_slot(self, target_table: str, slot: str, entry_columns: list[TuningColumn]) -> None:
-        """Write one layout slot onto one table, preserving other slots."""
         existing = self.table_tunings.get(target_table)
         if existing is not None:
             setattr(existing, slot, list(entry_columns))
@@ -1425,7 +962,6 @@ class UnifiedTuningConfiguration:
 
     @staticmethod
     def _explicit_layout_table(benchmark: str, table_name: Optional[str]) -> str:
-        """Resolve the target table for explicit caller-supplied columns."""
         table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark)
         ordered = sorted(table_tunings) if table_tunings else []
         if table_name is not None:
@@ -1441,13 +977,6 @@ class UnifiedTuningConfiguration:
         benchmark: str,
         table_name: Optional[str],
     ) -> dict[str, list[TuningColumn]]:
-        """Resolve default tables and columns for a layout type.
-
-        Applies the choice to every benchmark-template table carrying the
-        slot (not just the first), so a global TPC-H sorting choice reaches
-        all six tuned tables. Benchmarks with no packaged template resolve
-        to no targets, declining to substitute another benchmark's schema.
-        """
         table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark.lower())
         if not table_tunings:
             return {}
@@ -1478,14 +1007,6 @@ class UnifiedTuningConfiguration:
         return targets
 
     def disable_platform_optimization(self, optimization_type: TuningType) -> None:
-        """Disable a specific platform optimization.
-
-        Table-layout types clear their ``table_tunings`` slot across all
-        tables, dropping tables left with no tuning at all.
-
-        Args:
-            optimization_type: The type of optimization to disable
-        """
         if optimization_type in self._TABLE_LAYOUT_TYPES:
             slot = optimization_type.value
             for table_name in list(self.table_tunings):
@@ -1532,11 +1053,6 @@ class UnifiedTuningConfiguration:
     ]
 
     def get_enabled_tuning_types(self) -> set[TuningType]:
-        """Get all currently enabled tuning types.
-
-        Returns:
-            Set of enabled TuningType values
-        """
         enabled_types: set[TuningType] = set()
 
         for attr, tt in self._CONSTRAINT_CHECKS:
@@ -1553,42 +1069,10 @@ class UnifiedTuningConfiguration:
         return enabled_types
 
     def validate_for_platform(self, platform: str) -> list[str]:
-        """Validate configuration against platform capabilities.
-
-        Args:
-            platform: Target platform name (expects a canonical platform type
-                key, e.g. 'duckdb', 'clickhouse-local' -- not a human display
-                string like 'ClickHouse (Local)').
-
-        Returns:
-            List of validation error messages. Constraint-type mismatches and
-            mismatches on platforms absent from the compatibility map are
-            downgraded to warnings and are NOT included here -- call
-            `validate_for_platform_detailed` to see them.
-        """
         errors, _warnings = self.validate_for_platform_detailed(platform)
         return errors
 
     def validate_for_platform_detailed(self, platform: str) -> tuple[list[str], list[str]]:
-        """Validate configuration against platform capabilities, split by severity.
-
-        Table-layout and platform-specific tuning types (partitioning,
-        clustering, distribution, sorting, z-ordering, etc.) are hard errors
-        only when `platform` has an explicit entry in TuningType's
-        compatibility map AND the type is genuinely unsupported there.
-        Schema-constraint types (primary/foreign keys, unique/check
-        constraints) are always downgraded to warnings, since constraints
-        default to enabled=True and the compatibility map is not exhaustive
-        per-constraint. Any tuning type mismatch on a platform absent from the
-        map is also a warning: an unmapped platform is missing compatibility
-        data, not proven incompatible.
-
-        Args:
-            platform: Target platform name (canonical platform type key).
-
-        Returns:
-            Tuple of (errors, warnings) validation message lists.
-        """
         errors: list[str] = []
         warnings: list[str] = []
         enabled_types = self.get_enabled_tuning_types()
@@ -1611,7 +1095,6 @@ class UnifiedTuningConfiguration:
         return errors, warnings
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
         return {
             "primary_keys": self.primary_keys.to_dict(),
             "foreign_keys": self.foreign_keys.to_dict(),
@@ -1624,36 +1107,13 @@ class UnifiedTuningConfiguration:
         }
 
     def get_configuration_hash(self) -> str:
-        """Canonical SHA-256 hash of the requested tuning configuration.
-
-        Per ADR-1 (docs/development/tuning-adr-001-trust-and-hash-semantics.md),
-        this is ``requested_config_hash``: a full 64-hex-character SHA-256 over
-        ``to_dict()`` serialized as JSON with ``sort_keys=True`` and compact
-        separators, so two runs requesting the same template hash identically
-        regardless of platform or dict insertion order. This is the
-        platform-independent *requested* template identity - it does not
-        certify what was physically applied (see the separate, not-yet-built
-        applied-ledger hash).
-
-        Returns:
-            64-character lowercase hex SHA-256 digest.
-        """
         canonical_json = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "UnifiedTuningConfiguration":
-        """Create from dictionary.
-
-        Args:
-            data: Dictionary containing configuration data
-
-        Returns:
-            New UnifiedTuningConfiguration instance
-        """
         instance = cls()
 
-        # Load constraint configurations
         if "primary_keys" in data:
             instance.primary_keys = PrimaryKeyConfiguration.from_dict(data["primary_keys"])
         if "foreign_keys" in data:
@@ -1663,21 +1123,15 @@ class UnifiedTuningConfiguration:
         if "check_constraints" in data:
             instance.check_constraints = CheckConstraintConfiguration.from_dict(data["check_constraints"])
 
-        # Load platform optimizations
         if "platform_optimizations" in data:
             instance.platform_optimizations = PlatformOptimizationConfiguration.from_dict(
                 data["platform_optimizations"]
             )
 
-        # Load table tunings
         if "table_tunings" in data:
             for table_name, table_data in data["table_tunings"].items():
                 instance.table_tunings[table_name] = TableTuning.from_dict(table_data)
 
-        # A template that names per-table clustering/distribution columns without
-        # stating a strategy still drives ZORDER BY in the executor, so infer
-        # "z_order" to keep the reported strategy consistent with what applies.
-        # An explicitly stated strategy is always respected.
         platform_data = data.get("platform_optimizations", {})
         if (
             "databricks_clustering_strategy" not in platform_data

@@ -64,7 +64,8 @@ jobs:
         shell: bash
         run: |
           # Read ledger head from the branch — fail-closed if not present
-          LEDGER_CONTENT=$(git show published-results:publication/ledger.json 2>/dev/null || echo "")
+          LEDGER_CONTENT=$(git show published-results:publication/ledger.json 2>/dev/null || echo ""
+          )
           if [ -z "$LEDGER_CONTENT" ]; then
             echo "::error::publication/ledger.json not found on published-results branch"
             echo "ledger_head_sha=" >> "$GITHUB_OUTPUT"
@@ -84,7 +85,8 @@ jobs:
           except (json.JSONDecodeError, KeyError):
               print('', end='')
               sys.exit(1)
-          " || echo "")
+          " || echo ""
+          )
 
           if [ -z "$LEDGER_SHA" ]; then
             echo "::error::ledger_head_sha not found or empty in publication/ledger.json"

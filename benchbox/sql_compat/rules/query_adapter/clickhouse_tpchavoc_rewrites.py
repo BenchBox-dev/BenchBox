@@ -1,5 +1,3 @@
-"""Document ClickHouse TPC-Havoc query rewrites."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.dialect_compat import CLICKHOUSE_FILTER_VARIANT_IDS

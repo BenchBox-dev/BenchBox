@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
-"""Check that the bundled TPC-DS generators agree across platforms.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Each platform ships its own dsdgen and dsqgen binary (``benchbox/_binaries/tpc-ds/<platform>/``).
-``scripts/bundled_binary_manifest.py`` pins the bytes of those binaries; this script checks what
-they produce, because a DataFrame-versus-SQL comparison that diverges on one machine and not another
-cannot be debugged without knowing whether the data and the query parameters are the same.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-Two commands:
-
-``manifest``
-    Generate data at a small scale and record, per table, the row count, byte size and sha256 of the
-    raw ``.dat`` file; and, for every query, the substitution values dsqgen reports with ``-LOG`` for a
-    pinned seed plus the sha256 of the rendered SQL. Written as JSON, with the platform and the sha256
-    of each binary (informational: they differ by design).
-
-``compare``
-    Compare two or more manifests. Exit 1 if any table checksum, row count, parameter value or SQL
-    hash differs, or if the manifests were not built with the same scale factor and seed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -43,8 +23,6 @@ DEFAULT_SCALE_FACTOR = 0.01
 DEFAULT_SEED = 7
 QUERY_IDS = tuple(range(1, 100))
 _CHUNK = 1 << 20
-# dbgen_version records the generation date and time, so its checksum changes on every run of the same
-# binary. Only its row count is compared.
 VOLATILE_TABLES = frozenset({"dbgen_version"})
 
 
@@ -57,7 +35,6 @@ def sha256_file(path: Path) -> str:
 
 
 def table_entry(path: Path) -> dict[str, Any]:
-    """Row count, size and checksum of one raw dsdgen output file."""
     data = path.read_bytes()
     return {"rows": data.count(b"\n"), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
@@ -70,7 +47,6 @@ def generate_tables(scale_factor: float, output_dir: Path) -> dict[str, dict[str
 
 
 def query_entries(dsqgen: Any, scale_factor: float, seed: int, query_ids: Iterable[int]) -> dict[str, dict[str, Any]]:
-    """Per query: the dsqgen -LOG substitutions and the sha256 of the rendered SQL for a pinned seed."""
     entries: dict[str, dict[str, Any]] = {}
     for query_id in query_ids:
         logged = dsqgen.generate_parameter_log(query_id, seed=seed, scale_factor=scale_factor)
@@ -120,7 +96,6 @@ def _diff_table(name: str, reference: dict[str, Any], other: dict[str, Any]) -> 
 
 
 def compare_manifests(manifests: dict[str, dict[str, Any]]) -> list[str]:
-    """Differences between the first manifest (by name) and each of the others."""
     names = sorted(manifests)
     if len(names) < 2:
         return ["need at least two manifests to compare"]

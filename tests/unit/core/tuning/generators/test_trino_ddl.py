@@ -1,15 +1,6 @@
-"""Unit tests for Trino/Presto/Athena DDL Generators.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the TrinoDDLGenerator and AthenaDDLGenerator for:
-- Hive connector partitioning and bucketing
-- Iceberg connector partition transforms
-- Athena EXTERNAL TABLE syntax
-- WITH clause property generation
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,8 +25,6 @@ pytestmark = [
 
 
 class TestTrinoDDLGeneratorBasics:
-    """Tests for TrinoDDLGenerator basic properties."""
-
     def test_platform_name(self) -> None:
 
         generator = TrinoDDLGenerator()
@@ -59,8 +48,6 @@ class TestTrinoDDLGeneratorBasics:
 
 
 class TestHiveConnectorPartitioning:
-    """Tests for Hive connector partitioning and bucketing."""
-
     def test_basic_partitioning(self) -> None:
 
         generator = TrinoDDLGenerator(connector=ConnectorType.HIVE)
@@ -125,8 +112,6 @@ class TestHiveConnectorPartitioning:
 
 
 class TestIcebergConnectorPartitioning:
-    """Tests for Iceberg connector partition transforms."""
-
     def test_date_partition_transform(self) -> None:
 
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
@@ -135,19 +120,16 @@ class TestIcebergConnectorPartitioning:
             partitioning=[TuningColumn(name="event_date", type="DATE", order=1)],
         )
         clauses = generator.generate_tuning_clauses(table_tuning)
-        # Should use month transform for date columns by default
         assert "partitioning" in clauses.table_properties
         assert "month(event_date)" in clauses.table_properties["partitioning"]
 
     def test_non_date_partition(self) -> None:
-        """Test Iceberg partition for non-date columns (identity transform)."""
         generator = TrinoDDLGenerator(connector=ConnectorType.ICEBERG)
         table_tuning = TableTuning(
             table_name="orders",
             partitioning=[TuningColumn(name="region", type="VARCHAR", order=1)],
         )
         clauses = generator.generate_tuning_clauses(table_tuning)
-        # Should use identity transform (just column name)
         assert clauses.table_properties["partitioning"] == "ARRAY['region']"
 
     def test_iceberg_sorted_by(self) -> None:
@@ -175,8 +157,6 @@ class TestIcebergConnectorPartitioning:
 
 
 class TestDeltaConnector:
-    """Tests for Delta Lake connector."""
-
     def test_delta_partitioning(self) -> None:
 
         generator = TrinoDDLGenerator(connector=ConnectorType.DELTA)
@@ -198,8 +178,6 @@ class TestDeltaConnector:
 
 
 class TestFileFormat:
-    """Tests for file format handling."""
-
     def test_default_parquet_format(self) -> None:
 
         generator = TrinoDDLGenerator()
@@ -214,8 +192,6 @@ class TestFileFormat:
 
 
 class TestCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
 
         generator = TrinoDDLGenerator()
@@ -271,8 +247,6 @@ class TestCreateTableDDL:
 
 
 class TestAthenaDDLGenerator:
-    """Tests for AthenaDDLGenerator."""
-
     def test_platform_name(self) -> None:
 
         generator = AthenaDDLGenerator()
@@ -302,8 +276,6 @@ class TestAthenaDDLGenerator:
 
 
 class TestEnums:
-    """Tests for enum definitions."""
-
     def test_connector_type_values(self) -> None:
 
         assert ConnectorType.HIVE.value == "hive"

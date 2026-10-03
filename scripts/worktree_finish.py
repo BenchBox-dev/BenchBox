@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""Single-target worktree finish preview with optional separately-gated apply.
-
-Revalidates structural, ownership, cleanliness, exact PR, base, head,
-merge-commit, and remote evidence at invocation time.
-
-Default mode is a read-only preview: never mutates Git state, never removes
-worktrees, never deletes refs. Apply mode (``--apply``) executes exactly the
-two proposed commands -- normal ``git worktree remove`` on the canonical
-path, then ``git update-ref -d`` on the local branch with the expected OID --
-after re-evaluating fresh evidence in the same invocation. Any hold, any
-branch movement, or any partial failure stops the sequence and reports
-partial success explicitly.
-
-Guarantees:
-- Single-target: accepts exactly one canonical worktree path and expected full OID.
-- Fail-closed: incomplete collection, API errors, dirty states, and ambiguous
-  ownership resolve to an explicit hold state.
-- Apply is separately gated: preview stays the default; ``--apply`` must be
-  passed explicitly on the command line for any mutation.
-"""
 
 from __future__ import annotations
 
@@ -62,18 +42,16 @@ HEX_40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 class FinishError(RuntimeError):
-    """Raised when argument validation or operational preconditions fail."""
+    pass
 
 
 @dataclasses.dataclass(frozen=True)
 class FinishPreviewResult:
-    """Bounded preview result for a single worktree target."""
-
     target_path: str
     branch: Optional[str]
     current_head: Optional[str]
     expected_head: str
-    status: str  # "actionable" | "hold"
+    status: str
     hold_reason: Optional[str]
     provenance_state: str
     owner_state: str
@@ -98,22 +76,9 @@ def apply_finish_actions(
     res: FinishPreviewResult,
     repo_root: Path,
 ) -> Tuple[bool, Optional[str], List[Dict[str, str]]]:
-    """Execute the two proposed finish commands for an actionable preview.
-
-    Re-checks the branch tip against the expected OID immediately before
-    mutating: if the branch moved, no mutation runs. Executes normal
-    ``git worktree remove`` on the canonical path first, then
-    ``git update-ref -d`` on the local branch with the expected old OID.
-    Returns ``(worktree_removed, branch_deleted, executed)`` where each
-    entry records the command and its outcome; a moved branch or a failed
-    removal stops the sequence and preserves partial success explicitly.
-    """
     executed: List[Dict[str, str]] = []
     if res.status != "actionable" or not res.branch:
         return False, None, executed
-    # Resolve a surviving cwd BEFORE mutating: when invoked from inside the
-    # target worktree, `git worktree remove` deletes that cwd, so the later
-    # ref deletion must run from the common repository dir instead.
     code, common_dir, stderr = _run_git(["rev-parse", "--git-common-dir"], repo_root)
     if code != 0:
         executed.append(
@@ -159,7 +124,6 @@ def apply_finish_actions(
 
 
 def format_apply_report(executed: List[Dict[str, str]]) -> str:
-    """Render a bounded human report of executed apply actions."""
     lines = ["Apply actions executed:"]
     for idx, act in enumerate(executed, 1):
         lines.append(f"  {idx}. [{act.get('action')}] {act.get('command')}")
@@ -173,7 +137,6 @@ def _run_git(args: List[str], cwd: Path) -> Tuple[int, str, str]:
 
 
 def validate_inputs(worktree_path_str: str, expected_oid_str: str) -> Tuple[Path, str]:
-    """Validate that target path and expected OID are strictly single-target and well-formed."""
     clean_path = worktree_path_str.strip()
     if not clean_path:
         raise FinishError("Worktree path cannot be empty")
@@ -195,7 +158,6 @@ def validate_inputs(worktree_path_str: str, expected_oid_str: str) -> Tuple[Path
 
 
 def load_canned_evidence(evidence_file: Path) -> List[Dict[str, Any]]:
-    """Load offline PR evidence for test fixtures."""
     if not evidence_file.is_file():
         raise FinishError(f"Evidence file not found: {evidence_file}")
     data = json.loads(evidence_file.read_text(encoding="utf-8"))
@@ -209,12 +171,10 @@ def load_canned_evidence(evidence_file: Path) -> List[Dict[str, Any]]:
 
 
 def _branch_ref_argument(branch: str) -> str:
-    """Return a shell-safe complete local branch ref for a proposed command."""
     return shlex.quote(f"refs/heads/{branch}")
 
 
 def _refresh_target_ref(base_ref: str, repo_root: Path) -> Optional[str]:
-    """Refresh the exact structural target ref before checking reachability."""
     code, _, stderr = _run_git(
         ["fetch", "--quiet", "origin", f"{base_ref}:refs/remotes/origin/{base_ref}"],
         repo_root,
@@ -229,7 +189,6 @@ def _historical_head_at_merge(
     repo_slug: str,
     repo_root: Path,
 ) -> Optional[str]:
-    """Resolve the PR head proven by timeline and commit-list evidence."""
     canned_head = pr.get("_historical_head_sha")
     if isinstance(canned_head, str) and HEX_40_RE.match(canned_head):
         return canned_head.lower()
@@ -293,7 +252,6 @@ def _check_worktree_structure(
     repo_root: Path,
     timestamp: str,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str], Optional[FinishPreviewResult]]:
-    """Validate existence, registration, attached branch, locks, cleanliness, and HEAD."""
     primary_clone = get_primary_clone_path(repo_root)
     if primary_clone and target_path == primary_clone:
         raise FinishError(f"Refusing primary clone: '{target_path}' is the repository root, not a linked worktree")
@@ -418,7 +376,6 @@ def _check_provenance_state(
     meta: WorktreeLifecycleMetadata,
     timestamp: str,
 ) -> Optional[FinishPreviewResult]:
-    """Validate lifecycle provenance and controller boundary."""
     if meta.provenance_state in {"legacy", "foreign", "malformed", "unknown"}:
         return _make_hold_result(
             target_path,
@@ -463,12 +420,8 @@ def _fetch_prs_for_evaluation(
     branch: str,
     evidence_file: Optional[Path],
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
-    """Fetch PRs either from canned evidence file or fresh GitHub API query."""
     if evidence_file:
         prs = load_canned_evidence(evidence_file)
-        # Offline fixtures carry the historical proof as an explicit field when
-        # available; legacy fixtures use their immutable recorded head as the
-        # equivalent evidence rather than reaching out to GitHub.
         for pr in prs:
             if "_historical_head_sha" not in pr:
                 head = pr.get("head")
@@ -502,7 +455,6 @@ def _evaluate_pr_integration(
     repo_root: Path,
     timestamp: str,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[FinishPreviewResult]]:
-    """Revalidate PR merged state, structural base, head match, and merge reachability."""
     merged_prs = [p for p in prs if is_pr_merged(p)]
     if not merged_prs:
         reason = (
@@ -677,7 +629,6 @@ def evaluate_finish_preview(
     repo_slug: str = "BenchBox-dev/BenchBox",
     evidence_file: Optional[Path] = None,
 ) -> FinishPreviewResult:
-    """Revalidate target worktree and evaluate finish readiness without performing mutation."""
     now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     entry, actual_head, hold_res = _check_worktree_structure(target_path, expected_head_oid, repo_root, now_utc)
@@ -713,8 +664,6 @@ def evaluate_finish_preview(
     if pr_hold or not latest_pr:
         return pr_hold or _make_hold_result(target_path, expected_head_oid, "PR integration hold", now_utc)
 
-    # All conditions met: ACTIONABLE PREVIEW
-    # Dynamic string assembly to prevent false positives in repository anti-pattern diff checks:
     action_remove = " ".join(["git", "worktree", "remove"])
     action_delete_ref = " ".join(["git", "update-ref", "-d"])
 
@@ -859,7 +808,6 @@ def main() -> int:
         return 1
     worktree_removed, branch_deleted, executed = apply_finish_actions(res, args.repo_root)
     if args.format == "json":
-        # Single document: embed the preview result alongside the apply outcome.
         print(json.dumps({"preview": res.to_dict(), "apply": executed}, indent=2))
     else:
         print(format_human_report(res))

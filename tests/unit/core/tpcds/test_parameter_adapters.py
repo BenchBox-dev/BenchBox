@@ -1,5 +1,3 @@
-"""Tests for the TPC-DS parameter adapters and their wiring into the cross-surface gate builder."""
-
 from __future__ import annotations
 
 import re
@@ -17,8 +15,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium, pytest.mark.tpcds]
 
 
 class _StubDSQGen:
-    """Stands in for DSQGenBinary: returns fixed logged values and records how it was called."""
-
     def __init__(self, substitutions, binary_path):
         self.substitutions = substitutions
         self.dsqgen_path = binary_path
@@ -31,7 +27,7 @@ class _StubDSQGen:
 
 class TestAdapters:
     def test_q39_reproduces_the_templates_month_arithmetic(self):
-        # The SQL compares MONTH with MONTH+1; -LOG records only MONTH.01.
+
         assert ADAPTERS[39]({"YEAR.01": "1998", "MONTH.01": "4"}) == {"year": 1998, "months": [4, 5]}
 
     def test_q44_takes_the_store_and_the_null_column(self):
@@ -89,7 +85,6 @@ def dsqgen():
 
 @pytest.mark.parametrize("scale_factor", [0.01, 1.0])
 def test_adapted_values_are_the_values_in_the_sql_for_the_same_seed_and_scale(dsqgen, scale_factor):
-    """The point of an adapter: the DataFrame side runs on exactly what the SQL contains."""
 
     def squashed(query_id):
         return "".join(dsqgen.generate(query_id, seed=7, scale_factor=scale_factor).split())
@@ -111,7 +106,7 @@ def test_adapted_values_are_the_values_in_the_sql_for_the_same_seed_and_scale(ds
 def test_binding_follows_the_seed_and_the_scale(dsqgen):
     seeds = {bind_parameters(39, scale_factor=1.0, seed=seed, dsqgen=dsqgen).parameters["year"] for seed in range(1, 9)}
     assert len(seeds) > 1
-    # Q44's store is drawn from the store table's row count, so it follows the scale.
+
     stores = {
         bind_parameters(44, scale_factor=scale, seed=7, dsqgen=dsqgen).parameters["store_sk"] for scale in (0.01, 1, 10)
     }
@@ -119,13 +114,10 @@ def test_binding_follows_the_seed_and_the_scale(dsqgen):
 
 
 def _bound_keys(seen, binding):
-    """The parameters an execution saw, restricted to the keys the binding sets (the rest are defaults)."""
     return {key: seen[key] for key in binding.parameters}
 
 
 class TestGateBuilderWiring:
-    """The binding travels with the query returned for execution, not with process-wide state."""
-
     @pytest.fixture
     def gate(self, monkeypatch, tmp_path):
         import dataclasses
@@ -147,7 +139,6 @@ class TestGateBuilderWiring:
                 return {str(query_id): "select 1" for query_id in (39, 41, 44)}
 
         def recording(query_id):
-            """An implementation that returns the parameters it sees, as a real one would read them."""
 
             def run(ctx):
                 if ctx == "boom":
@@ -174,10 +165,10 @@ class TestGateBuilderWiring:
         query = gate.data.dataframe_query("39")
         binding = gate.data.dataframe_query.bindings[39]
 
-        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]  # looking the query up changes nothing
+        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]
         for implementation in (query.pandas_impl, query.expression_impl):
             assert _bound_keys(implementation(None), binding) == dict(binding.parameters)
-        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]  # and nothing stays installed
+        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]
         assert (binding.scale_factor, binding.seed, binding.stream_id) == (0.01, None, 0)
         assert re.fullmatch(r"[0-9a-f]{64}", binding.dsqgen_sha256)
 

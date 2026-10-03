@@ -1,18 +1,3 @@
-"""Parse pyproject.toml and emit a raw inventory of every declared dependency.
-
-This is the source-of-truth pass for w1 of the dependency audit. We deliberately
-parse pyproject.toml directly rather than `uv pip list` because the latter
-includes transitive packages, which would mask which extras group owns a dep.
-
-Usage:
-    uv run -- python _project/scripts/dependency_audit/parse_deps.py            # write docs
-    uv run -- python _project/scripts/dependency_audit/parse_deps.py --check    # drift gate
-
-Exit codes:
-    0  Doc written (default) or already up to date (--check).
-    1  --check found drift between the committed doc and the manifest.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -22,12 +7,6 @@ import sys
 import tomllib
 from collections import defaultdict
 
-# ---------------------------------------------------------------------------
-# Paths (resolved at runtime). Mirror check_deps.py: take the containing
-# directory first, then walk up to the repo root. The script lives at
-# _project/scripts/dependency_audit/parse_deps.py, so the root is parents[2]
-# of its directory.
-# ---------------------------------------------------------------------------
 _HERE = pathlib.Path(__file__).resolve().parent
 _ROOT = _HERE.parents[2]
 _OUT_REL = "docs/development/dependency-audit-raw.md"
@@ -52,7 +31,6 @@ CLI_EPILOG = (
 
 
 def split_spec(spec: str) -> tuple[str, str, str]:
-    """Return (name, version_spec, env_marker) from a PEP 508 requirement string."""
     s = spec.strip()
     marker = ""
     if ";" in s:
@@ -61,7 +39,6 @@ def split_spec(spec: str) -> tuple[str, str, str]:
         marker = marker.strip()
     else:
         body = s
-    # Strip extras: pkg[extra1,extra2]
     extras = ""
     m = re.match(r"^([A-Za-z0-9_.\-]+)(\[[^\]]+\])?(.*)$", body)
     if not m:
@@ -75,11 +52,9 @@ def split_spec(spec: str) -> tuple[str, str, str]:
 
 
 def render(root: pathlib.Path) -> str:
-    """Render the raw-inventory markdown for the manifest at ``root``."""
     pyproject = root / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
 
-    # name (with extras suffix) -> {(group, version, marker)}
     table: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
 
     project = data.get("project", {})
@@ -98,7 +73,6 @@ def render(root: pathlib.Path) -> str:
 
     sources = data.get("tool", {}).get("uv", {}).get("sources", {})
 
-    # Generate markdown
     lines = []
     lines.append("# Dependency Audit - Raw Inventory\n")
     lines.append(
@@ -107,9 +81,6 @@ def render(root: pathlib.Path) -> str:
         "It enumerates every dep declared in the manifest. Transitive deps are NOT listed here; "
         "see `uv tree` for those.\n"
     )
-    # Rendered as a bullet list rather than trailing-space hard breaks so the
-    # output survives the repo's trailing-whitespace pre-commit hook (otherwise
-    # the committed doc and the --check baseline would diverge by whitespace).
     lines.append("")
     lines.append(f"- **Source manifest:** `{pyproject.relative_to(root)}`")
     lines.append(f"- **Distinct declared package names:** {len({k.split('[')[0] for k in table})}")
@@ -120,7 +91,6 @@ def render(root: pathlib.Path) -> str:
     lines.append("| --- | --- | --- | --- |")
     for name in sorted(table):
         rows = table[name]
-        # Collect distinct version specs and group lists
         groups = sorted({r[0] for r in rows})
         version_specs = sorted({r[1] for r in rows if r[1]})
         markers = sorted({r[2] for r in rows if r[2]})
@@ -141,7 +111,6 @@ def render(root: pathlib.Path) -> str:
         for k, v in sorted(sources.items()):
             lines.append(f"| `{k}` | `{v}` |")
 
-    # Group composition table
     lines.append("\n## Group Composition (by extras / dep-group)\n")
     grp_to_pkgs: dict[str, list[str]] = defaultdict(list)
     for name, rows in table.items():

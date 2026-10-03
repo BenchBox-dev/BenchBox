@@ -1,5 +1,3 @@
-"""Per-benchmark cross-surface gate builders."""
-
 from benchbox.core.equivalence.builders.amplab import build_amplab_duckdb
 from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duckdb_cell
 from benchbox.core.equivalence.builders.clickbench import build_clickbench_duckdb

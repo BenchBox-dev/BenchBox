@@ -1,9 +1,6 @@
-"""Unit tests for Data Vault query manager.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -16,35 +13,28 @@ pytestmark = [
 
 
 class TestDataVaultQueryManager:
-    """Tests for DataVaultQueryManager."""
-
     @pytest.fixture
     def query_manager(self):
-        """Create a query manager instance."""
         return DataVaultQueryManager()
 
     def test_all_22_queries_exist(self, query_manager):
-        """All 22 TPC-H queries should have Data Vault equivalents."""
         queries = query_manager.get_all_queries()
         assert len(queries) == 22
         for qid in range(1, 23):
             assert qid in queries
 
     def test_get_query_returns_string(self, query_manager):
-        """get_query should return non-empty string."""
         for qid in range(1, 23):
             query = query_manager.get_query(qid)
             assert isinstance(query, str)
             assert len(query) > 0
 
     def test_get_query_with_string_id(self, query_manager):
-        """get_query should accept string query IDs."""
         query = query_manager.get_query("1")
         assert isinstance(query, str)
         assert len(query) > 0
 
     def test_get_query_invalid_raises(self, query_manager):
-        """get_query should raise ValueError for invalid IDs."""
         with pytest.raises(ValueError, match="Invalid query ID"):
             query_manager.get_query(0)
 
@@ -52,25 +42,19 @@ class TestDataVaultQueryManager:
             query_manager.get_query(23)
 
     def test_get_query_count(self, query_manager):
-        """get_query_count should return 22."""
         assert query_manager.get_query_count() == 22
 
     def test_queries_use_current_satellite_filter(self, query_manager):
-        """Queries should filter for current records (LOAD_END_DTS IS NULL)."""
         for qid in range(1, 23):
             query = query_manager.get_query(qid)
-            # Most queries should have this filter (for satellite joins)
-            # Some may not need it if they only use hubs/links
             if "sat_" in query.lower():
                 assert "load_end_dts IS NULL" in query.lower() or "load_end_dts is null" in query.lower(), (
                     f"Query {qid} uses satellite but may be missing current record filter"
                 )
 
     def test_queries_use_hub_link_satellite_pattern(self, query_manager):
-        """Queries should use Data Vault table names."""
         for qid in range(1, 23):
             query = query_manager.get_query(qid).lower()
-            # Should reference at least one Data Vault table type
             has_dv_table = any(
                 [
                     "hub_" in query,
@@ -81,23 +65,18 @@ class TestDataVaultQueryManager:
             assert has_dv_table, f"Query {qid} doesn't appear to use Data Vault tables"
 
     def test_query_syntax_valid(self, query_manager):
-        """All queries should have basic valid SQL structure."""
         for qid in range(1, 23):
             query = query_manager.get_query(qid).lower()
-            # Basic SQL validation
             assert "select" in query, f"Query {qid} missing SELECT"
             assert "from" in query, f"Query {qid} missing FROM"
 
 
 class TestQueryContent:
-    """Tests for specific query content."""
-
     @pytest.fixture
     def query_manager(self):
         return DataVaultQueryManager()
 
     def test_q1_lineitem_aggregation(self, query_manager):
-        """Q1 should aggregate lineitem data through satellite."""
         q1 = query_manager.get_query(1).lower()
         assert "sat_lineitem" in q1
         assert "sum" in q1
@@ -105,27 +84,23 @@ class TestQueryContent:
         assert "l_linestatus" in q1
 
     def test_q3_customer_order_lineitem_chain(self, query_manager):
-        """Q3 should join customer->order->lineitem chain."""
         q3 = query_manager.get_query(3).lower()
         assert "hub_customer" in q3
         assert "hub_order" in q3
         assert "link_order_customer" in q3
 
     def test_q6_simple_aggregation(self, query_manager):
-        """Q6 should be a simple lineitem aggregation."""
         q6 = query_manager.get_query(6).lower()
         assert "sat_lineitem" in q6
         assert "sum" in q6
         assert "l_discount" in q6
 
     def test_q15_uses_cte(self, query_manager):
-        """Q15 should use CTE instead of VIEW."""
         q15 = query_manager.get_query(15).lower()
         assert "with" in q15
         assert "revenue" in q15
 
     def test_q10_preaggregates_returned_lineitems_before_customer_details(self, query_manager):
-        """Q10 should bound its wide join while retaining Data Vault existence checks."""
         q10 = query_manager.get_query(10).lower()
 
         assert "lineitem_revenue_by_order as" in q10
@@ -136,20 +111,17 @@ class TestQueryContent:
         assert "sum(cr.customer_revenue) as revenue" in q10
 
     def test_q12_stays_tpc_style_without_cte(self, query_manager):
-        """Q12 should stay close to TPC-H structure and avoid CTE wrappers."""
         q12 = query_manager.get_query(12).lower()
         assert "with " not in q12
         assert "join hub_order" not in q12
 
     def test_q18_uses_inline_large_orders_subquery(self, query_manager):
-        """Q18 should use an inline order-quantity subquery (no CTE)."""
         q18 = query_manager.get_query(18).lower()
         assert "with " not in q18
         assert "join (" in q18
         assert "having sum(sl2.l_quantity) >" in q18
 
     def test_q21_preserves_exists_semantics(self, query_manager):
-        """Q21 should preserve EXISTS / NOT EXISTS structure from TPC-H intent."""
         q21 = query_manager.get_query(21).lower()
         assert "with " not in q21
         assert "exists (" in q21
@@ -157,86 +129,66 @@ class TestQueryContent:
 
 
 class TestParameterSubstitution:
-    """Tests for query parameter substitution."""
-
     @pytest.fixture
     def query_manager(self):
         return DataVaultQueryManager()
 
     def test_get_template_returns_placeholders(self, query_manager):
-        """Templates should contain :param_name placeholders."""
         template = query_manager.get_template(1)
         assert ":delta" in template
 
     def test_get_default_params_returns_dict(self, query_manager):
-        """Should return default parameters for each query."""
         params = query_manager.get_default_params(1)
         assert "delta" in params
         assert isinstance(params["delta"], int)
 
     def test_get_query_with_custom_params(self, query_manager):
-        """Should substitute custom parameters."""
         query = query_manager.get_query(1, params={"delta": 30})
         assert "INTERVAL '30 days'" in query
         assert ":delta" not in query
 
     def test_get_parameterized_query_returns_tuple(self, query_manager):
-        """get_parameterized_query should return (sql, params) tuple."""
         sql, params = query_manager.get_parameterized_query(1, stream_id=0)
         assert isinstance(sql, str)
         assert hasattr(params, "query_id")
         assert params.query_id == 1
 
     def test_parameterized_query_no_placeholders(self, query_manager):
-        """Parameterized queries should have all placeholders substituted."""
         for qid in range(1, 23):
             sql, _ = query_manager.get_parameterized_query(qid)
-            # Check no :param_name placeholders remain
             import re
 
             placeholders = re.findall(r":\w+", sql)
-            # Filter out valid SQL constructs like :TIMESTAMP
             invalid = [p for p in placeholders if not p.upper() == p]
             assert not invalid, f"Query {qid} has unsubstituted placeholders: {invalid}"
 
     def test_different_stream_ids_produce_different_params(self, query_manager):
-        """Different stream IDs should produce different parameters."""
-        # Use a query with variable parameters (like Q2)
         _, params1 = query_manager.get_parameterized_query(2, stream_id=0)
         _, params2 = query_manager.get_parameterized_query(2, stream_id=1)
-        # At least one parameter should differ
         assert params1.as_dict() != params2.as_dict()
 
     def test_same_stream_id_is_deterministic(self, query_manager):
-        """Same stream ID should produce identical parameters."""
         _, params1 = query_manager.get_parameterized_query(1, stream_id=42)
         _, params2 = query_manager.get_parameterized_query(1, stream_id=42)
         assert params1.as_dict() == params2.as_dict()
 
     def test_all_22_queries_have_default_params(self, query_manager):
-        """All 22 queries should have default parameters defined."""
         for qid in range(1, 23):
             params = query_manager.get_default_params(qid)
             assert isinstance(params, dict)
 
     def test_list_parameter_substitution(self, query_manager):
-        """List parameters should be properly formatted."""
-        # Q16 has a sizes list parameter
         params = query_manager.get_default_params(16)
         assert "sizes" in params
         assert isinstance(params["sizes"], list)
 
         query = query_manager.get_query(16)
-        # List should be comma-separated in the query
         for size in params["sizes"]:
             assert str(size) in query
 
 
 class TestParameterGenerator:
-    """Tests for DataVaultParameterGenerator."""
-
     def test_parameter_generator_deterministic(self):
-        """Same seed should produce same parameters."""
         from benchbox.core.datavault.queries import DataVaultParameterGenerator
 
         gen1 = DataVaultParameterGenerator(seed=12345)
@@ -248,7 +200,6 @@ class TestParameterGenerator:
         assert params1.as_dict() == params2.as_dict()
 
     def test_parameter_generator_all_queries(self):
-        """Generator should produce valid parameters for all 22 queries."""
         from benchbox.core.datavault.queries import DataVaultParameterGenerator
 
         gen = DataVaultParameterGenerator(seed=42)
@@ -258,7 +209,6 @@ class TestParameterGenerator:
             assert isinstance(params.as_dict(), dict)
 
     def test_q1_delta_in_valid_range(self):
-        """Q1 delta parameter should be 60-120."""
         from benchbox.core.datavault.queries import DataVaultParameterGenerator
 
         gen = DataVaultParameterGenerator(seed=0)
@@ -268,7 +218,6 @@ class TestParameterGenerator:
             assert 60 <= delta <= 120, f"delta {delta} out of range [60,120]"
 
     def test_q2_region_valid(self):
-        """Q2 region parameter should be a valid TPC-H region."""
         from benchbox.core.datavault.queries import REGIONS, DataVaultParameterGenerator
 
         gen = DataVaultParameterGenerator(seed=0)

@@ -1,34 +1,6 @@
-"""DataFrame Data Loading Strategy and Format Management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive data loading infrastructure for DataFrame
-benchmarking, including:
-- Format-aware loading (CSV, TBL, Parquet, Arrow)
-- CSV-to-Parquet conversion for optimal performance
-- Schema mapping from TPC-H/TPC-DS to DataFrame types
-- Cache directory management
-- Integration with TPC data generators
-
-Architecture:
-1. DataFrameDataLoader orchestrates data preparation
-2. SchemaMapper converts TPC schemas to platform-specific dtypes
-3. FormatConverter handles CSV→Parquet conversion
-4. DataCache manages cached/converted files
-
-Usage:
-    from benchbox.core.dataframe.data_loader import DataFrameDataLoader
-
-    loader = DataFrameDataLoader(platform="polars", data_dir=Path("./data"))
-
-    # Prepare data for benchmark
-    paths = loader.prepare_benchmark_data(benchmark, scale_factor=1.0)
-
-    # Load into platform-specific DataFrames
-    tables = loader.load_tables(paths, adapter)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -68,44 +40,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Relative cache directory suffix (resolved against runtime CWD).
-# Unified with SQL datagen under benchmark_runs/datagen/ for data reuse.
 DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
-# Bump when schema/type-conversion rules change so stale cached Parquet is not
-# silently reused on rerun. v3: TIME columns now load as strings (previously an
-# all-null Time column), so pre-v3 caches must be regenerated to pick up values.
-# v4: declared text columns (TEXT/STRING/CHAR families) are now written as string
-# even when all-NULL or numeric-looking, instead of being left to PyArrow
-# inference; and empty fields in declared string columns load as '' instead of
-# null when the SQL dialect keeps '' (null_marker is None). Pre-v4 caches must be
-# regenerated to pick up the declared dtypes and the empty-string contract.
-# v5: headered CSVs are read with skip_rows=1 when explicit column names are
-# supplied. Pre-v5 caches for such benchmarks either failed conversion (and
-# silently fell back to an untyped read of the source file) or embedded the header
-# row as data, so they must be regenerated.
-# v6: inferred TIME columns (time32/time64) are now cast to string before the
-# Parquet write. Pre-v6 caches may embed INT32 TIME(MILLIS,false), which Spark
-# rejects on read (PARQUET_TYPE_ILLEGAL), so they must be regenerated.
-# v7: CSV dialect (delimiter, header, null marker) now resolves through the
-# shared resolve_csv_dialect() single source -- manifest metadata first, then
-# benchmark attributes -- instead of benchmark attributes alone. Pre-v7 caches
-# for manifest-annotated benchmarks may embed the attribute-only reading, so
-# they must be regenerated.
-# v8: dialects with a non-empty NULL sentinel (e.g. ClickBench's __NULL__,
-# where only the sentinel is NULL) now keep empty string fields as '' instead
-# of NULL. Pre-v8 caches for such dialects embed NULL where the SQL surface
-# emits '', so they must be regenerated.
 DATAFRAME_CACHE_VERSION = "v8"
 
-# Format subdirectory names that belong to the DataFrame cache layer.
-# Used by clear_cache() to selectively remove cached conversions without
-# destroying raw datagen output (e.g. .tbl files) in the same directory.
-_KNOWN_FORMAT_DIRS = frozenset(f.value for f in DataFormat)  # {"csv", "parquet", "arrow"}
+_KNOWN_FORMAT_DIRS = frozenset(f.value for f in DataFormat)
 
 
 class ConversionStatus(Enum):
-    """Status of format conversion."""
-
     NOT_NEEDED = "not_needed"
     SUCCESS = "success"
     FAILED = "failed"
@@ -114,8 +55,6 @@ class ConversionStatus(Enum):
 
 @dataclass
 class LoadedTable:
-    """Information about a loaded table."""
-
     table_name: str
     file_path: Path
     format: DataFormat
@@ -126,8 +65,6 @@ class LoadedTable:
 
 @dataclass
 class DataLoadResult:
-    """Result of data loading operation."""
-
     tables: dict[str, LoadedTable] = field(default_factory=dict)
     total_load_time_seconds: float = 0.0
     source_format: DataFormat = DataFormat.CSV
@@ -138,14 +75,11 @@ class DataLoadResult:
 
     @property
     def success(self) -> bool:
-        """Check if load was successful."""
         return len(self.errors) == 0 and len(self.tables) > 0
 
 
 @dataclass
 class CacheManifest:
-    """Manifest tracking cached data files."""
-
     benchmark: str
     scale_factor: float
     format: str
@@ -154,7 +88,6 @@ class CacheManifest:
     tables: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
         return {
             "benchmark": self.benchmark,
             "scale_factor": self.scale_factor,
@@ -166,7 +99,6 @@ class CacheManifest:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CacheManifest:
-        """Create from dictionary."""
         return cls(
             benchmark=data["benchmark"],
             scale_factor=data["scale_factor"],
@@ -178,27 +110,16 @@ class CacheManifest:
 
 
 class SchemaMapper:
-    """Maps TPC benchmark schemas to DataFrame-specific types.
-
-    This class converts BenchBox schema definitions (Column, Table) to
-    platform-specific DataFrame column types.
-    """
-
-    # Mapping from TPC DataType enum values to Polars types
     POLARS_TYPE_MAP: dict[str, str] = {
         "INTEGER": "Int64",
-        "DECIMAL(15,2)": "Float64",  # Polars doesn't have native Decimal
+        "DECIMAL(15,2)": "Float64",
         "VARCHAR": "Utf8",
         "CHAR": "Utf8",
         "DATE": "Date",
         "TIMESTAMP": "Datetime",
-        # TIME has no reliable DataFrame dtype across backends (pyarrow->Parquet->Polars
-        # yields an all-null Time column; pandas has no time-only dtype), so load it as a
-        # string and let query impls parse the components, matching the SQL hour(time).
         "TIME": "Utf8",
     }
 
-    # Mapping from TPC DataType enum values to Pandas types
     PANDAS_TYPE_MAP: dict[str, str] = {
         "INTEGER": "int64",
         "DECIMAL(15,2)": "float64",
@@ -209,7 +130,6 @@ class SchemaMapper:
         "TIME": "object",
     }
 
-    # Mapping for PyArrow types (used in Parquet conversion)
     PYARROW_TYPE_MAP: dict[str, str] = {
         "INTEGER": "int64",
         "DECIMAL(15,2)": "float64",
@@ -220,15 +140,7 @@ class SchemaMapper:
         "TIME": "string",
     }
 
-    # SQL type *families* (matched on the base token after stripping any
-    # ``(precision[,scale])`` suffix) that the per-type maps above do not list
-    # verbatim. Benchmarks declare schemas with many spellings (e.g. ssb uses
-    # ``INTEGER``/``VARCHAR``, joinorder_synthetic uses raw DDL strings like
-    # ``"note TEXT"`` / ``"info TEXT NOT NULL"``), so a declared text column whose
-    # data is all-NULL or looks numeric must still be written as a string rather
-    # than left to PyArrow inference. Keyed by base token -> PyArrow type string.
     _ARROW_TYPE_FAMILIES: dict[str, str] = {
-        # Character/text families -> string
         "TEXT": "string",
         "STRING": "string",
         "CHARACTER": "string",
@@ -239,7 +151,6 @@ class SchemaMapper:
         "JSON": "string",
         "JSONB": "string",
         "ENUM": "string",
-        # Integer families -> int64
         "INT": "int64",
         "INT2": "int64",
         "INT4": "int64",
@@ -250,7 +161,6 @@ class SchemaMapper:
         "BIGINT": "int64",
         "SERIAL": "int64",
         "BIGSERIAL": "int64",
-        # Real/decimal families -> float64
         "DECIMAL": "float64",
         "NUMERIC": "float64",
         "NUMBER": "float64",
@@ -264,20 +174,7 @@ class SchemaMapper:
 
     @classmethod
     def sql_type_to_pyarrow(cls, sql_type: str) -> str | None:
-        """Resolve a SQL type spelling to a PyArrow type string for parquet typing.
-
-        Tries the exact and base-token entries in :data:`PYARROW_TYPE_MAP` first
-        (so ``VARCHAR(12)`` -> ``VARCHAR`` -> ``string`` and ``DECIMAL(15,2)``
-        keep their existing behavior), then falls back to the SQL type *families*
-        in :data:`_ARROW_TYPE_FAMILIES` and a couple of prefix rules. Returns
-        ``None`` for genuinely unrecognized types, leaving them to PyArrow
-        inference (unchanged from before this helper existed).
-        """
         normalized = sql_type.strip().upper()
-        # Base token: drop any ``(precision[,scale])`` and trailing constraint
-        # words (e.g. ``"VARCHAR(12) NOT NULL"`` / ``"TEXT NOT NULL"`` -> ``VARCHAR``
-        # / ``TEXT``). Multi-word real types (``CHARACTER VARYING``, ``DOUBLE
-        # PRECISION``, ``TIMESTAMP WITH TIME ZONE``) resolve via their first token.
         pre_paren = normalized.split("(", 1)[0].strip()
         base = pre_paren.split()[0] if pre_paren.split() else pre_paren
 
@@ -289,8 +186,6 @@ class SchemaMapper:
         if family:
             return family
 
-        # First-token spellings the family map misses, e.g. "CHARACTER VARYING"
-        # (CHARACTER), a bare "DOUBLE", or "TIMESTAMP"/"DATETIME"/"TIME" variants.
         if "CHAR" in base:
             return "string"
         if base.startswith("DOUBLE"):
@@ -303,26 +198,10 @@ class SchemaMapper:
 
     @classmethod
     def get_column_names(cls, table: Table) -> list[str]:
-        """Extract column names from a Table schema.
-
-        Args:
-            table: TPC schema Table object
-
-        Returns:
-            List of column names
-        """
         return [col.name for col in table.columns]
 
     @classmethod
     def get_polars_schema(cls, table: Table) -> dict[str, str]:
-        """Convert Table schema to Polars column types.
-
-        Args:
-            table: TPC schema Table object
-
-        Returns:
-            Dictionary mapping column name to Polars type string
-        """
         schema = {}
         for col in table.columns:
             dtype_value = col.data_type.value
@@ -332,14 +211,6 @@ class SchemaMapper:
 
     @classmethod
     def get_pandas_schema(cls, table: Table) -> dict[str, str]:
-        """Convert Table schema to Pandas column types.
-
-        Args:
-            table: TPC schema Table object
-
-        Returns:
-            Dictionary mapping column name to Pandas dtype string
-        """
         schema = {}
         for col in table.columns:
             dtype_value = col.data_type.value
@@ -349,14 +220,6 @@ class SchemaMapper:
 
     @classmethod
     def get_pyarrow_schema(cls, table: Table) -> dict[str, str]:
-        """Convert Table schema to PyArrow column types.
-
-        Args:
-            table: TPC schema Table object
-
-        Returns:
-            Dictionary mapping column name to PyArrow type string
-        """
         schema = {}
         for col in table.columns:
             dtype_value = col.data_type.value
@@ -366,12 +229,6 @@ class SchemaMapper:
 
 
 class FormatConverter:
-    """Converts data between file formats.
-
-    Primarily handles CSV/TBL → Parquet conversion for optimal DataFrame
-    performance.
-    """
-
     @staticmethod
     def convert_csv_to_parquet(
         source_path: Path,
@@ -384,34 +241,6 @@ class FormatConverter:
         null_marker: str | None = "",
         has_header: bool = False,
     ) -> tuple[ConversionStatus, int]:
-        """Convert CSV/TBL file to Parquet format.
-
-        Uses PyArrow for efficient conversion with proper type inference
-        and compression. Supports physical layout options via write_config.
-
-        Args:
-            source_path: Path to source CSV/TBL file
-            target_path: Path for output Parquet file
-            column_names: Optional column names (for headerless files)
-            delimiter: Field delimiter (default "|" for TBL files)
-            compression: Parquet compression codec (zstd, snappy, gzip)
-            write_config: Optional write configuration for physical layout
-            column_types: Optional dict mapping column names to PyArrow type
-                strings (e.g. {"l_shipdate": "date32"}) for explicit typing.
-                Without this, PyArrow infers types and date columns may be
-                read as strings.
-            null_marker: CSV null marker matching the SQL loader's resolved
-                dialect. ``""`` (default) converts empty string fields to NULL,
-                preserving prior behavior; ``None`` (no NULL conversion) or a
-                non-empty sentinel (only that literal is NULL, e.g. ClickBench's
-                ``__NULL__``) keeps empty fields as empty strings so a string
-                column materializes the same way the DuckDB SQL reference does
-                (its ``nullstr`` sentinel never matches an empty field), instead
-                of emitting NULL where SQL emits "".
-
-        Returns:
-            Tuple of (conversion status, row count)
-        """
         try:
             import pyarrow.csv as pv
             import pyarrow.parquet as pq
@@ -426,17 +255,10 @@ class FormatConverter:
                 is_tbl_file and bool(column_names) and has_trailing_delimiter(source_path, delimiter, column_names)
             )
 
-            # Handle TBL files with trailing delimiter (TPC spec)
             actual_column_names = column_names
             if is_tbl_file and column_names and has_trailing:
                 actual_column_names = column_names + [TRAILING_DUMMY_COLUMN]
 
-            # PyArrow's `column_names` REPLACES the header names but does NOT skip
-            # the header LINE, so a headered CSV read with explicit column names
-            # parses its own header as a data row. With declared numeric/date types
-            # that conversion FAILS, and the caller then silently falls back to the
-            # raw source file -- an UNTYPED read where dates stay strings and every
-            # date filter matches nothing. Headerless TPC `.tbl` is unaffected.
             read_options = pv.ReadOptions(
                 column_names=actual_column_names if actual_column_names else None,
                 skip_rows=1 if (has_header and actual_column_names) else 0,
@@ -444,11 +266,6 @@ class FormatConverter:
             parse_options = pv.ParseOptions(delimiter=delimiter)
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
 
-            # When the SQL loader's dialect keeps empty fields as empty strings
-            # (no NULL conversion, or a non-empty sentinel where only the
-            # sentinel is NULL), do the same here so the DataFrame surface
-            # does not emit NULL where the SQL surface emits "". Only "" maps
-            # empty fields to NULL.
             from benchbox.core.dataframe.csv_dialect import dialect_preserves_empty_strings
 
             convert_options = pv.ConvertOptions(
@@ -465,24 +282,17 @@ class FormatConverter:
             if is_tbl_file and column_names and has_trailing:
                 table = table.select(column_names)
 
-            # PyArrow CSV inference types time-like fields as time32/time64,
-            # which Parquet stores as TIME(...,false) that Spark cannot read
-            # (PARQUET_TYPE_ILLEGAL). Persist them as strings instead.
             table = FormatConverter._coerce_time_columns_to_string(table)
 
-            # Apply physical layout options from write_config
             if write_config:
                 table = FormatConverter._apply_write_config(table, write_config)
-                # Use compression from write_config if specified and different from default
                 if write_config.compression != "zstd":
                     compression = write_config.compression
 
-            # Ensure target directory exists
             target_path.parent.mkdir(parents=True, exist_ok=True)
 
             write_kwargs = FormatConverter._build_write_kwargs(compression, write_config, table)
 
-            # Write Parquet
             logger.debug(f"Writing {target_path}")
             pq.write_table(table, target_path, **write_kwargs)
 
@@ -497,7 +307,6 @@ class FormatConverter:
 
     @staticmethod
     def _resolve_arrow_types(column_types: dict[str, str] | None) -> dict[str, Any] | None:
-        """Convert string type names to PyArrow types for explicit column typing."""
         if not column_types:
             return None
         import pyarrow as pa
@@ -513,22 +322,6 @@ class FormatConverter:
 
     @staticmethod
     def _coerce_time_columns_to_string(table: Any) -> Any:
-        """Cast inferred TIME columns to string for Parquet/Spark compatibility.
-
-        PyArrow's CSV inference types ``HH:MM:SS`` fields as ``time32``/``time64``
-        when no explicit column type pins them to string (e.g. the benchmark
-        schema is unavailable). Parquet stores those as ``TIME(MILLIS/MICROS,false)``,
-        which Spark rejects on read (``PARQUET_TYPE_ILLEGAL``); TIME also has no
-        reliable DataFrame dtype across backends (see :class:`SchemaMapper`), so
-        persist such columns as strings.
-
-        Boundary: this runs on the CSV/TBL/DAT conversion path only. A
-        pre-existing external Parquet source that already embeds a TIME
-        logical type bypasses conversion and is not coerced here.
-
-        Returns:
-            The table with every ``time32``/``time64`` column cast to string.
-        """
         import pyarrow as pa
         import pyarrow.compute as pc
 
@@ -545,7 +338,6 @@ class FormatConverter:
 
     @staticmethod
     def _build_write_kwargs(compression: str, write_config: Any, table: Any) -> dict[str, Any]:
-        """Build Parquet write keyword arguments from compression and write config."""
         write_kwargs: dict[str, Any] = {
             "compression": compression,
             "use_dictionary": True,
@@ -571,11 +363,6 @@ class FormatConverter:
     def _read_csv_source(
         source_path: Path, read_options: Any, parse_options: Any, convert_options: Any, pv: Any
     ) -> Any:
-        """Read a CSV/TBL source file, handling compression transparently.
-
-        Returns:
-            PyArrow Table on success, None on failure.
-        """
         compression_type = detect_compression(source_path)
         if compression_type:
             manager = CompressionManager()
@@ -600,78 +387,30 @@ class FormatConverter:
 
     @staticmethod
     def _apply_write_config(
-        table: Any,  # PyArrow Table
+        table: Any,
         write_config: DataFrameWriteConfiguration,
     ) -> Any:
-        """Apply write configuration transformations to a PyArrow table.
-
-        This includes sorting the table based on sort_by columns.
-
-        Args:
-            table: PyArrow Table to transform
-            write_config: Write configuration specifying transformations
-
-        Returns:
-            Transformed PyArrow Table
-        """
         import pyarrow.compute as pc
 
-        # Apply sorting if specified
         if write_config.sort_by:
-            # Build sort keys from write_config
             sort_keys = []
             for sort_col in write_config.sort_by:
-                # Validate column exists
                 if sort_col.name not in table.column_names:
                     logger.warning(f"Sort column '{sort_col.name}' not found in table, skipping")
                     continue
-                # PyArrow sort_indices uses "ascending" or "descending"
                 order = "ascending" if sort_col.order == "asc" else "descending"
                 sort_keys.append((sort_col.name, order))
 
             if sort_keys:
                 logger.debug(f"Sorting table by {sort_keys}")
-                # Get sort indices
                 indices = pc.sort_indices(table, sort_keys=sort_keys)
-                # Reorder table using indices
                 table = table.take(indices)
 
         return table
 
 
 class DataCache:
-    """Manages cached DataFrame data files.
-
-    Default cache location is project-local under ``benchmark_runs/datagen/``,
-    unified with SQL datagen output for efficient data reuse across modes.
-    Override with the ``BENCHBOX_CACHE_DIR`` environment variable or the
-    ``cache_dir`` constructor parameter.
-
-    Cache structure (nested inside canonical datagen directories):
-        benchmark_runs/datagen/
-          tpch_sf1/
-            nation.tbl              ← raw generated data (not managed by cache)
-            _datagen_manifest.json  ← SQL datagen manifest (not managed by cache)
-            parquet/                ← cached format conversions
-              v6/
-                _manifest.json
-                customer.parquet
-                lineitem.parquet
-                ...
-          tpch_sf001/
-            parquet/
-              v6/
-                ...
-          tpcds_sf1/
-            ...
-    """
-
     def __init__(self, cache_dir: str | Path | None = None):
-        """Initialize the data cache.
-
-        Args:
-            cache_dir: Custom cache directory (default: benchmark_runs/datagen/)
-        """
         env_cache_dir = os.environ.get("BENCHBOX_CACHE_DIR")
         if cache_dir is not None:
             self.cache_dir = Path(cache_dir)
@@ -682,34 +421,10 @@ class DataCache:
         self.cache_version = DATAFRAME_CACHE_VERSION
 
     def get_cache_path(self, benchmark: str, scale_factor: float, format: DataFormat) -> Path:
-        """Get the cache path for a benchmark/SF/format combination.
-
-        The cache is nested inside the canonical flat datagen directory
-        (e.g. ``tpch_sf001/parquet/v3/``), reusing the same naming
-        convention as SQL generators via :func:`get_benchmark_runs_datagen_path`.
-
-        Args:
-            benchmark: Benchmark name (tpch, tpcds)
-            scale_factor: Scale factor
-            format: Target format
-
-        Returns:
-            Path to cache directory
-        """
         base = get_benchmark_runs_datagen_path(benchmark, scale_factor, self.cache_dir)
         return base / format.value / self.cache_version
 
     def get_manifest_path(self, benchmark: str, scale_factor: float, format: DataFormat) -> Path:
-        """Get the manifest file path.
-
-        Args:
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            format: Target format
-
-        Returns:
-            Path to manifest JSON file
-        """
         cache_path = self.get_cache_path(benchmark, scale_factor, format)
         return cache_path / "_manifest.json"
 
@@ -720,17 +435,6 @@ class DataCache:
         format: DataFormat,
         source_hash: str | None = None,
     ) -> bool:
-        """Check if cached data exists and is valid.
-
-        Args:
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            format: Target format
-            source_hash: Optional hash to validate against
-
-        Returns:
-            True if valid cached data exists
-        """
         manifest_path = self.get_manifest_path(benchmark, scale_factor, format)
 
         if not manifest_path.exists():
@@ -740,12 +444,10 @@ class DataCache:
             with open(manifest_path, encoding="utf-8") as f:
                 manifest = CacheManifest.from_dict(json.load(f))
 
-            # Validate source hash if provided
             if source_hash and manifest.source_hash != source_hash:
                 logger.debug(f"Cache hash mismatch: {manifest.source_hash} != {source_hash}")
                 return False
 
-            # Verify all table files exist
             cache_dir = manifest_path.parent
             for _table_name, table_info in manifest.tables.items():
                 if "files" in table_info:
@@ -769,16 +471,6 @@ class DataCache:
     def get_cached_files(
         self, benchmark: str, scale_factor: float, format: DataFormat
     ) -> dict[str, Path | list[Path]] | None:
-        """Get cached data file paths.
-
-        Args:
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            format: Target format
-
-        Returns:
-            Dictionary mapping table name to file path, or None if not cached
-        """
         manifest_path = self.get_manifest_path(benchmark, scale_factor, format)
 
         if not manifest_path.exists():
@@ -808,15 +500,6 @@ class DataCache:
         source_hash: str,
         tables: dict[str, dict[str, Any]],
     ) -> None:
-        """Save a cache manifest.
-
-        Args:
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            format: Target format
-            source_hash: Hash of source files
-            tables: Table metadata (file paths, row counts)
-        """
         manifest = CacheManifest(
             benchmark=benchmark,
             scale_factor=scale_factor,
@@ -838,27 +521,12 @@ class DataCache:
         scale_factor: float | None = None,
         format: DataFormat | None = None,
     ) -> int:
-        """Clear cached DataFrame format conversions.
-
-        Only removes format-specific subdirectories (parquet/, csv/, arrow/)
-        from datagen directories, preserving raw generated data files (.tbl,
-        _datagen_manifest.json, etc.) that may coexist in the same directory.
-
-        Args:
-            benchmark: Optional benchmark to clear (clears all if None)
-            scale_factor: Optional SF to clear
-            format: Optional format to clear
-
-        Returns:
-            Number of items removed
-        """
         if not self.cache_dir.exists():
             return 0
 
         removed = 0
 
         if format is not None and benchmark is not None and scale_factor is not None:
-            # Case 4: Clear specific format version directory
             cache_path = self.get_cache_path(benchmark, scale_factor, format)
             if cache_path.exists():
                 for f in cache_path.iterdir():
@@ -866,16 +534,13 @@ class DataCache:
                     removed += 1
                 cache_path.rmdir()
         elif benchmark is not None and scale_factor is not None:
-            # Case 3: Clear all format conversions for a specific benchmark+SF
             base = get_benchmark_runs_datagen_path(benchmark, scale_factor, self.cache_dir)
             removed += self._remove_format_subdirs(base)
         elif benchmark is not None:
-            # Case 2: Clear all SFs for a specific benchmark
             for child in self.cache_dir.iterdir():
                 if child.is_dir() and child.name.startswith(f"{benchmark}_sf"):
                     removed += self._remove_format_subdirs(child)
         else:
-            # Case 1: Clear all cached format conversions across all benchmarks
             for child in self.cache_dir.iterdir():
                 if child.is_dir():
                     removed += self._remove_format_subdirs(child)
@@ -883,11 +548,6 @@ class DataCache:
         return removed
 
     def _remove_format_subdirs(self, base_dir: Path) -> int:
-        """Remove only known format subdirectories from a datagen directory.
-
-        Preserves raw data files (.tbl, manifests, etc.) while removing
-        cached format conversions (parquet/, csv/, arrow/).
-        """
         if not base_dir.exists():
             return 0
         removed = 0
@@ -899,17 +559,6 @@ class DataCache:
 
 
 def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]]) -> str:
-    """Compute hash of source files for cache validation.
-
-    Uses file modification times for fast validation.
-
-    Args:
-        source_dir: Source data directory
-        tables: Dictionary of table name to file path
-
-    Returns:
-        Hash string
-    """
     hash_data = []
     for table_name in sorted(tables.keys()):
         file_paths = tables[table_name]
@@ -924,23 +573,6 @@ def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]])
 
 
 class DataFrameDataLoader:
-    """Main orchestrator for DataFrame data loading.
-
-    Coordinates data preparation for DataFrame benchmarking:
-    1. Determines optimal format for target platform
-    2. Checks cache for existing converted data
-    3. Converts source data if needed
-    4. Returns paths to ready-to-load files
-
-    Usage:
-        loader = DataFrameDataLoader(platform="polars")
-
-        # Prepare data (converts to Parquet if needed)
-        paths = loader.prepare_benchmark_data(benchmark, scale_factor=1.0)
-
-        # paths = {"customer": Path(".../customer.parquet"), ...}
-    """
-
     def __init__(
         self,
         platform: str = "polars",
@@ -949,55 +581,27 @@ class DataFrameDataLoader:
         force_regenerate: bool = False,
         write_config: DataFrameWriteConfiguration | None = None,
     ):
-        """Initialize the data loader.
-
-        Args:
-            platform: Target DataFrame platform (polars, pandas, etc.)
-            cache_dir: Custom cache directory
-            prefer_parquet: Prefer Parquet format for performance
-            force_regenerate: Force regeneration even if cached
-            write_config: Optional write configuration for physical layout
-        """
         self.platform = platform.lower().replace("-df", "")
         self.cache = DataCache(cache_dir)
         self.prefer_parquet = prefer_parquet
         self.force_regenerate = force_regenerate
         self.write_config = write_config
-        # Honest signal for the applied-tuning ledger (ADR-1): the non-default
-        # physical write-layout that was actually applied to the data returned by
-        # the most recent ``prepare_benchmark_data`` call. ``None`` when no layout
-        # was applied (default config, or source returned as-is without going
-        # through the converter). Read by the DataFrame adapters to fold POST_LOAD
-        # write-layout statements into the applied ledger.
         self.applied_write_layout: DataFrameWriteConfiguration | None = None
 
-        # Get platform capabilities
         try:
             self.capabilities = get_platform_capabilities(self.platform)
         except ValueError:
-            # Unknown platform - use defaults
             self.capabilities = None
             logger.warning(f"Unknown platform '{platform}', using default settings")
 
     def get_optimal_format(self, scale_factor: float) -> DataFormat:
-        """Determine optimal data format for platform and scale factor.
-
-        Args:
-            scale_factor: Data scale factor
-
-        Returns:
-            Recommended DataFormat
-        """
         if not self.prefer_parquet:
             return DataFormat.CSV
 
-        # Platform-specific recommendations
         if self.capabilities:
             recommended = self.capabilities.recommended_data_format
-            # recommended is already a DataFormat enum
             if isinstance(recommended, DataFormat):
                 return recommended
-            # Handle string comparison for backwards compatibility
             elif recommended == "parquet":
                 return DataFormat.PARQUET
             elif recommended == "arrow":
@@ -1005,7 +609,6 @@ class DataFrameDataLoader:
             else:
                 return DataFormat.CSV
 
-        # Default: Parquet for larger datasets
         if scale_factor >= 0.1:
             return DataFormat.PARQUET
         return DataFormat.CSV
@@ -1017,63 +620,25 @@ class DataFrameDataLoader:
         data_dir: Path | None = None,
         write_config: DataFrameWriteConfiguration | None = None,
     ) -> dict[str, Path | list[Path]]:
-        """Prepare benchmark data files for DataFrame loading.
-
-        This method:
-        1. Locates source data files (from benchmark.tables or data_dir)
-        2. Determines optimal format for the target platform
-        3. Converts to optimal format if needed (using cache)
-        4. Returns paths to ready-to-load files
-
-        Args:
-            benchmark: Benchmark instance with schema info
-            scale_factor: Data scale factor
-            data_dir: Optional data directory (overrides benchmark.tables)
-            write_config: Optional write configuration for physical layout
-                (overrides self.write_config if provided)
-
-        Returns:
-            Dictionary mapping table name to data file path
-        """
-        # Get benchmark name using canonical normalization
         raw_name = getattr(benchmark, "name", None) or getattr(benchmark, "_name", None) or "unknown"
         benchmark_name = normalize_benchmark_id(raw_name)
 
-        # Determine source files
         source_files = self._get_source_files(benchmark, data_dir)
         source_files = self._filter_source_files_for_benchmark(benchmark, source_files)
         if not source_files:
             raise ValueError("No source data files found")
 
-        # Determine target format
         target_format = self.get_optimal_format(scale_factor)
 
-        # Resolve write config before the format check so sort_by can force conversion.
         effective_write_config = write_config or self.write_config
-        # Reset the applied-layout signal; set it only on paths where the returned
-        # data actually carries a non-default physical layout (see below).
         self.applied_write_layout = None
         layout_applied = bool(
-            effective_write_config
-            and not effective_write_config.is_default()
-            # Only the Parquet path physically writes the requested layout:
-            # `_convert_data` logs a warning and returns the source files
-            # unchanged for any other target format. That is reachable for
-            # pandas-df (whose optimal format is CSV) once a `sort_by` config
-            # pushes past the already-in-target-format early return. Claiming the
-            # layout there folds POST_LOAD statements and an applied hash into
-            # the ledger for a layout that was never written.
-            and target_format == DataFormat.PARQUET
+            effective_write_config and not effective_write_config.is_default() and target_format == DataFormat.PARQUET
         )
 
-        # Check if source is already in target format.
-        # Skip conversion unless write_config requests physical layout changes (e.g. sort_by),
-        # which must be applied even when source is already in the target format.
         source_format = self._detect_source_format(source_files)
         needs_layout_transform = bool(effective_write_config and effective_write_config.sort_by)
         if source_format == target_format and not needs_layout_transform:
-            # Source returned verbatim: no conversion ran, so no write-layout was
-            # applied even if a config was supplied.
             logger.info(f"Source data already in {target_format.value} format")
             return source_files
         if source_format == target_format and needs_layout_transform:
@@ -1082,18 +647,12 @@ class DataFrameDataLoader:
                 "routing through conversion pipeline to apply physical sort."
             )
 
-        # Check cache
         first_entry = next(iter(source_files.values()))
         first_path = first_entry[0] if isinstance(first_entry, list) else first_entry
         source_hash = _compute_source_hash(
             data_dir or Path(first_path).parent,
             source_files,
         )
-        # Fold the resolved per-table CSV dialect into the cache key: manifest
-        # dialect metadata (delimiter/header/NULL marker) changes how bytes are
-        # interpreted without touching the CSV files, so file stats alone would
-        # reuse stale Parquet indefinitely. Resolution is cheap (one small
-        # manifest read) and falls back exactly as conversion does.
         table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
         dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
         dialect_key = "|".join(
@@ -1103,9 +662,7 @@ class DataFrameDataLoader:
         )
         source_hash = hashlib.md5(f"{source_hash}:{dialect_key}".encode()).hexdigest()[:12]
 
-        # Include write_config in cache key if it affects output
         if effective_write_config and not effective_write_config.is_default():
-            # Add write config hash to source hash to differentiate cached outputs
             import json
 
             config_str = json.dumps(effective_write_config.to_dict(), sort_keys=True)
@@ -1116,15 +673,11 @@ class DataFrameDataLoader:
         ):
             cached = self.cache.get_cached_files(benchmark_name, scale_factor, target_format)
             if cached:
-                # Cache key folds in the non-default write_config (above), so the
-                # cached files physically carry the requested layout.
                 logger.info(f"Using cached {target_format.value} data")
                 if layout_applied:
                     self.applied_write_layout = effective_write_config
                 return cached
 
-        # Convert to target format. Conversion routes the data through the
-        # FormatConverter, which applies the write_config's physical layout.
         converted = self._convert_data(
             benchmark=benchmark,
             benchmark_name=benchmark_name,
@@ -1141,28 +694,14 @@ class DataFrameDataLoader:
         return converted
 
     def _get_source_files(self, benchmark: Any, data_dir: Path | None) -> dict[str, list[Path]]:
-        """Get source data file paths.
-
-        Args:
-            benchmark: Benchmark instance
-            data_dir: Optional data directory
-
-        Returns:
-            Dictionary mapping table name to list of file paths
-        """
         resolved = self._resolve_table_paths(getattr(benchmark, "tables", None))
 
-        # Then try data_dir (_discover_files already filters directories at scan time)
         if not resolved and data_dir and data_dir.exists():
             return self._discover_files(data_dir)
 
         if not resolved:
             return {}
 
-        # Guard: reject directory paths from manifest-populated sources.
-        # Manifest validation should catch contamination first, but if a
-        # directory path leaks through, fail early instead of surfacing
-        # IsADirectoryError from pandas/polars.
         for name, paths in resolved.items():
             dir_paths = [p for p in paths if p.is_dir()]
             if dir_paths:
@@ -1175,7 +714,6 @@ class DataFrameDataLoader:
         return resolved
 
     def _resolve_table_paths(self, tables: Any) -> dict[str, list[Path]]:
-        """Normalize a benchmark table mapping into ``dict[str, list[Path]]``."""
         if not isinstance(tables, dict):
             return {}
 
@@ -1186,7 +724,6 @@ class DataFrameDataLoader:
         return resolved
 
     def _expected_benchmark_tables(self, benchmark: Any) -> set[str]:
-        """Infer expected table names for a benchmark run when available."""
         expected: set[str] = set()
         benchmark_name = (
             getattr(benchmark, "name", None) or getattr(benchmark, "_name", None) or benchmark.__class__.__name__
@@ -1220,7 +757,6 @@ class DataFrameDataLoader:
         benchmark: Any,
         source_files: dict[str, list[Path]],
     ) -> dict[str, list[Path]]:
-        """Drop source files that are outside the benchmark's expected table set."""
         expected_tables = self._expected_benchmark_tables(benchmark)
         if not expected_tables:
             return {str(name).lower(): list(paths) for name, paths in source_files.items()}
@@ -1243,47 +779,25 @@ class DataFrameDataLoader:
         return filtered
 
     def _discover_files(self, data_dir: Path) -> dict[str, list[Path]]:
-        """Discover data files in a directory.
-
-        Args:
-            data_dir: Directory to scan
-
-        Returns:
-            Dictionary mapping table name to file path
-        """
         files: dict[str, list[Path]] = {}
 
         for pattern in ["*.tbl", "*.csv", "*.parquet"]:
             for file_path in data_dir.glob(pattern):
-                # Skip directories (e.g., *.parquet directories used for database output)
                 if file_path.is_dir():
-                    # Check if this is a parquet directory containing table files
-                    # (e.g., tpch_sf001.parquet/ containing lineitem.parquet, etc.)
                     parquet_files = list(file_path.glob("*.parquet"))
                     if parquet_files:
-                        # This is a valid parquet output directory - recurse into it
                         for pq_file in parquet_files:
                             if pq_file.is_file():
                                 table_name = pq_file.stem.lower()
                                 files.setdefault(table_name, []).append(pq_file)
                     continue
 
-                # Table name is stem of filename
                 table_name = file_path.stem.lower()
-                # Prefer existing entry if already found (TBL > CSV priority)
                 files.setdefault(table_name, []).append(file_path)
 
         return files
 
     def _detect_source_format(self, source_files: dict[str, Path | list[Path]]) -> DataFormat:
-        """Detect the format of source files.
-
-        Args:
-            source_files: Dictionary of table name to file path
-
-        Returns:
-            Detected DataFormat
-        """
         for path in source_files.values():
             paths = path if isinstance(path, list) else [path]
             for entry in paths:
@@ -1310,31 +824,13 @@ class DataFrameDataLoader:
         write_config: DataFrameWriteConfiguration | None = None,
         data_dir: Path | None = None,
     ) -> dict[str, Path | list[Path]]:
-        """Convert data files to target format.
-
-        Args:
-            benchmark: Benchmark instance for schema info
-            benchmark_name: Name of benchmark
-            scale_factor: Scale factor
-            source_files: Source file paths
-            source_format: Source format
-            target_format: Target format
-            source_hash: Hash of source files
-            write_config: Optional write configuration for physical layout
-
-        Returns:
-            Dictionary mapping table name to converted file path
-        """
         if target_format != DataFormat.PARQUET:
-            # Currently only support CSV→Parquet conversion
             logger.warning(f"Conversion to {target_format.value} not supported, using source")
             return source_files
 
-        # Get cache path for output
         cache_path = self.cache.get_cache_path(benchmark_name, scale_factor, target_format)
         cache_path.mkdir(parents=True, exist_ok=True)
 
-        # Log write config if provided
         if write_config and not write_config.is_default():
             enabled_types = write_config.get_enabled_types()
             logger.info(
@@ -1344,13 +840,8 @@ class DataFrameDataLoader:
         else:
             logger.info(f"Converting {len(source_files)} tables from CSV/TBL to Parquet")
 
-        # Get schema info for column names and types
         schema_info = self._get_schema_info(benchmark)
         pyarrow_types = self._get_pyarrow_types(benchmark)
-        # Single CSV dialect source: one resolved dialect per table (manifest
-        # metadata, then benchmark attributes, then format defaults) feeds the
-        # null marker, delimiter, and header alike, so the DataFrame surface
-        # cannot interpret the same metadata differently from the SQL loader.
         table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
         dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
 
@@ -1390,7 +881,6 @@ class DataFrameDataLoader:
             if table_write_config and not table_write_config.is_default():
                 table_metadata[table_name]["write_config"] = table_write_config.to_dict()
 
-        # Save manifest
         self.cache.save_manifest(
             benchmark=benchmark_name,
             scale_factor=scale_factor,
@@ -1422,7 +912,6 @@ class DataFrameDataLoader:
         null_marker: str | None = "",
         has_header: bool = False,
     ) -> tuple[list[Path], list[dict[str, Any]]]:
-        """Convert a single table's source files to Parquet."""
         converted_list: list[Path] = []
         table_entries: list[dict[str, Any]] = []
 
@@ -1464,10 +953,6 @@ class DataFrameDataLoader:
         return converted_list, table_entries
 
     def _prune_cache_leaf_files(self, cache_path: Path, tracked_files: set[str]) -> int:
-        """Prune untracked leaf files from a cache directory.
-
-        Keeps `_manifest.json` and the tracked file names for the current run.
-        """
         if not cache_path.exists():
             return 0
 
@@ -1487,37 +972,20 @@ class DataFrameDataLoader:
         table_name: str,
         column_names: list[str] | None,
     ) -> DataFrameWriteConfiguration | None:
-        """Get write configuration filtered for a specific table.
-
-        Filters out sort columns that don't exist in this table's schema.
-
-        Args:
-            write_config: Base write configuration
-            table_name: Name of the table
-            column_names: Column names in the table
-
-        Returns:
-            Filtered write configuration or None
-        """
         if write_config is None or write_config.is_default():
             return write_config
 
         if column_names is None:
-            # Can't filter without column names
             return write_config
 
-        # Filter sort_by columns to only include those that exist in this table
         valid_columns = set(column_names)
         filtered_sort_by = [s for s in write_config.sort_by if s.name in valid_columns]
 
-        # Filter partition_by columns similarly
         filtered_partition_by = [p for p in write_config.partition_by if p.name in valid_columns]
 
-        # Filter dictionary columns
         filtered_dict_cols = [c for c in write_config.dictionary_columns if c in valid_columns]
         filtered_skip_dict_cols = [c for c in write_config.skip_dictionary_columns if c in valid_columns]
 
-        # Return a new config with filtered columns
         return DataFrameWriteConfiguration(
             partition_by=filtered_partition_by,
             sort_by=filtered_sort_by,
@@ -1532,12 +1000,6 @@ class DataFrameDataLoader:
 
     @staticmethod
     def _read_manifest_dialect_hints(data_dir: Path | None, table_names: list[str]) -> dict[str, dict[str, Any]]:
-        """Read per-table CSV dialect metadata from the datagen manifest, if present.
-
-        Returns an empty mapping when there is no data directory or no usable
-        manifest, in which case dialect resolution falls back to benchmark
-        attributes and format defaults exactly as before.
-        """
         if data_dir is None or not table_names:
             return {}
         from benchbox.platforms.base.data_loading import ManifestFileSource
@@ -1551,14 +1013,6 @@ class DataFrameDataLoader:
         source_files: dict[str, Path | list[Path]],
         table_metadata: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, CsvDialect]:
-        """Resolve one shared CSV dialect per table through ``resolve_csv_dialect``.
-
-        Manifest metadata (when provided) wins per field, then benchmark
-        attributes, then format defaults -- the same precedence the SQL loader
-        uses. On any per-table resolution failure the dialect falls back to the
-        historical attribute-only reading (benchmark delimiter/header, empty ->
-        NULL marker).
-        """
         from benchbox.platforms.base.data_loading import CsvDialect, DataSource, resolve_csv_dialect
 
         dialects: dict[str, CsvDialect] = {}
@@ -1588,36 +1042,17 @@ class DataFrameDataLoader:
         source_files: dict[str, Path | list[Path]],
         table_metadata: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, str | None]:
-        """Resolve each table's CSV null marker the same way the SQL loader does.
-
-        Returns a per-table marker: ``None`` means empty fields are kept as empty
-        strings (no NULL conversion, e.g. ClickBench), ``""`` means an empty field
-        becomes NULL (e.g. JoinOrder, TPC ``.tbl``). Threading this into the
-        Parquet conversion makes the DataFrame surface materialize empty strings
-        the same way its DuckDB SQL reference does. On any resolution failure the
-        marker defaults to ``""`` (prior behavior: empty -> NULL).
-        """
         return {
             table_name: dialect.null_marker
             for table_name, dialect in self._resolve_table_dialects(benchmark, source_files, table_metadata).items()
         }
 
     def _get_schema_info(self, benchmark: Any) -> dict[str, list[str]]:
-        """Extract column names from benchmark schema.
-
-        Args:
-            benchmark: Benchmark instance
-
-        Returns:
-            Dictionary mapping table name to list of column names
-        """
         schema_info: dict[str, list[str]] = {}
 
         for table_name, columns in get_benchmark_schema_columns(benchmark).items():
             schema_info[table_name] = [column["name"] for column in columns]
 
-        # Merge TPC-H base table schema for any tables not already covered
-        # (e.g. Write Primitives returns staging table schemas but uses TPC-H base data)
         try:
             from benchbox.core.tpch.schema import TABLES
 
@@ -1630,18 +1065,6 @@ class DataFrameDataLoader:
         return schema_info
 
     def _get_pyarrow_types(self, benchmark: Any) -> dict[str, dict[str, str]]:
-        """Extract PyArrow column types from benchmark schema.
-
-        Returns a mapping of table_name -> {column_name: pyarrow_type_string}
-        used to ensure proper type casting during CSV-to-Parquet conversion
-        (e.g. date columns typed as date32 instead of inferred as strings).
-
-        Args:
-            benchmark: Benchmark instance
-
-        Returns:
-            Dictionary mapping table name to dict of column name -> PyArrow type
-        """
         type_info: dict[str, dict[str, str]] = {}
 
         for table_name, columns in get_benchmark_schema_columns(benchmark).items():
@@ -1653,7 +1076,6 @@ class DataFrameDataLoader:
             if col_types:
                 type_info[table_name] = col_types
 
-        # Merge TPC-H base table types for any tables not already covered
         try:
             from benchbox.core.tpch.schema import TABLES
 
@@ -1672,7 +1094,6 @@ class DataFrameDataLoader:
         return type_info
 
     def _extract_arrow_types(self, columns: Any, get_name, get_sql_type) -> dict[str, str]:
-        """Extract supported Arrow types from a schema column iterable."""
         col_types: dict[str, str] = {}
         for column in columns:
             arrow_type = SchemaMapper.sql_type_to_pyarrow(str(get_sql_type(column)))
@@ -1682,17 +1103,11 @@ class DataFrameDataLoader:
 
 
 def get_tpch_column_names() -> dict[str, list[str]]:
-    """Get column names for all TPC-H tables.
-
-    Returns:
-        Dictionary mapping table name to column names
-    """
     try:
         from benchbox.core.tpch.schema import TABLES
 
         return {table.name.lower(): [col.name for col in table.columns] for table in TABLES}
     except ImportError:
-        # Fallback hardcoded columns (TPC-H spec)
         return {
             "region": ["r_regionkey", "r_name", "r_comment"],
             "nation": ["n_nationkey", "n_name", "n_regionkey", "n_comment"],
@@ -1752,15 +1167,9 @@ def get_tpch_column_names() -> dict[str, list[str]]:
 
 
 def get_tpcds_column_names() -> dict[str, list[str]]:
-    """Get column names for TPC-DS tables.
-
-    Returns:
-        Dictionary mapping table name to column names
-    """
     try:
         from benchbox.core.tpcds.schema import TABLES
 
         return {table.name.lower(): [col.name for col in table.columns] for table in TABLES}
     except ImportError:
-        # TPC-DS has ~24 tables, return empty and let schema inference handle it
         return {}

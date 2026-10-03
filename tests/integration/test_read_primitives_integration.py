@@ -1,19 +1,8 @@
-"""Integration tests for Primitives primitives_benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains integration tests for the Primitives primitives_benchmark:
-- TestPrimitivesIntegration: End-to-end integration tests
-- TestReadPrimitivesBenchmarkExtended: Extended primitives_benchmark functionality tests
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-These tests verify the complete functionality of the Primitives primitives_benchmark,
-including database integration, query execution, and full primitives_benchmark workflows.
-All tests are marked with @pytest.mark.integration to allow selective execution.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sqlite3
 import tempfile
@@ -33,28 +22,21 @@ pytestmark = [
 
 @pytest.mark.integration
 class TestPrimitivesIntegration:
-    """Test integration between different Primitives components."""
-
     def test_end_to_end_small_dataset(self):
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Initialize primitives_benchmark
             primitives_benchmark = ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=temp_dir)
 
-            # Generate data for subset of tables
             file_paths = primitives_benchmark.generate_data(["region", "nation", "customer"])
 
-            # Verify files were created (at least 2 tables should be generated)
             assert len(file_paths) >= 2, f"Expected at least 2 tables, got {len(file_paths)}: {list(file_paths.keys())}"
             for file_path in file_paths.values():
                 assert Path(file_path).exists()
                 assert Path(file_path).stat().st_size > 0
 
-            # Test that we can get queries
             queries = primitives_benchmark.get_queries()
             assert len(queries) > 0
 
-            # Test that schema is accessible
             schema = primitives_benchmark.get_schema()
             assert len(schema) == 8
 
@@ -63,7 +45,6 @@ class TestPrimitivesIntegration:
         primitives_benchmark = ReadPrimitivesBenchmark()
         queries = primitives_benchmark.get_queries()
 
-        # Test a few representative queries
         test_queries = [
             "aggregation_simple",
             "filter_bigint_selective",
@@ -74,11 +55,9 @@ class TestPrimitivesIntegration:
             if query_id in queries:
                 query = queries[query_id]
 
-                # Basic SQL structure checks
                 assert "SELECT" in query.upper()
                 assert "FROM" in query.upper()
 
-                # Check for table references that exist in schema
                 query_upper = query.upper()
                 table_found = False
                 for table_name in TABLES:
@@ -90,11 +69,8 @@ class TestPrimitivesIntegration:
 
 @pytest.mark.integration
 class TestReadPrimitivesBenchmarkExtended:
-    """Extended tests for ReadPrimitivesBenchmark class for better coverage."""
-
     @pytest.fixture
     def primitives_benchmark(self):
-        """Create a ReadPrimitivesBenchmark instance for testing."""
         with tempfile.TemporaryDirectory() as temp_dir:
             return ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=temp_dir)
 
@@ -121,7 +97,7 @@ class TestReadPrimitivesBenchmarkExtended:
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
         mock_connection.cursor.return_value = mock_cursor
-        del mock_connection.execute  # Remove execute method to force cursor path
+        del mock_connection.execute
 
         with patch.object(primitives_benchmark, "get_query") as mock_get_query:
             mock_get_query.return_value = "SELECT * FROM orders"
@@ -148,7 +124,6 @@ class TestReadPrimitivesBenchmarkExtended:
 
     def test_load_data_to_database_executescript_path(self, primitives_benchmark: ReadPrimitivesBenchmark):
 
-        # Set up mock data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
             csv_file.write_text(
@@ -173,7 +148,6 @@ class TestReadPrimitivesBenchmarkExtended:
 
     def test_load_data_to_database_cursor_mode(self, primitives_benchmark: ReadPrimitivesBenchmark):
 
-        # Set up mock data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
             csv_file.write_text("0|AFRICA|lar deposits\n")
@@ -196,8 +170,6 @@ class TestReadPrimitivesBenchmarkExtended:
                 mock_connection.commit.assert_called_once()
 
     def test_load_data_to_database_no_commit(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test load_data_to_database when connection doesn't have commit."""
-        # Set up mock data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
             csv_file.write_text("0|AFRICA|lar deposits\n")
@@ -212,7 +184,6 @@ class TestReadPrimitivesBenchmarkExtended:
             with patch.object(primitives_benchmark, "get_create_tables_sql") as mock_get_sql:
                 mock_get_sql.return_value = "CREATE TABLE region (...);"
 
-                # Should not raise an exception
                 primitives_benchmark.load_data_to_database(mock_connection)
 
     def test_run_benchmark_with_categories(self, primitives_benchmark: ReadPrimitivesBenchmark):
@@ -238,7 +209,7 @@ class TestReadPrimitivesBenchmarkExtended:
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
             mock_execute.return_value = [("result1",), ("result2",), ("result3",)]
             with patch("time.perf_counter") as mock_time:
-                mock_time.side_effect = [0.0, 0.5, 1.0, 1.3]  # Two iterations
+                mock_time.side_effect = [0.0, 0.5, 1.0, 1.3]
 
                 result = primitives_benchmark.run_benchmark(
                     mock_connection, queries=["aggregation_simple"], iterations=2
@@ -246,7 +217,7 @@ class TestReadPrimitivesBenchmarkExtended:
 
                 query_result = result["queries"]["aggregation_simple"]
                 assert query_result["category"] == "aggregation"
-                assert abs(query_result["avg_time"] - 0.4) < 0.01  # (0.5 + 0.3) / 2
+                assert abs(query_result["avg_time"] - 0.4) < 0.01
                 assert abs(query_result["min_time"] - 0.3) < 0.01
                 assert abs(query_result["max_time"] - 0.5) < 0.01
                 assert query_result["iterations"][0]["rows"] == 3
@@ -297,7 +268,6 @@ class TestReadPrimitivesBenchmarkExtended:
 
     def test_sqlite_integration_with_real_data(self, primitives_benchmark: ReadPrimitivesBenchmark):
 
-        # Generate some test data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
             csv_file.write_text(
@@ -306,14 +276,11 @@ class TestReadPrimitivesBenchmarkExtended:
 
             primitives_benchmark.tables = {"region": str(csv_file)}
 
-            # in-memory SQLite database
             conn = sqlite3.connect(":memory:")
 
             try:
-                # This should work without errors
                 primitives_benchmark.load_data_to_database(conn, tables=["region"])
 
-                # Verify data was loaded
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM region")
                 count = cursor.fetchone()[0]
@@ -322,20 +289,18 @@ class TestReadPrimitivesBenchmarkExtended:
                 cursor.execute("SELECT r_regionkey, r_name FROM region ORDER BY r_regionkey")
                 rows = cursor.fetchall()
                 assert len(rows) == 2
-                assert rows[0][0] == 0  # r_regionkey
-                assert rows[0][1] == "AFRICA"  # r_name
-                assert rows[1][0] == 1  # r_regionkey
-                assert rows[1][1] == "AMERICA"  # r_name
+                assert rows[0][0] == 0
+                assert rows[0][1] == "AFRICA"
+                assert rows[1][0] == 1
+                assert rows[1][1] == "AMERICA"
 
             finally:
                 conn.close()
 
     def test_load_data_batch_processing(self, primitives_benchmark: ReadPrimitivesBenchmark):
 
-        # Set up mock data with many rows to test batching
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
-            # 5 rows of data
             data_lines = [f"{i}|REGION_{i}|comment for region {i}" for i in range(5)]
             csv_file.write_text("\n".join(data_lines) + "\n")
 
@@ -351,7 +316,6 @@ class TestReadPrimitivesBenchmarkExtended:
 
                 primitives_benchmark.load_data_to_database(mock_connection)
 
-                # Verify executemany was called with the correct data
                 call_args = mock_connection.executemany.call_args
                 assert call_args is not None
                 sql, data = call_args[0]
@@ -394,6 +358,6 @@ class TestReadPrimitivesBenchmarkExtended:
             result = primitives_benchmark.run_benchmark(mock_connection, queries=["aggregation_simple"], iterations=1)
 
             query_result = result["queries"]["aggregation_simple"]
-            assert query_result["min_time"] == float("inf")  # Should remain inf if no successful iterations
+            assert query_result["min_time"] == float("inf")
             assert query_result["max_time"] == 0
             assert query_result["avg_time"] == 0

@@ -1,18 +1,6 @@
-"""Unit tests for DuckDB DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the DuckDBDDLGenerator class for:
-- Sort clause generation for CTAS patterns
-- Version handling (for API compatibility)
-- CTAS DDL generation with sorting
-- Partitioned export generation
-
-Note: DuckDB does NOT support inline ORDER BY in CREATE TABLE statements.
-Sorting is achieved via CTAS patterns: CREATE TABLE t AS SELECT * FROM src ORDER BY col
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -37,8 +25,6 @@ pytestmark = [
 
 
 class TestVersionParsing:
-    """Tests for version parsing utilities."""
-
     def test_parse_simple_version(self) -> None:
 
         assert parse_version("0.10.0") == (0, 10, 0)
@@ -67,17 +53,10 @@ class TestVersionParsing:
         assert len(version) >= 3
 
     def test_supports_order_by_always_true(self) -> None:
-        """Test that supports_order_by always returns True.
-
-        DuckDB always supports sorted table creation via CTAS patterns.
-        """
-        # supports_order_by() always returns True now
         assert supports_order_by() is True
 
 
 class TestDuckDBDDLGenerator:
-    """Tests for DuckDBDDLGenerator class."""
-
     def test_platform_name(self) -> None:
 
         generator = DuckDBDDLGenerator()
@@ -102,9 +81,7 @@ class TestDuckDBDDLGenerator:
             ],
         )
         clauses = generator.generate_tuning_clauses(table_tuning)
-        # DuckDB uses sort_by for CTAS patterns, not order_by
         assert clauses.sort_by == "ORDER BY l_shipdate, l_orderkey"
-        # order_by should be None (not used for inline CREATE TABLE)
         assert clauses.order_by is None
 
     def test_generate_tuning_clauses_respects_order(self) -> None:
@@ -130,7 +107,6 @@ class TestDuckDBDDLGenerator:
     def test_generate_tuning_clauses_empty_tuning(self) -> None:
 
         generator = DuckDBDDLGenerator()
-        # TableTuning with partitioning but no sorting
         table_tuning = TableTuning(
             table_name="test",
             partitioning=[TuningColumn(name="date", type="DATE", order=1)],
@@ -153,21 +129,14 @@ class TestDuckDBDDLGenerator:
             assert "Distribution tuning not applicable" in mock_logger.warning.call_args[0][0]
 
     def test_supports_order_by_clause_property(self) -> None:
-        """Test that supports_order_by_clause always returns True.
-
-        DuckDB supports sorting via CTAS patterns regardless of version.
-        """
         generator = DuckDBDDLGenerator()
         assert generator.supports_order_by_clause is True
 
-        # Even with explicit version check enabled, it should return True
         generator_with_check = DuckDBDDLGenerator(check_version=True)
         assert generator_with_check.supports_order_by_clause is True
 
 
 class TestDuckDBDDLGeneratorCreateTable:
-    """Tests for CREATE TABLE DDL generation."""
-
     def test_basic_create_table(self) -> None:
 
         generator = DuckDBDDLGenerator()
@@ -182,10 +151,6 @@ class TestDuckDBDDLGeneratorCreateTable:
         assert ddl.endswith(";")
 
     def test_create_table_without_order_by(self) -> None:
-        """Test that CREATE TABLE does NOT include ORDER BY.
-
-        DuckDB doesn't support inline ORDER BY in CREATE TABLE statements.
-        """
         generator = DuckDBDDLGenerator()
         columns = [
             ColumnDefinition("order_id", "BIGINT"),
@@ -199,9 +164,7 @@ class TestDuckDBDDLGeneratorCreateTable:
         )
         ddl = generator.generate_create_table_ddl("orders", columns, tuning=tuning)
         assert "CREATE TABLE orders" in ddl
-        # ORDER BY should NOT be in CREATE TABLE DDL
         assert "ORDER BY" not in ddl
-        # But the tuning should have sort_by for CTAS usage
         assert tuning.sort_by == "ORDER BY order_date"
 
     def test_create_table_if_not_exists(self) -> None:
@@ -220,8 +183,6 @@ class TestDuckDBDDLGeneratorCreateTable:
 
 
 class TestDuckDBCTAS:
-    """Tests for CREATE TABLE AS (CTAS) DDL generation."""
-
     def test_basic_ctas(self) -> None:
 
         generator = DuckDBDDLGenerator()
@@ -253,7 +214,6 @@ class TestDuckDBCTAS:
         assert ddl.endswith(";")
 
     def test_ctas_with_or_replace(self) -> None:
-        """Test CTAS with OR REPLACE (or_replace=True)."""
         generator = DuckDBDDLGenerator()
         ddl = generator.generate_ctas_ddl(
             table_name="test",
@@ -274,8 +234,6 @@ class TestDuckDBCTAS:
 
 
 class TestDuckDBPartitionedExport:
-    """Tests for partitioned COPY TO generation."""
-
     def test_generate_copy_to_partitioned(self) -> None:
 
         generator = DuckDBDDLGenerator()
@@ -311,8 +269,6 @@ class TestDuckDBPartitionedExport:
 
 
 class TestDuckDBIntegration:
-    """Integration tests with actual DuckDB."""
-
     @pytest.mark.integration
     def test_create_table_executes(self) -> None:
 
@@ -326,11 +282,9 @@ class TestDuckDBIntegration:
         ]
         ddl = generator.generate_create_table_ddl("events", columns)
 
-        # Execute in DuckDB
         conn = duckdb.connect(":memory:")
         try:
             conn.execute(ddl)
-            # Verify table exists
             result = conn.execute("SELECT COUNT(*) FROM events").fetchone()
             assert result[0] == 0
         finally:
@@ -353,7 +307,6 @@ class TestDuckDBIntegration:
 
         conn = duckdb.connect(":memory:")
         try:
-            # Create source table with test data
             conn.execute("""
                 CREATE TABLE raw_events (
                     id BIGINT,
@@ -368,7 +321,6 @@ class TestDuckDBIntegration:
                 (2, '2024-01-02 10:00:00', 20.0)
             """)
 
-            # Create sorted table using CTAS
             ctas_ddl = generator.generate_ctas_ddl(
                 table_name="sorted_events",
                 source_query="SELECT * FROM raw_events",
@@ -376,11 +328,9 @@ class TestDuckDBIntegration:
             )
             conn.execute(ctas_ddl)
 
-            # Verify table exists and has correct row count
             result = conn.execute("SELECT COUNT(*) FROM sorted_events").fetchone()
             assert result[0] == 3
 
-            # Verify data is sorted by created_at, id
             rows = conn.execute("SELECT id FROM sorted_events").fetchall()
             assert [r[0] for r in rows] == [1, 2, 3]
         finally:
@@ -396,7 +346,6 @@ class TestDuckDBIntegration:
 
         generator = DuckDBDDLGenerator()
 
-        # Create test data
         conn = duckdb.connect(":memory:")
         try:
             conn.execute("""
@@ -413,7 +362,6 @@ class TestDuckDBIntegration:
                 (3, '2024-02-01', 150.0)
             """)
 
-            # Export with partitioning
             with tempfile.TemporaryDirectory() as tmpdir:
                 output_path = Path(tmpdir) / "orders"
                 sql = generator.generate_copy_to_partitioned(
@@ -423,7 +371,6 @@ class TestDuckDBIntegration:
                 )
                 conn.execute(sql)
 
-                # Verify partitioned output exists
                 assert output_path.exists()
                 parquet_files = list(output_path.rglob("*.parquet"))
                 assert len(parquet_files) > 0

@@ -1,12 +1,6 @@
-"""Write Primitives data generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Generates staging data and bulk load files for write primitives benchmark.
-Reuses TPC-H base data to avoid duplication.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -14,12 +8,6 @@ from benchbox.core.primitives.generator_base import PrimitivesDataGeneratorBase
 
 
 class WritePrimitivesDataGenerator(PrimitivesDataGeneratorBase):
-    """Write Primitives data generator.
-
-    Reuses TPC-H data for base tables and generates staging tables
-    and bulk load files for write operations testing.
-    """
-
     _benchmark_name = "write_primitives"
     _display_name = "Write Primitives"
     _auxiliary_dir = "write_primitives_auxiliary"

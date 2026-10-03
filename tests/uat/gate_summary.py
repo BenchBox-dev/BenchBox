@@ -1,38 +1,3 @@
-"""Gate summary artifact: `uat_gate_summary.json`.
-
-Versioned, machine-readable per-sweep summary written beside `cells.jsonl` at
-the end of every sweep run through `tests.uat.orchestrator.run_sweep`
-(including dry-run sweeps, whose `verdict` is `"dry_run"` rather than
-`"green"`/`"red"` so a dry-run e2e check has something concrete to assert
-against without being misread as a real release-gate result).
-
-This is one summary per *stage* (one `make uat-sweep` invocation). The
-release-gate contract runs three stages; `make uat-gate-check`
-(`_cli.py`'s `gate-check` subcommand) aggregates all three stage summaries
-into the combined, committed release-evidence file that
-`scripts/release_readiness_check.py` reads -- see
-`build_combined_evidence` below.
-
-Schema is additive-versioned (`version: 1`): existing field names never
-change meaning, and `read_gate_summary`/`read_combined_evidence` ignore
-unknown keys, so a later summary with new fields never breaks an older
-checker -- see the "keystone" TODO's `approach` note. Downstream consumers
-(notably `scripts/release_readiness_check.py`) rely on that additive
-contract rather than validating `version` explicitly; bump the version
-constant only alongside a consumer that branches on it.
-
-Per-stage verdict derivation is deliberately narrow: it reduces to "did any
-phase this sweep ran end non-zero" (`derive_verdict`). Every phase already
-folds its own floor/accounting checks into its own `exit_code()` (the
-validate and report phases' floor breaches, in particular), so re-deriving
-those checks here would duplicate logic that can drift. The two checklist
-items that do NOT show up in any phase's exit code -- an accounting sidecar
-missing (`unreachable_is_estimated`) and explorer_smoke silently skipping
-(non-fatal by design) -- are captured as raw fields on the summary instead,
-and are enforced by `build_combined_evidence` at aggregation time, not by
-this module's verdict.
-"""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -55,10 +20,6 @@ VERDICT_DRY_RUN = "dry_run"
 EXPLORER_SMOKE_NOT_RUN = "not_run"
 EXPLORER_SMOKE_RAN = "ran"
 
-# The exact stage set (config `name:` fields) release evidence must be built
-# from -- tests/uat/configs/release-gate-0{1,2,3}-*.yaml. Aggregation reasons
-# on any mismatch, which kills both the pass-the-same-run-dir-three-times
-# footgun and substituting a hollow ad-hoc config for a real stage.
 EXPECTED_RELEASE_GATE_STAGES = (
     "release-gate-01-native-dataframe",
     "release-gate-02-docker-nonoltp",
@@ -67,32 +28,17 @@ EXPECTED_RELEASE_GATE_STAGES = (
 
 
 def gate_summary_path(log_dir: Path) -> Path:
-    """The one filename convention writer and reader share -- mirrors `cells_accounting_path`."""
     return log_dir / GATE_SUMMARY_FILENAME
 
 
 @dataclass(frozen=True)
 class PhaseAccounting:
-    """Per-sweep cell counts, disjoint components mirroring the report-phase footer.
-
-    ``unvalidated`` is the one exception to "disjoint components": it mirrors
-    ``ReportSummary.unvalidated_count`` (see `tests/uat/phases/report.py`), a
-    cross-cutting visibility count of ``passed`` cells whose
-    ``submit_terminal_state`` is ``unvalidated`` -- already included in
-    ``passed``/``attempted``, not a fifth bucket alongside them, and must
-    never make a stage's verdict red on its own
-    (unvalidated-results-misclassified-as-schema-violations).
-    """
-
     attempted: int = 0
     passed: int = 0
     failed: int = 0
     timed_out: int = 0
     unreachable: int = 0
     startup_failed: int = 0
-    # Cells whose platform died partway through its own cell list -- see
-    # ReportSummary.died_mid_platform_count. A disjoint component of
-    # total_defined, like startup_failed.
     died_mid_platform: int = 0
     skipped: int = 0
     compatibility_pruned: int = 0
@@ -104,13 +50,11 @@ class PhaseAccounting:
 
 @dataclass(frozen=True)
 class GateSummary:
-    """One stage's machine-readable release-gate evidence."""
-
     config_name: str
     source_commit_sha: str
     source_dirty: bool
     container_engine: str | None
-    completed_at: str  # ISO 8601 with UTC offset, tests.uat.orchestrator._dt.datetime.now().astimezone().isoformat()
+    completed_at: str
     dry_run: bool
     aborted: bool
     abort_phase: str | None
@@ -126,34 +70,8 @@ class GateSummary:
     cross_scale_floor_breached: bool | None
     explorer_smoke_status: str
     verdict: str
-    # Machine-readable abort taxonomy ("disk_floor", "memory_floor",
-    # "docker_required", "local_platform_unreachable", ...) beside the human
-    # `abort_reason` prose. Without it every abort looks alike to a machine
-    # reader: a sweep killed by the free-memory floor was distinguishable
-    # from one killed by the disk floor only by substring-matching the
-    # reason text. Additive, defaulted, and declared last so existing
-    # constructors are unaffected -- per this module's schema contract
-    # readers drop unknown keys and older summaries simply lack the field,
-    # so no version bump (no consumer branches on `version`). None on
-    # non-aborted sweeps and on aborts from phases that do not classify
-    # (validate/report).
     abort_kind: str | None = None
-    # Per-stage artifact provenance binding (uat-evidence-provenance-binding
-    # w1): sha256 digests of the stage artifacts computed at artifact-write
-    # time in tests.uat.orchestrator so gate-check can recompute and reject
-    # a mismatch. Additive and optional: older stage summaries simply lack
-    # the key (forward-compat via _dataclass_from_payload's unknown-key
-    # drop, plus build_combined_evidence's explicit "regenerate" HOLD for
-    # digests is None). Keys are fixed: cells_jsonl, accounting_sidecar,
-    # lifecycle_log. A value of None means the file was absent at capture
-    # time (e.g. an aborted sweep before its accounting sidecar was written);
-    # recomputation sees a missing file as the same "absent" digest so an
-    # honest aborted summary is not flagged as tampered.
     artifact_digests: dict[str, str | None] | None = None
-    # Threat-model note, not signed: digests are recomputed locally, so
-    # they prove the committed summary matches the stage directories the
-    # operator pointed gate-check at — not that those directories are the
-    # "authentic" originals. See _project/release-evidence/README.md.
     version: int = GATE_SUMMARY_SCHEMA_VERSION
 
     def to_json_dict(self) -> dict:
@@ -161,15 +79,6 @@ class GateSummary:
 
 
 def derive_verdict(*, dry_run: bool, aborted: bool, phase_exit_codes: dict[str, int]) -> str:
-    """Derive the single green|red|dry_run verdict for one stage's sweep.
-
-    Deliberately does not re-check floor breaches or per-status counts
-    directly: the validate and report phases already fold those into their
-    own `exit_code()` (see `tests.uat.phases.report.ReportSummary.exit_code`
-    and `tests.uat.phases.validate.ValidateResult.exit_code`), so a nonzero
-    entry anywhere in `phase_exit_codes` already means "this phase was not
-    clean," whatever the reason.
-    """
     if dry_run:
         return VERDICT_DRY_RUN
     if aborted:
@@ -186,7 +95,6 @@ def write_gate_summary(log_dir: Path, summary: GateSummary) -> Path:
 
 
 def _dataclass_from_payload(cls: type, payload: dict) -> object:
-    """Build `cls` from `payload`, silently dropping unknown keys (forward compat)."""
     known = {f.name for f in fields(cls)}
     return cls(**{k: v for k, v in payload.items() if k in known})
 
@@ -201,16 +109,6 @@ def read_gate_summary(path: Path) -> GateSummary:
     return GateSummary(**{k: v for k, v in payload.items() if k in known})  # type: ignore[arg-type]
 
 
-# ---------------------------------------------------------------------------
-# Combined release-gate evidence: aggregates the 3 release-gate stage
-# summaries into the one file the operator commits to
-# `_project/release-evidence/uat-gate-summary.json` -- see `make
-# uat-gate-check` / `_cli.py`'s `gate-check` subcommand, which owns the file
-# I/O (reading each stage's uat_lifecycle.log for the ordering check); this
-# module stays pure/testable.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class CombinedGateEvidence:
     verdict: str
@@ -222,12 +120,6 @@ class CombinedGateEvidence:
     stage_verdicts: dict[str, str]
     ordering_violations: tuple[str, ...]
     reasons: tuple[str, ...]
-    # Carried through from the per-stage GateSummary artifact_digests so the
-    # combined evidence — the one file that is committed and later read by
-    # scripts/release_readiness_check.py — preserves the provenance binding.
-    # None when any stage lacked digests (then build_combined_evidence already
-    # issued a "regenerate" HOLD). Additive, optional like its stage
-    # counterpart.
     stage_artifact_digests: dict[str, dict[str, str | None]] | None = None
     version: int = COMBINED_EVIDENCE_SCHEMA_VERSION
 
@@ -241,25 +133,10 @@ def build_combined_evidence(
     ordering_violations: Sequence[str],
     generated_at: _dt.datetime,
 ) -> CombinedGateEvidence:
-    """Aggregate 3 stage `GateSummary` records into one release-evidence verdict.
-
-    Mechanized APPROVE checklist (docs/operations/uat-framework.md
-    "APPROVE / HOLD gate"): every stage's own verdict is green, every
-    stage's accounting sidecar was present (not estimated), and
-    explorer_smoke actually ran for every stage whose `phases:` list
-    included it (`"explorer_smoke" in phase_exit_codes` is the same
-    membership test the orchestrator's own phase loop uses -- a phase not
-    reached because of an earlier abort never gets a `phase_exit_codes`
-    entry, so it correctly does not trigger this check).
-    """
     reasons: list[str] = []
     if len(stage_summaries) != 3:
         reasons.append(f"expected 3 release-gate stage summaries, got {len(stage_summaries)}")
 
-    # Defense-in-depth against honest operator error: the three summaries
-    # must be the three distinct release-gate stage configs, in order --
-    # not the same run dir passed thrice, and not an ad-hoc config standing
-    # in for a real stage.
     actual_stage_names = tuple(s.config_name for s in stage_summaries)
     if actual_stage_names != EXPECTED_RELEASE_GATE_STAGES:
         reasons.append(
@@ -290,17 +167,12 @@ def build_combined_evidence(
             )
         if stage.validator_clean_rate_floor is None or stage.cross_scale_floor is None:
             reasons.append(f"stage {stage.config_name!r} floor gates were not configured")
-        # sha='unknown' (git failure swallowed) must not pass locally even though CI
-        # fails closed later on the ancestry check: the operator acts on the local
-        # APPROVE, so a lying local gate erodes trust in the whole chain.
         if stage.source_commit_sha == "unknown":
             reasons.append(
                 f"stage {stage.config_name!r} source_commit_sha is 'unknown': "
                 "git rev-parse failed to capture provenance — regenerate evidence "
                 "from a repo checkout where `git rev-parse HEAD` succeeds"
             )
-        # Artifact digest provenance (w1/w2): older summaries lack artifact_digests
-        # entirely, so this is a HOLD with a regenerate message, not a crash.
         if stage.artifact_digests is None:
             reasons.append(
                 f"stage {stage.config_name!r} has no artifact digests: "
@@ -316,10 +188,6 @@ def build_combined_evidence(
 
     verdict = VERDICT_GREEN if not reasons else VERDICT_RED
 
-    # Preserve the per-stage digests in the committed combined evidence so the
-    # file that release_readiness_check reads still carries the binding. None
-    # when any stage lacked digests (already a HOLD via the loop above), but
-    # still carried so the regenerate path can see which stages are stale.
     stage_artifact_digests: dict[str, dict[str, str | None]] | None = None
     if all(s.artifact_digests is not None for s in stage_summaries):
         stage_artifact_digests = {

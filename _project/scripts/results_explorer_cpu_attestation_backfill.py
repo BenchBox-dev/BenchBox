@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Backfill operator-attested CPU identity into curated Explorer bundles.
-
-No historical result recorded a CPU. The capture path took ``cpu_model`` from
-``platform.processor()`` (the bare architecture on Darwin) and dropped
-``cpu_vendor`` entirely, and the DataFrame adapters recorded no client host at
-all -- see ``fix/cpu-identity-capture-source`` and the
-``dataframe-client-host-capture-gap`` tracker item. So there is no measured
-value in the archive to recover: 4 of 3845 raw local results carry a CPU, and
-all four post-date the fix.
-
-The values written here are therefore an OPERATOR ATTESTATION, not a
-measurement. The project maintainer attests that every run in this corpus
-executed on one machine -- natively, or driving Apple container Linux images
-whose engines share that host's CPU. That is consistent with the recorded
-evidence: every bundle carrying a client host records ``Darwin``/``arm64`` and
-the raw archive shows a single ``machine_id``.
-
-The attestation is recorded in the emitted manifest and in
-``results-data/CORPUS_NOTES.md`` and as typed in-band CPU identity provenance.
-
-Default mode is a dry run. ``--write`` rewrites bundles, companions and
-manifests atomically and emits the migration manifest.
-
-IMPORTANT: ``result_id`` embeds a SHA-256 prefix of the raw bundle bytes, so
-editing a bundle renumbers it. That is expected and has precedent
-(``path-privacy-migration``, ``unread-identifier-field-drop`` each renumbered
-all 207 entries); the emitted manifest records every old -> new mapping.
-"""
 
 from __future__ import annotations
 
@@ -103,18 +75,6 @@ CLI_DESCRIPTION = (
 
 
 def _inject_cpu(data: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of *data* carrying the attested CPU identity.
-
-    Mirrors the shape ``build_environment_payload`` produces: the fields live
-    inside ``environment.client_host`` and are also mirrored at the flat
-    ``environment`` level, which is the legacy surface older readers use.
-
-    Only the CPU fields are written. os / arch / python are NOT synthesized for
-    the DataFrame bundles that lack a client host: the attestation covers which
-    machine ran the corpus, and a per-run OS release or interpreter version is
-    not something it can speak to. That gap closes forward via
-    `dataframe-client-host-capture-gap`.
-    """
     out = json.loads(json.dumps(data))
     env = out.get("environment")
     if not isinstance(env, dict):
@@ -148,8 +108,6 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
             raise ValueError(f"primary bundle must be an object: {bundle_path}")
 
         attested = manager.anonymize_result_payload(_inject_cpu(data))
-        # The backfill touches provenance only. Any drift in a measured field
-        # is a bug in this migration, not an acceptable side effect.
         if _semantic_signature(data) != _semantic_signature(attested):
             raise ValueError(f"semantic fields changed during CPU backfill: {bundle_path}")
 
@@ -216,17 +174,6 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
 
     if write:
         if manifest_path.exists():
-            # The manifest is the ONLY record of the old -> new result_id
-            # mapping. A second --write is a no-op on the bundles (the backfill
-            # is idempotent), but re-emitting the manifest would overwrite that
-            # record with a snapshot reporting current ids as both old and new,
-            # 0 changed and 0 lacking a client host -- destroying the very
-            # provenance the file exists to preserve.
-            #
-            # So: keep the original whenever this pass changed nothing, and
-            # refuse outright if it did change something, because that means
-            # the corpus moved and the standing manifest no longer describes
-            # it. Mirrors the refusal in results_explorer_corpus_migrate.py.
             if pending_writes:
                 raise FileExistsError(
                     "refusing to mutate managed corpus artifacts while preserving an existing "

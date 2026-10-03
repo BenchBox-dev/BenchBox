@@ -1,5 +1,3 @@
-"""Hosted result-submission transport for the BenchBox CLI."""
-
 from __future__ import annotations
 
 import json
@@ -20,21 +18,19 @@ _TERMINAL_STATUSES = {"published", "rejected"}
 
 
 class HostedSubmitError(RuntimeError):
-    """Raised when hosted submission fails with a non-retryable error."""
+    pass
 
 
 class HostedSubmitUnauthorized(HostedSubmitError):
-    """Raised when hosted submission credentials are rejected."""
+    pass
 
 
 class _HostedSubmitTransientError(HostedSubmitError):
-    """Raised for network failures that are eligible for retry."""
+    pass
 
 
 @dataclass(frozen=True)
 class HostedSubmitResult:
-    """Final hosted submission state returned to the CLI."""
-
     status: str
     idempotency_key: str
     submission_id: str | None = None
@@ -55,7 +51,6 @@ Sleep = Callable[[float], None]
 
 
 def make_idempotency_key(service_url: str, bundle_hash: str) -> str:
-    """Return a stable UUID idempotency key for a service URL + bundle hash."""
 
     normalized = normalize_service_url(service_url)
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{normalized}:{bundle_hash}"))
@@ -80,7 +75,6 @@ def submit_hosted_bundle(
     initial_backoff_seconds: float = 5.0,
     max_backoff_seconds: float = 60.0,
 ) -> HostedSubmitResult:
-    """Upload a canonical result bundle and optionally poll for publication."""
 
     resolved_key = idempotency_key or make_idempotency_key(service_url, bundle_hash)
     response = _upload_with_retries(
@@ -154,7 +148,6 @@ def poll_submission_status(
     max_backoff_seconds: float = 60.0,
     status_history: tuple[str, ...] = (),
 ) -> HostedSubmitResult:
-    """Poll the hosted service until a terminal submission status is reached."""
 
     history = list(status_history)
     backoff = initial_backoff_seconds
@@ -389,9 +382,6 @@ def _raise_for_response(response: _HTTPResponse, payload: Mapping[str, Any]) -> 
         suffix = f" Retry after {retry_after} seconds." if retry_after else ""
         raise HostedSubmitError(f"Hosted submission was rate limited.{suffix}")
     if response.status in _TRANSIENT_STATUS_CODES:
-        # Surface the server-supplied diagnostic when present so contributors
-        # can see *why* the upstream is returning 5xx (e.g. "ingest-cluster
-        # restarting") instead of a bare HTTP code.
         message = _optional_str(payload.get("message")) or _optional_str(payload.get("error"))
         suffix = f": {message}" if message else "."
         raise HostedSubmitError(f"Hosted submission failed after retries: HTTP {response.status}{suffix}")

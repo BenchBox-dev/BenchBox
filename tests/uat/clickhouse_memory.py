@@ -1,22 +1,3 @@
-"""Measured ClickHouse streaming-memory traces for UAT calibration.
-
-The calibration TODO deliberately keeps measurement separate from the compose
-memory-admission policy.  This module records the quantities that policy is
-allowed to consume; it never turns a host-capacity guess into a memory limit.
-
-Use the module as a command wrapper around a real UAT cell or sweep::
-
-    uv run -- python -m tests.uat.clickhouse_memory \
-      --output "$BENCHBOX_OUTPUT_DIR/clickhouse-memory-1g.json" \
-      --rung baseline-1g -- -- benchbox run --platform clickhouse-server ...
-
-The trace is useful even when a cell fails: the failure, timeout, server
-responsiveness, host memory, engine memory, and ClickHouse counters remain in
-one atomic JSON artifact.  A trace is not considered calibration evidence
-unless it has at least one successful responsiveness sample and passes the
-native-streaming/no-legacy-batch guards.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -54,12 +35,6 @@ _MEMORY_UNITS = {
     "gib": 1024**3,
     "tib": 1024**4,
 }
-# ``MemoryRung.requested_memory_gib`` is a nominal envelope.  Compose and
-# Docker accept both decimal ``4g`` and binary ``4GiB`` spellings, so a
-# measured runtime cap is admissible only inside that exact unit-equivalence
-# window -- decimal gigabytes through binary gibibytes.  This is deliberately
-# not an arbitrary percentage tolerance: a materially smaller or larger cap
-# cannot be relabelled as the requested rung.
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
 
@@ -85,14 +60,6 @@ CLI_DESCRIPTION = (
 def runtime_limit_matches_rung(
     runtime_limit_bytes: int, requested_memory_gib: float, *, requested_bytes: int | None = None
 ) -> bool:
-    """Return whether a runtime cap is the requested rung in either unit system.
-
-    The trace format stores a nominal GiB rung, so it accepts the exact decimal
-    or binary spelling of that nominal value. Runtime admission also has the
-    original parsed byte count available; passing it switches to an exact
-    comparison and avoids converting a decimal request into a smaller binary
-    nominal value.
-    """
 
     if requested_bytes is not None:
         return runtime_limit_bytes == requested_bytes
@@ -101,10 +68,6 @@ def runtime_limit_matches_rung(
     return runtime_limit_bytes in {lower_limit, upper_limit}
 
 
-# These are the metrics that make a trace evidence rather than a host/engine
-# health sample. Optional asynchronous metrics such as OSMemoryFree are not
-# required, but a response from the wrong metric or a partially failed query
-# must not be enough to admit a rung.
 _REQUIRED_CLICKHOUSE_METRICS = frozenset(
     {
         "metric.MemoryTracking",
@@ -123,13 +86,6 @@ _MEMORY_FAILURE_MARKERS = (
 
 @dataclass(frozen=True)
 class MemoryRung:
-    """One explicitly named calibration rung.
-
-    ``requested_memory_gib`` is a requested engine/container envelope, not a
-    claim that the compose file currently enforces it.  The calibration trace
-    records the request and the observed runtime limit separately.
-    """
-
     name: str
     requested_memory_gib: float
     load_memory_gib: float
@@ -145,9 +101,6 @@ class MemoryRung:
 
 
 DEFAULT_MEMORY_RUNGS: tuple[MemoryRung, ...] = (
-    # Keep the driver timeout constant across memory rungs.  Otherwise a
-    # timeout change would confound the memory comparison and could turn a
-    # memory failure into a false "larger rung" success.
     MemoryRung("baseline-1g", 1.0, 1.0, DEFAULT_DRIVER_TIMEOUT_S),
     MemoryRung("candidate-4g", 4.0, 4.0, DEFAULT_DRIVER_TIMEOUT_S),
     MemoryRung("candidate-5.25g", 5.25, 5.25, DEFAULT_DRIVER_TIMEOUT_S),
@@ -187,8 +140,6 @@ class TraceSample:
 
 @dataclass
 class ClickHouseMemoryTrace:
-    """Durable trace and calibration guards for one real run."""
-
     platform: str
     rung: MemoryRung
     started_at_utc: str
@@ -204,14 +155,6 @@ class ClickHouseMemoryTrace:
 
     @property
     def _calibration_samples(self) -> list[TraceSample]:
-        """Return samples after ClickHouse's startup warm-up becomes observable.
-
-        The collector starts before the child command, so early samples can
-        precede the first insert and legitimately lack cumulative event
-        counters. Those samples are not load evidence. Once all required
-        counters appear, later samples must remain complete; a telemetry gap
-        during the measured run still invalidates the trace.
-        """
         first_complete = next(
             (
                 index
@@ -224,7 +167,6 @@ class ClickHouseMemoryTrace:
 
     @property
     def valid_for_calibration(self) -> bool:
-        """Return whether the trace is admissible evidence for rung selection."""
         samples = self._calibration_samples
         if not samples or not self.native_streaming:
             return False
@@ -295,7 +237,6 @@ class ClickHouseMemoryTrace:
 
     @property
     def memory_limit_exceeded(self) -> bool:
-        """Report measured or command-reported memory-limit failures."""
         if any(
             sample.engine.usage_bytes is not None
             and sample.engine.limit_bytes is not None
@@ -346,7 +287,6 @@ class ClickHouseMemoryTrace:
         }
 
     def _oom_killed_summary(self) -> bool | None:
-        """Summarize OOM state without converting unknown telemetry to False."""
         values = [sample.engine.oom_killed for sample in self.samples]
         if not values or any(value is None for value in values):
             return None
@@ -358,7 +298,6 @@ def utc_now() -> str:
 
 
 def parse_memory_bytes(value: Any) -> int | None:
-    """Parse Docker/mocker memory text (for example ``"1.5GiB / 4GiB"``)."""
     if value is None:
         return None
     if isinstance(value, bool):
@@ -374,7 +313,6 @@ def parse_memory_bytes(value: Any) -> int | None:
 
 
 def parse_engine_stats(text: str, *, engine: str | None, service: str | None) -> EngineMemorySample:
-    """Parse Docker and mocker ``compose stats --format json`` variants."""
     payload: Any = None
     for line in text.splitlines():
         line = line.strip()
@@ -393,9 +331,6 @@ def parse_engine_stats(text: str, *, engine: str | None, service: str | None) ->
             usage, limit = usage.split("/", 1)
         raw_status = str(payload.get("Name") or payload.get("Container") or "") or None
     else:
-        # Apple Containerization's Mocker currently ignores the JSON format
-        # template and emits the Docker-compatible table.  Keep this parser
-        # explicit rather than treating that limitation as missing telemetry.
         table_row = next(
             (
                 line.strip()
@@ -420,7 +355,6 @@ def parse_engine_stats(text: str, *, engine: str | None, service: str | None) ->
 
 
 def parse_engine_inspect(text: str, *, engine: str | None, service: str | None) -> EngineMemorySample:
-    """Extract running/OOM state from ``engine inspect`` JSON."""
     try:
         payload: Any = json.loads(text)
     except json.JSONDecodeError:
@@ -443,7 +377,6 @@ def parse_engine_inspect(text: str, *, engine: str | None, service: str | None) 
 
 
 def verify_native_streaming_loader() -> tuple[bool, str]:
-    """Verify the shipped ClickHouse path is a generator insert, not 1,000-row batching."""
     try:
         from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
 
@@ -464,7 +397,6 @@ def verify_native_streaming_loader() -> tuple[bool, str]:
 
 
 def read_host_memory() -> HostMemorySample:
-    """Read available, free, and swap metrics without substituting one for another."""
     try:
         import psutil
 
@@ -505,7 +437,6 @@ def read_clickhouse_metrics(
     password: str = "benchbox",
     timeout_s: float = DEFAULT_HTTP_TIMEOUT_S,
 ) -> tuple[dict[str, float], float | None]:
-    """Return server counters and a loopback ``SELECT 1`` responsiveness sample."""
     metrics: dict[str, float] = {}
     queries = (
         (
@@ -558,7 +489,7 @@ def _compose_stats_argv(
     compose_files: Iterable[Path],
     service: str,
 ) -> list[str]:
-    del compose_files  # the deterministic compose container name is sufficient for stats
+    del compose_files
     return [engine, "stats", "--no-stream", "--format", "{{json .}}", f"{project_name}-{service}-1"]
 
 
@@ -567,8 +498,6 @@ def _inspect_argv(*, engine: str, project_name: str, service: str) -> list[str]:
 
 
 class MemoryTraceCollector:
-    """Sample host, engine, and ClickHouse state in a bounded background thread."""
-
     def __init__(
         self,
         *,
@@ -605,9 +534,6 @@ class MemoryTraceCollector:
         if self._thread is not None:
             raise RuntimeError("memory trace collector already started")
         self._started_mono = time.monotonic()
-        # Replace any prior passing artifact before the child command starts.
-        # If the process is interrupted before stop(), a stale success must not
-        # be mistaken for evidence from this run.
         write_trace(self.output_path, self.trace)
         self._sample_once()
         self._thread = threading.Thread(target=self._run, name="clickhouse-memory-trace", daemon=True)
@@ -672,7 +598,6 @@ class MemoryTraceCollector:
 
 
 def write_trace(path: Path, trace: ClickHouseMemoryTrace) -> None:
-    """Atomically write a trace so a killed run cannot leave a false artifact."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(json.dumps(trace.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -680,7 +605,6 @@ def write_trace(path: Path, trace: ClickHouseMemoryTrace) -> None:
 
 
 def read_trace(path: Path) -> ClickHouseMemoryTrace:
-    """Load a trace artifact for rung comparison without trusting summary fields."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("trace_schema_version") != TRACE_SCHEMA_VERSION:
         raise ValueError(
@@ -718,7 +642,6 @@ def read_trace(path: Path) -> ClickHouseMemoryTrace:
 
 
 def select_lowest_successful_rung(traces: Iterable[ClickHouseMemoryTrace]) -> MemoryRung:
-    """Choose the lowest measured passing envelope; reject unmeasured guesses."""
     valid = sorted(
         (trace for trace in traces if trace.valid_for_calibration), key=lambda trace: trace.rung.requested_memory_gib
     )
@@ -728,7 +651,6 @@ def select_lowest_successful_rung(traces: Iterable[ClickHouseMemoryTrace]) -> Me
 
 
 def rung_matrix_text(rungs: Iterable[MemoryRung] = DEFAULT_MEMORY_RUNGS) -> str:
-    """Render the operator-facing rung policy used by the UAT document."""
     lines = ["name\trequested_memory_gib\tload_memory_gib\tdriver_timeout_s"]
     lines.extend(
         f"{rung.name}\t{rung.requested_memory_gib:g}\t{rung.load_memory_gib:g}\t{rung.driver_timeout_s}"
@@ -738,7 +660,6 @@ def rung_matrix_text(rungs: Iterable[MemoryRung] = DEFAULT_MEMORY_RUNGS) -> str:
 
 
 def summarize_command_failure(output: str, returncode: int) -> str:
-    """Keep the trace's failure reason short but preserve memory/timeout causes."""
     patterns = (
         "memory limit exceeded",
         "oomkilled",
@@ -755,7 +676,6 @@ def summarize_command_failure(output: str, returncode: int) -> str:
 
 
 def parse_driver_timeout(command: Sequence[str]) -> int | None:
-    """Read the explicit ClickHouse ``send_receive_timeout`` platform option."""
     for index, argument in enumerate(command[:-1]):
         if argument != "--platform-option":
             continue
@@ -771,12 +691,6 @@ def parse_driver_timeout(command: Sequence[str]) -> int | None:
 
 
 def default_clickhouse_driver_timeout_s() -> int:
-    """Read the server-mode default from the shipped setup implementation.
-
-    The CLI currently does not expose ``send_receive_timeout`` as a platform
-    option.  Recording the live setup default keeps successful traces honest
-    without inventing an option that the command rejects.
-    """
     try:
         from benchbox.platforms.clickhouse.setup import ClickHouseSetupMixin
 
@@ -793,7 +707,6 @@ def default_clickhouse_driver_timeout_s() -> int:
 
 
 def resolve_driver_timeout(command: Sequence[str]) -> tuple[int, str]:
-    """Resolve the command's explicit timeout or the live server-mode default."""
     explicit = parse_driver_timeout(command)
     if explicit is not None:
         return explicit, "command platform option"
@@ -860,10 +773,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace.finish(outcome="aborted", failure_reason=loader_reason)
         write_trace(args.output, trace)
         return 2
-    # Replace any prior passing artifact before launching the child.  If the
-    # operator interrupts or the process is terminated before ``stop`` can
-    # publish a final trace, the path still says ``outcome=running`` rather
-    # than leaving stale evidence that belongs to an older invocation.
     write_trace(args.output, trace)
     collector = MemoryTraceCollector(
         trace=trace,

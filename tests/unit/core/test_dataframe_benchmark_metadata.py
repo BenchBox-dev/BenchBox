@@ -1,5 +1,3 @@
-"""Tests for benchmark metadata dataframe support flags."""
-
 from __future__ import annotations
 
 import pytest

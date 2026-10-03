@@ -1,5 +1,3 @@
-"""Workload execution helpers for ClickHouse."""
-
 from __future__ import annotations
 
 import logging
@@ -21,13 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 def _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
-    """Select the ClickHouse load handler for one table path.
-
-    Module-level (rather than a ``load_data`` closure) so the dispatch is
-    unit-testable. Delta Lake table directories resolve to
-    :class:`ClickHouseDeltaHandler`; everything else keeps the established
-    extension-based dispatch.
-    """
     from benchbox.platforms.base.data_loading import (
         ClickHouseNativeHandler,
         DataSource,
@@ -36,16 +27,11 @@ def _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name=N
         resolve_csv_dialect,
     )
 
-    # Delta Lake table directories load as one unit through the
-    # read-path selection (native INSERT ... SELECT or snapshot
-    # export), never as raw part-file shards.
     if is_delta_table_dir(file_path):
         return ClickHouseDeltaHandler(adapter, benchmark_instance)
 
-    # Determine the true base extension (handles names like *.tbl.1.zst)
     base_ext = FileFormatRegistry.get_base_data_extension(file_path)
 
-    # Create ClickHouse native handler for supported formats
     if base_ext in (".tbl", ".dat", ".csv"):
         dialect_source = data_source or DataSource(source_type="clickhouse_handler", tables={})
         dialect = resolve_csv_dialect(dialect_source, table_name or file_path.stem, file_path, benchmark_instance)
@@ -56,54 +42,19 @@ def _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name=N
             has_header=dialect.has_header,
         )
     elif base_ext == ".parquet":
-        # Delimiter is unused for Parquet - file() reads the format natively.
-        # We route through ClickHouseNativeHandler so load_table() uses
-        # INSERT INTO ... SELECT * FROM file(path, 'Parquet') instead of
-        # falling back to the generic row-by-row ParquetHandler.
         return ClickHouseNativeHandler(",", adapter, benchmark_instance)
-    return None  # Fall back to generic handler
+    return None
 
 
 class ClickHouseDeltaHandler:
-    """Load a Delta Lake table directory into ClickHouse via the read-path selection.
-
-    The handler drives :meth:`ClickHouseWorkloadMixin.delta_reader_for` inside
-    an adapter run (this is the load/format-dispatch connection): a native
-    reader loads with ``INSERT INTO ... SELECT`` straight from the table
-    function, while a snapshot reader first exports the table directory with
-    :func:`benchbox.utils.delta_export.export_delta_to_parquet` and loads the
-    exported files through the native Parquet path. Only local table
-    directories reach this handler; remote locations without native reads
-    raise from the selection instead of producing an unexecutable snapshot.
-    """
-
     def __init__(self, adapter: Any, benchmark: Any):
-        """Initialize handler.
-
-        Args:
-            adapter: Platform adapter (exposes ``delta_reader_for``).
-            benchmark: Benchmark instance (forwarded to the Parquet path).
-        """
         self.adapter = adapter
         self.benchmark = benchmark
 
     def get_delimiter(self) -> str:
-        """Get delimiter for this file format (not applicable to Delta Lake)."""
         return ""
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
-        """Load a Delta Lake table directory into a ClickHouse table.
-
-        Args:
-            table_name: Name of table to load into.
-            file_path: Path to the Delta Lake table directory.
-            connection: ClickHouse connection.
-            benchmark: Benchmark instance.
-            logger: Logger instance.
-
-        Returns:
-            Number of rows loaded.
-        """
         from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, validate_sql_identifier
 
         validated_table = validate_sql_identifier(table_name, "table name")
@@ -129,25 +80,13 @@ class ClickHouseDeltaHandler:
 
 
 class ClickHouseWorkloadMixin:
-    """Provide schema management and workload execution utilities."""
-
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using ClickHouse-optimized table definitions."""
         start_time = mono_time()
 
-        # Get constraint settings from tuning configuration
         enable_primary_keys, enable_foreign_keys = self._get_constraint_configuration()
         self._log_constraint_configuration(enable_primary_keys, enable_foreign_keys)
 
         try:
-            # Get schema SQL directly from benchmark to avoid sqlglot translation issues.
-            # We ask for the DuckDB dialect because most BenchBox schemas emit identical
-            # DDL for "duckdb" and "clickhouse", and the few that differ (e.g.
-            # transaction_primitives / write_primitives drop inline PRIMARY KEY when
-            # dialect="clickhouse") would lose the PK info that
-            # `_extract_primary_key_columns` later uses to derive ORDER BY. Known
-            # DuckDB-only DDL syntax (Nullable() NOT NULL, FLOAT[N] vector columns)
-            # is rewritten in `_optimize_table_definition` below.
             effective_config = self.get_effective_tuning_configuration()
             schema_sql = benchmark.get_create_tables_sql(
                 dialect="duckdb",
@@ -155,20 +94,13 @@ class ClickHouseWorkloadMixin:
             )
             nullable_columns_by_table = self._get_nullable_columns_by_table(benchmark)
 
-            # Physical table_tunings (partitioning/sorting/clustering columns)
-            # render only when tuning is actually enabled -- matching the same
-            # `self.tuning_enabled` gate DataLoader/apply_ctas_sort use
-            # elsewhere, and per ADR-3 baseline policy (notuning = platform
-            # defaults + engine-mandatory only, no tuned rendering).
             table_tunings = None
             if self.tuning_enabled and effective_config is not None:
                 table_tunings = effective_config.table_tunings
 
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
-                # Optimize table definitions for ClickHouse
                 table_name = self._extract_table_name(statement)
                 nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
                 optimized = self._optimize_table_definition(
@@ -177,14 +109,6 @@ class ClickHouseWorkloadMixin:
                     nullable_columns=nullable_columns,
                 )
                 connection.execute(optimized)
-                # Record a tuned MergeTree CREATE TABLE into the applied ledger
-                # here, immediately after it executes. The tuned keys are
-                # rendered into the CREATE TABLE executed on the raw connection
-                # (outside the tuning RecordingConnection), so without this it
-                # never enters the ledger and the run cannot reach
-                # applied_verified even though system.tables.sorting_key carries
-                # the key. Recording at execute time also keeps the
-                # order-sensitive applied_ledger_hash in true chronology.
                 self._record_tuned_sort_key_op(statement, optimized, table_name, table_tunings)
                 self.logger.debug(f"Executed schema statement: {optimized[:100]}...")
 
@@ -203,33 +127,11 @@ class ClickHouseWorkloadMixin:
         *,
         nullable_columns: set[str] | None = None,
     ) -> str:
-        """Optimize table definition for ClickHouse.
-
-        Args:
-            statement: A single CREATE TABLE statement.
-            table_tunings: Optional mapping of table_name -> TableTuning, from
-                the effective tuning configuration, present only when tuning
-                is enabled (see create_schema). When a matching, non-empty
-                TableTuning exists for this statement's table, tuned
-                PARTITION BY/ORDER BY clauses are rendered via
-                core.tuning.generators.clickhouse.ClickHouseDDLGenerator --
-                the same generator dry-run preview uses (ADR-3 single
-                renderer) -- instead of the engine-mandatory PK/tuple()
-                fallback below.
-            nullable_columns: Lowercase source-schema column names whose values
-                may be NULL. Columns used by resolved MergeTree keys are
-                intentionally excluded before wrapping.
-        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Transform SQL for ClickHouse compatibility
-        # ClickHouse doesn't like "NOT NULL" on already non-nullable types
-        # Replace "Nullable(Type) NOT NULL" patterns
         import re
 
-        # [^)]+  would stop at the first ) inside Nullable(Decimal(38, 0)) NOT NULL;
-        # use an alternation that allows one level of nested parens.
         statement = re.sub(
             r"Nullable\((?:[^()]+|\([^)]*\))+\)\s+NOT\s+NULL",
             lambda m: m.group(0).replace(" NOT NULL", ""),
@@ -237,18 +139,9 @@ class ClickHouseWorkloadMixin:
             flags=re.IGNORECASE,
         )
 
-        # Schema generators emit DuckDB-style fixed-size float arrays
-        # (FLOAT[N], DOUBLE[N]) for embedding columns. ClickHouse rejects the
-        # `[N]` syntax (SYNTAX_ERROR Code 62) and uses Array(Float32/Float64)
-        # without a compile-time dimension. Rewrite in-place so the
-        # vector_search benchmark's CREATE TABLE parses on ClickHouse.
         statement = re.sub(r"\bFLOAT\s*\[\s*\d+\s*\]", "Array(Float32)", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bDOUBLE\s*\[\s*\d+\s*\]", "Array(Float64)", statement, flags=re.IGNORECASE)
 
-        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
-        # Portable remap to String ("HH:MM:SS") preserves semantics for benchmark
-        # data (coffeeshop order_time, tpcdi DIMTIME). Restrict this to column type
-        # positions so identifiers such as ``time`` in keys remain unchanged.
         statement = re.sub(
             r"(?P<prefix>[,(]\s*(?:\"[^\"]+\"|`[^`]+`|[A-Za-z_]\w*)\s+)TIME\b",
             r"\g<prefix>String",
@@ -261,17 +154,14 @@ class ClickHouseWorkloadMixin:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
             statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
 
-        # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()
 
-        # Include ENGINE if not present
         if "ENGINE" not in statement_upper:
             if statement.endswith(";"):
                 statement = statement[:-1] + " ENGINE = MergeTree();"
             else:
                 statement = statement + " ENGINE = MergeTree()"
 
-        # Include PARTITION BY if not present and the tuned generator produced one.
         statement_upper = statement.upper()
         if "PARTITION BY" not in statement_upper and tuning_clauses is not None and tuning_clauses.partition_by:
             partition_clause = f" PARTITION BY ({tuning_clauses.partition_by})"
@@ -280,22 +170,15 @@ class ClickHouseWorkloadMixin:
             else:
                 statement = statement + partition_clause
 
-        # Include ORDER BY if not present
         statement_upper = statement.upper()
         if "ORDER BY" not in statement_upper:
             if tuning_clauses is not None and tuning_clauses.sort_by:
-                # Tuned rendering: ORDER BY (sort + clustering columns), via
-                # the shared ClickHouseDDLGenerator.
                 order_by_clause = f" ORDER BY ({tuning_clauses.sort_by})"
             else:
-                # Engine-mandatory baseline: MergeTree requires ORDER BY.
-                # Extract primary key columns if any exist in the statement.
                 pk_columns = self._extract_primary_key_columns(statement)
                 if pk_columns:
-                    # Use primary key columns for ORDER BY to satisfy ClickHouse requirement
                     order_by_clause = f" ORDER BY ({', '.join(pk_columns)})"
                 else:
-                    # Use tuple() for tables without primary keys
                     order_by_clause = " ORDER BY tuple()"
 
             if statement.endswith(";"):
@@ -312,39 +195,11 @@ class ClickHouseWorkloadMixin:
         table_name: str | None,
         table_tunings: dict[str, Any] | None,
     ) -> None:
-        """Record a tuned MergeTree CREATE TABLE into the applied ledger.
-
-        The introspection receipt corroborates the recorded key clauses against
-        ``system.tables`` -- ``ORDER BY (cols)`` against ``sorting_key`` and
-        ``PARTITION BY (expr)`` against ``partition_key`` -- and upgrades the run
-        to ``applied_verified`` only when every one of them corroborates.
-
-        Recorded straight onto ``self._applied_tuning_ledger`` at
-        ``connection.execute`` time rather than queued on
-        ``_applied_layout_operations``: that queue is folded only after data
-        validation, which would place this ``CREATE TABLE`` *after* the
-        ``OPTIMIZE TABLE`` statements the recording connection captures during
-        load, and the order-sensitive ``applied_ledger_hash`` would then attest
-        an impossible chronology.
-
-        Recorded when the tuned generator produced EITHER a sort key or a
-        partition key. A partition-only tuned table must be recorded too: left
-        out, its unapplied partition key is never corroborated, and another
-        table's sort key could carry the whole run to ``applied_verified``.
-        A table with no tuned clause at all stays out of the ledger entirely --
-        its engine-mandatory ``ORDER BY`` (primary-key derived or ``tuple()``)
-        is not tuning, and corroborating it against nothing would be an unearned
-        upgrade. When only the partition is tuned, the baseline ``ORDER BY``
-        rides along in the recorded statement and is corroborated as a plain
-        catalog fact; it cannot mint verification on its own because the tuned
-        partition key must corroborate as well.
-        Never breaks a run: any failure degrades to a debug log.
-        """
         try:
             if not (getattr(self, "tuning_enabled", False) and table_tunings):
                 return
             if has_order_by_clause(original_statement):
-                return  # pre-existing ORDER BY was not overridden by tuning
+                return
             tuning_clauses = self._resolve_tuned_ddl_clauses(original_statement, table_tunings)
             if tuning_clauses is None:
                 return
@@ -370,12 +225,11 @@ class ClickHouseWorkloadMixin:
                 mechanism=mechanism,
                 table=table_name,
             )
-        except Exception as exc:  # capture must never break a run
+        except Exception as exc:
             self.logger.debug("clickhouse tuned key ledger record degraded: %s", exc)
 
     @staticmethod
     def _extract_table_name(statement: str) -> str | None:
-        """Extract an unquoted table name from a CREATE TABLE statement."""
         import re
 
         match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+([A-Za-z_]\w*)", statement, re.IGNORECASE)
@@ -383,13 +237,6 @@ class ClickHouseWorkloadMixin:
 
     @staticmethod
     def _get_nullable_columns_by_table(benchmark: Any) -> dict[str, set[str]]:
-        """Return source-nullable, non-primary-key columns by table.
-
-        BenchBox schemas use several shapes: dict/list columns (TPC-DS and
-        vector search), dict-of-column-specs (NYC Taxi and TSBS), and table
-        objects (Data Vault). Schema metadata treats an omitted ``nullable``
-        flag as nullable; explicit ``False`` is the non-null contract.
-        """
         schema_getter = getattr(benchmark, "get_schema", None)
         if not callable(schema_getter):
             return {}
@@ -436,7 +283,6 @@ class ClickHouseWorkloadMixin:
         return nullable_by_table
 
     def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
-        """Return nullable candidates referenced by PK/partition/order keys."""
         import re
 
         key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
@@ -465,12 +311,6 @@ class ClickHouseWorkloadMixin:
 
     @classmethod
     def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
-        """Wrap selected CREATE TABLE column types with ``Nullable(...)``.
-
-        The scanner splits only on top-level commas, so nested type commas
-        such as ``DECIMAL(10,2)`` cannot consume the next column. Edits are
-        confined to selected type spans; every other byte remains unchanged.
-        """
         import re
 
         if not nullable_columns:
@@ -498,14 +338,6 @@ class ClickHouseWorkloadMixin:
             data_type = segment[type_start:type_end].rstrip()
             if not data_type or data_type.upper().startswith("NULLABLE("):
                 continue
-            # ClickHouse forbids Nullable(Array(...)); an Array column expresses
-            # nullability per element (Array(Nullable(T))), never at the array
-            # level. The FLOAT[N]/DOUBLE[N] -> Array(Float32/Float64) rewrite
-            # above turns vector_search embedding/query_vector columns into
-            # exactly these Array types, and their schema metadata omits
-            # `nullable`, so they reach here as nullable candidates. Leave them
-            # non-nullable rather than emitting a type ClickHouse rejects at
-            # CREATE TABLE.
             if data_type.upper().startswith("ARRAY("):
                 continue
             suffix = segment[type_end:]
@@ -520,7 +352,6 @@ class ClickHouseWorkloadMixin:
 
     @staticmethod
     def _top_level_column_spans(body: str) -> list[tuple[int, int]]:
-        """Return comma-delimited spans while respecting nested SQL syntax."""
         spans: list[tuple[int, int]] = []
         start = 0
         depth = 0
@@ -549,7 +380,6 @@ class ClickHouseWorkloadMixin:
 
     @staticmethod
     def _column_type_end(segment: str, type_start: int) -> int:
-        """Locate the end of a type expression before column constraints."""
         import re
 
         constraint = re.compile(
@@ -581,13 +411,6 @@ class ClickHouseWorkloadMixin:
         return len(segment.rstrip())
 
     def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
-        """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
-
-        Returns None when tuning is not enabled, no table_tuning is
-        configured for this table, or the configured table_tuning has no
-        partitioning/sorting/clustering columns -- callers fall back to the
-        engine-mandatory baseline in that case.
-        """
         if not table_tunings:
             return None
 
@@ -598,9 +421,6 @@ class ClickHouseWorkloadMixin:
             return None
         table_name = match.group(1)
 
-        # Benchmark table names are lowercase while shipped tuning templates
-        # key tables uppercase (e.g. "LINEITEM") -- same case-insensitive
-        # lookup pattern as core/dryrun.py's _extract_ddl_preview.
         table_tuning = None
         for configured_name, configured_tuning in table_tunings.items():
             if str(configured_name).upper() == table_name.upper():
@@ -621,7 +441,6 @@ class ClickHouseWorkloadMixin:
 
     @classmethod
     def _normalize_tuning_clause_identifiers(cls, statement: str, tuning_clauses: Any) -> None:
-        """Match tuning-template identifier case to the emitted DDL columns."""
         import re
 
         column_names = cls._ddl_column_name_map(statement)
@@ -640,7 +459,6 @@ class ClickHouseWorkloadMixin:
 
     @classmethod
     def _ddl_column_name_map(cls, statement: str) -> dict[str, str]:
-        """Return lowercase-to-emitted names for CREATE TABLE columns."""
         import re
 
         create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
@@ -661,30 +479,17 @@ class ClickHouseWorkloadMixin:
         return names
 
     def _extract_primary_key_columns(self, statement: str) -> list[str]:
-        """Extract primary key column names from a CREATE TABLE statement.
-
-        Args:
-            statement: CREATE TABLE SQL statement
-
-        Returns:
-            List of primary key column names
-        """
         import re
 
-        # Look for PRIMARY KEY constraints in different formats
         pk_columns = []
 
-        # Pattern 1: column_name TYPE PRIMARY KEY
-        # (?:\((?:[^()]+|\([^)]*\))*\))? handles one level of nesting e.g. Nullable(Decimal(10,2))
         inline_pk_pattern = r"(\w+)\s+\w+(?:\((?:[^()]+|\([^)]*\))*\))?\s+PRIMARY\s+KEY"
         inline_matches = re.findall(inline_pk_pattern, statement, re.IGNORECASE)
         pk_columns.extend(inline_matches)
 
-        # Pattern 2: PRIMARY KEY (col1, col2, ...)
         composite_pk_pattern = r"PRIMARY\s+KEY\s*\(\s*([^)]+)\s*\)"
         composite_matches = re.findall(composite_pk_pattern, statement, re.IGNORECASE)
         for match in composite_matches:
-            # Split by comma and clean up column names
             cols = [col.strip() for col in match.split(",")]
             pk_columns.extend(cols)
 
@@ -693,16 +498,13 @@ class ClickHouseWorkloadMixin:
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using ClickHouse's optimized CSV import capabilities."""
         from benchbox.platforms.base.data_loading import DataLoader
 
-        # Check if using cloud storage and log
         if is_cloud_path(str(data_dir)):
             path_info = get_cloud_path_info(str(data_dir))
             self.log_verbose(f"Loading data from cloud storage: {path_info['provider']} bucket '{path_info['bucket']}'")
             emit(f"  Loading data from {path_info['provider']} cloud storage")
 
-        # Create ClickHouse-specific handler factory
         def clickhouse_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
             return _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name, data_source)
 
@@ -715,26 +517,13 @@ class ClickHouseWorkloadMixin:
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
-        # DataLoader doesn't provide per-table timings yet
         return table_stats, loading_time, None
 
     def _get_existing_tables(self, connection) -> list[str]:
-        """Get list of existing tables in the ClickHouse database.
-
-        Override the base class implementation with ClickHouse-specific query.
-
-        Args:
-            connection: ClickHouse connection (server or local)
-
-        Returns:
-            List of table names (lowercase for consistency)
-        """
         try:
             if self.deployment_mode == "local":
-                # For local mode (chdb), use SHOW TABLES
                 result = connection.execute("SHOW TABLES")
                 if result:
-                    # Handle different result formats from chdb
                     tables = []
                     for row in result:
                         if isinstance(row, (list, tuple)):
@@ -744,7 +533,6 @@ class ClickHouseWorkloadMixin:
                     return tables
                 return []
             else:
-                # For server mode, use system.tables query
                 result = connection.execute("SELECT name FROM system.tables WHERE database = currentDatabase()")
                 return [row[0].lower() for row in result] if result else []
         except Exception as e:
@@ -752,18 +540,6 @@ class ClickHouseWorkloadMixin:
             return []
 
     def get_table_row_count(self, connection: Any, table: str) -> int:
-        """Get row count using ClickHouse execute() API.
-
-        Overrides base implementation that uses cursor() - ClickHouseLocalClient
-        and ClickHouseCloudClient expose execute() but not cursor().
-
-        Args:
-            connection: ClickHouse connection (local, server, or cloud)
-            table: Table name
-
-        Returns:
-            Row count as integer, or 0 if unable to determine
-        """
         try:
             result = connection.execute(f"SELECT COUNT(*) FROM {table}")
             if result:
@@ -775,21 +551,6 @@ class ClickHouseWorkloadMixin:
             return 0
 
     def delta_native_registration(self, connection: Any) -> bool:
-        """Probe whether the server registers native Delta Lake reads.
-
-        Runs the ``system.table_functions`` / ``system.table_engines`` probes
-        from :mod:`benchbox.platforms.clickhouse.delta_lake` and applies
-        :func:`has_native_delta_registration`. No caching: the probe is two
-        light system queries, and callers that decide per statement should see
-        current server state.
-
-        Args:
-            connection: ClickHouse connection exposing ``execute()``.
-
-        Returns:
-            True when the server registers the ``deltaLake`` function and the
-            ``DeltaLake`` engine.
-        """
         from .delta_lake import delta_engine_probe_sql, delta_function_probe_sql, has_native_delta_registration
 
         function_rows = connection.execute(delta_function_probe_sql()) or []
@@ -800,25 +561,6 @@ class ClickHouseWorkloadMixin:
         )
 
     def delta_reader_for(self, connection: Any, location: str) -> DeltaReader:
-        """Select the native or snapshot read path for a Delta location.
-
-        Probes the server once, then resolves via
-        :func:`benchbox.platforms.clickhouse.delta_lake.resolve_delta_reader`
-        with both the base-integration verdict and the per-function
-        ``deltaLakeLocal`` verdict (a server can register the base
-        integration without the local alias).
-
-        Args:
-            connection: ClickHouse connection exposing ``execute()``.
-            location: Bucket URL or filesystem path of the Delta table.
-
-        Returns:
-            The chosen :class:`DeltaReader`.
-
-        Raises:
-            ValueError: If the location is empty, blank, unrecognized, or has
-                no executable read path (remote without native reads).
-        """
         from .delta_lake import (
             delta_engine_probe_sql,
             delta_function_probe_sql,
@@ -838,20 +580,10 @@ class ClickHouseWorkloadMixin:
         )
 
     def _get_constraint_configuration(self) -> tuple[bool, bool]:
-        """Extract constraint configuration settings from tuning config.
-
-        Override base implementation to ensure ClickHouse always has primary keys enabled,
-        since ClickHouse MergeTree engine requires ORDER BY (derived from PRIMARY KEY).
-
-        Returns:
-            Tuple of (enable_primary_keys, enable_foreign_keys)
-        """
         effective_config = self.get_effective_tuning_configuration()
 
-        # ClickHouse always needs primary keys for MergeTree engine, even in no-tuning mode
         enable_primary_keys = True
 
-        # Foreign keys follow normal tuning configuration
         enable_foreign_keys = effective_config.foreign_keys.enabled if effective_config else False
 
         return enable_primary_keys, enable_foreign_keys
@@ -862,19 +594,6 @@ class ClickHouseWorkloadMixin:
         connection: Any,
         table_stats: dict[str, int],
     ) -> tuple[str, dict[str, Any]]:
-        """Validate data integrity and table accessibility for ClickHouse.
-
-        Override base implementation to use execute() instead of cursor()
-        which is not available in ClickHouseLocalClient.
-
-        Args:
-            benchmark: Benchmark instance
-            connection: ClickHouse connection (server or local)
-            table_stats: Dictionary of table names to row counts
-
-        Returns:
-            Tuple of (status, details) where status is "PASSED" or "FAILED"
-        """
         validation_details: dict[str, Any] = {}
 
         try:
@@ -887,7 +606,6 @@ class ClickHouseWorkloadMixin:
 
             for table_name in table_stats:
                 try:
-                    # ClickHouseLocalClient and ClickHouse server clients both expose execute().
                     execute_fn(f"SELECT 1 FROM {table_name} LIMIT 1")
                     accessible_tables.append(table_name)
                 except Exception as e:
@@ -918,17 +636,11 @@ class ClickHouseWorkloadMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and profiling."""
         start_time = mono_time()
 
         try:
-            # Apply ClickHouse-specific query transformations for SQL compatibility
             transformer = ClickHouseQueryTransformer(verbose=self.very_verbose)
             transformed_query = transformer.transform(query)
-            # Keep the OLAP tuning pack out of baseline sessions. These two
-            # ClickHouse Local Havoc variants instead need a statement-level
-            # grace-hash join policy: the default hash build exceeds the 8 GiB
-            # local ceiling, while chDB supports grace_hash for both queries.
             additional_settings: tuple[tuple[str, str | int], ...] = ()
             if (
                 self.deployment_mode == "local"
@@ -939,22 +651,18 @@ class ClickHouseWorkloadMixin:
                     ("join_algorithm", "grace_hash"),
                     ("grace_hash_join_initial_buckets", 8),
                 )
-            # Session settings stay generic; analyzer-sensitive query rewrites live in the benchmark.
             transformed_query = transformer.add_query_settings(transformed_query, additional_settings)
 
-            # Log transformations if any were applied
             if transformer.get_transformations_applied() and self.verbose_enabled:
                 self.log_verbose(
                     f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
                 )
 
-            # Execute the transformed query
             result = connection.execute(transformed_query)
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
 
-            # Validate row count if enabled and benchmark type is provided
             validation_result = None
             if validate_row_count and benchmark_type:
                 from benchbox.core.validation.query_validation import QueryValidator
@@ -968,7 +676,6 @@ class ClickHouseWorkloadMixin:
                     stream_id=stream_id,
                 )
 
-                # Log validation result
                 if validation_result.warning_message:
                     self.log_verbose(f"Row count validation: {validation_result.warning_message}")
                 elif not validation_result.is_valid:
@@ -979,7 +686,6 @@ class ClickHouseWorkloadMixin:
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
-                # If validation failed, mark query as failed
                 if not validation_result.is_valid:
                     return {
                         "query_id": query_id,
@@ -997,9 +703,6 @@ class ClickHouseWorkloadMixin:
                         "translated_query": None,
                     }
 
-            # Preserve ClickHouse's historical row-count metadata semantics: a
-            # warning can accompany a successful validation result without the
-            # expected-results ValidationMode enum used by the shared builder.
             result_dict = {
                 "query_id": query_id,
                 "status": "SUCCESS",
@@ -1026,8 +729,6 @@ class ClickHouseWorkloadMixin:
         except Exception as e:
             execution_time = elapsed_seconds(start_time)
             error_type = type(e).__name__
-            # Always populate `error` with a non-empty string - some exceptions
-            # (e.g. chdb errors raised with no message) yield empty str(e).
             error_message = str(e) or repr(e) or error_type
 
             return {
@@ -1039,13 +740,6 @@ class ClickHouseWorkloadMixin:
                 "error_type": error_type,
             }
 
-        # Plan capture routes through the shared chokepoint, outside the try so a
-        # strict-mode PlanCaptureError propagates rather than being swallowed by the
-        # broad `except` above. For phase-eligible engines (the default) the
-        # chokepoint records the executed query for the isolated post-measurement
-        # phase instead of running EXPLAIN inline; otherwise it captures inline.
-        # EXPLAIN targets the transformed query (the one that actually ran): the
-        # original may not parse under ClickHouse without the compatibility transforms.
         self._merge_plan_capture_into_result(result_dict, connection, transformed_query, query_id)
 
         return result_dict

@@ -99,14 +99,6 @@ def _sort_kwargs(sort: str, descending: str, *, pandas: bool) -> dict[str, Any]:
     return {"by": columns, "descending": flags} if flags else {"by": columns}
 
 
-def _query_doc(query_id: str, family: str) -> str:
-    """Build a short docstring for a generated query implementation."""
-    descriptions = globals().get("_QUERY_DESCRIPTIONS", {})
-    description = descriptions.get(query_id, "SSB DataFrame query.")
-    family_label = "Expression" if family == "expression" else "Pandas"
-    return f"SSB {query_id} ({family_label}): {description}\n\nGenerated implementation from compact query metadata."
-
-
 def _make_expression_impl(spec: dict[str, str]) -> Any:
     def impl(ctx: DataFrameContext) -> Any:
         col = ctx.col
@@ -126,7 +118,6 @@ def _make_expression_impl(spec: dict[str, str]) -> Any:
 
     impl.__name__ = f"{spec['stem']}_expression_impl"
     impl.__qualname__ = impl.__name__
-    impl.__doc__ = _query_doc(spec["id"], "expression")
     return impl
 
 
@@ -150,7 +141,6 @@ def _make_pandas_impl(spec: dict[str, str]) -> Any:
 
     impl.__name__ = f"{spec['stem']}_pandas_impl"
     impl.__qualname__ = impl.__name__
-    impl.__doc__ = _query_doc(spec["id"], "pandas")
     return impl
 
 
@@ -201,18 +191,6 @@ Q4.1|Profit by Year/Nation|Profit (revenue - supply cost) by year and nation fil
 Q4.2|Profit by Year/Nation/Category|Profit by year, supplier nation, and part category with year and manufacturer filters|MJ,FI,GB,SO|q4_2
 Q4.3|Profit by Year/City/Brand|Profit by year, supplier city, and brand with category filter (deepest drill-down)|MJ,FI,GB,SO|q4_3
 """
-
-
-_QUERY_DESCRIPTIONS = {
-    query_id: description
-    for query_id, _query_name, description, *_ in (row.split("|") for row in _QUERY_METADATA.splitlines())
-}
-
-for _spec in _SPECS.values():
-    impl_name = f"{_spec['stem']}_expression_impl"
-    pandas_impl_name = f"{_spec['stem']}_pandas_impl"
-    globals()[impl_name].__doc__ = _query_doc(_spec["id"], "expression")
-    globals()[pandas_impl_name].__doc__ = _query_doc(_spec["id"], "pandas")
 
 
 def _impl_for(stem: str, family: str) -> Any:

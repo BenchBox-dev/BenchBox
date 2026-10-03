@@ -1,14 +1,6 @@
-"""Core tests for Metadata Primitives benchmark functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains unit tests for:
-- TestMetadataCatalogLoader: Tests for catalog YAML loading and validation
-- TestMetadataPrimitivesQueryManager: Tests for query management and retrieval
-- TestMetadataPrimitivesBenchmark: Tests for core benchmark functionality
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -32,8 +24,6 @@ pytestmark = [
 
 @pytest.mark.unit
 class TestMetadataCatalogLoader:
-    """Test Metadata Primitives catalog loading functionality."""
-
     def test_load_catalog(self):
 
         catalog = load_metadata_catalog()
@@ -47,7 +37,6 @@ class TestMetadataCatalogLoader:
         assert catalog.version == 1
 
     def test_catalog_query_structure(self):
-        """Test that queries have required fields."""
         catalog = load_metadata_catalog()
 
         for query_id, query in catalog.queries.items():
@@ -69,7 +58,6 @@ class TestMetadataCatalogLoader:
 
         catalog = load_metadata_catalog()
 
-        # Find a query with variants
         queries_with_variants = [q for q in catalog.queries.values() if q.variants]
         assert len(queries_with_variants) > 0
 
@@ -83,7 +71,6 @@ class TestMetadataCatalogLoader:
 
         catalog = load_metadata_catalog()
 
-        # Find queries with skip_on
         queries_with_skip = [q for q in catalog.queries.values() if q.skip_on]
         assert len(queries_with_skip) > 0
 
@@ -94,7 +81,6 @@ class TestMetadataCatalogLoader:
                 assert len(dialect) > 0
 
     def test_large_catalog_column_count_guards_empty_catalog_division(self):
-        """Column-count query should not divide by zero when no catalog tables exist."""
         query = load_metadata_catalog().queries["large_catalog_column_count"]
 
         assert "NULLIF(COUNT(DISTINCT table_name), 0)" in query.sql
@@ -103,8 +89,6 @@ class TestMetadataCatalogLoader:
 
 @pytest.mark.unit
 class TestMetadataPrimitivesQueryManager:
-    """Test Metadata Primitives query manager functionality."""
-
     def test_query_manager_initialization(self):
 
         manager = MetadataPrimitivesQueryManager()
@@ -121,7 +105,6 @@ class TestMetadataPrimitivesQueryManager:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Test valid query
         query = manager.get_query("schema_list_tables")
         assert isinstance(query, str)
         assert "SELECT" in query.upper()
@@ -138,7 +121,6 @@ class TestMetadataPrimitivesQueryManager:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # schema_list_tables has a clickhouse variant
         base_query = manager.get_query("schema_list_tables")
         clickhouse_query = manager.get_query("schema_list_tables", dialect="clickhouse")
 
@@ -149,12 +131,10 @@ class TestMetadataPrimitivesQueryManager:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # schema_list_views is skipped on clickhouse
         with pytest.raises(ValueError, match="not supported on dialect"):
             manager.get_query("schema_list_views", dialect="clickhouse")
 
     def test_datafusion_uses_view_definition_column_and_skips_constraints(self):
-        """DataFusion's catalog contract exposes ``definition`` but no constraints view."""
         manager = MetadataPrimitivesQueryManager()
 
         view_query = manager.get_query("schema_list_views", dialect="datafusion")
@@ -183,7 +163,6 @@ class TestMetadataPrimitivesQueryManager:
         )
 
     def test_clickhouse_role_membership_uses_native_admin_option_name(self):
-        """ClickHouse exposes role delegation as ``with_admin_option``."""
         manager = MetadataPrimitivesQueryManager()
 
         query = manager.get_query("acl_role_membership", dialect="clickhouse")
@@ -192,7 +171,6 @@ class TestMetadataPrimitivesQueryManager:
         assert "\n    admin_option\n" not in query
 
     def test_databricks_skips_unsupported_acl_queries(self):
-        """Databricks lacks the ACL introspection views these queries need."""
         manager = MetadataPrimitivesQueryManager()
 
         for query_id in (
@@ -235,17 +213,14 @@ class TestMetadataPrimitivesQueryManager:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Test schema category
         schema_queries = manager.get_queries_by_category("schema")
         assert len(schema_queries) > 0
         assert "schema_list_tables" in schema_queries
 
-        # Test column category
         column_queries = manager.get_queries_by_category("column")
         assert len(column_queries) > 0
         assert "column_list_all" in column_queries
 
-        # Test empty category
         empty_queries = manager.get_queries_by_category("nonexistent")
         assert len(empty_queries) == 0
 
@@ -253,21 +228,16 @@ class TestMetadataPrimitivesQueryManager:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Test DuckDB (should include most queries)
         duckdb_queries = manager.get_queries_for_dialect("duckdb")
         assert len(duckdb_queries) > 0
 
-        # Test ClickHouse (some queries skipped)
         clickhouse_queries = manager.get_queries_for_dialect("clickhouse")
         assert len(clickhouse_queries) > 0
-        # schema_list_views should not be in clickhouse queries
         assert "schema_list_views" not in clickhouse_queries
 
 
 @pytest.mark.unit
 class TestMetadataPrimitivesBenchmark:
-    """Test Metadata Primitives benchmark functionality."""
-
     def test_benchmark_initialization(self):
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -295,7 +265,6 @@ class TestMetadataPrimitivesBenchmark:
 
         benchmark = MetadataPrimitivesBenchmark()
 
-        # Test getting individual query
         query = benchmark.get_query("schema_list_tables")
         assert isinstance(query, str)
         assert "SELECT" in query.upper()
@@ -319,7 +288,6 @@ class TestMetadataPrimitivesBenchmark:
 
         benchmark = MetadataPrimitivesBenchmark()
 
-        # Should filter out unsupported queries
         clickhouse_queries = benchmark.get_queries(dialect="clickhouse")
         assert "schema_list_views" not in clickhouse_queries
 
@@ -353,8 +321,6 @@ class TestMetadataPrimitivesBenchmark:
 
 @pytest.mark.unit
 class TestMetadataQueryResult:
-    """Test MetadataQueryResult dataclass."""
-
     def test_result_creation(self):
 
         result = MetadataQueryResult(
@@ -387,8 +353,6 @@ class TestMetadataQueryResult:
 
 @pytest.mark.unit
 class TestMetadataBenchmarkResult:
-    """Test MetadataBenchmarkResult dataclass."""
-
     def test_result_creation(self):
 
         result = MetadataBenchmarkResult()
@@ -438,13 +402,10 @@ class TestMetadataBenchmarkResult:
 
 @pytest.mark.unit
 class TestQueryContentValidation:
-    """Test that queries contain expected SQL content."""
-
     def test_schema_queries_content(self):
 
         manager = MetadataPrimitivesQueryManager()
 
-        # List tables query should reference information_schema.tables
         query = manager.get_query("schema_list_tables")
         assert "table_name" in query.lower()
         assert "table_type" in query.lower()
@@ -453,7 +414,6 @@ class TestQueryContentValidation:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Column list query should reference columns
         query = manager.get_query("column_list_all")
         assert "column_name" in query.lower()
         assert "data_type" in query.lower()
@@ -462,7 +422,6 @@ class TestQueryContentValidation:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Stats query should aggregate counts
         query = manager.get_query("stats_column_count_summary")
         assert "count" in query.lower()
 
@@ -470,22 +429,18 @@ class TestQueryContentValidation:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # Explain query should have EXPLAIN
         query = manager.get_query("query_explain_simple")
         assert "explain" in query.lower() or "select" in query.lower()
 
 
 @pytest.mark.unit
 class TestDialectVariants:
-    """Test dialect-specific query variants."""
-
     def test_clickhouse_variants_use_system_tables(self):
 
         manager = MetadataPrimitivesQueryManager()
 
         clickhouse_queries = manager.get_queries_for_dialect("clickhouse")
 
-        # At least some queries should reference system tables
         has_system_tables = False
         for sql in clickhouse_queries.values():
             if "system." in sql:
@@ -497,7 +452,6 @@ class TestDialectVariants:
 
         manager = MetadataPrimitivesQueryManager()
 
-        # schema_list_views has a DuckDB variant using duckdb_views()
         duckdb_query = manager.get_query("schema_list_views", dialect="duckdb")
         assert "duckdb_views()" in duckdb_query
 
@@ -508,5 +462,4 @@ class TestDialectVariants:
         base_query = manager.get_query("schema_list_schemata")
         duckdb_query = manager.get_query("schema_list_schemata", dialect="duckdb")
 
-        # Without a DuckDB variant, should return base query
         assert base_query == duckdb_query

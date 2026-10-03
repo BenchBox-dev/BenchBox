@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Capture visualization screenshots and sync shared docs/blog image copies.
-
-Pipeline: ``benchbox visualize`` -> ANSI text -> ansi2html -> headless Chrome -> PNG.
-
-This script is the supported entrypoint for the historical blog/chart screenshot
-automation. Fresh renders are written to ``_blog/building-benchbox/images`` and
-then synced into ``docs/blog/images`` so the published docs do not drift from
-the blog source tree.
-"""
 
 from __future__ import annotations
 
@@ -38,12 +29,10 @@ PRIMARY_OUT = ROOT / "_blog" / "building-benchbox" / "images"
 SYNC_OUT_DIRS = (ROOT / "docs" / "blog" / "images",)
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
-# DuckDB 1.2.2 / 1.3.2 / 1.4.4 at SF=1 (Oxbow project)
-OX_A = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_140745_f1e6f02e.json"  # 1.2.2
-OX_B = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141239_0e852969.json"  # 1.3.2
-OX_C = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141527_a41ee940.json"  # 1.4.4
+OX_A = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_140745_f1e6f02e.json"
+OX_B = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141239_0e852969.json"
+OX_C = OX_RESULTS / "tpch_sf1_duckdb_sql_20260223_141527_a41ee940.json"
 
-# (output_name, [result_files], chart_type, no_color)
 CHARTS: list[tuple[str, list[Path], str, bool]] = [
     ("percentile_ladder", [OX_A, OX_B, OX_C], "percentile_ladder", False),
     ("cdf_chart", [OX_A, OX_B, OX_C], "cdf_chart", False),
@@ -98,7 +87,6 @@ HTML_TEMPLATE = """\
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse CLI args."""
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--sync-only",
@@ -113,7 +101,6 @@ def sync_existing_images(
     target_dirs: Sequence[Path] = SYNC_OUT_DIRS,
     names: Iterable[str] | None = None,
 ) -> int:
-    """Copy existing PNG screenshots into the synced docs/blog destinations."""
     copied = 0
     selected_names = list(names) if names is not None else sorted(path.stem for path in source_dir.glob("*.png"))
 
@@ -132,7 +119,6 @@ def sync_existing_images(
 
 
 def _require_capture_dependencies() -> None:
-    """Validate optional screenshot capture dependencies before rendering."""
     missing: list[str] = []
     try:
         import ansi2html  # noqa: F401
@@ -165,7 +151,6 @@ def _require_capture_dependencies() -> None:
 
 
 def run_chart(result_files: Sequence[Path], chart_type: str, no_color: bool) -> str:
-    """Run ``benchbox visualize`` and return raw chart output."""
     paths = [str(path if path.is_absolute() else RESULTS / path) for path in result_files]
     cmd = ["uv", "run", "benchbox", "visualize", *paths, "--chart-type", chart_type]
     if no_color:
@@ -179,7 +164,6 @@ def run_chart(result_files: Sequence[Path], chart_type: str, no_color: bool) -> 
 
 
 def ansi_to_html(ansi_text: str) -> str:
-    """Convert ANSI escape sequences to HTML spans via ``ansi2html``."""
     from ansi2html import Ansi2HTMLConverter  # type: ignore[import]
 
     converter = Ansi2HTMLConverter(inline=True, scheme="ansi2html", dark_bg=True)
@@ -187,13 +171,11 @@ def ansi_to_html(ansi_text: str) -> str:
 
 
 def estimate_height(text: str, pad: int = 80) -> int:
-    """Estimate viewport height from line count."""
     lines = text.count("\n") + 1
     return min(max(lines * 22 + pad * 2, 200), 2400)
 
 
 def save_png(html_content: str, out_path: Path, text: str, width: int = 960) -> None:
-    """Render HTML to PNG via headless Chrome."""
     height = estimate_height(text)
     with tempfile.NamedTemporaryFile(suffix=".html", mode="w", delete=False, encoding="utf-8") as handle:
         handle.write(html_content)
@@ -220,7 +202,6 @@ def save_png(html_content: str, out_path: Path, text: str, width: int = 960) -> 
 
 
 def crop_to_content(png_path: Path) -> None:
-    """Crop blank bottom rows using Pillow."""
     from PIL import Image  # type: ignore[import]
 
     img = Image.open(png_path).convert("RGB")
@@ -242,7 +223,6 @@ def crop_to_content(png_path: Path) -> None:
 
 
 def render_images() -> None:
-    """Render the configured screenshots and sync them into docs/blog."""
     _require_capture_dependencies()
     PRIMARY_OUT.mkdir(parents=True, exist_ok=True)
 
@@ -271,7 +251,6 @@ def render_images() -> None:
 
 
 def main() -> int:
-    """CLI entrypoint."""
     args = parse_args()
 
     if args.sync_only:

@@ -1,17 +1,6 @@
-"""Execution tests for DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Validates that Expression and Pandas family implementations:
-1. Execute without errors on real data
-2. Produce non-empty results with expected schemas
-3. Return equivalent results (same row counts and column values)
-
-Uses Polars (expression family) and Pandas (pandas family) as reference
-platforms with small in-memory fixture datasets.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -39,13 +28,7 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
-
-
 def _to_pandas(result: Any) -> pd.DataFrame:
-    """Normalize any result to a pandas DataFrame for comparison."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
     from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
@@ -63,19 +46,10 @@ def _to_pandas(result: Any) -> pd.DataFrame:
 
 
 def _compare_results(expr_result: pd.DataFrame, pandas_result: pd.DataFrame, *, rtol: float = 1e-5) -> None:
-    """Assert that expression and pandas results are equivalent.
-
-    Compares:
-    - Column names (sorted, order-independent)
-    - Row counts
-    - Values (numeric columns compared with tolerance, others exact)
-    """
-    # Column names must match
     expr_cols = sorted(expr_result.columns.tolist())
     pandas_cols = sorted(pandas_result.columns.tolist())
     assert expr_cols == pandas_cols, f"Column mismatch: expr={expr_cols}, pandas={pandas_cols}"
 
-    # Row counts must match
     assert len(expr_result) == len(pandas_result), (
         f"Row count mismatch: expr={len(expr_result)}, pandas={len(pandas_result)}"
     )
@@ -83,12 +57,10 @@ def _compare_results(expr_result: pd.DataFrame, pandas_result: pd.DataFrame, *, 
     if len(expr_result) == 0:
         return
 
-    # Align columns and sort both DataFrames identically for row-by-row comparison
     common_cols = sorted(expr_result.columns.tolist())
     expr_sorted = expr_result[common_cols].reset_index(drop=True)
     pandas_sorted = pandas_result[common_cols].reset_index(drop=True)
 
-    # Sort by all columns for deterministic comparison
     sort_cols = common_cols
     expr_sorted = expr_sorted.sort_values(sort_cols, ignore_index=True)
     pandas_sorted = pandas_sorted.sort_values(sort_cols, ignore_index=True)
@@ -114,24 +86,16 @@ def _compare_results(expr_result: pd.DataFrame, pandas_result: pd.DataFrame, *, 
 
 
 def _create_polars_context():
-    """Create a Polars expression-family context."""
     adapter = PolarsDataFrameAdapter()
     return adapter.create_context()
 
 
 def _create_pandas_context():
-    """Create a Pandas family context."""
     adapter = PandasDataFrameAdapter()
     return adapter.create_context()
 
 
-# =============================================================================
-# H2ODB Fixture Data (single "trips" table)
-# =============================================================================
-
-
 def _h2odb_trips_polars() -> pl.LazyFrame:
-    """Create a small H2ODB-compatible trips table as Polars LazyFrame."""
     return pl.DataFrame(
         {
             "vendor_id": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
@@ -155,7 +119,6 @@ def _h2odb_trips_polars() -> pl.LazyFrame:
 
 
 def _h2odb_trips_pandas() -> pd.DataFrame:
-    """Create a small H2ODB-compatible trips table as Pandas DataFrame."""
     return pd.DataFrame(
         {
             "vendor_id": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
@@ -180,13 +143,7 @@ def _h2odb_trips_pandas() -> pd.DataFrame:
     )
 
 
-# =============================================================================
-# SSB Fixture Data (lineorder + date tables)
-# =============================================================================
-
-
 def _ssb_lineorder_polars() -> pl.LazyFrame:
-    """Create a small SSB lineorder table as Polars LazyFrame."""
     return pl.DataFrame(
         {
             "lo_orderdate": [19930101, 19930115, 19930201, 19940101, 19940215, 19930310],
@@ -203,7 +160,6 @@ def _ssb_lineorder_polars() -> pl.LazyFrame:
 
 
 def _ssb_date_polars() -> pl.LazyFrame:
-    """Create a small SSB date table as Polars LazyFrame."""
     return pl.DataFrame(
         {
             "d_datekey": [19930101, 19930115, 19930201, 19930310, 19940101, 19940215],
@@ -215,7 +171,6 @@ def _ssb_date_polars() -> pl.LazyFrame:
 
 
 def _ssb_lineorder_pandas() -> pd.DataFrame:
-    """Create a small SSB lineorder table as Pandas DataFrame."""
     return pd.DataFrame(
         {
             "lo_orderdate": [19930101, 19930115, 19930201, 19940101, 19940215, 19930310],
@@ -232,7 +187,6 @@ def _ssb_lineorder_pandas() -> pd.DataFrame:
 
 
 def _ssb_date_pandas() -> pd.DataFrame:
-    """Create a small SSB date table as Pandas DataFrame."""
     return pd.DataFrame(
         {
             "d_datekey": [19930101, 19930115, 19930201, 19930310, 19940101, 19940215],
@@ -243,17 +197,9 @@ def _ssb_date_pandas() -> pd.DataFrame:
     )
 
 
-# =============================================================================
-# H2ODB Execution Tests - Expression Family (Polars)
-# =============================================================================
-
-
 class TestH2ODBExpressionExecution:
-    """Execute all H2ODB queries against Polars and verify results."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
-        """Set up a Polars context with H2ODB test data."""
         self.ctx = _create_polars_context()
         self.ctx.register_table("trips", _h2odb_trips_polars())
 
@@ -278,7 +224,7 @@ class TestH2ODBExpressionExecution:
 
     def test_q3_sum_by_passenger(self):
         result = self._execute("Q3")
-        assert len(result) == 3  # 3 distinct passenger_counts
+        assert len(result) == 3
         assert "passenger_count" in result.columns
         assert "sum_fare_amount" in result.columns
 
@@ -293,7 +239,7 @@ class TestH2ODBExpressionExecution:
         assert "passenger_count" in result.columns
         assert "vendor_id" in result.columns
         assert "sum_fare_amount" in result.columns
-        assert len(result) == 6  # 3 passengers x 2 vendors
+        assert len(result) == 6
 
     def test_q6_sum_mean_by_passenger_vendor(self):
         result = self._execute("Q6")
@@ -323,21 +269,12 @@ class TestH2ODBExpressionExecution:
         result = self._execute("Q10")
         assert "pickup_location_id" in result.columns
         assert "trip_count" in result.columns
-        # NULL location filtered out, so 3 distinct locations
         assert len(result) == 3
 
 
-# =============================================================================
-# H2ODB Execution Tests - Pandas Family
-# =============================================================================
-
-
 class TestH2ODBPandasExecution:
-    """Execute all H2ODB queries against Pandas and verify results."""
-
     @pytest.fixture(autouse=True)
     def setup_context(self):
-        """Set up a Pandas context with H2ODB test data."""
         self.ctx = _create_pandas_context()
         self.ctx.register_table("trips", _h2odb_trips_pandas())
 
@@ -393,19 +330,12 @@ class TestH2ODBPandasExecution:
         assert len(result) == 3
 
 
-# =============================================================================
-# H2ODB Cross-Family Comparison (Expression vs Pandas)
-# =============================================================================
-
 H2ODB_QUERY_IDS = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10"]
 
 
 class TestH2ODBCrossFamilyComparison:
-    """Verify Expression and Pandas implementations produce equivalent results."""
-
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
-        """Set up both Polars and Pandas contexts with identical data."""
         self.expr_ctx = _create_polars_context()
         self.expr_ctx.register_table("trips", _h2odb_trips_polars())
 
@@ -422,10 +352,6 @@ class TestH2ODBCrossFamilyComparison:
         expr_result = _to_pandas(query.expression_impl(self.expr_ctx))
         pandas_result = _to_pandas(query.pandas_impl(self.pandas_ctx))
 
-        # Q9 (percentile): Polars uses "nearest" interpolation for quantile
-        # while Pandas uses "linear".  On small datasets this causes large
-        # relative differences (e.g., p90 of [10,20] → 20 vs 19).  We still
-        # validate column names and row counts but skip numeric comparison.
         if query_id == "Q9":
             assert sorted(expr_result.columns) == sorted(pandas_result.columns)
             assert len(expr_result) == len(pandas_result)
@@ -433,21 +359,9 @@ class TestH2ODBCrossFamilyComparison:
             _compare_results(expr_result, pandas_result)
 
 
-# =============================================================================
-# SSB Execution Tests - Cross-Family for Q1.1 (join + filter + scalar agg)
-# =============================================================================
-
-
 class TestSSBQ11Execution:
-    """Execute SSB Q1.1 on both families and verify cross-family equivalence.
-
-    Q1.1 tests: 2-table join -> multi-column filter -> scalar aggregation.
-    This covers a fundamentally different pattern than H2ODB (single-table).
-    """
-
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
-        """Set up Polars and Pandas contexts with SSB fixture data."""
         self.expr_ctx = _create_polars_context()
         self.expr_ctx.register_table("lineorder", _ssb_lineorder_polars())
         self.expr_ctx.register_table("date", _ssb_date_polars())
@@ -457,16 +371,14 @@ class TestSSBQ11Execution:
         self.pandas_ctx.register_table("date", _ssb_date_pandas())
 
     def test_q1_1_expression_executes(self):
-        """Q1.1 expression impl produces a result."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
         result = _to_pandas(query.expression_impl(self.expr_ctx))
         assert "revenue" in result.columns
-        assert len(result) == 1  # scalar aggregation
+        assert len(result) == 1
 
     def test_q1_1_pandas_executes(self):
-        """Q1.1 pandas impl produces a result."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -475,7 +387,6 @@ class TestSSBQ11Execution:
         assert len(result) == 1
 
     def test_q1_1_cross_family_equivalence(self):
-        """Q1.1 expression and pandas produce the same revenue."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -485,16 +396,6 @@ class TestSSBQ11Execution:
         _compare_results(expr_result, pandas_result)
 
     def test_q1_1_revenue_value_correct(self):
-        """Q1.1 revenue matches hand-calculated expected value.
-
-        SSB Q1.1 params: year=1993, discount_min=1, discount_max=3, quantity<25.
-        Matching rows after join (d_year==1993 AND 1<=lo_discount<=3 AND lo_quantity<25):
-          - lo_orderdate=19930101: price=1000, disc=2, qty=10 -> 1000*2 = 2000
-          - lo_orderdate=19930115: price=2000, disc=1, qty=20 -> 2000*1 = 2000
-          - lo_orderdate=19930201: price=1500, disc=3, qty=15 -> 1500*3 = 4500
-          - lo_orderdate=19930310: price=500,  disc=2, qty=24 -> 500*2  = 1000
-        Total revenue = 2000 + 2000 + 4500 + 1000 = 9500
-        """
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -502,13 +403,7 @@ class TestSSBQ11Execution:
         assert abs(result["revenue"].iloc[0] - 9500.0) < 0.01
 
 
-# =============================================================================
-# CoffeeShop Fixture Data (order_lines + dim_locations)
-# =============================================================================
-
-
 def _coffeeshop_order_lines_polars() -> pl.LazyFrame:
-    """Create a small CoffeeShop order_lines table as Polars LazyFrame."""
     return pl.DataFrame(
         {
             "order_id": [1, 2, 3, 4, 5, 6, 7, 8],
@@ -529,7 +424,6 @@ def _coffeeshop_order_lines_polars() -> pl.LazyFrame:
 
 
 def _coffeeshop_dim_locations_polars() -> pl.LazyFrame:
-    """Create a small CoffeeShop dim_locations table as Polars LazyFrame."""
     return pl.DataFrame(
         {
             "record_id": [1, 2],
@@ -539,7 +433,6 @@ def _coffeeshop_dim_locations_polars() -> pl.LazyFrame:
 
 
 def _coffeeshop_order_lines_pandas() -> pd.DataFrame:
-    """Create a small CoffeeShop order_lines table as Pandas DataFrame."""
     return pd.DataFrame(
         {
             "order_id": [1, 2, 3, 4, 5, 6, 7, 8],
@@ -562,7 +455,6 @@ def _coffeeshop_order_lines_pandas() -> pd.DataFrame:
 
 
 def _coffeeshop_dim_locations_pandas() -> pd.DataFrame:
-    """Create a small CoffeeShop dim_locations table as Pandas DataFrame."""
     return pd.DataFrame(
         {
             "record_id": [1, 2],
@@ -571,22 +463,11 @@ def _coffeeshop_dim_locations_pandas() -> pd.DataFrame:
     )
 
 
-# =============================================================================
-# CoffeeShop SA4 Execution Tests (zero-division guard + scalar extraction)
-# =============================================================================
-
-
 class TestCoffeeShopSA4Execution:
-    """Execute CoffeeShop SA4 to verify the scalar extraction and zero-division fixes."""
-
-    # Patch CoffeeShop parameters to use datetime objects instead of strings.
-    # Polars rejects string-to-Date comparison, and Pandas rejects date-to-datetime64
-    # comparison, but both accept datetime objects.
     SA4_PARAMS = {"start_date": datetime(2023, 1, 1), "end_date": datetime(2024, 12, 31)}
 
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
-        """Set up both contexts with CoffeeShop data."""
         self.expr_ctx = _create_polars_context()
         self.expr_ctx.register_table("order_lines", _coffeeshop_order_lines_polars())
         self.expr_ctx.register_table("dim_locations", _coffeeshop_dim_locations_polars())
@@ -601,7 +482,6 @@ class TestCoffeeShopSA4Execution:
         return CoffeeShopParameters(query_id=query_id, params=self.SA4_PARAMS.copy())
 
     def test_sa4_expression_executes(self):
-        """SA4 expression impl produces results with revenue_share column."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("SA4")
@@ -609,10 +489,9 @@ class TestCoffeeShopSA4Execution:
             result = _to_pandas(query.expression_impl(self.expr_ctx))
         assert "revenue_share" in result.columns
         assert "revenue" in result.columns
-        assert len(result) == 2  # 2 regions
+        assert len(result) == 2
 
     def test_sa4_pandas_executes(self):
-        """SA4 pandas impl produces results with revenue_share column."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("SA4")
@@ -622,7 +501,6 @@ class TestCoffeeShopSA4Execution:
         assert len(result) == 2
 
     def test_sa4_revenue_shares_sum_to_one(self):
-        """SA4 revenue shares across regions should sum to ~1.0."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("SA4")
@@ -632,7 +510,6 @@ class TestCoffeeShopSA4Execution:
         assert abs(total_share - 1.0) < 0.01
 
     def test_sa4_cross_family_equivalence(self):
-        """SA4 expression and pandas produce equivalent results."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("SA4")
@@ -642,17 +519,9 @@ class TestCoffeeShopSA4Execution:
         _compare_results(expr_result, pandas_result)
 
 
-# =============================================================================
-# CoffeeShop TR1 Execution Tests (quarter column alias fix)
-# =============================================================================
-
-
 class TestCoffeeShopTR1Execution:
-    """Execute CoffeeShop TR1 to verify the quarter column alias fix."""
-
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
-        """Set up both contexts with CoffeeShop data."""
         self.expr_ctx = _create_polars_context()
         self.expr_ctx.register_table("order_lines", _coffeeshop_order_lines_polars())
 
@@ -660,7 +529,6 @@ class TestCoffeeShopTR1Execution:
         self.pandas_ctx.register_table("order_lines", _coffeeshop_order_lines_pandas())
 
     def test_tr1_expression_has_quarter_column(self):
-        """TR1 expression impl should have a 'quarter' column (not 'month')."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("TR1")
@@ -670,18 +538,14 @@ class TestCoffeeShopTR1Execution:
         assert "month" not in result.columns
 
     def test_tr1_quarter_values_correct(self):
-        """TR1 quarter values should be 1-4, computed from month."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("TR1")
         result = _to_pandas(query.expression_impl(self.expr_ctx))
         quarters = sorted(result["quarter"].unique().tolist())
-        # Our fixture data spans Jan, Feb, Apr, Jul, Oct (2023) + Jan, Apr, Jul (2024)
-        # Q1=Jan/Feb, Q2=Apr, Q3=Jul, Q4=Oct
         assert all(q in [1, 2, 3, 4] for q in quarters)
 
     def test_tr1_cross_family_equivalence(self):
-        """TR1 expression and pandas produce equivalent results."""
         from benchbox.core.coffeeshop.dataframe_queries import get_coffeeshop_query
 
         query = get_coffeeshop_query("TR1")
@@ -690,13 +554,7 @@ class TestCoffeeShopTR1Execution:
         _compare_results(expr_result, pandas_result)
 
 
-# =============================================================================
-# Data Vault Q5 Fixture Data (8 hub/link/satellite tables)
-# =============================================================================
-
-
 def _datavault_tables_polars() -> dict[str, pl.LazyFrame]:
-    """Create minimal Data Vault tables for Q5 testing (Polars)."""
     from datetime import date as d
 
     sat_region = pl.DataFrame({"hk_region": [1], "r_name": ["ASIA"], "load_end_dts": [None]}).lazy()
@@ -723,7 +581,6 @@ def _datavault_tables_polars() -> dict[str, pl.LazyFrame]:
             "load_end_dts": [None, None],
         }
     ).lazy()
-    # link_supplier_nation: supplier 200 is in nation 10, supplier 201 is in nation 11
     link_supplier_nation = pl.DataFrame({"hk_nation": [10, 11], "hk_supplier": [200, 201]}).lazy()
     return {
         "sat_region": sat_region,
@@ -739,7 +596,6 @@ def _datavault_tables_polars() -> dict[str, pl.LazyFrame]:
 
 
 def _datavault_tables_pandas() -> dict[str, pd.DataFrame]:
-    """Create minimal Data Vault tables for Q5 testing (Pandas)."""
     from datetime import date as d
 
     sat_region = pd.DataFrame({"hk_region": [1], "r_name": ["ASIA"], "load_end_dts": [None]})
@@ -778,17 +634,9 @@ def _datavault_tables_pandas() -> dict[str, pd.DataFrame]:
     }
 
 
-# =============================================================================
-# Data Vault Q5 Execution Tests (explicit suffix fix)
-# =============================================================================
-
-
 class TestDataVaultQ5Execution:
-    """Execute Data Vault Q5 to verify the explicit suffix fix for join disambiguation."""
-
     @pytest.fixture(autouse=True)
     def setup_contexts(self):
-        """Set up both contexts with Data Vault fixture data."""
         self.expr_ctx = _create_polars_context()
         for name, df in _datavault_tables_polars().items():
             self.expr_ctx.register_table(name, df)
@@ -798,7 +646,6 @@ class TestDataVaultQ5Execution:
             self.pandas_ctx.register_table(name, df)
 
     def test_q5_expression_executes(self):
-        """Q5 expression impl executes without errors on the suffix-fixed join chain."""
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         query = get_datavault_query("Q5")
@@ -808,7 +655,6 @@ class TestDataVaultQ5Execution:
         assert len(result) > 0
 
     def test_q5_pandas_executes(self):
-        """Q5 pandas impl executes without errors."""
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         query = get_datavault_query("Q5")
@@ -818,22 +664,15 @@ class TestDataVaultQ5Execution:
         assert len(result) > 0
 
     def test_q5_revenue_values_correct(self):
-        """Q5 revenue is correctly computed as extendedprice * (1 - discount).
-
-        Fixture data:
-          - CHINA:  supplier 200 matches nation 10 → 1000 * (1 - 0.1) = 900
-          - JAPAN:  supplier 201 matches nation 11 → 2000 * (1 - 0.05) = 1900
-        """
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         query = get_datavault_query("Q5")
         result = _to_pandas(query.expression_impl(self.expr_ctx))
         result_sorted = result.sort_values("n_name").reset_index(drop=True)
-        assert abs(result_sorted.loc[0, "revenue"] - 900.0) < 0.01  # CHINA
-        assert abs(result_sorted.loc[1, "revenue"] - 1900.0) < 0.01  # JAPAN
+        assert abs(result_sorted.loc[0, "revenue"] - 900.0) < 0.01
+        assert abs(result_sorted.loc[1, "revenue"] - 1900.0) < 0.01
 
     def test_q5_cross_family_equivalence(self):
-        """Q5 expression and pandas produce equivalent results."""
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
         query = get_datavault_query("Q5")

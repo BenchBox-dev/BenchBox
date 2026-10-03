@@ -1,23 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Live integration tests for Firebolt Cloud.
-
-Setup:
-1. Create a Firebolt Cloud account and provision an engine
-2. Create a service account with client ID and secret
-3. Set environment variables:
-   - FIREBOLT_CLIENT_ID
-   - FIREBOLT_CLIENT_SECRET
-   - FIREBOLT_ACCOUNT_NAME
-   - FIREBOLT_ENGINE_NAME
-   - FIREBOLT_DATABASE (optional, defaults to 'benchbox')
-4. Run: make test-live-firebolt
-
-These tests use scale_factor=0.01 for minimal cost.
-"""
 
 import os
 
@@ -38,7 +21,6 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def tpch_data(live_firebolt_adapter, test_scale_factor, test_output_dir):
-    """Load TPC-H data into Firebolt once per module; drop tables on teardown."""
     tpch = TPCH(scale_factor=test_scale_factor, output_dir=test_output_dir, verbose=False)
     data_files = tpch.generate_data()
     assert len(data_files) > 0, "No data files generated"
@@ -60,8 +42,6 @@ def tpch_data(live_firebolt_adapter, test_scale_factor, test_output_dir):
 
 
 class TestLiveFireboltConnection:
-    """Test basic Firebolt Cloud connectivity."""
-
     def test_connection(self, live_firebolt_adapter):
 
         connection = live_firebolt_adapter.create_connection()
@@ -83,10 +63,7 @@ class TestLiveFireboltConnection:
 
 
 class TestLiveFireboltQueryExecution:
-    """Test query execution against a live Firebolt instance."""
-
     def test_create_and_query_table(self, live_firebolt_adapter):
-        """Create a test table, insert data, and query it."""
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -107,7 +84,6 @@ class TestLiveFireboltQueryExecution:
             live_firebolt_adapter.close_connection(connection)
 
     def test_aggregation_query(self, live_firebolt_adapter):
-        """Execute an aggregation query to verify analytical capabilities."""
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -121,7 +97,6 @@ class TestLiveFireboltQueryExecution:
             live_firebolt_adapter.close_connection(connection)
 
     def test_tpch_query_1(self, live_firebolt_adapter, tpch_data):
-        """Execute TPC-H Query 1 against the module-loaded dataset."""
         tpch, _stats = tpch_data
         connection = live_firebolt_adapter.create_connection()
         try:
@@ -135,16 +110,12 @@ class TestLiveFireboltQueryExecution:
 
 
 class TestLiveFireboltSchemaManagement:
-    """Test database creation and management on Firebolt (uses databases, not schemas)."""
-
     def test_create_and_drop_database(self, live_firebolt_adapter):
-        """Create a test database and verify it can be dropped."""
         db_name = "benchbox_schema_test"
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
             cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
-            # Verify database exists via SHOW DATABASES
             cursor.execute("SHOW DATABASES")
             databases = [row[0] for row in cursor.fetchall()]
             assert db_name in databases, f"Expected {db_name} in SHOW DATABASES"
@@ -158,8 +129,6 @@ class TestLiveFireboltSchemaManagement:
 
 
 class TestLiveFireboltDataLoading:
-    """Test TPC-H data loading on Firebolt."""
-
     def test_tpch_data_load(self, tpch_data):
 
         _tpch, stats = tpch_data
@@ -168,15 +137,12 @@ class TestLiveFireboltDataLoading:
 
 
 class TestLiveFireboltSpecificFeatures:
-    """Test Firebolt-specific features."""
-
     def test_result_cache_control(self, live_firebolt_adapter):
 
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
             cursor.execute("SET enable_result_cache = false")
-            # Confirm the setting was accepted by running a query
             cursor.execute("SELECT 1")
             result = cursor.fetchone()
             assert result[0] == 1
@@ -184,17 +150,15 @@ class TestLiveFireboltSpecificFeatures:
             live_firebolt_adapter.close_connection(connection)
 
     def test_drop_table_is_synchronous(self, live_firebolt_adapter):
-        """Verify DROP TABLE completes synchronously - table is immediately gone after drop."""
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
             cursor.execute("CREATE TABLE IF NOT EXISTS benchbox_cleanup_test (id INT)")
             cursor.execute("DROP TABLE IF EXISTS benchbox_cleanup_test")
-            # Verify table is gone
             try:
                 cursor.execute("SELECT COUNT(*) FROM benchbox_cleanup_test")
                 pytest.fail("Table should have been dropped")
             except Exception:
-                pass  # Expected - table does not exist
+                pass
         finally:
             live_firebolt_adapter.close_connection(connection)

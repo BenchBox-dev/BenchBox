@@ -29,7 +29,9 @@ IGNORED_TOKENS = {
 }
 ANCHOR_WIDTH = 4
 DIRECTIVE_COMMENT = re.compile(
-    rf"(?:{'|'.join(DIRECTIVES)}|# type:\s*ignore(?:\[[^\]\r\n]*\])?|# noqa|# (?:ruff|flake8): noqa)",
+    rf"(?:{'|'.join(DIRECTIVES)}|# type:\s*ignore(?:\[[^\]\r\n]*\])?|# noqa|# (?:ruff|flake8): noqa)"
+    r"|#\s*(?:(?:ruff|flake8)\s*:\s*)?noqa"
+    r"(?::\s*[A-Z]+[0-9]+(?:[ \t,#][^\r\n]*)?|(?:[ \t]+[^\r\n]*)?)",
     re.IGNORECASE,
 )
 

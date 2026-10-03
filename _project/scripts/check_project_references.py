@@ -1,34 +1,4 @@
 #!/usr/bin/env python3
-"""Fail on NEW stale ``_project/`` references from tracked files outside ``_project/``.
-
-Docs are sometimes created inside ``_project/`` and linked from outside
-(``docs/``, ``README.md``, ``CLAUDE.md``, ...). When the ``_project/`` file is
-moved, archived, or deleted, the outside link goes stale silently. This lint
-catches new occurrences at CI time.
-
-Pre-existing stale references are recorded in a baseline file so this gate
-blocks *new* breakage immediately without forcing a repo-wide cleanup. The
-baseline cannot rot: an entry whose target now resolves (or whose scanned
-file no longer mentions it) is reported as stale and must be removed
-(regenerate with ``--update-baseline``).
-
-Behavior:
-
-* Scan every tracked file outside ``_project/`` for ``_project/<path>``
-  mentions ending in ``.md`` (plus ``.yaml``/``.yml``/``.json``).
-* Resolve each mention against the repo root. A mention is stale when the
-  path does not exist in the working tree.
-* Bare placeholder names (``foo``, ``bar``, ``example``) mark synthetic
-  fixture strings and are ignored everywhere.
-
-Usage:
-    uv run -- python _project/scripts/check_project_references.py                   # check (CI mode)
-    uv run -- python _project/scripts/check_project_references.py --update-baseline # regenerate baseline
-
-Exit codes:
-    0 - No new stale references; baseline is current
-    1 - New stale reference(s) found, or baseline contains stale entries
-"""
 
 from __future__ import annotations
 
@@ -41,19 +11,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = REPO_ROOT / "_project" / "scripts" / "project_references_baseline.txt"
 
-# Matches `_project/<path>` mentions with a doc/data suffix. The suffix must
-# be followed by a filename boundary (end of string, whitespace, or trailing
-# punctuation) so `_project/compat/inventory.jsonl` is not captured as the
-# shorter `_project/compat/inventory.json`. Trailing punctuation is stripped
-# during normalization.
 _REFERENCE_RE = re.compile(r"_project/[A-Za-z0-9_./@-]+\.(?:md|yaml|yml|json)(?![A-Za-z0-9_.~-])")
 
-# Placeholder path segments that mark a synthetic fixture string, not a real
-# reference. The stem (foo/bar/example) is what matters, not the suffix:
-# fixtures may use any supported doc/data extension. Ignored in every file.
 _PLACEHOLDER_STEMS = frozenset({"foo", "bar", "example"})
 
-# File extensions that are never scanned (scanning is text-based).
 _SKIP_SUFFIXES = frozenset(
     {
         ".png",
@@ -128,7 +89,6 @@ def _is_placeholder(ref: str) -> bool:
 
 
 def find_stale() -> list[str]:
-    """Return sorted ``<scanned_file>::<reference>`` keys for stale mentions."""
     stale: list[str] = []
     for tracked in _tracked_files():
         if tracked.startswith("_project/"):

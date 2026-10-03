@@ -1,5 +1,3 @@
-"""Unit and negative-control tests for the refresh certification classifier."""
-
 from __future__ import annotations
 
 import copy
@@ -234,7 +232,7 @@ def test_negative_authored_commit_not_two_parents() -> None:
 def test_negative_parent1_not_before() -> None:
     raw = _eligible_raw()
     raw["before"] = B0
-    raw["commits"][H0]  # keep objects
+    raw["commits"][H0]
     result = classify(request_from_mapping(raw))
     assert result.decision == DECISION_FULL
     assert result.reasons == [REASON_PARENT1_NOT_BEFORE]
@@ -392,12 +390,6 @@ def test_negative_malformed_pr_number() -> None:
 
 
 def test_agent_instruction_budget_history_is_not_a_skip_proof() -> None:
-    """#1539/#1541-style shared-budget edits stay shadow-eligible.
-
-    The classifier does not prove the combined budget. Lint on the combined
-    tree remains the invariant gate. This test documents that the decision
-    is evidence, not a safety proof.
-    """
 
     result = classify(
         _eligible_request(
@@ -410,11 +402,6 @@ def test_agent_instruction_budget_history_is_not_a_skip_proof() -> None:
 
 
 def test_cross_module_semantic_interaction_is_not_claimed_safe() -> None:
-    """A platforms change plus a utils change is still only shadow evidence.
-
-    Version 1 has no import-graph proof. The result must not be treated as
-    full behavioral integration.
-    """
 
     result = classify(
         _eligible_request(
@@ -476,7 +463,6 @@ def test_every_eligibility_predicate_has_a_negative_control() -> None:
 
 
 def test_deleting_any_predicate_would_drop_its_reason() -> None:
-    """Pin that each predicate is the unique source of its reason code."""
 
     for name, predicate in ELIGIBILITY_PREDICATES:
         request = _request_for_predicate(name)

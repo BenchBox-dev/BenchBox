@@ -1,5 +1,3 @@
-"""Canonical JoinOrder DataFrame capability tests."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -67,13 +65,6 @@ def duckdb_conn() -> Any:
 
 
 def _null_normalized_row(frame: pd.DataFrame) -> dict[str, Any]:
-    """Return the single result row with every NULL-like value mapped to None.
-
-    Pandas 3 uses a `str` dtype with NaN as its missing-value sentinel, and
-    `.where(notna, None)` is a no-op on such columns (None round-trips back
-    to NaN). Casting to object first restores the pandas 2 normalization so
-    oracle comparisons treat SQL NULL identically on every frame.
-    """
     as_object = frame.astype(object)
     return as_object.where(pd.notna(as_object), None).iloc[0].to_dict()
 

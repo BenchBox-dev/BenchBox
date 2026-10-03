@@ -1,7 +1,4 @@
-"""Tests for SSB data generator.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 

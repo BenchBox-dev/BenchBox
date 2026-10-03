@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""Generate cloud TPC tuned templates from the logical tuning profile.
-
-Renders one `<benchmark>_tuned.yaml` per platform/benchmark from the
-required candidates in `benchbox/core/tuning/profiles/tpc.yaml`, using each
-platform's logical-to-physical mapping
-(`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`).
-
-Platform rules honored here (mirroring the mappers, not reimplementing them):
-
-- BigQuery: at most 4 clustering columns per table; partitioning first.
-- Redshift: single DISTKEY per table (first distribution candidate);
-  remaining locality roles become compound sortkey entries.
-- Snowflake: at most 4 clustering columns per table so the adapter resumes automatic reclustering.
-
-Only platforms whose mapped tuning types reach the physical layout at
-execution time are generated here. BigQuery partitioning/clustering and
-Redshift distribution/sorting are preview-only or inspect-and-log in the
-current adapters (see benchbox/core/tuning/capability_registry.py), so they
-stay out of the certified set until the adapters render them for real;
-Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY and
-is the one certified platform in this generator today.
-
-Usage:
-    uv run -- python scripts/generate_cloud_tpc_templates.py --write
-    uv run -- python scripts/generate_cloud_tpc_templates.py --check
-    uv run -- python scripts/generate_cloud_tpc_templates.py --write --output-root examples/tunings
-"""
 
 from __future__ import annotations
 
@@ -135,7 +108,6 @@ def render_table(
     table: str,
     candidates: list,
 ) -> dict:
-    """Render one table_tunings entry from mapped candidates."""
     partitioning: list[dict] = []
     clustering: list[dict] = []
     distribution: list[dict] = []
@@ -171,8 +143,6 @@ def render_table(
         if clustering:
             block["clustering"] = _order_entries(clustering)
         if sorting and platform == "snowflake":
-            # Snowflake folds sort hints into clustering; keep both only
-            # when clustering did not already carry the column.
             extra = [e for e in sorting if e["name"] not in {c["name"] for c in clustering}]
             if extra:
                 block["sorting"] = _order_entries(extra)
@@ -182,7 +152,6 @@ def render_table(
 
 
 def render_template(platform: str, benchmark: str) -> str:
-    """Render the full tuned YAML for one platform/benchmark."""
     profile = load_tpc_tuning_profile()
     by_table: dict[str, list] = defaultdict(list)
     for candidate in profile.required_candidates(benchmark):

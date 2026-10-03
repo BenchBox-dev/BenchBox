@@ -1,36 +1,3 @@
-"""Run TPC-H on TigerData cloud (TimescaleDB managed service).
-
-TigerData is the managed cloud offering for TimescaleDB. BenchBox uses the
-`timescaledb:cloud` deployment mode, which applies SSL defaults and skips
-managed-database create/drop behavior.
-
-Required environment configuration (choose one approach):
-
-Option A: Service URL (recommended)
-    TIGERDATA_SERVICE_URL     Full URL (postgres://user:pass@host:port/db?sslmode=require)
-
-Option B: Individual values
-    TIGERDATA_HOST            Cloud hostname
-    TIGERDATA_PASSWORD        Password
-
-Optional environment variables:
-    TIGERDATA_USER            Username (default: tsdbadmin)
-    TIGERDATA_PORT            Port (default: 5432)
-    TIGERDATA_DATABASE        Database (default: tsdb)
-
-Backward-compatible fallback variables are still accepted:
-    TIMESCALE_SERVICE_URL, TIMESCALE_HOST, TIMESCALE_PASSWORD,
-    TIMESCALE_USER, TIMESCALE_PORT, TIMESCALE_DATABASE
-
-Usage:
-    export TIGERDATA_HOST=abc123.rc8ft3nbrw.tsdb.cloud.timescale.com
-    export TIGERDATA_PASSWORD=your-password
-    python examples/getting_started/cloud/tigerdata_tpch.py
-
-    # Dry-run preview
-    python examples/getting_started/cloud/tigerdata_tpch.py --dry-run ./preview
-"""
-
 from __future__ import annotations
 
 import argparse

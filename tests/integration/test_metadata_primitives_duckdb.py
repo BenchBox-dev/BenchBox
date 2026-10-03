@@ -1,13 +1,6 @@
-"""Integration tests for Metadata Primitives benchmark with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module tests end-to-end execution of metadata queries against a live DuckDB
-database. Unlike Read/Write Primitives, these tests don't require data generation -
-they query the database's own catalog metadata.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -24,12 +17,10 @@ pytestmark = [
 
 @pytest.fixture
 def duckdb_connection():
-    """Create a DuckDB connection with some sample tables."""
     import duckdb
 
     conn = duckdb.connect(":memory:")
 
-    # Create sample tables to have metadata to query
     conn.execute("""
         CREATE TABLE customers (
             customer_id INTEGER PRIMARY KEY,
@@ -69,8 +60,6 @@ def duckdb_connection():
 
 @pytest.mark.integration
 class TestMetadataPrimitivesQueryExecution:
-    """Test metadata query execution against DuckDB."""
-
     def test_schema_list_schemata(self, duckdb_connection):
 
         manager = MetadataPrimitivesQueryManager()
@@ -79,7 +68,6 @@ class TestMetadataPrimitivesQueryExecution:
         result = duckdb_connection.execute(sql).fetchall()
         assert len(result) > 0
 
-        # Should find main schema
         schema_names = [row[0] for row in result]
         assert "main" in schema_names
 
@@ -89,7 +77,7 @@ class TestMetadataPrimitivesQueryExecution:
         sql = manager.get_query("schema_list_tables", dialect="duckdb")
 
         result = duckdb_connection.execute(sql).fetchall()
-        assert len(result) >= 3  # customers, orders, products
+        assert len(result) >= 3
 
         table_names = [row[0] for row in result]
         assert "customers" in table_names
@@ -102,7 +90,6 @@ class TestMetadataPrimitivesQueryExecution:
         sql = manager.get_query("schema_list_views", dialect="duckdb")
 
         result = duckdb_connection.execute(sql).fetchall()
-        # Should find our active_orders view
         view_names = [row[0] for row in result]
         assert "active_orders" in view_names
 
@@ -114,7 +101,7 @@ class TestMetadataPrimitivesQueryExecution:
         result = duckdb_connection.execute(sql).fetchall()
         assert len(result) == 1
         count = result[0][0]
-        assert count >= 3  # At least our 3 tables
+        assert count >= 3
 
     def test_column_list_all(self, duckdb_connection):
 
@@ -124,8 +111,7 @@ class TestMetadataPrimitivesQueryExecution:
         result = duckdb_connection.execute(sql).fetchall()
         assert len(result) > 0
 
-        # Should find columns from our tables
-        column_names = [row[2] for row in result]  # column_name is 3rd
+        column_names = [row[2] for row in result]
         assert "customer_id" in column_names
         assert "order_id" in column_names
 
@@ -137,9 +123,7 @@ class TestMetadataPrimitivesQueryExecution:
         result = duckdb_connection.execute(sql).fetchall()
         assert len(result) > 0
 
-        # Should find various data types
         data_types = [row[0] for row in result]
-        # Check for presence of common types (case insensitive)
         data_types_upper = [dt.upper() for dt in data_types]
         has_integer = any("INT" in dt for dt in data_types_upper)
         has_varchar = any("VARCHAR" in dt for dt in data_types_upper)
@@ -169,8 +153,6 @@ class TestMetadataPrimitivesQueryExecution:
 
 @pytest.mark.integration
 class TestMetadataPrimitivesBenchmarkExecution:
-    """Test full benchmark execution with DuckDB."""
-
     def test_execute_single_query(self, duckdb_connection):
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -191,11 +173,10 @@ class TestMetadataPrimitivesBenchmarkExecution:
 
         benchmark = MetadataPrimitivesBenchmark()
 
-        # Force an error by passing invalid dialect (to trigger skip_on)
         result = benchmark.execute_query(
             "schema_list_views",
             duckdb_connection,
-            dialect="clickhouse",  # This is in skip_on
+            dialect="clickhouse",
         )
 
         assert result.success is False
@@ -212,7 +193,6 @@ class TestMetadataPrimitivesBenchmarkExecution:
 
         assert result.total_queries > 0
         assert result.successful_queries > 0
-        # Some queries might fail due to DuckDB-specific limitations
         assert result.total_time_ms > 0
         assert len(result.results) > 0
         assert len(result.category_summary) > 0
@@ -228,7 +208,6 @@ class TestMetadataPrimitivesBenchmarkExecution:
         )
 
         assert result.total_queries > 0
-        # All results should be in schema category
         for qr in result.results:
             assert qr.category == "schema"
 
@@ -258,7 +237,6 @@ class TestMetadataPrimitivesBenchmarkExecution:
             iterations=3,
         )
 
-        # Should have 3 results for the same query
         assert result.total_queries == 3
         assert all(r.query_id == "schema_list_tables" for r in result.results)
 
@@ -283,10 +261,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
 
 @pytest.mark.integration
 class TestAllQueriesExecute:
-    """Test that all queries can execute without SQL errors."""
-
     def test_all_duckdb_queries_execute(self, duckdb_connection):
-        """Test that all DuckDB-compatible queries execute successfully."""
         manager = MetadataPrimitivesQueryManager()
         queries = manager.get_queries_for_dialect("duckdb")
 
@@ -297,13 +272,11 @@ class TestAllQueriesExecute:
             except Exception as e:
                 failed_queries.append((query_id, str(e)))
 
-        # Report failures
         if failed_queries:
             failure_msg = "\n".join(f"  {qid}: {err}" for qid, err in failed_queries)
             pytest.fail(f"The following queries failed:\n{failure_msg}")
 
     def test_schema_category_queries(self, duckdb_connection):
-        """Test all schema category queries execute."""
         manager = MetadataPrimitivesQueryManager()
         schema_queries = manager.get_queries_by_category("schema")
 
@@ -312,11 +285,9 @@ class TestAllQueriesExecute:
                 sql = manager.get_query(query_id, dialect="duckdb")
                 duckdb_connection.execute(sql).fetchall()
             except ValueError:
-                # Skip if query not supported on duckdb
                 continue
 
     def test_column_category_queries(self, duckdb_connection):
-        """Test all column category queries execute."""
         manager = MetadataPrimitivesQueryManager()
         column_queries = manager.get_queries_by_category("column")
 
@@ -325,11 +296,9 @@ class TestAllQueriesExecute:
                 sql = manager.get_query(query_id, dialect="duckdb")
                 duckdb_connection.execute(sql).fetchall()
             except ValueError:
-                # Skip if query not supported on duckdb
                 continue
 
     def test_stats_category_queries(self, duckdb_connection):
-        """Test all stats category queries execute."""
         manager = MetadataPrimitivesQueryManager()
         stats_queries = manager.get_queries_by_category("stats")
 
@@ -338,14 +307,11 @@ class TestAllQueriesExecute:
                 sql = manager.get_query(query_id, dialect="duckdb")
                 duckdb_connection.execute(sql).fetchall()
             except ValueError:
-                # Skip if query not supported on duckdb
                 continue
 
 
 @pytest.mark.integration
 class TestBenchmarkLoaderIntegration:
-    """Test benchmark loader integration."""
-
     def test_benchmark_loads_from_loader(self):
 
         from benchbox.core.benchmark_loader import get_benchmark_class
@@ -353,6 +319,5 @@ class TestBenchmarkLoaderIntegration:
         benchmark_class = get_benchmark_class("metadata_primitives")
         assert benchmark_class == MetadataPrimitivesBenchmark
 
-        # Verify we can instantiate it
         benchmark = benchmark_class()
         assert benchmark._name == "Metadata Primitives Benchmark"

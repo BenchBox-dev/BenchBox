@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Run the reproducible DuckDB version matrix used by Results Explorer.
-
-The matrix is intentionally operator-run: it creates four SF10 synthetic
-datasets once, then loads and measures each dataset with seven DuckDB package
-versions. Each power cell is a separate BenchBox invocation, repeated three times. Generated
-artifacts stay outside the checkout and are recorded in ``matrix-manifest.json``. Run the
-analyzer with ``--explorer-bundles-dir`` to materialize one median bundle per cell for
-Results Explorer; the raw repetitions remain external.
-
-Run from the BenchBox checkout with:
-
-    uv run --no-sync -- python scripts/run_duckdb_version_matrix.py \
-      --output-dir /Users/joe/Developer/benchmark_runs/duckdb-version-matrix-20260829
-
-``--no-sync`` is required because the runner changes the active DuckDB wheel
-between subprocesses while the BenchBox project lock intentionally remains
-unchanged.
-"""
 
 from __future__ import annotations
 
@@ -86,7 +68,6 @@ def _run_command(
     log_path: Path,
     dry_run: bool,
 ) -> tuple[int, str, float]:
-    """Run one command, logging its output and using monotonic elapsed time."""
     if dry_run:
         print(f"$ {_command_text(command)}")
         return 0, "", 0.0
@@ -127,7 +108,6 @@ def _install_driver(version: str, *, cwd: Path, env: dict[str, str], log_path: P
 
 
 def _clear_database(output_dir: Path, benchmark: str, scale: float) -> None:
-    """Remove only the exact DuckDB database artifacts for one matrix cell."""
     database_dir = output_dir / "databases" / f"{benchmark}_sf{_scale_token(scale)}"
     if not database_dir.exists():
         return

@@ -1,25 +1,6 @@
-"""ClickBench query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides functionality to load and execute the 43 standard ClickBench queries that test various aspects of analytical database performance.
-
-The queries cover:
-- Basic aggregations and counting
-- Filtered scans and selections
-- Grouping and ordering operations
-- String operations and pattern matching
-- Complex analytical patterns
-- User behavior analysis
-
-All queries operate on a single flat table with web analytics data.
-
-For more information see:
-- https://github.com/ClickHouse/ClickBench
-- https://benchmark.clickhouse.com/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 
 class ClickBenchQueryManager:

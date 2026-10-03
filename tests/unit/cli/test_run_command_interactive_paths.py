@@ -1,5 +1,3 @@
-"""Interactive-path coverage tests for the run command."""
-
 from __future__ import annotations
 
 import sys as _sys
@@ -17,19 +15,9 @@ from benchbox.cli.tuning_runtime import build_baseline_unified_config
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
-# Similarly, benchbox.cli.__init__ uses __getattr__-based lazy loading which
-# can cause string-based patch() to resolve to a different module object than
-# what sys.modules contains on Python 3.10.  Pre-import and seed from
-# sys.modules so patch.object() can be used instead.
 __import__("benchbox.cli.benchmarks")
 _benchmarks_module = _sys.modules["benchbox.cli.benchmarks"]
 
@@ -269,11 +257,6 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     ) == (4, True, "gzip", 6)
     assert database_config.options["tuning_enabled"] is True
     assert database_config.tuning_enabled is True
-    # unified_tuning_configuration is deliberately NOT promoted onto database_config
-    # (a pydantic model): model_dump() would serialize the dataclass to a plain
-    # dict, which would break PlatformAdapter's config consumption. The live
-    # object instead reaches the adapter via benchmark_config.options (asserted
-    # above) -> get_platform_config()'s "tuning_config" kwarg.
     assert database_config.tuning_source == "wizard"
     assert database_config.tuning_source_file is None
     mock_preview.assert_called_once()
@@ -302,15 +285,6 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
 
 
 def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
-    """--stats-reset/--stats-per-table-timing are parsed onto `s` regardless of
-    interactive vs. non-interactive mode, but the interactive wizard builds
-    s.benchmark_config via bench_manager.select_benchmark(), which knows nothing
-    about them - the direct/load-only paths pass them at BenchmarkConfig
-    construction time instead. The interactive preview showed the flags (proving
-    they parsed), but the object handed to _execute_orchestrated_run never got
-    them, so the actual run silently used the defaults. This pins that
-    _interactive_preflight_and_execute copies both onto s.benchmark_config
-    before executing."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -422,17 +396,12 @@ def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
 
     assert result.exit_code == 0, result.output
     mock_execute.assert_called_once()
-    # The exact object bench_manager.select_benchmark() returned - proving the
-    # fields were set on the SAME BenchmarkConfig instance handed to the
-    # runner, not merely read into a preview that never wired back.
     assert mock_execute.call_args.args[1] is benchmark_config
     assert benchmark_config.stats_reset is True
     assert benchmark_config.stats_per_table_timing is True
 
 
 def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
-    """After the dead 'Test Execution Type' prompt was removed, execution type must
-    follow the phases selected in the wizard (single source of truth)."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -534,13 +503,10 @@ def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
 
     assert result.exit_code == 0, result.output
     assert mock_execute.called
-    # Phase-derived execution type is the single source of truth - and is now also
-    # written back to the BenchmarkConfig so save_last_run_config sees it.
     assert benchmark_config.test_execution_type == "throughput"
 
 
 def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_path: Path):
-    """Accepting tuning for a DataFrame platform must populate runtime DataFrame tuning."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -652,7 +618,6 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
 
 
 def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path: Path):
-    """Wizard baseline mode must not be re-labeled as tuned after Step 5."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -766,7 +731,6 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
 
 
 def test_interactive_dataframe_wizard_baseline_skips_runtime_defaults(tmp_path: Path):
-    """Wizard baseline mode must not trigger DataFrame smart defaults."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -878,7 +842,6 @@ def test_interactive_dataframe_wizard_baseline_skips_runtime_defaults(tmp_path: 
 
 
 def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platform(tmp_path: Path):
-    """Fallback wizard baseline must persist notuning and skip DataFrame defaults."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -982,15 +945,6 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
 
 
 def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path: Path):
-    """Non-interactive `benchbox run` must forward the resolved DataFrame tuning
-    config into benchmark_config.options so the adapter is built tuned.
-
-    Regression for cli-dataframe-tuning-config-propagation: the direct builder
-    resolved df_tuning_config onto the run state but never placed it in
-    benchmark_config.options (the interactive path did), so a plain
-    ``benchbox run --tuning <file>`` on a DataFrame platform reached the adapter
-    untuned and its bundle carried no applied ledger.
-    """
     runner = CliRunner()
 
     profiler = Mock()
@@ -1047,8 +1001,6 @@ def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path:
             )
         )
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
-        # Isolate the plumbing under test: pretend the resolver produced a
-        # DataFrame tuning config regardless of tuning-mode internals.
         mock_resolve = stack.enter_context(
             patch.object(_run_module, "resolve_dataframe_tuning_config", return_value=df_tuning_config)
         )
@@ -1080,7 +1032,6 @@ def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path:
 
 
 def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
-    """Declining tuning must set tuning_enabled=False and suppress --tuning in the preview."""
     runner = CliRunner()
 
     profiler = Mock()
@@ -1173,7 +1124,7 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
             if "configure tuning options" in text:
-                return False  # Decline tuning
+                return False
             if "Proceed with execution?" in text:
                 return True
             return default
@@ -1184,9 +1135,7 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
 
     assert result.exit_code == 0, result.output
     assert mock_execute.called
-    # Wizard must NOT be called when user declines
     mock_wizard.assert_not_called()
-    # Tuning state must reflect decline
     assert benchmark_config.options["tuning_enabled"] is False
     assert database_config.options["tuning_enabled"] is False
     assert database_config.tuning_enabled is False
@@ -1196,9 +1145,7 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
     assert baseline_config.foreign_keys.enabled is False
     assert baseline_config.unique_constraints.enabled is False
     assert baseline_config.check_constraints.enabled is False
-    # No DataFrame tuning config when tuning is declined for a SQL platform
     assert "df_tuning_config" not in benchmark_config.options
-    # Preview must suppress --tuning
     mock_preview.assert_called_once()
     assert mock_preview.call_args.kwargs["tuning"] is None
 
@@ -1247,13 +1194,7 @@ def test_interactive_cloud_platform_stops_when_credentials_are_missing():
     bench_manager.select_benchmark.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# Non-interactive validation tests (option parsing & error paths)
-# ---------------------------------------------------------------------------
-
-
 def _non_interactive_base_patches():
-    """Return a context manager with all infrastructure patches for non-interactive runs."""
     from contextlib import ExitStack
 
     stack = ExitStack()
@@ -1265,8 +1206,6 @@ def _non_interactive_base_patches():
 
 
 class TestRunCommandValidation:
-    """Validation-path tests for the run command (no real execution)."""
-
     def test_quiet_and_verbose_flags_conflict(self):
         runner = CliRunner()
         with _non_interactive_base_patches():
@@ -1291,8 +1230,6 @@ class TestRunCommandValidation:
 
     def test_official_mode_accepts_compliant_scale_factor(self):
         runner = CliRunner()
-        # Scale 1 is TPC-compliant - should NOT get the "not TPC-compliant" error
-        # (it will fail later due to missing execution, but not at scale validation)
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
             stack.enter_context(
@@ -1316,12 +1253,10 @@ class TestRunCommandValidation:
                 ["--official", "--scale", "1", "--platform", "duckdb", "--benchmark", "tpch", "--non-interactive"],
                 obj=_run_obj(),
             )
-        # Should NOT show scale factor error
         assert "not TPC-compliant" not in result.output
 
     @pytest.mark.parametrize("benchmark_name", ["tpcds", "tpc-ds", "tpc_ds"])
     def test_tpcds_official_mode_rejects_tpch_only_scale_factor(self, benchmark_name):
-        """TPC-DS must reject SF 30 before executing an unsubmittable run."""
         runner = CliRunner()
         with _non_interactive_base_patches():
             result = runner.invoke(
@@ -1389,7 +1324,7 @@ class TestRunCommandValidation:
         from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
 
         runner = CliRunner()
-        long_id = "Q" + "x" * MAX_QUERY_ID_LENGTH  # exceeds limit by 1
+        long_id = "Q" + "x" * MAX_QUERY_ID_LENGTH
         with _non_interactive_base_patches():
             result = runner.invoke(
                 run,
@@ -1433,7 +1368,6 @@ class TestRunCommandValidation:
         assert "Platform options require a --platform selection" in result.output
 
     def test_official_with_seed_shows_compliance_banner(self):
-        """--official with --seed shows the TPC compliance banner."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1473,7 +1407,6 @@ class TestRunCommandValidation:
         assert "Seed: 42" in result.output
 
     def test_official_without_seed_warns_about_reproducibility(self):
-        """--official without --seed shows reproducibility warning."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1501,7 +1434,6 @@ class TestRunCommandValidation:
         assert "No --seed specified" in result.output or "seed" in result.output.lower()
 
     def test_compression_flag_accepted_zstd(self):
-        """--compression zstd should be accepted without validation error."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1534,12 +1466,10 @@ class TestRunCommandValidation:
                 ],
                 obj=_run_obj(),
             )
-        # Flag was accepted: no parse error and command reached execution (mocked SystemExit(0))
         assert "Invalid value for '--compression'" not in result.output
         assert result.exit_code == 0
 
     def test_compression_flag_accepted_none(self):
-        """--compression none should be accepted without error."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1568,7 +1498,6 @@ class TestRunCommandValidation:
         assert result.exit_code == 0
 
     def test_validation_flag_accepted_loose(self):
-        """--validation loose should be accepted without parse error."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1597,7 +1526,6 @@ class TestRunCommandValidation:
         assert result.exit_code == 0
 
     def test_tuning_flag_accepted_notuning(self):
-        """--tuning notuning (default) should be accepted without error."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1626,7 +1554,6 @@ class TestRunCommandValidation:
         assert result.exit_code == 0
 
     def test_platform_option_with_platform_parsed(self):
-        """--platform-option KEY=VALUE with --platform should be parsed without rejection."""
         runner = CliRunner()
         with _non_interactive_base_patches() as stack:
             stack.enter_context(patch.object(_run_module, "_execute_orchestrated_run", side_effect=SystemExit(0)))
@@ -1659,6 +1586,5 @@ class TestRunCommandValidation:
                 ],
                 obj=_run_obj(),
             )
-        # Flag was accepted (no parse rejection); driver version error is a runtime failure, not a parse error
         assert "Platform options require a --platform selection" not in result.output
-        assert result.exit_code != 2  # Click exits with 2 on parse/usage errors
+        assert result.exit_code != 2

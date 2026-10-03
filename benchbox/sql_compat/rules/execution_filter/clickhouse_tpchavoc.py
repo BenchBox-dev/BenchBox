@@ -1,34 +1,3 @@
-"""ClickHouse execution-filter rules for unsupported TPC-Havoc variants.
-
-ClickHouse is the FOURTH engine sampled by the TPC-Havoc cross-dialect
-equivalence oracle (after DuckDB, the hard gate; PostgreSQL; and DataFusion).
-It is the first sampled engine that translates through a NATIVE, non-Postgres
-SQLGlot dialect (``normalize_dialect_for_sqlglot("clickhouse") == "clickhouse"``),
-so it exercises a different code path in the dialect seam than the three
-Postgres-family engines before it.
-
-Every entry below is a variant ClickHouse cannot *execute* as translated - it
-raises a planning (``NOT_IMPLEMENTED``), name-resolution, or type-system error,
-NOT a result divergence. The same SQL passes the DuckDB equivalence gate, so the
-variant is valid; these are simply ClickHouse engine/feature gaps. They are
-excluded from the equivalence sample (``CLICKHOUSE_TPCHAVOC_SKIPS``), never marked
-equivalent. Irreducible engine-semantic *result* differences (where ClickHouse
-executes the variant but computes a different answer than canonical TPC-H run on
-ClickHouse) live in
-``benchbox/core/tpchavoc/equivalence.py:CLICKHOUSE_KNOWN_DIVERGENCES``, not here.
-
-The dominant gap is ClickHouse's (still partial) correlated-subquery support: it
-plans some correlated shapes but rejects correlated subqueries in ORDER BY, in
-aggregate-function arguments, and behind a handful of plan steps. The remainder
-are the missing DuckDB ``LIST`` aggregate (also skipped on Postgres/DataFusion),
-ClickHouse's strict rejection of nested aggregates and of a ``SUM`` over a
-``Variant`` column produced by a mixed Decimal/Float ``CASE``, a window function
-in ``WHERE``, and a ``GROUP BY`` whose key is a ``CASE`` aliased to the same name
-as a column it references (alias shadowing). These gaps apply to the ClickHouse
-SQL engine itself, so the skips are registered for every ClickHouse deployment
-mode (local/chDB, server, cloud).
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -60,8 +29,6 @@ CLICKHOUSE_TPCHAVOC_SKIPS: dict[str, str] = {
     "17_v10": "ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED).",
 }
 
-# The ClickHouse SQL engine is shared across deployment modes, so the same
-# variant-execution gaps apply to local/chDB, self-hosted server, and Cloud.
 _CLICKHOUSE_TPCHAVOC_PLATFORMS = ("clickhouse-local", "clickhouse-server", "clickhouse-cloud")
 
 for _platform in _CLICKHOUSE_TPCHAVOC_PLATFORMS:

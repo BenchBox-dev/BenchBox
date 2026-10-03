@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Fail closed when BenchBox still carries the retired database tracker."""
 
 from __future__ import annotations
 
@@ -13,7 +12,7 @@ CLI_DESCRIPTION = "Fail closed when BenchBox still carries the retired database 
 
 
 class StateContractError(ValueError):
-    """The repository's JSON/Git tracker contract is incomplete or stale."""
+    pass
 
 
 EXPECTED_REMOTE = "https://github.com/BenchBox-dev/BenchBox.git"

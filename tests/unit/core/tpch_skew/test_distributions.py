@@ -1,9 +1,6 @@
-"""Tests for TPC-H Skew distribution implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import numpy as np
 import pytest
@@ -23,8 +20,6 @@ pytestmark = [
 
 
 class TestZipfianDistribution:
-    """Tests for Zipfian distribution."""
-
     def test_initialization(self):
 
         dist = ZipfianDistribution(s=1.0, num_elements=1000)
@@ -49,7 +44,6 @@ class TestZipfianDistribution:
         assert len(samples) == 1000
 
     def test_sample_range(self):
-        """Test samples are in [0, 1] range."""
         dist = ZipfianDistribution(s=1.0, num_elements=100)
         rng = np.random.default_rng(42)
         samples = dist.sample(1000, rng)
@@ -73,11 +67,9 @@ class TestZipfianDistribution:
         assert "500" in desc
 
     def test_uniform_case(self):
-        """Test s=0 produces uniform-like distribution."""
         dist = ZipfianDistribution(s=0.0, num_elements=100)
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
-        # Should be roughly uniform - check variance is not too low
         assert np.std(samples) > 0.2
 
     def test_map_to_range(self):
@@ -87,12 +79,10 @@ class TestZipfianDistribution:
         mapped = dist.map_to_range(samples, 1, 100)
         assert mapped[0] == 1
         assert 1 <= mapped[1] <= 100
-        assert mapped[2] == 100  # 0.99 * 100 + 1 = 100
+        assert mapped[2] == 100
 
 
 class TestNormalDistribution:
-    """Tests for Normal distribution."""
-
     def test_initialization(self):
 
         dist = NormalDistribution(mean=0.5, std=0.15)
@@ -114,7 +104,6 @@ class TestNormalDistribution:
             NormalDistribution(mean=0.5, std=-0.1)
 
     def test_sample_range(self):
-        """Test samples are truncated to [0, 1]."""
         dist = NormalDistribution(mean=0.5, std=0.5)
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
@@ -126,7 +115,6 @@ class TestNormalDistribution:
         dist = NormalDistribution(mean=0.3, std=0.1)
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
-        # Mean should be close to specified mean
         assert abs(np.mean(samples) - 0.3) < 0.05
 
     def test_skew_factor(self):
@@ -147,8 +135,6 @@ class TestNormalDistribution:
 
 
 class TestExponentialDistribution:
-    """Tests for Exponential distribution."""
-
     def test_initialization(self):
 
         dist = ExponentialDistribution(rate=3.0)
@@ -162,7 +148,6 @@ class TestExponentialDistribution:
             ExponentialDistribution(rate=-1.0)
 
     def test_sample_range(self):
-        """Test samples are in [0, 1) range."""
         dist = ExponentialDistribution(rate=3.0)
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
@@ -186,10 +171,7 @@ class TestExponentialDistribution:
 
 
 class TestUniformDistribution:
-    """Tests for Uniform distribution."""
-
     def test_sample_range(self):
-        """Test samples are in [0, 1] range."""
         dist = UniformDistribution()
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
@@ -201,11 +183,9 @@ class TestUniformDistribution:
         dist = UniformDistribution()
         rng = np.random.default_rng(42)
         samples = dist.sample(10000, rng)
-        # Mean should be close to 0.5
         assert abs(np.mean(samples) - 0.5) < 0.02
 
     def test_skew_factor(self):
-        """Test skew factor is always 0."""
         dist = UniformDistribution()
         assert dist.get_skew_factor() == 0.0
 
@@ -216,8 +196,6 @@ class TestUniformDistribution:
 
 
 class TestCreateDistribution:
-    """Tests for distribution factory function."""
-
     def test_create_zipfian(self):
 
         dist = create_distribution("zipfian", s=1.5, num_elements=100)
@@ -255,8 +233,6 @@ class TestCreateDistribution:
 
 
 class TestDistributionReproducibility:
-    """Tests for distribution reproducibility."""
-
     def test_zipfian_reproducibility(self):
 
         dist = ZipfianDistribution(s=1.0, num_elements=100)

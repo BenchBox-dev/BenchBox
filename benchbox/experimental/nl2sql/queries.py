@@ -1,9 +1,6 @@
-"""NL2SQL query definitions and management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -13,8 +10,6 @@ from typing import Any
 
 
 class NL2SQLQueryCategory(Enum):
-    """Categories of NL2SQL queries."""
-
     AGGREGATION = "aggregation"
     FILTERING = "filtering"
     JOINING = "joining"
@@ -28,8 +23,6 @@ class NL2SQLQueryCategory(Enum):
 
 
 class QueryDifficulty(Enum):
-    """Difficulty levels for NL2SQL queries."""
-
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -38,8 +31,6 @@ class QueryDifficulty(Enum):
 
 @dataclass
 class NL2SQLQuery:
-    """A natural language to SQL test case."""
-
     query_id: str
     natural_language: str
     expected_sql: str
@@ -54,7 +45,6 @@ class NL2SQLQuery:
     tags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "query_id": self.query_id,
             "natural_language": self.natural_language,
@@ -70,7 +60,6 @@ class NL2SQLQuery:
         }
 
 
-# Default schema context for TPC-H style tables
 TPCH_SCHEMA_CONTEXT = """
 Tables:
 - customer (c_custkey, c_name, c_address, c_nationkey, c_phone, c_acctbal, c_mktsegment, c_comment)
@@ -85,16 +74,11 @@ Tables:
 
 
 class NL2SQLQueryManager:
-    """Manager for NL2SQL test queries."""
-
     def __init__(self) -> None:
-        """Initialize the query manager."""
         self._queries: dict[str, NL2SQLQuery] = {}
         self._build_queries()
 
     def _build_queries(self) -> None:
-        """Build the test query set."""
-        # Easy - Simple Aggregation
         self._queries["agg_total_revenue"] = NL2SQLQuery(
             query_id="agg_total_revenue",
             natural_language="What is the total revenue from all orders?",
@@ -140,7 +124,6 @@ FROM customer
             tags=["avg"],
         )
 
-        # Easy - Simple Filtering
         self._queries["filter_high_value_orders"] = NL2SQLQuery(
             query_id="filter_high_value_orders",
             natural_language="Show all orders with total price greater than 100000",
@@ -171,7 +154,6 @@ WHERE o_orderpriority = '1-URGENT'
             tags=["string", "equality"],
         )
 
-        # Medium - Grouping
         self._queries["group_orders_by_status"] = NL2SQLQuery(
             query_id="group_orders_by_status",
             natural_language="Count orders grouped by order status",
@@ -208,7 +190,6 @@ ORDER BY total_revenue DESC
             tags=["group by", "join", "sum", "calculation"],
         )
 
-        # Medium - Simple Join
         self._queries["join_customer_orders"] = NL2SQLQuery(
             query_id="join_customer_orders",
             natural_language="List customer names with their order dates",
@@ -227,7 +208,6 @@ LIMIT 100
             tags=["join", "order by"],
         )
 
-        # Medium - Date Filtering
         self._queries["date_orders_year"] = NL2SQLQuery(
             query_id="date_orders_year",
             natural_language="Show all orders from 1995",
@@ -258,7 +238,6 @@ WHERE l_shipdate >= '1997-10-01' AND l_shipdate <= '1997-12-31'
             tags=["date", "range"],
         )
 
-        # Hard - Multi-table Join
         self._queries["join_supplier_parts_nation"] = NL2SQLQuery(
             query_id="join_supplier_parts_nation",
             natural_language="List suppliers with their available parts and nation names",
@@ -279,7 +258,6 @@ LIMIT 100
             tags=["join", "multi-table"],
         )
 
-        # Hard - Window Functions
         self._queries["window_customer_rank"] = NL2SQLQuery(
             query_id="window_customer_rank",
             natural_language="Rank customers by their account balance within each market segment",
@@ -323,7 +301,6 @@ ORDER BY o.o_custkey, o.o_orderdate
             tags=["window", "sum", "running total"],
         )
 
-        # Hard - Subquery
         self._queries["subquery_above_avg_orders"] = NL2SQLQuery(
             query_id="subquery_above_avg_orders",
             natural_language="Find customers with order totals above the average order total",
@@ -367,7 +344,6 @@ ORDER BY s.s_name
             tags=["subquery", "exists", "join"],
         )
 
-        # Expert - Complex Analytical
         self._queries["complex_top_customers"] = NL2SQLQuery(
             query_id="complex_top_customers",
             natural_language="Find the top 10 customers by total spending and show their percentage of total revenue",
@@ -467,7 +443,6 @@ LIMIT 20
             tags=["self-join", "market basket", "having"],
         )
 
-        # String Manipulation
         self._queries["string_search"] = NL2SQLQuery(
             query_id="string_search",
             natural_language="Find all parts with 'BRASS' in their name",
@@ -503,7 +478,6 @@ LIMIT 100
             tags=["string", "split"],
         )
 
-        # Sorting
         self._queries["sort_multi_column"] = NL2SQLQuery(
             query_id="sort_multi_column",
             natural_language="List orders sorted by priority (descending) then by date (ascending)",
@@ -522,37 +496,28 @@ LIMIT 100
         )
 
     def get_query(self, query_id: str) -> NL2SQLQuery | None:
-        """Get a query by ID."""
         return self._queries.get(query_id)
 
     def get_all_queries(self) -> dict[str, NL2SQLQuery]:
-        """Get all queries."""
         return self._queries.copy()
 
     def get_queries_by_category(self, category: NL2SQLQueryCategory) -> list[NL2SQLQuery]:
-        """Get queries for a specific category."""
         return [q for q in self._queries.values() if q.category == category]
 
     def get_queries_by_difficulty(self, difficulty: QueryDifficulty) -> list[NL2SQLQuery]:
-        """Get queries for a specific difficulty level."""
         return [q for q in self._queries.values() if q.difficulty == difficulty]
 
     def get_query_ids(self) -> list[str]:
-        """Get all query IDs."""
         return list(self._queries.keys())
 
     def get_categories(self) -> list[NL2SQLQueryCategory]:
-        """Get all query categories."""
         return list(NL2SQLQueryCategory)
 
     def get_difficulty_levels(self) -> list[QueryDifficulty]:
-        """Get all difficulty levels."""
         return list(QueryDifficulty)
 
     def export_queries(self) -> dict[str, Any]:
-        """Export all queries as a dictionary."""
         return {query_id: query.to_dict() for query_id, query in self._queries.items()}
 
     def get_queries_by_tag(self, tag: str) -> list[NL2SQLQuery]:
-        """Get queries with a specific tag."""
         return [q for q in self._queries.values() if tag in q.tags]

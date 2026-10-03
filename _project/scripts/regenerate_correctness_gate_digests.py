@@ -1,43 +1,7 @@
 #!/usr/bin/env python3
-"""Regenerate the bounded correctness-gate TPC-H value-digest reference.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This WRITES
-``benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json``
-from a live gate run, replacing the historical hand-copy (the old provenance note
-asked a human to run the gate and paste the stream-0 digests). It is the auditable,
-one-command regeneration path required by
-``correctness-gate-value-digest-fidelity-followups`` w3.
-
-It deliberately REUSES the same configuration as ``make test-correctness-gate``
-rather than re-hardcoding it:
-
-  * query-id set: read from ``BENCHBOX_CORRECTNESS_GATE_QUERY_IDS`` -- the SAME env
-    var the gate target exports (the Makefile defines it once in
-    ``CORRECTNESS_GATE_QUERY_IDS`` and passes it to both targets);
-  * scale: SF=1 (the only scale with stored TPC-H answers / a pinned seed);
-  * seed: ``benchbox.core.tpch.benchmark.get_reference_seed(1.0)`` (the reference
-    qgen seed the answer files were generated with);
-  * digest emission: ``BENCHBOX_EMIT_RESULT_DIGEST=1`` (gate-only flag).
-
-The output is deterministic on a clean tree: a regenerate -> no-diff round trip is
-the idempotency check (``make correctness-gate-digests-regen && git diff --exit-code``).
-The digests are tied to the DuckDB build pinned in ``uv.lock``; the DuckDB version
-that produced them is stamped into the provenance block.
-
-NOTE: the value oracle this feeds is a REGRESSION SNAPSHOT vs a DuckDB-pinned
-baseline (it detects change from the frozen benchbox-on-DuckDB answer), NOT an
-independent correctness oracle -- a conceptual value bug present at freeze time is
-enshrined, not caught. See
-``_project/analysis/value-digest-cross-engine-independence-decision.md``.
-
-Usage (always via the make target, which exports the shared query-id env var):
-
-    make correctness-gate-digests-regen
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,8 +14,6 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The gate exports this; it is the ONE source of the gate query-id set (defined once
-# in the Makefile and shared between test-correctness-gate and the regen target).
 CORRECTNESS_GATE_QUERY_IDS_ENV = "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS"
 EMIT_RESULT_DIGEST_ENV = "BENCHBOX_EMIT_RESULT_DIGEST"
 CLI_MODULE = "benchbox.cli.main"
@@ -76,7 +38,6 @@ _PROVENANCE_NOTE = (
 
 
 def _query_ids() -> list[str]:
-    """The gate query-id list, in gate order, from the shared env var."""
     raw = os.environ.get(CORRECTNESS_GATE_QUERY_IDS_ENV, "").strip()
     if not raw:
         raise SystemExit(
@@ -87,7 +48,6 @@ def _query_ids() -> list[str]:
 
 
 def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
-    """Run the DuckDB TPC-H SF=1 gate slice with digest emission and return the payload."""
     from benchbox.core.results.loader import find_latest_result
 
     command = [
@@ -113,11 +73,6 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env[EMIT_RESULT_DIGEST_ENV] = "1"
-    # Pin the child's output root to the temp work dir. Otherwise a caller that has
-    # BENCHBOX_OUTPUT_DIR set (a supported configuration -- it relocates the
-    # benchmark_runs root, see benchbox.utils.path_utils.resolve_benchmark_runs_dir)
-    # would make `benchbox run` write its result under that configured root while we
-    # search work_dir, and the run would complete but then fail with "no result JSON".
     runs_root = work_dir / "benchmark_runs"
     env["BENCHBOX_OUTPUT_DIR"] = str(runs_root)
 
@@ -147,7 +102,6 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
 
 
 def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, str]:
-    """Map each gate query id -> its emitted stream-0 value digest, in gate order."""
     emitted: dict[str, str] = {}
     for query in payload.get("queries", []):
         if int(query.get("stream") or 0) != 0:
@@ -175,7 +129,6 @@ def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, s
 
 
 def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> dict:
-    """Assemble the reference JSON payload in the committed key order (deterministic)."""
     return {
         "benchmark": "tpch",
         "scale_factor": 1.0,
@@ -197,7 +150,6 @@ def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> 
 
 
 def render(reference: dict) -> str:
-    """Serialize deterministically (2-space indent, insertion order, trailing newline)."""
     return json.dumps(reference, indent=2) + "\n"
 
 

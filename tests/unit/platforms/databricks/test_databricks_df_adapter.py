@@ -1,9 +1,6 @@
-"""Tests for Databricks DataFrame platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -23,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def databricks_dependencies():
-    """Mock Databricks dependency check to simulate installed extras."""
     with patch(
         "benchbox.platforms.databricks.adapter.check_platform_dependencies",
         return_value=(True, []),
@@ -33,14 +29,12 @@ def databricks_dependencies():
 
 @pytest.fixture
 def mock_databricks_sql():
-    """Mock databricks.sql module."""
     with patch("benchbox.platforms.databricks.adapter.databricks_sql") as mock:
         yield mock
 
 
 @pytest.fixture
 def mock_databricks_connect():
-    """Mock databricks.connect module."""
     mock_session = MagicMock()
     mock_session.version = "14.3.0"
     mock_session.catalog = MagicMock()
@@ -72,8 +66,6 @@ def mock_databricks_connect():
 
 
 class TestDatabricksDataFrameAdapterInitialization:
-    """Test DatabricksDataFrameAdapter initialization."""
-
     def test_initialization_success(self, mock_databricks_sql):
 
         adapter = DatabricksDataFrameAdapter(
@@ -90,7 +82,6 @@ class TestDatabricksDataFrameAdapterInitialization:
         assert adapter.schema == "test_schema"
 
     def test_initialization_rejects_hudi_table_format(self, mock_databricks_sql):
-        """DataFrame mode has no Hudi write path, so it must fail fast."""
         with pytest.raises(ValueError, match="does not support table_format"):
             DatabricksDataFrameAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -112,7 +103,6 @@ class TestDatabricksDataFrameAdapterInitialization:
 
     def test_initialization_with_execution_mode(self, mock_databricks_sql):
 
-        # SQL mode
         adapter_sql = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -121,14 +111,12 @@ class TestDatabricksDataFrameAdapterInitialization:
         )
         assert adapter_sql.execution_mode == "sql"
 
-        # DataFrame mode falls back to SQL when Databricks Connect not available
         adapter_df = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
             execution_mode="dataframe",
         )
-        # Falls back to SQL when Databricks Connect not installed
         if not DATABRICKS_CONNECT_AVAILABLE:
             assert adapter_df.execution_mode == "sql"
 
@@ -149,10 +137,7 @@ class TestDatabricksDataFrameAdapterInitialization:
 
 
 class TestDatabricksDataFrameAdapterFromConfig:
-    """Test DatabricksDataFrameAdapter.from_config() method."""
-
     def test_from_config_basic(self, mock_databricks_sql):
-        """Test from_config() with basic configuration."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
@@ -168,7 +153,6 @@ class TestDatabricksDataFrameAdapterFromConfig:
         assert adapter.schema == "test_schema"
 
     def test_from_config_with_execution_mode(self, mock_databricks_sql):
-        """Test from_config() respects execution_mode setting."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
@@ -181,7 +165,6 @@ class TestDatabricksDataFrameAdapterFromConfig:
         assert adapter.execution_mode == "sql"
 
     def test_from_config_with_cluster_id(self, mock_databricks_sql):
-        """Test from_config() with cluster_id for Databricks Connect."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
@@ -195,8 +178,6 @@ class TestDatabricksDataFrameAdapterFromConfig:
 
 
 class TestDatabricksDataFrameAdapterPlatformInfo:
-    """Test DatabricksDataFrameAdapter platform info methods."""
-
     def test_platform_name_sql_mode(self, mock_databricks_sql):
 
         adapter = DatabricksDataFrameAdapter(
@@ -209,7 +190,6 @@ class TestDatabricksDataFrameAdapterPlatformInfo:
         assert adapter.platform_name == "Databricks"
 
     def test_get_platform_info_includes_execution_mode(self, mock_databricks_sql):
-        """Test get_platform_info() includes execution mode."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -227,17 +207,13 @@ class TestDatabricksDataFrameAdapterPlatformInfo:
 
 
 class TestDatabricksDataFrameAdapterExpressionHelpers:
-    """Test expression helper methods for DataFrame API compatibility."""
-
     def test_col_expression(self, mock_databricks_sql):
-        """Test col() creates column expression."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
         )
 
-        # Mock PySpark functions
         with patch(
             "benchbox.platforms.databricks.dataframe_adapter.PYSPARK_AVAILABLE",
             True,
@@ -249,7 +225,6 @@ class TestDatabricksDataFrameAdapterExpressionHelpers:
                 mock_col.assert_called_once_with("test_column")
 
     def test_lit_expression(self, mock_databricks_sql):
-        """Test lit() creates literal expression."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -310,17 +285,13 @@ class TestDatabricksDataFrameAdapterExpressionHelpers:
 
 
 class TestDatabricksDataFrameAdapterQueryExecution:
-    """Test query execution methods."""
-
     def test_execute_query_with_sql_string(self, mock_databricks_sql):
-        """Test execute_query() with SQL string uses parent implementation."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
         )
 
-        # Mock connection and cursor
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [(1, "test")]
         mock_cursor.fetchone.return_value = ("use_cached_result", "false")
@@ -338,16 +309,14 @@ class TestDatabricksDataFrameAdapterQueryExecution:
         assert executed.count("SELECT 1, 'test'") == 1
 
     def test_execute_query_with_callable_uses_dataframe_mode(self, mock_databricks_sql):
-        """Test execute_query() with callable dispatches to DataFrame mode."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
         )
 
-        # Mock the execute_dataframe_query method
         with patch.object(adapter, "execute_dataframe_query", return_value={"query_id": "Q1"}) as mock_df_exec:
-            # Create a callable query builder
+
             def query_builder(spark, tables):
                 return spark.table("test")
 
@@ -362,8 +331,6 @@ class TestDatabricksDataFrameAdapterQueryExecution:
 
 
 class TestDatabricksDataFrameAdapterSparkSession:
-    """Test Spark session management."""
-
     def test_spark_session_created_lazily(self, mock_databricks_sql):
 
         adapter = DatabricksDataFrameAdapter(
@@ -372,19 +339,16 @@ class TestDatabricksDataFrameAdapterSparkSession:
             access_token="test_token",
         )
 
-        # Session should not be created until accessed
         assert adapter._spark is None
         assert adapter._spark_initialized is False
 
     def test_close_connection_stops_spark_session(self, mock_databricks_sql):
-        """Test close_connection() stops Spark session."""
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
         )
 
-        # Simulate initialized session
         mock_spark = MagicMock()
         adapter._spark = mock_spark
         adapter._spark_initialized = True
@@ -398,8 +362,6 @@ class TestDatabricksDataFrameAdapterSparkSession:
 
 
 class TestDatabricksDataFrameAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_databricks_df_registered_in_platform_registry(self):
 
         from benchbox.core.platform_registry import PlatformRegistry
@@ -430,7 +392,6 @@ class TestDatabricksDataFrameAdapterRegistry:
         assert caps.default_mode == "dataframe"
 
     def test_databricks_original_now_supports_dataframe(self):
-        """Test original databricks adapter metadata updated for DataFrame support."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("databricks")
@@ -442,8 +403,6 @@ class TestDatabricksDataFrameAdapterRegistry:
 
 
 class TestDatabricksDataFrameAdapterIntegration:
-    """Integration tests for DatabricksDataFrameAdapter."""
-
     def test_adapter_creates_with_from_config_factory(self, mock_databricks_sql):
 
         from benchbox.core.platform_registry import PlatformRegistry

@@ -1,5 +1,3 @@
-"""Show query plan command implementation."""
-
 from __future__ import annotations
 
 import json
@@ -19,13 +17,6 @@ from benchbox.core.results.query_normalizer import normalize_query_id
 
 
 def _find_query(results, query_id: str):
-    """Find a query result whose ID matches after normalization.
-
-    ``load_result_file`` returns already-normalized IDs from a real bundle's
-    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
-    string comparison against the CLI's documented ``--query-id q05`` input
-    would report "not found" even when the plan is present.
-    """
     normalized_target = normalize_query_id(query_id)
     return next(
         (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),
@@ -103,44 +94,16 @@ def show_plan(
     compact: bool,
     max_depth: int | None,
 ):
-    """Display query plan as ASCII tree.
-
-    Shows the logical query plan for a specific query from a benchmark run.
-    The plan must have been captured using --capture-plans during the benchmark.
-
-    \b
-    Examples:
-        # Show plan as tree
-        benchbox show-plan --run results.json --query-id q05
-
-    \b
-        # Show summary statistics only
-        benchbox show-plan --run results.json --query-id 1 --format summary
-
-    \b
-        # Export plan as JSON
-        benchbox show-plan --run results.json --query-id q05 --format json
-
-    \b
-        # Compact tree view without properties
-        benchbox show-plan --run results.json --query-id q05 --compact --no-properties
-    """
     try:
-        # Load benchmark results (also loads companion .plans.json if present)
         results, _ = load_result_file(run_path)
 
-        # Find query execution
         query_exec = _find_query(results, query_id)
 
         if not query_exec:
             console.print(f"[red]Error:[/red] Query '{query_id}' not found in results")
             ctx.exit(1)
 
-        # Check if plan was captured
         if query_exec.get("query_plan") is None:
-            # Distinguish "no plan captured" from "a .plans.json exists but
-            # failed to load" (qpc-05 / F4.3): the fix differs (re-run with
-            # --capture-plans vs. investigate the corrupt companion file).
             plans_load_error = getattr(results, "plans_load_error", None)
             if plans_load_error:
                 console.print(f"[red]Error:[/red] plans file exists but failed to load: {plans_load_error}")
@@ -151,19 +114,15 @@ def show_plan(
 
         plan = query_exec["query_plan"]
 
-        # Handle different output formats
         if output_format == "json":
-            # Export as JSON
             output = json.dumps(plan.to_dict(), indent=2)
             console.print(output)
 
         elif output_format == "summary":
-            # Show summary statistics
             output = render_summary(plan)
             console.print(Panel(output, title=f"Query Plan Summary: {query_id}", border_style="cyan"))
 
-        else:  # tree
-            # Show ASCII tree
+        else:
             options = VisualizationOptions(
                 show_properties=not no_properties,
                 compact=compact,

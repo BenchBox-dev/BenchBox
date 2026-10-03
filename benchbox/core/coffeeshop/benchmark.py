@@ -100,7 +100,6 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
         return self.query_manager.get_query(str(query_id), params)
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
-        import benchbox.sql_compat.rules.query_source.coffeeshop_variants  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
@@ -147,7 +146,7 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
             registry_decision = REGISTRY.resolve(ctx)
             if registry_decision is not None:
                 if registry_decision.action is CompatAction.SELECT_VARIANT:
-                    variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                    variant_sql = registry_decision.payload.variant_sql
                 else:
                     continue
             else:
@@ -298,7 +297,7 @@ class CoffeeShopBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
                     total_successful += duration
                     success_count += 1
                     total_rows += row_count
-                except Exception as exc:  # pragma: no cover - defensive
+                except Exception as exc:
                     iteration_results.append(
                         {
                             "iteration": iteration + 1,

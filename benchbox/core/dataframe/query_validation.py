@@ -1,12 +1,3 @@
-"""Honest row-count validation for DataFrame benchmark results.
-
-DataFrame adapters fully materialize each result and already report its row
-count, but historically no oracle consumed that count.  This module reuses the
-same expected-result registry as SQL execution while keeping the evidence
-boundary deliberately narrow: only TPC-H SF1 runs using reference-equivalent
-parameters may produce a clean validation pass today.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,8 +11,6 @@ _MAX_EVIDENCE_MESSAGE_CHARS = 500
 
 @dataclass(frozen=True)
 class DataFrameQueryValidationSummary:
-    """Run-level status and bounded evidence for DataFrame query validation."""
-
     status: str
     details: dict[str, Any]
 
@@ -34,18 +23,7 @@ def validate_dataframe_query_results(
     validation_mode: str | None = None,
     seed: int | None = None,
 ) -> DataFrameQueryValidationSummary:
-    """Validate successful measurement rows against a supported TPC oracle.
 
-    Warmups and summary rows are never evidence.  DataFrame ``stream_id`` is
-    also intentionally not forwarded to :class:`QueryValidator`: in this path
-    it labels repeated measurements, while the expected-result registry uses it
-    to select distinct answer streams.
-
-    TPC-DS remains uncertain because its stored row counts represent one
-    parameterization and its provider defaults to ``SKIP``.  Other benchmarks
-    remain ``NOT_RUN`` until a production-faithful cross-surface provider is
-    available.
-    """
     benchmark_id = _normalize_benchmark_name(benchmark_name)
     mode = str(validation_mode or "exact").strip().lower()
     evidence = {
@@ -138,10 +116,10 @@ def _apply_expected_row_counts(
     scale_factor: float,
     evidence: dict[str, Any],
 ) -> str | None:
-    """Attach per-query evidence, returning an initialization error if one occurs."""
+
     try:
         validator = QueryValidator()
-    except Exception as exc:  # noqa: BLE001 - an unavailable oracle is not a candidate-result mismatch
+    except Exception as exc:
         message = _bounded_message(f"Row-count oracle failed to initialize: {type(exc).__name__}: {exc}")
         for row in successful_rows:
             row["row_count_validation"] = {
@@ -168,9 +146,8 @@ def _apply_expected_row_counts(
                 query_id=str(row.get("query_id", "")),
                 actual_row_count=actual_row_count,
                 scale_factor=scale_factor,
-                # Deliberately omit stream_id; it is a repetition ID in this path.
             )
-        except Exception as exc:  # noqa: BLE001 - an unavailable oracle is not a candidate-result mismatch
+        except Exception as exc:
             message = _bounded_message(f"Row-count oracle failed: {type(exc).__name__}: {exc}")
             row["row_count_validation"] = {
                 "status": "ERROR",

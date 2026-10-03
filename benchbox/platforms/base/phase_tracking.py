@@ -1,27 +1,3 @@
-"""Phase tracking and loaded-data validation helpers for PlatformAdapter.
-
-Extracted from `benchbox.platforms.base.adapter` per the refactor map
-(`docs/development/adapter-refactor-map.md` Slice 4). Houses:
-
-- `_create_enhanced_*_phase` builders that roll raw loading/validation
-  timing into the structured phase dataclasses published by
-  `run_enhanced_benchmark`.
-- `_validate_*_integrity` / `_validate_table_row_counts` helpers that
-  the enhanced validation-phase builder delegates to.
-- Table-name resolution helpers (`_extract_table_names`,
-  `_resolve_benchmark_table_names`) used by the enhanced schema phase.
-- `get_table_row_count` - a DB-API cursor-based default that five
-  adapters override with platform-native APIs.
-
-The abstract `create_schema` / `load_data` contract methods stay on
-`PlatformAdapter` itself - they have 38+ subclass overrides each and
-the contract surface is intentionally visible on the base class.
-
-(Module name is `phase_tracking` rather than `data_loading` because
-`benchbox/platforms/base/data_loading.py` is an unrelated pre-existing
-module providing bulk loader framework primitives.)
-"""
-
 from __future__ import annotations
 
 import logging
@@ -60,7 +36,6 @@ except ImportError:  # pragma: no cover - models always present in real install
 
 
 def _extract_table_names(raw_table_names: Any) -> list[str]:
-    """Coerce various table name representations to a list of strings."""
     if raw_table_names is None:
         return []
     if isinstance(raw_table_names, dict):
@@ -78,7 +53,6 @@ def _extract_table_names(raw_table_names: Any) -> list[str]:
 
 
 def _resolve_benchmark_table_names(benchmark: Any) -> list[str]:
-    """Resolve table names from a benchmark object using fallback chain."""
     if hasattr(benchmark, "get_table_names") and callable(benchmark.get_table_names):
         try:
             names = _extract_table_names(benchmark.get_table_names())
@@ -94,25 +68,15 @@ def _resolve_benchmark_table_names(benchmark: Any) -> list[str]:
 
 
 class PhaseTrackingMixin:
-    """Mixin providing phase-tracking and loaded-data validation hooks.
-
-    Expects host class to expose `logger`. The `_validate_*` helpers are
-    default implementations that platforms may override; `get_table_row_count`
-    is a DB-API cursor default overridden by BigQuery, ClickHouse workload,
-    InfluxDB, Spark execution, etc.
-    """
-
     logger: logging.Logger
 
     def _create_enhanced_data_generation_phase(self, benchmark) -> DataGenerationPhase | None:
-        """Create detailed data generation phase tracking."""
         if not hasattr(benchmark, "tables") and not hasattr(getattr(benchmark, "_impl", None), "tables"):
             return None
 
         start_time = mono_time()
         tables_dict = benchmark.tables if hasattr(benchmark, "tables") else getattr(benchmark._impl, "tables", {})
 
-        # Require mapping-like tables metadata.
         if not tables_dict or not hasattr(tables_dict, "items"):
             return None
 
@@ -123,7 +87,6 @@ class PhaseTrackingMixin:
 
         try:
             table_items = tables_dict.items()
-            # Validate iterability before consuming table entries.
             if not hasattr(table_items, "__iter__"):
                 return None
             try:
@@ -131,7 +94,6 @@ class PhaseTrackingMixin:
             except (TypeError, AttributeError):
                 return None
         except (AttributeError, TypeError):
-            # Handle malformed table containers.
             return None
 
         try:
@@ -142,7 +104,6 @@ class PhaseTrackingMixin:
                         rows = list(table_data)
                         row_count = len(rows)
 
-                        # Estimate data size (rough approximation)
                         if rows:
                             avg_row_size = len(str(rows[0])) if rows else 50
                             estimated_bytes = row_count * avg_row_size
@@ -173,7 +134,6 @@ class PhaseTrackingMixin:
                         error_timestamp=datetime.now().isoformat(),
                     )
         except (TypeError, AttributeError):
-            # If we can't iterate over table_items, return None
             return None
 
         overall_status = "SUCCESS"
@@ -192,7 +152,6 @@ class PhaseTrackingMixin:
     def _create_enhanced_schema_creation_phase(
         self, benchmark, connection: Any, schema_creation_time: float
     ) -> SchemaCreationPhase:
-        """Create detailed schema creation phase tracking."""
         duration_ms = int(schema_creation_time * 1000)
         table_names = _resolve_benchmark_table_names(benchmark)
         table_count = len(table_names)
@@ -220,31 +179,19 @@ class PhaseTrackingMixin:
     def _create_enhanced_data_loading_phase(
         self, table_stats: dict[str, int], loading_time: float, per_table_timings: dict[str, Any] | None = None
     ) -> DataLoadingPhase:
-        """Create detailed data loading phase tracking.
-
-        Args:
-            table_stats: Dictionary mapping table names to row counts
-            loading_time: Total loading time in seconds
-            per_table_timings: Optional dict with actual per-table timing details
-                              (if None, will estimate based on row ratios)
-        """
         duration_ms = int(loading_time * 1000)
 
         per_table_loading = {}
         total_rows = sum(table_stats.values())
 
-        # Use actual timings if provided, otherwise distribute total time proportionally by row count
         timings = per_table_timings if isinstance(per_table_timings, dict) else {}
         if timings:
-            # Use actual per-table timings from adapter
             for table_name, row_count in table_stats.items():
                 actual_time_ms = total_ms_or_zero(timings.get(table_name, {}))
                 per_table_loading[table_name] = TableLoadingStats(
                     rows=row_count, load_time_ms=int(actual_time_ms), status="SUCCESS"
                 )
         else:
-            # No detailed timings available - distribute total time proportionally by row count
-            # Note: This is an approximation and may not reflect actual per-table performance
             time_per_row = duration_ms / max(1, total_rows)
             for table_name, row_count in table_stats.items():
                 proportional_time = int(row_count * time_per_row)
@@ -261,7 +208,6 @@ class PhaseTrackingMixin:
         )
 
     def _create_enhanced_validation_phase(self, benchmark=None, connection=None, table_stats=None) -> ValidationPhase:
-        """Create validation phase tracking with actual data validation."""
         start_time = mono_time()
 
         validation_details = {
@@ -270,21 +216,17 @@ class PhaseTrackingMixin:
             "constraints_enabled": True,
         }
 
-        # Perform actual data validation if parameters provided
         row_count_status = "PASSED"
         schema_status = "PASSED"
         integrity_status = "PASSED"
 
         if benchmark and connection and table_stats is not None:
-            # Validate row counts
             row_count_status, row_validation_details = self._validate_table_row_counts(benchmark, table_stats)
             validation_details.update(row_validation_details)
 
-            # Validate schema integrity
             schema_status, schema_validation_details = self._validate_schema_integrity(benchmark, connection)
             validation_details.update(schema_validation_details)
 
-            # Validate data integrity
             integrity_status, integrity_validation_details = self._validate_data_integrity(
                 benchmark, connection, table_stats
             )
@@ -293,7 +235,7 @@ class PhaseTrackingMixin:
         duration_ms = int(elapsed_seconds(start_time) * 1000)
 
         return ValidationPhase(
-            duration_ms=max(50, duration_ms),  # Minimum 50ms
+            duration_ms=max(50, duration_ms),
             row_count_validation=row_count_status,
             schema_validation=schema_status,
             data_integrity_checks=integrity_status,
@@ -301,22 +243,18 @@ class PhaseTrackingMixin:
         )
 
     def _validate_table_row_counts(self, benchmark, table_stats: dict[str, int]) -> tuple[str, dict[str, Any]]:
-        """Validate that tables have expected row counts."""
         validation_details = {}
 
-        # Get minimum expected row counts for benchmark
         expected_row_counts = self._get_expected_row_counts(benchmark)
 
         failed_tables = []
         empty_tables = []
 
         for table_name, actual_rows in table_stats.items():
-            # Check for completely empty tables
             if actual_rows == 0:
                 empty_tables.append(table_name)
                 continue
 
-            # Check against expected minimums if available.
             if (
                 expected_row_counts
                 and hasattr(expected_row_counts, "__contains__")
@@ -332,7 +270,6 @@ class PhaseTrackingMixin:
                         }
                     )
 
-        # Determine validation status
         if empty_tables:
             status = "FAILED"
             validation_details["empty_tables"] = empty_tables
@@ -351,14 +288,11 @@ class PhaseTrackingMixin:
         return status, validation_details
 
     def _validate_schema_integrity(self, benchmark, connection) -> tuple[str, dict[str, Any]]:
-        """Validate database schema integrity."""
         validation_details = {}
 
         try:
-            # Get expected schema from benchmark
             expected_tables = self._get_expected_tables(benchmark)
 
-            # Verify tables exist in database
             existing_tables = self._get_existing_tables(connection)
 
             missing_tables = []
@@ -382,18 +316,14 @@ class PhaseTrackingMixin:
     def _validate_data_integrity(
         self, benchmark, connection, table_stats: dict[str, int]
     ) -> tuple[str, dict[str, Any]]:
-        """Validate basic data integrity checks."""
         validation_details = {}
 
         try:
-            # Verify tables are accessible through the provided connection object.
             accessible_tables = []
             inaccessible_tables = []
 
             for table_name in table_stats:
                 try:
-                    # Try a simple SELECT to verify table is accessible.
-                    # Use cursor API (not all connection objects support execute() directly).
                     cursor = connection.cursor()
                     try:
                         cursor.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
@@ -418,26 +348,11 @@ class PhaseTrackingMixin:
             return "FAILED", validation_details
 
     def _get_expected_row_counts(self, benchmark) -> dict[str, int] | None:
-        """Get expected minimum row counts for benchmark tables."""
-        # This can be overridden by specific benchmarks
-        # For now, we just require non-zero rows
         if hasattr(benchmark, "expected_row_counts"):
             return benchmark.expected_row_counts
         return None
 
     def get_table_row_count(self, connection: Any, table: str) -> int:
-        """Get row count for a table using platform-specific API.
-
-        Default implementation uses cursor pattern. Platforms like BigQuery
-        that don't support cursor() can override to use their specific APIs.
-
-        Args:
-            connection: Database connection
-            table: Table name
-
-        Returns:
-            Row count as integer, or 0 if unable to determine
-        """
         try:
             cursor = connection.cursor()
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
@@ -447,16 +362,9 @@ class PhaseTrackingMixin:
             return 0
 
     def _get_expected_tables(self, benchmark) -> list[str] | None:
-        """Get list of expected table names from the benchmark definition.
-
-        Prefer schema- or API-declared tables over loaded data keys to avoid
-        masking missing tables when generation is incomplete.
-        """
-        # 1) Prefer schema if available
         try:
             if hasattr(benchmark, "get_schema") and callable(benchmark.get_schema):
                 schema = benchmark.get_schema()
-                # Support both list[dict{name}] and list[str]
                 if isinstance(schema, list) and schema and isinstance(schema[0], dict) and "name" in schema[0]:
                     return [str(t["name"]).lower() for t in schema]
                 if isinstance(schema, list) and schema and not isinstance(schema[0], dict):
@@ -465,7 +373,6 @@ class PhaseTrackingMixin:
                     return [str(t).lower() for t in schema]
         except Exception:
             pass
-        # 2) Prefer explicit table listing if provided by the benchmark
         try:
             if hasattr(benchmark, "get_available_tables") and callable(benchmark.get_available_tables):
                 return [str(t).lower() for t in benchmark.get_available_tables()]
@@ -473,7 +380,6 @@ class PhaseTrackingMixin:
                 return [str(t).lower() for t in benchmark.get_table_names()]
         except Exception:
             pass
-        # 3) Fall back to whatever was generated (least strict)
         if hasattr(benchmark, "tables") and benchmark.tables and hasattr(benchmark.tables, "keys"):
             try:
                 return [str(t).lower() for t in benchmark.tables.keys()]
@@ -482,19 +388,12 @@ class PhaseTrackingMixin:
         return None
 
     def _get_existing_tables(self, connection) -> list[str]:
-        """Get list of existing tables in the database.
-
-        Tries cursor-based API (psycopg2, etc.) first, then falls back to
-        DuckDB-style connection-level execute.  Platform adapters should
-        override this method when they need database-specific SQL.
-        """
         query = """
             SELECT table_name FROM information_schema.tables
             WHERE table_type = 'BASE TABLE'
             AND table_schema NOT IN ('information_schema', 'pg_catalog',
                                      'mysql', 'performance_schema', 'sys')
         """
-        # Try cursor-based API (psycopg2 and similar)
         try:
             cursor = connection.cursor()
             cursor.execute(query)
@@ -503,7 +402,6 @@ class PhaseTrackingMixin:
             return [row[0].lower() for row in rows]
         except Exception:
             pass
-        # Fall back to DuckDB-style connection-level execute
         try:
             result = connection.execute(query).fetchall()
             return [row[0].lower() for row in result]

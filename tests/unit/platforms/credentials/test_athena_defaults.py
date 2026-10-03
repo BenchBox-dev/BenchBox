@@ -1,9 +1,6 @@
-"""Tests for Athena credential setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -23,8 +20,6 @@ pytestmark = [
 
 
 class TestAthenaCredentialDefaults:
-    """Test Athena credential setup shows existing values as defaults."""
-
     @patch("benchbox.platforms.credentials.athena.validate_athena_credentials")
     @patch("benchbox.platforms.credentials.athena.prompt_secure_field")
     @patch("benchbox.platforms.credentials.athena.prompt_with_default")
@@ -39,7 +34,6 @@ class TestAthenaCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "region": "us-west-2",
@@ -50,14 +44,13 @@ class TestAthenaCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
-            "us-west-2",  # region
-            "my-workgroup",  # workgroup
-            "s3://my-bucket/staging/",  # s3_staging_dir
-            "s3://my-bucket/results/",  # s3_output_location
-            "production",  # aws_profile
+            "us-west-2",
+            "my-workgroup",
+            "s3://my-bucket/staging/",
+            "s3://my-bucket/results/",
+            "production",
         ]
 
         mock_validate.return_value = (True, None)
@@ -65,13 +58,12 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify prompts were called with existing values as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] == "us-west-2"  # region
-        assert calls[1][1]["current_value"] == "my-workgroup"  # workgroup
-        assert calls[2][1]["current_value"] == "s3://my-bucket/staging/"  # s3_staging_dir
-        assert calls[3][1]["current_value"] == "s3://my-bucket/results/"  # s3_output_location
-        assert calls[4][1]["current_value"] == "production"  # aws_profile
+        assert calls[0][1]["current_value"] == "us-west-2"
+        assert calls[1][1]["current_value"] == "my-workgroup"
+        assert calls[2][1]["current_value"] == "s3://my-bucket/staging/"
+        assert calls[3][1]["current_value"] == "s3://my-bucket/results/"
+        assert calls[4][1]["current_value"] == "production"
 
     @patch("benchbox.platforms.credentials.athena.validate_athena_credentials")
     @patch("benchbox.platforms.credentials.athena.prompt_secure_field")
@@ -87,19 +79,17 @@ class TestAthenaCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User provides new values
-        mock_confirm.return_value = False  # Skip auto-detection
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
-            "us-east-1",  # region (default)
-            "primary",  # workgroup (default)
-            "s3://new-bucket/data/",  # s3_staging_dir
-            "",  # s3_output_location (will be derived)
-            "default",  # aws_profile (default)
+            "us-east-1",
+            "primary",
+            "s3://new-bucket/data/",
+            "",
+            "default",
         ]
 
         mock_validate.return_value = (True, None)
@@ -107,12 +97,11 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify prompts were called with None as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] is None  # region
-        assert calls[0][1]["default_if_none"] == "us-east-1"  # region default
-        assert calls[1][1]["current_value"] is None  # workgroup
-        assert calls[1][1]["default_if_none"] == "primary"  # workgroup default
+        assert calls[0][1]["current_value"] is None
+        assert calls[0][1]["default_if_none"] == "us-east-1"
+        assert calls[1][1]["current_value"] is None
+        assert calls[1][1]["default_if_none"] == "primary"
 
     @patch("benchbox.platforms.credentials.athena.validate_athena_credentials")
     @patch("benchbox.platforms.credentials.athena.prompt_secure_field")
@@ -128,7 +117,6 @@ class TestAthenaCredentialDefaults:
         mock_validate,
     ):
 
-        # Setup: existing credentials with access keys
         mock_manager = Mock()
         existing_creds = {
             "region": "us-east-1",
@@ -140,14 +128,13 @@ class TestAthenaCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt
-        mock_int_prompt.return_value = 2  # Access keys auth method
+        mock_int_prompt.return_value = 2
         mock_prompt_default.side_effect = [
-            "us-east-1",  # region
-            "primary",  # workgroup
-            "s3://my-bucket/data/",  # s3_staging_dir
-            "s3://my-bucket/results/",  # s3_output_location
-            "AKIAIOSFODNN7EXAMPLE",  # aws_access_key_id
+            "us-east-1",
+            "primary",
+            "s3://my-bucket/data/",
+            "s3://my-bucket/results/",
+            "AKIAIOSFODNN7EXAMPLE",
         ]
         mock_prompt_secure.return_value = "secret_key"
 
@@ -156,11 +143,9 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify access key prompts were called with existing values
         default_calls = mock_prompt_default.call_args_list
-        assert default_calls[4][1]["current_value"] == "AKIAIOSFODNN7EXAMPLE"  # access_key_id
+        assert default_calls[4][1]["current_value"] == "AKIAIOSFODNN7EXAMPLE"
 
-        # Verify secure field was called with existing secret key
         mock_prompt_secure.assert_called_once_with(
             "AWS Secret Access Key",
             current_value="secret_key",
@@ -180,18 +165,17 @@ class TestAthenaCredentialDefaults:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test that S3 output location is derived from staging dir when empty."""
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        mock_confirm.return_value = False  # Skip auto-detection
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
-            "us-east-1",  # region
-            "primary",  # workgroup
-            "s3://my-bucket/data/",  # s3_staging_dir
-            "",  # s3_output_location (empty - should be derived)
-            "default",  # aws_profile
+            "us-east-1",
+            "primary",
+            "s3://my-bucket/data/",
+            "",
+            "default",
         ]
 
         mock_validate.return_value = (True, None)
@@ -199,7 +183,6 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify saved credentials have derived output location
         saved_creds = mock_manager.set_platform_credentials.call_args[0][1]
         assert saved_creds["s3_output_location"] == "s3://my-bucket/data/athena-results/"
 
@@ -219,7 +202,6 @@ class TestAthenaCredentialDefaults:
         mock_auto_detect,
     ):
 
-        # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
             "region": "us-west-2",
@@ -229,7 +211,7 @@ class TestAthenaCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
             "us-west-2",
             "my-workgroup",
@@ -242,10 +224,8 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify no auto-detection was attempted
         mock_auto_detect.assert_not_called()
 
-        # Verify "updating configuration" message was displayed
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Existing credentials found" in console_output
         assert "updating configuration" in console_output
@@ -266,15 +246,13 @@ class TestAthenaCredentialDefaults:
         mock_auto_detect,
     ):
 
-        # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User declines auto-detection
         mock_confirm.return_value = False
         mock_auto_detect.return_value = None
 
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
             "us-east-1",
             "primary",
@@ -287,14 +265,11 @@ class TestAthenaCredentialDefaults:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify auto-detection prompt WAS shown
         auto_detect_call = mock_confirm.call_args_list[0]
         assert "auto-detection" in str(auto_detect_call).lower()
 
 
 class TestAthenaValidation:
-    """Test Athena credential validation."""
-
     def test_validation_fails_without_credentials(self):
 
         mock_manager = Mock()
@@ -306,13 +281,11 @@ class TestAthenaValidation:
         assert "No credentials found" in error
 
     def test_validation_fails_without_s3_config(self):
-        """Test validation fails without S3 staging directory."""
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {
             "region": "us-east-1",
             "workgroup": "primary",
             "aws_profile": "default",
-            # Missing s3_staging_dir and s3_output_location
         }
 
         success, error = validate_athena_credentials(mock_manager)
@@ -329,12 +302,9 @@ class TestAthenaValidation:
             "region": "us-east-1",
             "workgroup": "primary",
             "s3_staging_dir": "s3://bucket/data/",
-            # No aws_profile, no aws_access_key_id, no env vars
         }
 
-        # No environment variables for AWS auth
         mock_environ_get.return_value = None
-        # No ~/.aws/credentials file
         mock_path_exists.return_value = False
 
         success, error = validate_athena_credentials(mock_manager)
@@ -353,7 +323,6 @@ class TestAthenaValidation:
             "aws_profile": "default",
         }
 
-        # Mock successful connection
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -364,7 +333,6 @@ class TestAthenaValidation:
             patch.dict("sys.modules", {"pyathena": Mock(connect=mock_connect), "boto3": Mock()}),
             patch("benchbox.platforms.credentials.athena.athena_connect", mock_connect),
         ):
-            # Re-import to pick up mocks
             from importlib import reload
 
             import benchbox.platforms.credentials.athena as athena_mod
@@ -373,8 +341,6 @@ class TestAthenaValidation:
 
             success, error = athena_mod.validate_athena_credentials(mock_manager)
 
-        # Due to import complexity in testing, we test the function structure
-        # The actual connection test would require integration tests
         assert mock_manager.get_platform_credentials.called
 
     @patch("benchbox.platforms.credentials.athena.athena_connect", create=True)
@@ -407,8 +373,6 @@ class TestAthenaValidation:
 
 
 class TestAthenaAutoDetection:
-    """Test Athena auto-detection from environment variables."""
-
     @patch.dict(
         "os.environ",
         {
@@ -452,14 +416,12 @@ class TestAthenaAutoDetection:
     @patch.dict("os.environ", {}, clear=True)
     @patch("os.path.exists")
     def test_auto_detect_returns_none_without_s3(self, mock_exists):
-        """Test auto-detection returns None when S3 config is missing."""
         mock_exists.return_value = False
         console = Mock()
 
         result = _auto_detect_athena(console)
 
         assert result is None
-        # Verify warning was shown
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "ATHENA_S3_STAGING_DIR" in console_output or "Missing" in console_output
 
@@ -471,13 +433,12 @@ class TestAthenaAutoDetection:
     @patch("os.path.exists")
     def test_auto_detect_returns_none_without_auth(self, mock_exists):
 
-        mock_exists.return_value = False  # No ~/.aws/credentials
+        mock_exists.return_value = False
         console = Mock()
 
         result = _auto_detect_athena(console)
 
         assert result is None
-        # Verify warning was shown
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "AWS credentials" in console_output or "Missing" in console_output
 
@@ -489,20 +450,18 @@ class TestAthenaAutoDetection:
     @patch("os.path.exists")
     def test_auto_detect_uses_aws_credentials_file(self, mock_exists):
 
-        mock_exists.return_value = True  # ~/.aws/credentials exists
+        mock_exists.return_value = True
         console = Mock()
 
         result = _auto_detect_athena(console)
 
         assert result is not None
         assert result["s3_staging_dir"] == "s3://bucket/data/"
-        assert result["region"] == "us-east-1"  # Default
-        assert result["workgroup"] == "primary"  # Default
+        assert result["region"] == "us-east-1"
+        assert result["workgroup"] == "primary"
 
 
 class TestAthenaCredentialStorage:
-    """Test Athena credential storage behavior."""
-
     @patch("benchbox.platforms.credentials.athena.validate_athena_credentials")
     @patch("benchbox.platforms.credentials.athena.prompt_secure_field")
     @patch("benchbox.platforms.credentials.athena.prompt_with_default")
@@ -520,8 +479,8 @@ class TestAthenaCredentialStorage:
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        mock_confirm.return_value = False  # Skip auto-detection
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
             "us-east-1",
             "primary",
@@ -534,7 +493,6 @@ class TestAthenaCredentialStorage:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify credentials were saved
         mock_manager.save_credentials.assert_called()
         mock_manager.update_validation_status.assert_called_with("athena", CredentialStatus.VALID)
 
@@ -555,8 +513,8 @@ class TestAthenaCredentialStorage:
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        mock_confirm.return_value = False  # Skip auto-detection
-        mock_int_prompt.return_value = 1  # AWS profile auth
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 1
         mock_prompt_default.side_effect = [
             "us-east-1",
             "primary",
@@ -569,7 +527,6 @@ class TestAthenaCredentialStorage:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify credentials were marked invalid
         mock_manager.update_validation_status.assert_called_with(
             "athena", CredentialStatus.INVALID, "Connection failed"
         )
@@ -592,8 +549,8 @@ class TestAthenaCredentialStorage:
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        mock_confirm.return_value = False  # Skip auto-detection
-        mock_int_prompt.return_value = 2  # Access keys auth
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 2
         mock_prompt_default.side_effect = [
             "us-east-1",
             "primary",
@@ -607,7 +564,6 @@ class TestAthenaCredentialStorage:
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify secret key was never printed to console
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "supersecretkey12345" not in console_output
 
@@ -622,23 +578,20 @@ class TestAthenaCredentialStorage:
         mock_prompt_default,
         mock_validate,
     ):
-        """Test that setup aborts when S3 staging directory is not provided."""
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        mock_confirm.return_value = False  # Skip auto-detection
+        mock_confirm.return_value = False
         mock_prompt_default.side_effect = [
             "us-east-1",
             "primary",
-            "",  # Empty S3 staging dir - should abort
+            "",
         ]
         console = Mock()
 
         setup_athena_credentials(mock_manager, console)
 
-        # Verify error message was shown
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "S3 staging directory is required" in console_output
 
-        # Verify credentials were NOT saved
         mock_manager.save_credentials.assert_not_called()

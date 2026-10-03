@@ -1,5 +1,3 @@
-"""Verify the complete bundled-generator tree shipped inside BenchBox."""
-
 from __future__ import annotations
 
 import argparse
@@ -26,7 +24,6 @@ def _unique_object(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
 
 
 def read_binary_manifest(payload: bytes) -> dict[str, str]:
-    """Validate the manifest schema, relative paths, and SHA-256 digests."""
     manifest = json.loads(payload, object_pairs_hook=_unique_object)
     if (
         not isinstance(manifest, dict)
@@ -68,7 +65,6 @@ def _tree_files(root: Path) -> dict[str, Path]:
 
 
 def build_binary_manifest(root: Path) -> bytes:
-    """Generate deterministic hashes for every bundled file except the manifest."""
     hashes = {}
     for name, path in _tree_files(root).items():
         with path.open("rb") as stream:
@@ -79,7 +75,6 @@ def build_binary_manifest(root: Path) -> bytes:
 
 
 def verify_binary_payload(manifest: bytes, files: Mapping[str, bytes]) -> None:
-    """Verify exact file membership and bytes, including files read from archives."""
     expected = read_binary_manifest(manifest)
     if set(expected) != set(files):
         missing = sorted(set(expected) - set(files))
@@ -91,7 +86,6 @@ def verify_binary_payload(manifest: bytes, files: Mapping[str, bytes]) -> None:
 
 
 def verify_binary_tree(root: Path = DEFAULT_ROOT) -> None:
-    """Verify an installed or source package against its bundled manifest."""
     files = _tree_files(root)
     manifest_path = root / MANIFEST_NAME
     if manifest_path.is_symlink() or not manifest_path.is_file():

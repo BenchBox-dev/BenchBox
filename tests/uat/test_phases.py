@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/phases/*.py (preflight, enumerate, execute)."""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -58,11 +56,6 @@ def _cfg(payload: dict) -> UATConfig:
     return validate_config({"name": "phase-test", **payload})
 
 
-# ---------------------------------------------------------------------------
-# Preflight.
-# ---------------------------------------------------------------------------
-
-
 def test_preflight_aborts_below_min_free_space(tmp_path):
     with patch.object(preflight_phase, "free_space_gib", return_value=1.0):
         result = preflight_phase.run_preflight(
@@ -87,11 +80,6 @@ def test_preflight_warns_on_high_load(tmp_path):
     assert any("host load" in w for w in result.warnings)
 
 
-# ---------------------------------------------------------------------------
-# Enumerate.
-# ---------------------------------------------------------------------------
-
-
 def test_enumerate_filters_dataframe_against_sql_only():
     raw = {
         "platforms": {"include": ["polars-df"]},
@@ -100,7 +88,7 @@ def test_enumerate_filters_dataframe_against_sql_only():
     }
     cells = enum_phase.enumerate_cells(_cfg(raw))
     benches = {c.benchmark for c in cells}
-    assert "vector_search" not in benches  # sql-only
+    assert "vector_search" not in benches
     assert "tpch" in benches
 
 
@@ -484,24 +472,11 @@ def test_enumerate_honours_scale_options():
     }
     cells = enum_phase.enumerate_cells(_cfg(raw))
     scales = {c.scale for c in cells}
-    # tpch scale_options = development subscales + official TPC ladder
-    # (PR #332 review follow-up): 0.01, 0.1, 1.0, 10.0, 30.0, 100.0, 300.0…
-    # so 100.0 stays, but non-canonical 50.0 is dropped.
     assert 50.0 not in scales
     assert {0.01, 0.1, 1.0, 100.0}.issubset(scales)
 
 
 def test_enumerate_override_replaces_rungs():
-    """`scales.override` wins over `scales.rungs` at enumerate time.
-
-    YAML configs can no longer express both fields at once (w1:
-    `scales.rungs`/`scales.override` are validated mutually exclusive at
-    load time, uat-config-schema-spec-realignment) -- but the stress-override
-    runtime path (`tests/uat/orchestrator.py`'s `SCALE=` handling) legitimately
-    builds a config with both set via `dataclasses.replace`, bypassing YAML
-    validation entirely. This exercises that same precedence at the enumerate
-    layer without going through `validate_config`.
-    """
     from dataclasses import replace
 
     raw = {
@@ -515,13 +490,7 @@ def test_enumerate_override_replaces_rungs():
     assert {c.scale for c in cells} == {0.1}
 
 
-# ---------------------------------------------------------------------------
-# Execute.
-# ---------------------------------------------------------------------------
-
-
 def _stub_runner_factory(elapsed_map: dict[float, float], pass_map: dict[float, bool]):
-    """Build a stand-in for runner.run_cell that drives the ladder logic."""
 
     def fake_runner(platform, benchmark, scale, **kwargs):
         return CellResult(
@@ -595,8 +564,6 @@ def test_execute_skips_unreachable_platform(tmp_path):
         )
     assert len(outcome.results) == 0
     assert len(outcome.skipped_unreachable) == 1
-    # w2 regression: `all(...)` over an empty `results` tuple is vacuously
-    # True, so an all-unreachable sweep (zero cells run) must not exit 0.
     assert outcome.exit_code() == 1
 
 
@@ -614,12 +581,10 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
 
 
 def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
-    """A `compose ps -a` result whose single service is Up -- readiness passes."""
     return docker_assets.DockerCommandResult(tuple(argv), 0, healthy_ps_stdout(), "")
 
 
 def _healthy_stats_result(argv: list[str], *, limit: str = "5.25GB") -> docker_assets.DockerCommandResult:
-    """A Docker-compatible stats row exposing the calibrated ClickHouse cap."""
     return docker_assets.DockerCommandResult(
         tuple(argv),
         0,
@@ -692,9 +657,6 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
 
 
 def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_mocker(tmp_path, monkeypatch):
-    """uat-container-engine-routing w3: mocker's `compose down -v` leaks named
-    volumes; teardown must sweep them project-scoped when volumes/images mode
-    requested `-v` and the resolved engine is mocker."""
     monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
     monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
     docker_assets.resolve_container_cli.cache_clear()
@@ -710,9 +672,6 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
         )
         volume_calls: list[tuple[str, ...]] = []
 
-        # Exact leaked name mocker 0.5.4 creates for this project: the
-        # postgresql spec declares volume key `postgresql18-data`, and
-        # mocker joins <project>-<key> with a hyphen (live-verified).
         leaked_volume = "benchbox-uat-mocker-volume-sweep-postgresql-postgresql18-data"
 
         def fake_docker(argv, **kwargs):
@@ -759,9 +718,6 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
 
 
 def test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode(tmp_path, monkeypatch):
-    """The sweep only runs when `-v` was requested (volumes/images mode) --
-    `containers` mode intentionally keeps volumes for platform-reuse, and the
-    sweep must not defeat that."""
     monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
     monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
     docker_assets.resolve_container_cli.cache_clear()
@@ -854,16 +810,6 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
 
 
 def test_execute_aborts_before_compose_up_when_benchmark_runs_dir_is_relative_for_path_mirroring_platform(tmp_path):
-    """must_preserve: compose_environment() (tests/uat/docker_assets.py) is
-    the enforcement point every UAT-managed bring-up path funnels through --
-    not just `make test-docker-up-*`, which the Makefile's
-    require_data_dir_if_mounted guards separately and does not cover this
-    path at all. A relative benchmark_runs_dir for a path-mirroring platform
-    (lakesail, velox) is a pre-flight config problem identical in kind to
-    validate_managed_start_allowed's failures -- it would break EVERY cell
-    on the platform identically, not one query -- so it must abort the
-    sweep before compose is ever invoked, not silently mount an
-    empty/garbage path (`mocker compose config -q` exits 0 on that)."""
     cfg = validate_config(
         {
             "name": "docker relative data dir",
@@ -892,25 +838,10 @@ def test_execute_aborts_before_compose_up_when_benchmark_runs_dir_is_relative_fo
     assert outcome.aborted is True
     assert "BENCHBOX_DATA_DIR" in (outcome.abort_reason or "")
     assert "absolute" in (outcome.abort_reason or "")
-    # compose is never invoked at all -- the config error is caught before `up`.
     assert calls == []
 
 
 def test_run_docker_teardown_substitutes_absolute_placeholder_when_benchmark_runs_dir_is_relative():
-    """Down must never fail (or raise out of run_execute's `finally`) just
-    because BENCHBOX_DATA_DIR is unset or relative -- `down` never mounts
-    anything, so any absolute value lets compose parse the file.
-
-    Direct unit test of _run_docker_teardown rather than through
-    run_execute's public API: within one run_execute call, up and down for a
-    single platform always share the SAME benchmark_runs_dir value, so if up
-    already succeeded (compose_environment did not raise), down's identical
-    call cannot raise either -- the defensive substitution in
-    _run_docker_teardown is unreachable end-to-end through run_execute as
-    currently wired. It exists as defence-in-depth against a future
-    caller/refactor that decouples the two values, mirroring the Makefile's
-    compose_down_fresh placeholder for `make test-docker-down-*` (same
-    reasoning, same fix, different layer)."""
     cfg = validate_config(
         {
             "name": "docker teardown relative data dir",
@@ -947,15 +878,6 @@ def test_run_docker_teardown_substitutes_absolute_placeholder_when_benchmark_run
 
 
 def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tmp_path):
-    """A managed compose-up failure must not truncate the sweep.
-
-    Regression for uat-docker-stack-recovery: the 2026-05-28 non-OLTP run ended
-    after the LakeSail compose-up timed out, so no other stack ran. A failed
-    `up` should record the platform's cells (the failure is captured in
-    docker_events / uat_lifecycle.log) and advance to the next stack, one stack
-    at a time. Only genuine global aborts (free space, teardown failure, fixed
-    container-name policy) may stop the sweep.
-    """
     cfg = validate_config(
         {
             "name": "docker startup failure",
@@ -971,7 +893,6 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         action = _docker_verb(argv)
         platform = _docker_platform_from_argv(argv)
         sequence.append(("docker", action, platform))
-        # clickhouse-server compose-up fails (e.g. start timeout); others succeed.
         if action == "up" and platform == "clickhouse-server":
             return docker_assets.DockerCommandResult(
                 tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
@@ -1007,9 +928,7 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
             sleep_fn=lambda _s: None,
         )
 
-    # The sweep is NOT aborted by one stack's startup failure.
     assert outcome.aborted is False
-    # The failed stack ran no cells but was still torn down; the next stack ran.
     assert sequence == [
         ("docker", "up", "clickhouse-server"),
         ("docker", "down", "clickhouse-server"),
@@ -1018,11 +937,6 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
-    # The failed platform's cells are recorded as startup_failed (not
-    # skipped_unreachable -- uat-fail-advance-consistency w3 splits the two
-    # so accounting can tell "stack failed to start" from "TCP probe found
-    # nothing listening"), not silently dropped, and the compose-up failure
-    # is captured in the lifecycle events.
     assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
     assert len(outcome.skipped_unreachable) == 0
     assert any(
@@ -1032,17 +946,6 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
 
 
 def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_success(tmp_path):
-    """uat-container-readiness-and-memory-headroom-gate w0/w1 (RED-NOW rung 2).
-
-    Regression for the 2026-08-04 CedarDB incident: `up --wait` exited 0,
-    but `compose ps` showed the container Exited ~29s later, and UAT ran
-    171 cells against the dead stack -- all recorded as CELL failures
-    instead of a startup failure. `up --wait` succeeding must not be
-    trusted on its own: a settle window plus a `compose ps` re-check must
-    run first, and a service that has already Exited by then must route
-    into the existing startup_failed path (advance, don't run cells,
-    don't abort the sweep) instead of being counted as 171 cell failures.
-    """
     cfg = validate_config(
         {
             "name": "readiness settle",
@@ -1060,8 +963,6 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
         platform = _docker_platform_from_argv(argv)
         sequence.append(("docker", action, platform))
         if action == "ps" and platform == "clickhouse-server":
-            # `mocker compose ps` output shape (live-observed 2026-08-04):
-            # the service reported started by `up --wait` has since exited.
             return docker_assets.DockerCommandResult(
                 tuple(argv),
                 0,
@@ -1097,17 +998,10 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
             sleep_fn=sleep_calls.append,
         )
 
-    # The dead stack's cells are NOT run and NOT counted as cell failures --
-    # exactly the miscount the 2026-08-04 incident produced.
     assert not any(entry[:2] == ("cell", "run") and entry[2] == "clickhouse-server" for entry in sequence)
     assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
     assert not any(r.platform == "clickhouse-server" for r in outcome.results)
-    # The settle window ran (the default docker_settle_s=10) before the
-    # re-check, once per managed Docker platform (clickhouse-server, then
-    # postgresql).
     assert sleep_calls == [10, 10]
-    # The sweep still advances to the next stack -- one dead stack does not
-    # abort the whole sweep (uat-docker-stack-recovery w2, preserved here).
     assert outcome.aborted is False
     assert any(r.platform == "postgresql" and r.status == "passed" for r in outcome.results)
     assert any(
@@ -1120,10 +1014,6 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
 
 
 def test_execute_readiness_check_fails_when_platform_unreachable_after_settle(tmp_path):
-    """`compose ps` can look healthy while nothing is actually listening yet
-    (or ever) -- the readiness check must also re-probe reachability, reusing
-    the same primitive `_run_or_skip_platform`'s skip_unreachable check uses
-    (see uat-container-readiness-and-memory-headroom-gate w0 prior_art)."""
     cfg = validate_config(
         {
             "name": "readiness unreachable",
@@ -1202,9 +1092,6 @@ def test_execute_readiness_settle_uses_configured_docker_settle_s(tmp_path):
 
 
 def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
-    """A dry run never actually starts a container -- there is nothing to
-    settle or probe, and the readiness check must not fabricate a settle
-    delay or a real reachability probe against it."""
     cfg = validate_config(
         {
             "name": "dry run readiness",
@@ -1236,7 +1123,6 @@ def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
 
 
 def _memory_reader(free_gib, swap_used_percent=0.0):
-    """A `memory_reader` for run_execute that returns a fixed host reading."""
     return lambda: MemorySnapshot(free_gib=free_gib, swap_used_percent=swap_used_percent)
 
 
@@ -1263,7 +1149,6 @@ def _healthy_fake_docker(argv, **kwargs):
 
 
 def test_execute_starrocks_requires_backend_liveness_and_runtime_memory(monkeypatch, tmp_path):
-    """A StarRocks TCP listener is insufficient: FE and BE must both be alive."""
     monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
     docker_assets.resolve_container_cli.cache_clear()
     calls: list[tuple[str, ...]] = []
@@ -1443,14 +1328,6 @@ def test_execute_starrocks_memory_admission_uses_measured_request(tmp_path):
 
 
 def test_execute_memory_floor_aborts_the_platform_before_starting_it(tmp_path):
-    """End-to-end: a host below the free-memory floor aborts the sweep at the
-    platform boundary, with abort_kind="memory_floor".
-
-    The gate had zero end-to-end coverage: inserting `return None` as the
-    first statement of `_free_memory_abort_reason` (making the gate
-    incapable of ever aborting) left the whole suite green. This test, and
-    the three below, are what make that mutation fail.
-    """
     cfg = _managed_docker_cfg("memory floor abort")
     started: list[str] = []
 
@@ -1474,15 +1351,10 @@ def test_execute_memory_floor_aborts_the_platform_before_starting_it(tmp_path):
     assert outcome.aborted is True
     assert outcome.abort_kind == "memory_floor"
     assert outcome.results == ()
-    # The abort happens BEFORE the stack is started: the whole point is to
-    # not ask a starved host for another container VM.
     assert "up" not in started
 
 
 def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(tmp_path):
-    """The abort reason is the message `format_memory_headroom_failure`
-    renders, plus this call site's context -- not a second, divergent
-    open-coded string (see preflight_budget.format_memory_headroom_failure)."""
     cfg = _managed_docker_cfg("memory floor message")
 
     outcome = exec_phase.run_execute(
@@ -1505,10 +1377,7 @@ def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(t
     assert reason.startswith(expected_core)
     assert "before starting platform clickhouse-server" in reason
     assert "engine=docker" in reason
-    # Single source of truth: the swap note comes from the shared formatter
-    # and must not be appended a second time by the call site.
     assert reason.count("swap 88.0% used") == 1
-    # And the same reading is on the lifecycle log for the operator.
     lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
     assert "[free-memory]" in lifecycle
     assert "0.07 GiB available" in lifecycle
@@ -1544,8 +1413,6 @@ def test_execute_clickhouse_default_admission_uses_measured_request_without_unva
             databases_root=tmp_path / "databases",
             runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
             docker_runner=_healthy_fake_docker,
-            # 5 GiB available exceeds the 5.25g request's binary equivalent
-            # while remaining below the old request-plus-2 GiB policy.
             memory_reader=_memory_reader(5.0),
             sleep_fn=lambda _s: None,
         )
@@ -1555,8 +1422,6 @@ def test_execute_clickhouse_default_admission_uses_measured_request_without_unva
 
 
 def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
-    """0-disables convention: `free_memory_min_gib: 0` turns the gate off even
-    on a host with essentially no free memory."""
     cfg = _managed_docker_cfg("memory floor off", preflight={"free_memory_min_gib": 0})
 
     with platform_reachability(True):
@@ -1572,15 +1437,12 @@ def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
 
     assert outcome.aborted is False
     assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
-    # The pre-start floor is off, but ClickHouse still requires a valid
-    # post-start runtime limit and request-plus-reserve reading.
     lifecycle_path = tmp_path / "uat_lifecycle.log"
     lifecycle = lifecycle_path.read_text(encoding="utf-8") if lifecycle_path.exists() else ""
     assert "[free-memory]" not in lifecycle
 
 
 def test_execute_memory_floor_unmeasurable_clickhouse_host_fails_closed(tmp_path):
-    """ClickHouse admission must not proceed without pre-start headroom evidence."""
     cfg = _managed_docker_cfg("memory unmeasurable")
 
     with platform_reachability(True):
@@ -1620,8 +1482,6 @@ def test_execute_clickhouse_runtime_memory_rejects_host_below_explicit_request_p
 
 
 def test_execute_memory_floor_ignores_non_docker_platforms(tmp_path):
-    """The gate exists to protect a container VM start. A native platform
-    asks the host for no VM, so a low reading must not abort it."""
     cfg = validate_config(
         {
             "name": "memory native",
@@ -1648,8 +1508,6 @@ def test_execute_memory_floor_ignores_non_docker_platforms(tmp_path):
 
 
 def test_execute_disk_floor_takes_precedence_over_memory_floor(tmp_path):
-    """Both gates short at the same boundary; disk wins, matching the
-    disk-before-docker_required precedence in run_preflight."""
     cfg = _managed_docker_cfg("both floors")
 
     outcome = exec_phase.run_execute(
@@ -1672,17 +1530,6 @@ def test_execute_disk_floor_takes_precedence_over_memory_floor(tmp_path):
 
 
 def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):
-    """w4: teardown failing on a stack whose OWN startup already failed must not defeat #700's advance.
-
-    Regression for uat-fail-advance-consistency w4: `started=True` is set
-    unconditionally after a compose-up so the finally-teardown still runs on
-    a broken stack (it can still leak containers/volumes); before this fix,
-    a teardown failure on that same broken stack was treated exactly like a
-    healthy-stack teardown failure and turned into a GLOBAL abort, defeating
-    the #700 advance-past-broken-stack intent. Policy: only a stack that
-    started successfully makes an undoable teardown failure a resource-leak
-    emergency worth a global abort.
-    """
     cfg = validate_config(
         {
             "name": "docker startup and teardown both fail",
@@ -1698,7 +1545,6 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
         action = _docker_verb(argv)
         platform = _docker_platform_from_argv(argv)
         sequence.append(("docker", action, platform))
-        # clickhouse-server's compose-up fails AND its teardown also fails.
         if platform == "clickhouse-server":
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", f"{action} failed")
         if action == "ps":
@@ -1730,7 +1576,6 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
             sleep_fn=lambda _s: None,
         )
 
-    # The sweep advances past the broken stack instead of a global abort.
     assert outcome.aborted is False
     assert outcome.abort_reason is None
     assert sequence == [
@@ -1742,8 +1587,6 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
         ("docker", "down", "postgresql"),
     ]
     assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
-    # Both the raw teardown failure and the FAIL-and-advance policy decision
-    # are recorded as lifecycle events for auditability.
     assert any(
         event.platform == "clickhouse-server" and event.action == "down" and event.status == "failed"
         for event in outcome.docker_events
@@ -1757,13 +1600,6 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
 
 
 def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_failed_regression_guard(tmp_path):
-    """w4 must_preserve: a HEALTHY stack's teardown failure still aborts globally.
-
-    Companion to test_execute_docker_teardown_failure_aborts_before_next_platform:
-    that test already pins this behavior, but is duplicated here explicitly
-    alongside the new startup-failed-teardown-advances test so the two
-    directions of the w4 policy are visible side by side.
-    """
     cfg = validate_config(
         {
             "name": "healthy stack teardown failure",
@@ -1801,12 +1637,6 @@ def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_faile
 
 
 def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path):
-    """w2 regression: every managed compose-up failing means zero cells run.
-
-    A single-platform sweep whose only compose-up fails ends with an empty
-    `results` tuple, same as the all-unreachable case -- `all([])` must not
-    read as a clean sweep here either.
-    """
     cfg = validate_config(
         {
             "name": "docker all compose-up failed",
@@ -1847,7 +1677,6 @@ def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path)
 
 
 def test_execute_outcome_exit_code_zero_only_when_all_passed(tmp_path):
-    """Sanity check the guard did not change the ordinary passed/failed behavior."""
     all_passed = exec_phase.ExecuteOutcome(
         phase="execute",
         results=(
@@ -2153,14 +1982,6 @@ def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
-    """A passed cell whose result JSON refuses submission surfaces as FAILED.
-
-    Submit classification is the runner's job (run_cell, runner.py:256-260);
-    execute.py no longer re-applies it. The fake runner therefore mirrors
-    run_cell's classification step against the real fixture JSON, and the
-    test pins that the classified failure flows through run_execute's
-    pipeline (ladder, results aggregation) unmangled.
-    """
     result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
     _write_submit_result(result_path, failed=1)
     cfg = validate_config(
@@ -2173,9 +1994,6 @@ def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
     )
 
     def fake_runner(platform, benchmark, scale, **kwargs):
-        # Same classification sequence as the real run_cell: classify the
-        # exported result JSON, downgrade a passed status when the submit
-        # state is a cell failure.
         submit_state = classify_for_submit(result_path)
         is_failure = submit_state_is_cell_failure(submit_state)
         return CellResult(
@@ -2230,23 +2048,16 @@ def test_default_log_dir_substitutes_date_and_name():
     cfg = validate_config({"name": "uat-2026-05-02"})
     out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5))
     assert "20260505" in str(out)
-    assert "uat-2026-05-02" not in str(out)  # default template uses {date} only
+    assert "uat-2026-05-02" not in str(out)
 
 
 def test_default_log_dir_substitutes_time_component():
-    """The DEFAULT template's {time} placeholder expands to HHMMSS."""
     cfg = validate_config({"name": "uat-smoke"})
     out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 14, 30, 7))
     assert "143007" in str(out)
 
 
 def test_default_log_dir_time_avoids_same_day_collision():
-    """Two same-day sweeps at different times land in distinct default dirs.
-
-    Prior to uat-resume-retirement-artifact-durability the default template
-    was {date}-only, so a second same-day run silently overwrote the
-    first run's evidence (mode "w" on every durable artifact).
-    """
     cfg = validate_config({"name": "uat-smoke"})
     first = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 0))
     second = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 1))
@@ -2254,12 +2065,6 @@ def test_default_log_dir_time_avoids_same_day_collision():
 
 
 def test_default_log_dir_same_second_collision_gets_disambiguated(tmp_path: Path):
-    """#1143 review: {time} truncates to HHMMSS, so two sweeps starting in the
-    same second (e.g. automation kicking off multiple configs at once)
-    resolved to the same directory pre-fix, silently combining/overwriting
-    durable artifacts. A path that already exists on disk now gets a
-    numeric suffix instead.
-    """
     cfg = validate_config(
         {
             "name": "collision-smoke",
@@ -2294,7 +2099,6 @@ def test_reserve_default_log_dir_is_atomic_for_same_timestamp(tmp_path: Path):
 
 
 def test_default_log_dir_explicit_date_only_template_still_works():
-    """Existing configs with an explicit {date}-only template keep working verbatim."""
     cfg = validate_config(
         {
             "name": "uat-smoke",
@@ -2322,15 +2126,6 @@ def test_atomic_write_text_overwrites_existing_content(tmp_path: Path):
 
 
 def test_atomic_write_text_survives_a_failed_write_without_torn_output(tmp_path: Path):
-    """A write failure must not clobber the previous good artifact.
-
-    The temp-file + os.replace design means a crash or exception while
-    building/writing the new content leaves the last successfully written
-    artifact untouched -- unlike the prior mode="w" writes, which truncated
-    the destination file before any new content was available. The failed
-    write's .tmp sibling must also be cleaned up, not orphaned in the run
-    directory.
-    """
     target = tmp_path / "validator_rollup.tsv"
     report_phase.atomic_write_text(target, "good-content\n")
 
@@ -2353,17 +2148,9 @@ def test_default_benchmark_runs_dir_substitutes_date_and_name(tmp_path):
     assert out == tmp_path / "uat-smoke" / "20260505"
 
 
-# ---------------------------------------------------------------------------
-# BENCHBOX_OUTPUT_DIR as base for DEFAULT output templates
-# (uat-operator-provisioning w2). Explicit YAML templates always win
-# (must_preserve) -- bare uat-cell already honored the env var
-# (tests.uat.runner._default_*_dir); sweeps did not until this fix.
-# ---------------------------------------------------------------------------
-
-
 def test_default_benchmark_runs_dir_honors_env_var_when_template_is_default(monkeypatch, tmp_path):
     monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))
-    cfg = validate_config({"name": "uat-smoke"})  # output.* left at schema defaults
+    cfg = validate_config({"name": "uat-smoke"})
     out = exec_phase.default_benchmark_runs_dir(cfg, now=_dt.datetime(2026, 5, 5))
     assert out == tmp_path / "external-root"
 
@@ -2385,7 +2172,6 @@ def test_default_submissions_dir_honors_env_var_when_template_is_default(monkeyp
 
 
 def test_default_benchmark_runs_dir_explicit_template_wins_over_env_var(monkeypatch, tmp_path):
-    """An explicit YAML template must never be silently overridden by the env var."""
     monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))
     cfg = validate_config(
         {
@@ -2410,7 +2196,6 @@ def test_default_log_dir_explicit_template_wins_over_env_var(monkeypatch, tmp_pa
 
 
 def test_default_benchmark_runs_dir_default_template_without_env_var_unchanged(monkeypatch):
-    """No env var set -> the schema default template still resolves verbatim."""
     monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
     cfg = validate_config({"name": "uat-smoke"})
     out = exec_phase.default_benchmark_runs_dir(cfg, now=_dt.datetime(2026, 5, 5))
@@ -2418,14 +2203,6 @@ def test_default_benchmark_runs_dir_default_template_without_env_var_unchanged(m
 
 
 def test_default_benchmark_runs_dir_explicit_template_equal_to_default_wins_over_env_var(monkeypatch, tmp_path):
-    """Provenance, not value equality (uat-operator-provisioning review response).
-
-    A config that explicitly sets `benchmark_runs_dir_template` to the SAME
-    string as the schema default must still be treated as explicit -- the
-    prior string-equality check in `_resolve_output_base` could not tell
-    this apart from "unset", so BENCHBOX_OUTPUT_DIR would silently reroot an
-    explicit template that happened to match the default value.
-    """
     monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))
     default_template = "~/Developer/benchmark_runs"
     cfg = validate_config(
@@ -2436,7 +2213,6 @@ def test_default_benchmark_runs_dir_explicit_template_equal_to_default_wins_over
     )
     assert "benchmark_runs_dir_template" in cfg.output.explicitly_set
     out = exec_phase.default_benchmark_runs_dir(cfg, now=_dt.datetime(2026, 5, 5))
-    # Explicit value wins -- NOT rerooted under tmp_path / "external-root".
     assert out == Path(default_template).expanduser()
 
 
@@ -2454,13 +2230,11 @@ def test_topological_sort_moves_source_before_consumer():
 
 
 def test_topological_sort_stable_when_no_constraint():
-    """Benchmarks unconstrained by the reuse graph keep input order."""
     out = exec_phase._topological_sort(["clickbench", "ssb", "h2odb"], {})
     assert out == ["clickbench", "ssb", "h2odb"]
 
 
 def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
-    """Stable order should move sources only as far left as dependency constraints require."""
     consumer_to_sources = {
         "read_primitives": ["tpch"],
         "write_primitives": ["tpch"],
@@ -2489,12 +2263,10 @@ def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
 
 
 def test_execute_reorders_consumer_before_source(tmp_path):
-    """Even if include lists read_primitives first, tpch must run first."""
     cfg = validate_config(
         {
             "name": "fake",
             "platforms": {"include": ["duckdb"]},
-            # Order deliberately puts the consumer first.
             "benchmarks": {"include": ["read_primitives", "tpch"]},
             "scales": {"rungs": [0.01]},
         }
@@ -2525,7 +2297,6 @@ def test_execute_reorders_consumer_before_source(tmp_path):
 
 
 def test_execute_prunes_source_after_consumer_completes(tmp_path):
-    """The tpch DB should be pruned once its only consumer (read_primitives) finishes."""
     cfg = validate_config(
         {
             "name": "fake",
@@ -2535,7 +2306,6 @@ def test_execute_prunes_source_after_consumer_completes(tmp_path):
         }
     )
     db_root = tmp_path / "databases"
-    # Create a fake on-disk source DB so prune_database_dir has something to remove.
     (db_root / "duckdb" / "tpch" / "0.01").mkdir(parents=True)
     (db_root / "duckdb" / "tpch" / "0.01" / "data.duckdb").write_text("stub")
 
@@ -2549,12 +2319,10 @@ def test_execute_prunes_source_after_consumer_completes(tmp_path):
         databases_root=db_root,
         runner=runner,
     )
-    # After read_primitives completes, the tpch source DB should have been pruned.
     assert not (db_root / "duckdb" / "tpch" / "0.01").exists()
 
 
 def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
-    """During the (duckdb, tpch) cleanup pass, read_primitives is still pending — DB stays."""
     cfg = validate_config(
         {
             "name": "fake",
@@ -2567,7 +2335,6 @@ def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
     (db_root / "duckdb" / "tpch" / "0.01").mkdir(parents=True)
     (db_root / "duckdb" / "tpch" / "0.01" / "data.duckdb").write_text("stub")
 
-    # Stop after tpch finishes, before read_primitives runs.
     invocations: list[str] = []
 
     def stop_after_tpch(platform, benchmark, scale, **kwargs):
@@ -2592,32 +2359,10 @@ def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
             databases_root=db_root,
             runner=stop_after_tpch,
         )
-    # tpch ran; read_primitives was attempted next (before its cleanup);
-    # the tpch DB must NOT have been pruned because read_primitives is
-    # the consumer that gates the prune.
     assert (db_root / "duckdb" / "tpch" / "0.01").exists()
 
 
-# ---------------------------------------------------------------------------
-# Per-cell liveness probe: the 2026-08-04 incident, reproduced.
-#
-# `up --wait` returns 0, the readiness check passes, and the container dies
-# ~29s later, partway through the platform's cell list. Before the probe
-# existed, every remaining cell ran against the dead stack and was recorded
-# as a CELL FAILURE -- 171 of them. The post-start readiness check cannot
-# catch this: it has rendered its verdict ~12s after `up --wait`.
-# ---------------------------------------------------------------------------
-
-
 def _probe_dying_after(alive_calls: int):
-    """Reachability probe that reports True `alive_calls` times, then False forever.
-
-    Call order for a managed Docker platform, so the counts below are
-    readable rather than magic:
-      1. the post-start readiness check
-      2. arming the liveness probe at the start of the platform's cell list
-      3+ the per-cell liveness probe, once before each cell
-    """
     calls = {"n": 0}
 
     def probe(_platform, **_kwargs):
@@ -2628,9 +2373,6 @@ def _probe_dying_after(alive_calls: int):
 
 
 def test_execute_stack_dying_mid_platform_records_remaining_cells_as_died_not_failures(tmp_path):
-    """The headline regression. Stack is up at platform start and for the
-    first cell, then dies. Remaining cells must land in `died_mid_platform`
-    and must NOT appear as cell failures."""
     cfg = validate_config(
         {
             "name": "mid platform death",
@@ -2655,7 +2397,6 @@ def test_execute_stack_dying_mid_platform_records_remaining_cells_as_died_not_fa
             result_path=None,
         )
 
-    # readiness + arm + the 0.01 cell all see it alive; it dies before 0.1.
     with platform_reachability(True, probe=_probe_dying_after(3)):
         outcome = exec_phase.run_execute(
             cfg,
@@ -2669,12 +2410,10 @@ def test_execute_stack_dying_mid_platform_records_remaining_cells_as_died_not_fa
     assert ran == [0.01]
     died = [(c.platform, c.scale) for c in outcome.died_mid_platform]
     assert died == [("clickhouse-server", 0.1), ("clickhouse-server", 1.0)]
-    # The whole point: NOT cell failures, and not silently dropped either.
     assert [r.status for r in outcome.results] == ["passed"]
     assert not any(r.status == "failed" for r in outcome.results)
     assert outcome.startup_failed == ()
     assert outcome.skipped_unreachable == ()
-    # A lost platform is a real failure of the sweep, not a clean skip.
     assert outcome.exit_code() == 1
     lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
     assert "[liveness]" in lifecycle
@@ -2682,8 +2421,6 @@ def test_execute_stack_dying_mid_platform_records_remaining_cells_as_died_not_fa
 
 
 def test_execute_stack_death_also_claims_the_platforms_later_benchmarks(tmp_path):
-    """The bucket is per-PLATFORM: benchmarks queued after the one that was
-    interrupted never run either, and must be accounted, not vanish."""
     cfg = validate_config(
         {
             "name": "death spans benchmarks",
@@ -2706,7 +2443,6 @@ def test_execute_stack_death_also_claims_the_platforms_later_benchmarks(tmp_path
             result_path=None,
         )
 
-    # readiness + arm + the first cell; dead from the second cell onward.
     with platform_reachability(True, probe=_probe_dying_after(3)):
         outcome = exec_phase.run_execute(
             cfg,
@@ -2718,16 +2454,12 @@ def test_execute_stack_death_also_claims_the_platforms_later_benchmarks(tmp_path
         )
 
     assert len(outcome.results) == 1
-    # Every cell the platform still owed: the rest of tpch plus all of tpcds.
     assert len(outcome.died_mid_platform) == 3
     assert {c.benchmark for c in outcome.died_mid_platform} == {"tpch", "tpcds"}
-    # No cell count is lost: 4 defined = 1 run + 3 died.
     assert len(outcome.results) + len(outcome.died_mid_platform) == 4
 
 
 def test_execute_stack_death_does_not_stop_the_next_platform(tmp_path):
-    """One platform dying must not truncate the sweep -- same advance policy
-    as a startup failure (uat-docker-stack-recovery w2)."""
     cfg = validate_config(
         {
             "name": "death advances",
@@ -2739,7 +2471,6 @@ def test_execute_stack_death_does_not_stop_the_next_platform(tmp_path):
     )
 
     def probe(platform, **_kwargs):
-        # clickhouse is up to arm, then dead; duckdb is always fine.
         if platform != "clickhouse-server":
             return True
         probe.calls += 1  # type: ignore[attr-defined]
@@ -2763,10 +2494,6 @@ def test_execute_stack_death_does_not_stop_the_next_platform(tmp_path):
 
 
 def test_execute_liveness_probe_disabled_by_zero_timeout(tmp_path):
-    """0 disables the probe -- the same opt-out shape as the two *_min_gib
-    floors. With it off, a dead stack is invisible again (cells run and the
-    runner reports whatever it reports), which is exactly why the default is
-    not 0."""
     cfg = validate_config(
         {
             "name": "liveness off",
@@ -2793,9 +2520,6 @@ def test_execute_liveness_probe_disabled_by_zero_timeout(tmp_path):
 
 
 def test_execute_liveness_probe_not_armed_for_a_platform_that_was_never_reachable(tmp_path):
-    """`died_mid_platform` means "was up, then died". A platform that never
-    listened (skip_unreachable: false, so cells are attempted anyway) must
-    not be relabelled as a mid-run death."""
     cfg = validate_config(
         {
             "name": "never reachable",
@@ -2807,8 +2531,6 @@ def test_execute_liveness_probe_not_armed_for_a_platform_that_was_never_reachabl
         }
     )
 
-    # Readiness passes (ps is healthy and its probe is the first call), but
-    # the platform is not reachable when the cell list starts.
     with platform_reachability(True, probe=_probe_dying_after(1)):
         outcome = exec_phase.run_execute(
             cfg,
@@ -2824,20 +2546,6 @@ def test_execute_liveness_probe_not_armed_for_a_platform_that_was_never_reachabl
 
 
 def test_execute_readiness_check_does_not_poison_the_reachability_cache(tmp_path):
-    """Regression guard for the defect that made adding the readiness check a
-    net LOSS of coverage.
-
-    The readiness check originally probed via the CACHED
-    `platform_is_reachable`, which writes True into
-    `matrix._REACHABILITY_CACHE`. `_run_or_skip_platform`'s skip_unreachable
-    check then read that cached True instead of probing -- so the new check
-    silently disabled the existing check downstream of it, and the cache is
-    cleared only on lifecycle changes, never in between.
-
-    Asserted directly: when the skip_unreachable check runs, the cache must
-    still be empty, i.e. it is about to do real work rather than read
-    somebody else's answer.
-    """
     cfg = _managed_docker_cfg("no cache poisoning")
     cache_when_skip_check_ran: list[dict] = []
     real_is_reachable = matrix.platform_is_reachable
@@ -2860,15 +2568,10 @@ def test_execute_readiness_check_does_not_poison_the_reachability_cache(tmp_path
         )
 
     assert outcome.aborted is False
-    # The cached entry point is reached exactly once (the skip_unreachable
-    # check), and nothing had populated the cache before it.
     assert cache_when_skip_check_ran == [{}]
 
 
 def test_execute_readiness_check_fails_closed_on_an_empty_compose_ps_table(tmp_path):
-    """`ps -a` finding no rows for a project that was just `up`'d means the
-    containers are gone. Passing there would be the same fail-open shape as
-    the missing `-a` flag: an empty result read as a healthy one."""
     cfg = _managed_docker_cfg("empty ps table")
 
     def fake_docker(argv, **kwargs):
@@ -2896,7 +2599,6 @@ def test_execute_readiness_check_fails_closed_on_an_empty_compose_ps_table(tmp_p
 
 
 def test_execute_readiness_check_requests_ps_all(tmp_path):
-    """Regression guard: without `-a` the dead container is not in the output."""
     cfg = _managed_docker_cfg("ps all argv")
     ps_argvs: list[tuple[str, ...]] = []
 

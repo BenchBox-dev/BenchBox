@@ -1,11 +1,6 @@
-"""Unit tests for NYC Taxi spatial extensions.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests spatial query definitions, schema generation, and platform capability detection.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -28,8 +23,6 @@ pytestmark = [
 
 
 class TestTaxiZoneCentroids:
-    """Tests for taxi zone centroid data."""
-
     def test_centroids_not_empty(self):
 
         assert len(TAXI_ZONE_CENTROIDS) > 0
@@ -38,44 +31,38 @@ class TestTaxiZoneCentroids:
 
         for location_id, (lon, lat) in TAXI_ZONE_CENTROIDS.items():
             assert isinstance(location_id, int)
-            # NYC area bounding box
             assert -74.5 <= lon <= -73.5, f"Invalid longitude for zone {location_id}: {lon}"
             assert 40.4 <= lat <= 41.0, f"Invalid latitude for zone {location_id}: {lat}"
 
     def test_key_zones_present(self):
 
         key_zones = [
-            1,  # EWR Airport
-            132,  # JFK Airport
-            138,  # LaGuardia Airport
-            161,  # Midtown Center
-            230,  # Times Square
+            1,
+            132,
+            138,
+            161,
+            230,
         ]
         for zone_id in key_zones:
             assert zone_id in TAXI_ZONE_CENTROIDS, f"Missing centroid for zone {zone_id}"
 
     def test_airport_zones_distinct(self):
 
-        airports = [1, 132, 138]  # EWR, JFK, LGA
+        airports = [1, 132, 138]
         centroids = [TAXI_ZONE_CENTROIDS[z] for z in airports if z in TAXI_ZONE_CENTROIDS]
 
-        # Check all airports present
         assert len(centroids) == len(airports)
 
-        # Check all distinct
         unique_centroids = set(centroids)
         assert len(unique_centroids) == len(centroids)
 
 
 class TestSpatialSchemaExtension:
-    """Tests for spatial schema extension definition."""
-
     def test_schema_has_spatial_table(self):
 
         assert "taxi_zones_spatial" in SPATIAL_SCHEMA_EXTENSION
 
     def test_spatial_table_has_required_columns(self):
-        """Test spatial table has all required columns."""
         table_def = SPATIAL_SCHEMA_EXTENSION["taxi_zones_spatial"]
         columns = table_def["columns"]
 
@@ -91,14 +78,11 @@ class TestSpatialSchemaExtension:
 
 
 class TestDuckDBSpatialQueries:
-    """Tests for DuckDB spatial query definitions."""
-
     def test_has_queries(self):
 
         assert len(DUCKDB_SPATIAL_QUERIES) >= 10
 
     def test_all_queries_have_required_fields(self):
-        """Test all queries have required metadata."""
         required_fields = ["id", "name", "description", "category", "platform", "sql"]
 
         for query_name, query_def in DUCKDB_SPATIAL_QUERIES.items():
@@ -138,14 +122,11 @@ class TestDuckDBSpatialQueries:
 
 
 class TestPostGISSpatialQueries:
-    """Tests for PostgreSQL/PostGIS spatial query definitions."""
-
     def test_has_queries(self):
 
         assert len(POSTGIS_SPATIAL_QUERIES) >= 3
 
     def test_all_queries_have_required_fields(self):
-        """Test all queries have required metadata."""
         required_fields = ["id", "name", "description", "category", "platform", "sql"]
 
         for query_name, query_def in POSTGIS_SPATIAL_QUERIES.items():
@@ -171,23 +152,18 @@ class TestPostGISSpatialQueries:
         assert found_postgis, "No PostGIS-specific functions found"
 
     def test_queries_specify_srid(self):
-        """Test that PostGIS queries specify SRID 4326 (WGS84)."""
         for query_name, query_def in POSTGIS_SPATIAL_QUERIES.items():
             sql = query_def["sql"]
-            # PostGIS queries should use SRID 4326 for GPS coordinates
             if "ST_SetSRID" in sql:
                 assert "4326" in sql, f"Query {query_name} should use SRID 4326"
 
 
 class TestClickHouseSpatialQueries:
-    """Tests for ClickHouse spatial query definitions."""
-
     def test_has_queries(self):
 
         assert len(CLICKHOUSE_SPATIAL_QUERIES) >= 3
 
     def test_all_queries_have_required_fields(self):
-        """Test all queries have required metadata."""
         required_fields = ["id", "name", "description", "category", "platform", "sql"]
 
         for query_name, query_def in CLICKHOUSE_SPATIAL_QUERIES.items():
@@ -213,13 +189,10 @@ class TestClickHouseSpatialQueries:
         assert found_ch_geo, "No ClickHouse geo functions found"
 
     def test_h3_query_exists(self):
-        """Test that H3 indexing query exists (ClickHouse specialty)."""
         assert "spatial-h3-aggregation" in CLICKHOUSE_SPATIAL_QUERIES
 
 
 class TestGetSpatialQueries:
-    """Tests for get_spatial_queries function."""
-
     def test_returns_duckdb_queries(self):
 
         queries = get_spatial_queries("duckdb")
@@ -251,8 +224,6 @@ class TestGetSpatialQueries:
 
 
 class TestGetAllSpatialQueries:
-    """Tests for get_all_spatial_queries function."""
-
     def test_returns_all_platforms(self):
 
         all_queries = get_all_spatial_queries()
@@ -270,8 +241,6 @@ class TestGetAllSpatialQueries:
 
 
 class TestGetSpatialCreateTableSql:
-    """Tests for get_spatial_create_table_sql function."""
-
     def test_duckdb_sql_valid(self):
 
         sql = get_spatial_create_table_sql("duckdb")
@@ -307,8 +276,6 @@ class TestGetSpatialCreateTableSql:
 
 
 class TestCheckSpatialSupport:
-    """Tests for check_spatial_support function."""
-
     def test_duckdb_support(self):
 
         support = check_spatial_support("duckdb")
@@ -316,7 +283,6 @@ class TestCheckSpatialSupport:
         assert support["basic_spatial"] is True
         assert support["st_distance"] is True
         assert support["st_point"] is True
-        # DuckDB doesn't have geohash built-in
         assert support["geohash"] is False
 
     def test_postgres_support(self):
@@ -336,7 +302,6 @@ class TestCheckSpatialSupport:
         assert support["geo_distance"] is True
         assert support["geohash"] is True
         assert support["h3"] is True
-        # ClickHouse doesn't have ST_* functions
         assert support["st_distance"] is False
 
     def test_unsupported_platform(self):
@@ -351,8 +316,6 @@ class TestCheckSpatialSupport:
 
 
 class TestQueryCategories:
-    """Tests for query categorization."""
-
     def test_all_queries_have_spatial_category(self):
 
         for platform_queries in [DUCKDB_SPATIAL_QUERIES, POSTGIS_SPATIAL_QUERIES, CLICKHOUSE_SPATIAL_QUERIES]:
@@ -363,13 +326,10 @@ class TestQueryCategories:
 
         for platform_queries in [DUCKDB_SPATIAL_QUERIES, POSTGIS_SPATIAL_QUERIES, CLICKHOUSE_SPATIAL_QUERIES]:
             for query_name, query_def in platform_queries.items():
-                # All queries should have params (even if empty)
                 assert "params" in query_def, f"Query {query_name} missing params"
 
 
 class TestQuerySQLValidity:
-    """Tests for query SQL syntax validity."""
-
     def test_queries_have_from_clause(self):
 
         for platform_queries in [DUCKDB_SPATIAL_QUERIES, POSTGIS_SPATIAL_QUERIES, CLICKHOUSE_SPATIAL_QUERIES]:
@@ -378,14 +338,12 @@ class TestQuerySQLValidity:
                 assert "FROM" in sql, f"Query {query_name} missing FROM clause"
 
     def test_queries_reference_trips_table(self):
-        """Test all queries reference trips table."""
         for platform_queries in [DUCKDB_SPATIAL_QUERIES, POSTGIS_SPATIAL_QUERIES, CLICKHOUSE_SPATIAL_QUERIES]:
             for query_name, query_def in platform_queries.items():
                 sql = query_def["sql"].lower()
                 assert "trips" in sql, f"Query {query_name} should reference trips table"
 
     def test_queries_reference_spatial_zones(self):
-        """Test all queries reference taxi_zones_spatial table."""
         for platform_queries in [DUCKDB_SPATIAL_QUERIES, POSTGIS_SPATIAL_QUERIES, CLICKHOUSE_SPATIAL_QUERIES]:
             for query_name, query_def in platform_queries.items():
                 sql = query_def["sql"].lower()

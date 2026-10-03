@@ -1,12 +1,6 @@
-"""SSB DataFrame query registry.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the central registry for SSB DataFrame queries,
-following the same pattern as TPC-DS.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

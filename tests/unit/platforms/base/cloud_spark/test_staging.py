@@ -1,9 +1,6 @@
-"""Tests for CloudSparkStaging unified cloud storage interface.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -31,8 +28,6 @@ pytestmark = [
 
 
 class TestCloudProvider:
-    """Test CloudProvider enum."""
-
     def test_provider_values(self):
 
         assert CloudProvider.AWS_S3.value == "s3"
@@ -43,8 +38,6 @@ class TestCloudProvider:
 
 
 class TestUploadProgress:
-    """Test UploadProgress dataclass."""
-
     def test_percent_complete(self):
 
         progress = UploadProgress(
@@ -71,10 +64,7 @@ class TestUploadProgress:
 
 
 class TestCloudSparkStagingFromUri:
-    """Test CloudSparkStaging.from_uri() factory method."""
-
     def test_from_uri_s3(self):
-        """Test S3 URI parsing."""
         staging = CloudSparkStaging.from_uri("s3://my-bucket/path/to/data")
 
         assert isinstance(staging, S3Staging)
@@ -83,7 +73,6 @@ class TestCloudSparkStagingFromUri:
         assert staging.config.prefix == "path/to/data"
 
     def test_from_uri_s3a(self):
-        """Test s3a:// scheme is treated as S3."""
         staging = CloudSparkStaging.from_uri("s3a://my-bucket/data")
 
         assert isinstance(staging, S3Staging)
@@ -125,16 +114,12 @@ class TestCloudSparkStagingFromUri:
 
 
 class TestLocalStaging:
-    """Test LocalStaging implementation."""
-
     def test_upload_file(self):
-        """Test local file upload (copy)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir) / "source"
             staging_dir = Path(tmpdir) / "staging"
             source_dir.mkdir()
 
-            # Create test file
             test_file = source_dir / "test.parquet"
             test_file.write_text("test data")
 
@@ -146,7 +131,6 @@ class TestLocalStaging:
             )
             staging = LocalStaging(config)
 
-            # Upload
             uri = staging.upload_file(test_file, "table/test.parquet")
 
             assert "test.parquet" in uri
@@ -217,7 +201,6 @@ class TestLocalStaging:
             staging_dir = Path(tmpdir) / "staging"
             source_dir.mkdir()
 
-            # Create test table files
             (source_dir / "lineitem.parquet").write_text("lineitem data")
             (source_dir / "orders.parquet").write_text("orders data")
 
@@ -241,7 +224,6 @@ class TestLocalStaging:
             assert (staging_dir / "orders").exists()
 
     def test_upload_data_files(self):
-        """Explicit file mappings should upload without table-name globbing."""
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir) / "source"
             staging_dir = Path(tmpdir) / "staging"
@@ -276,7 +258,6 @@ class TestLocalStaging:
             assert (staging_dir / "orders" / "orders.parquet.2").exists()
 
     def test_upload_data_files_preserves_nested_relative_paths(self):
-        """Explicit file mappings should preserve nested layouts and duplicate basenames."""
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir) / "source"
             staging_dir = Path(tmpdir) / "staging"
@@ -308,7 +289,6 @@ class TestLocalStaging:
         with tempfile.TemporaryDirectory() as tmpdir:
             staging_dir = Path(tmpdir)
 
-            # Create one table
             (staging_dir / "lineitem").mkdir()
             (staging_dir / "lineitem" / "data.parquet").write_text("data")
 
@@ -324,7 +304,6 @@ class TestLocalStaging:
             assert not staging.tables_exist(["lineitem", "orders"])
 
     def test_fingerprint_gates_reuse(self):
-        """Reuse requires the dataset manifest, not just table files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir) / "source"
             staging_dir = Path(tmpdir) / "staging"
@@ -349,7 +328,6 @@ class TestLocalStaging:
 
             assert staging.tables_exist(["lineitem"], "parquet", "abc123")
             assert not staging.tables_exist(["lineitem"], "parquet", "other-fp")
-            # Name-only checks keep their legacy behavior without a fingerprint.
             assert staging.tables_exist(["lineitem"])
 
     def test_get_table_uri(self):
@@ -367,10 +345,7 @@ class TestLocalStaging:
 
 
 class TestS3Staging:
-    """Test S3Staging implementation with mocked boto3."""
-
     def test_s3_upload_file(self):
-        """Test S3 file upload."""
         config = StagingConfig(
             uri="s3://my-bucket/data",
             provider=CloudProvider.AWS_S3,
@@ -392,7 +367,6 @@ class TestS3Staging:
             assert uri == "s3://my-bucket/data/table/file.parquet"
 
     def test_s3_file_exists_true(self):
-        """Test S3 file existence check - file exists."""
         config = StagingConfig(
             uri="s3://my-bucket/data",
             provider=CloudProvider.AWS_S3,
@@ -410,7 +384,6 @@ class TestS3Staging:
         mock_client.head_object.assert_called_with(Bucket="my-bucket", Key="data/table/file.parquet")
 
     def test_s3_list_files(self):
-        """Test S3 file listing."""
         config = StagingConfig(
             uri="s3://my-bucket/data",
             provider=CloudProvider.AWS_S3,
@@ -433,7 +406,6 @@ class TestS3Staging:
         assert "data/table/file1.parquet" in files
 
     def test_s3_delete_recursive(self):
-        """Test S3 recursive delete."""
         config = StagingConfig(
             uri="s3://my-bucket/data",
             provider=CloudProvider.AWS_S3,
@@ -454,8 +426,6 @@ class TestS3Staging:
 
 
 class TestStagingConfig:
-    """Test StagingConfig dataclass."""
-
     def test_default_values(self):
 
         config = StagingConfig(
@@ -488,10 +458,7 @@ class TestStagingConfig:
 
 
 class TestUploadProgressBoundaries:
-    """Additional boundary tests for UploadProgress.percent_complete."""
-
     def test_percent_complete_exactly_full(self):
-        """When bytes_uploaded == total_bytes, result is 100.0."""
         progress = UploadProgress(
             table_name="t",
             file_name="f.parquet",
@@ -503,7 +470,6 @@ class TestUploadProgressBoundaries:
         assert progress.percent_complete == 100.0
 
     def test_percent_complete_zero_uploaded(self):
-        """When bytes_uploaded is 0 but total > 0, result is 0.0."""
         progress = UploadProgress(
             table_name="t",
             file_name="f.parquet",
@@ -516,36 +482,25 @@ class TestUploadProgressBoundaries:
 
 
 class TestCloudSparkStagingFromUriExtra:
-    """Additional from_uri tests for less-common schemes."""
-
     def test_from_uri_wasbs(self):
-        """wasbs:// scheme maps to AZURE_BLOB."""
         result = CloudSparkStaging.from_uri("wasbs://container@account.blob.core.windows.net/path")
         assert isinstance(result, AzureBlobStaging)
         assert result.config.provider == CloudProvider.AZURE_BLOB
 
     def test_from_uri_bare_local_path(self):
-        """A path without a URI scheme (empty scheme) maps to LOCAL."""
         staging = CloudSparkStaging.from_uri("/tmp/benchbox/data")
         assert isinstance(staging, LocalStaging)
         assert staging.config.provider == CloudProvider.LOCAL
 
     def test_parse_uri_s3_bucket_and_prefix(self):
-        """_parse_uri correctly splits bucket and prefix for s3 URI."""
         bucket, prefix = CloudSparkStaging._parse_uri("s3://my-bucket/path/to/prefix", CloudProvider.AWS_S3)
         assert bucket == "my-bucket"
         assert prefix == "path/to/prefix"
 
     def test_parse_uri_gcs_bucket_and_prefix(self):
-        """_parse_uri correctly splits bucket and prefix for gs URI."""
         bucket, prefix = CloudSparkStaging._parse_uri("gs://gcs-bucket/benchbox/data", CloudProvider.GCS)
         assert bucket == "gcs-bucket"
         assert prefix == "benchbox/data"
-
-
-# ---------------------------------------------------------------------------
-# S3Staging provider methods
-# ---------------------------------------------------------------------------
 
 
 def _s3_config(prefix: str | None = "data") -> StagingConfig:
@@ -601,18 +556,13 @@ class TestS3StagingMethods:
         assert p.file_exists("missing.parquet") is False
 
     def test_delete_path_single_file(self):
-        p = self._provider(prefix=None)  # no prefix → key is passed as-is
+        p = self._provider(prefix=None)
         p.delete_path("tables/data.parquet", recursive=False)
         p._client.delete_object.assert_called_once_with(Bucket="my-bucket", Key="tables/data.parquet")
 
     def test_full_key_no_prefix(self):
         p = self._provider(prefix=None)
         assert p._full_key("tables/data") == "tables/data"
-
-
-# ---------------------------------------------------------------------------
-# GCSStaging provider methods
-# ---------------------------------------------------------------------------
 
 
 class TestGCSStagingMethods:
@@ -667,14 +617,8 @@ class TestGCSStagingMethods:
 
     def test_get_client_caches(self):
         p = self._provider()
-        # Already has _client set, should return it
         client = p._get_client()
         assert client is p._client
-
-
-# ---------------------------------------------------------------------------
-# AzureADLSStaging provider methods
-# ---------------------------------------------------------------------------
 
 
 class TestAzureADLSStagingMethods:
@@ -743,11 +687,6 @@ class TestAzureADLSStagingMethods:
         mock_fc.delete_file.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# AzureBlobStaging provider methods
-# ---------------------------------------------------------------------------
-
-
 class TestAzureBlobStagingMethods:
     def _provider(self):
         from benchbox.platforms.base.cloud_spark.staging import AzureBlobStaging, CloudProvider, StagingConfig
@@ -798,11 +737,6 @@ class TestAzureBlobStagingMethods:
         p = self._provider()
         p.delete_path("tables/data.parquet", recursive=False)
         p._client.delete_blob.assert_called_once_with("prefix/tables/data.parquet")
-
-
-# ---------------------------------------------------------------------------
-# DBFSStaging provider methods
-# ---------------------------------------------------------------------------
 
 
 class TestDBFSStagingMethods:

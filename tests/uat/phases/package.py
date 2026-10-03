@@ -1,21 +1,3 @@
-"""Package phase: read submit_terminal_state from YAML and dispatch.
-
-Four-word vocabulary (from
-`uat-template-success-metric-terminal-state-and-gating`):
-
-  - local-stage:                 invoke `benchbox submit --output ...`
-  - cloud-uploaded:              invoke `benchbox submit --service ...`
-  - draft-pr:                    open PR vs published-results, NO auto-merge
-  - merged-to-published-results: open PR vs published-results, auto-merge
-
-This module dispatches; it does not implement submission. The
-`benchbox submit` CLI surface is unchanged (parent TODO must_preserve).
-PR-opening modes are stubbed at this work unit (the published-results
-flow is owned by `results-explorer-uat-corpus-integrate-validated-bundles`,
-which is in DONE) — the dispatcher invokes the CLI and surfaces the
-result; it does not duplicate gh-pr machinery.
-"""
-
 from __future__ import annotations
 
 import subprocess
@@ -27,10 +9,6 @@ from tests.uat.config import VALID_TERMINAL_STATES, UATConfig
 from tests.uat.phases import PhaseResult
 from tests.uat.runner import SubmitTerminalState, classify_for_submit
 
-# Terminal states whose PR-opening flow is not yet implemented; the
-# dispatcher emits the same argv as `local-stage` and warns the operator
-# so a sweep does not silently produce a local stage when a PR was asked
-# for. See module docstring for the four-word vocabulary.
 PR_STUB_TERMINAL_STATES: frozenset[str] = frozenset({"draft-pr", "merged-to-published-results"})
 
 
@@ -49,7 +27,7 @@ class PackageResult(PhaseResult):
 
 
 class PackagePhaseError(RuntimeError):
-    """Raised when YAML config cannot drive the package phase."""
+    pass
 
 
 def _resolve_state(config: UATConfig) -> str:
@@ -75,7 +53,6 @@ def _build_submit_argv(
     submissions_dir: Path,
     service: str | None,
 ) -> list[str]:
-    """Build the `benchbox submit ...` argv for a single result file."""
     base = [
         "benchbox",
         "submit",
@@ -84,7 +61,7 @@ def _build_submit_argv(
     if state in ("local-stage", "draft-pr", "merged-to-published-results"):
         return base + ["--output", str(submissions_dir)]
     if state == "cloud-uploaded":
-        assert service is not None  # validated above
+        assert service is not None
         return base + ["--service", service]
     raise PackagePhaseError(f"Unhandled terminal state {state!r}")
 
@@ -98,12 +75,6 @@ def run_package(
     warn=None,
     classify_results: bool = True,
 ) -> PackageResult:
-    """Dispatch submission per `submit_terminal_state`.
-
-    `runner` is injectable so the fast tests can drive without
-    spawning real `benchbox submit` invocations. `warn` defaults to
-    printing to stderr; tests inject a callable to capture warnings.
-    """
     if warn is None:
 
         def warn(msg: str) -> None:
@@ -138,10 +109,6 @@ def run_package(
     for result_path in result_paths:
         if classify_results and result_path.exists():
             submit_state = classify_for_submit(result_path)
-            # Soft-skip states that are successful runs but non-submittable: they
-            # must not inflate package failure_count (same posture as unofficial).
-            # Integrity failures (query_failure / schema_violation / missing_manifest)
-            # still count as package failures.
             if submit_state in {
                 SubmitTerminalState.unofficial,
                 SubmitTerminalState.unvalidated,

@@ -1,9 +1,6 @@
-"""Result output and export functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from pathlib import Path
@@ -29,34 +26,20 @@ logger = logging.getLogger(__name__)
 
 
 class ConsoleResultFormatter:
-    """Console-friendly result formatting for examples and CLI tools.
-
-    Provides standardized result display functionality that consolidates
-    the duplicate display_results functions found across example files.
-    """
-
     @staticmethod
     def display_benchmark_summary(
         results: BenchmarkResults,
         verbose: bool = False,
     ) -> None:
-        """Display standardized benchmark result summary.
-
-        Args:
-            results: Benchmark results to display (supports CLI, platform, and enhanced types)
-            verbose: Whether to show detailed query-level information
-        """
         ConsoleResultFormatter._display_enhanced_result(results, verbose)
 
     @staticmethod
     def _display_enhanced_result(results: BenchmarkResults, verbose: bool) -> None:
-        """Display enhanced platform BenchmarkResults format with all enhanced elements."""
         console.print(f"[bold blue]Benchmark:[/bold blue] {results.benchmark_name}")
         console.print(f"[bold blue]Scale Factor:[/bold blue] {results.scale_factor}")
         console.print(f"[bold blue]Platform:[/bold blue] {results.platform}")
         console.print(f"[bold blue]Database:[/bold blue] {getattr(results, 'database_name', 'in-memory')}")
 
-        # Summary status similar to CLI format
         total = getattr(results, "total_queries", 0) or 0
         successful = getattr(results, "successful_queries", 0) or 0
         if total:
@@ -66,14 +49,12 @@ class ConsoleResultFormatter:
                 f"[bold blue]Status:[/bold blue] [{status_color}]{successful}/{total} queries successful ({success_rate:.1f}%)[/{status_color}]"
             )
 
-        # Enhanced elements - Phase tracking
         if getattr(results, "execution_phases", None):
             console.print("\n[bold yellow]Phase Execution Summary:[/bold yellow]")
 
         ConsoleResultFormatter._display_resource_utilization(results)
         ConsoleResultFormatter._display_performance_characteristics(results)
 
-        # Data and timing information
         if hasattr(results, "data_size_mb"):
             console.print(f"[bold blue]Data Size:[/bold blue] {format_bytes(results.data_size_mb * 1024 * 1024)}")
         if hasattr(results, "schema_creation_time"):
@@ -97,7 +78,6 @@ class ConsoleResultFormatter:
             )
             console.print(f"[bold blue]Average Query Time:[/bold blue] {format_duration(results.average_query_time)}")
 
-        # Tuning configuration display
         if hasattr(results, "tuning_enabled") and results.tuning_enabled:
             console.print("[bold blue]Tuning Configuration:[/bold blue] [green]Enabled[/green]")
             if hasattr(results, "constraints_applied"):
@@ -110,7 +90,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_resource_utilization(results: BenchmarkResults) -> None:
-        """Display resource utilization metrics."""
         if not hasattr(results, "resource_utilization") or not results.resource_utilization:
             return
         console.print("\n[bold yellow]Resource Utilization:[/bold yellow]")
@@ -127,7 +106,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_performance_characteristics(results: BenchmarkResults) -> None:
-        """Display performance characteristics."""
         if not hasattr(results, "performance_characteristics") or not results.performance_characteristics:
             return
         console.print("\n[bold yellow]Performance Characteristics:[/bold yellow]")
@@ -145,8 +123,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _determine_benchmark_status(results: BenchmarkResults) -> tuple[str, str]:
-        """Determine overall benchmark status and color."""
-        # Defense-in-depth: 0 total queries means nothing ran - always FAILED.
         if results.total_queries == 0:
             return "FAILED", "red"
         query_success = results.successful_queries == results.total_queries
@@ -160,7 +136,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_validation_status(results: BenchmarkResults, validation_details: dict[str, Any]) -> None:
-        """Display validation status details for failed or partial validations."""
         validation_status = getattr(results, "validation_status", "PASSED")
 
         if validation_status == "FAILED":
@@ -190,7 +165,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _print_validation_stages(details: Optional[dict[str, Any]]) -> None:
-        """Render validation stage summaries when available."""
 
         if not isinstance(details, dict):
             return
@@ -222,7 +196,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_platform_result(results: BenchmarkResults, verbose: bool) -> None:
-        """Display platform BenchmarkResults format."""
         ConsoleResultFormatter._display_platform_header(results)
 
         status, status_color = ConsoleResultFormatter._determine_benchmark_status(results)
@@ -240,7 +213,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_platform_header(results: BenchmarkResults) -> None:
-        """Display platform identification and data/timing header info."""
         console.print(f"[bold blue]Scale Factor:[/bold blue] {results.scale_factor}")
         console.print(f"[bold blue]Platform:[/bold blue] {results.platform}")
         console.print(f"[bold blue]Database:[/bold blue] {getattr(results, 'database_name', 'in-memory')}")
@@ -254,7 +226,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_timing_and_tuning(results: BenchmarkResults) -> None:
-        """Display query timing and tuning configuration info."""
         if results.successful_queries > 0:
             console.print(
                 f"[bold blue]Query Execution Time:[/bold blue] {format_duration(results.total_execution_time)}"
@@ -270,7 +241,6 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _display_platform_query_details(results: BenchmarkResults) -> None:
-        """Display detailed query information for platform results."""
         if not hasattr(results, "query_results") or not results.query_results:
             return
 
@@ -282,7 +252,6 @@ class ConsoleResultFormatter:
                 normalized.append(entry)
                 continue
 
-            # Fallback for legacy QueryResult dataclass
             execution_time_seconds: Optional[float] = None
             if hasattr(entry, "execution_time") and entry.execution_time is not None:
                 execution_time_seconds = entry.execution_time
@@ -301,14 +270,12 @@ class ConsoleResultFormatter:
         successful_queries = [q for q in normalized if q.get("status") == "SUCCESS"]
         failed_queries = [q for q in normalized if q.get("status") != "SUCCESS"]
 
-        # Failed queries
         if failed_queries:
             console.print(f"[red]Failed Queries ({len(failed_queries)}):[/red]")
-            for q in failed_queries[:5]:  # Show up to 5 failed queries
+            for q in failed_queries[:5]:
                 error_msg = q.get("error", "Unknown error")[:100]
                 console.print(f"  [red]Query {q.get('query_id', '?')}:[/red] {error_msg}")
 
-        # Query performance analysis
         if successful_queries and len(successful_queries) > 1:
             execution_times = [q["execution_time_seconds"] for q in successful_queries]
             slowest_time = max(execution_times)
@@ -317,7 +284,6 @@ class ConsoleResultFormatter:
                 f"[bold blue]Query Performance Range:[/bold blue] {format_duration(fastest_time)} - {format_duration(slowest_time)}"
             )
 
-            # Top 3 fastest queries
             fastest_queries = sorted(successful_queries, key=lambda x: x["execution_time_seconds"])[:3]
             console.print("[green]Top 3 fastest queries:[/green]")
             for q in fastest_queries:
@@ -325,7 +291,6 @@ class ConsoleResultFormatter:
                     f"  [green]Query {q.get('query_id', '?')}:[/green] {format_duration(q['execution_time_seconds'])}"
                 )
 
-            # Top 3 slowest queries
             slowest_queries = sorted(successful_queries, key=lambda x: x["execution_time_seconds"], reverse=True)[:3]
             console.print("[yellow]Top 3 slowest queries:[/yellow]")
             for q in slowest_queries:
@@ -337,25 +302,12 @@ class ConsoleResultFormatter:
     def display_query_performance(
         results: BenchmarkResults,
     ) -> None:
-        """Display focused query-level performance metrics.
-
-        Args:
-            results: Benchmark results to analyze
-        """
         ConsoleResultFormatter.display_benchmark_summary(results, verbose=True)
 
     @staticmethod
     def format_execution_statistics(
         results: BenchmarkResults,
     ) -> dict[str, str]:
-        """Format execution statistics for programmatic use.
-
-        Args:
-            results: Benchmark results to format
-
-        Returns:
-            Dictionary of formatted statistics
-        """
         stats: dict[str, str] = {}
         stats["benchmark"] = results.benchmark_name
         stats["platform"] = getattr(results, "platform", "unknown")
@@ -386,40 +338,24 @@ class ConsoleResultFormatter:
         results: BenchmarkResults,
         _show_query_details: bool = True,
     ) -> None:
-        """Render comprehensive execution summary with validation results.
-
-        This provides an enhanced summary view that includes:
-        - Overall execution metrics
-        - Validation breakdown by status
-        - Top query failures
-        - Recommendations
-
-        Args:
-            results: Benchmark results to summarize
-            show_query_details: Whether to show individual query details
-        """
         from rich.table import Table
 
         console.print("\n[bold cyan]📊 Execution Summary[/bold cyan]\n")
 
-        # Overall Metrics Table
         metrics_table = Table(show_header=False, box=None, padding=(0, 2))
         metrics_table.add_column("Metric", style="cyan bold", width=25)
         metrics_table.add_column("Value", style="white")
 
-        # Basic info
         metrics_table.add_row("Benchmark", results.benchmark_name)
         metrics_table.add_row("Scale Factor", str(results.scale_factor))
         metrics_table.add_row("Platform", getattr(results, "platform", "unknown"))
 
-        # Timing metrics
         if hasattr(results, "total_execution_time"):
             metrics_table.add_row("Total Runtime", format_duration(results.total_execution_time))
 
         if hasattr(results, "average_query_time"):
             metrics_table.add_row("Average Query Time", format_duration(results.average_query_time))
 
-        # Query statistics
         total_queries = getattr(results, "total_queries", 0)
         successful_queries = getattr(results, "successful_queries", 0)
         failed_queries = total_queries - successful_queries
@@ -432,26 +368,21 @@ class ConsoleResultFormatter:
 
         console.print(metrics_table)
 
-        # Validation Breakdown
         if hasattr(results, "query_results") and results.query_results:
             ConsoleResultFormatter._render_validation_breakdown(results)
 
-        # Top Failures
         if failed_queries > 0 and hasattr(results, "query_results"):
             ConsoleResultFormatter._render_top_failures(results, limit=5)
 
-        # Overall Status
         validation_status = getattr(results, "validation_status", "UNKNOWN")
         ConsoleResultFormatter._render_overall_status(validation_status, successful_queries, total_queries)
 
     @staticmethod
     def _render_validation_breakdown(results: BenchmarkResults) -> None:
-        """Render validation status breakdown by query."""
         from rich.table import Table
 
         console.print("\n[bold yellow]Validation Breakdown[/bold yellow]")
 
-        # Collect validation statistics
         validation_stats = {"PASSED": 0, "FAILED": 0, "SKIPPED": 0, "UNKNOWN": 0}
 
         for query in results.query_results:
@@ -461,7 +392,6 @@ class ConsoleResultFormatter:
                 validation_status = getattr(getattr(query, "row_count_validation", None), "status", "UNKNOWN")
             validation_stats[validation_status] = validation_stats.get(validation_status, 0) + 1
 
-        # Create validation table
         val_table = Table(show_header=True, box=None)
         val_table.add_column("Status", style="bold", width=15)
         val_table.add_column("Count", justify="right", style="white", width=10)
@@ -499,18 +429,11 @@ class ConsoleResultFormatter:
 
         console.print(val_table)
 
-        # Show note about skipped validations
         if validation_stats["SKIPPED"] > 0:
             console.print("[dim]Note: Validation is typically skipped when scale factor ≠ 1.0[/dim]")
 
     @staticmethod
     def _render_top_failures(results: BenchmarkResults, limit: int = 5) -> None:
-        """Render top query failures with details.
-
-        Args:
-            results: Benchmark results
-            limit: Maximum number of failures to show
-        """
         console.print(f"\n[bold red]Top Query Failures (showing up to {limit})[/bold red]")
 
         failed_queries = []
@@ -537,14 +460,12 @@ class ConsoleResultFormatter:
             query_id = query.get("query_id", "unknown")
             error_msg = str(query.get("error", "Unknown error"))
 
-            # Truncate long error messages
             if len(error_msg) > 150:
                 error_msg = error_msg[:150] + "..."
 
             console.print(f"\n[bold]  {i}. Query {query_id}[/bold]")
             console.print(f"     [red]Error:[/red] {error_msg}")
 
-            # Show validation details if available
             if "row_count_validation" in query:
                 validation = query["row_count_validation"]
                 if validation.get("status") == "FAILED":
@@ -557,16 +478,8 @@ class ConsoleResultFormatter:
 
     @staticmethod
     def _render_overall_status(validation_status: str, successful_queries: int, total_queries: int) -> None:
-        """Render overall benchmark status with recommendations.
-
-        Args:
-            validation_status: Overall validation status
-            successful_queries: Number of successful queries
-            total_queries: Total number of queries
-        """
         console.print("\n[bold cyan]Overall Status[/bold cyan]")
 
-        # Determine status and recommendations
         if successful_queries == total_queries and validation_status == "PASSED":
             console.print("[bold green]✓ Benchmark completed successfully![/bold green]")
             console.print("[dim]All queries executed and validated correctly.[/dim]")
@@ -594,8 +507,6 @@ class ConsoleResultFormatter:
 
 
 class ResultExporter(_CoreResultExporter):
-    """CLI wrapper for the core exporter that keeps console and behaviour aligned with the CLI."""
-
     def __init__(
         self,
         output_dir: Optional[Union[str, Path]] = None,
@@ -631,5 +542,3 @@ class ResultExporter(_CoreResultExporter):
     ) -> PathLike:
         self._sync_console()
         return super().export_comparison_report(comparison, output_path)
-
-    # ConsoleResultFormatter remains below; no changes needed

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compute median DuckDB version-matrix metrics from a run manifest."""
 
 from __future__ import annotations
 
@@ -106,7 +105,6 @@ def _query_key(query: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def aggregate_payloads(payloads: list[dict[str, Any]], *, version: str, benchmark: str) -> dict[str, Any]:
-    """Create one Results Explorer bundle from the repetitions of one matrix cell."""
     if len(payloads) != EXPECTED_REPETITIONS:
         raise ValueError(f"expected {EXPECTED_REPETITIONS} repetitions for {version}/{benchmark}")
     if any(payload.get("summary", {}).get("validation") != "passed" for payload in payloads):
@@ -169,7 +167,6 @@ def _write_json(path: Path, payload: Any) -> None:
 
 
 def write_explorer_bundles(manifest_path: Path, output_dir: Path) -> list[Path]:
-    """Write one median bundle per version/benchmark cell for Explorer ingestion."""
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError(f"Explorer bundle output directory must be new or empty: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)

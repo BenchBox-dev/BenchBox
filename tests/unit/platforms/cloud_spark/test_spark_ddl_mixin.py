@@ -1,14 +1,6 @@
-"""Unit tests for SparkDDLGeneratorMixin.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the SparkDDLGeneratorMixin for:
-- Format routing (Delta, Iceberg, Parquet, Hive)
-- Integration with platform adapters
-- DDL generation via mixin
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,32 +23,22 @@ pytestmark = [
 
 
 class MockSparkAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter for testing SparkDDLGeneratorMixin."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.DELTA
 
 
 class MockParquetAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Parquet format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.PARQUET
 
 
 class MockIcebergAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Iceberg format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.ICEBERG
 
 
 class MockHiveAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Hive format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.HIVE
 
 
 class TestSparkTableFormatEnum:
-    """Tests for SparkTableFormat enum."""
-
     def test_enum_values(self) -> None:
 
         assert SparkTableFormat.DELTA.value == "delta"
@@ -66,8 +48,6 @@ class TestSparkTableFormatEnum:
 
 
 class TestGetTableFormat:
-    """Tests for get_table_format method."""
-
     def test_default_format(self) -> None:
 
         adapter = MockSparkAdapter()
@@ -80,10 +60,7 @@ class TestGetTableFormat:
 
 
 class TestMixinSupportsTuningTypes:
-    """Tests for supported tuning types."""
-
     def test_supports_all_tuning_types(self) -> None:
-        """Test that mixin supports all required tuning types."""
         adapter = MockSparkAdapter()
         assert adapter.supports_tuning_type("partitioning")
         assert adapter.supports_tuning_type("clustering")
@@ -92,8 +69,6 @@ class TestMixinSupportsTuningTypes:
 
 
 class TestMixinDeltaTuning:
-    """Tests for Delta tuning via mixin."""
-
     def test_delta_partitioning(self) -> None:
 
         adapter = MockSparkAdapter()
@@ -117,8 +92,6 @@ class TestMixinDeltaTuning:
 
 
 class TestMixinIcebergTuning:
-    """Tests for Iceberg tuning via mixin."""
-
     def test_iceberg_partitioning(self) -> None:
 
         adapter = MockIcebergAdapter()
@@ -132,8 +105,6 @@ class TestMixinIcebergTuning:
 
 
 class TestMixinParquetTuning:
-    """Tests for Parquet tuning via mixin."""
-
     def test_parquet_distribution(self) -> None:
 
         adapter = MockParquetAdapter()
@@ -147,8 +118,6 @@ class TestMixinParquetTuning:
 
 
 class TestMixinHiveTuning:
-    """Tests for Hive tuning via mixin."""
-
     def test_hive_storage_format(self) -> None:
 
         adapter = MockHiveAdapter()
@@ -158,8 +127,6 @@ class TestMixinHiveTuning:
 
 
 class TestMixinCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation via mixin."""
-
     def test_delta_create_table(self) -> None:
 
         adapter = MockSparkAdapter()
@@ -213,8 +180,6 @@ class TestMixinCreateTableDDL:
 
 
 class TestMixinPostLoadStatements:
-    """Tests for post-load statement generation via mixin."""
-
     def test_delta_zorder(self) -> None:
 
         adapter = MockSparkAdapter()
@@ -243,8 +208,6 @@ class TestMixinPostLoadStatements:
 
 
 class TestMixinNullHandling:
-    """Tests for null tuning handling."""
-
     def test_null_tuning_returns_format(self) -> None:
 
         adapter = MockSparkAdapter()

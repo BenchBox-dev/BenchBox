@@ -1,5 +1,3 @@
-"""Integration contracts for the installed todo-db batch delivery capability."""
-
 from __future__ import annotations
 
 import hashlib
@@ -14,8 +12,8 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[3]
-# The catalog revision that delivered the batch contract; the evidence file records it as history,
-# so a later catalog bump does not change it.
+
+
 DELIVERY_CATALOG_REV = "5c7ff93e8103ee5a4ac59ea2330625e85250b206"
 SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
 TODO_DB_VERSION = "0.8.1"
@@ -32,16 +30,6 @@ def _sha256(path: Path) -> str:
 def _evidence() -> dict:
     path = ROOT / "_project/analysis/batch-rollout-evidence.json"
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _local_tool(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["uv", "run", "--project", str(SCRIPTS_PROJECT), "--locked", "--", *args],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
 
 
 def _rpc(proc: subprocess.Popen[str], method: str, params: dict | None = None, request_id: int = 1) -> dict:
@@ -62,7 +50,7 @@ def test_pin_receipt_and_tracked_mirror_bind_catalog_tip() -> None:
     config = (ROOT / "skill-sync.conf").read_text(encoding="utf-8")
     receipt = (ROOT / ".claude/skills/skill-sync.receipt").read_text(encoding="utf-8")
     evidence = _evidence()
-    # Every catalog revision the config pins is the one the tracked mirror was materialized from.
+
     pins = re.findall(r"^source = ~/Developer/skill-sync-skills\nrev\s+=\s+([0-9a-f]{40})$", config, re.MULTILINE)
     assert pins, "skill-sync.conf pins no catalog revision"
     for pin in pins:
@@ -118,7 +106,26 @@ def test_project_local_wheel_and_lock_are_exact_and_sibling_free() -> None:
 def test_installed_runtime_handshake_exposes_registered_batch_tools(tmp_path: Path) -> None:
     remote = tmp_path / "state.git"
     subprocess.run(["git", "init", "--bare", "--quiet", str(remote)], check=True, capture_output=True)
-    _local_tool("todo-db", "bootstrap", "--state-remote", str(remote), "--state-branch", "todo-state")
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "--project",
+            str(SCRIPTS_PROJECT),
+            "--locked",
+            "--",
+            "todo-db",
+            "bootstrap",
+            "--state-remote",
+            str(remote),
+            "--state-branch",
+            "todo-state",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     proc = subprocess.Popen(
         [
             "uv",

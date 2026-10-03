@@ -1,22 +1,8 @@
-"""Star Schema Benchmark (SSB) data generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module generates synthetic data for the Star Schema Benchmark according
-to the SSB specification. The data is based on TPC-H but with a denormalized
-star schema structure.
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-The generator creates:
-- DATE dimension (2556 rows for 7 years)
-- CUSTOMER dimension (30,000 * scale_factor)
-- SUPPLIER dimension (2,000 * scale_factor)
-- PART dimension (200,000 * scale_factor)
-- LINEORDER fact table (6,000,000 * scale_factor)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

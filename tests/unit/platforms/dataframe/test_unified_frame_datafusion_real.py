@@ -1,5 +1,3 @@
-"""Real DataFusion behavioral tests for UnifiedLazyFrame and UnifiedExpr."""
-
 from __future__ import annotations
 
 import datetime
@@ -73,7 +71,6 @@ def test_datafusion_string_operations(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_split_returns_full_list_expression(datafusion_frame):
-    """str.split() returns a real list expression, not a get-only proxy."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedListExpr
 
     _, frame = datafusion_frame
@@ -97,11 +94,6 @@ def test_datafusion_split_returns_full_list_expression(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_split_edge_cases_match_list_semantics(datafusion_frame):
-    """Out-of-range/missing-separator edges return NULL, like polars/pyspark.
-
-    (The retired split_part proxy returned "" here; real list semantics is
-    NULL. A column expression is also accepted as the separator.)
-    """
     _, frame = datafusion_frame
 
     split_expr = UnifiedExpr(datafusion.col("text")).str.split(" ")
@@ -204,13 +196,11 @@ def test_datafusion_frame_operations(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_distinct_and_limit(datafusion_frame):
-    """distinct() deduplicates; limit() restricts row count."""
     ctx, frame = datafusion_frame
 
-    # vstack with itself to create duplicates
     doubled = frame.vstack(frame)
     distinct_result = doubled.distinct().collect()
-    assert distinct_result.num_rows == 2  # back to original 2 rows
+    assert distinct_result.num_rows == 2
 
     limited = frame.limit(1).collect()
     assert limited.num_rows == 1
@@ -218,7 +208,6 @@ def test_datafusion_distinct_and_limit(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_type_coercions(datafusion_frame):
-    """cast(), cast_float(), cast_string(), cast_int() work with DataFusion."""
     import pyarrow as pa
 
     _, frame = datafusion_frame
@@ -241,7 +230,6 @@ def test_datafusion_type_coercions(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_is_in_is_null_is_not_null(datafusion_frame):
-    """is_in(), is_null(), is_not_null() work with DataFusion."""
     ctx = datafusion.SessionContext()
     table = pa.table({"v": [1, None, 3], "n": pa.array([None, "b", "c"], type=pa.string())})
     ctx.register_record_batches("t2", [table.to_batches()])
@@ -261,12 +249,10 @@ def test_datafusion_is_in_is_null_is_not_null(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_case_when_otherwise(datafusion_frame):
-    """CASE/WHEN via UnifiedWhen works with DataFusion."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedWhen
 
     _, frame = datafusion_frame
 
-    # Build: CASE WHEN a > 1 THEN 'big' ELSE 'small' END
     when = UnifiedWhen(datafusion.col("a") > datafusion.lit(1), platform="DataFusion")
     case_expr = when.then("big").otherwise("small")
 
@@ -278,12 +264,10 @@ def test_datafusion_case_when_otherwise(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_case_when_chained(datafusion_frame):
-    """Chained CASE/WHEN via UnifiedWhenThen.when() works with DataFusion."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedWhen
 
     _, frame = datafusion_frame
 
-    # CASE WHEN a=1 THEN 'one' WHEN a=2 THEN 'two' ELSE 'other' END
     when = UnifiedWhen(datafusion.col("a") == datafusion.lit(1), platform="DataFusion")
     when_then = when.then("one")
     case_expr = when_then.when(datafusion.col("a") == datafusion.lit(2)).then("two").otherwise("other")
@@ -296,19 +280,15 @@ def test_datafusion_case_when_chained(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_dt_truncate_and_total_seconds(datafusion_frame):
-    """dt.truncate() and dt.total_seconds() work with DataFusion."""
     _, frame = datafusion_frame
 
-    # Truncate to day
     result = frame.with_columns(
         UnifiedExpr(datafusion.col("dt")).dt.truncate("1d").alias("trunc_day"),
     ).collect()
 
     d = result.to_pydict()
-    # Truncated to day: 2024-01-15 00:00:00
     trunc0 = d["trunc_day"][0]
     trunc1 = d["trunc_day"][1]
-    # Handle both PyArrow scalar and Python datetime
     if hasattr(trunc0, "as_py"):
         trunc0 = trunc0.as_py()
     if hasattr(trunc1, "as_py"):
@@ -319,7 +299,6 @@ def test_datafusion_dt_truncate_and_total_seconds(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_arithmetic_operators(datafusion_frame):
-    """__add__, __sub__, __mul__, __truediv__ work with DataFusion numeric columns."""
     _, frame = datafusion_frame
 
     result = frame.with_columns(
@@ -330,15 +309,14 @@ def test_datafusion_arithmetic_operators(datafusion_frame):
     ).collect()
 
     d = result.to_pydict()
-    assert d["add"] == [4, 6]  # 1+3, 2+4
-    assert d["sub"] == [2, 2]  # 3-1, 4-2
-    assert d["mul"] == [3, 8]  # 1*3, 2*4
-    assert d["div"] == [3.0, 2.0]  # 3/1, 4/2
+    assert d["add"] == [4, 6]
+    assert d["sub"] == [2, 2]
+    assert d["mul"] == [3, 8]
+    assert d["div"] == [3.0, 2.0]
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_concat_str(datafusion_frame):
-    """concat_str joins columns across DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.with_columns(
@@ -351,7 +329,6 @@ def test_datafusion_concat_str(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_rename_columns(datafusion_frame):
-    """rename() renames columns in DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.select("a", "b").rename({"a": "col_a", "b": "col_b"}).collect()
@@ -365,7 +342,6 @@ def test_datafusion_rename_columns(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_drop_columns(datafusion_frame):
-    """drop() removes specified columns in DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.select("a", "b", "name").drop("name").collect()
@@ -378,7 +354,6 @@ def test_datafusion_drop_columns(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_limit_and_head(datafusion_frame):
-    """limit() and head() return at most n rows in DataFusion."""
     _, frame = datafusion_frame
 
     result_limit = frame.select("a").limit(1).collect()
@@ -392,7 +367,6 @@ def test_datafusion_limit_and_head(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_sort_ascending(datafusion_frame):
-    """sort() ascending works in DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.select("a").sort("a").collect()
@@ -402,7 +376,6 @@ def test_datafusion_sort_ascending(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_sort_descending(datafusion_frame):
-    """sort() descending works in DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.select("a").sort("a", descending=True).collect()
@@ -412,7 +385,6 @@ def test_datafusion_sort_descending(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_sort_tuple_syntax(datafusion_frame):
-    """sort() with tuple syntax [("col", "desc")] works in DataFusion."""
     _, frame = datafusion_frame
 
     result = frame.select("a").sort([("a", "desc")]).collect()
@@ -422,7 +394,6 @@ def test_datafusion_sort_tuple_syntax(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_vstack_union(datafusion_frame):
-    """vstack() unions two DataFusion frames (UNION ALL)."""
     _, frame = datafusion_frame
 
     sub_frame = frame.select("a")
@@ -434,7 +405,6 @@ def test_datafusion_vstack_union(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_scalar_extraction(datafusion_frame):
-    """scalar() extracts a single value from a DataFusion frame."""
     _, frame = datafusion_frame
 
     value = frame.select("a").limit(1).scalar(row=0, col=0)
@@ -443,10 +413,8 @@ def test_datafusion_scalar_extraction(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_unique_dedup(datafusion_frame):
-    """unique() deduplicates rows in DataFusion."""
     ctx, _ = datafusion_frame
 
-    # Build a frame with duplicates
     import pyarrow as pa
 
     dup_table = pa.table({"x": [1, 1, 2, 2, 3]})
@@ -464,7 +432,6 @@ def test_datafusion_unique_dedup(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_columns_property(datafusion_frame):
-    """columns property returns column names in DataFusion."""
     _, frame = datafusion_frame
 
     cols = frame.select("a", "b").columns
@@ -473,14 +440,12 @@ def test_datafusion_columns_property(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_filter_after_group_by_having(datafusion_frame):
-    """group_by + filter on aggregated column (HAVING equivalent) works in DataFusion."""
     ctx, _ = datafusion_frame
 
     from types import SimpleNamespace
 
     import pyarrow as pa
 
-    # Build a frame with groups
     grouped_table = pa.table({"cat": ["A", "A", "B", "B", "B"], "val": [1, 2, 3, 4, 5]})
     ctx.register_record_batches("grouped_t", [grouped_table.to_batches()])
     g_frame = UnifiedLazyFrame(
@@ -495,19 +460,16 @@ def test_datafusion_filter_after_group_by_having(datafusion_frame):
         .collect()
     )
     d = result.to_pydict()
-    # B group: 3+4+5=12 > 5, A group: 1+2=3 not > 5
     assert d["cat"] == ["B"]
     assert d["total"] == [12]
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_string_add_concat(datafusion_frame):
-    """__add__ with string literal operand uses concat in DataFusion."""
     from datafusion import lit as df_lit
 
     _, frame = datafusion_frame
 
-    # Mark expr as string literal so __add__ routes through concat path
     name_expr = UnifiedExpr(datafusion.col("name"), _is_string_literal=True)
     suffix_expr = UnifiedExpr(df_lit("!"), _is_string_literal=True)
     result = frame.with_columns((name_expr + suffix_expr).alias("name_excl")).collect()

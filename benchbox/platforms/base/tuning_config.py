@@ -1,14 +1,3 @@
-"""Tuning configuration helpers for PlatformAdapter.
-
-Extracted from `benchbox.platforms.base.adapter` per the refactor map
-(`docs/development/adapter-refactor-map.md` Slice 2). Covers unified-tuning
-application, effective-config resolution, and tuning-metadata persistence.
-
-The abstract `configure_for_benchmark` hook stays on PlatformAdapter
-itself (32 subclass overrides - moving its name risks breaking the
-contract surface).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -19,13 +8,6 @@ if TYPE_CHECKING:
 
 
 def apply_standard_unified_tuning(adapter: Any, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-    """Apply the standard constraint, platform, then table-tuning hook sequence.
-
-    The connection is wrapped so every tuning-relevant statement the hooks
-    execute (DDL phase) is recorded into the adapter's applied-tuning ledger.
-    Wrapping degrades to the raw connection when no ledger is present, so this
-    never changes control flow for the tuning hooks.
-    """
     if not unified_config:
         return
 
@@ -41,35 +23,12 @@ def apply_standard_unified_tuning(adapter: Any, unified_config: UnifiedTuningCon
 
 
 class TuningConfigMixin:
-    """Mixin providing unified-tuning configuration handling for `PlatformAdapter`.
-
-    Expects host class to expose `platform_name`, `canonical_platform_type`,
-    `logger`, `tuning_enabled`, `create_connection`, `close_connection`, plus
-    `log_verbose` / `log_very_verbose` from `VerbosityMixin`.
-    """
-
     platform_name: str
     canonical_platform_type: str
     logger: logging.Logger
     tuning_enabled: bool
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to the database.
-
-        This method should implement platform-specific logic for applying
-        the full unified tuning configuration, including:
-        - Schema constraints (primary keys, foreign keys, unique, check)
-        - Platform-specific optimizations (Z-ordering, auto-optimize, etc.)
-        - Table-level tunings (partitioning, clustering, distribution, sorting)
-
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: Database connection
-
-        Raises:
-            NotImplementedError: If unified tuning is not supported by the platform
-            ValueError: If the configuration is invalid for this platform
-        """
         if unified_config:
             self.log_verbose(f"Unified tuning not implemented for {self.platform_name} - using base class no-op")
         else:
@@ -77,19 +36,9 @@ class TuningConfigMixin:
         return None
 
     def get_effective_tuning_configuration(self) -> UnifiedTuningConfiguration | None:
-        """Get the effective tuning configuration.
-
-        Returns:
-            The unified tuning configuration, or None if no tuning is configured
-        """
         return getattr(self, "unified_tuning_configuration", None)
 
     def validate_tuning_configuration_for_platform(self) -> list[str]:
-        """Validate the current tuning configuration against this platform's capabilities.
-
-        Returns:
-            List of validation error messages (empty if no errors)
-        """
         effective_config = self.get_effective_tuning_configuration()
         if not effective_config:
             return []
@@ -97,28 +46,12 @@ class TuningConfigMixin:
         return effective_config.validate_for_platform(self.canonical_platform_type)
 
     def validate_tuning_configuration(self, unified_config: UnifiedTuningConfiguration) -> list[str]:
-        """Validate a unified tuning configuration against platform capabilities.
-
-        Args:
-            unified_config: The unified tuning configuration to validate
-
-        Returns:
-            List of validation error messages (empty if all valid)
-        """
         if not unified_config:
             return []
 
         return unified_config.validate_for_platform(self.canonical_platform_type)
 
     def _validate_database_tunings(self, **connection_config):
-        """Validate that database tunings match expected configuration.
-
-        Args:
-            **connection_config: Connection configuration
-
-        Returns:
-            ValidationResult with tuning comparison results
-        """
         try:
             from benchbox.core.tuning.metadata import (
                 MetadataValidationResult,
@@ -149,8 +82,6 @@ class TuningConfigMixin:
                             result.add_error(
                                 "Refusing to reuse a tuned database for a notuning run; recreate the database first"
                             )
-                # Stash for the .applied.json companion's drift_check section
-                # (routed into the bundle for reused DBs; see ADR-001 addendum).
                 self._drift_validation_result = result
                 return result
 
@@ -168,14 +99,6 @@ class TuningConfigMixin:
             return result
 
     def save_tuning_metadata(self, connection: Any) -> bool:
-        """Save tuning metadata to database for future validation.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            True if metadata was saved successfully, False otherwise
-        """
         effective_config = self.get_effective_tuning_configuration()
         if not self.tuning_enabled or not effective_config:
             return True

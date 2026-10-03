@@ -1,9 +1,6 @@
-"""Tests for statistical analysis utilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -35,8 +32,6 @@ pytestmark = [
 
 
 class TestBasicStatistics:
-    """Tests for basic statistical functions."""
-
     def test_calculate_mean(self):
 
         assert calculate_mean([1, 2, 3, 4, 5]) == 3.0
@@ -59,11 +54,9 @@ class TestBasicStatistics:
 
     def test_calculate_geometric_mean(self):
 
-        # Geometric mean of [2, 8] = sqrt(16) = 4
         result = calculate_geometric_mean([2, 8])
         assert result == pytest.approx(4.0, rel=0.001)
 
-        # Geometric mean of [1, 10, 100] = (1000)^(1/3) = 10
         result = calculate_geometric_mean([1, 10, 100])
         assert result == pytest.approx(10.0, rel=0.001)
 
@@ -78,10 +71,9 @@ class TestBasicStatistics:
 
     def test_calculate_std_dev(self):
 
-        # Sample std dev of [2, 4, 4, 4, 5, 5, 7, 9]
         values = [2, 4, 4, 4, 5, 5, 7, 9]
         result = calculate_std_dev(values)
-        expected = 2.138  # Approximate sample std dev
+        expected = 2.138
         assert result == pytest.approx(expected, rel=0.01)
 
     def test_calculate_std_dev_insufficient_data(self):
@@ -93,13 +85,12 @@ class TestBasicStatistics:
 
         values = [2, 4, 4, 4, 5, 5, 7, 9]
         result = calculate_variance(values)
-        expected = 4.571  # Approximate sample variance
+        expected = 4.571
         assert result == pytest.approx(expected, rel=0.01)
 
     def test_calculate_coefficient_of_variation(self):
 
-        # CV = std_dev / mean
-        values = [10, 12, 14, 16, 18]  # mean=14, std_dev≈3.16
+        values = [10, 12, 14, 16, 18]
         cv = calculate_coefficient_of_variation(values)
         assert cv == pytest.approx(0.226, rel=0.01)
 
@@ -113,8 +104,6 @@ class TestBasicStatistics:
 
 
 class TestConfidenceInterval:
-    """Tests for confidence interval calculation."""
-
     def test_calculate_ci_basic(self):
 
         values = [100, 105, 95, 102, 98]
@@ -144,8 +133,6 @@ class TestConfidenceInterval:
 
 
 class TestPerformanceMetrics:
-    """Tests for performance metrics calculation."""
-
     def test_calculate_performance_metrics(self):
 
         values = [100, 120, 90, 110, 105]
@@ -182,24 +169,20 @@ class TestPerformanceMetrics:
 
 
 class TestEffectSize:
-    """Tests for effect size calculation."""
-
     def test_cohens_d_large_effect(self):
 
-        group_a = [100, 105, 95, 102, 98]  # mean ≈ 100
-        group_b = [150, 155, 145, 152, 148]  # mean ≈ 150
+        group_a = [100, 105, 95, 102, 98]
+        group_b = [150, 155, 145, 152, 148]
         d = calculate_cohens_d(group_a, group_b)
 
-        # Effect size > 0.8 is large
         assert abs(d) > 0.8
 
     def test_cohens_d_small_effect(self):
 
         group_a = [100, 105, 95, 102, 98]
-        group_b = [101, 106, 96, 103, 99]  # Very similar to group_a
+        group_b = [101, 106, 96, 103, 99]
         d = calculate_cohens_d(group_a, group_b)
 
-        # Effect size < 0.2 is small
         assert abs(d) < 0.5
 
     def test_cohens_d_insufficient_data(self):
@@ -209,12 +192,10 @@ class TestEffectSize:
 
 
 class TestStatisticalTests:
-    """Tests for statistical significance tests."""
-
     def test_welchs_t_test_significant(self):
 
-        group_a = [100, 102, 98, 101, 99] * 3  # 15 samples
-        group_b = [150, 152, 148, 151, 149] * 3  # 15 samples
+        group_a = [100, 102, 98, 101, 99] * 3
+        group_b = [150, 152, 148, 151, 149] * 3
 
         result = welchs_t_test(group_a, group_b)
 
@@ -229,7 +210,6 @@ class TestStatisticalTests:
 
         result = welchs_t_test(group_a, group_b)
 
-        # Similar groups should not be significant
         assert result.p_value > 0.05 or result.significance == SignificanceLevel.NOT_SIGNIFICANT
 
     def test_welchs_t_test_insufficient_samples(self):
@@ -259,8 +239,6 @@ class TestStatisticalTests:
 
 
 class TestPValueInterpretation:
-    """Tests for p-value interpretation."""
-
     def test_interpret_not_significant(self):
 
         assert interpret_p_value(0.10) == SignificanceLevel.NOT_SIGNIFICANT
@@ -281,14 +259,11 @@ class TestPValueInterpretation:
 
 
 class TestOutlierDetection:
-    """Tests for outlier detection."""
-
     def test_detect_outliers_iqr(self):
 
-        values = [10, 12, 14, 16, 18, 100]  # 100 is an outlier
+        values = [10, 12, 14, 16, 18, 100]
         outliers = detect_outliers_iqr(values)
 
-        # Should detect 100 as outlier
         assert len(outliers) == 1
         outlier_value = outliers[0][1]
         assert outlier_value == 100
@@ -309,10 +284,9 @@ class TestOutlierDetection:
 
     def test_detect_outliers_zscore(self):
 
-        values = [10, 12, 14, 16, 18, 100]  # 100 is an outlier
+        values = [10, 12, 14, 16, 18, 100]
         outliers = detect_outliers_zscore(values, threshold=2.0)
 
-        # Should detect 100 as outlier
         assert len(outliers) >= 1
         outlier_values = [o[1] for o in outliers]
         assert 100 in outlier_values
@@ -326,20 +300,16 @@ class TestOutlierDetection:
 
 
 class TestBonferroniCorrection:
-    """Tests for Bonferroni correction."""
-
     def test_bonferroni_basic(self):
 
         p_values = [0.01, 0.02, 0.03]
         corrected = apply_bonferroni_correction(p_values)
 
-        # Each p-value multiplied by 3
         assert corrected[0] == pytest.approx(0.03, rel=0.001)
         assert corrected[1] == pytest.approx(0.06, rel=0.001)
         assert corrected[2] == pytest.approx(0.09, rel=0.001)
 
     def test_bonferroni_capped_at_one(self):
-        """Test Bonferroni correction is capped at 1.0."""
         p_values = [0.5, 0.6]
         corrected = apply_bonferroni_correction(p_values)
 
@@ -352,18 +322,14 @@ class TestBonferroniCorrection:
 
 
 class TestStatisticalPower:
-    """Tests for statistical power analysis."""
-
     def test_calculate_power_large_effect(self):
 
         power = calculate_statistical_power(effect_size=0.8, sample_size=30)
-        # Large effect + reasonable sample should have good power
         assert power > 0.7
 
     def test_calculate_power_small_effect(self):
 
         power = calculate_statistical_power(effect_size=0.2, sample_size=10)
-        # Small effect + small sample should have low power
         assert power < 0.5
 
     def test_calculate_power_zero_effect(self):
@@ -374,17 +340,14 @@ class TestStatisticalPower:
     def test_recommend_sample_size_large_effect(self):
 
         n = recommend_sample_size(effect_size=0.8)
-        # Large effect needs smaller sample
         assert n < 30
 
     def test_recommend_sample_size_small_effect(self):
 
         n = recommend_sample_size(effect_size=0.2)
-        # Small effect needs larger sample
         assert n > 100
 
     def test_recommend_sample_size_zero_effect(self):
 
         n = recommend_sample_size(effect_size=0.0)
-        # Can't calculate for zero effect
         assert n == 1000

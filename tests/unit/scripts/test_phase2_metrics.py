@@ -1,10 +1,3 @@
-"""Tests for scripts/phase2_metrics.py.
-
-Covers the parsing helpers and metric functions. The gh CLI is not
-exercised here — those code paths take a list[dict] | GhError and we
-inject both shapes directly.
-"""
-
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -47,21 +40,12 @@ NOW = datetime(2026, 4, 27, 12, 0, 0, tzinfo=timezone.utc)
 
 
 def _pr(merged_offset_days: float | None, created_offset_days: float | None = None) -> dict:
-    """Build a minimal gh-shaped PR dict.
-
-    `*_offset_days` is days BEFORE NOW (positive = past). None = field absent.
-    """
     out: dict = {}
     if merged_offset_days is not None:
         out["mergedAt"] = (NOW - timedelta(days=merged_offset_days)).isoformat().replace("+00:00", "Z")
     if created_offset_days is not None:
         out["createdAt"] = (NOW - timedelta(days=created_offset_days)).isoformat().replace("+00:00", "Z")
     return out
-
-
-# ---------------------------------------------------------------------------
-# Section parsing
-# ---------------------------------------------------------------------------
 
 
 class TestSplitSections:
@@ -76,7 +60,7 @@ class TestSplitSections:
         text = "# H1\n## Real\nbody\n### Sub\nnope\n"
         sections = _split_sections(text)
         assert list(sections.keys()) == ["Real"]
-        assert "### Sub" in sections["Real"]  # h3 is content of the h2
+        assert "### Sub" in sections["Real"]
 
     def test_empty_text(self):
         assert _split_sections("") == {}
@@ -106,21 +90,14 @@ class TestCountDistinctLowercased:
 class TestCountEntries:
     def test_one_per_date_line(self):
         body = "**Date**: 2026-04-01\n**Date**: 2026-04-02\n**Date**: 2026-04-02\n"
-        # Same date twice -> two entries (a heavy contributor blocked twice).
         assert _count_entries(body) == 3
 
     def test_no_dates(self):
         assert _count_entries("no dates here") == 0
 
     def test_rejects_malformed_dates(self):
-        # The regex requires YYYY-MM-DD; bare year or text is ignored.
         body = "**Date**: 2026\n**Date**: yesterday\n**Date**: 2026-04-01\n"
         assert _count_entries(body) == 1
-
-
-# ---------------------------------------------------------------------------
-# metric_qualitative
-# ---------------------------------------------------------------------------
 
 
 def _notes_with(section: str, body: str) -> str:
@@ -161,25 +138,19 @@ class TestMetricQualitative:
         assert r.breached is None
 
 
-# ---------------------------------------------------------------------------
-# Quantitative metrics
-# ---------------------------------------------------------------------------
-
-
 class TestMetricMergedVolume:
     def test_buckets_by_30d_window(self):
         prs = [
-            _pr(merged_offset_days=5),  # bucket 0
-            _pr(merged_offset_days=29),  # bucket 0
-            _pr(merged_offset_days=45),  # bucket 1
-            _pr(merged_offset_days=80),  # bucket 2
-            _pr(merged_offset_days=120),  # outside window
+            _pr(merged_offset_days=5),
+            _pr(merged_offset_days=29),
+            _pr(merged_offset_days=45),
+            _pr(merged_offset_days=80),
+            _pr(merged_offset_days=120),
         ]
         r = metric_merged_volume(prs, NOW)
         assert "2 / 1 / 1" in r.value
 
     def test_future_dated_merge_skipped(self):
-        # mergedAt 1 day in the future -> negative delta_days -> must skip.
         prs = [_pr(merged_offset_days=-1), _pr(merged_offset_days=5)]
         r = metric_merged_volume(prs, NOW)
         assert r.value.startswith("1 / 0 / 0")
@@ -191,7 +162,6 @@ class TestMetricMergedVolume:
         assert r.note == "nope"
 
     def test_breached_requires_all_three_buckets(self):
-        # Threshold is 50/mo; this fails because only bucket 0 has 50.
         prs = [_pr(merged_offset_days=10) for _ in range(50)]
         r = metric_merged_volume(prs, NOW)
         assert r.breached is False
@@ -199,13 +169,11 @@ class TestMetricMergedVolume:
 
 class TestMetricReviewLatency:
     def test_computes_median_open_to_merge(self):
-        # PR1: 24h open->merge, PR2: 96h open->merge.
         prs = [
-            _pr(merged_offset_days=1, created_offset_days=2),  # 24h
-            _pr(merged_offset_days=1, created_offset_days=5),  # 96h
+            _pr(merged_offset_days=1, created_offset_days=2),
+            _pr(merged_offset_days=1, created_offset_days=5),
         ]
         r = metric_review_latency(prs, NOW)
-        # median = 60h, below 72h threshold
         assert "60.0h" in r.value
         assert r.breached is False
 
@@ -215,7 +183,6 @@ class TestMetricReviewLatency:
         assert r.value == "0 PRs in window"
 
     def test_skips_negative_duration_rows(self):
-        # createdAt after mergedAt is nonsensical; the helper must skip it.
         prs = [_pr(merged_offset_days=2, created_offset_days=1)]
         r = metric_review_latency(prs, NOW)
         assert r.value == "0 PRs in window"
@@ -229,24 +196,18 @@ class TestMetricReviewLatency:
 class TestMetricBacklog:
     def test_counts_only_aged(self):
         prs = [
-            _pr(merged_offset_days=None, created_offset_days=1),  # too new
-            _pr(merged_offset_days=None, created_offset_days=10),  # aged
-            _pr(merged_offset_days=None, created_offset_days=20),  # aged
+            _pr(merged_offset_days=None, created_offset_days=1),
+            _pr(merged_offset_days=None, created_offset_days=10),
+            _pr(merged_offset_days=None, created_offset_days=20),
         ]
-        # createdAt set, mergedAt absent -> open
         r = metric_backlog(prs, NOW)
         assert "2 (of 3 open)" in r.value
-        assert r.breached is False  # threshold is 5
+        assert r.breached is False
 
     def test_breached_at_threshold(self):
         prs = [_pr(merged_offset_days=None, created_offset_days=10) for _ in range(5)]
         r = metric_backlog(prs, NOW)
         assert r.breached is True
-
-
-# ---------------------------------------------------------------------------
-# Extraction triggers
-# ---------------------------------------------------------------------------
 
 
 class TestQ1Size:
@@ -266,14 +227,8 @@ class TestQ2PrVolume:
     def test_future_dated_merge_skipped(self):
         prs = [_pr(merged_offset_days=-1), _pr(merged_offset_days=5)]
         r = _trigger_q2_pr_volume(prs, NOW)
-        # Most recent 30d gets the one valid PR; older buckets stay 0.
         assert r.value.startswith("1 / 0 / 0")
         assert r.breached is False
-
-
-# ---------------------------------------------------------------------------
-# Glyphs
-# ---------------------------------------------------------------------------
 
 
 class TestGlyph:
@@ -287,16 +242,7 @@ class TestGlyph:
         assert _glyph(None) == "?"
 
 
-# ---------------------------------------------------------------------------
-# JSON payload + trend vs prior review
-# ---------------------------------------------------------------------------
-
-
 def _review_doc(rows: list[tuple[int, str, str, str]]) -> str:
-    """Build a minimal review markdown with a `## Metrics` table.
-
-    `rows` are (num, name, value, status) tuples.
-    """
     lines = [
         "# Phase 3 Promotion Metrics",
         "",
@@ -327,8 +273,6 @@ class TestParsePriorMetrics:
     def test_ignores_extraction_table_and_separators(self, tmp_path: Path):
         path = tmp_path / "phase-3-review-2026-04-27.md"
         path.write_text(_review_doc([(1, "Only", "1", "ok")]))
-        # The extraction-trigger table rows have no leading integer and live
-        # under a different ## section -> excluded.
         assert len(parse_prior_metrics(path)) == 1
 
 
@@ -346,12 +290,11 @@ class TestFindPriorReview:
         result = find_prior_review(tmp_path, date(2026, 5, 26))
         assert result is not None
         since, rows = result
-        assert since == "2026-04-27"  # not the future-dated one
+        assert since == "2026-04-27"
         assert rows[0]["value"] == "mid"
 
     def test_none_when_no_earlier_review(self, tmp_path: Path):
         self._seed(tmp_path)
-        # Today before every review -> nothing strictly earlier.
         assert find_prior_review(tmp_path, date(2026, 1, 1)) is None
 
     def test_missing_dir_is_none(self, tmp_path: Path):
@@ -379,9 +322,8 @@ class TestComputeTrend:
         trend = compute_trend(prior, self._results())
         assert trend["since"] == "2026-04-27"
         m1, m2 = trend["metrics"]
-        # Current name is used; prior value paired by position despite name drift.
         assert m1["name"] == "M1" and m1["value_then"] == "then1" and m1["value_now"] == "now1"
-        assert m1["status_changed"] is False  # ok -> ok
+        assert m1["status_changed"] is False
         assert m2["status_then"] == "ok" and m2["status_now"] == "BREACHED"
         assert m2["status_changed"] is True
 
@@ -426,5 +368,5 @@ class TestBuildPayload:
         triggers = [MetricResult("Q1", "1 MB", breached=False, threshold="t")]
         payload = build_payload("o/r", "published-results", results, triggers, now, trend=None)
         assert set(payload) == {"generated_at", "repo", "base_branch", "results", "extraction_triggers", "trend"}
-        assert payload["results"][0]["breached"] is None  # None survives round-trip
+        assert payload["results"][0]["breached"] is None
         assert json.loads(json.dumps(payload))["base_branch"] == "published-results"

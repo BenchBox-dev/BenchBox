@@ -18,6 +18,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Hermetic lane artifact builders and deterministic whole-site assembler (A4 w1, w3).\n"
+    "\n"
+    "Builds immutable, content-addressed lane artifacts for prose, API docs, Explorer,\n"
+    "publisher, and corpus read models, then assembles them into a unified shadow site\n"
+    "tree with strict path ownership.\n"
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -210,7 +218,7 @@ def build_lane_artifact(name: str, src: Path, prefix: str) -> LaneArtifact:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--receipt-path", type=Path, required=True)
     parser.add_argument(

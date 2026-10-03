@@ -1,5 +1,3 @@
-"""Coverage-focused tests for results display and timing modules."""
-
 from __future__ import annotations
 
 import time
@@ -180,12 +178,10 @@ def test_query_timing_and_collector(monkeypatch):
     assert completed[0].parse_time == pytest.approx(200.0 - 101.0)
     assert completed[0].rows_returned == 42
 
-    # detailed timing disabled/missing query paths
     collector_no_detail = TimingCollector(enable_detailed_timing=False)
     with collector_no_detail.time_phase("missing", "parse"):
         pass
 
-    # error path in context manager still records
     with pytest.raises(RuntimeError, match="boom"):
         with collector.time_query("QERR"):
             raise RuntimeError("boom")

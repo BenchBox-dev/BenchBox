@@ -1,20 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""Live PostgreSQL integration tests for query plan capture.
-
-Unlike the mocked unit tests in tests/unit/platforms/test_postgresql_plan_capture.py,
-these exercise real ``EXPLAIN (FORMAT JSON)`` against a live PostgreSQL instance,
-the real PostgreSQLQueryPlanParser, and the real plan fingerprint.
-
-CI-gating: the whole module is skipped unless ``POSTGRESQL_HOST`` is set, so it
-is a graceful no-op locally and in default test runs. A CI job (or
-``make test-docker-up-postgresql`` followed by exporting ``POSTGRESQL_HOST``)
-that provisions a PostgreSQL service can run it by setting the connection
-environment variables below. ``POSTGRESQL_HOST`` is intentionally the single
-gate; the other variables fall back to the BenchBox Docker defaults.
-"""
 
 import os
 
@@ -24,7 +10,7 @@ from benchbox.platforms.postgresql import PostgreSQLAdapter
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.medium,  # required speed marker; module still skips without POSTGRESQL_HOST
+    pytest.mark.medium,
     pytest.mark.skipif(
         not os.environ.get("POSTGRESQL_HOST"),
         reason="live PostgreSQL not available (POSTGRESQL_HOST unset)",

@@ -1,5 +1,3 @@
-"""Coverage tests for lightweight CLI entrypoints."""
-
 from __future__ import annotations
 
 import builtins
@@ -16,11 +14,6 @@ from benchbox.cli.commands.benchmarks import list_benchmarks
 from benchbox.cli.commands.config import validate
 from benchbox.cli.commands.profile import profile
 
-# benchbox.cli.commands.__init__ re-exports `profile` and `benchmarks` (Click
-# Commands) under the same names as their submodules.  On Python 3.10 mock's
-# string-based patch() resolves via getattr(benchbox.cli.commands, "profile"),
-# returning the Command, not the submodule.  Seeding sys.modules here avoids
-# the ambiguity on all Python versions.
 __import__("benchbox.cli.commands.profile")
 _profile_module = _sys.modules["benchbox.cli.commands.profile"]
 __import__("benchbox.cli.commands.benchmarks")

@@ -1,13 +1,6 @@
-"""Canonical Join Order Benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the main benchmark class for the Join Order Benchmark,
-which tests query optimizer join order selection using a complex schema based
-on the canonical IMDb 2013 dataset used by the JOB paper.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,15 +24,6 @@ if TYPE_CHECKING:
 
 
 class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
-    """Canonical Join Order Benchmark implementation.
-
-    The public ``joinorder`` benchmark uses the canonical IMDb 2013 Parquet
-    archive produced by the foundation build. The old synthetic generator is
-    available as the internal ``joinorder_synthetic`` benchmark.
-    """
-
-    # The JOB corpus is PostgreSQL. Stated explicitly (rather than inheriting
-    # the mixin default) so the translation source stays deliberate.
     _source_dialect = "postgres"
 
     data_manifest_path = Path(__file__).with_name("data_manifest.toml")
@@ -55,18 +39,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         force_regenerate: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Join Order benchmark.
-
-        Args:
-            scale_factor: Canonical JoinOrder only supports 1.0.
-            output_dir: Directory for verified Parquet files
-                (defaults to benchmark_runs/datagen/joinorder_sf1)
-            queries_dir: Directory containing Join Order Benchmark query files (optional)
-            verbose: Verbosity level (-v=1, -vv=2; bool True treated as 1)
-            parallel: Number of parallel workers for data generation
-            force_regenerate: Force regeneration even if data exists
-            **kwargs: Additional options (compression settings, etc.) passed to generator
-        """
         if not isinstance(parallel, int) or parallel < 1:
             raise ValueError(f"parallel must be a positive integer, got {parallel}")
         if abs(float(scale_factor) - 1.0) > 1e-9:
@@ -75,7 +47,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
                 "use joinorder_synthetic for scaled synthetic smoke-test data."
             )
 
-        # Extract quiet from kwargs to avoid duplicate parameter
         quiet = kwargs.pop("quiet", False)
 
         super().__init__(
@@ -94,11 +65,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         self._data_manifest = load_manifest(self.data_manifest_path)
 
     def generate_data(self) -> list[Path]:
-        """Ensure the canonical Join Order Benchmark dataset is present.
-
-        Returns:
-            List of verified Parquet data file paths.
-        """
         self.log_verbose("Ensuring canonical JoinOrder IMDb 2013 data is available...")
 
         start_time = mono_time()
@@ -114,14 +80,12 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         return data_files
 
     def _clear_cached_data(self) -> None:
-        """Remove manifest-owned cache files before a forced refresh."""
         for table in self._data_manifest.tables:
             (self.output_dir / table.file).unlink(missing_ok=True)
         archive_name = Path(self._data_manifest.url).name or "joinorder-imdb-2013-v1.tar.zst"
         (self.output_dir / archive_name).unlink(missing_ok=True)
 
     def _fetch_and_verify_data(self) -> Path:
-        """Fetch, extract when needed, and verify canonical table files."""
         try:
             return fetch_data("joinorder", self.data_manifest_path, self.output_dir)
         except ExtractionRequiredError as exc:
@@ -130,7 +94,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
 
     @staticmethod
     def _extract_tar_zst(archive_path: Path, output_dir: Path) -> None:
-        """Extract a zstd-compressed tarball while rejecting unsafe paths."""
         try:
             import zstandard as zstd
         except ImportError as exc:  # pragma: no cover - dependency is required by pyproject
@@ -158,11 +121,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
                             shutil.copyfileobj(extracted, output)
 
     def get_schema(self) -> dict[str, dict]:
-        """Get the Join Order Benchmark schema definitions.
-
-        Returns:
-            Dictionary mapping table names to their schema definitions.
-        """
         return self._schema._tables
 
     def get_create_tables_sql(
@@ -170,24 +128,9 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         dialect: str = "sqlite",
         tuning_config: UnifiedTuningConfiguration | None = None,
     ) -> str:
-        """Get CREATE TABLE statements for all tables.
-
-        Args:
-            dialect: Target SQL dialect
-            tuning_config: Unified tuning configuration (accepted for interface
-                compatibility; join order schema does not currently use it)
-
-        Returns:
-            SQL CREATE TABLE statements
-        """
         return self._schema.get_create_tables_sql(dialect)
 
     def get_table_names(self) -> list[str]:
-        """Get list of all table names.
-
-        Returns:
-            List of table names in the schema
-        """
         return self._schema.get_table_names()
 
     def get_query(
@@ -197,20 +140,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         params: dict[str, Any] | None = None,
         dialect: str | None = None,
     ) -> str:
-        """Get a specific query by ID.
-
-        Args:
-            query_id: Query identifier (e.g., '1a', '2b', etc.)
-            params: Optional parameter values (not supported for JoinOrder)
-            dialect: Target SQL dialect for query translation. If None,
-                returns the canonical query text unchanged.
-
-        Returns:
-            SQL query text, translated to *dialect* when requested
-
-        Raises:
-            ValueError: If params are provided, or if the query ID is unknown
-        """
         if params is not None:
             raise ValueError("JoinOrder queries are static and don't accept parameters")
         query = self._query_manager.get_query(query_id)
@@ -219,105 +148,40 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         return query
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
-        """Get all queries.
-
-        Args:
-            dialect: Target SQL dialect for query translation. If None,
-                returns the canonical queries unchanged.
-
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
         return get_queries_with_translation(self._query_manager, dialect, self.translate_query_text)
-
-    # translate_query_text() is inherited from TranslatableQueryMixin
 
     @property
     def query_manager(self) -> JoinOrderQueryManager:
-        """Public query-manager handle (shared translation contract)."""
         return self._query_manager
 
     def get_all_queries(self) -> dict[str, str]:
-        """Get all available JoinOrder queries (canonical text).
-
-        Returns:
-            A dictionary mapping query identifiers to their SQL text
-        """
         return self._query_manager.get_all_queries()
 
     def get_query_ids(self) -> list[str]:
-        """Get list of all query IDs.
-
-        Returns:
-            List of query IDs
-        """
         return self._query_manager.get_query_ids()
 
     def get_query_count(self) -> int:
-        """Get total number of queries.
-
-        Returns:
-            Number of queries available
-        """
         return self._query_manager.get_query_count()
 
     def get_queries_by_complexity(self) -> dict[str, list[str]]:
-        """Get queries categorized by complexity.
-
-        Returns:
-            Dictionary mapping complexity levels to query IDs
-        """
         return self._query_manager.get_queries_by_complexity()
 
     def get_queries_by_pattern(self) -> dict[str, list[str]]:
-        """Get queries categorized by join pattern.
-
-        Returns:
-            Dictionary mapping join patterns to query IDs
-        """
         return self._query_manager.get_queries_by_pattern()
 
     def load_queries_from_directory(self, queries_dir: str) -> None:
-        """Load queries from original Join Order Benchmark query files.
-
-        Args:
-            queries_dir: Path to directory containing Join Order Benchmark .sql files
-        """
         self._query_manager = JoinOrderQueryManager(queries_dir)
 
     def get_table_info(self, table_name: str) -> dict[str, Any]:
-        """Get information about a specific table.
-
-        Args:
-            table_name: Name of the table
-
-        Returns:
-            Dictionary with table schema information
-        """
         return self._schema.get_table_info(table_name)
 
     def get_relationship_tables(self) -> list[str]:
-        """Get list of relationship/junction tables.
-
-        Returns:
-            List of relationship table names
-        """
         return self._schema.get_relationship_tables()
 
     def get_dimension_tables(self) -> list[str]:
-        """Get list of main dimension tables.
-
-        Returns:
-            List of dimension table names
-        """
         return self._schema.get_dimension_tables()
 
     def get_estimated_data_size(self) -> int:
-        """Get estimated data size in bytes.
-
-        Returns:
-            Estimated total data size in bytes
-        """
         return sum(
             (self.output_dir / table.file).stat().st_size
             for table in self._data_manifest.tables
@@ -325,31 +189,14 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         )
 
     def get_table_row_count(self, table_name: str) -> int:
-        """Get expected row count for a table.
-
-        Args:
-            table_name: Name of the table
-
-        Returns:
-            Expected number of rows at current scale factor
-        """
         try:
             return self._data_manifest.table(table_name).row_count
         except KeyError:
             return 0
 
     def validate_query(self, query_id: str) -> bool:
-        """Validate that a query is syntactically correct.
-
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            True if query is valid, False otherwise
-        """
         try:
             query = self.get_query(query_id)
-            # Basic validation - check for SQL keywords
             query_upper = query.upper()
             required_keywords = ["SELECT", "FROM"]
             return all(keyword in query_upper for keyword in required_keywords)
@@ -357,11 +204,6 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
             return False
 
     def get_benchmark_info(self) -> dict[str, Any]:
-        """Get comprehensive benchmark information.
-
-        Returns:
-            Dictionary with benchmark metadata
-        """
         return {
             "benchmark_name": "Join Order Benchmark",
             "description": "Canonical IMDb 2013 Join Order Benchmark",
@@ -382,35 +224,18 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         }
 
     def get_dataframe_queries(self) -> QueryRegistry:
-        """Get DataFrame query implementations for JoinOrder.
-
-        Returns a registry containing all canonical query IDs.
-
-        Returns:
-            QueryRegistry for canonical JoinOrder DataFrame queries.
-        """
         from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
 
         return get_dataframe_queries()
 
     def get_dataframe_skip_queries(self) -> list[str]:
-        """Return canonical queries unavailable in DataFrame mode."""
         from benchbox.core.joinorder.dataframe_queries import get_untranslated_dataframe_query_ids
 
         return get_untranslated_dataframe_query_ids()
 
     def __repr__(self) -> str:
-        """String representation of the benchmark.
-
-        Returns:
-            String representation
-        """
         return f"JoinOrderBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
 
-
-# ---------------------------------------------------------------------------
-# Register benchmark-specific CLI option specs
-# ---------------------------------------------------------------------------
 
 from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,

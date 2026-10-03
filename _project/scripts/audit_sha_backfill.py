@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Backfill `develop_sha` frontmatter into historical audit Markdown files."""
 
 from __future__ import annotations
 
@@ -16,15 +15,12 @@ CLI_DESCRIPTION = "Backfill `develop_sha` frontmatter into historical audit Mark
 
 @dataclass(frozen=True)
 class Derivation:
-    """Where a backfilled develop SHA came from."""
-
     develop_sha: str
     source: str
     introducing_commit: str
 
 
 def git_lines(args: list[str]) -> list[str]:
-    """Run git and return non-empty stdout lines."""
     result = subprocess.run(
         ["git", *args],
         check=False,
@@ -39,17 +35,14 @@ def git_lines(args: list[str]) -> list[str]:
 
 
 def repo_root() -> Path:
-    """Return the repository root."""
     return Path(run_git(["rev-parse", "--show-toplevel"]))
 
 
 def relative_to_root(path: Path, root: Path) -> str:
-    """Return a POSIX repo-relative path for git commands."""
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
 def is_ancestor(commit: str, target_ref: str) -> bool:
-    """Return whether commit is an ancestor of target_ref."""
     return (
         subprocess.run(
             ["git", "merge-base", "--is-ancestor", commit, target_ref],
@@ -63,12 +56,10 @@ def is_ancestor(commit: str, target_ref: str) -> bool:
 
 
 def first_parent(commit: str) -> str:
-    """Return the first parent of a commit as a full SHA."""
     return run_git(["rev-parse", f"{commit}^1"])
 
 
 def introducing_commit(path: Path, root: Path, target_ref: str) -> tuple[str, str]:
-    """Return `(commit, source)` for the commit that added an audit file."""
     rel_path = relative_to_root(path, root)
 
     head_candidates = git_lines(["log", "--diff-filter=A", "--reverse", "--format=%H", "--", rel_path])
@@ -86,13 +77,11 @@ def introducing_commit(path: Path, root: Path, target_ref: str) -> tuple[str, st
 
 
 def derive_develop_sha(path: Path, root: Path, target_ref: str) -> Derivation:
-    """Derive the develop SHA for one audit file from its introducing commit."""
     commit, source = introducing_commit(path, root, target_ref)
     return Derivation(develop_sha=first_parent(commit), source=source, introducing_commit=commit)
 
 
 def has_develop_sha(path: Path) -> str | None:
-    """Return an existing develop_sha value when the audit is already stamped."""
     frontmatter = parse_frontmatter(path)
     if frontmatter is None:
         return None
@@ -101,7 +90,6 @@ def has_develop_sha(path: Path) -> str | None:
 
 
 def stamp_text(original: str, develop_sha: str, comment: str | None = None) -> str:
-    """Return audit text with a develop_sha frontmatter field inserted."""
     stamp_lines = []
     if comment:
         stamp_lines.append(f"# {comment}\n")
@@ -119,14 +107,12 @@ def stamp_text(original: str, develop_sha: str, comment: str | None = None) -> s
 
 
 def audit_paths(root: Path, paths: list[Path]) -> list[Path]:
-    """Resolve the audit files to backfill."""
     if paths:
         return sorted(path if path.is_absolute() else root / path for path in paths)
     return sorted((root / "_project" / "audits").glob("*.md"))
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI parser."""
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("paths", nargs="*", type=Path, help="Specific audit Markdown files to backfill")
     parser.add_argument(
@@ -139,7 +125,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint."""
     args = build_parser().parse_args(argv)
     root = repo_root()
 

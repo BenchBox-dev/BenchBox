@@ -1,9 +1,6 @@
-"""Tests for enhanced benchmark selection with unified display and filtering.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import patch
 
@@ -19,13 +16,10 @@ pytestmark = [
 
 
 class TestBenchmarkFiltering:
-    """Test benchmark filtering functionality."""
-
     def test_filter_by_category(self):
 
         manager = BenchmarkManager()
 
-        # Filter by TPC category
         tpc_benchmarks = manager._filter_benchmarks(category="TPC")
         assert "tpch" in tpc_benchmarks
         assert "tpcds" in tpc_benchmarks
@@ -37,7 +31,6 @@ class TestBenchmarkFiltering:
 
         manager = BenchmarkManager()
 
-        # Search for "TPC"
         tpc_results = manager._filter_benchmarks(search_term="TPC")
         assert "tpch" in tpc_results
         assert "tpcds" in tpc_results
@@ -47,7 +40,6 @@ class TestBenchmarkFiltering:
 
         manager = BenchmarkManager()
 
-        # Search for "decision"
         decision_results = manager._filter_benchmarks(search_term="decision")
         assert "tpch" in decision_results
         assert "tpcds" in decision_results
@@ -56,7 +48,6 @@ class TestBenchmarkFiltering:
 
         manager = BenchmarkManager()
 
-        # Test case insensitive
         lower_results = manager._filter_benchmarks(search_term="tpc")
         upper_results = manager._filter_benchmarks(search_term="TPC")
         mixed_results = manager._filter_benchmarks(search_term="TpC")
@@ -67,17 +58,15 @@ class TestBenchmarkFiltering:
 
         manager = BenchmarkManager()
 
-        # Filter by Industry category and search for "click"
         results = manager._filter_benchmarks(category="Industry", search_term="click")
         assert "clickbench" in results
-        assert "tpch" not in results  # Not in Industry category
-        assert "ssb" not in results  # Doesn't contain "click"
+        assert "tpch" not in results
+        assert "ssb" not in results
 
     def test_filter_no_results(self):
 
         manager = BenchmarkManager()
 
-        # Search for non-existent term
         results = manager._filter_benchmarks(search_term="nonexistent")
         assert len(results) == 0
 
@@ -91,7 +80,6 @@ class TestBenchmarkFiltering:
         assert "joinorder_synthetic" not in results
 
     def test_filter_academic_excludes_internal_benchmarks(self):
-        """Academic filtering should hide internal synthetic compatibility surfaces."""
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks(category="Academic")
@@ -102,10 +90,7 @@ class TestBenchmarkFiltering:
 
 
 class TestBenchmarkDisplay:
-    """Test unified benchmark display functionality."""
-
     def test_list_available_benchmarks_prints_tree(self):
-        """list_available_benchmarks should render the benchmark tree."""
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console") as mock_console:
@@ -117,15 +102,12 @@ class TestBenchmarkDisplay:
 
         manager = BenchmarkManager()
 
-        # Capture display output
         with patch("benchbox.cli.benchmarks.console"):
             displayed = manager._display_all_benchmarks()
 
-        # Should return all public benchmarks
         assert len(displayed) == len(manager._get_public_benchmarks())
         assert "joinorder_synthetic" not in displayed
 
-        # Check structure of returned data
         for bench_id, bench_info in displayed.items():
             assert "display_name" in bench_info
             assert "category" in bench_info
@@ -140,7 +122,6 @@ class TestBenchmarkDisplay:
         with patch("benchbox.cli.benchmarks.console"):
             displayed = manager._display_all_benchmarks(filter_category="TPC")
 
-        # Should only return TPC benchmarks
         assert "tpch" in displayed
         assert "tpcds" in displayed
         assert "clickbench" not in displayed
@@ -152,8 +133,6 @@ class TestBenchmarkDisplay:
         with patch("benchbox.cli.benchmarks.console"):
             displayed = manager._display_all_benchmarks(search_term="Decision")
 
-        # Should return benchmarks matching "Decision"
-        # (TPC-H and TPC-DS have "Decision Support" in description)
         assert len(displayed) > 0
 
     def test_display_empty_results(self):
@@ -163,16 +142,12 @@ class TestBenchmarkDisplay:
         with patch("benchbox.cli.benchmarks.console") as mock_console:
             displayed = manager._display_all_benchmarks(search_term="xyz123nonexistent")
 
-        # Should return empty dict
         assert len(displayed) == 0
 
-        # Should print warning message
         assert any("No benchmarks match" in str(call) for call in mock_console.print.call_args_list)
 
 
 class TestBenchmarkPreview:
-    """Test benchmark preview functionality."""
-
     def test_show_benchmark_preview(self):
 
         manager = BenchmarkManager()
@@ -180,9 +155,7 @@ class TestBenchmarkPreview:
         with patch("benchbox.cli.benchmarks.console") as mock_console:
             manager._show_benchmark_preview("tpch", manager.benchmarks["tpch"])
 
-        # Should have printed a panel with preview info
         assert mock_console.print.called
-        # The print call should have received a Panel object
         assert len(mock_console.print.call_args_list) > 0
 
     def test_preview_includes_key_info(self):
@@ -192,16 +165,13 @@ class TestBenchmarkPreview:
         with patch("benchbox.cli.benchmarks.console") as mock_console:
             manager._show_benchmark_preview("tpcds", manager.benchmarks["tpcds"])
 
-        # Should have called print with a Panel
         assert mock_console.print.called
-        # Verify that a Panel was passed (it's a rich Panel object)
         from rich.panel import Panel
 
         panel_arg = mock_console.print.call_args[0][0]
         assert isinstance(panel_arg, Panel)
 
     def test_show_sample_queries_renders_loaded_queries(self):
-        """Sample query preview should render heading and SQL snippets."""
         manager = BenchmarkManager()
         seen_scale = None
 
@@ -227,7 +197,6 @@ class TestBenchmarkPreview:
         assert seen_scale == manager.benchmarks["joinorder"]["default_scale"]
 
     def test_show_sample_queries_without_queries_warns(self):
-        """Benchmarks without a queries mapping should emit a warning."""
         manager = BenchmarkManager()
 
         class StubBenchmark:
@@ -244,7 +213,6 @@ class TestBenchmarkPreview:
         assert any("No queries available for preview" in str(call) for call in mock_console.print.call_args_list)
 
     def test_show_sample_queries_load_failure_warns(self):
-        """Benchmark loading failures should be surfaced as a warning."""
         manager = BenchmarkManager()
 
         with (
@@ -257,17 +225,13 @@ class TestBenchmarkPreview:
 
 
 class TestBenchmarkSelectionIntegration:
-    """Integration tests for the complete selection flow."""
-
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_direct_numeric(self, mock_prompt):
 
         manager = BenchmarkManager()
 
-        # Mock user selecting option 1
         mock_prompt.ask.return_value = "1"
 
-        # Mock the configuration prompts
         with patch.object(manager, "_configure_benchmark") as mock_config:
             mock_config.return_value = BenchmarkConfig(
                 name="tpch",
@@ -280,7 +244,6 @@ class TestBenchmarkSelectionIntegration:
 
             result = manager.select_benchmark()
 
-        # Should return a configured benchmark
         assert isinstance(result, BenchmarkConfig)
         assert result.name in manager.benchmarks
 
@@ -289,7 +252,6 @@ class TestBenchmarkSelectionIntegration:
 
         manager = BenchmarkManager()
 
-        # Mock user interactions: '1' for TPC category, '1' for TPC-H (first in TPC)
         mock_prompt.ask.side_effect = ["1", "1"]
 
         with patch.object(manager, "_configure_benchmark") as mock_config:
@@ -309,10 +271,8 @@ class TestBenchmarkSelectionIntegration:
 
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_two_phase_primitives_category(self, mock_prompt):
-        """Test selecting from Primitives category (second in order)."""
         manager = BenchmarkManager()
 
-        # Mock: '2' for Primitives, '1' for Read Primitives (first in Primitives)
         mock_prompt.ask.side_effect = ["2", "1"]
 
         with patch.object(manager, "_configure_benchmark") as mock_config:
@@ -332,10 +292,8 @@ class TestBenchmarkSelectionIntegration:
 
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_two_phase_industry_category(self, mock_prompt):
-        """Test selecting from Industry category (third in order)."""
         manager = BenchmarkManager()
 
-        # Mock: '3' for Industry, '1' for ClickBench (first in Industry)
         mock_prompt.ask.side_effect = ["3", "1"]
 
         with patch.object(manager, "_configure_benchmark") as mock_config:
@@ -355,10 +313,8 @@ class TestBenchmarkSelectionIntegration:
 
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_two_phase_experimental_category(self, mock_prompt):
-        """Test selecting from Experimental category (last in order)."""
         manager = BenchmarkManager()
 
-        # Mock: '7' for Experimental, '1' for TPC-H Skew (first in Experimental)
         mock_prompt.ask.side_effect = ["7", "1"]
 
         with patch.object(manager, "_configure_benchmark") as mock_config:
@@ -378,33 +334,25 @@ class TestBenchmarkSelectionIntegration:
 
 
 class TestBenchmarkSelectionEdgeCases:
-    """Test edge cases in benchmark selection."""
-
     def test_filter_with_empty_string(self):
 
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks(search_term="")
-        # Empty string should return all public benchmarks.
         assert len(results) == len(manager._get_public_benchmarks())
 
     def test_filter_with_whitespace(self):
 
         manager = BenchmarkManager()
 
-        # Whitespace search should be treated as empty and return all
         results = manager._filter_benchmarks(search_term="   ")
-        # Since the filter does not strip whitespace, this will match benchmarks
-        # that contain spaces, which is all of them (they have spaces in descriptions)
         assert isinstance(results, dict)
 
     def test_filter_with_special_characters(self):
 
         manager = BenchmarkManager()
 
-        # Should not crash with special regex characters
         results = manager._filter_benchmarks(search_term="[]*?")
-        # May return 0 or more results, but should not crash
         assert isinstance(results, dict)
 
     def test_display_single_benchmark_after_filter(self):
@@ -412,22 +360,16 @@ class TestBenchmarkSelectionEdgeCases:
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console"):
-            # Filter to a very specific benchmark
             displayed = manager._display_all_benchmarks(search_term="clickbench")
 
-        # Should display at least ClickBench
         assert "clickbench" in displayed
 
 
 class TestBackwardsCompatibility:
-    """Test that old methods still work for backwards compatibility."""
-
     def test_old_display_benchmark_categories_still_works(self):
-        """Test that old category display method still works."""
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console"):
-            # Should not raise exception
             manager._display_benchmark_categories()
 
     def test_old_select_category_still_works(self):
@@ -458,8 +400,6 @@ class TestBackwardsCompatibility:
 
 
 class TestTwoPhaseSelectionFlow:
-    """Test the new two-phase Category > Benchmark selection flow."""
-
     def test_category_order_is_popularity_based(self):
 
         manager = BenchmarkManager()
@@ -480,15 +420,12 @@ class TestTwoPhaseSelectionFlow:
 
         manager = BenchmarkManager()
 
-        # Get all categories from benchmarks
         actual_categories = {info["category"] for info in manager.benchmarks.values()}
 
-        # All categories should have a benchmark order defined
         for category in actual_categories:
             assert category in manager.BENCHMARK_ORDER, f"Missing BENCHMARK_ORDER for {category}"
 
     def test_tpc_benchmark_order(self):
-        """Test that TPC benchmarks are ordered by popularity (H > DS > DI)."""
         manager = BenchmarkManager()
 
         tpc_order = manager.BENCHMARK_ORDER["TPC"]
@@ -512,33 +449,30 @@ class TestTwoPhaseSelectionFlow:
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
-            mock_prompt.ask.return_value = "1"  # TPC is first
+            mock_prompt.ask.return_value = "1"
 
             result = manager._prompt_category_selection()
 
         assert result == "TPC"
 
     def test_prompt_category_selection_academic(self):
-        """Test selecting Academic category (4th in order)."""
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
-            mock_prompt.ask.return_value = "4"  # Academic is 4th
+            mock_prompt.ask.return_value = "4"
 
             result = manager._prompt_category_selection()
 
         assert result == "Academic"
 
     def test_prompt_benchmark_in_category_returns_tuple(self):
-        """Test that _prompt_benchmark_in_category returns (id, info) tuple."""
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
-            mock_prompt.ask.return_value = "1"  # First benchmark
+            mock_prompt.ask.return_value = "1"
 
             bench_id, bench_info = manager._prompt_benchmark_in_category("TPC")
 
-        # Should return TPC-H (first in TPC popularity order)
         assert bench_id == "tpch"
         assert bench_info["display_name"] == "TPC-H"
 
@@ -547,11 +481,10 @@ class TestTwoPhaseSelectionFlow:
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
-            mock_prompt.ask.return_value = "2"  # Second benchmark
+            mock_prompt.ask.return_value = "2"
 
             bench_id, bench_info = manager._prompt_benchmark_in_category("TPC")
 
-        # Should return TPC-DS (second in TPC popularity order)
         assert bench_id == "tpcds"
         assert bench_info["display_name"] == "TPC-DS"
 
@@ -559,7 +492,6 @@ class TestTwoPhaseSelectionFlow:
 
         manager = BenchmarkManager()
 
-        # Get sorted benchmarks for a category
         category = "Industry"
         category_benchmarks = {
             bench_id: info for bench_id, info in manager.benchmarks.items() if info["category"] == category
@@ -577,9 +509,6 @@ class TestTwoPhaseSelectionFlow:
 
         sorted_benchmarks = sorted(category_benchmarks.items(), key=sort_key)
 
-        # First should be clickbench (first in popularity order)
         assert sorted_benchmarks[0][0] == "clickbench"
-        # Second should be h2odb
         assert sorted_benchmarks[1][0] == "h2odb"
-        # Third should be coffeeshop
         assert sorted_benchmarks[2][0] == "coffeeshop"

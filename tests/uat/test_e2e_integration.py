@@ -1,16 +1,3 @@
-"""End-to-end integration test: execute → orchestrator → report wiring.
-
-Distinct from test_replay_2026_05_02.py, which runs with `dry_run=True`
-(short-circuits every phase). This test drives a real, non-trivial fake
-matrix through the orchestrator with a stubbed cell runner and asserts
-that:
-
-- Topological reordering moves source benchmarks ahead of consumers.
-- Cleanup prunes a source DB at the moment its last consumer completes.
-- The cells.jsonl emitted by execute round-trips into the report TSV.
-- Validator-clean status flows through to cross_scale_clean_pair_count.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,7 +14,6 @@ pytestmark = pytest.mark.fast
 
 
 def _runner_factory(invocations: list[tuple[str, str, float]]):
-    """Build a stubbed cell runner that records (platform, benchmark, scale)."""
 
     def fake(platform, benchmark, scale, **kwargs):
         invocations.append((platform, benchmark, scale))
@@ -49,21 +35,12 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
     tmp_path: Path,
     monkeypatch,
 ):
-    """Drive (duckdb, sqlite) × (tpch, read_primitives, write_primitives) through the orchestrator.
-
-    Asserts:
-      - tpch runs before read_primitives and write_primitives on each platform.
-      - tpch DB pruned after both consumers complete (per platform).
-      - cells.jsonl contains every cell that ran.
-      - matrix_summary.tsv has the right row count and pass count.
-    """
 
     cfg = validate_config(
         {
             "name": "e2e",
             "phases": ["execute", "report"],
             "platforms": {"include": ["duckdb", "sqlite"]},
-            # Deliberately put consumers ahead of source — topology must reorder.
             "benchmarks": {"include": ["read_primitives", "write_primitives", "tpch"]},
             "scales": {"rungs": [0.01]},
             "execute": {"skip_unreachable": False},
@@ -125,7 +102,6 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
 
 
 def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypatch):
-    """A failed validator status should disqualify the cell from cross_scale_clean_pair_count."""
 
     cfg = validate_config(
         {

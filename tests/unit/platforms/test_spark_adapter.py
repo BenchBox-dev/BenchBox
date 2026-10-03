@@ -1,5 +1,3 @@
-"""Unit tests for Apache Spark platform adapter."""
-
 from __future__ import annotations
 
 import argparse
@@ -20,16 +18,6 @@ pytestmark = [
 
 @contextlib.contextmanager
 def _mock_sys_modules(replacements):
-    """Temporarily replace entries in ``sys.modules`` without evicting the rest.
-
-    Unlike ``patch.dict("sys.modules", ...)`` — which snapshots the ENTIRE
-    dict on entry and restores the snapshot on exit, evicting every module
-    imported inside the block — this only touches the named keys. Eviction is
-    fatal for native extension modules that cannot re-initialize in-process:
-    re-importing datafusion after eviction panics with ``SetLoggerError``
-    (pyo3-log), which broke every test running after this file's mock
-    fixtures in the same pytest process.
-    """
     saved = {key: sys.modules[key] for key in replacements if key in sys.modules}
     sys.modules.update(replacements)
     try:
@@ -41,8 +29,6 @@ def _mock_sys_modules(replacements):
 
 
 class TestMockSysModules:
-    """Pin _mock_sys_modules semantics: only named keys are touched."""
-
     def test_only_named_keys_restored(self):
         sentinel = object()
         sys.modules["_spark_test_sentinel_present"] = sentinel
@@ -50,7 +36,6 @@ class TestMockSysModules:
             with _mock_sys_modules({"_spark_test_sentinel_present": "mock", "_spark_test_sentinel_absent": "mock"}):
                 assert sys.modules["_spark_test_sentinel_present"] == "mock"
                 assert sys.modules["_spark_test_sentinel_absent"] == "mock"
-                # Modules imported inside the block must survive teardown.
                 sys.modules["_spark_test_imported_inside"] = object()
             assert sys.modules["_spark_test_sentinel_present"] is sentinel
             assert "_spark_test_sentinel_absent" not in sys.modules
@@ -60,22 +45,6 @@ class TestMockSysModules:
             sys.modules.pop("_spark_test_imported_inside", None)
 
     def test_native_modules_survive_mock_block(self):
-        """Modules imported under the mock must still import afterwards.
-
-        Regression test: patch.dict("sys.modules", ...) evicted everything
-        imported inside the block, so a later datafusion import panicked with
-        SetLoggerError (pyo3-log). Importing here, then re-importing after
-        teardown, must be a no-op.
-
-        This only exercises the real eviction path when datafusion is not
-        already resident: under `-n auto`, an earlier test on the same worker
-        (e.g. anything touching the platform registry) may have imported it,
-        reducing the in-block import to a sys.modules cache hit that passes
-        under any implementation. Skip loudly in that case instead of
-        silently passing vacuous; the deterministic eviction semantics are
-        pinned by test_only_named_keys_restored, which does not depend on
-        ambient import state.
-        """
         if "datafusion" in sys.modules:
             pytest.skip("datafusion already imported on this worker; eviction path not exercisable")
         pytest.importorskip("datafusion")
@@ -89,11 +58,8 @@ class TestMockSysModules:
 
 
 class TestSparkAdapter:
-    """Tests for SparkAdapter class."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module."""
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.master.return_value = mock_builder
@@ -145,9 +111,6 @@ class TestSparkAdapter:
             ):
                 yield mock_session_class, mock_spark_session
         finally:
-            # The adapter imports SparkSession at module import time. Evict the
-            # module loaded against the mocked Spark package before the next
-            # test so it cannot leak a MagicMock into a real Spark import.
             for key in list(sys.modules):
                 if key == spark_module_prefix or key.startswith(f"{spark_module_prefix}."):
                     sys.modules.pop(key, None)
@@ -160,7 +123,6 @@ class TestSparkAdapter:
                     platforms_package.spark = package_spark_before
 
     def test_initialization_success(self, mock_pyspark):
-        """Test successful adapter initialization."""
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -181,7 +143,6 @@ class TestSparkAdapter:
         assert adapter.executor_memory == "8g"
 
     def test_initialization_with_defaults(self, mock_pyspark):
-        """Test initialization with default values."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -197,7 +158,6 @@ class TestSparkAdapter:
         assert adapter.table_format == "parquet"
 
     def test_initialization_with_cluster_mode(self, mock_pyspark):
-        """Test initialization with cluster master URL."""
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -213,7 +173,6 @@ class TestSparkAdapter:
         assert adapter.num_executors == 10
 
     def test_initialization_with_kubernetes(self, mock_pyspark):
-        """Test initialization with Kubernetes master."""
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -226,14 +185,12 @@ class TestSparkAdapter:
         assert adapter.master == "k8s://https://k8s-master:6443"
 
     def test_get_target_dialect(self, mock_pyspark):
-        """Test that target dialect returns spark."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
         assert adapter.get_target_dialect() == "spark"
 
     def test_platform_info(self, mock_pyspark):
-        """Test platform info collection."""
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -257,7 +214,6 @@ class TestSparkAdapter:
         assert info["configuration"]["executor_cores"] == 4
 
     def test_platform_info_cluster_mode(self, mock_pyspark):
-        """Test platform info in cluster mode."""
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -270,7 +226,6 @@ class TestSparkAdapter:
         assert info["connection_mode"] == "cluster"
 
     def test_from_config(self, mock_pyspark):
-        """Test adapter creation from config."""
         from benchbox.cli.platform_hooks import PlatformHookRegistry
         from benchbox.core.platform_config import get_platform_config
         from benchbox.platforms.spark import SparkAdapter
@@ -285,7 +240,6 @@ class TestSparkAdapter:
         adapter = SparkAdapter.from_config(config)
 
         assert adapter.driver_memory == "8g"
-        # Database name should be auto-generated
         assert "tpch" in adapter.database.lower() or "benchmark" in adapter.database.lower()
 
         joinorder_adapter = SparkAdapter.from_config(
@@ -331,7 +285,6 @@ class TestSparkAdapter:
         assert explicit_spark_conf_adapter._get_spark_conf()["spark.sql.autoBroadcastJoinThreshold"] == "2097152"
 
     def test_supports_tuning_type(self, mock_pyspark):
-        """Test tuning type support."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -343,11 +296,9 @@ class TestSparkAdapter:
             assert adapter.supports_tuning_type(TuningType.SORTING) is True
             assert adapter.supports_tuning_type(TuningType.CLUSTERING) is False
         except ImportError:
-            # TuningType may not be available in all test environments
             pass
 
     def test_get_spark_conf(self, mock_pyspark):
-        """Test Spark configuration generation."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter(
@@ -367,12 +318,10 @@ class TestSparkAdapter:
         assert conf["spark.executor.cores"] == "4"
         assert conf["spark.sql.shuffle.partitions"] == "500"
         assert conf["spark.sql.adaptive.enabled"] == "true"
-        # zstd codec must be registered in Hadoop for auto-detection from .zst extension
         codecs = conf["spark.hadoop.io.compression.codecs"]
         assert "ZStandardCodec" in codecs
 
     def test_csv_compression_codecs_excludes_zstd(self, mock_pyspark):
-        """Spark 4's CSV reader doesn't support zstd; it relies on Hadoop auto-detection."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -380,7 +329,6 @@ class TestSparkAdapter:
         assert isinstance(adapter._csv_compression_codecs, frozenset)
 
     def test_get_spark_conf_delta_lake(self, mock_pyspark):
-        """Test Spark configuration for Delta Lake."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter(table_format="delta")
@@ -391,7 +339,6 @@ class TestSparkAdapter:
         assert "delta" in conf["spark.sql.extensions"].lower()
 
     def test_get_spark_conf_iceberg(self, mock_pyspark):
-        """Test Spark configuration for Iceberg."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter(table_format="iceberg")
@@ -402,7 +349,6 @@ class TestSparkAdapter:
         assert "iceberg" in conf["spark.sql.extensions"].lower()
 
     def test_normalize_table_name(self, mock_pyspark):
-        """Test table name normalization (delegates to shared helper)."""
         from benchbox.platforms._spark_helpers import normalize_spark_table_name_in_sql
 
         sql = 'CREATE TABLE "CUSTOMER" (id INT)'
@@ -411,7 +357,6 @@ class TestSparkAdapter:
         assert "customer" in normalized.lower()
 
     def test_optimize_table_definition_parquet(self, mock_pyspark):
-        """V1 (parquet) DDL gets constraint stripping + SMALLINT upcasting."""
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
@@ -422,7 +367,6 @@ class TestSparkAdapter:
         assert "USING PARQUET" in optimized.upper()
 
     def test_optimize_table_definition_delta(self, mock_pyspark):
-        """V2 (delta) DDL preserves constraints and SMALLINT (caller passes False)."""
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
@@ -433,7 +377,6 @@ class TestSparkAdapter:
         assert "USING DELTA" in optimized.upper()
 
     def test_optimize_table_definition_orc(self, mock_pyspark):
-        """ORC behaves like parquet (V1 datasource)."""
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
@@ -444,15 +387,12 @@ class TestSparkAdapter:
         assert "USING ORC" in optimized.upper()
 
     def test_validate_identifier(self, mock_pyspark):
-        """Test SQL identifier validation (delegates to shared helper)."""
         from benchbox.platforms._spark_helpers import validate_spark_identifier
 
-        # Valid identifiers
         assert validate_spark_identifier("my_table") is True
         assert validate_spark_identifier("_private") is True
         assert validate_spark_identifier("Table123") is True
 
-        # Invalid identifiers
         assert validate_spark_identifier("") is False
         assert validate_spark_identifier("123table") is False
         assert validate_spark_identifier("table-name") is False
@@ -460,11 +400,8 @@ class TestSparkAdapter:
 
 
 class TestSparkAdapterExecution:
-    """Tests for Spark query execution and connection lifecycle."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module."""
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.master.return_value = mock_builder
@@ -498,12 +435,10 @@ class TestSparkAdapterExecution:
             yield mock_session_class, mock_spark_session
 
     def test_execute_query_success(self, mock_pyspark):
-        """Test successful query execution."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
 
-        # Mock DataFrame result
         mock_df = MagicMock()
         mock_df.collect.return_value = [(1, "test"), (2, "test2")]
         mock_df.count.return_value = 2
@@ -518,7 +453,6 @@ class TestSparkAdapterExecution:
         assert result["rows_returned"] == 2
 
     def test_execute_query_failure(self, mock_pyspark):
-        """Test query execution failure."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -533,7 +467,6 @@ class TestSparkAdapterExecution:
         assert "Query failed" in result.get("error", "")
 
     def test_close_connection(self, mock_pyspark):
-        """Test connection (SparkSession) closing."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -544,22 +477,18 @@ class TestSparkAdapterExecution:
         mock_spark_session.stop.assert_called_once()
 
     def test_close_connection_handles_none(self, mock_pyspark):
-        """Test connection closing handles None gracefully."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
 
-        # Should not raise
         adapter.close_connection(None)
 
     def test_validate_data_integrity_uses_spark_sql(self, mock_pyspark):
-        """Test that validation uses spark.sql() instead of cursor API."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
         adapter = SparkAdapter()
 
-        # spark.sql().collect() should succeed for accessible tables
         mock_df = MagicMock()
         mock_spark_session.sql.return_value = mock_df
 
@@ -571,13 +500,11 @@ class TestSparkAdapterExecution:
         assert mock_spark_session.sql.call_count == 2
 
     def test_validate_data_integrity_detects_inaccessible(self, mock_pyspark):
-        """Test that inaccessible tables are detected via spark.sql()."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
         adapter = SparkAdapter()
 
-        # Make spark.sql() raise for one table
         def side_effect(query):
             if "bad_table" in query:
                 raise Exception("Table not found")
@@ -592,35 +519,29 @@ class TestSparkAdapterExecution:
         assert "bad_table" in details["inaccessible_tables"]
 
     def test_create_schema_removes_orphaned_location(self, mock_pyspark, tmp_path):
-        """Test that LOCATION_ALREADY_EXISTS triggers orphaned directory removal."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
         adapter = SparkAdapter()
 
-        # Create an orphaned table directory
         db_dir = tmp_path / "test_db.db"
         table_dir = db_dir / "date_dim"
         table_dir.mkdir(parents=True)
         (table_dir / "part-00000.parquet").touch()
 
-        # Configure mock spark session
         mock_spark_session.conf.get.return_value = str(tmp_path)
         mock_spark_session.catalog.currentDatabase.return_value = "test_db"
 
         adapter._remove_orphaned_table_location(mock_spark_session, "date_dim")
 
-        # The orphaned directory should be removed
         assert not table_dir.exists()
 
     def test_remove_orphaned_location_qualified_name(self, mock_pyspark, tmp_path):
-        """Test that qualified table names (catalog.db.table) are handled correctly."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
         adapter = SparkAdapter()
 
-        # Create an orphaned table directory
         db_dir = tmp_path / "test_db.db"
         table_dir = db_dir / "date_dim"
         table_dir.mkdir(parents=True)
@@ -628,18 +549,15 @@ class TestSparkAdapterExecution:
         mock_spark_session.conf.get.return_value = str(tmp_path)
         mock_spark_session.catalog.currentDatabase.return_value = "test_db"
 
-        # Qualified name with backticks - should strip to leaf "date_dim"
         adapter._remove_orphaned_table_location(mock_spark_session, "`spark_catalog`.`test_db`.`date_dim`")
         assert not table_dir.exists()
 
     def test_remove_orphaned_location_rejects_path_traversal(self, mock_pyspark, tmp_path):
-        """Test that path traversal in table name is rejected."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
         adapter = SparkAdapter()
 
-        # Create a directory outside the warehouse that should NOT be removed
         outside_dir = tmp_path / "outside"
         outside_dir.mkdir()
 
@@ -649,12 +567,10 @@ class TestSparkAdapterExecution:
         mock_spark_session.conf.get.return_value = str(warehouse)
         mock_spark_session.catalog.currentDatabase.return_value = "test_db"
 
-        # Attempt traversal - should be refused
         adapter._remove_orphaned_table_location(mock_spark_session, "../../outside")
         assert outside_dir.exists()
 
     def test_remove_orphaned_location_rejects_root_table_name(self, mock_pyspark, tmp_path):
-        """Test that table_name='/' does not escape the warehouse."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -666,13 +582,10 @@ class TestSparkAdapterExecution:
         mock_spark_session.conf.get.return_value = str(warehouse)
         mock_spark_session.catalog.currentDatabase.return_value = "test_db"
 
-        # "/" as table name resolves to root - must be refused
         adapter._remove_orphaned_table_location(mock_spark_session, "/")
-        # Warehouse itself must still exist
         assert warehouse.exists()
 
     def test_generate_tuning_clause_partitioning(self, mock_pyspark):
-        """Test tuning clause generation with partitioning."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -697,7 +610,6 @@ class TestSparkAdapterExecution:
             assert "date_col" in clause
 
     def test_generate_tuning_clause_sorting(self, mock_pyspark):
-        """Test tuning clause generation with sorting (clustering)."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -716,11 +628,9 @@ class TestSparkAdapterExecution:
             mock_tuning.get_columns_by_type.side_effect = lambda t: [mock_col] if t == mock_tuning_type.SORTING else []
 
             clause = adapter.generate_tuning_clause(mock_tuning)
-            # Spark uses CLUSTERED BY for sorting
             assert "CLUSTERED BY" in clause or "SORTED BY" in clause or clause == ""
 
     def test_generate_tuning_clause_empty(self, mock_pyspark):
-        """Test tuning clause generation with no tuning."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -732,14 +642,12 @@ class TestSparkAdapterExecution:
         assert clause == ""
 
     def test_configure_for_benchmark_olap(self, mock_pyspark):
-        """Test OLAP benchmark configuration."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
 
         adapter = SparkAdapter()
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_spark_session, "olap")
 
         mock_spark_session.conf.set.reset_mock()
@@ -750,7 +658,6 @@ class TestSparkAdapterExecution:
         mock_spark_session.conf.set.assert_any_call("spark.sql.cbo.joinReorder.enabled", "true")
 
     def test_get_query_plan(self, mock_pyspark):
-        """Test query plan retrieval."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -761,38 +668,31 @@ class TestSparkAdapterExecution:
 
         adapter = SparkAdapter()
 
-        # The method may use different approach, just verify it doesn't crash
         try:
             plan = adapter.get_query_plan(mock_spark_session, "SELECT * FROM test")
             assert isinstance(plan, str)
         except (AttributeError, NotImplementedError):
-            # Method may not be fully implemented
             pass
 
     def test_analyze_table(self, mock_pyspark):
-        """Test table analysis for query optimization."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
 
         adapter = SparkAdapter(database="test_db")
 
-        # Should not raise
         adapter.analyze_table(mock_spark_session, "orders")
 
-        # Should have called sql with ANALYZE TABLE
         calls = [str(c) for c in mock_spark_session.sql.call_args_list]
         assert any("ANALYZE" in c.upper() for c in calls) or len(calls) >= 0
 
     def test_extract_table_name(self, mock_pyspark):
-        """Test extracting table name from CREATE TABLE (shared helper)."""
         from benchbox.platforms._spark_helpers import extract_spark_table_name
 
         assert extract_spark_table_name("CREATE TABLE orders (id INT)") == "orders"
         assert extract_spark_table_name("CREATE TABLE IF NOT EXISTS lineitem (id INT)") == "lineitem"
 
     def test_get_existing_tables(self, mock_pyspark):
-        """Test getting list of existing tables."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -806,7 +706,6 @@ class TestSparkAdapterExecution:
 
         adapter = SparkAdapter(database="test_db")
 
-        # May need to handle different implementations
         try:
             tables = adapter._get_existing_tables(mock_spark_session)
             assert isinstance(tables, list)
@@ -814,7 +713,6 @@ class TestSparkAdapterExecution:
             pass
 
     def test_execute_query_calls_spark_sql_with_exact_query(self, mock_pyspark):
-        """spark_session.sql() must receive the exact query string passed to execute_query."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -832,7 +730,6 @@ class TestSparkAdapterExecution:
         )
 
     def test_optimize_table_definition_has_exactly_one_using_clause(self, mock_pyspark):
-        """Helper must add exactly one USING clause across V1 and V2 paths, never two."""
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         for fmt in ("parquet", "delta", "iceberg", "orc"):
@@ -848,7 +745,6 @@ class TestSparkAdapterExecution:
             assert using_count == 1, f"Expected exactly 1 USING for format={fmt!r}, got {using_count}: {result}"
 
     def test_analyze_table_sends_analyze_sql_to_spark(self, mock_pyspark):
-        """analyze_table must call spark.sql with an ANALYZE TABLE statement."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -861,13 +757,7 @@ class TestSparkAdapterExecution:
 
 
 class TestSparkAdapterImportError:
-    """Tests for import error handling when pyspark is not installed."""
-
     def test_missing_dependencies(self):
-        """Test that missing dependencies raise ImportError."""
-        # A None entry in sys.modules makes `import pyspark` raise ImportError.
-        # _mock_sys_modules restores only these keys (unlike patch.dict on the
-        # whole dict, which would evict every module imported inside the block).
         with _mock_sys_modules({"pyspark": None, "pyspark.sql": None}):
             with pytest.raises(ImportError):
                 importlib.import_module("pyspark")
@@ -876,24 +766,19 @@ class TestSparkAdapterImportError:
 
 
 class TestSparkAdapterRegistration:
-    """Tests for platform registration."""
-
     def test_spark_in_platform_list(self):
-        """Test that Spark is listed in available platforms."""
         from benchbox.platforms import list_available_platforms
 
         platforms = list_available_platforms()
         assert "spark" in platforms
 
     def test_spark_requirements(self):
-        """Test that Spark requirements are correct."""
         from benchbox.platforms import get_platform_requirements
 
         requirements = get_platform_requirements("spark")
         assert "pyspark" in requirements
 
     def test_spark_dependency_group(self):
-        """Test that Spark dependency group is defined."""
         from benchbox.utils.dependencies import DEPENDENCY_GROUPS
 
         assert "spark" in DEPENDENCY_GROUPS
@@ -902,11 +787,8 @@ class TestSparkAdapterRegistration:
 
 
 class TestSparkAdapterCliArguments:
-    """Tests for CLI argument registration."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module."""
         mock_spark_session = MagicMock()
         mock_session_class = MagicMock()
         mock_session_class.builder = MagicMock()
@@ -930,7 +812,6 @@ class TestSparkAdapterCliArguments:
             yield mock_session_class, mock_spark_session
 
     def test_add_cli_arguments_registers_expected_flags(self, mock_pyspark):
-        """Test add_cli_arguments registers expected flags on parser."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_parser = MagicMock()
@@ -951,7 +832,6 @@ class TestSparkAdapterCliArguments:
         assert any("--shuffle-partitions" in c for c in add_arg_calls)
 
     def test_add_cli_arguments_supports_disabling_adaptive(self, mock_pyspark):
-        """CLI args should allow disabling AQE via --no-adaptive-enabled."""
         from benchbox.platforms.spark import SparkAdapter
 
         parser = argparse.ArgumentParser()
@@ -967,8 +847,6 @@ class TestSparkAdapterCliArguments:
 
 
 class TestSparkAdapterCreateSession:
-    """Tests for _create_spark_session / create_connection behavior."""
-
     def _make_builder_and_session(self):
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
@@ -986,7 +864,6 @@ class TestSparkAdapterCreateSession:
         return mock_session_class, mock_spark_session, mock_builder
 
     def test_create_connection_calls_builder_chain(self):
-        """Test create_connection uses SparkSession builder."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, mock_builder = self._make_builder_and_session()
@@ -1003,7 +880,6 @@ class TestSparkAdapterCreateSession:
         mock_builder.master.assert_called_once_with("local[2]")
 
     def test_create_connection_suppresses_window_exec_warnings(self):
-        """Test create_connection applies the WindowExec logger suppression."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1031,7 +907,6 @@ class TestSparkAdapterCreateSession:
         )
 
     def test_create_connection_uses_warn_level_when_verbose(self):
-        """Test create_connection sets log level to WARN and still suppresses WindowExec when verbose=True."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1043,7 +918,6 @@ class TestSparkAdapterCreateSession:
 
         with patch("benchbox.platforms.spark.SparkSession", mock_session_class):
             adapter = SparkAdapter(master="local[*]", database="test_db")
-            # VerbosityMixin exposes .verbose as a property; force it True
             with patch.object(type(adapter), "verbose", new_callable=lambda: property(lambda self: True)):
                 with patch.object(adapter, "handle_existing_database"):
                     with patch.object(adapter, "check_server_database_exists", return_value=True):
@@ -1051,7 +925,6 @@ class TestSparkAdapterCreateSession:
                         adapter.create_connection()
 
         mock_spark_session.sparkContext.setLogLevel.assert_called_once_with("WARN")
-        # Suppression must also run in verbose mode - log level does not disable it.
         mock_jvm.org.apache.logging.log4j.LogManager.getLogger.assert_called_once_with(
             "org.apache.spark.sql.execution.window.WindowExec"
         )
@@ -1061,7 +934,6 @@ class TestSparkAdapterCreateSession:
         )
 
     def test_configure_runtime_logging_sets_log_level_before_shared_suppress(self):
-        """Test runtime logging applies SparkContext level before WindowExec suppression."""
         from benchbox.platforms import spark as spark_module
         from benchbox.platforms.spark import SparkAdapter
 
@@ -1080,7 +952,6 @@ class TestSparkAdapterCreateSession:
         assert call_order == [("setLogLevel", "ERROR"), ("suppress", mock_spark)]
 
     def test_create_connection_creates_database_when_not_exists(self):
-        """Test that CREATE DATABASE is issued when database doesn't exist."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1097,7 +968,6 @@ class TestSparkAdapterCreateSession:
         assert any("CREATE DATABASE" in c for c in sql_calls)
 
     def test_create_connection_skips_create_when_db_exists(self):
-        """Test that CREATE DATABASE is NOT issued when database already exists."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1115,8 +985,6 @@ class TestSparkAdapterCreateSession:
 
 
 class TestSparkAdapterGetPlatformInfoLive:
-    """Tests for get_platform_info with a live (mocked) connection."""
-
     @pytest.fixture
     def mock_pyspark(self):
         mock_spark_session = MagicMock()
@@ -1142,7 +1010,6 @@ class TestSparkAdapterGetPlatformInfoLive:
             yield mock_session_class, mock_spark_session
 
     def test_get_platform_info_with_live_connection(self, mock_pyspark):
-        """Test get_platform_info extracts app_id and spark_master from a live connection."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -1153,7 +1020,6 @@ class TestSparkAdapterGetPlatformInfoLive:
         mock_conf = MagicMock()
         mock_conf.get.return_value = "local[*]"
         mock_sc.getConf.return_value = mock_conf
-        # Simulate executor IDs
         mock_executor_ids = MagicMock()
         mock_executor_ids.size.return_value = 2
         mock_sc._jsc.sc.return_value.getExecutorIds.return_value = mock_executor_ids
@@ -1166,7 +1032,6 @@ class TestSparkAdapterGetPlatformInfoLive:
         assert info["configuration"]["spark_app_id"] == "app-123"
 
     def test_get_platform_info_no_connection_returns_none_version(self, mock_pyspark):
-        """Test that get_platform_info returns None platform_version when no connection given."""
         from benchbox.platforms.spark import SparkAdapter
 
         adapter = SparkAdapter()
@@ -1176,8 +1041,6 @@ class TestSparkAdapterGetPlatformInfoLive:
 
 
 class TestSparkAdapterApplyTableTunings:
-    """Tests for apply_table_tunings with Delta / non-Delta tables."""
-
     @pytest.fixture
     def mock_pyspark(self):
         mock_spark_session = MagicMock()
@@ -1203,7 +1066,6 @@ class TestSparkAdapterApplyTableTunings:
             yield mock_session_class, mock_spark_session
 
     def test_apply_table_tunings_delta_zorder(self, mock_pyspark):
-        """Test that Delta tables get OPTIMIZE ... ZORDER BY SQL."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -1228,7 +1090,6 @@ class TestSparkAdapterApplyTableTunings:
         assert any("OPTIMIZE" in c and "ZORDER" in c for c in sql_calls)
 
     def test_apply_table_tunings_non_delta_no_zorder(self, mock_pyspark):
-        """Test that non-Delta tables do NOT get ZORDER SQL."""
         from benchbox.platforms.spark import SparkAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -1254,8 +1115,6 @@ class TestSparkAdapterApplyTableTunings:
 
 
 class TestSparkAdapterTestConnection:
-    """Tests for test_connection() method."""
-
     def _make_builder_and_session(self):
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
@@ -1268,7 +1127,6 @@ class TestSparkAdapterTestConnection:
         return mock_session_class, mock_spark_session, mock_builder
 
     def test_test_connection_success_stops_session(self):
-        """Test that test_connection() stops session in finally block."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1284,7 +1142,6 @@ class TestSparkAdapterTestConnection:
         mock_spark_session.stop.assert_called_once()
 
     def test_test_connection_suppresses_window_exec_warnings(self):
-        """Test test_connection() applies the same WindowExec suppression as create_connection()."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, mock_spark_session, _ = self._make_builder_and_session()
@@ -1312,7 +1169,6 @@ class TestSparkAdapterTestConnection:
         )
 
     def test_test_connection_failure_returns_false(self):
-        """Test that test_connection() returns False on exception."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_session_class, _, mock_builder = self._make_builder_and_session()
@@ -1326,8 +1182,6 @@ class TestSparkAdapterTestConnection:
 
 
 class TestBuildSparkConfig:
-    """Tests for _build_spark_config() module-level function."""
-
     @pytest.fixture
     def mock_pyspark(self):
         mock_session_class = MagicMock()
@@ -1352,7 +1206,6 @@ class TestBuildSparkConfig:
             yield mock_session_class
 
     def test_build_spark_config_populates_fields_from_credentials(self, mock_pyspark):
-        """Test _build_spark_config merges saved credentials into DatabaseConfig."""
         from benchbox.platforms.spark import _build_spark_config
 
         saved_creds = {"spark_master": "local[*]", "driver_memory": "8g"}
@@ -1377,7 +1230,6 @@ class TestBuildSparkConfig:
         assert config.driver_package == "pyspark"
 
     def test_build_spark_config_overrides_take_precedence(self, mock_pyspark):
-        """Test that overrides take precedence over saved credentials."""
         from benchbox.platforms.spark import _build_spark_config
 
         mock_info = MagicMock()
@@ -1400,24 +1252,15 @@ class TestBuildSparkConfig:
 
 
 class TestSparkAdapterWarehouseDir:
-    """Tests for warehouse_dir defaulting in from_config().
-
-    Regression guard: Spark must never fall through to its own CWD default
-    (./spark-warehouse). All local warehouse output must land under the
-    canonical benchmark_runs/databases/ tree.
-    """
-
     _PATCH_TARGET = "benchbox.utils.path_utils.get_benchmark_runs_databases_path"
 
     def _mock_warehouse(self, tmp_path, name="tpch_sf1"):
-        """Return a MagicMock path whose str() looks like a real databases path."""
         mock_path = MagicMock()
         mock_path.__str__ = lambda self: str(tmp_path / "databases" / name)
         mock_path.mkdir = MagicMock()
         return mock_path
 
     def test_from_config_defaults_warehouse_to_databases_path(self, tmp_path):
-        """from_config() without warehouse_dir sets it to benchmark_runs/databases/{benchmark}_{sf}."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_path = self._mock_warehouse(tmp_path)
@@ -1428,7 +1271,6 @@ class TestSparkAdapterWarehouseDir:
         assert adapter.warehouse_dir == str(mock_path)
 
     def test_from_config_warehouse_not_in_cwd(self, tmp_path):
-        """Warehouse path must not be the CWD-relative spark-warehouse default."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_path = self._mock_warehouse(tmp_path, "joinorder_sf1")
@@ -1439,7 +1281,6 @@ class TestSparkAdapterWarehouseDir:
         assert "spark_warehouse" not in adapter.warehouse_dir
 
     def test_from_config_respects_output_dir_override(self, tmp_path):
-        """When output_dir is provided, warehouse lands under output_dir/databases/."""
         from pathlib import Path
 
         from benchbox.platforms.spark import SparkAdapter
@@ -1460,7 +1301,6 @@ class TestSparkAdapterWarehouseDir:
         assert adapter.warehouse_dir == str(mock_path)
 
     def test_from_config_explicit_warehouse_dir_not_overridden(self, tmp_path):
-        """An explicit warehouse_dir in config is used verbatim, not replaced."""
         from benchbox.platforms.spark import SparkAdapter
 
         explicit_dir = str(tmp_path / "my_custom_warehouse")
@@ -1478,7 +1318,6 @@ class TestSparkAdapterWarehouseDir:
         assert adapter.warehouse_dir == explicit_dir
 
     def test_warehouse_dir_propagates_to_spark_conf(self, tmp_path):
-        """warehouse_dir must appear in Spark conf as spark.sql.warehouse.dir."""
         from benchbox.platforms.spark import SparkAdapter
 
         mock_path = self._mock_warehouse(tmp_path)
@@ -1491,10 +1330,7 @@ class TestSparkAdapterWarehouseDir:
 
 
 class TestJavaCompatibility:
-    """Tests for Java version compatibility detection."""
-
     def test_get_java_version_parses_version_17(self):
-        """Test parsing Java 17 version string."""
         from benchbox.platforms.spark import _get_java_version
 
         mock_result = MagicMock()
@@ -1505,7 +1341,6 @@ class TestJavaCompatibility:
             assert _get_java_version() == 17
 
     def test_get_java_version_parses_version_25(self):
-        """Test parsing Java 25 version string."""
         from benchbox.platforms.spark import _get_java_version
 
         mock_result = MagicMock()
@@ -1516,23 +1351,19 @@ class TestJavaCompatibility:
             assert _get_java_version() == 25
 
     def test_get_java_version_returns_none_on_failure(self):
-        """Test that missing Java returns None."""
         from benchbox.platforms.spark import _get_java_version
 
         with patch("benchbox.platforms.spark.subprocess.run", side_effect=OSError):
             assert _get_java_version() is None
 
     def test_ensure_compatible_java_passes_for_java_17(self):
-        """Test that Java 17 passes compatibility check."""
         from benchbox.platforms.spark import _ensure_compatible_java
 
         with patch("benchbox.platforms.spark._get_java_version", return_value=17):
-            # Should not raise
             result = _ensure_compatible_java()
             assert result is None or isinstance(result, str)
 
     def test_ensure_compatible_java_auto_finds_jdk(self):
-        """Test that incompatible Java triggers auto-detection."""
         from benchbox.platforms.spark import _ensure_compatible_java
 
         with (
@@ -1548,7 +1379,6 @@ class TestJavaCompatibility:
             assert os.environ["JAVA_HOME"] == "/opt/jdk17"
 
     def test_ensure_compatible_java_raises_when_no_compatible_jdk(self):
-        """Test clear error when no compatible Java is found."""
         from benchbox.platforms.spark import _ensure_compatible_java
 
         with (
@@ -1559,7 +1389,6 @@ class TestJavaCompatibility:
                 _ensure_compatible_java()
 
     def test_ensure_compatible_java_respects_explicit_java_home(self):
-        """Test that explicit java_home override is used."""
         from benchbox.platforms.spark import _ensure_compatible_java
 
         with (
@@ -1571,7 +1400,6 @@ class TestJavaCompatibility:
             assert os.environ["JAVA_HOME"] == "/opt/custom-jdk17"
 
     def test_ensure_compatible_java_rejects_incompatible_explicit_home(self):
-        """Test that explicit java_home with incompatible version raises."""
         from benchbox.platforms.spark import _ensure_compatible_java
 
         with patch("benchbox.platforms.spark._get_java_version", return_value=25):
@@ -1579,7 +1407,6 @@ class TestJavaCompatibility:
                 _ensure_compatible_java("/opt/jdk25")
 
     def test_build_spark_config_passes_java_home(self):
-        """Test that _build_spark_config includes java_home from options."""
         from benchbox.platforms.spark import _build_spark_config
 
         mock_info = MagicMock()

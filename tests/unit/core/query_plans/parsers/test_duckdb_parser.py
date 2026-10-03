@@ -1,9 +1,3 @@
-"""
-Tests for DuckDB query plan parser.
-
-Uses real DuckDB EXPLAIN output examples to verify parsing correctness.
-"""
-
 import pytest
 
 from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
@@ -15,7 +9,6 @@ pytestmark = [
 ]
 
 
-# Sample DuckDB EXPLAIN outputs
 SIMPLE_SCAN = """
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -104,8 +97,6 @@ JOIN_QUERY = """
 
 
 class TestDuckDBQueryPlanParser:
-    """Test DuckDB query plan parser."""
-
     def test_parser_initialization(self) -> None:
 
         parser = DuckDBQueryPlanParser()
@@ -122,7 +113,6 @@ class TestDuckDBQueryPlanParser:
         assert plan.logical_root is not None
         assert plan.raw_explain_output == SIMPLE_SCAN
 
-        # Should have a scan operator
         root = plan.logical_root
         assert root.operator_type == LogicalOperatorType.SCAN
         assert root.table_name == "orders"
@@ -134,8 +124,6 @@ class TestDuckDBQueryPlanParser:
 
         assert plan is not None
 
-        # Root should be FILTER or have a filter in the tree
-        # (exact structure depends on how we build the tree)
         assert plan.logical_root is not None
 
     def test_parse_aggregate_query(self) -> None:
@@ -146,11 +134,9 @@ class TestDuckDBQueryPlanParser:
         assert plan is not None
         assert plan.logical_root is not None
 
-        # Should find HASH_GROUP_BY operator somewhere in tree
         operators = self._collect_operators(plan.logical_root)
         operator_types = [op.operator_type for op in operators]
 
-        # Should have scan, filter, aggregate, and projection
         assert LogicalOperatorType.SCAN in operator_types
         assert any(t in [LogicalOperatorType.FILTER, LogicalOperatorType.AGGREGATE] for t in operator_types)
 
@@ -162,7 +148,6 @@ class TestDuckDBQueryPlanParser:
         assert plan is not None
         assert plan.logical_root is not None
 
-        # Should find ORDER_BY or SORT operator
         operators = self._collect_operators(plan.logical_root)
         operator_types = [op.operator_type for op in operators]
 
@@ -198,11 +183,9 @@ class TestDuckDBQueryPlanParser:
             operators = self._collect_operators(plan.logical_root)
             operator_ids = [op.operator_id for op in operators]
 
-            # All operator IDs should be unique
             assert len(operator_ids) == len(set(operator_ids))
 
     def test_operator_ids_reset_between_parses(self) -> None:
-        """Operator IDs should restart from 1 for each parse."""
         parser = DuckDBQueryPlanParser()
         plan1 = parser.parse_explain_output("q_reset_1", SIMPLE_FILTER)
         plan2 = parser.parse_explain_output("q_reset_2", ORDER_BY_QUERY)
@@ -225,7 +208,6 @@ class TestDuckDBQueryPlanParser:
         plan = parser.parse_explain_output("q09", SIMPLE_SCAN)
 
         if plan:
-            # Root should have physical operator
             assert plan.logical_root.physical_operator is not None
             assert plan.logical_root.physical_operator.operator_type == "SEQ_SCAN"
 
@@ -270,12 +252,10 @@ class TestDuckDBQueryPlanParser:
 
         parser = DuckDBQueryPlanParser()
 
-        # Valid table names
         assert parser._extract_table_name_from_details(["orders"]) == "orders"
         assert parser._extract_table_name_from_details(["lineitem"]) == "lineitem"
         assert parser._extract_table_name_from_details(["customer_orders"]) == "customer_orders"
 
-        # Invalid table names (should return None)
         assert parser._extract_table_name_from_details(["123invalid"]) is None
         assert parser._extract_table_name_from_details(["with space"]) is None
         assert parser._extract_table_name_from_details([]) is None
@@ -297,7 +277,7 @@ class TestDuckDBQueryPlanParser:
 
         assert plan is not None
         assert plan.plan_fingerprint is not None
-        assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+        assert len(plan.plan_fingerprint) == 64
 
     def test_fingerprint_stability(self) -> None:
 
@@ -308,9 +288,6 @@ class TestDuckDBQueryPlanParser:
 
         assert plan1 is not None
         assert plan2 is not None
-        # Fingerprints should match (same logical structure)
-        # Note: operator IDs will be different, but fingerprints exclude IDs
-        # However, since we're parsing fresh each time, the structure should be identical
 
     def test_raw_explain_output_preserved(self) -> None:
 
@@ -321,7 +298,6 @@ class TestDuckDBQueryPlanParser:
         assert plan.raw_explain_output == SIMPLE_SCAN
 
     def _collect_operators(self, root: LogicalOperator) -> list[LogicalOperator]:
-        """Helper to collect all operators in tree (DFS)."""
         operators = [root]
         for child in root.children:
             operators.extend(self._collect_operators(child))
@@ -329,34 +305,26 @@ class TestDuckDBQueryPlanParser:
 
 
 class TestDuckDBBranchingDetection:
-    """Test branching detection and fail-fast behavior for text plans."""
-
     def test_join_query_rejected_in_text_format(self) -> None:
 
         parser = DuckDBQueryPlanParser()
 
-        # JOIN_QUERY contains HASH_JOIN which indicates branching
         plan = parser.parse_explain_output("q_join", JOIN_QUERY)
 
-        # Should return None (parsed as error) because branching was detected
         assert plan is None
 
     def test_branching_error_message_contains_hint(self) -> None:
 
         parser = DuckDBQueryPlanParser()
 
-        # The parser should return None but log the error
-        # We can check this by calling _detect_branching_structure directly
         branching_info = parser._detect_branching_structure(JOIN_QUERY)
 
         assert branching_info is not None
         assert "JOIN" in branching_info
 
     def test_linear_plans_still_work(self) -> None:
-        """Test that linear plans (no branching) still parse correctly."""
         parser = DuckDBQueryPlanParser()
 
-        # These should all parse successfully (no branching)
         for explain, query_id in [
             (SIMPLE_SCAN, "q_scan"),
             (SIMPLE_FILTER, "q_filter"),
@@ -382,10 +350,8 @@ class TestDuckDBBranchingDetection:
         assert "UNION" in branching
 
     def test_detect_multiple_boxes_same_line(self) -> None:
-        """Test detection of side-by-side boxes (parallel branches)."""
         parser = DuckDBQueryPlanParser()
 
-        # This simulates the pattern in JOIN_QUERY where children are side-by-side
         parallel_plan = """
         ┌──────┐ ┌──────┐
         │ SCAN │ │ SCAN │
@@ -400,22 +366,18 @@ class TestDuckDBBranchingDetection:
 
         parser = DuckDBQueryPlanParser()
 
-        # These should NOT be detected as branching
         for explain in [SIMPLE_SCAN, SIMPLE_FILTER, AGGREGATE_QUERY, ORDER_BY_QUERY]:
             branching = parser._detect_branching_structure(explain)
             assert branching is None, "Linear plan should not be detected as branching"
 
 
 class TestDuckDBParserEdgeCases:
-    """Test edge cases and error handling."""
-
     def test_malformed_box_structure(self) -> None:
 
         parser = DuckDBQueryPlanParser()
         malformed = "┌──────\n│ SCAN\n└──"
 
         plan = parser.parse_explain_output("q13", malformed)
-        # Should return None or handle gracefully
         assert plan is None or plan.logical_root is not None
 
     def test_missing_operator_name(self) -> None:
@@ -429,18 +391,15 @@ class TestDuckDBParserEdgeCases:
         """
 
         plan = parser.parse_explain_output("q14", missing_name)
-        # Should handle gracefully
         assert plan is None or plan.logical_root is not None
 
     def test_very_long_explain_output(self) -> None:
 
         parser = DuckDBQueryPlanParser()
 
-        # Create a long chain of operators
-        long_output = SIMPLE_SCAN * 10  # Repeat the scan pattern
+        long_output = SIMPLE_SCAN * 10
 
         plan = parser.parse_explain_output("q15", long_output)
-        # Should parse without crashing
         assert plan is None or plan.logical_root is not None
 
     def test_unicode_in_explain_output(self) -> None:
@@ -455,5 +414,4 @@ class TestDuckDBParserEdgeCases:
         """
 
         plan = parser.parse_explain_output("q16", unicode_output)
-        # Should handle unicode gracefully
         assert plan is None or plan.logical_root is not None

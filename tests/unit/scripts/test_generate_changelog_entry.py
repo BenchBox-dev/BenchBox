@@ -1,5 +1,3 @@
-"""Tests for release changelog generation."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -125,7 +123,6 @@ def test_update_github_release_notes_edits_existing_release_idempotently(tmp_pat
 
 
 def test_since_ref_limits_release_changelog_to_main_delta(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Release branches should summarize changes absent from main, not all reachable commits."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -163,7 +160,6 @@ def test_since_ref_limits_release_changelog_to_main_delta(tmp_path: Path, monkey
 def test_since_ref_ignores_commits_already_present_via_squash_merge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A squash-merged release on main must not make old develop commits reappear."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -204,7 +200,6 @@ def test_since_ref_ignores_commits_already_present_via_squash_merge(
 def test_since_ref_ignores_squashed_commit_when_new_patch_touches_same_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A later same-file patch must not pull already released commit subjects back in."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -243,7 +238,6 @@ def test_since_ref_ignores_squashed_commit_when_new_patch_touches_same_file(
 def test_since_ref_ignores_intermediate_squashed_same_file_commits(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Intermediate same-file states from a squashed release must stay released."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -282,12 +276,6 @@ def test_since_ref_ignores_intermediate_squashed_same_file_commits(
 
 
 class TestSummarizeSkipReason:
-    """`claude --print` must never be spawned from inside a Claude Code session.
-
-    The v0.3.1 cut hung twice on the nested CLI call, leaving an orphaned
-    make/uv/python tree and a half-applied cut.
-    """
-
     def test_nested_session_skips_summarization(self) -> None:
         for var in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID"):
             reason = generate_changelog_entry.summarize_skip_reason({var: "1"})
@@ -315,7 +303,6 @@ class TestSummarizeSkipReason:
         assert generate_changelog_entry._summarize_changelog_with_claude("0.3.1", "2026-07-09", ["a"], [], []) is None
 
     def test_claude_cli_runs_in_its_own_process_group(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A timeout must be able to kill grandchildren holding the stdout pipe."""
         captured: dict[str, object] = {}
 
         class _FakeProc:
@@ -342,8 +329,6 @@ class TestSummarizeSkipReason:
 
 
 class TestChangelogCurationGuard:
-    """`EDITOR=true` used to wave a raw commit dump straight into a release."""
-
     def _write(self, repo: Path, body: str) -> None:
         (repo / "CHANGELOG.md").write_text(body, encoding="utf-8")
 
@@ -389,10 +374,6 @@ class TestChangelogCurationGuard:
         assert ok, problems
 
     def test_every_shipped_changelog_section_passes_the_guard(self) -> None:
-        """The ceiling is calibrated on real releases, not on the prompt's target.
-
-        0.2.1 shipped 39 hand-curated bullets; a tighter ceiling would reject it.
-        """
         repo_root = Path(__file__).resolve().parents[3]
         text = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
         for version in generate_changelog_entry.released_versions_in_changelog(text):
@@ -401,8 +382,6 @@ class TestChangelogCurationGuard:
 
 
 class TestChangelogGenerationIsIdempotent:
-    """Re-running an interrupted `make release-cut` must not double-insert."""
-
     def test_existing_section_is_left_untouched(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -423,8 +402,6 @@ class TestChangelogGenerationIsIdempotent:
 
 
 class TestCurationOverrideScope:
-    """RELEASE_ALLOW_RAW_CHANGELOG forgives an uncurated section, not a missing one."""
-
     def test_missing_changelog_reports_cleanly(self, tmp_path: Path) -> None:
         ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
         assert not ok

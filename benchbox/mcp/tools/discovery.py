@@ -1,11 +1,6 @@
-"""Discovery tools for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides tools for discovering available platforms, benchmarks, and system information.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,7 +23,6 @@ from benchbox.utils.dependencies import get_extra_install_message
 
 logger = logging.getLogger(__name__)
 
-# Tool annotations for read-only discovery tools
 READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read-only discovery tool",
     read_only_hint=True,
@@ -76,19 +70,10 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     return queries, tables
 
 
-# Discovery tools and MCP resources serve the same registry data. This module
-# owns the one canonical payload; each surface is a PROJECTION of it, never a
-# second walk over the registry with a slightly different field set. Adding a
-# `fields=` switch with per-caller branches would be the same duplication with
-# extra indirection, so the projections are separate, explicit functions.
 BENCHMARK_QUERY_ID_TOOL_LIMIT = 30
 
 
 def build_benchmark_payload(benchmark: str) -> dict[str, Any]:
-    """Build the canonical benchmark payload, or a not-found marker.
-
-    Returns every field any MCP surface needs. Callers project.
-    """
     benchmark_lower = benchmark.lower()
     meta = get_benchmark_metadata(benchmark_lower)
     if meta is None or get_benchmark_surface(benchmark_lower) != "public":
@@ -124,7 +109,6 @@ def build_benchmark_payload(benchmark: str) -> dict[str, Any]:
 
 
 def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
-    """Projection of the canonical payload for the get_benchmark_info tool."""
     payload = build_benchmark_payload(benchmark)
     if not payload["found"]:
         return {
@@ -155,22 +139,13 @@ def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
 
 
 def _system_profile_impl() -> dict[str, Any]:
-    """Delegate to the core system profiler (one-engine convergence).
-
-    The core owns ``SystemProfiler`` and the scale heuristic; this wrapper
-    preserves the MCP response shape while removing the raw ``psutil`` field
-    assembly from the transport layer.
-    """
     from benchbox.core.system import SystemProfiler, collect_system_profile_with_recommendations
 
-    # Ensure SystemProfiler is referenced in this module for the
-    # ``grep -q 'SystemProfiler'`` verification gate.
     _ = SystemProfiler
     return collect_system_profile_with_recommendations()  # type: ignore[return-value]
 
 
 def _filter_dependency_groups(all_groups: dict, platform: str | None) -> dict | dict[str, Any]:
-    """Return filtered groups, or an error dict if platform is unknown."""
     if not platform:
         return all_groups
     platform_lower = platform.lower()
@@ -246,21 +221,12 @@ def _check_dependencies_impl(platform: str | None, verbose: bool) -> dict[str, A
 
 
 def register_discovery_tools(mcp: MCPServer) -> None:
-    """Register discovery tools with the MCP server."""
 
     @mcp.tool(
         description="List available platforms, benchmarks, or chart templates.\n\n        Args:\n            category: What to list: 'platforms', 'benchmarks', 'charts', or 'all'\n\n        Returns:\n            Available items in the requested category.\n        ",
         annotations=READONLY_ANNOTATIONS,
     )
     def list_available(category: str = "all") -> dict[str, Any]:
-        """List available platforms, benchmarks, or chart templates.
-
-        Args:
-            category: What to list: 'platforms', 'benchmarks', 'charts', or 'all'
-
-        Returns:
-            Available items in the requested category.
-        """
         return _list_available_impl(category)
 
     @mcp.tool(
@@ -268,14 +234,6 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         annotations=READONLY_ANNOTATIONS,
     )
     def get_benchmark_info(benchmark: str) -> dict[str, Any]:
-        """Get detailed information about a specific benchmark.
-
-        Args:
-            benchmark: Any registered benchmark ID; call list_available("benchmarks") to enumerate.
-
-        Returns:
-            Detailed benchmark information including queries and schema.
-        """
         return _get_benchmark_info_impl(benchmark)
 
     @mcp.tool(
@@ -283,11 +241,6 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         annotations=READONLY_ANNOTATIONS,
     )
     def system_profile() -> dict[str, Any]:
-        """Get system profile information.
-
-        Returns:
-            System info including CPU, memory, disk, and package versions.
-        """
         return _system_profile_impl()
 
     @mcp.tool(
@@ -298,15 +251,6 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         platform: str | None = None,
         verbose: bool = False,
     ) -> dict[str, Any]:
-        """Check platform dependencies and installation status.
-
-        Args:
-            platform: Specific platform to check (omit to check all)
-            verbose: Include detailed package information
-
-        Returns:
-            Dependency status with missing packages and install commands.
-        """
         return _check_dependencies_impl(platform, verbose)
 
 
@@ -314,7 +258,6 @@ ADOPTION_ORDER = {"mainstream": 0, "established": 1, "emerging": 2, "niche": 3}
 
 
 def build_platform_payloads() -> list[dict[str, Any]]:
-    """Build the canonical per-platform payloads, adoption-then-name ordered."""
     from benchbox.core.platform_registry import PlatformRegistry
 
     platforms = []
@@ -342,7 +285,6 @@ def build_platform_payloads() -> list[dict[str, Any]]:
 
 
 def _list_platforms_impl() -> dict[str, Any]:
-    """List all available database platforms."""
     platforms = build_platform_payloads()
 
     return {
@@ -357,7 +299,6 @@ def _list_platforms_impl() -> dict[str, Any]:
 
 
 def _list_benchmarks_impl() -> dict[str, Any]:
-    """List all available benchmarks."""
     benchmarks = []
     for name, meta in get_all_benchmarks().items():
         if get_benchmark_surface(name) != "public":
@@ -393,7 +334,6 @@ def _list_benchmarks_impl() -> dict[str, Any]:
 
 
 def _list_chart_templates_impl() -> dict[str, Any]:
-    """List available chart templates for visualization."""
     from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_DESCRIPTIONS
     from benchbox.core.visualization.templates import list_templates
 

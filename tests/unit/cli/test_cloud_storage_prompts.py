@@ -1,9 +1,6 @@
-"""Tests for CLI cloud storage prompt functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import patch
 
@@ -21,8 +18,6 @@ pytestmark = [
 
 
 class TestPromptCloudOutputLocation:
-    """Test cloud output location prompts."""
-
     @patch("benchbox.cli.cloud_storage.PlatformRegistry.requires_cloud_storage")
     def test_returns_none_for_local_platforms(self, mock_requires):
 
@@ -76,7 +71,7 @@ class TestPromptCloudOutputLocation:
         mock_registry.requires_cloud_storage.return_value = True
         mock_registry.get_cloud_path_examples.return_value = ["s3://bucket/path"]
         mock_isatty.return_value = True
-        mock_confirm.return_value = False  # User declines
+        mock_confirm.return_value = False
 
         result = prompt_cloud_output_location(
             platform_name="databricks",
@@ -98,7 +93,7 @@ class TestPromptCloudOutputLocation:
         mock_registry.get_cloud_path_examples.return_value = ["s3://bucket/path"]
         mock_isatty.return_value = True
         mock_is_cloud.return_value = True
-        mock_confirm.side_effect = [True, True]  # wants cloud, confirms path
+        mock_confirm.side_effect = [True, True]
         mock_prompt.return_value = "s3://my-bucket/benchbox/data"
 
         result = prompt_cloud_output_location(
@@ -121,7 +116,6 @@ class TestPromptCloudOutputLocation:
         mock_registry.get_cloud_path_examples.return_value = ["s3://bucket/path"]
         mock_isatty.return_value = True
         mock_is_cloud.return_value = True
-        # First wants cloud, then doesn't retry after empty path
         mock_confirm.side_effect = [True, False]
         mock_prompt.return_value = ""
 
@@ -144,11 +138,9 @@ class TestPromptCloudOutputLocation:
         mock_registry.requires_cloud_storage.return_value = True
         mock_registry.get_cloud_path_examples.return_value = ["s3://bucket/path"]
         mock_isatty.return_value = True
-        mock_is_cloud.return_value = False  # Not a cloud path
-        # wants cloud (True), doesn't proceed with non-cloud path (False),
-        # then when prompted with empty string asks "try again?" (False)
+        mock_is_cloud.return_value = False
         mock_confirm.side_effect = [True, False, False]
-        mock_prompt.side_effect = ["/local/path", ""]  # Second time returns empty to trigger exit
+        mock_prompt.side_effect = ["/local/path", ""]
 
         result = prompt_cloud_output_location(
             platform_name="databricks",
@@ -171,8 +163,7 @@ class TestPromptCloudOutputLocation:
         mock_registry.requires_cloud_storage.return_value = True
         mock_registry.get_cloud_path_examples.return_value = ["s3://bucket/path"]
         mock_isatty.return_value = True
-        mock_is_cloud.return_value = False  # Not a cloud path
-        # wants cloud, proceeds anyway, confirms path
+        mock_is_cloud.return_value = False
         mock_confirm.side_effect = [True, True, True]
         mock_prompt.return_value = "/local/path"
 
@@ -232,21 +223,17 @@ class TestPromptCloudOutputLocation:
             non_interactive=False,
         )
 
-        # Verify examples were requested
         mock_registry.get_cloud_path_examples.assert_called_with("databricks")
         assert result == "s3://test/path"
 
 
 class TestDisplayPlatformGuidance:
-    """Test platform-specific guidance display."""
-
     @patch("benchbox.cli.cloud_storage.console")
     def test_displays_databricks_guidance(self, mock_console):
 
         _display_platform_guidance("databricks")
 
         assert mock_console.print.called
-        # Check that some expected content was printed
         calls = [str(call) for call in mock_console.print.call_args_list]
         all_output = " ".join(calls)
         assert "Unity Catalog" in all_output or "dbfs:" in all_output.lower()
@@ -283,12 +270,7 @@ class TestDisplayPlatformGuidance:
 
     @patch("benchbox.cli.cloud_storage.console")
     def test_handles_unknown_platform(self, mock_console):
-        """Test that unknown platforms don't crash."""
-        # Should not crash, just not display any guidance
         _display_platform_guidance("unknown_platform")
-
-        # May or may not call console.print depending on implementation
-        # The important thing is it doesn't crash
 
     @patch("benchbox.cli.cloud_storage.console")
     def test_case_insensitive_platform_names(self, mock_console):

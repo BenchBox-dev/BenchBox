@@ -1,19 +1,6 @@
-"""Starburst platform adapter for managed Trino (Starburst Galaxy).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Starburst Galaxy is a managed Trino service providing serverless distributed
-SQL query execution. This adapter inherits from the Trino adapter with
-Starburst-specific authentication and connection handling.
-
-Key differences from self-hosted Trino:
-- HTTPS on port 443 by default
-- Basic authentication with email/role username format
-- Starburst Galaxy-specific catalogs and configuration
-- No local server management required
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,97 +17,45 @@ if TYPE_CHECKING:
 
 
 class StarburstAdapter(TrinoAdapter):
-    """Starburst platform adapter for Starburst Galaxy (managed Trino).
-
-    Starburst Galaxy is a managed Trino service that provides:
-    - Serverless distributed SQL query execution
-    - Automatic scaling and resource management
-    - Built-in data catalogs and connectors
-    - Enterprise security and governance
-
-    Connection Configuration:
-    - Host: {cluster-name}.trino.galaxy.starburst.io
-    - Port: 443 (HTTPS)
-    - Username: email/role (e.g., joe@example.com/accountadmin)
-    - Password: API key or password
-
-    Environment Variables:
-    - STARBURST_HOST: Galaxy cluster hostname
-    - STARBURST_USER or STARBURST_USERNAME: User email or email/role
-    - STARBURST_PASSWORD: Authentication password or API key
-    - STARBURST_ROLE: Role name (appended to username if not already included)
-    - STARBURST_CATALOG: Default catalog name
-
-    Example:
-        # Using environment variables
-        export STARBURST_HOST="my-cluster.trino.galaxy.starburst.io"
-        export STARBURST_USER="joe@example.com/accountadmin"
-        export STARBURST_PASSWORD="my-password"
-        benchbox run --platform starburst --benchmark tpch --scale 0.01
-
-        # Or place the connection values in the platform configuration
-        # consumed by BenchBox, then run the same command without inline secrets.
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
-        # Configure Starburst Galaxy defaults before calling parent __init__
         self._configure_starburst_defaults(config)
 
-        # Call parent Trino adapter initialization
         super().__init__(**config)
 
-        # Store Starburst-specific attributes
         self.role = config.get("role") or os.environ.get("STARBURST_ROLE")
-        self._dialect = "trino"  # Starburst uses Trino SQL dialect
+        self._dialect = "trino"
 
     def _configure_starburst_defaults(self, config: dict[str, Any]) -> None:
-        """Configure Starburst Galaxy-specific defaults.
-
-        Reads environment variables and sets Starburst-specific defaults
-        for host, port, authentication, and SSL configuration.
-
-        Args:
-            config: Configuration dictionary to update with defaults
-        """
-        # Host configuration (required for Starburst Galaxy)
         if "host" not in config or not config["host"]:
             config["host"] = os.environ.get("STARBURST_HOST")
 
-        # Port defaults to 443 for Starburst Galaxy (HTTPS)
         if "port" not in config or config["port"] is None:
             env_port = os.environ.get("STARBURST_PORT")
             config["port"] = int(env_port) if env_port else 443
 
-        # Username with email/role format
         if "username" not in config or not config["username"]:
             config["username"] = os.environ.get("STARBURST_USER") or os.environ.get("STARBURST_USERNAME")
 
-        # Append role to username if provided separately and not already in username
         role = config.get("role") or os.environ.get("STARBURST_ROLE")
         if role and config.get("username") and "/" not in (config.get("username") or ""):
             config["username"] = f"{config['username']}/{role}"
 
-        # Password for authentication
         if "password" not in config or not config["password"]:
             config["password"] = os.environ.get("STARBURST_PASSWORD")
 
-        # Default catalog from environment
         if "catalog" not in config or not config["catalog"]:
             config["catalog"] = os.environ.get("STARBURST_CATALOG")
 
-        # HTTPS is required for Starburst Galaxy
         if "http_scheme" not in config:
             config["http_scheme"] = "https"
 
-        # SSL verification defaults to True for production security
         if "verify_ssl" not in config:
             config["verify_ssl"] = True
 
-        # Validate required configuration for Starburst Galaxy
         if not config.get("host"):
             raise ValueError(
                 "Starburst Galaxy requires host configuration.\n"
@@ -145,21 +80,11 @@ class StarburstAdapter(TrinoAdapter):
         return "Starburst"
 
     def get_query_plan_parser(self):
-        """Return the shared Presto/Trino parser stamped as ``starburst``.
-
-        Starburst inherits Trino's ``platform_key`` (for credential lookup), so the
-        concrete plan-capture platform name is supplied explicitly here rather than
-        recording captured plans under ``trino``.
-        """
         from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
 
         return PrestoTrinoQueryPlanParser(platform_name="starburst")
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Starburst Galaxy platform information.
-
-        Extends Trino platform info with Starburst-specific details.
-        """
         info = super().get_platform_info(connection)
         info["platform_type"] = "starburst"
         info["platform_name"] = "Starburst Galaxy"
@@ -168,14 +93,11 @@ class StarburstAdapter(TrinoAdapter):
         return info
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Starburst (Trino-compatible)."""
         return "trino"
 
     def _build_friendly_connection_error(self, exc: Exception) -> str | None:
-        """Build user-friendly error message for Starburst connection failures."""
         error_str = str(exc).lower()
 
-        # Authentication errors
         if "401" in error_str or "unauthorized" in error_str:
             return (
                 "Starburst Galaxy authentication failed.\n"
@@ -185,7 +107,6 @@ class StarburstAdapter(TrinoAdapter):
                 "  - Verify credentials at: https://galaxy.starburst.io"
             )
 
-        # Connection errors
         if "connection refused" in error_str or "could not connect" in error_str:
             return (
                 f"Cannot connect to Starburst Galaxy at {self.host}:{self.port}.\n"
@@ -195,7 +116,6 @@ class StarburstAdapter(TrinoAdapter):
                 "  - Any firewall or proxy restrictions"
             )
 
-        # Certificate errors
         if "ssl" in error_str or "certificate" in error_str:
             return (
                 "SSL certificate error connecting to Starburst Galaxy.\n"
@@ -209,7 +129,6 @@ class StarburstAdapter(TrinoAdapter):
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Starburst-specific CLI arguments."""
         starburst_group = parser.add_argument_group("Starburst Arguments")
         starburst_group.add_argument(
             "--host", type=str, help="Starburst Galaxy hostname (e.g., my-cluster.trino.galaxy.starburst.io)"
@@ -234,7 +153,6 @@ class StarburstAdapter(TrinoAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Starburst adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         return cls(

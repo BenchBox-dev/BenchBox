@@ -1,9 +1,6 @@
-"""Tests for interactive wizard functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from io import StringIO
 from unittest.mock import patch
@@ -36,19 +33,16 @@ pytestmark = [
 
 
 class TestGenerateCLICommand:
-    """Tests for generate_cli_command function."""
-
     def test_basic_command(self):
-        """Test basic command generation with required params only."""
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
-            scale=0.01,  # Default scale - should not appear
+            scale=0.01,
         )
         assert "benchbox run" in cmd
         assert "--platform duckdb" in cmd
         assert "--benchmark tpch" in cmd
-        assert "--scale" not in cmd  # Default value omitted
+        assert "--scale" not in cmd
 
     def test_non_default_scale(self):
 
@@ -70,7 +64,6 @@ class TestGenerateCLICommand:
         assert "--phases generate,load,power" in cmd
 
     def test_default_phases_omitted(self):
-        """Test that default phases (power) are omitted."""
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -100,7 +93,6 @@ class TestGenerateCLICommand:
         assert "--tuning tuned" in cmd
 
     def test_default_tuning_omitted(self):
-        """Test that default tuning (notuning) is omitted."""
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -170,7 +162,6 @@ class TestGenerateCLICommand:
         assert "--table-mode external" in cmd
 
     def test_table_mode_native_omitted(self):
-        """Native table mode (default) should be omitted from equivalent command."""
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -200,7 +191,6 @@ class TestGenerateCLICommand:
         assert "--official" in cmd
 
     def test_capture_plans_flag(self):
-        """Test that capture-plans flag is included."""
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -263,15 +253,11 @@ class TestGenerateCLICommand:
             tuning="tuned",
             seed=42,
         )
-        # Check for line continuation characters
         assert "\\\n" in cmd
 
 
 class TestDisplayInteractivePreview:
-    """Tests for display_interactive_preview function."""
-
     def _create_mock_database_config(self, platform_type="duckdb", execution_mode="sql"):
-        """Create a mock database config for testing."""
 
         class MockDatabaseConfig:  # noqa: B903 - test stub, not domain model
             def __init__(self):
@@ -291,7 +277,6 @@ class TestDisplayInteractivePreview:
         compression_level=None,
         options=None,
     ):
-        """Create a mock benchmark config for testing."""
         config = BenchmarkConfig(
             name=name,
             display_name=display_name,
@@ -378,16 +363,14 @@ class TestDisplayInteractivePreview:
             console_obj=console,
         )
 
-        # Strip ANSI escape codes for assertions
         result = re.sub(r"\x1b\[[0-9;]*m", "", output.getvalue())
         assert "Equivalent CLI command" in result
         assert "--platform duckdb" in result
         assert "--benchmark tpch" in result
         assert "--scale 0.5" in result
-        assert "--table-mode" not in result  # native is default, omitted
+        assert "--table-mode" not in result
 
     def test_preview_external_table_mode_reflected(self):
-        """Preview table and command should reflect external table mode."""
         import re
 
         output = StringIO()
@@ -474,7 +457,6 @@ class TestDisplayInteractivePreview:
         assert "dataframe mode" in result
 
     def test_preview_shows_table_format_in_table(self):
-        """Table Format row appears when table_format is in benchmark options."""
         import re
 
         output = StringIO()
@@ -498,7 +480,6 @@ class TestDisplayInteractivePreview:
         assert "zstd" in result
 
     def test_preview_shows_table_format_in_cli_command(self):
-        """Equivalent CLI command includes --table-format when format is set."""
         import re
 
         output = StringIO()
@@ -520,7 +501,6 @@ class TestDisplayInteractivePreview:
         assert "--table-format parquet" in result
 
     def test_preview_omits_format_when_not_set(self):
-        """No Table Format row when table_format is absent from options."""
         import re
 
         output = StringIO()
@@ -541,7 +521,6 @@ class TestDisplayInteractivePreview:
         assert "--table-format" not in result
 
     def test_preview_cli_command_includes_tuning_when_set(self):
-        """CLI command in preview should include --tuning when tuning is specified."""
         import re
 
         output = StringIO()
@@ -562,7 +541,6 @@ class TestDisplayInteractivePreview:
         assert "--tuning tuned" in result
 
     def test_preview_cli_command_omits_tuning_when_none(self):
-        """CLI command should not include --tuning when tuning is None."""
         import re
 
         output = StringIO()
@@ -583,7 +561,6 @@ class TestDisplayInteractivePreview:
         assert "--tuning" not in result
 
     def test_preview_cli_command_includes_compression(self):
-        """CLI command should include --compression when compress_data is set."""
         import re
 
         output = StringIO()
@@ -607,7 +584,6 @@ class TestDisplayInteractivePreview:
         assert "--compression zstd:3" in result
 
     def test_preview_cli_command_includes_all_configured_options(self):
-        """CLI command should include tuning, table-mode, table-format, and compression."""
         import re
 
         output = StringIO()
@@ -639,10 +615,7 @@ class TestDisplayInteractivePreview:
 
 
 class TestDisplayInteractivePreviewAllParams:
-    """Integration test: display_interactive_preview with all params set."""
-
     def test_preview_cli_command_includes_all_new_params(self):
-        """CLI command output should contain every new flag when all params are set."""
         import re
 
         output = StringIO()
@@ -690,7 +663,6 @@ class TestDisplayInteractivePreviewAllParams:
 
         result = re.sub(r"\x1b\[[0-9;]*m", "", output.getvalue())
 
-        # All original params
         assert "--platform databricks" in result
         assert "--benchmark tpch" in result
         assert "--scale 1.0" in result
@@ -706,7 +678,6 @@ class TestDisplayInteractivePreviewAllParams:
         assert "--validation full" in result
         assert "-vv" in result
 
-        # All new params
         assert "--platform-option driver_version=1.2.0" in result
         assert "--plan-config sample:0.1,first:5" in result
         assert "--presort delta-sorted" in result
@@ -717,7 +688,6 @@ class TestDisplayInteractivePreviewAllParams:
         assert "--global-cache" in result
 
     def test_preview_compression_zstd_not_dropped(self):
-        """Regression: --compression zstd should appear when compress_data=True."""
         import re
 
         output = StringIO()
@@ -747,7 +717,6 @@ class TestDisplayInteractivePreviewAllParams:
         assert "--compression zstd" in result
 
     def test_preview_table_format_with_compression_suffix(self):
-        """--table-format should include :compression when not snappy."""
         import re
 
         output = StringIO()
@@ -777,8 +746,6 @@ class TestDisplayInteractivePreviewAllParams:
 
 
 class TestPromptPhases:
-    """Tests for prompt_phases function."""
-
     @pytest.mark.parametrize(
         ("responses", "expected"),
         [
@@ -787,8 +754,6 @@ class TestPromptPhases:
             (["3"], ["generate"]),
             (["4"], ["load"]),
             (["5"], ["generate", "load", "warmup", "power", "throughput", "maintenance"]),
-            # Numeric menu after statistics was inserted at position 3:
-            # 1=generate 2=load 3=statistics 4=warmup 5=power.
             (["6", "1,2,5"], ["generate", "load", "power"]),
             (["6", "1,2,3"], ["generate", "load", "statistics"]),
             (["6", "generate,power,throughput"], ["generate", "power", "throughput"]),
@@ -803,13 +768,11 @@ class TestPromptPhases:
         assert prompt_phases() == expected
 
     def test_phases_out_of_range_input_explains_and_points_to_query_step(self, monkeypatch):
-        """Out-of-range input (e.g. '37') must show typed value and point user to the query step."""
         rendered_lines: list[str] = []
         monkeypatch.setattr(
             "benchbox.cli.benchmarks.console.print",
             lambda *args, **_kwargs: rendered_lines.append(str(args[0]) if args else ""),
         )
-        # First answer "6" to enter custom mode, then "37" (intending Query 37)
         response_iter = iter(["6", "37"])
         monkeypatch.setattr("benchbox.cli.benchmarks.Prompt.ask", lambda *_args, **_kwargs: next(response_iter))
 
@@ -817,18 +780,13 @@ class TestPromptPhases:
 
         assert result == ["power"]
         joined = "\n".join(rendered_lines)
-        # Up-front guidance distinguishing phase numbers from query numbers
         assert "not query numbers" in joined
         assert "power or standard" in joined.lower()
-        # Fallback echoes the typed input
         assert "'37'" in joined
-        # Fallback points the user to the query step
         assert "query selection" in joined.lower()
 
 
 class TestPromptTableMode:
-    """Tests for prompt_table_mode function."""
-
     def test_select_native(self, monkeypatch):
         monkeypatch.setattr("benchbox.cli.benchmarks.Prompt.ask", lambda *_args, **_kwargs: "1")
         assert prompt_table_mode() == "native"
@@ -860,8 +818,6 @@ class TestPromptTableMode:
 
 
 class TestPromptQuerySubset:
-    """Tests for prompt_query_subset function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_run_all_queries(self, mock_confirm):
 
@@ -890,7 +846,6 @@ class TestPromptQuerySubset:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_empty_selection_returns_none(self, mock_confirm, mock_prompt):
-        """Test that empty selection returns None (all queries)."""
         mock_confirm.return_value = False
         mock_prompt.return_value = ""
         result = prompt_query_subset("tpch", 22)
@@ -898,8 +853,6 @@ class TestPromptQuerySubset:
 
 
 class TestPromptOfficialMode:
-    """Tests for prompt_official_mode function."""
-
     def test_non_tpc_benchmark_returns_false(self):
 
         result, adjusted_scale = prompt_official_mode("ssb", 0.1)
@@ -920,30 +873,28 @@ class TestPromptOfficialMode:
         mock_confirm.return_value = True
         result, adjusted_scale = prompt_official_mode("tpch", 10.0)
         assert result is True
-        assert adjusted_scale is None  # No adjustment needed
+        assert adjusted_scale is None
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_non_compliant_scale_adjusts_to_nearest(self, mock_confirm):
 
-        mock_confirm.side_effect = [True, True]  # Enable official, accept nearest
+        mock_confirm.side_effect = [True, True]
         result, adjusted_scale = prompt_official_mode("tpch", 0.1)
         assert result is True
-        assert adjusted_scale == 1.0  # Nearest TPC-allowed scale
+        assert adjusted_scale == 1.0
 
     @patch("benchbox.cli.benchmarks.FloatPrompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_non_compliant_scale_custom_entry(self, mock_confirm, mock_float):
 
-        mock_confirm.side_effect = [True, False]  # Enable official, decline nearest
-        mock_float.return_value = 100.0  # Enter TPC-compliant scale
+        mock_confirm.side_effect = [True, False]
+        mock_float.return_value = 100.0
         result, adjusted_scale = prompt_official_mode("tpch", 0.1)
         assert result is True
         assert adjusted_scale == 100.0
 
 
 class TestPromptSeed:
-    """Tests for prompt_seed function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_no_seed_selected(self, mock_confirm):
 
@@ -971,8 +922,6 @@ class TestPromptSeed:
 
 
 class TestPromptForceRegeneration:
-    """Tests for prompt_force_regeneration function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_force_regeneration(self, mock_confirm):
 
@@ -1009,8 +958,6 @@ class TestPromptForceRegeneration:
 
 
 class TestPromptValidationMode:
-    """Tests for prompt_validation_mode function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_validation_config(self, mock_confirm):
 
@@ -1065,29 +1012,23 @@ class TestPromptValidationMode:
 
 
 class TestPromptCapturePlans:
-    """Tests for prompt_capture_plans function."""
-
     def test_unsupported_platform_returns_false(self):
 
-        # Snowflake doesn't support plan capture
         result = prompt_capture_plans("snowflake")
         assert result is False
 
     def test_unsupported_platform_sqlite(self):
-        """Test SQLite (unsupported) returns False."""
         result = prompt_capture_plans("sqlite")
         assert result is False
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_supported_platform_decline(self, mock_confirm):
-        """Test declining plan capture for supported platform."""
         mock_confirm.return_value = False
         result = prompt_capture_plans("duckdb")
         assert result is False
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_supported_platform_accept(self, mock_confirm):
-        """Test accepting plan capture for supported platform."""
         mock_confirm.return_value = True
         result = prompt_capture_plans("duckdb")
         assert result is True
@@ -1115,8 +1056,6 @@ class TestPromptCapturePlans:
 
 
 class TestPromptOutputLocation:
-    """Tests for prompt_output_location function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_custom_output(self, mock_confirm):
 
@@ -1142,14 +1081,12 @@ class TestPromptOutputLocation:
         mock_confirm.return_value = True
         mock_prompt.return_value = "/tmp"
         result = prompt_output_location()
-        # Path resolves symlinks, so /tmp may become /private/tmp on macOS
         expected = str(Path("/tmp").resolve())
         assert result == expected
 
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_tilde_expansion(self, mock_confirm, mock_prompt):
-        """Test tilde (~) is expanded to home directory."""
         import os
 
         mock_confirm.return_value = True
@@ -1164,22 +1101,19 @@ class TestPromptOutputLocation:
         mock_confirm.return_value = True
         mock_prompt.return_value = "/tmp/benchbox_test_output"
         result = prompt_output_location()
-        # Use Path for cross-platform path comparison
         assert "benchbox_test_output" in result
 
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_nonexistent_parent_declined(self, mock_confirm, mock_prompt):
 
-        mock_confirm.side_effect = [True, False]  # Yes to custom, No to create
+        mock_confirm.side_effect = [True, False]
         mock_prompt.return_value = "/nonexistent_parent_xyz/output"
         result = prompt_output_location()
         assert result is None
 
 
 class TestGetPlatformFormatRecommendation:
-    """Tests for get_platform_format_recommendation function."""
-
     def test_databricks_recommends_delta(self):
 
         fmt, reason = get_platform_format_recommendation("databricks")
@@ -1223,8 +1157,6 @@ class TestGetPlatformFormatRecommendation:
 
 
 class TestPromptTableFormat:
-    """Tests for prompt_table_format function."""
-
     def test_unsupported_platform_returns_none(self):
 
         result = prompt_table_format("postgresql")
@@ -1242,7 +1174,7 @@ class TestPromptTableFormat:
     def test_select_csv(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        mock_prompt.return_value = "1"  # CSV
+        mock_prompt.return_value = "1"
         fmt, compression = prompt_table_format("duckdb")
         assert fmt is None
         assert compression is None
@@ -1252,7 +1184,6 @@ class TestPromptTableFormat:
     def test_select_parquet_with_compression(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # Parquet=2, zstd=2 (parquet options: snappy=1, zstd=2, gzip=3, none=4)
         mock_prompt.side_effect = ["2", "2"]
         fmt, compression = prompt_table_format("duckdb")
         assert fmt == "parquet"
@@ -1263,7 +1194,6 @@ class TestPromptTableFormat:
     def test_select_vortex(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # Vortex=3, zstd=1 (vortex options: zstd=1, lz4=2, none=3)
         mock_prompt.side_effect = ["3", "1"]
         fmt, compression = prompt_table_format("duckdb")
         assert fmt == "vortex"
@@ -1274,7 +1204,6 @@ class TestPromptTableFormat:
     def test_select_delta(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # Delta=4, snappy=1 (delta options: snappy=1, zstd=2, none=3)
         mock_prompt.side_effect = ["4", "1"]
         fmt, compression = prompt_table_format("databricks")
         assert fmt == "delta"
@@ -1285,7 +1214,6 @@ class TestPromptTableFormat:
     def test_select_iceberg(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # Iceberg=5, zstd=1 (iceberg options: zstd=1, snappy=2, gzip=3, none=4)
         mock_prompt.side_effect = ["5", "1"]
         fmt, compression = prompt_table_format("snowflake")
         assert fmt == "iceberg"
@@ -1296,7 +1224,6 @@ class TestPromptTableFormat:
     def test_no_compression(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # Parquet=2, none=4 (parquet options: snappy=1, zstd=2, gzip=3, none=4)
         mock_prompt.side_effect = ["2", "4"]
         fmt, compression = prompt_table_format("duckdb")
         assert fmt == "parquet"
@@ -1305,17 +1232,10 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_format_and_compression_returned_separately(self, mock_confirm, mock_prompt):
-        """Format and compression must be separate values, not combined as 'iceberg:zstd'.
-
-        The runner expects table_format='iceberg' and table_format_compression='zstd'
-        as separate keys in benchmark_config.options. A combined string would fail
-        the allowed_formats validation in _run_format_conversion().
-        """
         mock_confirm.return_value = True
-        mock_prompt.side_effect = ["5", "1"]  # Iceberg + zstd
+        mock_prompt.side_effect = ["5", "1"]
         fmt, compression = prompt_table_format("snowflake")
 
-        # Format must be a plain name without colon - runner validates against {"parquet", "vortex", "delta", "iceberg"}
         assert fmt == "iceberg"
         assert ":" not in fmt
         assert compression == "zstd"
@@ -1323,24 +1243,20 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_all_formats_return_valid_runner_names(self, mock_confirm, mock_prompt):
-        """Every format returned by prompt_table_format must be in the runner's allowed set."""
         allowed_formats = {"parquet", "vortex", "delta", "iceberg"}
         format_choices = {"2": "parquet", "3": "vortex", "4": "delta", "5": "iceberg"}
 
         for choice, expected_fmt in format_choices.items():
             mock_confirm.return_value = True
-            mock_prompt.side_effect = [choice, "1"]  # format + first compression option
+            mock_prompt.side_effect = [choice, "1"]
             fmt, _ = prompt_table_format("duckdb")
             assert fmt in allowed_formats, f"Format '{fmt}' from choice {choice} not in runner's allowed set"
             assert fmt == expected_fmt
 
 
 class TestPromptVerboseOutput:
-    """Tests for prompt_verbose_output function."""
-
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_verbose(self, mock_confirm):
-        """Test declining verbose returns 0."""
         mock_confirm.return_value = False
         result = prompt_verbose_output()
         assert result == 0
@@ -1348,7 +1264,6 @@ class TestPromptVerboseOutput:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_verbose_level_1(self, mock_confirm, mock_prompt):
-        """Test selecting verbose level 1."""
         mock_confirm.return_value = True
         mock_prompt.return_value = "1"
         result = prompt_verbose_output()
@@ -1357,7 +1272,6 @@ class TestPromptVerboseOutput:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_verbose_level_2_debug(self, mock_confirm, mock_prompt):
-        """Test selecting debug level 2."""
         mock_confirm.return_value = True
         mock_prompt.return_value = "2"
         result = prompt_verbose_output()
@@ -1365,11 +1279,8 @@ class TestPromptVerboseOutput:
 
 
 class TestPromptPlatformOptions:
-    """Tests for prompt_platform_options function."""
-
     def test_unknown_platform_returns_empty(self):
 
-        # Use a platform name that definitely has no options
         result = prompt_platform_options("unknown_platform_xyz")
         assert result == {}
 
@@ -1385,15 +1296,12 @@ class TestPromptPlatformOptions:
     def test_duckdb_memory_limit(self, mock_confirm, mock_prompt):
 
         mock_confirm.return_value = True
-        # DuckDB has: memory_limit, plan_capture_timeout_seconds,
-        # plan_max_depth, temp_directory, threads (sorted alphabetically)
-        # Each needs a value; threads uses special handling for None
         mock_prompt.side_effect = [
-            "16GB",  # memory_limit
-            "",  # plan_capture_timeout_seconds (empty = default)
-            "",  # plan_max_depth (empty = default)
-            "",  # temp_directory (empty = default)
-            "",  # threads (empty = auto/None)
+            "16GB",
+            "",
+            "",
+            "",
+            "",
         ]
         result = prompt_platform_options("duckdb")
         assert "memory_limit" in result
@@ -1403,21 +1311,18 @@ class TestPromptPlatformOptions:
     def test_case_insensitive_platform(self, mock_confirm):
 
         mock_confirm.return_value = False
-        # Should not raise even with mixed case
         result = prompt_platform_options("DuckDB")
         assert isinstance(result, dict)
 
 
 class TestExecutionModeSelection:
-    """Tests for execution mode selection in DatabaseManager."""
-
     @patch("benchbox.cli.database.Prompt.ask")
     def test_sql_mode_selection(self, mock_ask):
 
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
-        mock_ask.return_value = "1"  # Select SQL
+        mock_ask.return_value = "1"
         mode = manager._prompt_execution_mode("polars", "sql")
         assert mode == "sql"
 
@@ -1427,7 +1332,7 @@ class TestExecutionModeSelection:
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
-        mock_ask.return_value = "2"  # Select DataFrame
+        mock_ask.return_value = "2"
         mode = manager._prompt_execution_mode("polars", "sql")
         assert mode == "dataframe"
 
@@ -1437,19 +1342,12 @@ class TestExecutionModeSelection:
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
-        # Default for pyspark is dataframe, so choice "2" should be default
         mock_ask.return_value = "2"
         mode = manager._prompt_execution_mode("pyspark", "dataframe")
         assert mode == "dataframe"
 
 
 class TestRunCommandImportIntegrity:
-    """Tests to verify run command imports don't have scoping issues.
-
-    These tests catch bugs like self-referential imports that shadow
-    module-level imports (e.g., the ForceConfig bug in commit 8b08b497).
-    """
-
     def test_composite_param_classes_accessible(self):
 
         from benchbox.cli.commands.run import (
@@ -1460,7 +1358,6 @@ class TestRunCommandImportIntegrity:
             ValidationConfig,
         )
 
-        # Instantiate each to verify they're properly imported
         force = ForceConfig()
         assert force.datagen is False
         assert force.upload is False
@@ -1481,12 +1378,10 @@ class TestRunCommandImportIntegrity:
 
         from benchbox.cli.commands.run import run
 
-        # Verify it's a click command
         assert hasattr(run, "callback")
         assert callable(run.callback)
 
     def test_no_self_referential_imports_in_run_module(self):
-        """Verify run.py doesn't import from itself (causes UnboundLocalError)."""
         import ast
         from pathlib import Path
 

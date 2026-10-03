@@ -1,26 +1,3 @@
-"""Cross-branch contract test: develop's writer must emit hashes that
-the published-results validator accepts.
-
-Background: the 2026-04-29 Codex agent-proxy dry-run surfaced a
-release-blocker — develop's `benchbox submit` writer used a per-FILE
-SHA-256 hash, while the validator pinned at v0.2.1 on the
-`published-results` branch used a per-DIRECTORY hash. Result: every
-contributor-emitted bundle would fail CI on the documented PR target
-branch with `Bundle hash mismatch` and no contributor-side knob to
-resolve it. Forensic at
-`_project/handoffs/external-dry-run-retrospective-2026-04-29.md`.
-
-This test exercises the writer → validator round-trip end-to-end so any
-future drift between the two sides of the contract fails CI on develop
-before it reaches contributors.
-
-The validation implementation lives in `benchbox.validation.bundle` and
-is mirrored to the `published-results` branch alongside the thin
-`scripts/validate_submission.py` wrapper. These tests import the library
-directly so the writer/validator contract stays deterministic without a
-byte-identical fixture copy under `tests/`.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -46,7 +23,6 @@ def _run_validator(paths: list[Path]) -> tuple[int, str]:
 
 
 def _fake_result() -> SimpleNamespace:
-    """Mirror the unit-test stub in tests/unit/cli/commands/test_submit.py."""
     return SimpleNamespace(
         benchmark_name="tpch",
         platform="duckdb",
@@ -57,15 +33,6 @@ def _fake_result() -> SimpleNamespace:
 
 
 def _minimal_schema_v2_bundle() -> dict:
-    """Bundle JSON that satisfies all required validator schema-v2 keys.
-
-    The submit writer copies the source file verbatim into bundle/, so
-    the source must already be a valid schema-v2 bundle for the
-    validator to accept it. This is the leanest payload that passes —
-    any tighter and the validator's schema checks (REQUIRED_TOP_KEYS,
-    queries timing) start failing for reasons unrelated to the hash
-    contract.
-    """
     return {
         "version": "2.0",
         "run": {
@@ -77,20 +44,13 @@ def _minimal_schema_v2_bundle() -> dict:
         "platform": {"name": "duckdb"},
         "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "phases": {"validation": {"status": "PASSED"}},
-        # Full canonical TPC-H coverage: the query-set coverage gate
-        # refuses short query sets, so the round-trip source must carry
-        # all 22, the same way a genuine complete submission does.
         "queries": [{"id": f"Q{i}", "ms": 100.0} for i in range(1, 23)],
     }
 
 
 def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """End-to-end contract: `benchbox submit` must produce a bundle
-    that the shared published-results validator accepts."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
-    # `benchbox submit` is community-facing end-to-end (both --output and
-    # --service modes) and hard-refuses without a deployment salt.
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     src = tmp_path / "tpch_duckdb.json"
@@ -116,12 +76,8 @@ def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPa
 
 
 def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Companion files (.plans.json / .tuning.json) — the per-file hash
-    contract covers them too via manifest.companion_hashes."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
-    # `benchbox submit` is community-facing end-to-end and hard-refuses
-    # without a deployment salt.
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     src = tmp_path / "tpch_duckdb.json"
@@ -144,26 +100,16 @@ def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPat
 
 
 def test_validator_rejects_symlinked_bundle(tmp_path: Path) -> None:
-    """Symlink defense: a bundle that resolves through a symlink must be
-    rejected by the validator regardless of whether the symlink target's
-    bytes happen to hash correctly. The validator runs on PR-supplied
-    content; without this check, a malicious PR could redirect the hash
-    computation to attacker-chosen bytes."""
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
 
     real = tmp_path / "real_target.json"
     real.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
 
-    # Symlink lives inside bundle_dir, points to a file outside it.
     bundle_filename = "tpch_duckdb.json"
     symlink_path = bundle_dir / bundle_filename
     symlink_path.symlink_to(real)
 
-    # Manifest sits beside the bundle (where the validator discovers it
-    # via bundle_path.parent / "submission-manifest.json"). Hash matches
-    # the real target's bytes — the validator must reject *because of*
-    # the symlink, not because of a hash mismatch.
     real_hash = hashlib.sha256(real.read_bytes()).hexdigest()
     manifest = {
         "bundle_file": bundle_filename,
@@ -179,30 +125,19 @@ def test_validator_rejects_symlinked_bundle(tmp_path: Path) -> None:
 
 
 def test_validator_surfaces_both_missing_manifest_fields(tmp_path: Path) -> None:
-    """Early-return UX: a manifest missing both bundle_file and bundle_hash
-    should warn about both in one pass, not just the first."""
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
     bundle_path = bundle_dir / "tpch_duckdb.json"
     bundle_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
-    # Manifest is intentionally empty to exercise the both-fields-missing path.
-    # Sits beside the bundle where the validator discovers it.
     (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
 
     _rc, output = _run_validator([bundle_path])
 
-    # Both fields are missing — both warnings should surface in one pass.
     assert "bundle_file" in output, output
     assert "bundle_hash" in output, output
 
 
 def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> None:
-    """Per-bundle manifest precedence: when both ``<stem>.manifest.json`` and
-    legacy ``submission-manifest.json`` are present, the per-bundle file
-    must win. The hosted-submit CLI emits per-bundle manifests exclusively;
-    if a future refactor flips precedence so legacy beats per-bundle, hosted
-    bundles mirrored into the PR corpus would fail with confusing errors.
-    """
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
     bundle_filename = "tpch_duckdb.json"
@@ -218,7 +153,7 @@ def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> No
     }
     legacy_manifest = {
         "bundle_file": bundle_filename,
-        "bundle_hash": "0" * 64,  # Wrong hash — would fail if validator picked legacy.
+        "bundle_hash": "0" * 64,
         "companion_hashes": {},
     }
     (bundle_dir / "tpch_duckdb.manifest.json").write_text(json.dumps(per_bundle_manifest), encoding="utf-8")
@@ -231,10 +166,6 @@ def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> No
 
 
 def test_validator_skips_per_bundle_manifest_during_discovery(tmp_path: Path) -> None:
-    """Discovery skip: ``*.manifest.json`` files must not be discovered as
-    bundles. Without this skip, an explicit-path validation that includes
-    the per-bundle manifest fails with "JSON object" or hash errors and the
-    published-results CI workflow falsely rejects valid PRs."""
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
     bundle_filename = "tpch_duckdb.json"
@@ -250,10 +181,7 @@ def test_validator_skips_per_bundle_manifest_during_discovery(tmp_path: Path) ->
     manifest_path = bundle_dir / "tpch_duckdb.manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    # Pass BOTH paths explicitly, mirroring how the published-results
-    # workflow may pass changed files.
     rc, output = _run_validator([bundle_path, manifest_path])
 
     assert rc == 0, f"Validator must skip explicit-path *.manifest.json files. Output:\n{output}"
-    # Validate exactly one bundle was processed even though two paths were passed.
     assert "Validated 1 bundle(s)" in output or "1 bundle" in output, output

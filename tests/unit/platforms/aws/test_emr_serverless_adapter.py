@@ -1,9 +1,6 @@
-"""Tests for Amazon EMR Serverless platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,10 +16,7 @@ pytestmark = [
 
 
 class TestEMRServerlessAdapterInitialization:
-    """Test EMRServerlessAdapter initialization."""
-
     def test_missing_s3_staging_dir_raises_error(self):
-        """Test error when s3_staging_dir is not provided."""
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="s3_staging_dir"):
@@ -52,7 +46,6 @@ class TestEMRServerlessAdapterInitialization:
             )
 
     def test_invalid_s3_path_raises_error(self):
-        """Test error when s3_staging_dir has invalid format."""
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="Invalid S3"):
@@ -128,8 +121,6 @@ class TestEMRServerlessAdapterInitialization:
 
 
 class TestEMRServerlessTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
 
         with (
@@ -181,8 +172,6 @@ class TestEMRServerlessTableFormat:
 
 
 class TestEMRServerlessAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
 
         with (
@@ -229,8 +218,6 @@ class TestEMRServerlessAdapterPlatformInfo:
 
 
 class TestEMRServerlessAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_success(self):
 
         with (
@@ -266,11 +253,8 @@ class TestEMRServerlessAdapterConnection:
 
 
 class TestEMRServerlessAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self, tmp_path):
 
-        # Create actual source directory to pass validation
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -299,8 +283,6 @@ class TestEMRServerlessAdapterDataLoading:
 
 
 class TestEMRServerlessJobState:
-    """Test job state constants."""
-
     def test_job_state_values(self):
 
         from benchbox.platforms.aws.emr_serverless_adapter import EMRServerlessJobState
@@ -314,8 +296,6 @@ class TestEMRServerlessJobState:
 
 
 class TestEMRServerlessAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
 
         from benchbox.core.platform_registry import PlatformRegistry
@@ -338,8 +318,6 @@ class TestEMRServerlessAdapterRegistry:
 
 
 class TestEMRServerlessAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
 
         with (
@@ -382,7 +360,6 @@ class TestEMRServerlessAdapterTuning:
 
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -405,8 +382,6 @@ class TestEMRServerlessAdapterTuning:
 
 
 class TestEMRServerlessAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
 
         from benchbox.platforms.aws import EMRServerlessAdapter
@@ -420,8 +395,6 @@ class TestEMRServerlessAdapterCLI:
 
 
 class TestEMRServerlessAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
 
         with (
@@ -447,8 +420,6 @@ class TestEMRServerlessAdapterFromConfig:
 
 
 class TestEMRServerlessAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_metrics(self):
 
         with (
@@ -470,13 +441,10 @@ class TestEMRServerlessAdapterClose:
 
             adapter.close()
 
-            # Verify logging was called
             mock_logger.info.assert_called()
 
 
 class TestLoadDataRequestedFormat:
-    """Registration must follow the resolved upload format, not table_format alone."""
-
     def test_requested_delta_registers_delta(self, tmp_path):
         ClientError = pytest.importorskip("botocore.exceptions").ClientError
         source_dir = tmp_path / "test_data"

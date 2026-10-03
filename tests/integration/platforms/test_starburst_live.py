@@ -1,29 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Live integration tests for Starburst Galaxy (Trino-compatible).
-
-Setup:
-1. Create a Starburst Galaxy account and provision a cluster
-2. Set environment variables:
-   - STARBURST_HOST (e.g., your-cluster.galaxy.starburst.io)
-   - STARBURST_USER
-   - STARBURST_PASSWORD
-   - STARBURST_CATALOG (optional, defaults to 'tpch')
-   - STARBURST_SCHEMA (optional, defaults to 'sf1')
-   - STARBURST_PORT (optional, defaults to 443)
-3. Run: make test-live-starburst
-
-These tests use the built-in TPC-H catalog available in Starburst Galaxy.
-
-Write tests (SchemaManagement, DataLoading) require a writable catalog:
-   - STARBURST_WRITABLE_CATALOG (e.g., 'memory' or a configured Hive/Iceberg catalog)
-
-Without STARBURST_WRITABLE_CATALOG these tests are skipped - the default tpch
-catalog is read-only and cannot accept DDL or DML.
-"""
 
 import os
 
@@ -45,12 +22,6 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def starburst_writable_catalog():
-    """Return the writable catalog name or skip the test.
-
-    The default tpch catalog in Starburst Galaxy is read-only; write operations
-    require a separate catalog (e.g. 'memory', 'hive', or an Iceberg catalog).
-    Set STARBURST_WRITABLE_CATALOG to enable write tests.
-    """
     catalog = os.getenv("STARBURST_WRITABLE_CATALOG")
     if not catalog:
         pytest.skip("Requires STARBURST_WRITABLE_CATALOG for write tests (tpch catalog is read-only)")
@@ -58,8 +29,6 @@ def starburst_writable_catalog():
 
 
 class TestLiveStarburstConnection:
-    """Test basic Starburst Galaxy connectivity."""
-
     def test_connection(self, live_starburst_adapter):
 
         connection = live_starburst_adapter.create_connection()
@@ -81,24 +50,15 @@ class TestLiveStarburstConnection:
 
 
 class TestLiveStarburstQueryExecution:
-    """Test query execution against a live Starburst Galaxy cluster."""
-
     def test_tpch_query(self, live_starburst_adapter):
-        """Execute a TPC-H-style aggregation query.
-
-        Uses the built-in tpch catalog if available, otherwise runs a
-        standalone aggregation.
-        """
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()
-            # Try querying the built-in TPC-H catalog
             try:
                 cursor.execute("SELECT COUNT(*) FROM tpch.tiny.lineitem")
                 result = cursor.fetchone()
                 assert result[0] > 0
             except TrinoUserError:
-                # Fall back if tpch catalog is not available
                 cursor.execute("SELECT COUNT(*) AS cnt, SUM(x) AS total FROM (VALUES 1, 2, 3) AS t(x)")
                 result = cursor.fetchone()
                 assert result[0] == 3
@@ -107,7 +67,6 @@ class TestLiveStarburstQueryExecution:
             live_starburst_adapter.close_connection(connection)
 
     def test_aggregation_query(self, live_starburst_adapter):
-        """Execute an aggregation query to verify analytical capabilities."""
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -119,7 +78,6 @@ class TestLiveStarburstQueryExecution:
             live_starburst_adapter.close_connection(connection)
 
     def test_tpch_builtin_query(self, live_starburst_adapter):
-        """Query the built-in tpch catalog with a GROUP BY aggregation."""
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -136,10 +94,7 @@ class TestLiveStarburstQueryExecution:
 
 
 class TestLiveStarburstSchemaManagement:
-    """Test schema creation in a writable catalog on Starburst Galaxy."""
-
     def test_schema_creation(self, live_starburst_adapter, starburst_writable_catalog, unique_test_schema):
-        """Create a schema in the writable catalog and verify it exists."""
         connection = live_starburst_adapter.create_connection()
         schema_ref = f"{starburst_writable_catalog}.{unique_test_schema}"
         try:
@@ -160,8 +115,6 @@ class TestLiveStarburstSchemaManagement:
 
 
 class TestLiveStarburstDataLoading:
-    """Test TPC-H data loading into a writable Starburst catalog."""
-
     def test_tpch_data_load(
         self,
         live_starburst_adapter,
@@ -170,7 +123,6 @@ class TestLiveStarburstDataLoading:
         test_scale_factor,
         test_output_dir,
     ):
-        """Load TPC-H data into Starburst via the writable catalog and verify row counts."""
         tpch = TPCH(scale_factor=test_scale_factor, output_dir=test_output_dir, verbose=False)
         data_files = tpch.generate_data()
         assert len(data_files) > 0, "No data files generated"
@@ -180,10 +132,6 @@ class TestLiveStarburstDataLoading:
         try:
             cursor = connection.cursor()
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_ref}")
-            # USE sets the session's current catalog.schema on this connection.
-            # trino-python-client propagates session context to subsequent cursors
-            # opened from the same connection, so create_schema/load_data below
-            # will execute DDL/DML in {schema_ref} without explicit qualification.
             cursor.execute(f"USE {schema_ref}")
             live_starburst_adapter.create_schema(tpch, connection)
             stats, _errors, _ = live_starburst_adapter.load_data(tpch, connection, test_output_dir)
@@ -199,8 +147,6 @@ class TestLiveStarburstDataLoading:
 
 
 class TestLiveStarburstSpecificFeatures:
-    """Test Starburst Galaxy-specific features."""
-
     def test_show_catalogs(self, live_starburst_adapter):
 
         connection = live_starburst_adapter.create_connection()

@@ -1,7 +1,4 @@
-"""Tests for TPCDSDataGenerator manager orchestration.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -19,14 +16,8 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def tmp_gen(tmp_path):
-    """Generator with dsdgen marked unavailable (no binary needed)."""
     gen = TPCDSDataGenerator.__new__(TPCDSDataGenerator)
     gen.scale_factor = 1.0
     gen.output_dir = tmp_path
@@ -53,11 +44,6 @@ def tmp_gen(tmp_path):
     return gen
 
 
-# ---------------------------------------------------------------------------
-# Parameter validation
-# ---------------------------------------------------------------------------
-
-
 class TestValidateParameters:
     def test_negative_scale_factor_raises(self, tmp_path):
         with pytest.raises(ValueError, match="positive"):
@@ -80,20 +66,10 @@ class TestValidateParameters:
             TPCDSDataGenerator(scale_factor=1.0, output_dir=tmp_path, parallel=100)
 
 
-# ---------------------------------------------------------------------------
-# _known_table_names
-# ---------------------------------------------------------------------------
-
-
 def test_known_table_names_includes_dbgen_version(tmp_gen):
     names = tmp_gen._known_table_names()
     assert "dbgen_version" in names
-    assert len(names) > 20  # TPC-DS has 24 tables + dbgen_version
-
-
-# ---------------------------------------------------------------------------
-# _raise_missing_dsdgen
-# ---------------------------------------------------------------------------
+    assert len(names) > 20
 
 
 def test_raise_missing_dsdgen_includes_error_detail(tmp_gen):
@@ -108,21 +84,9 @@ def test_raise_missing_dsdgen_no_error(tmp_gen):
         tmp_gen._raise_missing_dsdgen()
 
 
-# ---------------------------------------------------------------------------
-# resolve_dsdgen_path
-# ---------------------------------------------------------------------------
-
-
 def test_resolve_dsdgen_path_returns_none_when_missing():
-    # All candidate paths are nonexistent in test environment
     result = TPCDSDataGenerator.resolve_dsdgen_path()
-    # Either None (no binary) or a Path (binary found)
     assert result is None or isinstance(result, Path)
-
-
-# ---------------------------------------------------------------------------
-# _prepare_output_dir - missing binary branch
-# ---------------------------------------------------------------------------
 
 
 def test_prepare_output_dir_raises_when_no_dsdgen(tmp_gen):
@@ -139,31 +103,16 @@ def test_prepare_output_dir_creates_directory(tmp_gen, tmp_path):
     assert target.exists()
 
 
-# ---------------------------------------------------------------------------
-# generate_tables - no dsdgen → raises
-# ---------------------------------------------------------------------------
-
-
 def test_generate_tables_raises_when_no_dsdgen(tmp_gen):
     tmp_gen.dsdgen_available = False
     with pytest.raises(RuntimeError):
         tmp_gen.generate_tables(["customer"])
 
 
-# ---------------------------------------------------------------------------
-# generate_tables - invalid table names
-# ---------------------------------------------------------------------------
-
-
 def test_generate_tables_invalid_names_raises(tmp_gen):
     tmp_gen.dsdgen_available = True
     with pytest.raises(ValueError, match="Invalid table names"):
         tmp_gen.generate_tables(["not_a_real_table_xyz"])
-
-
-# ---------------------------------------------------------------------------
-# has_dsdgen_sources
-# ---------------------------------------------------------------------------
 
 
 def test_has_dsdgen_sources_false(tmp_gen):
@@ -176,84 +125,47 @@ def test_has_dsdgen_sources_true(tmp_gen):
     assert tmp_gen.has_dsdgen_sources() is True
 
 
-# ---------------------------------------------------------------------------
-# _package_root_dir
-# ---------------------------------------------------------------------------
-
-
 def test_package_root_dir_returns_path():
     root = TPCDSDataGenerator._package_root_dir()
     assert isinstance(root, Path)
 
 
-# ---------------------------------------------------------------------------
-# _log_regeneration_reason - non-verbose skips emit
-# ---------------------------------------------------------------------------
-
-
 def test_log_regeneration_reason_silent_when_quiet(tmp_gen):
     tmp_gen.verbose = False
-    # Should not raise
     tmp_gen._log_regeneration_reason(None)
 
 
 def test_log_regeneration_reason_verbose_force_regen(tmp_gen, capsys):
     tmp_gen.verbose = True
-    # Pass None validation result (means force regen)
     tmp_gen._log_regeneration_reason(None)
-    # Should emit something
-
-
-# ---------------------------------------------------------------------------
-# _build_schema_registry
-# ---------------------------------------------------------------------------
 
 
 def test_build_schema_registry_returns_tables(tmp_gen):
     registry = tmp_gen._build_schema_registry()
     assert isinstance(registry, dict)
     assert len(registry) > 0
-    # Each entry has name and columns
     first = next(iter(registry.values()))
     assert "name" in first
     assert "columns" in first
 
 
-# ---------------------------------------------------------------------------
-# _candidate_dsdgen_paths - coverage
-# ---------------------------------------------------------------------------
-
-
 def test_candidate_dsdgen_paths_yields_paths():
     paths = list(TPCDSDataGenerator._candidate_dsdgen_paths())
-    assert len(paths) >= 2  # At least package root + relative
+    assert len(paths) >= 2
     for p in paths:
         assert isinstance(p, Path)
 
 
-# ---------------------------------------------------------------------------
-# __init__ with BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON env var
-# ---------------------------------------------------------------------------
-
-
 def test_init_with_data_organization_env_var_invalid_json(tmp_path, monkeypatch):
-    """Invalid JSON in env var should be silently ignored."""
     monkeypatch.setenv("BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON", "{invalid json}")
     gen = TPCDSDataGenerator(scale_factor=1.0, output_dir=tmp_path)
-    # Should still initialize without error
     assert gen._data_organization_config is None
 
 
 def test_init_with_data_organization_env_var_empty(tmp_path, monkeypatch):
-    """No env var should leave data_organization_config as None."""
     monkeypatch.delenv("BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON", raising=False)
     gen = TPCDSDataGenerator(scale_factor=1.0, output_dir=tmp_path)
     assert gen._data_organization_config is None
-
-
-# ---------------------------------------------------------------------------
-# _log_regeneration_reason - verbose with validation issues
-# ---------------------------------------------------------------------------
 
 
 def test_log_regeneration_reason_verbose_with_issues(tmp_gen, capsys):
@@ -261,12 +173,6 @@ def test_log_regeneration_reason_verbose_with_issues(tmp_gen, capsys):
     mock_result = MagicMock()
     mock_result.issues = ["issue1"]
     tmp_gen._log_regeneration_reason(mock_result)
-    # Should not raise; just emits
-
-
-# ---------------------------------------------------------------------------
-# _generate_from_sample - no files in target
-# ---------------------------------------------------------------------------
 
 
 def test_generate_from_sample_returns_none_when_no_files(tmp_gen, tmp_path):
@@ -275,7 +181,6 @@ def test_generate_from_sample_returns_none_when_no_files(tmp_gen, tmp_path):
     target = tmp_path / "target"
     target.mkdir()
 
-    # Patch _copy_sample_dataset to do nothing
     tmp_gen._copy_sample_dataset = MagicMock()
     tmp_gen._gather_existing_table_files = MagicMock(return_value={})
     tmp_gen._validate_file_format_consistency = MagicMock()
@@ -301,16 +206,10 @@ def test_generate_from_sample_returns_paths_when_files_found(tmp_gen, tmp_path):
     assert result == fake_paths
 
 
-# ---------------------------------------------------------------------------
-# generate_tables - success path (mocked generation)
-# ---------------------------------------------------------------------------
-
-
 def test_generate_tables_success_with_mock(tmp_gen, tmp_path):
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
 
-    # Mock the generation helpers
     tmp_gen._generate_table_with_streaming = MagicMock()
     fake_all_paths = {"customer": [tmp_path / "customer.dat"]}
     tmp_gen._gather_existing_table_files = MagicMock(return_value=fake_all_paths)
@@ -331,11 +230,6 @@ def test_generate_tables_verbose(tmp_gen, tmp_path):
     assert "customer" in result
 
 
-# ---------------------------------------------------------------------------
-# generate - delegates to _handle_cloud_or_local_generation
-# ---------------------------------------------------------------------------
-
-
 def test_generate_delegates_correctly(tmp_gen, tmp_path):
     tmp_gen.output_dir = tmp_path
     expected = {"customer": [tmp_path / "customer.dat"]}
@@ -345,20 +239,13 @@ def test_generate_delegates_correctly(tmp_gen, tmp_path):
     assert result == expected
 
 
-# ---------------------------------------------------------------------------
-# _generate_local - mocked happy path
-# ---------------------------------------------------------------------------
-
-
 def test_generate_local_no_regeneration_needed(tmp_gen, tmp_path):
-    """When validator says no regeneration needed, should return existing files."""
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
 
     fake_paths = {"customer": [tmp_path / "customer.dat"]}
     mock_validation = MagicMock()
 
-    # Set up validator mock
     tmp_gen.validator = MagicMock()
     tmp_gen.validator.should_regenerate_data.return_value = (False, mock_validation)
     tmp_gen._gather_existing_table_files = MagicMock(return_value=fake_paths)
@@ -368,7 +255,6 @@ def test_generate_local_no_regeneration_needed(tmp_gen, tmp_path):
 
 
 def test_generate_local_with_sample_data(tmp_gen, tmp_path):
-    """When sample data is available, use it."""
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
 
@@ -388,7 +274,6 @@ def test_generate_local_with_sample_data(tmp_gen, tmp_path):
 
 
 def test_generate_local_no_sample_data_raises(tmp_gen, tmp_path):
-    """Without sample data, delegates to native dsdgen (which then raises)."""
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
 
@@ -405,11 +290,9 @@ def test_generate_local_no_sample_data_raises(tmp_gen, tmp_path):
 
 
 def test_generate_local_with_data_organization(tmp_gen, tmp_path):
-    """When data_organization_config is set, applies it."""
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
 
-    # Minimal fake data_organization_config
     from types import SimpleNamespace
 
     tmp_gen._data_organization_config = SimpleNamespace(
@@ -436,22 +319,14 @@ def test_generate_local_with_data_organization(tmp_gen, tmp_path):
 
 
 def test_compress_raw_dat_files_no_compression(tmp_gen, tmp_path):
-    """Without compression enabled, _compress_raw_dat_files is a no-op."""
     tmp_gen.should_use_compression = MagicMock(return_value=False)
-    tmp_gen._compress_raw_dat_files(tmp_path)  # Should not raise
-
-
-# ---------------------------------------------------------------------------
-# _prepare_output_dir - non-writable directory (permission error)
-# ---------------------------------------------------------------------------
+    tmp_gen._compress_raw_dat_files(tmp_path)
 
 
 def test_prepare_output_dir_non_writable_raises(tmp_gen, tmp_path, monkeypatch):
     tmp_gen.dsdgen_available = True
-    # Make the directory exist
     target = tmp_path / "target"
     target.mkdir()
-    # Patch os.access to return False for write access
     import os
 
     original_access = os.access
@@ -460,13 +335,7 @@ def test_prepare_output_dir_non_writable_raises(tmp_gen, tmp_path, monkeypatch):
         tmp_gen._prepare_output_dir(target)
 
 
-# ---------------------------------------------------------------------------
-# _generate_local - verbose mode with no sample
-# ---------------------------------------------------------------------------
-
-
 def test_generate_local_verbose_logs(tmp_gen, tmp_path):
-    """Verbose mode with existing valid data should log and return."""
     tmp_gen.dsdgen_available = True
     tmp_gen.verbose = True
     tmp_gen.output_dir = tmp_path
@@ -482,7 +351,6 @@ def test_generate_local_verbose_logs(tmp_gen, tmp_path):
 
 
 def test_generate_local_after_native_dsdgen_with_compression(tmp_gen, tmp_path):
-    """After dsdgen, verify file gathering and validation."""
     tmp_gen.dsdgen_available = True
     tmp_gen.output_dir = tmp_path
     tmp_gen._data_organization_config = None
@@ -507,11 +375,6 @@ def test_generate_local_after_native_dsdgen_with_compression(tmp_gen, tmp_path):
     tmp_gen._write_manifest.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# _generate_from_sample - verbose path
-# ---------------------------------------------------------------------------
-
-
 def test_generate_from_sample_verbose(tmp_gen, tmp_path):
     tmp_gen.verbose = True
     sample_dir = tmp_path / "sample"
@@ -529,13 +392,7 @@ def test_generate_from_sample_verbose(tmp_gen, tmp_path):
     assert result == fake_paths
 
 
-# ---------------------------------------------------------------------------
-# __init__ with valid BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON env var
-# ---------------------------------------------------------------------------
-
-
 def test_init_with_valid_data_organization_env_var(tmp_path, monkeypatch):
-    """Valid JSON in env var should be parsed."""
     import json
 
     config_dict = {
@@ -544,10 +401,8 @@ def test_init_with_valid_data_organization_env_var(tmp_path, monkeypatch):
     }
     monkeypatch.setenv("BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON", json.dumps(config_dict))
 
-    # Should not raise even if DataOrganizationConfig.from_dict fails
     try:
         gen = TPCDSDataGenerator(scale_factor=1.0, output_dir=tmp_path)
-        # Config may be set or None depending on DataOrganizationConfig availability
         assert gen is not None
     except Exception:
-        pass  # DataOrganizationConfig.from_dict may fail with this minimal config
+        pass

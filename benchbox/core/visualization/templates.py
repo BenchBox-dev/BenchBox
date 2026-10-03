@@ -1,5 +1,3 @@
-"""Template definitions for common BenchBox chart sets."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -11,8 +9,6 @@ from benchbox.core.visualization.exceptions import VisualizationError
 
 @dataclass(frozen=True)
 class ChartTemplate:
-    """Named chart template describing chart types and export formats."""
-
     name: str
     description: str
     chart_types: Sequence[str]
@@ -112,7 +108,6 @@ _TEMPLATES: dict[str, ChartTemplate] = {
 
 
 def get_template(name: str) -> ChartTemplate:
-    """Lookup a chart template by name."""
     normalized = name.lower().replace("-", "_")
     try:
         return _TEMPLATES[normalized]
@@ -123,5 +118,4 @@ def get_template(name: str) -> ChartTemplate:
 
 
 def list_templates() -> list[ChartTemplate]:
-    """Return all available templates."""
     return list(_TEMPLATES.values())

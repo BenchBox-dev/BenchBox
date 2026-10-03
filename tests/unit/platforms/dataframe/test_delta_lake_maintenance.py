@@ -1,15 +1,11 @@
-"""Tests for Delta Lake maintenance operations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
 import pytest
 
-# Check if deltalake is available
 try:
     import deltalake  # noqa: F401
 
@@ -17,7 +13,6 @@ try:
 except ImportError:
     DELTA_AVAILABLE = False
 
-# Check if pyarrow is available
 try:
     import pyarrow as pa
 
@@ -27,7 +22,6 @@ except ImportError:
     PYARROW_AVAILABLE = False
 
 
-# Skip all tests if Delta Lake not available
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -39,8 +33,6 @@ pytestmark = [
 
 
 class TestDeltaLakeMaintenanceAvailability:
-    """Tests for Delta Lake maintenance availability."""
-
     def test_get_maintenance_operations_returns_delta_lake(self):
 
         from benchbox.core.dataframe.maintenance_interface import (
@@ -88,8 +80,6 @@ class TestDeltaLakeMaintenanceAvailability:
 
 
 class TestDeltaLakeInsert:
-    """Tests for Delta Lake insert operations."""
-
     def test_insert_new_rows(self, tmp_path):
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -99,7 +89,6 @@ class TestDeltaLakeInsert:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create a PyArrow table
         data = pa.table(
             {
                 "id": [1, 2, 3],
@@ -125,18 +114,15 @@ class TestDeltaLakeInsert:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         initial_data = pa.table({"id": [1, 2], "name": ["Alice", "Bob"]})
         write_deltalake(str(table_path), initial_data)
 
-        # Append new data
         new_data = pa.table({"id": [3, 4], "name": ["Charlie", "Diana"]})
         result = ops.insert_rows(table_path=table_path, dataframe=new_data, mode="append")
 
         assert result.success is True
         assert result.rows_affected == 2
 
-        # Verify total rows
         dt = DeltaTable(str(table_path))
         total_rows = dt.to_pyarrow_table().num_rows
         assert total_rows == 4
@@ -152,18 +138,15 @@ class TestDeltaLakeInsert:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         initial_data = pa.table({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
         write_deltalake(str(table_path), initial_data)
 
-        # Overwrite with new data
         new_data = pa.table({"id": [10, 20], "name": ["Xavier", "Yolanda"]})
         result = ops.insert_rows(table_path=table_path, dataframe=new_data, mode="overwrite")
 
         assert result.success is True
         assert result.rows_affected == 2
 
-        # Verify only new rows exist
         dt = DeltaTable(str(table_path))
         total_rows = dt.to_pyarrow_table().num_rows
         assert total_rows == 2
@@ -177,7 +160,6 @@ class TestDeltaLakeInsert:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create empty PyArrow table
         empty_data = pa.table({"id": pa.array([], type=pa.int64()), "name": pa.array([], type=pa.string())})
 
         result = ops.insert_rows(table_path=table_path, dataframe=empty_data, mode="append")
@@ -187,8 +169,6 @@ class TestDeltaLakeInsert:
 
 
 class TestDeltaLakeDelete:
-    """Tests for Delta Lake delete operations."""
-
     def test_delete_with_condition(self, tmp_path):
 
         from deltalake import DeltaTable, write_deltalake
@@ -200,7 +180,6 @@ class TestDeltaLakeDelete:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         data = pa.table(
             {
                 "id": [1, 2, 3, 4, 5],
@@ -210,13 +189,11 @@ class TestDeltaLakeDelete:
         )
         write_deltalake(str(table_path), data)
 
-        # Delete rows where age > 35
         result = ops.delete_rows(table_path=table_path, condition="age > 35")
 
         assert result.success is True
-        assert result.rows_affected == 2  # Diana and Eve
+        assert result.rows_affected == 2
 
-        # Verify remaining rows
         dt = DeltaTable(str(table_path))
         remaining = dt.to_pyarrow_table().num_rows
         assert remaining == 3
@@ -232,23 +209,19 @@ class TestDeltaLakeDelete:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         data = pa.table({"id": [1, 2, 3], "value": [10, 20, 30]})
         write_deltalake(str(table_path), data)
 
-        # Delete rows where value > 100 (none match)
         result = ops.delete_rows(table_path=table_path, condition="value > 100")
 
         assert result.success is True
         assert result.rows_affected == 0
 
-        # Verify all rows still exist
         dt = DeltaTable(str(table_path))
         remaining = dt.to_pyarrow_table().num_rows
         assert remaining == 3
 
     def test_delete_nonexistent_table(self, tmp_path):
-        """Test delete on non-existent table returns 0 rows."""
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -258,14 +231,11 @@ class TestDeltaLakeDelete:
 
         result = ops.delete_rows(table_path=table_path, condition="id > 0")
 
-        # Should succeed with 0 rows (table doesn't exist)
         assert result.success is True
         assert result.rows_affected == 0
 
 
 class TestDeltaLakeUpdate:
-    """Tests for Delta Lake update operations."""
-
     def test_update_rows(self, tmp_path):
 
         from deltalake import DeltaTable, write_deltalake
@@ -277,7 +247,6 @@ class TestDeltaLakeUpdate:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         data = pa.table(
             {
                 "id": [1, 2, 3],
@@ -287,7 +256,6 @@ class TestDeltaLakeUpdate:
         )
         write_deltalake(str(table_path), data)
 
-        # Update status where value > 150
         result = ops.update_rows(
             table_path=table_path,
             condition="value > 150",
@@ -295,19 +263,14 @@ class TestDeltaLakeUpdate:
         )
 
         assert result.success is True
-        # Delta Lake update returns row count (approximate)
 
-        # Verify the update
         dt = DeltaTable(str(table_path))
         table = dt.to_pyarrow_table()
         statuses = table.column("status").to_pylist()
-        # Rows with value 200 and 300 should be 'updated'
         assert statuses.count("updated") == 2
 
 
 class TestDeltaLakeMerge:
-    """Tests for Delta Lake merge (upsert) operations."""
-
     def test_merge_upsert(self, tmp_path):
 
         from deltalake import DeltaTable, write_deltalake
@@ -319,11 +282,9 @@ class TestDeltaLakeMerge:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create initial table
         data = pa.table({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"], "value": [100, 200, 300]})
         write_deltalake(str(table_path), data)
 
-        # Source data for merge (update id=2, insert id=4)
         source = pa.table({"id": [2, 4], "name": ["Bobby", "Diana"], "value": [250, 400]})
 
         result = ops.merge_rows(
@@ -336,20 +297,16 @@ class TestDeltaLakeMerge:
 
         assert result.success is True
 
-        # Verify merge results
         dt = DeltaTable(str(table_path))
         table = dt.to_pyarrow_table()
-        assert table.num_rows == 4  # 3 original + 1 new
+        assert table.num_rows == 4
 
-        # Check that Bob was updated to Bobby
         names = table.column("name").to_pylist()
         assert "Bobby" in names
         assert "Diana" in names
 
 
 class TestDeltaLakeMaintenanceResult:
-    """Tests for Delta Lake maintenance result timing."""
-
     def test_result_timing(self, tmp_path):
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -368,8 +325,6 @@ class TestDeltaLakeMaintenanceResult:
 
 
 class TestDeltaLakeDataFrameConversion:
-    """Tests for DataFrame type conversion."""
-
     def test_convert_polars_dataframe(self, tmp_path):
 
         pytest.importorskip("polars")
@@ -382,7 +337,6 @@ class TestDeltaLakeDataFrameConversion:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create Polars DataFrame
         df = pl.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
 
         result = ops.insert_rows(table_path=table_path, dataframe=df, mode="append")
@@ -402,7 +356,6 @@ class TestDeltaLakeDataFrameConversion:
         ops = DeltaLakeMaintenanceOperations()
         table_path = tmp_path / "test_table"
 
-        # Create Pandas DataFrame
         df = pd.DataFrame({"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"]})
 
         result = ops.insert_rows(table_path=table_path, dataframe=df, mode="append")

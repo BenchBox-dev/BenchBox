@@ -1,14 +1,8 @@
-"""Star Schema Benchmark (SSB) implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Star Schema Benchmark implementation,
-a simplified TPC-H version for testing OLAP systems.
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union

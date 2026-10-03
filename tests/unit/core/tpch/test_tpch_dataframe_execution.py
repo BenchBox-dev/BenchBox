@@ -1,11 +1,4 @@
-"""Execution tests for TPC-H DataFrame query implementations using Polars.
-
-Tests each TPC-H query (Q1-Q22) against small test DataFrames with correct
-TPC-H table schemas, using the expression_impl family via the real Polars
-ExpressionFamilyContext.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -31,11 +24,6 @@ pytestmark = [
     pytest.mark.fast,
     pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed"),
 ]
-
-
-# ---------------------------------------------------------------------------
-# Minimal TPC-H table fixtures (5-10 rows each with correct column names)
-# ---------------------------------------------------------------------------
 
 
 def _build_region() -> pl.LazyFrame:
@@ -73,7 +61,7 @@ def _build_supplier() -> pl.LazyFrame:
             "s_suppkey": [1, 2, 3, 4, 5],
             "s_name": ["Supp-A", "Supp-B", "Supp-C", "Supp-D", "Supp-E"],
             "s_address": ["Addr1", "Addr2", "Addr3", "Addr4", "Addr5"],
-            "s_nationkey": [3, 2, 0, 4, 1],  # GERMANY, FRANCE, BRAZIL, SAUDI ARABIA, CANADA
+            "s_nationkey": [3, 2, 0, 4, 1],
             "s_phone": ["17-000-0001", "13-000-0002", "23-000-0003", "30-000-0004", "29-000-0005"],
             "s_acctbal": [5000.0, 3000.0, 7000.0, 2000.0, 4000.0],
             "s_comment": [
@@ -93,7 +81,7 @@ def _build_customer() -> pl.LazyFrame:
             "c_custkey": [1, 2, 3, 4, 5, 6],
             "c_name": ["Cust-A", "Cust-B", "Cust-C", "Cust-D", "Cust-E", "Cust-F"],
             "c_address": ["CA1", "CA2", "CA3", "CA4", "CA5", "CA6"],
-            "c_nationkey": [3, 2, 0, 4, 1, 3],  # GERMANY, FRANCE, BRAZIL, SAUDI ARABIA, CANADA, GERMANY
+            "c_nationkey": [3, 2, 0, 4, 1, 3],
             "c_phone": ["17-100", "13-200", "23-300", "30-400", "29-500", "17-600"],
             "c_acctbal": [1000.0, 2500.0, 500.0, 8000.0, 100.0, 3000.0],
             "c_mktsegment": ["BUILDING", "AUTOMOBILE", "BUILDING", "HOUSEHOLD", "BUILDING", "BUILDING"],
@@ -267,16 +255,11 @@ def _build_lineitem() -> pl.LazyFrame:
 
 @pytest.fixture(scope="session")
 def polars_adapter() -> PolarsDataFrameAdapter:
-    """Create a Polars adapter for tests."""
     return PolarsDataFrameAdapter()
 
 
 @pytest.fixture(scope="session")
 def tpch_context(polars_adapter):
-    """Create and populate an ExpressionFamilyContext with TPC-H test data.
-
-    Session-scoped so the context is shared across all tests for performance.
-    """
     ctx = polars_adapter.create_context()
     ctx.register_table("region", _build_region())
     ctx.register_table("nation", _build_nation())
@@ -288,10 +271,6 @@ def tpch_context(polars_adapter):
     ctx.register_table("lineitem", _build_lineitem())
     return ctx
 
-
-# ---------------------------------------------------------------------------
-# Expected output columns for each TPC-H query
-# ---------------------------------------------------------------------------
 
 EXPECTED_COLUMNS: dict[str, list[str]] = {
     "Q1": [
@@ -331,10 +310,6 @@ EXPECTED_COLUMNS: dict[str, list[str]] = {
 
 
 def _collect_result(result):
-    """Collect a query result to a Polars DataFrame.
-
-    Handles UnifiedLazyFrame, LazyFrame, and DataFrame transparently.
-    """
     if hasattr(result, "native"):
         result = result.native
     if hasattr(result, "collect"):
@@ -343,10 +318,7 @@ def _collect_result(result):
 
 
 class TestTPCHContextSetup:
-    """Verify the test context is correctly populated."""
-
     def test_all_tables_registered(self, tpch_context):
-        """Test that all 8 TPC-H tables are registered."""
         tables = tpch_context.list_tables()
         expected = ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"]
         assert sorted(tables) == expected
@@ -356,173 +328,140 @@ class TestTPCHContextSetup:
         lineitem = tpch_context.get_table("lineitem")
         assert lineitem is not None
         df = _collect_result(lineitem)
-        assert len(df) == 10  # 10 lineitem rows
+        assert len(df) == 10
 
 
 class TestTPCHExpressionQueries:
-    """Execute each TPC-H expression_impl query against test data.
-
-    For each query, verify:
-    1. The query executes without error
-    2. The result can be collected to a DataFrame
-    3. The result has the expected column names
-    """
-
     def test_q1_pricing_summary(self, tpch_context):
-        """Q1: Pricing Summary Report."""
         query = get_query("Q1")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert len(result) > 0
         assert set(EXPECTED_COLUMNS["Q1"]).issubset(set(result.columns))
-        # Should have groups by returnflag x linestatus
         assert "l_returnflag" in result.columns
         assert "sum_qty" in result.columns
 
     def test_q2_minimum_cost_supplier(self, tpch_context):
-        """Q2: Minimum Cost Supplier."""
         query = get_query("Q2")
         result = _collect_result(query.expression_impl(tpch_context))
 
-        # May be empty with tiny data if no parts match size=15 + type BRASS in EUROPE
         assert set(EXPECTED_COLUMNS["Q2"]).issubset(set(result.columns))
 
     def test_q3_shipping_priority(self, tpch_context):
-        """Q3: Shipping Priority."""
         query = get_query("Q3")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q3"]).issubset(set(result.columns))
 
     def test_q4_order_priority(self, tpch_context):
-        """Q4: Order Priority Checking."""
         query = get_query("Q4")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q4"]).issubset(set(result.columns))
 
     def test_q5_local_supplier_volume(self, tpch_context):
-        """Q5: Local Supplier Volume."""
         query = get_query("Q5")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q5"]).issubset(set(result.columns))
 
     def test_q6_forecasting_revenue(self, tpch_context):
-        """Q6: Forecasting Revenue Change."""
         query = get_query("Q6")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q6"]).issubset(set(result.columns))
 
     def test_q7_volume_shipping(self, tpch_context):
-        """Q7: Volume Shipping."""
         query = get_query("Q7")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q7"]).issubset(set(result.columns))
 
     def test_q8_national_market_share(self, tpch_context):
-        """Q8: National Market Share."""
         query = get_query("Q8")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q8"]).issubset(set(result.columns))
 
     def test_q9_product_type_profit(self, tpch_context):
-        """Q9: Product Type Profit Measure."""
         query = get_query("Q9")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q9"]).issubset(set(result.columns))
 
     def test_q10_returned_items(self, tpch_context):
-        """Q10: Returned Item Reporting."""
         query = get_query("Q10")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q10"]).issubset(set(result.columns))
 
     def test_q11_important_stock(self, tpch_context):
-        """Q11: Important Stock Identification."""
         query = get_query("Q11")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q11"]).issubset(set(result.columns))
 
     def test_q12_shipping_modes(self, tpch_context):
-        """Q12: Shipping Modes and Order Priority."""
         query = get_query("Q12")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q12"]).issubset(set(result.columns))
 
     def test_q13_customer_distribution(self, tpch_context):
-        """Q13: Customer Distribution."""
         query = get_query("Q13")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q13"]).issubset(set(result.columns))
 
     def test_q14_promotion_effect(self, tpch_context):
-        """Q14: Promotion Effect."""
         query = get_query("Q14")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q14"]).issubset(set(result.columns))
 
     def test_q15_top_supplier(self, tpch_context):
-        """Q15: Top Supplier."""
         query = get_query("Q15")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q15"]).issubset(set(result.columns))
 
     def test_q16_parts_supplier_relationship(self, tpch_context):
-        """Q16: Parts/Supplier Relationship."""
         query = get_query("Q16")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q16"]).issubset(set(result.columns))
 
     def test_q17_small_quantity_order_revenue(self, tpch_context):
-        """Q17: Small-Quantity-Order Revenue."""
         query = get_query("Q17")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q17"]).issubset(set(result.columns))
 
     def test_q18_large_volume_customer(self, tpch_context):
-        """Q18: Large Volume Customer."""
         query = get_query("Q18")
         result = _collect_result(query.expression_impl(tpch_context))
 
-        # May be empty if no orders exceed quantity_threshold=300
         assert set(EXPECTED_COLUMNS["Q18"]).issubset(set(result.columns))
 
     def test_q19_discounted_revenue(self, tpch_context):
-        """Q19: Discounted Revenue."""
         query = get_query("Q19")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q19"]).issubset(set(result.columns))
 
     def test_q20_potential_part_promotion(self, tpch_context):
-        """Q20: Potential Part Promotion."""
         query = get_query("Q20")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q20"]).issubset(set(result.columns))
 
     def test_q21_suppliers_kept_waiting(self, tpch_context):
-        """Q21: Suppliers Who Kept Orders Waiting."""
         query = get_query("Q21")
         result = _collect_result(query.expression_impl(tpch_context))
 
         assert set(EXPECTED_COLUMNS["Q21"]).issubset(set(result.columns))
 
     def test_q22_global_sales_opportunity(self, tpch_context):
-        """Q22: Global Sales Opportunity."""
         query = get_query("Q22")
         result = _collect_result(query.expression_impl(tpch_context))
 
@@ -530,11 +469,8 @@ class TestTPCHExpressionQueries:
 
 
 class TestTPCHParameterizedExecution:
-    """Parametrized execution of all Q1-Q22 for comprehensive coverage."""
-
     @pytest.mark.parametrize("query_id", list_query_ids())
     def test_expression_impl_executes(self, tpch_context, query_id: str):
-        """Every expression_impl should execute without error and produce a DataFrame."""
         query = get_query(query_id)
         assert query.expression_impl is not None, f"{query_id} has no expression_impl"
 
@@ -547,7 +483,6 @@ class TestTPCHParameterizedExecution:
 
     @pytest.mark.parametrize("query_id", list_query_ids())
     def test_expression_impl_column_structure(self, tpch_context, query_id: str):
-        """Every expression_impl should return the expected columns."""
         query = get_query(query_id)
         result = _collect_result(query.expression_impl(tpch_context))
 
@@ -559,22 +494,17 @@ class TestTPCHParameterizedExecution:
 
 
 class TestTPCHQueryResultValues:
-    """Spot-check result values for queries that reliably produce data with tiny tables."""
-
     def test_q1_has_multiple_groups(self, tpch_context):
-        """Q1 should produce at least 2 returnflag x linestatus groups."""
         query = get_query("Q1")
         result = _collect_result(query.expression_impl(tpch_context))
         assert len(result) >= 2
 
     def test_q6_returns_single_row(self, tpch_context):
-        """Q6 returns a single revenue scalar."""
         query = get_query("Q6")
         result = _collect_result(query.expression_impl(tpch_context))
         assert len(result) == 1
 
     def test_q13_produces_distribution(self, tpch_context):
-        """Q13 should produce customer-order count distribution."""
         query = get_query("Q13")
         result = _collect_result(query.expression_impl(tpch_context))
         assert len(result) >= 1
@@ -582,7 +512,6 @@ class TestTPCHQueryResultValues:
         assert "custdist" in result.columns
 
     def test_q14_returns_single_row(self, tpch_context):
-        """Q14 returns a single promo_revenue value."""
         query = get_query("Q14")
         result = _collect_result(query.expression_impl(tpch_context))
         assert len(result) == 1

@@ -1,17 +1,8 @@
-"""TPC-H Skew benchmark implementation module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides TPC-H benchmark with configurable data skew for testing
-database performance under realistic data distributions.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-Based on the research: "Introducing Skew into the TPC-H Benchmark"
-Reference: https://www.tpc.org/tpctc/tpctc2011/slides_and_papers/introducing_skew_into_the_tpc_h_benchmark.pdf
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,43 +21,6 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
 class TPCHSkewBenchmark(TPCHBenchmark):
-    """TPC-H Skew benchmark implementation.
-
-    Extends TPC-H benchmark with configurable data skew to test
-    database performance under realistic data distribution patterns.
-
-    This benchmark generates TPC-H data with non-uniform distributions:
-    - Attribute skew: Some values appear more frequently
-    - Join skew: Some foreign key relationships are more common
-    - Temporal skew: Some time periods have more activity
-
-    The standard TPC-H queries (1-22) are used unchanged, allowing
-    direct comparison between uniform and skewed data performance.
-
-    Usage:
-        >>> from benchbox import TPCHSkew
-        >>> from benchbox.platforms.duckdb import DuckDBAdapter
-        >>>
-        >>> # Create benchmark with moderate skew
-        >>> benchmark = TPCHSkew(scale_factor=1.0, skew_preset="moderate")
-        >>>
-        >>> # Or use custom configuration
-        >>> from benchbox.core.tpch_skew import SkewConfiguration
-        >>> config = SkewConfiguration(skew_factor=0.7, distribution_type="zipfian")
-        >>> benchmark = TPCHSkew(scale_factor=1.0, skew_config=config)
-        >>>
-        >>> # Generate data and run queries
-        >>> adapter = DuckDBAdapter(database=":memory:")
-        >>> adapter.load_benchmark(benchmark)
-        >>> results = adapter.run_benchmark(benchmark)
-
-    Attributes:
-        scale_factor: Scale factor (1.0 = ~1GB)
-        output_dir: Data output directory
-        skew_config: Skew configuration settings
-        skew_preset: Name of preset used (if any)
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -78,22 +32,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         force_regenerate: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize TPC-H Skew benchmark instance.
-
-        Args:
-            scale_factor: Scale factor (1.0 = ~1GB)
-            output_dir: Data output directory
-            skew_preset: Preset name ("none", "light", "moderate", "heavy", "extreme", "realistic")
-            skew_config: Custom SkewConfiguration (overrides preset if both provided)
-            verbose: Verbosity level
-            parallel: Parallel processes for data generation
-            force_regenerate: Force data regeneration
-            **kwargs: Additional options
-
-        Raises:
-            ValueError: If both preset and config are invalid
-        """
-        # Determine skew configuration
         if skew_config is not None:
             self.skew_config = skew_config
             self.skew_preset = "custom"
@@ -106,11 +44,9 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             self.skew_config = get_preset_config(preset_enum)
             self.skew_preset = skew_preset.lower()
         else:
-            # Default to moderate skew
             self.skew_config = get_preset_config(SkewPreset.MODERATE)
             self.skew_preset = "moderate"
 
-        # Initialize parent class (TPC-H benchmark)
         super().__init__(
             scale_factor=scale_factor,
             output_dir=output_dir,
@@ -120,7 +56,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             **kwargs,
         )
 
-        # Replace data generator with skewed version
         self.data_generator = TPCHSkewDataGenerator(
             scale_factor=scale_factor,
             output_dir=self.output_dir,
@@ -131,19 +66,12 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             force_regenerate=force_regenerate,
         )
 
-        # Update benchmark name
         self._name = f"TPC-H Skew Benchmark ({self.skew_preset})"
 
     def generate_data(self) -> list[Path | list[Path]]:
-        """Generate TPC-H data with skew applied.
-
-        Returns:
-            List of paths to generated data files (may include sharded file lists)
-        """
         self.log_verbose(f"Generating TPC-H Skew data (preset: {self.skew_preset})")
         self.log_verbose(f"Skew factor: {self.skew_config.skew_factor}")
 
-        # Use the skewed data generator
         self.tables = self.data_generator.generate()
 
         if self.verbose_enabled:
@@ -154,11 +82,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         return list(self.tables.values())
 
     def get_skew_info(self) -> dict[str, Any]:
-        """Get information about the skew configuration.
-
-        Returns:
-            Dictionary containing skew configuration details
-        """
         return {
             "preset": self.skew_preset,
             "skew_factor": self.skew_config.skew_factor,
@@ -170,15 +93,9 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         }
 
     def manifest_matches_datagen_identity(self, manifest: dict[str, Any]) -> bool:
-        """Return whether ``manifest`` matches this benchmark's skew configuration."""
         return self.data_generator.manifest_matches_datagen_identity(manifest)
 
     def get_benchmark_info(self) -> dict[str, Any]:
-        """Get information about the benchmark.
-
-        Returns:
-            Dictionary containing benchmark metadata
-        """
         base_info = {
             "name": "TPC-H Skew Benchmark",
             "version": "1.0",
@@ -202,43 +119,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         queries: list[int] | None = None,
         iterations: int = 1,
     ) -> dict[str, Any]:
-        """Run comparison between skewed and uniform TPC-H data.
-
-        This method orchestrates running the same queries on both uniform
-        (standard TPC-H) and skewed data to measure performance differences.
-        It uses the existing TPCHBenchmark for uniform data generation.
-
-        Args:
-            adapter: Platform adapter to use for query execution
-            queries: List of query IDs to run (default: all 22)
-            iterations: Number of times to run each query for averaging (default: 1)
-
-        Returns:
-            Dictionary with comparison results:
-            - queries: List of query IDs compared
-            - scale_factor: Scale factor used
-            - skew_preset: Skew preset name
-            - skew_config: Skew configuration details
-            - uniform_results: Query timing results on uniform data
-            - skewed_results: Query timing results on skewed data
-            - comparison: Per-query comparison with ratios
-            - summary: Aggregate statistics
-
-        Raises:
-            ValueError: If adapter is None or queries list is invalid
-            RuntimeError: If benchmark execution fails
-
-        Example:
-            >>> from benchbox import TPCHSkew
-            >>> from benchbox.platforms.duckdb import DuckDBAdapter
-            >>>
-            >>> benchmark = TPCHSkew(scale_factor=0.01, skew_preset="heavy")
-            >>> adapter = DuckDBAdapter(database=":memory:")
-            >>>
-            >>> # Compare queries 1, 6, and 14
-            >>> results = benchmark.compare_with_uniform(adapter, queries=[1, 6, 14])
-            >>> emit(results["summary"]["avg_skew_slowdown"])
-        """
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
         if adapter is None:
@@ -272,15 +152,12 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             "summary": {},
         }
 
-        # Phase 1: Run queries on uniform data
         self._run_benchmark_phase(
             adapter, uniform_benchmark, query_subset, results["uniform_results"], "uniform", "Phase 1"
         )
 
-        # Phase 2: Run queries on skewed data
         self._run_benchmark_phase(adapter, self, query_subset, results["skewed_results"], "skewed", "Phase 2")
 
-        # Phase 3: Compute comparison statistics
         self.log_verbose("Phase 3: Computing comparison statistics...")
         results["comparison"], results["summary"] = self._compute_comparison_stats(queries, results)
 
@@ -289,7 +166,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
 
     @staticmethod
     def _validate_comparison_queries(queries: list[int] | None, iterations: int) -> list[int]:
-        """Validate and return query list for comparison."""
         if queries is None:
             queries = list(range(1, 23))
         else:
@@ -309,7 +185,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         label: str,
         phase_name: str,
     ) -> None:
-        """Run a single benchmark phase (uniform or skewed) and collect results."""
         self.log_verbose(f"{phase_name}: Running queries on {label} TPC-H data...")
         start = mono_time()
 
@@ -338,7 +213,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
     def _compute_comparison_stats(
         self, queries: list[int], results: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Compute per-query comparison and summary statistics."""
         from statistics import mean, stdev
 
         comparison: dict[str, Any] = {}
@@ -380,7 +254,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
     def _build_comparison_summary(
         self, all_ratios: list[float], uniform_total: float, skewed_total: float
     ) -> dict[str, Any]:
-        """Build summary statistics from comparison ratios."""
         from statistics import mean, stdev
 
         if not all_ratios:
@@ -410,7 +283,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
 
     @staticmethod
     def _geometric_mean(values: list[float]) -> float:
-        """Compute geometric mean of positive values."""
         if not values:
             return 0.0
         from functools import reduce
@@ -421,26 +293,10 @@ class TPCHSkewBenchmark(TPCHBenchmark):
 
     @staticmethod
     def get_available_presets() -> list[str]:
-        """Get list of available skew presets.
-
-        Returns:
-            List of preset names
-        """
         return [p.value for p in SkewPreset]
 
     @staticmethod
     def get_preset_description(preset_name: str) -> str:
-        """Get description of a skew preset.
-
-        Args:
-            preset_name: Name of the preset
-
-        Returns:
-            Human-readable description
-
-        Raises:
-            ValueError: If preset name is invalid
-        """
         descriptions = {
             "none": "Uniform distribution (standard TPC-H)",
             "light": "Light skew (z=0.2) - mild concentration in popular values",
@@ -454,10 +310,6 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             raise ValueError(f"Unknown preset: {preset_name}. Valid: {list(descriptions.keys())}")
         return descriptions[preset_lower]
 
-
-# ---------------------------------------------------------------------------
-# Register benchmark-specific CLI option specs
-# ---------------------------------------------------------------------------
 
 from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,

@@ -1,12 +1,6 @@
-"""Resource limits and monitoring utilities for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides configurable resource limits with warning thresholds,
-memory limit enforcement, and graceful degradation support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -17,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable
 
-try:  # Optional dependency; tests patch this symbol directly
+try:
     import psutil  # type: ignore
 except ImportError:  # pragma: no cover - exercised via patched fallback
     psutil = None
@@ -26,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceWarningLevel(Enum):
-    """Severity levels for resource warnings."""
-
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -35,11 +27,9 @@ class ResourceWarningLevel(Enum):
 
 @dataclass
 class ResourceWarning:
-    """A recorded resource warning event."""
-
     timestamp: float
     level: ResourceWarningLevel
-    resource_type: str  # "memory", "cpu", "timeout"
+    resource_type: str
     current_value: float
     threshold_value: float
     message: str
@@ -57,33 +47,22 @@ class ResourceWarning:
 
 @dataclass
 class ResourceLimitsConfig:
-    """Configuration for resource limits and warning thresholds.
+    memory_limit_mb: float | None = None
+    memory_warning_percent: float = 75.0
+    memory_critical_percent: float = 90.0
 
-    All memory values are in MB. All percentages are 0-100 scale.
-    """
+    cpu_warning_percent: float = 90.0
 
-    # Memory limits
-    memory_limit_mb: float | None = None  # Hard limit - fail if exceeded
-    memory_warning_percent: float = 75.0  # Warn at this percentage of system memory
-    memory_critical_percent: float = 90.0  # Critical warning at this percentage
-
-    # CPU limits (informational - cannot enforce CPU limits in Python)
-    cpu_warning_percent: float = 90.0  # Warn when CPU exceeds this
-
-    # Timeout limits (in seconds)
-    default_operation_timeout: float = 300.0  # 5 minutes default
+    default_operation_timeout: float = 300.0
     enforce_timeouts: bool = True
 
-    # Callback configuration
     warning_callback: Callable[[ResourceWarning], None] | None = None
     critical_callback: Callable[[ResourceWarning], None] | None = None
 
-    # Graceful degradation
     enable_graceful_degradation: bool = False
     degradation_memory_threshold_percent: float = 80.0
 
     def __post_init__(self):
-        """Validate configuration values."""
         if not 0 < self.memory_warning_percent <= 100:
             raise ValueError("memory_warning_percent must be between 0 and 100")
         if not 0 < self.memory_critical_percent <= 100:
@@ -93,14 +72,6 @@ class ResourceLimitsConfig:
 
     @classmethod
     def from_config_dict(cls, config: dict[str, Any]) -> ResourceLimitsConfig:
-        """Create configuration from a dictionary.
-
-        Args:
-            config: Dictionary with resource limit settings
-
-        Returns:
-            ResourceLimitsConfig instance
-        """
         return cls(
             memory_limit_mb=config.get("memory_limit_mb"),
             memory_warning_percent=config.get("memory_warning_percent", 75.0),
@@ -114,8 +85,6 @@ class ResourceLimitsConfig:
 
 
 class ResourceLimitExceeded(Exception):
-    """Raised when a hard resource limit is exceeded."""
-
     def __init__(self, message: str, resource_type: str, current_value: float, limit_value: float):
         self.resource_type = resource_type
         self.current_value = current_value
@@ -125,8 +94,6 @@ class ResourceLimitExceeded(Exception):
 
 @dataclass
 class ResourceUsageSummary:
-    """Summary of resource usage during an operation."""
-
     peak_memory_mb: float = 0.0
     average_memory_mb: float = 0.0
     peak_cpu_percent: float = 0.0
@@ -149,43 +116,18 @@ class ResourceUsageSummary:
 
 
 class ResourceLimitMonitor:
-    """Monitors resource usage and enforces limits.
-
-    Extends the basic ResourceMonitor functionality with:
-    - Configurable warning thresholds
-    - Hard memory limits
-    - Warning callbacks
-    - Resource usage summaries
-
-    Example:
-        >>> config = ResourceLimitsConfig(memory_warning_percent=75)
-        >>> monitor = ResourceLimitMonitor(config)
-        >>> monitor.start()
-        >>> # ... run benchmark ...
-        >>> summary = monitor.stop()
-        >>> if summary.warnings:
-        ...     emit(f"Got {len(summary.warnings)} warnings")
-    """
-
     def __init__(
         self,
         config: ResourceLimitsConfig | None = None,
         sample_interval: float = 2.0,
     ):
-        """Initialize resource limit monitor.
-
-        Args:
-            config: Resource limits configuration
-            sample_interval: Seconds between resource samples
-        """
         self.config = config or ResourceLimitsConfig()
         self.sample_interval = sample_interval
 
         self._stop_event: threading.Event | None = None
         self._thread: threading.Thread | None = None
-        self._process: Any = None  # psutil.Process
+        self._process: Any = None
 
-        # Tracking state
         self._peak_memory_mb: float = 0.0
         self._peak_cpu_percent: float = 0.0
         self._memory_samples: list[float] = []
@@ -194,29 +136,24 @@ class ResourceLimitMonitor:
         self._limit_exceeded: bool = False
         self._degradation_triggered: bool = False
 
-        # Warning deduplication (don't spam same warning)
         self._last_memory_warning_level: ResourceWarningLevel | None = None
         self._last_cpu_warning_level: ResourceWarningLevel | None = None
 
-        # System memory info (cached)
         self._total_memory_mb: float | None = None
 
     def start(self) -> None:
-        """Start background resource monitoring thread."""
         if psutil is None:
             logger.debug("psutil not available, resource monitoring disabled")
             return
 
         if self._thread is not None and self._thread.is_alive():
-            return  # Already running
+            return
 
         self._process = psutil.Process()
         self._stop_event = threading.Event()
 
-        # Cache total system memory
         self._total_memory_mb = psutil.virtual_memory().total / (1024 * 1024)
 
-        # Reset tracking state
         self._peak_memory_mb = 0.0
         self._peak_cpu_percent = 0.0
         self._memory_samples = []
@@ -236,7 +173,6 @@ class ResourceLimitMonitor:
         logger.debug("Resource limit monitoring started")
 
     def _sample_loop(self) -> None:
-        """Background loop that samples resource usage."""
         while not self._stop_event.is_set():
             try:
                 self._sample_and_check()
@@ -246,30 +182,24 @@ class ResourceLimitMonitor:
             self._stop_event.wait(self.sample_interval)
 
     def _sample_and_check(self) -> None:
-        """Sample current resource usage and check limits."""
         if self._process is None:
             return
 
         try:
-            # Get memory usage
             mem_info = self._process.memory_info()
             memory_mb = mem_info.rss / (1024 * 1024)
             memory_percent = (memory_mb / self._total_memory_mb * 100) if self._total_memory_mb else 0
 
-            # Get CPU usage
             cpu_percent = self._process.cpu_percent(interval=0.1)
 
-            # Record samples
             self._memory_samples.append(memory_mb)
             self._cpu_samples.append(cpu_percent)
 
-            # Track peaks
             if memory_mb > self._peak_memory_mb:
                 self._peak_memory_mb = memory_mb
             if cpu_percent > self._peak_cpu_percent:
                 self._peak_cpu_percent = cpu_percent
 
-            # Check limits and generate warnings
             self._check_memory_limits(memory_mb, memory_percent)
             self._check_cpu_limits(cpu_percent)
 
@@ -277,8 +207,6 @@ class ResourceLimitMonitor:
             logger.debug(f"Error sampling resources: {e}")
 
     def _check_memory_limits(self, memory_mb: float, memory_percent: float) -> None:
-        """Check memory usage against limits and thresholds."""
-        # Check hard limit
         if self.config.memory_limit_mb and memory_mb > self.config.memory_limit_mb:
             self._limit_exceeded = True
             warning = ResourceWarning(
@@ -295,7 +223,6 @@ class ResourceLimitMonitor:
                 self._stop_event.set()
             return
 
-        # Check critical threshold
         if memory_percent >= self.config.memory_critical_percent:
             if self._last_memory_warning_level != ResourceWarningLevel.CRITICAL:
                 warning = ResourceWarning(
@@ -310,7 +237,6 @@ class ResourceLimitMonitor:
                 logger.warning(warning.message)
                 self._last_memory_warning_level = ResourceWarningLevel.CRITICAL
 
-        # Check warning threshold
         elif memory_percent >= self.config.memory_warning_percent:
             if self._last_memory_warning_level not in (ResourceWarningLevel.WARNING, ResourceWarningLevel.CRITICAL):
                 warning = ResourceWarning(
@@ -325,7 +251,6 @@ class ResourceLimitMonitor:
                 logger.warning(warning.message)
                 self._last_memory_warning_level = ResourceWarningLevel.WARNING
 
-        # Check degradation threshold
         if (
             self.config.enable_graceful_degradation
             and memory_percent >= self.config.degradation_memory_threshold_percent
@@ -338,7 +263,6 @@ class ResourceLimitMonitor:
             )
 
     def _check_cpu_limits(self, cpu_percent: float) -> None:
-        """Check CPU usage against warning threshold."""
         if cpu_percent >= self.config.cpu_warning_percent:
             if self._last_cpu_warning_level != ResourceWarningLevel.WARNING:
                 warning = ResourceWarning(
@@ -350,14 +274,12 @@ class ResourceLimitMonitor:
                     message=f"High CPU usage: {cpu_percent:.1f}% >= {self.config.cpu_warning_percent:.1f}%",
                 )
                 self._record_warning(warning)
-                logger.info(warning.message)  # CPU warnings are informational
+                logger.info(warning.message)
                 self._last_cpu_warning_level = ResourceWarningLevel.WARNING
 
     def _record_warning(self, warning: ResourceWarning) -> None:
-        """Record a warning and invoke callbacks."""
         self._warnings.append(warning)
 
-        # Invoke callbacks
         if warning.level == ResourceWarningLevel.CRITICAL and self.config.critical_callback:
             try:
                 self.config.critical_callback(warning)
@@ -370,7 +292,6 @@ class ResourceLimitMonitor:
                 logger.debug(f"Warning callback error: {e}")
 
     def stop(self) -> ResourceUsageSummary:
-        """Stop monitoring and return usage summary."""
         if self._stop_event is not None:
             self._stop_event.set()
 
@@ -378,7 +299,6 @@ class ResourceLimitMonitor:
             self._thread.join(timeout=5.0)
             self._thread = None
 
-        # Calculate averages
         avg_memory = sum(self._memory_samples) / len(self._memory_samples) if self._memory_samples else 0.0
         avg_cpu = sum(self._cpu_samples) / len(self._cpu_samples) if self._cpu_samples else 0.0
 
@@ -399,11 +319,6 @@ class ResourceLimitMonitor:
         return summary
 
     def get_current_usage(self) -> dict[str, float]:
-        """Get current resource usage.
-
-        Returns:
-            Dictionary with memory_mb, memory_percent, cpu_percent keys.
-        """
         if self._process is None:
             return {"memory_mb": 0.0, "memory_percent": 0.0, "cpu_percent": 0.0}
 
@@ -420,30 +335,18 @@ class ResourceLimitMonitor:
             return {"memory_mb": 0.0, "memory_percent": 0.0, "cpu_percent": 0.0}
 
     def should_degrade(self) -> bool:
-        """Check if graceful degradation should be applied.
-
-        Returns:
-            True if degradation has been triggered due to resource pressure.
-        """
         return self._degradation_triggered
 
     @property
     def warnings(self) -> list[ResourceWarning]:
-        """Get list of recorded warnings."""
         return list(self._warnings)
 
     @property
     def limit_exceeded(self) -> bool:
-        """Check if any hard limit was exceeded."""
         return self._limit_exceeded
 
 
 def get_system_memory_mb() -> float:
-    """Get total system memory in MB.
-
-    Returns:
-        Total system memory in MB, or 0 if unavailable.
-    """
     if psutil is None:
         return 0.0
     try:
@@ -453,11 +356,6 @@ def get_system_memory_mb() -> float:
 
 
 def get_available_memory_mb() -> float:
-    """Get available system memory in MB.
-
-    Returns:
-        Available system memory in MB, or 0 if unavailable.
-    """
     if psutil is None:
         return 0.0
     try:
@@ -470,18 +368,9 @@ def calculate_safe_memory_limit(
     safety_margin_percent: float = 20.0,
     max_limit_mb: float | None = None,
 ) -> float:
-    """Calculate a safe memory limit for operations.
-
-    Args:
-        safety_margin_percent: Percentage of memory to reserve (0-100)
-        max_limit_mb: Maximum limit to return (optional)
-
-    Returns:
-        Safe memory limit in MB
-    """
     total_mb = get_system_memory_mb()
     if total_mb == 0:
-        return max_limit_mb or 8192.0  # Default 8GB if unknown
+        return max_limit_mb or 8192.0
 
     safe_mb = total_mb * (1 - safety_margin_percent / 100)
 

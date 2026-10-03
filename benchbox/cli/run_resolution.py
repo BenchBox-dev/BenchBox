@@ -1,11 +1,3 @@
-"""Typed request and resolved-plan contracts for ``benchbox run``.
-
-The Click command still exposes compatibility attributes while the run pipeline
-is migrated incrementally.  These frozen models identify which values are user
-intent and which values are derived, and give every dispatch path one stable
-snapshot to use for configuration and execution metadata.
-"""
-
 from __future__ import annotations
 
 import os
@@ -24,14 +16,6 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class RunRequest:
-    """User intent for a run, before registry and tuning resolution.
-
-    ``exact_replay`` is false when a historical preference omitted information
-    needed to reproduce the original run.  Compatibility defaults remain
-    explicit in ``compatibility_notes`` rather than being presented as an exact
-    replay.
-    """
-
     platform: str | None
     benchmark: str | None
     scale: float
@@ -54,14 +38,6 @@ class RunRequest:
 
 @dataclass(frozen=True)
 class ResolvedRunPlan:
-    """Immutable snapshot of all execution-significant derived run state.
-
-    Runtime outputs (result status, timings, and artifacts) intentionally do not
-    belong here.  Mutable configuration payloads are retained by reference for
-    compatibility, but the plan's selection of those payloads cannot be
-    reassigned after resolution.
-    """
-
     request: RunRequest
     platform_key: str | None
     benchmark: str | None
@@ -116,13 +92,6 @@ _NON_REPLAYABLE_OPTION_NAMES = frozenset(
 
 
 def _active_non_replayable_options(state: types.SimpleNamespace) -> tuple[str, ...]:
-    """Identify active execution controls that quick restart does not serialize.
-
-    Platform option values are deliberately excluded because option payloads may
-    contain credentials. Force regeneration is likewise never replayed
-    implicitly. The remaining controls require a future typed persistence
-    contract before they can safely be advertised as exact replay inputs.
-    """
     checks = {
         "analyze_plans": getattr(state, "analyze_plans", None) is not None,
         "benchmark_options": bool(getattr(state, "benchmark_option_pairs", ())),
@@ -159,11 +128,6 @@ def _saved_non_replayable_options(saved: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _live_concurrency(state: types.SimpleNamespace) -> int:
-    """Validate the live CLI concurrency exactly like the saved-path check.
-
-    Only an absent value defaults to the single-stream plan of 1; an
-    explicit zero or a non-integer is rejected rather than coerced.
-    """
     raw_concurrency = getattr(state, "concurrency", None)
     if raw_concurrency is None:
         return 1
@@ -177,7 +141,6 @@ def _live_concurrency(state: types.SimpleNamespace) -> int:
 
 
 def current_run_request(state: types.SimpleNamespace) -> RunRequest:
-    """Capture user intent without including fields derived by the resolver."""
     phases = state.phases if isinstance(state.phases, (list, tuple)) else str(state.phases).split(",")
     compression = getattr(state, "comp_config", None) or state.compression or CompressionConfig()
     return RunRequest(
@@ -195,9 +158,6 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
         compression_type=compression.type,
         compression_level=compression.level,
         iterations=getattr(state, "iterations", None),
-        # Click leaves the hidden --concurrency option as None when callers
-        # use the normal CLI surface; only that absent value defaults to the
-        # single-stream plan - explicit values go through saved-path validation.
         concurrency=_live_concurrency(state),
         non_replayable_options=_active_non_replayable_options(state),
     )
@@ -208,7 +168,6 @@ def capture_resolved_run_plan(
     *,
     canonical_tuning_mode: str | None,
 ) -> ResolvedRunPlan:
-    """Take one immutable snapshot after all run-resolution stages succeed."""
     request = getattr(state, "run_request", None) or current_run_request(state)
     organization = (
         MappingProxyType(dict(state.data_organization_payload)) if state.data_organization_payload is not None else None
@@ -243,7 +202,6 @@ def capture_resolved_run_plan(
 
 
 def parse_saved_phases(value: object) -> tuple[str, ...]:
-    """Validate and normalize the historical ``phases`` preference."""
     if isinstance(value, str):
         phases = tuple(part.strip() for part in value.split(",") if part.strip())
     elif isinstance(value, (list, tuple)):
@@ -393,11 +351,6 @@ def merge_quick_restart_request(
     *,
     explicit_fields: frozenset[str],
 ) -> RunRequest:
-    """Merge saved preferences with current command-line intent.
-
-    Explicit current CLI values always win.  Missing historical optional fields
-    use documented compatibility defaults.  Required selectors fail closed.
-    """
 
     def choose(field: str, saved_field: str, current_value: Any, default: Any = None) -> Any:
         if field in explicit_fields:
@@ -488,7 +441,6 @@ def merge_quick_restart_request(
 
 
 def apply_run_request(state: types.SimpleNamespace, request: RunRequest) -> None:
-    """Apply raw intent only; derived fields remain owned by the resolver."""
     state.platform = request.platform
     state.benchmark = request.benchmark
     state.scale = request.scale
@@ -524,7 +476,6 @@ def resolve_quick_restart_atomically(
     resolve: Callable[[types.SimpleNamespace], None],
     data_organization_environment: str,
 ) -> ResolvedRunPlan:
-    """Merge and resolve saved intent, rolling back state and environment on failure."""
     request = merge_quick_restart_request(current_request, last_run, explicit_fields=explicit_fields)
     previous_state = vars(state).copy()
     missing_environment = object()

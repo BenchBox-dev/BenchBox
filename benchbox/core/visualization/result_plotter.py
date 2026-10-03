@@ -1,5 +1,3 @@
-"""High-level chart orchestration for benchmark results."""
-
 from __future__ import annotations
 
 import json
@@ -49,8 +47,6 @@ class NormalizedResult:
 
 
 class _NormalizedResultAdapter:
-    """Adapts NormalizedResult to the _DisambiguatableResult protocol for label disambiguation."""
-
     __slots__ = ("_result",)
 
     def __init__(self, result: NormalizedResult) -> None:
@@ -62,7 +58,6 @@ class _NormalizedResultAdapter:
 
     @property
     def platform_id(self) -> str:
-        # NormalizedResult has no canonical ID; display name is already normalizer-produced
         return self._result.platform
 
     @property
@@ -92,8 +87,6 @@ class _NormalizedResultAdapter:
 
 
 class ResultPlotter:
-    """Load and normalize benchmark results for ASCII chart generation."""
-
     def __init__(self, results: Sequence[NormalizedResult], theme: str = "light"):
         if not results:
             raise VisualizationError("No results provided for visualization.")
@@ -106,12 +99,6 @@ class ResultPlotter:
         self.theme = theme
 
     def _sort_results_by_version(self) -> None:
-        """Sort results by semantic version extracted from the platform label.
-
-        Provides a natural progression ordering (1.0.0 → 1.1.3 → 1.2.2 ...) for
-        multi-version comparisons, regardless of run timestamp or file order.
-        Non-versioned labels sort last, preserving their relative order.
-        """
 
         def _version_key(result: NormalizedResult) -> tuple:
             m = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-(\w+))?", result.platform)
@@ -120,21 +107,17 @@ class ResultPlotter:
             major = int(m.group(1))
             minor = int(m.group(2))
             patch = int(m.group(3)) if m.group(3) else 0
-            # Pre-release suffixes (dev, alpha, beta) sort after the base release
-            # since they represent development snapshots beyond the tagged version.
             is_pre = 1 if m.group(4) else 0
             return (major, minor, patch, is_pre, result.platform)
 
         self.results.sort(key=_version_key)
 
-    # ------------------------------------------------------------------ Loading
     @classmethod
     def from_sources(
         cls,
         sources: Sequence[str | Path] | None = None,
         theme: str = "light",
     ) -> ResultPlotter:
-        """Create a plotter from JSON result files or directories."""
         normalized: list[NormalizedResult] = []
         resolved_sources = cls._expand_sources(sources)
         for path in resolved_sources:
@@ -182,7 +165,6 @@ class ResultPlotter:
 
     @staticmethod
     def _normalize_dict(data: dict[str, Any], source_path: Path | None) -> NormalizedResult:
-        """Convert raw JSON dict to NormalizedResult."""
         normalized = normalize_result_dict(data)
 
         platform = normalized.platform
@@ -277,7 +259,6 @@ class ResultPlotter:
             power_at_size=getattr(result, "power_at_size", None),
         )
 
-    # ---------------------------------------------------------------- Utilities
     def _suggest_chart_types(self) -> list[str]:
         return [recommendation.chart_type for recommendation in recommend_charts(self.results)]
 
@@ -296,11 +277,9 @@ class ResultPlotter:
 
     @staticmethod
     def _natural_sort_key(s: str) -> tuple[float, str]:
-        """Sort key for natural ordering of query IDs."""
         return natural_query_sort_key(s)
 
     def group_by(self, field: str) -> dict[str, ResultPlotter]:
-        """Split results by a field (platform or benchmark) for batch rendering."""
         if field not in {"platform", "benchmark"}:
             raise VisualizationError("group_by must be 'platform' or 'benchmark'.")
 

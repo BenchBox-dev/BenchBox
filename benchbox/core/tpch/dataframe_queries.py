@@ -190,9 +190,7 @@ def get_tpch_parameters(query_id: int) -> dict[str, Any]:
     return params
 
 
-# =============================================================================
 # Expression Family Implementations (Polars, PySpark, DataFusion)
-# =============================================================================
 
 
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1083,13 +1081,11 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Pandas Family Implementations (Pandas and Dask)
-# =============================================================================
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q1: Pricing Summary Report (Pandas Family)."""
+
     lineitem = ctx.get_table("lineitem")
 
     params = get_tpch_parameters(1)
@@ -1121,7 +1117,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q6: Forecasting Revenue Change (Pandas Family)."""
+
     lineitem = ctx.get_table("lineitem")
 
     params = get_tpch_parameters(6)
@@ -1152,7 +1148,7 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q3: Shipping Priority (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -1190,7 +1186,7 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q4: Order Priority Checking (Pandas Family)."""
+
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
 
@@ -1217,7 +1213,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q5: Local Supplier Volume (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -1262,7 +1258,7 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q10: Returned Item Reporting (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -1315,7 +1311,7 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q2: Minimum Cost Supplier (Pandas Family)."""
+
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
     partsupp = ctx.get_table("partsupp")
@@ -1371,7 +1367,7 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q7: Volume Shipping (Pandas Family)."""
+
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
     orders = ctx.get_table("orders")
@@ -1428,7 +1424,7 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q8: National Market Share (Pandas Family)."""
+
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
@@ -1497,7 +1493,7 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q9: Product Type Profit Measure (Pandas Family)."""
+
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
@@ -1545,7 +1541,7 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q11_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q11: Important Stock Identification (Pandas Family)."""
+
     partsupp = ctx.get_table("partsupp")
     supplier = ctx.get_table("supplier")
     nation = ctx.get_table("nation")
@@ -1578,7 +1574,7 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q12: Shipping Modes and Order Priority (Pandas Family)."""
+
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
 
@@ -1614,7 +1610,7 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q13_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q13: Customer Distribution (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
 
@@ -1640,7 +1636,7 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q14: Promotion Effect (Pandas Family)."""
+
     import pandas as pd
 
     lineitem = ctx.get_table("lineitem")
@@ -1673,7 +1669,7 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q15: Top Supplier (Pandas Family)."""
+
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
 
@@ -1703,7 +1699,7 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q16: Parts/Supplier Relationship (Pandas Family)."""
+
     partsupp = ctx.get_table("partsupp")
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
@@ -1738,7 +1734,7 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q17: Small-Quantity-Order Revenue (Pandas Family)."""
+
     import pandas as pd
 
     lineitem = ctx.get_table("lineitem")
@@ -1777,7 +1773,7 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q18_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q18: Large Volume Customer (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
@@ -1808,7 +1804,7 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q19: Discounted Revenue (Pandas Family)."""
+
     import pandas as pd
 
     lineitem = ctx.get_table("lineitem")
@@ -1870,7 +1866,7 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q20: Potential Part Promotion (Pandas Family)."""
+
     supplier = ctx.get_table("supplier")
     nation = ctx.get_table("nation")
     partsupp = ctx.get_table("partsupp")
@@ -1912,7 +1908,7 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q21_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q21: Suppliers Who Kept Orders Waiting (Pandas Family)."""
+
     supplier = ctx.get_table("supplier")
     lineitem = ctx.get_table("lineitem")
     orders = ctx.get_table("orders")
@@ -1977,7 +1973,7 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q22: Global Sales Opportunity (Pandas Family)."""
+
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
 
@@ -2011,9 +2007,8 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
 # Query Registry
-# =============================================================================
+
 
 # Create the TPC-H DataFrame query registry
 TPCH_DATAFRAME_QUERIES = QueryRegistry("TPC-H DataFrame")

@@ -48,6 +48,42 @@ import zipfile
 from pathlib import Path
 from typing import Any, Sequence
 
+CLI_DESCRIPTION = (
+    "Validate Results Explorer compatibility against the current read model.\n"
+    "\n"
+    "This CLI tool verifies that the Results Explorer SPA and its artifacts\n"
+    "maintain compatibility with the current corpus DuckDB read-model schema\n"
+    "(v11). It also validates hermetic, content-addressed Explorer application\n"
+    "artifact bundles.\n"
+    "\n"
+    "Usage:\n"
+    "    # Run schema compatibility checks only (v11 only):\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only\n"
+    "\n"
+    "    # Validate an Explorer build artifact directory or archive:\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist\n"
+    "\n"
+    "    # Validate with required manifest (fail-closed):\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist --require-manifest\n"
+    "\n"
+    "    # Generate content-addressed manifest and checksums in artifact directory:\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist --generate-manifest\n"
+    "\n"
+    "    # Validate a specific DuckDB database snapshot file:\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb\n"
+    "\n"
+    "    # Check specific schema versions (only 11 is supported):\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 10\n"
+    "\n"
+    "    # Output machine-readable JSON:\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - All compatibility and artifact checks passed\n"
+    "    1 - Compatibility or artifact validation failed\n"
+    "    2 - CLI argument or environment error\n"
+)
+
 # Import canonical read-model version from contract. Fall back to 10 if
 # contract is unavailable (e.g. during isolated test import).
 try:
@@ -920,7 +956,7 @@ def validate_artifact_bundle(
 def build_parser() -> argparse.ArgumentParser:
     """Build CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

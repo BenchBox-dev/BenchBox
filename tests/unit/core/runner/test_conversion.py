@@ -122,11 +122,9 @@ def test_convert_benchmark_tables_happy_path(monkeypatch, tmp_path):
 
 
 def test_format_preference_moves_existing_format_to_position_zero(tmp_path):
-    """format_preference should always place target_format at position 0, even if already present."""
     orchestrator = FormatConversionOrchestrator()
     manifest = _build_manifest_with_tbl()
 
-    # Simulate prior conversions leaving vortex at position 0, delta at position 1
     manifest.format_preference = ["vortex", "delta", "tbl"]
 
     output_file = tmp_path / "customer.delta"
@@ -147,14 +145,11 @@ def test_format_preference_moves_existing_format_to_position_zero(tmp_path):
 
     orchestrator._update_manifest_with_results(manifest, results, target_format="delta", output_dir=tmp_path)
 
-    # delta must be at position 0, not stuck behind vortex
     assert manifest.format_preference[0] == "delta"
-    # delta should appear exactly once
     assert manifest.format_preference.count("delta") == 1
 
 
 def test_format_preference_inserts_new_format_at_position_zero(tmp_path):
-    """A brand-new format should be inserted at position 0."""
     orchestrator = FormatConversionOrchestrator()
     manifest = _build_manifest_with_tbl()
 

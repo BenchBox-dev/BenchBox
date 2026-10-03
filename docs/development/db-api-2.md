@@ -194,6 +194,11 @@ def _get_parameter_placeholder(self, connection: Any) -> str:
 
 ## Platform Adapter Implementations
 
+The following excerpts focus on connection and cursor operations. `**options`
+stands for omitted platform-specific adapter options. See the
+[platform API reference](../reference/python-api/platforms.rst) for complete
+method signatures.
+
 ### Fully Compliant Platforms
 
 #### DuckDB
@@ -207,7 +212,7 @@ def create_connection(self, **connection_config) -> Any:
     conn.execute(f"SET memory_limit = '{self.memory_limit}'")
     return conn  # Direct execute() available
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     result = connection.execute(query)  # Direct execute
     rows = result.fetchall()  # DB-API 2.0 method
 ```
@@ -226,7 +231,7 @@ def create_connection(self, **connection_config) -> Any:
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     cursor = connection.cursor()  # Standard cursor pattern
     cursor.execute(query)
     results = cursor.fetchall()  # DB-API 2.0 method
@@ -246,7 +251,7 @@ def create_connection(self, **connection_config) -> Any:
     cursor.execute("SELECT CURRENT_VERSION()")
     return connection
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     cursor = connection.cursor()
     cursor.execute(query)
     result = cursor.fetchall()  # DB-API 2.0 method
@@ -269,7 +274,7 @@ def create_connection(self, **connection_config) -> Any:
     connection.autocommit = True
     return connection
 
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     cursor = connection.cursor()
     cursor.execute(query)
     result = cursor.fetchall()  # DB-API 2.0 method
@@ -291,7 +296,7 @@ def execute_query(self, connection: Any, query: str, query_id: str, ...):
 - **DB API 2.0 Compliance**: Non-compliant - uses custom interface
 
 ```python
-def execute_query(self, connection: Any, query: str, query_id: str, ...):
+def execute_query(self, connection: Any, query: str, query_id: str, **options):
     # DataFusion uses non-standard interface
     df = connection.sql(query)  # Not DB-API 2.0
     result_batches = df.collect()

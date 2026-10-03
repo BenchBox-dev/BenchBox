@@ -1,11 +1,6 @@
-"""AMPLab DataFrame query parameters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Default parameter values for AMPLab queries.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

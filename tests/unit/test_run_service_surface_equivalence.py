@@ -1,11 +1,3 @@
-"""Core run resolution and real CLI/MCP delegation contracts.
-
-W3 for one-engine-mcp-run-service-adoption. The one-engine contract is that
-all benchmark business logic lives in benchbox.core below both surfaces. These
-tests exercise each real surface boundary; they do not simulate MCP by calling
-the core helpers directly and labeling that call a surface-level parity test.
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -35,7 +27,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
     ],
 )
 def test_execution_type_and_lifecycle_resolution_agree(phases, expected_type, expected_execute):
-    """Core phase resolution keeps execution type and lifecycle flags aligned."""
     execution_type = map_phases_to_execution_type(phases)
     lifecycle = resolve_lifecycle_phases(phases if phases else None)
 
@@ -48,7 +39,6 @@ def test_execution_type_and_lifecycle_resolution_agree(phases, expected_type, ex
 
 
 def test_runplan_parity_cli_mcp_run_config_resolution(tmp_path):
-    """CLI orchestrator and MCP both delegate RunConfig to core (parity)."""
     from pathlib import Path
 
     from benchbox.cli.orchestrator import BenchmarkOrchestrator
@@ -72,8 +62,6 @@ def test_runplan_parity_cli_mcp_run_config_resolution(tmp_path):
         verbosity=SilentVerbosity(),
     )
 
-    # CLI uses its own verbosity (quiet False), MCP uses SilentVerbosity (quiet True) — they differ only in verbosity flags
-    # The equivalence is that the non-verbosity fields are identical because both delegate to core
     cli_dump = via_cli.model_dump()
     core_dump = via_core.model_dump()
     for k in ("quiet", "verbose", "verbose_level", "verbose_enabled", "very_verbose"):
@@ -85,7 +73,6 @@ def test_runplan_parity_cli_mcp_run_config_resolution(tmp_path):
 
 
 def test_synchronous_mcp_surface_delegates_to_execute_run(tmp_path):
-    """The actual MCP request surface, not a simulated core call, reaches the service."""
     from benchbox.mcp.tools import benchmark as benchmark_tools
 
     benchmark_instance = SimpleNamespace(output_dir=tmp_path / "datagen")
@@ -119,7 +106,6 @@ def test_synchronous_mcp_surface_delegates_to_execute_run(tmp_path):
 
 
 def test_durable_data_only_surface_delegates_to_execute_run(tmp_path):
-    """Durable replay routes data_only through core with no platform adapter."""
     from benchbox.mcp.jobs import DurableJobWorker
 
     job = SimpleNamespace(

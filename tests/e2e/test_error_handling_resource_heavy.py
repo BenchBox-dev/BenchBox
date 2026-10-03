@@ -1,5 +1,3 @@
-"""Resource-heavy CLI error-handling coverage."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -22,7 +20,6 @@ _CLI_RUNNER = CliRunner()
 
 
 def run_cli_command(args: Sequence[str], *, use_subprocess: bool = False) -> SimpleNamespace:
-    """Run CLI in-process by default to reduce subprocess startup cost."""
     if use_subprocess:
         result = run_cli_subprocess_command(list(args))
         return SimpleNamespace(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
@@ -32,11 +29,8 @@ def run_cli_command(args: Sequence[str], *, use_subprocess: bool = False) -> Sim
 
 
 class TestTPCDSConstraints:
-    """Tests for TPC-DS specific constraints."""
-
     @pytest.mark.tpcds
     def test_tpcds_fractional_scale_warns_but_succeeds(self, tmp_path: Path) -> None:
-        """Test that TPC-DS warns on fractional scale factors but still proceeds."""
         output_dir = tmp_path / "dry_run"
         output_dir.mkdir()
 
@@ -59,7 +53,6 @@ class TestTPCDSConstraints:
 
     @pytest.mark.tpcds
     def test_tpcds_fractional_scale_quiet_suppresses_warning(self, tmp_path: Path) -> None:
-        """Test that --quiet suppresses the unofficial subscale warning."""
         output_dir = tmp_path / "dry_run"
         output_dir.mkdir()
 

@@ -67,56 +67,213 @@ API Reference
 BigQueryAdapter Class
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.bigquery.BigQueryAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.bigquery.BigQueryAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   BigQuery adapter.  ``project_id`` is required; ``dataset_id`` defaults to
+   ``"benchbox"``, ``location`` to ``"US"``, ``storage_prefix`` to
+   ``"benchbox-data"``, ``job_priority`` to ``"INTERACTIVE"``, and result
+   caching is disabled unless explicitly configured.  ``staging_root`` must be
+   a GCS location when supplied.  Missing dependencies raise ``ImportError``;
+   missing project configuration raises ``ConfigurationError``.
 
-.. code-block:: python
+   Example::
 
-    BigQueryAdapter(
-        project_id: str,
-        dataset_id: str = "benchbox",
-        location: str = "US",
-        credentials_path: Optional[str] = None,
-        storage_bucket: Optional[str] = None,
-        storage_prefix: str = "benchbox-data",
-        job_priority: str = "INTERACTIVE",
-        query_cache: bool = True,
-        dry_run: bool = False,
-        maximum_bytes_billed: Optional[int] = None,
-        clustering_fields: List[str] = [],
-        partitioning_field: Optional[str] = None
-    )
+      adapter = BigQueryAdapter(project_id="example-project", dataset_id="benchbox")
 
-Parameters:
+   The adapter advertises external-table support.  See :doc:`common` for shared methods.
 
-**Connection (Required)**:
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.create_connection(**connection_config) -> Any
 
-- **project_id** (str): Google Cloud project ID
-- **dataset_id** (str): BigQuery dataset name. Default: "benchbox"
-- **location** (str): Dataset location (US, EU, asia-northeast1, etc.). Default: "US"
-- **credentials_path** (str, optional): Path to service account JSON key file
+   Create optimized BigQuery client connection.
 
-**Cloud Storage**:
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.create_schema(benchmark, connection: Any) -> float
 
-- **storage_bucket** (str, optional): GCS bucket for efficient data loading
-- **storage_prefix** (str): Prefix for uploaded data files. Default: "benchbox-data"
+   Create schema using BigQuery dataset and tables.
 
-**Query Configuration**:
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-- **job_priority** (str): Query priority - "INTERACTIVE" or "BATCH". Default: "INTERACTIVE"
-- **query_cache** (bool): Enable query result caching. Default: True
-- **dry_run** (bool): Validate queries without execution. Default: False
-- **maximum_bytes_billed** (int, optional): Maximum bytes billed per query (cost control)
+   Load data using BigQuery efficient loading via Cloud Storage.
 
-**Table Optimization**:
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-- **clustering_fields** (List[str]): Default clustering columns for tables. Default: []
-- **partitioning_field** (str, optional): Default partitioning column
+   Upload external-table sources to GCS and register BigQuery external tables.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
+
+   Execute query with detailed timing and cost tracking.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_query_plan(connection: Any, query: str) -> dict[str, Any] | None
+
+   Return BigQuery's dry-run bytes and estimated on-demand cost.
+
+   BigQuery exposes bytes processed through a dry-run job rather than an
+   EXPLAIN text result. Structured execution stages remain available from
+   the completed job through ``_capture_bq_plan``.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_table_row_count(connection: Any, table: str) -> int
+
+   Get row count using BigQuery Client API.
+
+   Overrides base implementation that uses cursor pattern.
+   BigQuery Client doesn't have .cursor() method, so we use .query() instead.
+
+   :param connection: BigQuery Client
+   :param table: Table name
+
+   :returns: Row count as integer, or 0 if unable to determine
+
+Static member inventory
+-----------------------
+
+.. py:staticmethod:: benchbox.platforms.bigquery.BigQueryAdapter.add_cli_arguments(parser: argparse.ArgumentParser) -> None
+
+   Add BigQuery-specific CLI arguments.
+
+.. py:classmethod:: benchbox.platforms.bigquery.BigQueryAdapter.from_config(config: dict[str, Any])
+
+   Create BigQuery adapter from unified configuration.
+
+.. py:property:: benchbox.platforms.bigquery.BigQueryAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get BigQuery platform information.
+
+   Captures comprehensive BigQuery configuration including:
+   Dataset location and region
+   Slot reservation information (best effort)
+   Project and billing configuration
+   Dataset metadata
+
+   BigQuery doesn't expose a version number as it's a fully managed service.
+   Gracefully degrades if permissions are insufficient for metadata queries.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_normalized_result_metadata(self, *, connection: Any | None=None, platform_info: Mapping[str, Any] | None=None) -> dict[str, Any]
+
+   Return BigQuery-specific normalized cloud/runtime metadata.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_target_dialect(self) -> str
+
+   Return the target SQL dialect for BigQuery.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.preprocess_operation_sql(self, query_id: str, operation: Any) -> str | None
+
+   Rewrite operation write SQL for BigQuery-only dialect gaps.
+
+   Respects catalog ``bigquery`` overrides (including skip ``None``):
+   rewrites the override when present, otherwise the default write SQL.
+   Four rewrites, each linear and single-level by construction of the
+   catalog SQL they target (verified live: the unmodified forms fail
+   server-side with ``Type not found: VARCHAR`` and ``INT64`` interval
+   complaints while COUNT(*) validations kept passing):
+
+   ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)``
+   ``INTERVAL 'N' UNIT`` -> ``INTERVAL N UNIT``
+   a missing ``WHERE`` on an UPDATE/DELETE statement gains
+   ``WHERE true`` (BigQuery rejects filter-less DML; constant-true
+   preserves the full-table intent)
+   a trailing bare ``WHEN NOT MATCHED ... THEN INSERT`` gains
+   ``ROW`` (Snowflake shorthand for inserting the source row;
+   BigQuery requires ``INSERT ROW``)
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.check_server_database_exists(self, **connection_config) -> bool
+
+   Check if dataset exists in BigQuery project.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.drop_database(self, **connection_config) -> None
+
+   Drop dataset in BigQuery project.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.validate_external_table_requirements(self) -> None
+
+   Validate required GCS configuration for external table mode.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply BigQuery-specific optimizations based on benchmark type.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.get_query_plan_parser(self)
+
+   Expose the BigQuery plan parser for symmetry with other adapters.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.close_connection(self, connection: Any) -> None
+
+   Close BigQuery connection.
+
+   Handles credential refresh errors gracefully during connection cleanup.
+   Suppresses all credential-related errors as they are non-fatal during cleanup.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.generate_tuning_clause(self, table_tuning) -> str
+
+   Generate BigQuery-specific tuning clauses for CREATE TABLE statements.
+
+   BigQuery supports:
+   PARTITION BY DATE(column), DATETIME_TRUNC(column, DAY), column (for date/integer)
+   CLUSTER BY column1, column2, ... (up to 4 columns)
+
+   :param table_tuning: The tuning configuration for the table
+
+   :returns: SQL clause string to be appended to CREATE TABLE statement
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.apply_table_tunings(self, table_tuning, connection: Any) -> None
+
+   Apply tuning configurations to a BigQuery table.
+
+   BigQuery tuning approach:
+   PARTITIONING: Handled in CREATE TABLE via PARTITION BY
+   CLUSTERING: Handled in CREATE TABLE via CLUSTER BY
+   Additional optimization via table options
+
+   :param table_tuning: The tuning configuration to apply
+   :param connection: BigQuery client connection
+
+   :raises ValueError: If the tuning configuration is invalid for BigQuery
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None
+
+   Apply unified tuning configuration to BigQuery.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None
+
+   Apply BigQuery-specific platform optimizations.
+
+   :param platform_config: Platform optimization configuration
+   :param connection: BigQuery connection
+
+.. py:attribute:: benchbox.platforms.bigquery.BigQueryAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.bigquery.BigQueryAdapter.supports_external_tables
+
+   Advertises whether the adapter implements external-table creation.
+
+.. py:attribute:: benchbox.platforms.bigquery.BigQueryAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:method:: benchbox.platforms.bigquery.BigQueryAdapter.apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None
+
+   Logs informational messages for enabled primary-key and foreign-key settings.
+   This hook executes no SQL and does not use ``connection``. Table-creation
+   hooks handle any platform-supported constraint DDL.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``BigQueryAdapter(**config)``.
+
+- ``project_id`` identifies the project; ``credentials_path`` is optional.
+- ``dataset_id`` defaults to ``"benchbox"`` and ``location`` to ``"US"``.
+- ``storage_bucket`` is optional; ``storage_prefix`` defaults to ``"benchbox-data"``.
+  A GCS ``staging_root`` overrides the bucket/prefix derived from these fields.
+- ``job_priority`` defaults to ``"INTERACTIVE"``. ``query_cache`` defaults to
+  ``False``; an explicit value takes precedence over ``disable_result_cache``.
+- ``dry_run`` defaults to ``False``; ``maximum_bytes_billed`` is optional.
+- ``clustering_fields`` defaults to a new empty list; ``partitioning_field``
+  is optional. These are table-creation settings.
 
 Configuration Examples
 ----------------------
@@ -670,14 +827,18 @@ Slow Query Performance
     print(f"Bytes processed: {query_job.total_bytes_processed:,}")
 
     # 2. Add partitioning to reduce data scanned
+    conn.query("""
     CREATE TABLE dataset.table_partitioned
     PARTITION BY DATE(date_column)
     AS SELECT * FROM dataset.table
+    """).result()
 
     # 3. Add clustering for better data organization
+    conn.query("""
     CREATE TABLE dataset.table_clustered
     CLUSTER BY key_column1, key_column2
     AS SELECT * FROM dataset.table
+    """).result()
 
     # 4. Check for full table scans
     # Use query plan to identify issues
@@ -711,10 +872,12 @@ High Costs
 
     # 4. Use partitioning and clustering
     # Reduces data scanned per query
+    conn.query("""
     CREATE TABLE dataset.table_optimized
     PARTITION BY DATE(date_column)
     CLUSTER BY key1, key2
     AS SELECT * FROM dataset.table_raw
+    """).result()
 
 See Also
 --------

@@ -162,7 +162,6 @@ def make_platform_config_builder(
     _builder.__name__ = name
     _builder.__qualname__ = name
     _builder.__module__ = module_name
-    _builder.__doc__ = f"Build {default_display_name} database configuration with credential loading."
     return _builder
 
 

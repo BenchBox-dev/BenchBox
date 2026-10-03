@@ -1,5 +1,3 @@
-"""Durable, tenant-owned benchmark jobs for remote stateless MCP."""
-
 from __future__ import annotations
 
 import json
@@ -67,15 +65,11 @@ CANCEL_ANNOTATIONS = ToolAnnotations(
 )
 
 
-# Leased attempts always hold database capacity. Unknown outcomes hold it until
-# the fenced executor durably attests that its call has returned.
 LEASED_STATES = ("running", "publishing")
 
 
 @dataclass(frozen=True, slots=True)
 class JobRecord:
-    """One persisted benchmark job."""
-
     execution_id: str
     principal_id: str
     state: str
@@ -97,8 +91,6 @@ class JobRecord:
 
 
 class DurableJobRepository:
-    """SQLite job queue whose transitions are safe across worker processes."""
-
     def __init__(self, path: Path, limits: JobLimits):
         self.path = path
         self.limits = limits
@@ -184,7 +176,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _ensure_column(connection: sqlite3.Connection, name: str, declaration: str) -> None:
-        """Add one migration column, tolerating a concurrent initializer winner."""
         columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs)")}
         if name in columns:
             return
@@ -197,7 +188,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _migrate_state_check(connection: sqlite3.Connection) -> None:
-        """Widen the state CHECK on pre-unknown databases so recovery can record unknown outcomes."""
         try:
             stranded = connection.execute(
                 "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
@@ -213,12 +203,11 @@ class DurableJobRepository:
             DurableJobRepository._rebuild_state_table(connection)
         except sqlite3.OperationalError:
             if DurableJobRepository._migration_complete(connection):
-                return  # A concurrent worker already migrated the shared database.
+                return
             raise
 
     @staticmethod
     def _migration_complete(connection: sqlite3.Connection) -> bool:
-        """Check whether another initializer already finished the state migration."""
         stranded = connection.execute(
             "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
         ).fetchone()
@@ -229,7 +218,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _resume_state_migration(connection: sqlite3.Connection) -> None:
-        """Finish a state migration interrupted after the rename, in one transaction."""
         connection.execute("BEGIN IMMEDIATE")
         try:
             DurableJobRepository._copy_legacy_jobs(connection)
@@ -240,7 +228,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _rebuild_state_table(connection: sqlite3.Connection) -> None:
-        """Rebuild the jobs table with the widened state CHECK, preserving rows by column name."""
         connection.execute("BEGIN IMMEDIATE")
         try:
             connection.execute("ALTER TABLE mcp_benchmark_jobs RENAME TO mcp_benchmark_jobs_legacy")
@@ -252,7 +239,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _copy_legacy_jobs(connection: sqlite3.Connection) -> None:
-        """Copy stranded legacy rows into the widened table and drop the legacy table."""
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS mcp_benchmark_jobs (
@@ -325,7 +311,6 @@ class DurableJobRepository:
 
     @staticmethod
     def _next_order(connection: sqlite3.Connection, name: str) -> int:
-        """Return a database-owned monotonic order value inside the caller's transaction."""
         connection.execute(
             "INSERT INTO mcp_job_order (name, value) VALUES (?, 0) ON CONFLICT (name) DO NOTHING",
             (name,),
@@ -342,13 +327,6 @@ class DurableJobRepository:
         *,
         idempotency_key: str | None = None,
     ) -> tuple[JobRecord, bool]:
-        """Create a queued job, or return the principal's idempotent match.
-
-        Submission bounds queued depth only: the global queue and the
-        principal's own queued share. Running admission is enforced
-        separately by :meth:`claim`, so new work can wait while outstanding
-        attempts hold database capacity.
-        """
         normalized_key = idempotency_key.strip() if idempotency_key is not None else None
         if normalized_key is not None and (not normalized_key or len(normalized_key) > 200):
             raise MCPError(-32602, "idempotency_key must contain 1 to 200 characters")
@@ -405,7 +383,6 @@ class DurableJobRepository:
         return self._record(row), True
 
     def get_owned(self, execution_id: str, principal_id: str) -> JobRecord | None:
-        """Return a job only when the caller owns it."""
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ? AND principal_id = ?",
@@ -414,7 +391,6 @@ class DurableJobRepository:
         return self._record(row) if row is not None else None
 
     def get(self, execution_id: str) -> JobRecord | None:
-        """Return a job for worker coordination, independent of tenant requests."""
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (execution_id,)
@@ -422,16 +398,6 @@ class DurableJobRepository:
         return self._record(row) if row is not None else None
 
     def claim(self, worker_id: str) -> JobRecord | None:
-        """Transactionally lease one queued job under running capacity and fairness.
-
-        Running admission is bounded globally and per principal over leased
-        attempts plus unquiesced unknown work, so a lost
-        lease keeps holding database capacity until a fenced transition
-        proves quiescence. Among eligible principals the least-recently-served
-        wins, and each principal's own oldest queued job wins, which keeps
-        per-principal FIFO order while preventing a noisy principal from
-        starving the rest.
-        """
         now = utc_now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -514,16 +480,6 @@ class DurableJobRepository:
         return self._record(claimed)
 
     def renew(self, execution_id: str, worker_id: str) -> bool:
-        """Renew a running or publishing lease owned by this worker.
-
-        Ownership is the fence: renewal succeeds only while this worker still
-        owns the lease, so a fenced worker learns it lost the lease and stops
-        before publication. Lapse detection stays wall-clock free at this
-        layer; expiry is decided by the recovery-side monotonic observation
-        mechanism in :meth:`claim_expired`, never by comparing a wall-clock
-        deadline here, so a host clock step cannot falsely evict a healthy
-        attempt.
-        """
         now = utc_now()
         with self._connect() as connection:
             changed = connection.execute(
@@ -543,7 +499,6 @@ class DurableJobRepository:
         return changed == 1
 
     def begin_publication(self, execution_id: str, worker_id: str) -> bool:
-        """Fence stale/cancelled workers before they publish an artifact."""
         with self._connect() as connection:
             changed = connection.execute(
                 """
@@ -563,7 +518,6 @@ class DurableJobRepository:
         *,
         publish: Callable[[], None] | None = None,
     ) -> bool:
-        """Mark complete only after the worker has durably published the artifact."""
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -591,13 +545,6 @@ class DurableJobRepository:
         return changed == 1
 
     def fail_attempt(self, execution_id: str, worker_id: str, error_code: str, *, retryable: bool = True) -> str | None:
-        """Retry an owned failure when budget remains, otherwise fail terminally.
-
-        Only the lease owner may report, and only while it still owns the lease,
-        so a requeue here is safe: the reporting attempt already finished and
-        cannot still be executing database work. Expiry recovery without such a
-        report must use :meth:`recover`, which records ``unknown`` instead.
-        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -636,18 +583,9 @@ class DurableJobRepository:
         return next_state
 
     def mark_unknown_outstanding(self, execution_id: str, worker_id: str) -> bool:
-        """Quarantine an owned job whose serialized result reports live work."""
         return self._record_attempt_boundary(execution_id, worker_id, transition="outstanding")
 
     def cancel(self, execution_id: str, principal_id: str) -> tuple[JobRecord, str] | None:
-        """Cancel an owned job and report how the request was honored.
-
-        Returns the current record with one of ``accepted`` (queued work
-        cancelled immediately), ``requested`` (the running attempt will stop at
-        the next safe boundary), or ``too_late`` (publication already committed
-        or the job is otherwise terminal, so nothing can be revoked). Returns
-        ``None`` when the job does not belong to the principal.
-        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -683,7 +621,6 @@ class DurableJobRepository:
         return self._record(updated), outcome
 
     def claim_expired(self, recovery_owner: str) -> JobRecord | None:
-        """Transactionally fence and return the oldest expired lease."""
         observed_at = mono_time()
         wall_now = utc_now().timestamp()
         with self._connect() as connection:
@@ -767,17 +704,6 @@ class DurableJobRepository:
         return self._record(fenced)
 
     def recover(self, job: JobRecord, *, published_artifact: Path | None = None) -> str | None:
-        """Recover one expired lease without allowing duplicate completion.
-
-        The publication commit point can be completed from a durable artifact.
-        Every other unreported expiry becomes ``unknown`` until the displaced
-        worker separately attests quiescence. The proof may arrive just before
-        or after recovery wins the fence. Cancellation and an exhausted
-        attempt budget prove nothing about termination, so an
-        unreported expired attempt records the terminal ``unknown`` outcome
-        even on its final attempt: the job is never claimed again and an
-        operator must inspect before resubmitting with a new idempotency key.
-        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -826,13 +752,6 @@ class DurableJobRepository:
         return next_state
 
     def attest_quiescence(self, execution_id: str, worker_id: str) -> bool:
-        """Record that an executor returned, releasing capacity if it becomes unknown.
-
-        The recovery transition records the displaced lease owner. Only that
-        owner can attest that the synchronous database call has returned. The
-        outcome remains unknown; the attestation proves only that the old
-        attempt can no longer produce external effects.
-        """
         return self._record_attempt_boundary(execution_id, worker_id, transition="quiescent")
 
     def _record_attempt_boundary(
@@ -842,7 +761,6 @@ class DurableJobRepository:
         *,
         transition: Literal["outstanding", "quiescent"],
     ) -> bool:
-        """Record one owner-fenced executor boundary with a single timestamp."""
         now = utc_now().isoformat()
         if transition == "outstanding":
             statement = """
@@ -872,7 +790,6 @@ class DurableJobRepository:
         return changed == 1
 
     def expired_terminal(self) -> list[JobRecord]:
-        """Return terminal jobs whose retention period has elapsed."""
         cutoff = utc_now().timestamp() - self.limits.retention_seconds
         with self._connect() as connection:
             rows = connection.execute(
@@ -887,7 +804,6 @@ class DurableJobRepository:
         return [self._record(row) for row in rows]
 
     def delete_terminal(self, execution_id: str) -> bool:
-        """Delete terminal metadata only after owned artifact cleanup succeeds."""
         with self._connect() as connection:
             changed = connection.execute(
                 """
@@ -902,14 +818,6 @@ class DurableJobRepository:
         return changed == 1
 
     def capacity_summary(self) -> dict[str, Any]:
-        """Report durable row counts against running capacity for operators.
-
-        Row counts and capacity usage are separated: ``outstanding`` jobs
-        (leased attempts plus work whose lease was lost without proof of
-        termination) hold database capacity until a fenced transition
-        releases them. ``quarantined`` names every unproven job with the
-        reason it still holds capacity.
-        """
         with self._connect() as connection:
             state_rows = connection.execute(
                 "SELECT state, COUNT(*) AS total FROM mcp_benchmark_jobs GROUP BY state"
@@ -969,7 +877,6 @@ BenchmarkExecutor = Callable[[JobRecord, Path], dict[str, Any]]
 
 
 def _response_has_outstanding_work(value: object) -> bool:
-    """Return whether a serialized core result says work may still be running."""
     if isinstance(value, Mapping):
         outstanding = value.get("outstanding_stream_ids")
         if isinstance(outstanding, (list, tuple)) and bool(outstanding):
@@ -983,8 +890,6 @@ def _response_has_outstanding_work(value: object) -> bool:
 
 
 class DurableJobWorker:
-    """Lease and execute durable jobs for one HTTP worker process."""
-
     def __init__(
         self,
         repository: DurableJobRepository,
@@ -1008,16 +913,6 @@ class DurableJobWorker:
 
     @staticmethod
     def _execute_benchmark(job: JobRecord, staging: Path) -> dict[str, Any]:
-        """Execute a durable job via the shared core run service.
-
-        This is the one-engine adoption for the worker path: instead of
-        calling the MCP-private ``_run_benchmark_impl`` helper chain, the
-        worker builds surface-neutral configs and delegates to
-        ``benchbox.core.run_service.execute_run`` with a surface-injected
-        ``AdapterFactory`` and ``SilentVerbosity``. Lease/fencing,
-        idempotency and ``staging→os.replace`` publication remain in
-        ``DurableJobWorker._run_job`` and are untouched.
-        """
         from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 
         request = job.request
@@ -1035,7 +930,6 @@ class DurableJobWorker:
         anonymize = True
         start_time = __import__("benchbox.utils.clock", fromlist=["mono_time"]).mono_time()
 
-        # Re-admission: durable store is re-read, so validate again.
         try:
             from benchbox.mcp.schemas import validate_platform_options
 
@@ -1115,7 +1009,6 @@ class DurableJobWorker:
         )
 
     async def run(self) -> None:
-        """Continuously recover and execute shared queued work."""
         while True:
             await anyio.to_thread.run_sync(self.recover_expired)
             if mono_time() >= self._next_retention_check:
@@ -1128,11 +1021,6 @@ class DurableJobWorker:
             await self._run_job(job)
 
     def recover_expired(self) -> None:
-        """Fence expired leases and finalize only what the old attempt proved.
-
-        Attempts that may still be executing are recorded ``unknown`` and never
-        retried automatically; see :meth:`DurableJobRepository.recover`.
-        """
         while True:
             recovery_owner = f"{self.worker_id}:recovery:{uuid.uuid4().hex}"
             job = self.repository.claim_expired(recovery_owner)
@@ -1150,7 +1038,7 @@ class DurableJobWorker:
         gate = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
         if gate is None or gate.lease_owner != self.worker_id or gate.state != "running":
             await anyio.to_thread.run_sync(self.repository.attest_quiescence, job.execution_id, self.worker_id)
-            return  # Fenced or finalized before starting; recovery owns the outcome.
+            return
         if gate.cancel_requested:
             await anyio.to_thread.run_sync(self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled")
             return
@@ -1196,8 +1084,6 @@ class DurableJobWorker:
                             shutil.rmtree(staging, ignore_errors=True)
                             return
                         if lease_lost.is_set():
-                            # The lease lapsed mid-execution; recovery owns the
-                            # outcome. Never publish or report from a stale attempt.
                             shutil.rmtree(staging, ignore_errors=True)
                             return
                         if not await anyio.to_thread.run_sync(
@@ -1213,9 +1099,6 @@ class DurableJobWorker:
                             shutil.rmtree(staging, ignore_errors=True)
                 finally:
                     task_group.cancel_scope.cancel()
-                    # The synchronous executor has returned. If recovery fenced
-                    # this attempt meanwhile, record the distinct durable proof
-                    # that it can no longer produce external effects.
                     if executor_quiescent:
                         with anyio.CancelScope(shield=True):
                             await anyio.to_thread.run_sync(
@@ -1228,15 +1111,11 @@ class DurableJobWorker:
             if isinstance(exc, anyio.get_cancelled_exc_class()):
                 raise
             if (final_dir / ".published").is_file() and response_path.is_file():
-                # The artifact crossed the durable publication boundary. Leave
-                # it in publishing for lease recovery rather than re-executing.
                 await anyio.to_thread.run_sync(
                     self.repository.complete, job.execution_id, self.worker_id, response_path
                 )
                 return
             if lease_lost.is_set():
-                # The lease lapsed before the failure was reported; recovery
-                # owns the outcome, so a stale attempt must not requeue.
                 return
             logger.error("Durable MCP benchmark failed (%s)", type(exc).__name__)
             await anyio.to_thread.run_sync(
@@ -1259,7 +1138,6 @@ class DurableJobWorker:
         final_dir: Path,
         response_path: Path,
     ) -> bool:
-        """Flush and atomically publish while the database fence remains owned."""
         (staging / "response.json").write_text(json.dumps(response, sort_keys=True), encoding="utf-8")
         (staging / ".published").write_text(job.execution_id, encoding="ascii")
         self._sync_tree(staging)
@@ -1299,16 +1177,8 @@ class DurableJobWorker:
 
     @staticmethod
     def _sync_path(path: Path) -> None:
-        """Flush a file or directory before a durable state transition.
-
-        Directory metadata is flushed where supported (POSIX); on Windows
-        directory ``fsync`` is skipped because opening directories with
-        ``os.open`` is not supported.
-        """
         if path.is_dir() and sys.platform == "win32":
             return
-        # Windows' ``FlushFileBuffers`` requires a write-capable handle.  Keep
-        # read-only handles on POSIX so directory metadata remains flushable.
         flags = os.O_RDWR if sys.platform == "win32" else os.O_RDONLY
         descriptor = os.open(path, flags)
         try:
@@ -1318,13 +1188,11 @@ class DurableJobWorker:
 
     @classmethod
     def _sync_tree(cls, root: Path) -> None:
-        """Flush every staged file and directory before atomic publication."""
         for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
             cls._sync_path(path)
         cls._sync_path(root)
 
     def purge_expired(self) -> None:
-        """Delete retained artifacts only inside their persisted tenant workspace."""
         for job in self.repository.expired_terminal():
             if job.artifact_path is not None:
                 workspace = self.workspaces.paths_for_principal_id(job.principal_id)
@@ -1343,8 +1211,6 @@ class DurableJobWorker:
 
 @dataclass(frozen=True, slots=True)
 class DurableJobRuntime:
-    """Repository and worker lifecycle attached only to remote servers."""
-
     repository: DurableJobRepository
     worker: DurableJobWorker
 
@@ -1355,7 +1221,6 @@ class DurableJobRuntime:
 
     @asynccontextmanager
     async def lifespan(self, _server: MCPServer):
-        """Run the background queue consumer for this server process."""
         async with anyio.create_task_group() as task_group:
             task_group.start_soon(self.worker.run)
             try:
@@ -1391,7 +1256,6 @@ def _public_status(job: JobRecord) -> dict[str, Any]:
 
 
 def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> None:
-    """Register remote-only durable benchmark job tools."""
 
     @mcp.tool(
         description="Queue a tenant-owned benchmark and immediately return its durable handle.",
@@ -1409,7 +1273,6 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         platform_options: dict[str, object] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        """Queue a tenant-owned benchmark and immediately return its durable handle."""
         principal = authenticated_principal()
         try:
             normalized_platform_options = validate_platform_options(platform, platform_options)
@@ -1437,7 +1300,6 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         description="Read the status of a benchmark job owned by the current principal.", annotations=READ_ANNOTATIONS
     )
     async def get_benchmark_status(execution_id: str) -> dict[str, Any]:
-        """Read the status of a benchmark job owned by the current principal."""
         principal = authenticated_principal()
         job = await anyio.to_thread.run_sync(_owned_job, runtime.repository, execution_id, principal)
         return _public_status(job)
@@ -1447,11 +1309,6 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         annotations=READ_ANNOTATIONS,
     )
     async def get_benchmark_capacity() -> dict[str, Any]:
-        """Report queue depth and running capacity without exposing other tenants.
-
-        Global row counts are aggregates only; the per-principal slice and
-        the quarantined job list are restricted to the current principal.
-        """
         principal = authenticated_principal()
         summary = await anyio.to_thread.run_sync(runtime.repository.capacity_summary)
         owned = summary["per_principal"].get(principal.principal_id, {"queued": 0, "outstanding": 0})
@@ -1473,7 +1330,6 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         annotations=READ_ANNOTATIONS,
     )
     async def get_benchmark_result(execution_id: str) -> dict[str, Any]:
-        """Return a completed owned result without exposing another tenant's paths."""
         principal = authenticated_principal()
         job = await anyio.to_thread.run_sync(_owned_job, runtime.repository, execution_id, principal)
         if job.state != "completed" or job.artifact_path is None:
@@ -1497,7 +1353,6 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         annotations=CANCEL_ANNOTATIONS,
     )
     async def cancel_benchmark(execution_id: str) -> dict[str, Any]:
-        """Cancel queued work, request cancellation at the next safe boundary, or report it is too late."""
         principal = authenticated_principal()
         outcome = await anyio.to_thread.run_sync(runtime.repository.cancel, execution_id, principal.principal_id)
         if outcome is None:

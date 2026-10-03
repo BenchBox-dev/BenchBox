@@ -1,5 +1,3 @@
-"""Metadata DDL capability data used by schema-rendering helpers."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,8 +5,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class MetadataDdlCapabilities:
-    """Rendering policy for metadata-primitives DDL generation."""
-
     supports_complex_types: bool
     supports_map_columns: bool
     supports_primary_key_clause: bool
@@ -83,6 +79,5 @@ _DIALECT_CAPABILITIES: dict[str, MetadataDdlCapabilities] = {
 
 
 def get_metadata_ddl_capabilities(dialect: str) -> MetadataDdlCapabilities:
-    """Return metadata DDL rendering capabilities for *dialect*."""
     normalized = dialect.lower().strip()
     return _DIALECT_CAPABILITIES.get(normalized, _DEFAULT_CAPABILITIES)

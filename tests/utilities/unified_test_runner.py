@@ -1,24 +1,7 @@
 #!/usr/bin/env python3
-"""Unified Test Runner for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides a comprehensive test runner that consolidates functionality from:
-- tests/run_tpch_tests.py
-- tests/run_tpcds_tests.py
-- tests/run_coverage.py
-
-Features:
-- Support for all BenchBox benchmarks
-- Multiple execution modes (unit, integration, performance, specialized)
-- Coverage reporting integration
-- Parallel execution support
-- Database-specific testing (DuckDB/SQLite)
-- CI/CD and development optimizations
-- Comprehensive error handling and progress reporting
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import argparse
 import contextlib
@@ -30,14 +13,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-# Include project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 
 class Benchmark(Enum):
-    """Supported benchmarks."""
-
     TPCH = "tpch"
     TPCDS = "tpcds"
     TPCDI = "tpcdi"
@@ -52,8 +32,6 @@ class Benchmark(Enum):
 
 
 class UnifiedRunnerMode(Enum):
-    """Test execution modes."""
-
     UNIT = "unit"
     INTEGRATION = "integration"
     PERFORMANCE = "performance"
@@ -62,8 +40,6 @@ class UnifiedRunnerMode(Enum):
 
 
 class ExecutionStrategy(Enum):
-    """Test execution strategies."""
-
     DEVELOPMENT = "development"
     CI = "ci"
     INTEGRATION = "integration"
@@ -71,8 +47,6 @@ class ExecutionStrategy(Enum):
 
 
 class DatabaseType(Enum):
-    """Database types for testing."""
-
     DUCKDB = "duckdb"
     SQLITE = "sqlite"
     BOTH = "both"
@@ -80,8 +54,6 @@ class DatabaseType(Enum):
 
 @dataclass
 class UnifiedRunnerConfig:
-    """Test runner configuration."""
-
     benchmarks: list[Benchmark]
     modes: list[UnifiedRunnerMode]
     strategy: ExecutionStrategy
@@ -106,8 +78,6 @@ class UnifiedRunnerConfig:
 
 @dataclass
 class TestResult:
-    """Test execution result."""
-
     benchmark: str
     mode: str
     database: str
@@ -125,8 +95,6 @@ class TestResult:
 
 
 class UnifiedTestRunner:
-    """Unified test runner for BenchBox."""
-
     def __init__(self, project_root: Optional[Path] = None):
         self.project_root = project_root or PROJECT_ROOT
         self.tests_dir = self.project_root / "tests"
@@ -134,15 +102,12 @@ class UnifiedTestRunner:
         self.start_time = time.time()
 
     def get_test_files_for_benchmark(self, benchmark: Benchmark) -> list[Path]:
-        """Get test files for a specific benchmark."""
         test_files = []
 
         if benchmark == Benchmark.ALL:
-            # all test files
             test_files.extend(self.tests_dir.glob("test_*.py"))
             test_files.extend(self.tests_dir.glob("**/test_*.py"))
         else:
-            # Benchmark-specific files
             benchmark_name = benchmark.value
             patterns = [
                 f"test_{benchmark_name}.py",
@@ -157,7 +122,6 @@ class UnifiedTestRunner:
         return sorted(set(test_files))
 
     def get_test_files_for_mode(self, mode: UnifiedRunnerMode) -> list[Path]:
-        """Get test files for a specific test mode."""
         test_files = []
 
         if mode == UnifiedRunnerMode.ALL:
@@ -182,28 +146,22 @@ class UnifiedTestRunner:
         mode: UnifiedRunnerMode,
         database: DatabaseType,
     ) -> list[str]:
-        """Build pytest command for execution."""
         cmd = ["python", "-m", "pytest"]
 
-        # Include test files
         if test_files:
             cmd.extend([str(f) for f in test_files])
 
-        # Verbosity
         if config.verbose:
             cmd.append("-v")
         elif not config.verbose:
             cmd.append("-q")
 
-        # Fail fast
         if config.fail_fast:
             cmd.append("-x")
 
-        # Parallel execution
         if config.parallel and config.workers > 1:
             cmd.extend(["-n", str(config.workers)])
 
-        # Coverage
         if config.coverage:
             cmd.extend(
                 [
@@ -217,7 +175,6 @@ class UnifiedTestRunner:
             if config.min_coverage:
                 cmd.append(f"--cov-fail-under={config.min_coverage}")
 
-        # Output format
         if config.output_format == "json":
             cmd.append("--json-report")
             if config.output_location:
@@ -226,22 +183,17 @@ class UnifiedTestRunner:
             output_file = config.output_location or "test_results.xml"
             cmd.append(f"--junit-xml={output_file}")
 
-        # Timeout
         if config.timeout:
             cmd.extend(["--timeout", str(config.timeout)])
 
-        # Markers
         markers = config.markers.copy()
 
-        # Include benchmark-specific markers
         if benchmark != Benchmark.ALL:
             markers.append(benchmark.value)
 
-        # Include mode-specific markers
         if mode != UnifiedRunnerMode.ALL:
             markers.append(mode.value)
 
-        # Include database-specific markers
         if database == DatabaseType.DUCKDB:
             markers.append("duckdb")
             config.exclude_markers.append("sqlite")
@@ -249,7 +201,6 @@ class UnifiedTestRunner:
             markers.append("sqlite")
             config.exclude_markers.append("duckdb")
 
-        # Build marker expression
         marker_expr = []
         if markers:
             marker_expr.append("(" + " or ".join(markers) + ")")
@@ -261,15 +212,12 @@ class UnifiedTestRunner:
         if marker_expr:
             cmd.extend(["-m", " and ".join(marker_expr)])
 
-        # Benchmark-only mode
         if config.benchmark_only:
             cmd.append("--benchmark-only")
 
-        # Collect only
         if config.collect_only:
             cmd.append("--collect-only")
 
-        # Additional pytest options
         cmd.extend(["--tb=short", "--strict-markers", "--disable-warnings"])
 
         return cmd
@@ -281,14 +229,11 @@ class UnifiedTestRunner:
         mode: UnifiedRunnerMode,
         database: DatabaseType,
     ) -> TestResult:
-        """Execute a test suite with the given configuration."""
         print(f"\n=== Running {benchmark.value.upper()} {mode.value} tests ({database.value}) ===")
 
-        # test files
         benchmark_files = self.get_test_files_for_benchmark(benchmark)
         mode_files = self.get_test_files_for_mode(mode)
 
-        # Find intersection of files
         test_files = list(set(benchmark_files) & set(mode_files))
 
         if not test_files:
@@ -308,7 +253,6 @@ class UnifiedTestRunner:
 
         print(f"Found {len(test_files)} test files")
 
-        # Build command
         cmd = self.build_pytest_command(test_files, config, benchmark, mode, database)
 
         if config.dry_run:
@@ -327,7 +271,6 @@ class UnifiedTestRunner:
                 command=" ".join(cmd),
             )
 
-        # Execute command
         start_time = time.time()
 
         try:
@@ -344,7 +287,6 @@ class UnifiedTestRunner:
 
             duration = time.time() - start_time
 
-            # Parse output
             test_result = self.parse_pytest_output(result.stdout, result.stderr)
             test_result.benchmark = benchmark.value
             test_result.mode = mode.value
@@ -354,7 +296,6 @@ class UnifiedTestRunner:
             test_result.output = result.stdout + result.stderr
             test_result.command = " ".join(cmd)
 
-            # Extract coverage if available
             if config.coverage:
                 test_result.coverage = self.extract_coverage(result.stdout)
 
@@ -373,7 +314,7 @@ class UnifiedTestRunner:
                 errors=1,
                 warnings=0,
                 duration=duration,
-                exit_code=124,  # Timeout exit code
+                exit_code=124,
                 output=f"Test execution timed out after {config.timeout} seconds",
             )
 
@@ -395,10 +336,8 @@ class UnifiedTestRunner:
             )
 
     def parse_pytest_output(self, stdout: str, stderr: str) -> TestResult:
-        """Parse pytest output to extract test results."""
         output = stdout + stderr
 
-        # Default values
         total_tests = 0
         passed = 0
         failed = 0
@@ -406,11 +345,9 @@ class UnifiedTestRunner:
         errors = 0
         warnings = 0
 
-        # Parse pytest summary line
         lines = output.split("\n")
         for line in lines:
             if "passed" in line and ("failed" in line or "error" in line or "skipped" in line):
-                # Summary line like "5 passed, 2 failed, 1 skipped in 10.2s"
                 parts = line.split()
                 for i, part in enumerate(parts):
                     if part in ["passed", "passed,"] and i > 0:
@@ -427,32 +364,28 @@ class UnifiedTestRunner:
                             errors = int(parts[i - 1])
                 break
 
-        # Count warnings
         warnings = output.count("warning")
 
-        # Calculate total
         total_tests = passed + failed + skipped + errors
 
         return TestResult(
-            benchmark="",  # Will be set by caller
-            mode="",  # Will be set by caller
-            database="",  # Will be set by caller
+            benchmark="",
+            mode="",
+            database="",
             total_tests=total_tests,
             passed=passed,
             failed=failed,
             skipped=skipped,
             errors=errors,
             warnings=warnings,
-            duration=0.0,  # Will be set by caller
+            duration=0.0,
         )
 
     def extract_coverage(self, output: str) -> Optional[float]:
-        """Extract coverage percentage from pytest output."""
         lines = output.split("\n")
         for line in lines:
             if "TOTAL" in line and "%" in line:
                 try:
-                    # Look for percentage in the line
                     parts = line.split()
                     for part in parts:
                         if part.endswith("%"):
@@ -462,10 +395,8 @@ class UnifiedTestRunner:
         return None
 
     def run_development_strategy(self, config: UnifiedRunnerConfig) -> list[TestResult]:
-        """Run tests optimized for development (fast feedback)."""
         results = []
 
-        # Run unit tests first for quick feedback
         for benchmark in config.benchmarks:
             if benchmark == Benchmark.ALL:
                 continue
@@ -473,23 +404,19 @@ class UnifiedTestRunner:
             result = self.execute_test_suite(config, benchmark, UnifiedRunnerMode.UNIT, config.database_type)
             results.append(result)
 
-            # Stop on first failure if fail_fast is enabled
             if config.fail_fast and result.failed > 0:
                 break
 
         return results
 
     def run_ci_strategy(self, config: UnifiedRunnerConfig) -> list[TestResult]:
-        """Run tests optimized for CI (comprehensive but efficient)."""
         results = []
 
-        # Run fast tests first
         print("=== CI Strategy: Running fast tests first ===")
         config.exclude_markers.append("slow")
 
         for benchmark in config.benchmarks:
             if benchmark == Benchmark.ALL:
-                # Run all benchmarks
                 all_benchmarks = [b for b in Benchmark if b != Benchmark.ALL]
                 for bench in all_benchmarks:
                     for mode in config.modes:
@@ -504,7 +431,6 @@ class UnifiedTestRunner:
                     result = self.execute_test_suite(config, benchmark, mode, config.database_type)
                     results.append(result)
 
-        # If fast tests pass, run slow tests
         if all(r.failed == 0 for r in results):
             print("=== CI Strategy: Running slow tests ===")
             config.exclude_markers.remove("slow")
@@ -519,10 +445,8 @@ class UnifiedTestRunner:
         return results
 
     def run_integration_strategy(self, config: UnifiedRunnerConfig) -> list[TestResult]:
-        """Run tests optimized for integration testing (DuckDB focus)."""
         results = []
 
-        # Focus on DuckDB integration tests
         config.database_type = DatabaseType.DUCKDB
         config.markers.append("integration")
 
@@ -535,7 +459,6 @@ class UnifiedTestRunner:
         return results
 
     def run_custom_strategy(self, config: UnifiedRunnerConfig) -> list[TestResult]:
-        """Run tests with custom configuration."""
         results = []
 
         databases = []
@@ -547,7 +470,6 @@ class UnifiedTestRunner:
         for database in databases:
             for benchmark in config.benchmarks:
                 if benchmark == Benchmark.ALL:
-                    # Run all benchmarks
                     all_benchmarks = [b for b in Benchmark if b != Benchmark.ALL]
                     for bench in all_benchmarks:
                         for mode in config.modes:
@@ -573,7 +495,6 @@ class UnifiedTestRunner:
         return results
 
     def run(self, config: UnifiedRunnerConfig) -> list[TestResult]:
-        """Run tests based on the configuration."""
         print("BenchBox Unified Test Runner")
         print(f"Strategy: {config.strategy.value}")
         print(f"Benchmarks: {[b.value for b in config.benchmarks]}")
@@ -596,10 +517,8 @@ class UnifiedTestRunner:
         return results
 
     def generate_report(self, results: list[TestResult]) -> str:
-        """Generate a comprehensive test report."""
         total_duration = time.time() - self.start_time
 
-        # Aggregate statistics
         total_tests = sum(r.total_tests for r in results)
         total_passed = sum(r.passed for r in results)
         total_failed = sum(r.failed for r in results)
@@ -607,18 +526,15 @@ class UnifiedTestRunner:
         total_errors = sum(r.errors for r in results)
         total_warnings = sum(r.warnings for r in results)
 
-        # Coverage statistics
         coverage_results = [r for r in results if r.coverage is not None]
         avg_coverage = sum(r.coverage for r in coverage_results) / len(coverage_results) if coverage_results else None
 
-        # Generate report
         report = []
         report.append("# BenchBox Test Execution Report")
         report.append(f"Generated at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
         report.append(f"Total execution time: {total_duration:.2f}s")
         report.append("")
 
-        # Summary
         report.append("## Summary")
         report.append(f"- Total tests: {total_tests}")
         report.append(f"- Passed: {total_passed}")
@@ -633,7 +549,6 @@ class UnifiedTestRunner:
         report.append(f"- Success rate: {success_rate:.1f}%")
         report.append("")
 
-        # Detailed results
         report.append("## Detailed Results")
         for result in results:
             status = "✅ PASS" if result.failed == 0 and result.errors == 0 else "❌ FAIL"
@@ -652,7 +567,6 @@ class UnifiedTestRunner:
                 report.append(f"- Exit code: {result.exit_code}")
             report.append("")
 
-        # Failed tests
         failed_results = [r for r in results if r.failed > 0 or r.errors > 0]
         if failed_results:
             report.append("## Failed Tests")
@@ -667,7 +581,6 @@ class UnifiedTestRunner:
         return "\n".join(report)
 
     def save_report(self, report: str, filename: Optional[str] = None) -> Path:
-        """Save the test report to a file."""
         if not filename:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"test_report_{timestamp}.md"
@@ -678,7 +591,6 @@ class UnifiedTestRunner:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Unified Test Runner for BenchBox",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -701,7 +613,6 @@ Examples:
         """,
     )
 
-    # Benchmark selection
     parser.add_argument(
         "--benchmark",
         nargs="+",
@@ -710,7 +621,6 @@ Examples:
         help="Benchmarks to test",
     )
 
-    # Mode selection
     parser.add_argument(
         "--mode",
         nargs="+",
@@ -719,7 +629,6 @@ Examples:
         help="Test modes to run",
     )
 
-    # Strategy selection
     parser.add_argument(
         "--strategy",
         choices=[s.value for s in ExecutionStrategy],
@@ -727,20 +636,16 @@ Examples:
         help="Test execution strategy",
     )
 
-    # Database selection
     db_group = parser.add_mutually_exclusive_group()
     db_group.add_argument("--duckdb", action="store_true", help="Run DuckDB tests only")
     db_group.add_argument("--sqlite", action="store_true", help="Run SQLite tests only")
 
-    # Coverage options
     parser.add_argument("--coverage", action="store_true", help="Enable coverage reporting")
     parser.add_argument("--min-coverage", type=float, help="Minimum coverage percentage")
 
-    # Parallel execution
     parser.add_argument("--parallel", action="store_true", help="Enable parallel execution")
     parser.add_argument("--workers", type=int, default=2, help="Number of parallel workers")
 
-    # Output options
     parser.add_argument(
         "--output",
         choices=["term", "json", "junit"],
@@ -749,12 +654,10 @@ Examples:
     )
     parser.add_argument("--output-location", help="Output file location")
 
-    # Execution options
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--fail-fast", "-x", action="store_true", help="Stop on first failure")
     parser.add_argument("--timeout", type=int, help="Test timeout in seconds")
 
-    # Test selection
     parser.add_argument("--markers", nargs="+", default=[], help="Include tests with these markers")
     parser.add_argument(
         "--exclude-markers",
@@ -763,12 +666,10 @@ Examples:
         help="Exclude tests with these markers",
     )
 
-    # Special modes
     parser.add_argument("--benchmark-only", action="store_true", help="Run benchmark tests only")
     parser.add_argument("--collect-only", action="store_true", help="Collect tests only, don't run")
     parser.add_argument("--dry-run", action="store_true", help="Show commands without executing")
 
-    # Reporting
     parser.add_argument("--report", action="store_true", help="Generate detailed report")
     parser.add_argument("--report-file", help="Report file name")
 
@@ -776,15 +677,12 @@ Examples:
 
 
 def main() -> int:
-    """Main entry point."""
     args = parse_args()
 
-    # Build configuration
     benchmarks = [Benchmark(b) for b in args.benchmark]
     modes = [UnifiedRunnerMode(m) for m in args.mode]
     strategy = ExecutionStrategy(args.strategy)
 
-    # Determine database type
     if args.duckdb:
         database_type = DatabaseType.DUCKDB
     elif args.sqlite:
@@ -815,11 +713,9 @@ def main() -> int:
         dry_run=args.dry_run,
     )
 
-    # Run tests
     runner = UnifiedTestRunner()
     results = runner.run(config)
 
-    # Generate report
     if args.report or args.report_file:
         report = runner.generate_report(results)
         if args.report_file:
@@ -828,7 +724,6 @@ def main() -> int:
         else:
             print("\n" + report)
 
-    # Print summary
     total_failed = sum(r.failed + r.errors for r in results)
     total_tests = sum(r.total_tests for r in results)
     total_passed = sum(r.passed for r in results)

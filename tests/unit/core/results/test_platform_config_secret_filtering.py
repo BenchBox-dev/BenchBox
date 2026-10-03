@@ -1,12 +1,5 @@
-"""platform.config extraction, the raw_config fallbacks, and the results.db
-metadata sink must filter secrets structurally.
-
-Adapters keep secrets out of platform_info by convention; these boundaries
-previously trusted that convention with no enforcement.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,7 +20,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Distinct sentinels per source so a partial fix cannot silence the gate.
 _RAW_CONFIG_GATE = "RAW_CONFIG_GATE"
 _RAW_METADATA_GATE = "RAW_METADATA_GATE"
 _DEPLOYMENT_GATE = "DEPLOYMENT_GATE"
@@ -89,8 +81,6 @@ class TestExtractPlatformConfigFiltering:
 
 
 class TestPlatformMetadataBoundaryFiltering:
-    """raw_config, raw_metadata, and all four normalized mapping blocks."""
-
     def test_all_sources_filtered_at_payload_builder(self):
         payload = build_platform_metadata_payload(
             platform_info={"sort_key": "o_orderkey", "threads": 4},
@@ -140,7 +130,6 @@ class TestPlatformMetadataBoundaryFiltering:
         text = json.dumps(build_result_payload(_multi_source_result()), default=str)
         for gate in _ALL_GATES:
             assert gate not in text, f"public payload leaked {gate}"
-        # Non-secret tuning survives into platform.config / platform_info path.
         assert "o_orderkey" in text
         assert "threads" in text
 
@@ -169,7 +158,6 @@ class TestPlatformMetadataBoundaryFiltering:
         assert platform.get("cloud", {}).get("access_key") == REDACTED_VALUE
         assert platform.get("compute", {}).get("connection_string") == REDACTED_VALUE
         assert platform.get("storage", {}).get("secret") == REDACTED_VALUE
-        # Non-secret fields preserved for analysis consumers.
         assert platform.get("raw_config", {}).get("sort_key") == "o_orderkey"
         assert platform.get("raw_config", {}).get("threads") == 4
         assert platform.get("compute", {}).get("warehouse") == "BENCH_WH"

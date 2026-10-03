@@ -1,95 +1,4 @@
 #!/usr/bin/env python3
-"""Nightly sweep for open develop PRs that look stranded after arm intent.
-
-Prior art: `harden-auto-merge-on-open-stranding` diagnosed the original
-failure class -- auto-merge-on-open.yml's `enable` job completed with
-`conclusion: success` while the PR's own `auto_merge` field later read
-back `null`. After the intentional auto-merge hold (#1592 and follow-ons),
-a green non-draft non-soundness PR with auto-merge OFF is **normal** when
-nobody asked to arm it. This script therefore does NOT treat "auto-merge
-off" alone as stranded.
-
-It is a read-only external observer that classifies every OPEN develop PR
-and alerts only when all of the following hold:
-
-    (a) required-lane green -- EVERY develop-ruleset required status
-        context in `REQUIRED_CHECK_NAMES` has its LATEST check run on the
-        PR's head SHA completed with conclusion `success`. Today that is
-        `ci-required-result`, `tooling`, `Results Explorer browser gate`,
-        `ruleset-drift`, and `Public-site visual acceptance`
-        (docs/operations/repo-admin-settings.md; live ruleset
-        develop-squash-only). Partial green (one context success, another
-        missing or red) is NOT required-green. Every required context
-        reports (path-aware skip still concludes success); a missing run
-        is fail-closed not-green.
-    (b) auto-merge is OFF    -- the PR's own `auto_merge` field is falsy
-        (null or an explicit off), re-read from REST (never inferred from
-        a workflow run's conclusion; see "Known timing behavior" below).
-    (c) not soundness-gated  -- `any_soundness_path` over the PR's changed
-        files is False. Soundness-gated PRs correctly never auto-merge
-        (see `auto_merge_soundness_paths.py` /
-        `.github/workflows/auto-merge-on-open.yml`); that withheld state
-        is by design and is covered by the separate daily
-        soundness-drain digest, not this sweep.
-    (d) past the grace period -- more than `GRACE_PERIOD_HOURS` (default
-        2h) since the head commit was pushed, so an arm that just fired
-        has had time to populate `auto_merge` before this sweep alerts.
-    (e) not explicitly held -- the PR does not carry the durable hold
-        label ``no-auto-merge`` (``AUTO_MERGE_HOLD_LABEL``). That label is
-        the same durable hold ``auto-merge-on-open.yml`` honours: drafts
-        are already excluded by (job skip / draft check); the label holds
-        a non-draft without converting it to draft. An explicit hold is
-        intentional, not stranded — this sweep must never re-arm it.
-    (f) prior arm intent     -- the issue/PR timeline shows evidence that
-        auto-merge was requested or previously enabled, then lost. Signals
-        (any one is enough):
-          * `ready_for_review` (draft → ready; historical workflow arm path,
-            deleted 2026-08-06 — still valid as arm-intent evidence in old
-            timelines)
-          * `auto_squash_enabled` / `auto_merge_enabled` (arm succeeded once)
-          * `auto_merge_disabled` (implies a prior enable that was dropped)
-        Never-armed intentional holds have none of these events and are
-        excluded even without the hold label. Missing timeline data
-        fail-closes to "no arm intent" (prefer missing a true strand over
-        false-positiveing holds).
-
-The only mutation this script ever performs (and only under `--apply`) is
-creating/updating ONE marker-tagged tracking issue (title "Green-but-unmerged
-PR sweep") with the current digest -- created/refreshed while the stranded
-set is non-empty, and patched to the empty state exactly once when it
-drains, then left alone. It never enables auto-merge, never merges, never labels, and
-never comments on a PR -- enabling auto-merge outside the sanctioned
-predicate path in `auto-merge-on-open.yml` / `make pr-ready` would bypass
-the soundness gate and would re-arm intentional holds (including a
-``no-auto-merge`` hold this sweep did not set).
-
-Known timing behavior (observed live 2026-07-23 against PRs #1282-#1286,
-all opened and auto-merge-enabled the same day): the `auto-merge-on-open.yml`
-`enable` job (`gh pr merge --auto --squash`) completed `conclusion: success`
-on every one of those PRs' head SHAs, per the Actions API. However, reading
-those same PRs back through the GitHub MCP server's `pull_request_read` tool
-omitted the `auto_merge` field entirely rather than surfacing it as populated
-or explicit `null` -- i.e. a caller relying on that read path cannot tell
-"enabled but not yet visible" from "never enabled" from "the read path just
-doesn't carry this field". The raw REST `GET /pulls` endpoint (what this
-script calls directly) does carry `auto_merge` on every PR, so this script
-never infers state from a workflow run's conclusion -- it always re-fetches
-each PR's own current `auto_merge` object. Arm intent is read from the
-timeline REST endpoint (events such as `auto_squash_enabled`), not from
-workflow conclusions either.
-
-Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the
-REST API). If neither is set but the `gh` CLI is on PATH, its token
-(`gh auth token`) is used instead -- this lets the script run locally
-against an interactively-authenticated `gh` without exporting a token by
-hand. No long-lived PAT is required or read from anywhere else.
-
-Usage:
-    uv run -- python _project/scripts/green_unmerged_sweep.py
-    uv run -- python _project/scripts/green_unmerged_sweep.py --json
-    uv run -- python _project/scripts/green_unmerged_sweep.py --apply
-    uv run -- python _project/scripts/green_unmerged_sweep.py --self-test
-"""
 
 from __future__ import annotations
 
@@ -123,20 +32,10 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
-# Durable explicit hold shared with `.github/workflows/auto-merge-on-open.yml`
-# (exact label name; keep both layers in lockstep — pinned by
-# tests/unit/test_auto_merge_hold_is_durable.py). Applying this label is the
-# non-draft durable hold; drafts remain a separate, job-level hold.
 AUTO_MERGE_HOLD_LABEL = "no-auto-merge"
 
 PINNED_ISSUE_TITLE = "Green-but-unmerged PR sweep"
-# Body marker: proves the digest issue was written by this script, so
-# find_pinned_issue never adopts (and later clobbers) a human issue that
-# happens to reuse the title.
 DIGEST_BODY_MARKER = "<!-- green-unmerged-sweep -->"
-# Timeline event names that prove someone asked to arm auto-merge (or that
-# auto-merge was previously on and later dropped). Intentional holds never
-# emit these; true stranding after an arm always leaves at least one.
 ARM_INTENT_TIMELINE_EVENTS = frozenset(
     {
         "ready_for_review",
@@ -145,14 +44,9 @@ ARM_INTENT_TIMELINE_EVENTS = frozenset(
         "auto_merge_disabled",
     }
 )
-# Timeline API still documents the mockingbird media type; send both so a
-# token that only accepts one still succeeds.
 TIMELINE_ACCEPT = "application/vnd.github.mockingbird-preview+json, application/vnd.github+json"
 
 
-# ---------------------------------------------------------------------------
-# Pure classification logic (unit-/self-tested; no git/network)
-# ---------------------------------------------------------------------------
 CLI_DESCRIPTION = (
     "Nightly sweep for open develop PRs that look stranded after arm intent.\n"
     "\n"
@@ -259,8 +153,6 @@ class ClassifiedPR:
     had_arm_intent: bool
     head_age_hours: float
     stranded: bool
-    # True when the PR carries AUTO_MERGE_HOLD_LABEL. Composable with other
-    # intentional-hold classifiers (draft is tracked separately via `draft`).
     explicit_hold: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -268,8 +160,6 @@ class ClassifiedPR:
 
 
 def _parse_iso(value: str) -> dt.datetime:
-    # Re-export for fixture/tests that import via the sweep module. Real logic
-    # lives in required_lane to keep timestamp handling consistent.
     from required_lane import _parse_iso as _rl_parse_iso  # noqa: E402
 
     return _rl_parse_iso(value)
@@ -280,31 +170,12 @@ def is_soundness_gated(changed_files: list[str]) -> bool:
 
 
 def has_auto_merge_hold_label(labels: list[str] | tuple[str, ...] | None) -> bool:
-    """True when *labels* includes the durable ``no-auto-merge`` hold label.
-
-    Exact name match only (case-sensitive, same as the workflow's
-    ``grep -qxF``). Composable: intentional-hold classifiers can OR this
-    with draft / other signals without forking the label constant.
-    """
     if not labels:
         return False
     return AUTO_MERGE_HOLD_LABEL in {str(label).strip() for label in labels if label is not None}
 
 
 def head_age_hours(pr: dict[str, Any], now: dt.datetime) -> float:
-    """Hours since the PR's head commit was pushed.
-
-    Anchored on ``head_pushed_at`` when present (the commit's own
-    author/committer timestamp, fetched alongside the head SHA -- see
-    `fetch_head_pushed_at`). committer.date is a push-time APPROXIMATION:
-    rebases/cherry-picks reset it to ~push time, but an old commit held
-    locally then pushed, or a reopened PR, can look past-grace early. The
-    consequence is bounded to a premature advisory line (no PR mutation)
-    that self-corrects on the next nightly run. Falls back to
-    ``updated_at``. An unknown
-    anchor returns 0.0 (fail-closed: an unaged PR never qualifies as
-    stranded until its push time is actually known).
-    """
     anchor = pr.get("head_pushed_at") or pr.get("updated_at")
     if not anchor:
         return 0.0
@@ -312,11 +183,6 @@ def head_age_hours(pr: dict[str, Any], now: dt.datetime) -> float:
 
 
 def has_arm_intent(timeline_events: list[dict[str, Any]] | None) -> bool:
-    """True when timeline shows auto-merge was requested or previously enabled.
-
-    Fail-closed: missing/empty timeline means no arm intent (intentional
-    holds never armed; prefer a false negative over re-flagging holds).
-    """
     if not timeline_events:
         return False
     for event in timeline_events:
@@ -326,7 +192,6 @@ def has_arm_intent(timeline_events: list[dict[str, Any]] | None) -> bool:
 
 
 def resolve_had_arm_intent(pr: dict[str, Any]) -> bool:
-    """Prefer an explicit fixture/API flag; else derive from timeline events."""
     if "had_arm_intent" in pr:
         return bool(pr["had_arm_intent"])
     return has_arm_intent(pr.get("timeline_events"))
@@ -343,16 +208,6 @@ def is_stranded(
     explicit_hold: bool = False,
     had_arm_intent: bool = False,
 ) -> bool:
-    """True when auto-merge was requested/previously on, then lost while green.
-
-    Composition of hold classifiers:
-    - Explicit hold (``no-auto-merge`` label) or draft is intentional, not stranded.
-    - Auto-merge OFF alone is an intentional hold after the post-#1592 arm
-      policy -- never stranded without prior arm intent.
-    - True stranding: had arm intent + green + auto-merge off + aged + not
-      soundness-gated + not explicitly held.
-    ``--apply`` must never re-arm a hold it did not set.
-    """
     return (
         (not draft)
         and required_green
@@ -370,7 +225,6 @@ def classify_pr(
     *,
     grace_hours: float = GRACE_PERIOD_HOURS,
 ) -> ClassifiedPR:
-    """Classify one normalized PR record. Pure -- no I/O."""
     check_runs = pr.get("check_runs") or []
     changed_files = pr.get("changed_files") or []
     labels = pr.get("labels") or []
@@ -418,7 +272,6 @@ def classify_all(
 
 
 def stranded_prs(classified: list[ClassifiedPR]) -> list[ClassifiedPR]:
-    """Stranded PRs, oldest-head-push first (longest stranded, most urgent)."""
     hits = [c for c in classified if c.stranded]
     return sorted(hits, key=lambda c: c.head_age_hours, reverse=True)
 
@@ -436,12 +289,6 @@ def build_digest(
     now: dt.datetime,
     repo: str,
 ) -> str:
-    """Human-readable digest body.
-
-    Empty-queue body (no stranded PRs) is used by local/manual runs and by
-    the one-time "mark existing digest empty" patch; --apply never CREATES
-    an issue for that state.
-    """
     hits = stranded_prs(classified)
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
     lines = [
@@ -478,10 +325,6 @@ def build_digest(
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# I/O: GitHub REST (token-source chain: GITHUB_TOKEN/GH_TOKEN env, else the
-# `gh` CLI's own token if it is on PATH -- never a separately-stored PAT).
-# ---------------------------------------------------------------------------
 def resolve_token() -> str | None:
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if token:
@@ -505,11 +348,6 @@ def resolve_token() -> str | None:
 
 
 class GitHubClient:
-    """Thin REST client. GET pagination via Link headers; single-page
-    mutations otherwise. Mirrors soundness_drain_report.py's retry/urllib
-    conventions.
-    """
-
     def __init__(self, token: str) -> None:
         self.token = token
 
@@ -556,17 +394,11 @@ class GitHubClient:
         *,
         accept: str = "application/vnd.github+json",
     ) -> list[dict[str, Any]]:
-        """GET a list endpoint, following `page` params up to a sane cap.
-
-        `max_items` stops fetching once that many items are collected --
-        without it, a small per_page (e.g. 1) would page all the way to the
-        cap just to return the first item.
-        """
         query = dict(params or {})
         query.setdefault("per_page", "100")
         out: list[dict[str, Any]] = []
         page = 1
-        while page <= 10:  # 1000 items is far beyond this repo's open-PR volume
+        while page <= 10:
             query["page"] = str(page)
             url = f"{API_ROOT}/{path}?{urllib.parse.urlencode(query)}"
             result = self._request("GET", url, accept=accept) or []
@@ -595,12 +427,6 @@ class GitHubClient:
 
 
 def fetch_pr_timeline_events(client: GitHubClient, owner: str, repo: str, number: int) -> list[dict[str, Any]]:
-    """Issue/PR timeline events used only for arm-intent classification.
-
-    Returns a compact list of ``{"event": ...}`` dicts. On API failure or
-    empty response the classifier treats the PR as no-arm-intent (fail-closed
-    against intentional-hold false positives).
-    """
     try:
         raw_events = client.get_all(
             f"repos/{owner}/{repo}/issues/{number}/timeline",
@@ -617,9 +443,6 @@ def fetch_pr_timeline_events(client: GitHubClient, owner: str, repo: str, number
 
 
 def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str, Any]]:
-    """Fetch + normalize every OPEN PR targeting develop into the internal
-    shape consumed by classify_pr (same shape as the self-test fixture).
-    """
     raw_prs = client.get_all(f"repos/{owner}/{repo}/pulls", {"state": "open", "base": "develop"})
     normalized: list[dict[str, Any]] = []
     for raw in raw_prs:
@@ -645,15 +468,8 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
                 "draft": bool(raw.get("draft")),
                 "updated_at": raw.get("updated_at"),
                 "head_pushed_at": head_pushed_at,
-                # auto_merge is the PR's OWN current field -- re-fetched here,
-                # never inferred from a workflow run's conclusion. See "Known
-                # timing behavior" in the module docstring.
                 "auto_merge": raw.get("auto_merge"),
-                # Durable hold signal shared with auto-merge-on-open.yml.
                 "labels": [name for name in label_names if name],
-                # Prior arm intent from timeline (ready_for_review /
-                # auto_squash_enabled / auto_merge_disabled). Intentional
-                # holds never arm and have an empty signal set.
                 "timeline_events": timeline_events,
                 "changed_files": [f.get("filename", "") for f in files],
                 "check_runs": [
@@ -670,17 +486,7 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
     return normalized
 
 
-# ---------------------------------------------------------------------------
-# Mutations (only reached under --apply): pinned-issue upsert only. No
-# label, no auto-merge call, no PR comments.
-# ---------------------------------------------------------------------------
 def find_pinned_issue(client: GitHubClient, owner: str, repo: str) -> dict[str, Any] | None:
-    """Locate the digest issue: exact title AND the body marker.
-
-    The marker requirement means a manually-created issue that happens to
-    reuse the title is never clobbered; the script only adopts issues it
-    wrote. Title matches without the marker are skipped.
-    """
     issues = client.get_all(f"repos/{owner}/{repo}/issues", {"state": "all"})
     for item in issues:
         if "pull_request" in item:
@@ -691,7 +497,6 @@ def find_pinned_issue(client: GitHubClient, owner: str, repo: str) -> dict[str, 
 
 
 def upsert_pinned_issue(client: GitHubClient, owner: str, repo: str, body: str) -> str:
-    """Create/update the single digest issue (non-empty path)."""
     existing = find_pinned_issue(client, owner, repo)
     if existing is None:
         created = client.post(
@@ -706,9 +511,6 @@ def upsert_pinned_issue(client: GitHubClient, owner: str, repo: str, body: str) 
     return f"updated issue #{existing['number']}"
 
 
-# ---------------------------------------------------------------------------
-# Self-test (fixture-driven, no network)
-# ---------------------------------------------------------------------------
 def run_self_test() -> int:
     fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     now = _parse_iso(fixture["as_of"])
@@ -759,7 +561,6 @@ def run_self_test() -> int:
         expect(not c.auto_merge_enabled, f"PR #{number} stranded but auto_merge still on")
         expect(not c.explicit_hold, f"PR #{number} stranded but explicit_hold=True")
 
-    # build_digest must always carry the marker, whatever the queue state.
     expect(
         DIGEST_BODY_MARKER in build_digest(classified, now=now, repo=fixture.get("repo", DEFAULT_REPO)),
         "build_digest output missing DIGEST_BODY_MARKER",
@@ -775,9 +576,6 @@ def run_self_test() -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
@@ -849,15 +647,8 @@ def main(argv: list[str] | None = None) -> int:
             outcome = upsert_pinned_issue(client, owner, repo, body)
             print(f"digest issue: {outcome}", file=sys.stderr)
         else:
-            # Silent-when-clear means no new issue and no repeated updates --
-            # but an existing digest must not keep showing yesterday's
-            # stranded PRs forever. Patch it to the clear state exactly once.
             existing = find_pinned_issue(client, owner, repo)
             existing_body = (existing or {}).get("body") or ""
-            # Stale content = either yesterday's stranded list OR a RED
-            # post-merge banner written by an earlier version of this script:
-            # such a body already contains the clear-state line, so guarding
-            # on that line alone would leave the banner up forever.
             stale = "No stranded PRs" not in existing_body or "develop post-merge is RED" in existing_body
             if existing is not None and stale:
                 client.patch(

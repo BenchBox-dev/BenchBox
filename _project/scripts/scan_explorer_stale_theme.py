@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""Fail when active source revives the retired mixed-theme Results Explorer contract.
-
-The current product contract is the shared BenchBox `system` / `light` / `dark`
-theme. Earlier planning evidence described a retired "dark BenchBox shell +
-light analytical data panels" contract; if those phrases re-enter active source
-or active test/spec names, future implementers can silently restore the wrong
-contract.
-
-This scan looks for the retired phrases in:
-  * results-explorer/src (production source and unit tests)
-  * results-explorer/e2e (route specs)
-  * _project/analysis  (planning evidence)
-
-It allows two escape hatches:
-  * Inline marker `allow-stale-theme: <reason>` on the same line.
-  * For `_project/analysis/*` files, an early supersession note within the
-    first 40 lines that mentions one of: superseded, supersedes, supersede,
-    supersession.
-
-Historical evidence under `_project/DONE/` is intentionally excluded - the
-project rule is to add supersession notes to active analysis, not to rewrite
-completed work.
-
-Exit status:
-  0 - no unallowlisted references found
-  1 - one or more references found (printed to stderr)
-"""
 
 from __future__ import annotations
 

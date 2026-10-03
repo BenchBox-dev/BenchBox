@@ -1,5 +1,3 @@
-"""Merge one checked release PR and tag its exact merge commit, with safe resume."""
-
 from __future__ import annotations
 
 import argparse
@@ -17,7 +15,7 @@ VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.+-]+)?\Z")
 
 
 class FinalizeError(Exception):
-    """A release invariant is unproven or contradicted."""
+    pass
 
 
 def command(*args: str, pending_ok: bool = False, env: dict[str, str] | None = None) -> str:
@@ -107,7 +105,6 @@ def merge_pr(pr: dict[str, Any], version: str, required_contexts: tuple[str, ...
         f"v{version}",
     ) or refreshed.get("headRefOid") != head:
         raise FinalizeError("Release PR state or head changed while checking required contexts")
-    # The REST merge endpoint rejects a concurrent head change when sha is set.
     command(
         "gh",
         "api",

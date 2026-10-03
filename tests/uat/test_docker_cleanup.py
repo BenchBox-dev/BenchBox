@@ -1,5 +1,3 @@
-"""Fast-test coverage for abandoned UAT Docker recovery."""
-
 from __future__ import annotations
 
 import json
@@ -247,15 +245,6 @@ def test_apply_deduplicates_multitagged_uat_image_cleanup_id():
     ]
     assert image_cleanup_commands == [("docker", "image", "rm", "sha256:uat-image-id")]
     assert [call for call in calls if call[:3] == ("docker", "image", "rm")] == image_cleanup_commands
-
-
-# --------------------------------------------------------------------------
-# mocker fallback (uat-container-engine-routing w1/w3): the resolved engine's
-# JSON inventory is Docker-shaped and does not work against mocker (verified
-# live in w0 -- see recover_abandoned_uat_docker_usage's docstring). This
-# falls back to mocker's one faithful plain-text verb (`volume ls`) instead
-# of crashing on unparseable `--format json` output.
-# --------------------------------------------------------------------------
 
 
 def _mocker_volume_runner(calls: list[tuple[str, ...]]):

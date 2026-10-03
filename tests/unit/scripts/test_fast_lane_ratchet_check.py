@@ -1,12 +1,3 @@
-"""Unit tests for _project/scripts/fast_lane_ratchet_check.py's pure logic.
-
-The GitHub-API I/O (issue upsert) is exercised by the nightly workflow
-itself and mirrors green_unmerged_sweep.py's pattern (see
-test_green_unmerged_sweep.py); here we pin the headroom/quantum math and
-digest formatting with no network, plus the script's own fixture-driven
-`--self-test`.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -16,9 +7,6 @@ from pathlib import Path
 
 import pytest
 
-# medium, not fast: see test_timing_policy_modes.py's pytestmark comment --
-# this batch reforms the fast lane's own contention problem and must not add
-# to the fast lane it is in the middle of decoupling.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -38,9 +26,6 @@ def _load():
 mod = _load()
 
 
-# ------------------------------------------------------------------ #
-# headroom_status                                                      #
-# ------------------------------------------------------------------ #
 def test_headroom_status_healthy() -> None:
     headroom, needs_ratchet = mod.headroom_status(25000, 26050)
     assert headroom == 1050
@@ -54,7 +39,6 @@ def test_headroom_status_below_warn_threshold() -> None:
 
 
 def test_headroom_status_boundary_exactly_at_threshold_is_not_ratchet() -> None:
-    # headroom == warn_threshold must NOT trigger (strict "<" per the spec).
     headroom, needs_ratchet = mod.headroom_status(25950, 26050)
     assert headroom == 100
     assert needs_ratchet is False
@@ -66,9 +50,6 @@ def test_headroom_status_over_ceiling() -> None:
     assert needs_ratchet is True
 
 
-# ------------------------------------------------------------------ #
-# suggested_next_ceiling: +500 quantum, >=250 headroom convention       #
-# ------------------------------------------------------------------ #
 def test_suggested_next_ceiling_single_quantum() -> None:
     next_ceiling = mod.suggested_next_ceiling(25960, 26050)
     assert next_ceiling == 26550
@@ -77,8 +58,6 @@ def test_suggested_next_ceiling_single_quantum() -> None:
 
 def test_suggested_next_ceiling_multiple_quanta_when_far_over() -> None:
     next_ceiling = mod.suggested_next_ceiling(26800, 26050)
-    # 26050 + 500 = 26550 (headroom -250, still short); +500 again = 27050
-    # (headroom 250, clears the floor).
     assert next_ceiling == 27050
     assert next_ceiling - 26800 >= 250
     assert (next_ceiling - 26050) % 500 == 0
@@ -111,9 +90,6 @@ def test_load_reservation_rejects_malformed_policy(tmp_path: Path, reservation) 
         mod.load_reservation(policy)
 
 
-# ------------------------------------------------------------------ #
-# Digest formatting                                                    #
-# ------------------------------------------------------------------ #
 def test_build_digest_contains_marker_and_exact_edit() -> None:
     import datetime as dt
 
@@ -154,9 +130,6 @@ def test_build_clear_digest_contains_marker_and_clear_line() -> None:
     assert "No ratchet needed" in digest
 
 
-# ------------------------------------------------------------------ #
-# Fixture / self-test consistency                                      #
-# ------------------------------------------------------------------ #
 def test_bundled_fixture_is_valid_json_with_scenarios() -> None:
     fixture = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     assert "as_of" in fixture

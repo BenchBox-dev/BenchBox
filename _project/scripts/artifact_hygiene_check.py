@@ -1,5 +1,3 @@
-"""Fail PRs that commit temporary review evidence as repository source."""
-
 from __future__ import annotations
 
 import argparse

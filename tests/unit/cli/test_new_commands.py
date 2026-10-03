@@ -1,11 +1,6 @@
-"""Tests for newly implemented CLI commands.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests for datagen, aggregate, plot, shell, calculate-qphh, and run-official commands.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
@@ -19,12 +14,6 @@ from click.testing import CliRunner
 
 from benchbox.cli.app import cli
 
-# benchbox.cli.commands.__init__ re-exports several Click Commands under the
-# same names as their submodules.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "<module>"), which
-# returns the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.shell")
 _shell_module = _sys.modules["benchbox.cli.commands.shell"]
 __import__("benchbox.cli.commands.datagen")
@@ -39,8 +28,6 @@ pytestmark = [
 
 
 class TestDatagenCommand:
-    """Test the datagen CLI command."""
-
     def test_datagen_command_exists(self):
 
         runner = CliRunner()
@@ -71,8 +58,6 @@ class TestDatagenCommand:
 
 
 class TestAggregateCommand:
-    """Test the aggregate CLI command."""
-
     def test_aggregate_command_exists(self):
 
         runner = CliRunner()
@@ -118,7 +103,6 @@ class TestAggregateCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a sample result file
             result_file = Path(tmpdir) / "result1.json"
             result_data = {
                 "schema_version": "1.0",
@@ -153,8 +137,6 @@ class TestAggregateCommand:
 
 
 class TestShellCommand:
-    """Test the shell CLI command."""
-
     def test_shell_command_exists(self):
 
         runner = CliRunner()
@@ -193,7 +175,6 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a sample database with correct naming pattern (no decimal in scale)
             db_path = Path(tmpdir) / "datagen" / "tpch_sf1"
             db_path.mkdir(parents=True)
             db_file = db_path / "tpch_sf1_none_none.duckdb"
@@ -201,7 +182,6 @@ class TestShellCommand:
 
             result = runner.invoke(cli, ["shell", "--output", tmpdir, "--list"])
 
-            # Should list databases and exit successfully
             assert result.exit_code == 0
             assert "tpch" in result.output.lower() or "Available" in result.output
 
@@ -210,16 +190,12 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a DuckDB file
             db_path = Path(tmpdir) / "test.duckdb"
             db_path.touch()
 
-            # This should start the shell (but will fail in test without interaction)
-            # We're just testing that it accepts the path and tries to connect
             with patch.object(_shell_module, "_launch_duckdb_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
-                # Should have called _launch_duckdb_shell
                 mock_launch.assert_called_once()
 
     def test_shell_platform_autodetect(self):
@@ -227,15 +203,12 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a DuckDB file
             db_path = Path(tmpdir) / "test.duckdb"
             db_path.touch()
 
-            # Don't specify --platform, should auto-detect
             with patch.object(_shell_module, "_launch_duckdb_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
-                # Should have auto-detected and called DuckDB shell
                 mock_launch.assert_called_once()
 
     def test_shell_sqlite_autodetect(self):
@@ -243,15 +216,12 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a .sqlite file
             db_path = Path(tmpdir) / "test.sqlite"
             db_path.touch()
 
-            # Don't specify --platform, should auto-detect
             with patch.object(_shell_module, "_launch_sqlite_shell") as mock_launch:
                 runner.invoke(cli, ["shell", "--database", str(db_path)])
 
-                # Should have auto-detected and called SQLite shell
                 mock_launch.assert_called_once()
 
     def test_shell_unsupported_platform_explicit(self):
@@ -272,7 +242,6 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create databases for different benchmarks with correct naming pattern (no decimals)
             datagen_dir = Path(tmpdir) / "datagen"
             tpch_dir = datagen_dir / "tpch_sf1"
             tpcds_dir = datagen_dir / "tpcds_sf1"
@@ -282,19 +251,15 @@ class TestShellCommand:
             (tpch_dir / "tpch_sf1_none_none.duckdb").touch()
             (tpcds_dir / "tpcds_sf1_none_none.duckdb").touch()
 
-            # Filter for tpch only
             result = runner.invoke(cli, ["shell", "--output", tmpdir, "--benchmark", "tpch", "--list"])
 
             assert result.exit_code == 0
-            # Should show tpch but implementation may vary
-            # This is a basic test that the flag is accepted
 
     def test_shell_scale_filter(self):
 
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create databases with different scales using correct naming pattern (no decimals)
             datagen_dir = Path(tmpdir) / "datagen"
             dir1 = datagen_dir / "tpch_sf1"
             dir2 = datagen_dir / "tpch_sf10"
@@ -304,11 +269,9 @@ class TestShellCommand:
             (dir1 / "tpch_sf1_none_none.duckdb").touch()
             (dir2 / "tpch_sf10_none_none.duckdb").touch()
 
-            # Filter for scale 1.0 only
             result = runner.invoke(cli, ["shell", "--output", tmpdir, "--scale", "1.0", "--list"])
 
             assert result.exit_code == 0
-            # Should filter to scale 1.0 but implementation may vary
 
     def test_shell_discovers_databases_in_multiple_locations(self):
 
@@ -317,30 +280,23 @@ class TestShellCommand:
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Use DirectoryManager to create correct directory structure
             dir_mgr = DirectoryManager(base_dir=tmpdir)
 
-            # Create database in datagen directory (standard location)
             datagen_path = dir_mgr.get_datagen_path("tpch", 1.0)
             datagen_path.mkdir(parents=True, exist_ok=True)
             (datagen_path / "tpch_sf1_notuning.duckdb").touch()
 
-            # Create database in databases directory (alternate location)
             dir_mgr.databases_dir.mkdir(parents=True, exist_ok=True)
             (dir_mgr.databases_dir / "tpcds_sf10_notuning.duckdb").touch()
 
-            # Should find both databases
             result = runner.invoke(cli, ["shell", "--output", tmpdir, "--list"])
 
             assert result.exit_code == 0
-            # Both databases should be listed
             assert "tpch" in result.output.lower() or "Available" in result.output
             assert "tpcds" in result.output.lower() or "Available" in result.output
 
 
 class TestMetricsCommand:
-    """Test the metrics CLI command group."""
-
     def test_metrics_command_exists(self):
 
         runner = CliRunner()
@@ -385,7 +341,6 @@ class TestMetricsCommand:
             power_file = Path(tmpdir) / "power.json"
             throughput_file = Path(tmpdir) / "throughput.json"
 
-            # Create sample result files with new schema (summary.tpc_metrics)
             power_data = {
                 "environment": {"scale_factor": 1.0},
                 "summary": {
@@ -415,15 +370,12 @@ class TestMetricsCommand:
 
 
 class TestCalculateQphhCommand:
-    """Test the calculate-qphh CLI command (deprecated)."""
-
     def test_calculate_qphh_hidden_from_help(self):
 
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        # calculate-qphh should NOT appear in main help (it's hidden)
         assert "calculate-qphh" not in result.output
 
     def test_calculate_qphh_help(self):
@@ -453,7 +405,6 @@ class TestCalculateQphhCommand:
             power_file = Path(tmpdir) / "power.json"
             throughput_file = Path(tmpdir) / "throughput.json"
 
-            # Create sample result files with new schema (summary.tpc_metrics)
             power_data = {
                 "environment": {"scale_factor": 1.0},
                 "summary": {
@@ -479,15 +430,11 @@ class TestCalculateQphhCommand:
             )
 
             assert result.exit_code == 0
-            # Should show deprecation warning
             assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
-            # But still work
             assert "QphH@Size" in result.output
 
 
 class TestRunOfficialFlag:
-    """Test the run --official flag."""
-
     def test_run_official_flag_in_help(self):
 
         runner = CliRunner()
@@ -512,8 +459,6 @@ class TestRunOfficialFlag:
 
         runner = CliRunner()
 
-        # The official mode validation runs before any benchmark execution,
-        # so we just need to test that the warning is shown
         result = runner.invoke(
             cli,
             [
@@ -532,28 +477,22 @@ class TestRunOfficialFlag:
             ],
         )
 
-        # Should warn about missing seed (validation happens before dry run)
         assert "No --seed specified" in result.output or "seed" in result.output.lower()
 
 
 class TestRunOfficialCommand:
-    """Test the run-official CLI command (deprecated)."""
-
     def test_run_official_hidden_from_help(self):
 
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        # run-official should NOT appear in main help (it's hidden)
         assert "run-official" not in result.output
 
     def test_run_official_still_functional(self):
-        """Test that run-official command still works (backwards compatibility)."""
         runner = CliRunner()
         result = runner.invoke(cli, ["run-official", "--help"])
 
-        # May show deprecation warning but should still work
         assert "TPC-compliant" in result.output or "DEPRECATED" in result.output
 
     def test_run_official_help_mentions_quiet(self):
@@ -569,7 +508,6 @@ class TestRunOfficialCommand:
             cli, ["run-official", "tpch", "--platform", "duckdb", "--scale", "0.5", "--phases", "power"]
         )
 
-        # Should show deprecation warning (even if it fails due to invalid scale)
         assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
 
     def test_run_official_invalid_scale_factor(self):
@@ -584,8 +522,6 @@ class TestRunOfficialCommand:
 
 
 class TestDatagenParseRunArgs:
-    """Test the _parse_run_args helper directly."""
-
     def test_benchmark_and_scale(self):
         from benchbox.cli.commands.datagen import _parse_run_args
 
@@ -615,13 +551,7 @@ class TestDatagenParseRunArgs:
 
 
 class TestDatagenCommandBranches:
-    """Test datagen CLI branches not covered by existing tests."""
-
     def test_non_parquet_format_note_in_console(self):
-        """Non-parquet format triggers a console note about default format being used."""
-        # _parse_run_args doesn't encode data_format - the datagen command
-        # prints a note when data_format != 'parquet'. Verify the note is emitted
-        # by checking the console directly with mocked ctx.invoke.
         from unittest.mock import MagicMock, patch as _patch
 
         from benchbox.cli.commands.datagen import _parse_run_args
@@ -637,7 +567,6 @@ class TestDatagenCommandBranches:
                 cli,
                 ["datagen", "--benchmark", "tpch", "--scale", "0.01", "--format", "csv"],
             )
-        # The note about format not being supported is shown
         all_output = " ".join(calls)
         assert "csv" in all_output.lower() or "format" in all_output.lower()
 
@@ -649,8 +578,6 @@ class TestDatagenCommandBranches:
 
 
 class TestRunOfficialCommandBranches:
-    """Test run-official validation branches."""
-
     def test_throughput_without_streams_exits_1(self):
         runner = CliRunner()
         result = runner.invoke(
@@ -685,8 +612,6 @@ class TestRunOfficialCommandBranches:
             cli,
             ["run-official", "tpch", "--platform", "duckdb", "--scale", "5", "--phases", "power"],
         )
-        # Scale 5 is not TPC-allowed so exits 1, but we can still check warnings
-        # OR scale is 1 which is valid and should show seed warning
         assert "seed" in result.output.lower() or "not TPC-compliant" in result.output
 
     def test_validate_results_forwarded(self):

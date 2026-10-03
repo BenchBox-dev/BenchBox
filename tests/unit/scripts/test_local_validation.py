@@ -1,5 +1,3 @@
-"""Tests for local validation singleflight: bounded lock waits and receipt reuse."""
-
 from __future__ import annotations
 
 import errno
@@ -52,8 +50,6 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _counter_gate(marker: Path) -> list[str]:
-    # NOTE: the marker must live outside the repo: a gate that writes into the
-    # tree changes the validated input, and re-execution is then correct.
     return [sys.executable, "-c", f"open({str(marker)!r}, 'a').write('x')"]
 
 
@@ -686,7 +682,6 @@ def test_changed_tool_identity_invalidates_receipt(repo: Path, tmp_path: Path, m
 
 
 def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) -> None:
-    """Same porcelain status text, different content: status alone must not hit."""
     tracked = Path(str(repo)) / "tracked.txt"
     tracked.write_text("work1")
     marker = tmp_path / "count.txt"
@@ -730,7 +725,6 @@ def test_active_ignored_skill_mirror_is_part_of_receipt_identity(repo: Path, tmp
 
 
 def test_different_gates_proceed_in_parallel(repo: Path, tmp_path: Path) -> None:
-    """Per-receipt locks: unrelated gates must not serialize on one lock."""
     marker = tmp_path / "slow.txt"
     gate = [sys.executable, "-c", f"import time; time.sleep(2); open({str(marker)!r}, 'a').write('x')"]
     store = lv.store_dir(repo)

@@ -45,25 +45,79 @@ Quick Start
     result = bench.execute_operation("insert_single_row", conn)
     print(f"Success: {result.success}, Time: {result.write_duration_ms:.2f}ms")
 
+Shared query and category contracts are maintained in :doc:`mixins`.
+
 API Reference
 -------------
 
 WritePrimitives Class
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.write_primitives.WritePrimitives
-   :members:
-   :inherited-members:
+.. py:module:: benchbox.write_primitives
+.. py:class:: WritePrimitives(scale_factor: float = 1.0, output_dir: Optional[Union[str, Path]] = None, **kwargs)
+
+   Catalog-driven write operations over TPC-H data. Operation, query, and
+   category facade contracts are supported through the inherited mixins and
+   are maintained in :doc:`mixins`; shared lifecycle behavior remains in
+   :doc:`../base`.
+
+   .. py:method:: get_data_source_benchmark() -> Optional[str]
+
+      Return ``"tpch"``.
+   .. py:attribute:: tables
+
+      Mapping of table names to data paths.
+   .. py:method:: generate_data(tables: Optional[list[str]] = None) -> list[Union[str, Path]]
+
+      Generate or reuse TPC-H source data for the selected tables and return file paths.
+   .. py:method:: get_operation(operation_id: str) -> Any
+
+      Return the operation identified by ``operation_id`` from the complete live
+      operation catalog, including DataFrame-only aggregate or sketch
+      operations when present.
+
+   .. py:method:: get_all_operations() -> dict[str, Any]
+
+      Return SQL-operable operations only. DataFrame aggregate-state operations
+      and sketch-category operations are intentionally excluded; use
+      ``get_operation`` for a specific operation from the complete catalog.
+   .. py:method:: get_schema(dialect: str = "standard") -> dict[str, dict]
+
+      Return staging-table schema metadata for the requested dialect.
+
+   .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config=None) -> str
+
+      Return CREATE TABLE SQL for staging tables in the requested dialect.
+   .. py:method:: get_benchmark_info() -> dict[str, Any]
+
+      Return metadata describing the write-primitives benchmark and operation catalog.
+   .. py:method:: setup(connection: Any, force: bool = False) -> dict[str, Any]
+
+      Create and populate staging tables; missing TPC-H tables or setup errors raise ``RuntimeError``.
+   .. py:method:: load_data(connection: Any, **kwargs) -> dict[str, Any]
+
+      Load source data into the staging tables and return load result metadata.
+
+   .. py:method:: teardown(connection: Any) -> None
+
+      Remove write-primitives staging state from the supplied connection.
+
+   .. py:method:: reset(connection: Any) -> None
+
+      Reset staging state on the supplied connection.
+
+   .. py:method:: is_setup(connection: Any) -> bool
+
+      Return whether the staging tables are ready on the supplied connection.
+
+   .. py:method:: execute_operation(operation_id: str, connection: Any, **kwargs: Any) -> Any
+
+      Execute one catalog operation on the supplied connection and return its operation result.
+   .. py:method:: run_benchmark(connection: Any, operation_ids: Optional[list[str]] = None, categories: Optional[list[str]] = None) -> list[Any]
+
+      Manage staging state, execute operations, and return implementation-defined results.
 
 **Constructor**:
-
-.. code-block:: python
-
-    WritePrimitives(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 **Parameters**:
 
@@ -186,7 +240,8 @@ Operation Query Methods
 
 **get_all_operations() -> dict[str, WriteOperation]**
 
-Get all available operations.
+Get SQL-operable operations. DataFrame aggregate-state and sketch operations
+are excluded; retrieve a specific catalog entry with ``get_operation()``.
 
 **Example**:
 

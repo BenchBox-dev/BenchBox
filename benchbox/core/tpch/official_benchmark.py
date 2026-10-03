@@ -1,16 +1,9 @@
-"""TPC-H Official Benchmark Implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the official TPC-H benchmark implementation that follows
-the TPC-H specification exactly, including all three test phases (Power Test,
-Throughput Test, and Maintenance Test) and the official QphH@Size calculation.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import math
 from dataclasses import dataclass
@@ -29,8 +22,6 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 @dataclass
 class TPCHOfficialBenchmarkConfig:
-    """Configuration for TPC-H Official Benchmark."""
-
     scale_factor: float = 1.0
     num_streams: int = 2
     power_test_enabled: bool = True
@@ -44,8 +35,6 @@ class TPCHOfficialBenchmarkConfig:
 
 @dataclass
 class TPCHOfficialBenchmarkResult:
-    """Result of TPC-H Official Benchmark."""
-
     config: TPCHOfficialBenchmarkConfig
     start_time: str
     end_time: str
@@ -63,8 +52,6 @@ class TPCHOfficialBenchmarkResult:
 
 
 class TPCHOfficialBenchmark:
-    """TPC-H Official Benchmark implementation following TPC-H specification."""
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -72,17 +59,6 @@ class TPCHOfficialBenchmark:
         verbose: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize TPC-H Official Benchmark.
-
-        Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
-            output_dir: Directory for benchmark results and audit trail
-            verbose: Enable verbose logging
-            **kwargs: Additional benchmark configuration options
-        """
-        # The wrapper's contract is official runs: default official=True for the
-        # inner benchmark (mirrors TPCDSOfficialBenchmark) so an SF=1
-        # official-wrapper run classifies as official, not UNOFFICIAL_NONSTANDARD.
         benchmark_kwargs = dict(kwargs)
         benchmark_kwargs.setdefault("official", True)
         self.benchmark = TPCHBenchmark(
@@ -101,22 +77,6 @@ class TPCHOfficialBenchmark:
         connection_factory: Callable[[], Any],
         config: Optional[TPCHOfficialBenchmarkConfig] = None,
     ) -> TPCHOfficialBenchmarkResult:
-        """Run the complete TPC-H Official Benchmark.
-
-        This method executes all three phases of the TPC-H benchmark according
-        to the official specification and calculates the QphH@Size metric.
-
-        Args:
-            connection_factory: Factory function to create database connections
-            config: Optional benchmark configuration (uses default if not provided)
-
-        Returns:
-            Complete benchmark results with QphH@Size metric
-
-        Raises:
-            RuntimeError: If benchmark execution fails
-            ValueError: If configuration is invalid
-        """
         if config is None:
             config = self.config
 
@@ -138,7 +98,6 @@ class TPCHOfficialBenchmark:
         )
 
         try:
-            # Phase 1: Power Test
             if config.power_test_enabled:
                 try:
                     connection = connection_factory()
@@ -155,7 +114,6 @@ class TPCHOfficialBenchmark:
                     result.errors.append(f"Power Test failed: {e}")
                     result.success = False
 
-            # Phase 2: Throughput Test
             if config.throughput_test_enabled:
                 try:
                     throughput_result = self.benchmark.run_throughput_test(
@@ -169,7 +127,6 @@ class TPCHOfficialBenchmark:
                     result.errors.append(f"Throughput Test failed: {e}")
                     result.success = False
 
-            # Phase 3: Maintenance Test
             if config.maintenance_test_enabled:
                 try:
                     maintenance_result = self.benchmark.run_maintenance_test(
@@ -181,7 +138,6 @@ class TPCHOfficialBenchmark:
                     result.errors.append(f"Maintenance Test failed: {e}")
                     result.success = False
 
-            # Calculate QphH@Size (geometric mean)
             if result.power_at_size > 0 and result.throughput_at_size > 0:
                 result.qphh_at_size = math.sqrt(result.power_at_size * result.throughput_at_size)
 
@@ -198,15 +154,6 @@ class TPCHOfficialBenchmark:
             return result
 
     def validate_compliance(self, result: TPCHOfficialBenchmarkResult) -> bool:
-        """Validate benchmark results against TPC-H specification.
-
-        Args:
-            result: Benchmark results to validate
-
-        Returns:
-            True if compliant with TPC-H specification, False otherwise
-        """
-        # Basic compliance checks
         if not result.success:
             return False
 
@@ -216,7 +163,6 @@ class TPCHOfficialBenchmark:
         if result.qphh_at_size <= 0:
             return False
 
-        # Additional specification compliance checks would go here
         return True
 
     def generate_audit_trail(
@@ -224,15 +170,6 @@ class TPCHOfficialBenchmark:
         result: TPCHOfficialBenchmarkResult,
         output_file: Optional[Union[str, Path]] = None,
     ) -> Path:
-        """Generate audit trail for TPC-H certification.
-
-        Args:
-            result: Benchmark results to document
-            output_file: Optional output file path
-
-        Returns:
-            Path to generated audit trail file
-        """
         return generate_official_benchmark_audit_trail(
             result=result,
             benchmark_title="TPC-H",

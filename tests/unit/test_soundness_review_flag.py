@@ -1,5 +1,3 @@
-"""Tests for the manifest-backed soundness review flag."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -116,7 +114,6 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     soundness_step = next(step for step in flag["steps"] if step.get("name") == "soundness-flag")
     assert "check_soundness_review.py" in soundness_step["run"]
     assert "if" not in flag
-    # The always-reporting `tooling` unit result must require the flag on every run.
     tooling = jobs["tooling"]
     assert tooling["name"] == "tooling"
     assert "soundness-flag" in tooling["needs"]
@@ -162,7 +159,6 @@ def _git(repo: Path, *args: str, input: str | None = None) -> str:
 
 @pytest.fixture
 def queue_history(tmp_path: Path) -> dict[str, Any]:
-    """Create a behind PR and its squash on an independently advanced base."""
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "--initial-branch=trunk")
@@ -211,7 +207,6 @@ def _run_queue_guard(history: dict[str, Any], **overrides: str) -> subprocess.Co
     script = script.replace(
         "${{ github.ref }}", overrides.pop("queue_ref", "refs/heads/gh-readonly-queue/develop/pr-1")
     )
-    # Stub only the API: Git history and the trusted base checker remain real.
     api = r"""
 gh() {
   case "$*" in
@@ -302,7 +297,6 @@ def test_missing_or_malformed_queue_evidence_fails_closed(
 
 
 def _stale_event_base_history(tmp_path: Path, pr_files: dict[str, str]) -> dict[str, Any]:
-    """A pull request, one commit per file, merged on a target that moved after the event."""
     repo = tmp_path / "stale-repo"
     repo.mkdir()
     _git(repo, "init", "--initial-branch=trunk")

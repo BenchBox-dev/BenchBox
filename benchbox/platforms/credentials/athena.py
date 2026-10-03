@@ -1,9 +1,6 @@
-"""AWS Athena credentials setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from typing import Optional, Union
@@ -17,7 +14,6 @@ from benchbox.utils.printing import QuietConsoleProxy
 
 
 def _print_athena_auto_config(console, auto_config: dict) -> None:
-    """Display the auto-detected Athena fields for user confirmation."""
     console.print(f"\n✅ Found region: [cyan]{auto_config.get('region')}[/cyan]")
     if auto_config.get("workgroup"):
         console.print(f"✅ Found workgroup: [cyan]{auto_config['workgroup']}[/cyan]")
@@ -32,7 +28,6 @@ def _print_athena_auto_config(console, auto_config: dict) -> None:
 
 
 def _prompt_athena_s3_config(console, existing: dict) -> Optional[tuple[str, str]]:
-    """Prompt for S3 staging dir and output location; returns None on missing staging dir."""
     console.print("\n[bold]S3 Configuration (Required):[/bold]")
     console.print("[dim]Athena requires S3 for query results and data staging.[/dim]\n")
 
@@ -57,7 +52,6 @@ def _prompt_athena_s3_config(console, existing: dict) -> Optional[tuple[str, str
 
 
 def _prompt_athena_auth(console, existing: dict) -> Optional[tuple[Optional[str], Optional[str], Optional[str]]]:
-    """Prompt for auth credentials; returns (profile, access_key_id, secret) or None on missing required."""
     from rich.prompt import IntPrompt
 
     console.print("\n[bold]AWS Authentication:[/bold]")
@@ -95,7 +89,6 @@ def _prompt_athena_auth(console, existing: dict) -> Optional[tuple[Optional[str]
 
 
 def _prompt_athena_full(console, existing_creds: Optional[dict]) -> Optional[dict]:
-    """Full interactive prompt path; returns credentials dict or None on required-field failure."""
     existing = existing_creds or {}
     console.print("\n[bold]AWS Configuration:[/bold]")
 
@@ -126,7 +119,6 @@ def _prompt_athena_full(console, existing_creds: Optional[dict]) -> Optional[dic
 
 
 def _finalize_athena_credentials(cred_manager: CredentialManager, console, raw: dict) -> None:
-    """Assemble, save, and validate Athena credentials, printing next steps."""
     credentials = {
         "region": raw["region"],
         "workgroup": raw["workgroup"],
@@ -163,12 +155,6 @@ def _finalize_athena_credentials(cred_manager: CredentialManager, console, raw: 
 
 
 def setup_athena_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for AWS Athena credentials.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • AWS credentials (access key + secret, or profile name)")
     console.print("  • S3 bucket for query results and data staging")
@@ -201,15 +187,6 @@ def setup_athena_credentials(cred_manager: CredentialManager, console: Union[Con
 def validate_athena_credentials(
     cred_manager: CredentialManager, console: Optional[Union[Console, QuietConsoleProxy]] = None
 ) -> tuple[bool, Optional[str]]:
-    """Validate Athena credentials by testing connection.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Optional console for detailed output
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("athena")
 
     if not creds:
@@ -253,7 +230,6 @@ def validate_athena_credentials(
 
 
 def _check_athena_prerequisites(creds: dict) -> Optional[str]:
-    """Check required Athena credential fields and AWS authentication availability."""
     if not creds.get("s3_staging_dir") and not creds.get("s3_output_location"):
         return "S3 staging directory or output location is required"
 
@@ -269,7 +245,6 @@ def _check_athena_prerequisites(creds: dict) -> Optional[str]:
 
 
 def _build_athena_connect_kwargs(creds: dict) -> dict:
-    """Build pyathena connection keyword arguments from credentials."""
     connect_kwargs = {
         "s3_staging_dir": creds.get("s3_output_location") or creds.get("s3_staging_dir"),
         "region_name": creds.get("region", "us-east-1"),
@@ -286,7 +261,6 @@ def _build_athena_connect_kwargs(creds: dict) -> dict:
 
 
 def _classify_athena_error(error_msg: str, workgroup: str) -> str:
-    """Classify Athena connection errors into user-friendly messages."""
     _error_patterns = [
         (("Access Denied", "AccessDenied"), "Access denied. Check S3 bucket permissions and IAM policies."),
         (("InvalidAccessKeyId",), "Invalid AWS Access Key ID."),
@@ -304,14 +278,6 @@ def _classify_athena_error(error_msg: str, workgroup: str) -> str:
 
 
 def _auto_detect_athena(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect Athena configuration from environment variables.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     env_vars = {
         "region": os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION"),
         "workgroup": os.getenv("ATHENA_WORKGROUP"),
@@ -322,7 +288,6 @@ def _auto_detect_athena(console: Union[Console, QuietConsoleProxy]) -> Optional[
         "aws_profile": os.getenv("AWS_PROFILE"),
     }
 
-    # Check if we have the minimum required fields
     has_s3 = bool(env_vars.get("s3_staging_dir") or env_vars.get("s3_output_location"))
     has_auth = bool(
         env_vars.get("aws_profile")
@@ -340,7 +305,6 @@ def _auto_detect_athena(console: Union[Console, QuietConsoleProxy]) -> Optional[
         )
         return None
 
-    # Set defaults
     if not env_vars.get("region"):
         env_vars["region"] = "us-east-1"
     if not env_vars.get("workgroup"):

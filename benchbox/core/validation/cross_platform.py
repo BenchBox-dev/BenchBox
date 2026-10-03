@@ -1,47 +1,6 @@
-"""Cross-platform result comparator for benchmark correctness.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-BenchBox's product is trustworthy results. This module compares the rows
-returned by the SAME query on TWO platforms and reports divergences with
-per-query tolerance rules.
-
-Tolerance model
----------------
-Default: exact match on every cell.
-
-Per-benchmark overrides are spec-anchored, never convenience-driven:
-
-  * **TPC-H §2.6.3 ordering**: when a query has no ORDER BY, rows may
-    appear in any order - the comparator sorts both result sets by all
-    columns before diffing.
-  * **TPC-H §2.6.4 numeric tolerance**: aggregate floating-point columns
-    (SUM/AVG over DECIMAL or DOUBLE) compare to within ``epsilon`` per
-    cell. Default epsilon is 1e-6 - TPC-H gives 0.01% relative; the
-    tighter absolute is safer for SF=0.01 magnitudes.
-  * **NULL handling**: NULL == NULL for comparison purposes (matches
-    SQL ``IS NOT DISTINCT FROM`` semantics, NOT default ``=``).
-
-Anything looser must cite a spec rule in the override registry - see
-``register_query_tolerance``.
-
-Reference platform
-------------------
-Use DuckDB by default: it's BenchBox's lingua franca, ships
-TPC-H/TPC-DS expected answer sets, and runs locally without
-credentials. Override via ``Comparator(reference="snowflake")`` if
-you need a different anchor.
-
-Surface
--------
-This module exposes a Python comparator. It does NOT add a CLI command
-in v1; pytest is the canonical execution surface (see
-``tests/integration/validation/test_cross_platform.py``). A
-``benchbox validate`` command may follow once the comparator semantics
-have stabilized.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,18 +9,10 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-# Sentinel for NULL - comparator treats NULL == NULL.
 _NULL = object()
 
 
 def _canonicalize(value: Any) -> Any:
-    """Map raw cell values to a comparable canonical form.
-
-    - ``None`` and pandas/polars-style NaN both become the NULL sentinel.
-    - ``Decimal`` is preserved; floats become ``float``.
-    - Strings are stripped of trailing whitespace (a common cross-platform
-      divergence - DuckDB pads CHAR(N), ClickHouse does not).
-    """
     if value is None:
         return _NULL
     if isinstance(value, float) and math.isnan(value):
@@ -74,7 +25,6 @@ def _canonicalize(value: Any) -> Any:
 
 
 def _cells_equal(a: Any, b: Any, *, epsilon: float) -> bool:
-    """True if two canonical cells match under the active tolerance."""
     if a is _NULL or b is _NULL:
         return a is _NULL and b is _NULL
     if isinstance(a, (int, float, Decimal)) and isinstance(b, (int, float, Decimal)):
@@ -94,15 +44,6 @@ def _normalize_rows(rows: list[tuple], *, sort: bool) -> list[tuple]:
 
 @dataclass(frozen=True)
 class Tolerance:
-    """Per-query tolerance contract.
-
-    ``ordering_required`` = False means rows may appear in any order
-    (e.g., TPC-H queries without ORDER BY). ``epsilon`` is absolute
-    float tolerance applied cell-by-cell to numeric values.
-    ``rationale`` MUST cite a spec rule when epsilon > 0 or
-    ordering_required is False - drift checks reject empty strings.
-    """
-
     epsilon: float = 0.0
     ordering_required: bool = True
     rationale: str = ""
@@ -116,14 +57,11 @@ class Tolerance:
             )
 
 
-# Strict default - exact match, ordering enforced.
 STRICT = Tolerance()
 
 
 @dataclass(frozen=True)
 class Divergence:
-    """One row-level mismatch surfaced by the comparator."""
-
     row_index: int
     column_index: int
     reference_value: Any
@@ -138,8 +76,6 @@ class Divergence:
 
 @dataclass
 class ComparisonReport:
-    """Result of comparing two platforms' output for a single query."""
-
     query_id: str
     reference_platform: str
     comparison_platform: str
@@ -176,11 +112,6 @@ def compare_query_results(
     comparison_rows: list[tuple],
     tolerance: Tolerance = STRICT,
 ) -> ComparisonReport:
-    """Compare two platforms' rows for one query under the supplied tolerance.
-
-    Returns a ComparisonReport. A row-count mismatch is itself a
-    divergence and short-circuits the per-cell diff.
-    """
     ref = _normalize_rows(reference_rows, sort=not tolerance.ordering_required)
     cmp = _normalize_rows(comparison_rows, sort=not tolerance.ordering_required)
 
@@ -236,15 +167,12 @@ def compare_query_results(
     )
 
 
-# Per-query tolerance overrides. Populate via register_query_tolerance.
 _TOLERANCE_REGISTRY: dict[tuple[str, str], Tolerance] = {}
 
 
 def register_query_tolerance(benchmark: str, query_id: str, tolerance: Tolerance) -> None:
-    """Register a non-strict tolerance for one benchmark/query pair."""
     _TOLERANCE_REGISTRY[(benchmark, query_id)] = tolerance
 
 
 def tolerance_for(benchmark: str, query_id: str) -> Tolerance:
-    """Look up the active tolerance, defaulting to STRICT."""
     return _TOLERANCE_REGISTRY.get((benchmark, query_id), STRICT)

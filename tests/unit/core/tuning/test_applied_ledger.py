@@ -1,16 +1,6 @@
-"""Unit tests for the applied-tuning ledger.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers ``benchbox.core.tuning.applied_ledger`` (TODO
-``tuning-applied-ledger-and-validation-status-20260712`` / tuning-ADR-001): the
-honest, execution-derived ``validation_status`` vocabulary, the physical-
-identity ``applied_ledger_hash`` (determinism + order-sensitivity),
-``record_dropped``, and the recording-connection proxy that captures exactly
-what a connection actually executed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -38,9 +28,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Fakes: minimal connection surfaces the recording proxy wraps.
-# ---------------------------------------------------------------------------
 class _FakeCursor:
     def __init__(self, sink: list[str], fail_on: str | None = None) -> None:
         self._sink = sink
@@ -57,8 +44,6 @@ class _FakeCursor:
 
 
 class _FakeConnection:
-    """Records every statement it actually executes (via execute + cursor)."""
-
     def __init__(self, fail_on: str | None = None) -> None:
         self.executed: list[str] = []
         self._fail_on = fail_on
@@ -72,18 +57,14 @@ class _FakeConnection:
     def cursor(self, *args, **kwargs):
         return _FakeCursor(self.executed, fail_on=self._fail_on)
 
-    # A non-recorded passthrough attribute, to prove transparency.
     def rollback(self) -> str:
         return "rolled-back"
 
 
-# ---------------------------------------------------------------------------
-# Status derivation
-# ---------------------------------------------------------------------------
 class TestStatusDerivation:
     def test_not_applicable_when_tuning_disabled(self) -> None:
         ledger = AppliedTuningLedger()
-        ledger.record("CREATE INDEX x", PHASE_DDL)  # even with a statement
+        ledger.record("CREATE INDEX x", PHASE_DDL)
         assert ledger.overall_status(tuning_enabled=False, has_config=True) == NOT_APPLICABLE
 
     def test_not_applicable_when_no_config(self) -> None:
@@ -129,27 +110,18 @@ class TestStatusDerivation:
         assert ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED
 
     def test_overall_status_never_returns_applied_verified(self) -> None:
-        # applied_verified is RESERVED: it requires an introspection receipt from
-        # a separate code path and must never be derived from the ledger alone.
         ledger = AppliedTuningLedger()
         ledger.record("SET a=1", PHASE_SESSION)
         assert ledger.overall_status(tuning_enabled=True, has_config=True) != APPLIED_VERIFIED
 
     def test_noop_platform_never_reports_applied(self) -> None:
-        # A deliberately no-op apply path (base-class no-op adapter) executes
-        # nothing on the wrapped connection, so status is noop, never applied.
         ledger = AppliedTuningLedger()
         conn = _FakeConnection()
         _ = recording_connection(conn, ledger, PHASE_DDL)
-        # ... apply path decides to run no statement at all.
         assert conn.executed == []
         assert ledger.overall_status(tuning_enabled=True, has_config=True) == NOOP
 
     def test_metadata_persistence_failure_is_not_an_alarming_status(self) -> None:
-        # tuning_metadata_saved (a persistence note) is NOT an input to the
-        # status: a run whose statements executed stays applied_unverified even
-        # if a later metadata INSERT failed. The ledger never yields "failed"
-        # for a benign persistence problem.
         ledger = AppliedTuningLedger()
         ledger.record("CREATE INDEX idx ON t (a)", PHASE_DDL)
         status = ledger.overall_status(tuning_enabled=True, has_config=True)
@@ -157,9 +129,6 @@ class TestStatusDerivation:
         assert status != FAILED
 
 
-# ---------------------------------------------------------------------------
-# Hashing: determinism + order-sensitivity
-# ---------------------------------------------------------------------------
 class TestAppliedLedgerHash:
     def test_none_when_nothing_executed(self) -> None:
         assert AppliedTuningLedger().applied_ledger_hash() is None
@@ -190,8 +159,6 @@ class TestAppliedLedgerHash:
         assert forward.applied_ledger_hash() != reverse.applied_ledger_hash()
 
     def test_failed_statements_excluded_from_hash(self) -> None:
-        # A trailing failed statement must not change the physical identity of
-        # what actually applied.
         clean = AppliedTuningLedger()
         clean.record("CREATE INDEX i1 ON t (a)", PHASE_DDL)
 
@@ -202,9 +169,6 @@ class TestAppliedLedgerHash:
         assert clean.applied_ledger_hash() == with_failure.applied_ledger_hash()
 
 
-# ---------------------------------------------------------------------------
-# Dropped intents
-# ---------------------------------------------------------------------------
 class TestDroppedIntents:
     def test_record_dropped_appears_in_payload(self) -> None:
         ledger = AppliedTuningLedger()
@@ -215,7 +179,6 @@ class TestDroppedIntents:
     def test_dropped_intent_does_not_count_as_executed(self) -> None:
         ledger = AppliedTuningLedger()
         ledger.record_dropped("distribution:ORDERS", "single-node")
-        # A dropped intent is not an executed statement -> still noop.
         assert ledger.overall_status(tuning_enabled=True, has_config=True) == NOOP
         assert ledger.applied_ledger_hash() is None
 
@@ -231,9 +194,6 @@ class TestDroppedIntents:
         assert payload["statements"][0]["status"] == EXECUTED
 
 
-# ---------------------------------------------------------------------------
-# Recording-connection harness (the w5 harness): captured == actually executed.
-# ---------------------------------------------------------------------------
 class TestRecordingConnectionHarness:
     def test_captured_statements_match_what_the_connection_ran(self) -> None:
         ledger = AppliedTuningLedger()
@@ -246,9 +206,7 @@ class TestRecordingConnectionHarness:
         ]
         results = [wrapped.execute(sql) for sql in statements]
 
-        # The real results are returned unchanged (control flow preserved).
         assert results == [f"result::{sql}" for sql in statements]
-        # The ledger's captured statements EXACTLY match what the fake ran.
         assert conn.executed == statements
         assert [s.statement for s in ledger.executed_statements] == statements
         assert all(s.phase == PHASE_DDL and s.status == EXECUTED for s in ledger.executed_statements)
@@ -273,8 +231,6 @@ class TestRecordingConnectionHarness:
         with pytest.raises(RuntimeError):
             wrapped.execute("CREATE INDEX bad ON t (a)")
 
-        # The connection never appended it (it raised), but the ledger recorded
-        # the attempt as failed -- capture happens around the real call.
         assert conn.executed == []
         assert len(ledger.statements) == 1
         assert ledger.statements[0].status == STATEMENT_FAILED
@@ -289,25 +245,19 @@ class TestRecordingConnectionHarness:
         ledger = AppliedTuningLedger()
         conn = _FakeConnection()
         wrapped = recording_connection(conn, ledger, PHASE_DDL)
-        # Passthrough method is delegated and does not touch the ledger.
         assert wrapped.rollback() == "rolled-back"
         assert ledger.is_empty()
 
     def test_readback_select_executes_but_is_not_recorded(self) -> None:
-        # Adapters run verification readbacks through the same wrapped connection
-        # (e.g. ClickHouse's validate_session_cache_control issues
-        # `SELECT ... FROM system.settings` to confirm a SET took effect). Those
-        # must still execute and return, but must NOT pollute the ledger/hash as
-        # applied tuning.
         ledger = AppliedTuningLedger()
         conn = _FakeConnection()
         wrapped = recording_connection(conn, ledger, PHASE_SESSION)
 
         result = wrapped.execute("SELECT name, value FROM system.settings WHERE name = 'x'")
 
-        assert result.startswith("result::")  # really executed on the connection
+        assert result.startswith("result::")
         assert conn.executed == ["SELECT name, value FROM system.settings WHERE name = 'x'"]
-        assert ledger.is_empty()  # but not recorded as applied tuning
+        assert ledger.is_empty()
 
     def test_only_mutating_statement_recorded_when_interleaved_with_readback(self) -> None:
         ledger = AppliedTuningLedger()
@@ -317,12 +267,10 @@ class TestRecordingConnectionHarness:
         wrapped.execute("SET max_threads = 8")
         wrapped.execute("SELECT value FROM system.settings WHERE name = 'max_threads'")
 
-        # Both really ran on the connection...
         assert conn.executed == [
             "SET max_threads = 8",
             "SELECT value FROM system.settings WHERE name = 'max_threads'",
         ]
-        # ...but only the SET is recorded as applied tuning.
         assert [s.statement for s in ledger.statements] == ["SET max_threads = 8"]
 
     def test_cursor_readback_is_not_recorded(self) -> None:

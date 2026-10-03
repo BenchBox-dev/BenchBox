@@ -1,45 +1,3 @@
-"""Run TPC-H on AWS Athena (serverless query service).
-
-Athena is AWS's serverless interactive query service built on Trino. It queries
-data directly from S3 without requiring infrastructure management. You only pay
-for the data scanned by each query.
-
-Prerequisites:
-    1. AWS account with Athena access
-    2. S3 bucket for data staging and query results
-    3. IAM permissions for Athena and S3 operations
-    4. AWS credentials configured (CLI, environment, or IAM role)
-
-Required environment variables:
-    ATHENA_S3_STAGING_DIR   S3 path for data staging (e.g., s3://bucket/benchbox/)
-
-Optional environment variables:
-    AWS_REGION              AWS region (default: us-east-1)
-    AWS_PROFILE             AWS CLI profile name
-    ATHENA_WORKGROUP        Athena workgroup (default: primary)
-    ATHENA_DATABASE         Glue database name (default: benchbox)
-    ATHENA_OUTPUT_LOCATION  S3 path for query results (defaults to staging dir)
-
-Installation:
-    uv add benchbox --extra athena
-
-Usage:
-    export ATHENA_S3_STAGING_DIR=s3://your-bucket/benchbox/
-    export AWS_REGION=us-east-1
-
-    python examples/getting_started/cloud/athena_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/athena_tpch.py --dry-run ./preview
-
-Cost Estimation:
-    Athena charges $5 per TB of data scanned.
-    - TPC-H SF=0.01 (~10MB): ~$0.0001 per query
-    - TPC-H SF=1.0 (~1GB): ~$0.005 per query
-    - Full benchmark (22 queries): multiply by 22
-    Using Parquet format reduces data scanned by ~10x vs CSV.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -56,13 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "athena"
 
 
 def _require_env(var_name: str) -> str:
-    """Require an AWS/Athena environment variable.
-
-    AWS credentials should be configured via:
-    - AWS CLI: aws configure
-    - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-    - IAM role (on EC2/ECS/Lambda)
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -72,40 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Athena.
-
-    AWS Athena Concepts:
-
-    1. SERVERLESS ARCHITECTURE
-       - No servers to manage
-       - Automatic scaling based on query complexity
-       - Pay only for data scanned
-       - Queries run on shared infrastructure
-
-    2. S3 INTEGRATION
-       - Data lives in S3 (your bucket)
-       - Query results written to S3
-       - Staging dir for benchmark data upload
-       - Supports Parquet, ORC, CSV, JSON formats
-
-    3. GLUE DATA CATALOG
-       - Metadata store for tables
-       - Database = container for tables
-       - Tables point to S3 locations
-       - Automatically used by Athena
-
-    4. WORKGROUPS
-       - Resource isolation and cost tracking
-       - Query limits and settings
-       - Result encryption options
-       - Default workgroup: "primary"
-
-    5. COST MODEL
-       - $5 per TB of data scanned
-       - Parquet format reduces scans ~10x
-       - Partitioning reduces scans further
-       - No charge for failed queries
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -120,17 +37,12 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="athena",
         name="athena_tpch",
         options={
-            # S3 configuration (required)
             "s3_staging_dir": staging_dir,
             "s3_output_location": os.getenv("ATHENA_OUTPUT_LOCATION") or f"{staging_dir.rstrip('/')}/results/",
-            # AWS region
             "region": os.getenv("AWS_REGION", "us-east-1"),
-            # Athena configuration
             "workgroup": os.getenv("ATHENA_WORKGROUP", "primary"),
             "database": os.getenv("ATHENA_DATABASE", "benchbox"),
-            # AWS profile (optional, uses default credential chain if not set)
             "aws_profile": os.getenv("AWS_PROFILE"),
-            # Data format for better performance and lower costs
             "default_format": "PARQUET",
             "compression": "SNAPPY",
         },
@@ -140,14 +52,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on AWS Athena.
-
-    Athena is ideal for:
-    - Ad-hoc analytics on S3 data lakes
-    - Serverless operation (no infrastructure)
-    - Pay-per-query cost model
-    - Integration with AWS ecosystem
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 

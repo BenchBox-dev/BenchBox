@@ -1,11 +1,6 @@
-"""SQLite platform adapter for testing and lightweight benchmarks.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides SQLite-specific functionality for BenchBox testing and small-scale benchmarks.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -122,8 +117,6 @@ _JOINORDER_HELPER_INDEXES: tuple[str, ...] = (
 
 
 class _SQLiteStdDev:
-    """SQLite aggregate implementing PostgreSQL's sample STDDEV semantics."""
-
     def __init__(self) -> None:
         self.count = 0
         self.mean = 0.0
@@ -145,8 +138,6 @@ class _SQLiteStdDev:
 
 
 class _SQLitePercentileCont:
-    """SQLite aggregate for the two-argument percentile-continuous form."""
-
     def __init__(self) -> None:
         self.percentile: float | None = None
         self.values: list[float] = []
@@ -178,14 +169,12 @@ class _SQLitePercentileCont:
 
 
 def _sqlite_regexp_replace(value: Any, pattern: Any, replacement: Any) -> str | None:
-    """Implement the three-argument REGEXP_REPLACE used by ClickBench."""
     if value is None or pattern is None or replacement is None:
         return None
     return re.sub(str(pattern), str(replacement), str(value))
 
 
 def _register_sqlite_compatibility_functions(connection: Any) -> None:
-    """Register portable analytical functions missing from SQLite's core."""
     connection.create_function("REGEXP_REPLACE", 3, _sqlite_regexp_replace)
     connection.create_aggregate("STDDEV", 1, _SQLiteStdDev)
     connection.create_aggregate("STDDEV_SAMP", 1, _SQLiteStdDev)
@@ -193,14 +182,8 @@ def _register_sqlite_compatibility_functions(connection: Any) -> None:
 
 
 class SQLiteAdapter(PlatformAdapter):
-    """SQLite platform adapter for testing and lightweight usage."""
-
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
     plan_capture_phase_eligible = True
-    # SQLite serves throughput streams from cursors of the single connection:
-    # the adapter defaults ``check_same_thread`` to False (cross-thread use
-    # is an explicit opt-in, not an accident) against one process-local file,
-    # so per-stream cursors share one session exactly like the DuckDB tier.
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
@@ -209,15 +192,6 @@ class SQLiteAdapter(PlatformAdapter):
 
     @staticmethod
     def add_cli_arguments(parser) -> None:  # type: ignore[override]
-        """Add SQLite-specific CLI arguments.
-
-        Kept minimal for testing; provides database path and basic options.
-
-        NOTE: These flags (``--sqlite-database``, etc.) are legacy and are NOT
-        exposed by ``benchbox run``.  Use ``--platform-option database_path=<path>``
-        instead, which is registered in PlatformHookRegistry and appears in
-        ``benchbox run --help``.
-        """
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -240,34 +214,21 @@ class SQLiteAdapter(PlatformAdapter):
                 help="Enable SQLite check_same_thread flag",
             )
         except Exception:
-            # Be resilient in non-argparse parser usages in tests
             pass
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):  # type: ignore[override]
-        """Create SQLite adapter from unified configuration.
-
-        Handles configuration from multiple sources:
-        - connection_string: Path to database file (from DatabaseConfig)
-        - database_path: Direct path specification (from options or CLI)
-        - Auto-generation: Creates path in benchmark_runs/databases if needed
-        """
         from pathlib import Path
 
         from benchbox.utils.database_naming import generate_database_filename
 
-        # Extract SQLite-specific configuration
         adapter_config = {}
 
-        # Database path handling - check multiple sources
-        # Priority: database_path > connection_string > auto-generate
         if config.get("database_path"):
             adapter_config["database_path"] = config["database_path"]
         elif config.get("connection_string"):
-            # Extract from connection_string (set by platform_defaults.py)
             adapter_config["database_path"] = config["connection_string"]
         elif config.get("benchmark") and config.get("scale_factor") is not None:
-            # Generate database path using canonical benchmark_runs/databases path.
             from benchbox.utils.path_utils import get_benchmark_runs_databases_path
 
             if config.get("output_dir"):
@@ -286,10 +247,8 @@ class SQLiteAdapter(PlatformAdapter):
                 tuning_config=config.get("tuning_config"),
             )
             adapter_config["database_path"] = str(data_dir / db_filename)
-            # Create directory if it doesn't exist
             data_dir.mkdir(parents=True, exist_ok=True)
         else:
-            # No database path and no benchmark/scale to generate one - raise error
             from ..core.exceptions import ConfigurationError
 
             raise ConfigurationError(
@@ -297,23 +256,14 @@ class SQLiteAdapter(PlatformAdapter):
                 "Either pass --platform-option database_path=<path> or provide --benchmark and --scale."
             )
 
-        # Extract optional configuration parameters
         adapter_config["timeout"] = config.get("timeout", 30.0)
         adapter_config["check_same_thread"] = config.get("check_same_thread", False)
 
-        # Force recreate (if database should be replaced)
-        # force_recreate may arrive via config["options"] (from DatabaseConfig.model_dump() in the
-        # execution pipeline) or directly at the top level (direct API usage / old code path).
         _opts = config.get("options") or {}
         adapter_config["force_recreate"] = bool(
             config.get("force_recreate") or _opts.get("force_recreate") or config.get("force")
         )
 
-        # Pass through other relevant config (verbose settings, tuning config, etc.)
-        # Plan display/capture keys ride along via shared PLAN_FORWARD_KEYS
-        # (skipping None so adapter defaults apply): __init__ only ever sees
-        # this rebuilt config, so dropping them silently disables console plan
-        # display and plan capture/filtering even when requested.
         from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
 
         for key in PLAN_FORWARD_KEYS:
@@ -334,7 +284,6 @@ class SQLiteAdapter(PlatformAdapter):
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get SQLite platform information."""
         platform_info = {
             "platform_type": "sqlite",
             "platform_name": "SQLite",
@@ -346,11 +295,9 @@ class SQLiteAdapter(PlatformAdapter):
             },
         }
 
-        # Get SQLite version
         try:
             import sqlite3
 
-            # sqlite3 is built into Python, so we use "builtin" for the client library version
             platform_info["client_library_version"] = "builtin"
             platform_info["platform_version"] = sqlite3.sqlite_version
         except (ImportError, AttributeError):
@@ -360,7 +307,6 @@ class SQLiteAdapter(PlatformAdapter):
         return platform_info
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for SQLite."""
         return "sqlite"
 
     def __init__(self, **config):
@@ -368,44 +314,26 @@ class SQLiteAdapter(PlatformAdapter):
         if sqlite3 is None:
             raise ImportError("SQLite not available (should be included with Python)")
 
-        # SQLite configuration
         self.database_path = config.get("database_path", ":memory:")
         self.timeout = config.get("timeout", 30.0)
         self.check_same_thread = config.get("check_same_thread", False)
 
     def get_database_path(self, **connection_config) -> str | None:
-        """Get the database file path for SQLite."""
-        # Return connection_config database_path if provided and not None
         db_path = connection_config.get("database_path")
         if db_path is not None:
             return db_path
-        # Otherwise return instance database_path
         return self.database_path
 
     def create_connection(self, **connection_config) -> Any:
-        """Create SQLite connection."""
         self.log_operation_start("SQLite connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
         db_path = self.get_database_path(**connection_config)
         self.log_very_verbose(f"SQLite database path: {db_path}")
 
-        # SQLite's DB-API driver does not bind Decimal instances returned by
-        # PyArrow's decimal Parquet columns. SQLite's NUMERIC affinity stores
-        # the adapted real value using its native numeric representation.
         sqlite3.register_adapter(Decimal, float)
 
-        # Create connection. Throughput streams run on cursors of this one
-        # connection (SHARED_CURSOR). CPython's sqlite3 keeps a per-connection
-        # statement cache (sqlite3.connect cached_statements, default 128):
-        # concurrent cursors running identical SQL can share one prepared
-        # statement, so one stream's execute resets another's result set and it
-        # reads wrong or missing rows (sqlite 3.53.1, threadsafety 1). Zero
-        # disables reuse so each cursor prepares its own statement. The cost is
-        # one extra prepare per stream query; benchmark queries dominate it,
-        # and this adapter serves single-file testing, not a hot OLTP path.
         conn = sqlite3.connect(
             db_path,
             timeout=self.timeout,
@@ -415,14 +343,11 @@ class SQLiteAdapter(PlatformAdapter):
 
         _register_sqlite_compatibility_functions(conn)
 
-        # Apply SQLite optimizations
         optimizations_applied = []
 
-        # Enable foreign keys (disabled by default in SQLite)
         conn.execute("PRAGMA foreign_keys = ON")
         optimizations_applied.append("foreign_keys=ON")
 
-        # Optimize for better performance
         conn.execute("PRAGMA journal_mode = WAL")
         optimizations_applied.append("journal_mode=WAL")
 
@@ -440,16 +365,13 @@ class SQLiteAdapter(PlatformAdapter):
         return conn
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
-        # Use common schema creation helper
         schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
-        # Execute schema creation
         connection.executescript(schema_sql)
         connection.commit()
 
@@ -458,21 +380,16 @@ class SQLiteAdapter(PlatformAdapter):
         return duration
 
     def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
-        """Apply tuning configurations to SQLite (limited support)."""
-        # SQLite has limited tuning options
-        # Most tuning is handled through connection pragmas
+        pass
 
     def generate_tuning_clause(self, table_tuning: TableTuning) -> str:
-        """Generate SQLite-specific tuning clauses (none supported)."""
         return ""
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration (limited support in SQLite)."""
-        # SQLite doesn't support tuning features
+        pass
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply SQLite-specific optimizations."""
-        # Basic optimizations are applied in create_connection
+        pass
 
     def apply_constraint_configuration(
         self,
@@ -480,7 +397,6 @@ class SQLiteAdapter(PlatformAdapter):
         foreign_key_config: ForeignKeyConfiguration,
         connection: Any,
     ) -> None:
-        """Apply constraint configurations to SQLite."""
         if foreign_key_config and hasattr(foreign_key_config, "enabled"):
             if foreign_key_config.enabled:
                 connection.execute("PRAGMA foreign_keys = ON")
@@ -490,7 +406,6 @@ class SQLiteAdapter(PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into SQLite."""
         from benchbox.platforms.base.data_loading import DataLoader
 
         loader = DataLoader(
@@ -502,11 +417,9 @@ class SQLiteAdapter(PlatformAdapter):
         )
         table_stats, loading_time = loader.load()
         helper_index_time = self._apply_benchmark_helper_indexes(benchmark, connection)
-        # DataLoader doesn't provide per-table timings yet
         return table_stats, loading_time + helper_index_time, None
 
     def _apply_benchmark_helper_indexes(self, benchmark: Any, connection: Any) -> float:
-        """Apply SQLite indexes needed to keep supported local benchmark runs terminating."""
         if _is_tpch_benchmark(benchmark):
             return self._apply_helper_index_set(
                 benchmark_name="TPC-H",
@@ -535,7 +448,6 @@ class SQLiteAdapter(PlatformAdapter):
         connection: Any,
         analyze: bool,
     ) -> float:
-        """Apply a benchmark-scoped set of SQLite helper indexes."""
         existing_tables = set(self._get_existing_tables(connection))
         if not required_tables.issubset(existing_tables):
             missing = ", ".join(sorted(required_tables - existing_tables))
@@ -564,47 +476,26 @@ class SQLiteAdapter(PlatformAdapter):
         return elapsed_seconds(start_time)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """SQLite does not support efficient post-load CTAS sorting in this workflow."""
         return None
 
     def _get_existing_tables(self, connection) -> list[str]:
-        """Get list of existing tables in the SQLite database.
-
-        Override the base class implementation with SQLite-specific query.
-        SQLite uses sqlite_master table instead of information_schema.
-
-        Args:
-            connection: SQLite connection
-
-        Returns:
-            List of table names (lowercase)
-        """
         try:
             cursor = connection.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             result = cursor.fetchall()
-            # Convert to lowercase for consistent comparison
             return [row[0].lower() for row in result]
         except Exception as e:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply SQLite optimizations for benchmark type."""
         if benchmark_type == "olap":
-            # OLAP optimizations
             connection.execute("PRAGMA query_only = false")
             connection.execute("PRAGMA read_uncommitted = true")
         elif benchmark_type == "oltp":
-            # OLTP optimizations
             connection.execute("PRAGMA synchronous = FULL")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get SQLite query execution plan using EXPLAIN QUERY PLAN.
-
-        Reconstructs the tree-formatted text that SQLiteQueryPlanParser expects
-        from the raw (id, parent, notused, detail) rows SQLite returns.
-        """
         if callable(getattr(connection, "cursor", None)):
             cursor = connection.cursor()
             _owns_cursor = True
@@ -626,7 +517,6 @@ class SQLiteAdapter(PlatformAdapter):
                 cursor.close()
 
     def get_query_plan_parser(self):
-        """Get SQLite query plan parser."""
         from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
         return SQLiteQueryPlanParser()
@@ -641,7 +531,6 @@ class SQLiteAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a single query and return detailed results."""
         start_time = mono_time()
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
@@ -657,7 +546,6 @@ class SQLiteAdapter(PlatformAdapter):
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(results)
 
-            # Validate row count if enabled and benchmark type is provided
             validation_result = None
             if validate_row_count and benchmark_type:
                 from benchbox.core.validation.query_validation import QueryValidator
@@ -671,7 +559,6 @@ class SQLiteAdapter(PlatformAdapter):
                     stream_id=stream_id,
                 )
 
-                # Log validation result
                 if validation_result.warning_message:
                     self.log_verbose(f"Row count validation: {validation_result.warning_message}")
                 elif not validation_result.is_valid:
@@ -682,8 +569,6 @@ class SQLiteAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
-            # Use centralized helper to build result with consistent validation field mapping
-            # Note: SQLite returns "results" instead of "first_row" for backward compatibility
             result = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
@@ -692,7 +577,6 @@ class SQLiteAdapter(PlatformAdapter):
                 validation_result=validation_result,
                 materialized_rows=results,
             )
-            # Include full results for SQLite compatibility
             result["results"] = results
 
         except Exception as e:
@@ -701,40 +585,24 @@ class SQLiteAdapter(PlatformAdapter):
             if _owns_cursor and cursor is not None:
                 cursor.close()
 
-        # Display plan in console when --show-query-plans is active.
-        # Skip here when --capture-plans is also active: capture_query_plan below
-        # already calls get_query_plan (running EXPLAIN); calling
-        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
         if not self.capture_plans:
             self.display_query_plan_if_enabled(connection, query, query_id)
 
-        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
-        # Deliberately outside the try: with strict_plan_capture=True a capture
-        # failure raises PlanCaptureError, which must propagate instead of being
-        # swallowed by the broad except and mislabeling the successful query FAILED.
         self._merge_plan_capture_into_result(result, connection, query, query_id)
 
         return result
 
     def run_power_test(self, benchmark, **kwargs) -> dict[str, Any]:
-        """Run TPC power test (not implemented for SQLite)."""
         raise NotImplementedError("Power test not implemented for SQLite adapter")
 
     def run_throughput_test(self, benchmark, **kwargs) -> dict[str, Any]:
-        """Run TPC throughput test (not implemented for SQLite)."""
         raise NotImplementedError("Throughput test not implemented for SQLite adapter")
 
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
-        """Run TPC maintenance test (not implemented for SQLite)."""
         raise NotImplementedError("Maintenance test not implemented for SQLite adapter")
 
 
 def _format_sqlite_query_plan(rows: list) -> str | None:
-    """Format SQLite EXPLAIN QUERY PLAN rows into tree text for SQLiteQueryPlanParser.
-
-    SQLite returns rows of (id, parent, notused, detail). Reconstructs the
-    indented "|--" / "`--" tree format that SQLiteQueryPlanParser expects.
-    """
     if not rows:
         return None
     node_text: dict[int, str] = {}

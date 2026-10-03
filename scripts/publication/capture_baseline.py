@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Capture and validate the evidence-fresh independent publication baseline."""
 
 from __future__ import annotations
 
@@ -32,7 +31,6 @@ def gh(path: str) -> Any:
 
 
 def fetch_branch_sha(branch: str) -> str:
-    """Fetch a branch without updating its remote-tracking ref and return the fetched SHA."""
     run("git", "fetch", "--no-tags", "origin", f"refs/heads/{branch}")
     return run("git", "rev-parse", "FETCH_HEAD")
 
@@ -84,7 +82,6 @@ def accepted_objects(trees: dict[str, dict[str, dict[str, Any]]]) -> list[dict[s
 
 
 def current_successful_deployment(deployments: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return the newest release deployment whose latest status is successful."""
     candidates = sorted(
         (item for item in deployments if item["ref"] == "release"),
         key=lambda item: item["created_at"],
@@ -287,7 +284,6 @@ def _is_hex64(value: Any) -> bool:
 
 
 def validate_live_evidence(data: dict[str, Any]) -> list[str]:
-    """Require observed live Pages/database evidence fields for --check."""
     errors: list[str] = []
     live = data.get("live_database")
     if not isinstance(live, dict):

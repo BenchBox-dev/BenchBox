@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Render hero PNGs for v0.3.0 release blog posts.
-
-Two render modes:
-  --ansi-file <path>  ANSI text → ansi2html → headless Chrome → PNG
-  --url <url>         headless Chrome → PNG (for the /prompts/ landing page)
-
-Outputs land in ``_blog/building-benchbox/images`` and are synced into
-``docs/blog/images``, matching ``scripts/capture_chart_images.py`` conventions.
-"""
 
 from __future__ import annotations
 

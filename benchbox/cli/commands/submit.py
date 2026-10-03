@@ -1,5 +1,3 @@
-"""Result submission command implementation."""
-
 from __future__ import annotations
 
 import json
@@ -52,17 +50,10 @@ from benchbox.validation.bundle import (
     validate_bundles,
 )
 
-# Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
 _SUBMISSION_PHASE = 2
 
 _VISIBILITY_CHOICES = ("public", "unlisted", "private")
 
-# Static checklist (Option B from
-# dry-run-followup-package-canonical-contributing): the four required steps
-# are inlined so an offline contributor can complete a submission, and the
-# canonical URL is included for the full guide. Drift risk is real but
-# bounded; the pinned regression test in tests/unit/cli/commands/test_submit.py
-# asserts the four required tokens stay present.
 _CONTRIBUTING_TEXT = """\
 # Contributing a Benchmark Result
 
@@ -101,7 +92,6 @@ see https://benchbox.dev/docs/contributing-results.html.
 
 
 def _get_git_username() -> str:
-    """Return the git config user.name, or empty string if unavailable."""
     try:
         result = subprocess.run(
             ["git", "config", "user.name"],
@@ -115,12 +105,6 @@ def _get_git_username() -> str:
 
 
 def _resolve_submitted_by(explicit: str | None) -> str:
-    """Resolve the manifest's submitted_by field.
-
-    Precedence: explicit --submitted-by > git config user.name > "" (with warning).
-    The empty case stays a soft warning, not a hard failure: anonymous
-    submissions are valid.
-    """
     if explicit:
         return explicit.strip()
     from_git = _get_git_username()
@@ -134,7 +118,6 @@ def _resolve_submitted_by(explicit: str | None) -> str:
 
 
 def _canonical_submission_file_bytes(file_path: Path) -> bytes:
-    """Return canonical JSON bytes for a submit source or companion file."""
 
     try:
         return canonical_json_file_bytes(file_path)
@@ -145,7 +128,6 @@ def _canonical_submission_file_bytes(file_path: Path) -> bytes:
 
 
 def _write_canonical_submission_file(source_path: Path, target_path: Path) -> Path:
-    """Write a submit source/companion in canonical JSON form."""
 
     target_path.write_bytes(_canonical_submission_file_bytes(source_path))
     return target_path
@@ -161,14 +143,6 @@ def _build_submission_manifest(
     funding: str | None = None,
     submission_notes: str | None = None,
 ) -> dict:
-    """Build the shared submission manifest envelope for PR and hosted modes.
-
-    ``result_source`` is hard-coded to ``community``: the public submit CLI is the
-    community contribution path and must never self-assert the ``vendor`` label
-    (that is applied downstream under maintainer control). Funding precedence:
-    explicit ``--funding`` > the bundle's declared ``provenance.funding`` >
-    ``unspecified``.
-    """
 
     resolved_funding = normalize_funding(funding or getattr(result, "funding", None))
 
@@ -193,7 +167,6 @@ def _build_submission_manifest(
 
 
 def _refuse_missing_public_pseudonym_salt(ctx: click.Context) -> None:
-    """Hard-refuse community submit when the deployment salt is unset."""
     try:
         require_public_pseudonym_salt()
     except MissingPublicPseudonymSaltError as exc:
@@ -202,15 +175,8 @@ def _refuse_missing_public_pseudonym_salt(ctx: click.Context) -> None:
 
 
 def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_state: SubmitTerminalState) -> None:
-    """Print a state-specific refusal message and exit non-zero.
-
-    Unvalidated results get distinct wording so operators do not confuse
-    never-validated runs with schema/integrity failures.
-    """
     if submit_state is SubmitTerminalState.unvalidated:
         unvalidated_reason = result_unvalidated_reason(result) or result_non_clean_reason(result)
-        # Branch copy on the concrete status: "never executed" is wrong for
-        # uncertain (validation ran but the correctness claim is weakened).
         status = None
         if unvalidated_reason and unvalidated_reason.startswith("validation_status="):
             status = unvalidated_reason.split("=", 1)[1]
@@ -241,14 +207,6 @@ def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_st
 
 
 def _validate_submission_bundle(ctx: click.Context, source_path: Path) -> None:
-    """Run the same local bundle validator used by published-results CI.
-
-    Every submit path (PR package and hosted upload, dry-run or not) runs
-    this gate before anything is written or sent: a clean
-    ``classify_loaded_result`` verdict alone must not let the CLI emit an
-    artifact (short query coverage, unofficial compliance, …) that
-    published-results CI is guaranteed to refuse.
-    """
 
     try:
         validation_results = validate_bundles([source_path])
@@ -268,15 +226,10 @@ def _validate_submission_bundle(ctx: click.Context, source_path: Path) -> None:
         ctx.exit(1)
         return
 
-    # The validator CLI rejects the same bundle through unsatisfied_override_rules;
-    # the dry-run preview must refuse with the same wording instead of printing
-    # submission instructions for a bundle CI would reject.
     pending = unsatisfied_override_rules(validation_results)
     if pending:
         console.print("\n[red]Submission validation failed:[/red]")
         for path, rule_ids in sorted(pending.items()):
-            # soft_wrap: the wording must match the validator CLI exactly at any
-            # terminal width instead of folding mid-phrase on narrow consoles.
             console.print(
                 f"ERROR: {path} requires overrides: {', '.join(sorted(rule_ids))}",
                 soft_wrap=True,
@@ -301,26 +254,6 @@ def _dispatch_service_mode(
     funding: str | None = None,
     submission_notes: str | None = None,
 ) -> None:
-    """Phase 3 hosted-API submission path.
-
-    --dry-run is fully supported: it validates the bundle, prints what
-    would be uploaded, and needs no credentials. The real path resolves
-    auth, uploads the canonical bundle, and optionally polls for hosted
-    publication status.
-
-    Validation policy: `submit()` runs the same
-    ``benchbox.validation.bundle`` checks used by published-results CI
-    before dispatching into this mode, for dry runs and real uploads
-    alike. The real hosted upload still relies on server-side validation
-    as well, so a bundle that passes here can still be refused downstream.
-    Older clients predate the client-side gate but are not blocked by it;
-    the server remains the final authority.
-
-    Hash contract for the dry-run: the values printed are SHA-256 of the
-    canonical JSON bytes that the real hosted path uploads. This matches the
-    Phase 2 PR-package path, which writes the same canonical bytes into
-    `bundle/` before building the manifest.
-    """
     bundle_bytes = _canonical_submission_file_bytes(source_path)
     companion_bytes = {comp.name: _canonical_submission_file_bytes(comp) for comp in companions}
     bundle_size = len(bundle_bytes)
@@ -462,14 +395,6 @@ def _print_submission_summary(
     result,
     dry_run: bool,
 ) -> None:
-    """Print the file list + next-step commands for the contributor.
-
-    Same shape for dry-run and real-run so contributors see exactly
-    what the real run will print before they commit. Dry-run swaps
-    only the header and the trailing footer; the file list and
-    next-steps block are identical (the commands reference the paths
-    the real run would create — useful as a preview).
-    """
     if dry_run:
         console.print("\n[bold]Dry-run preview — would create:[/bold]")
     else:
@@ -651,49 +576,6 @@ def submit(
     funding,
     submission_notes,
 ):
-    """Submit a benchmark result bundle to the BenchBox results platform.
-
-    Two modes, selected by the flag set:
-
-      --output PATH (Phase 2, default)
-        Package the canonical bundle + submission manifest into PATH ready
-        for opening a PR against the BenchBox repository's results-data/
-        directory. No network. No credentials. Existing v0.2.x behavior.
-
-      --service [URL] (Phase 3)
-        Upload the canonical bundle to a hosted ingest API. Requires
-        authentication via 'benchbox auth login'. With --dry-run, validates
-        the bundle and prints what would be uploaded - no credentials
-        needed for the dry-run path.
-
-    RESULT_FILE: Path to result JSON file (optional; with --last, picked
-    from history).
-
-    \b
-    Examples:
-        # Package most recent result for PR contribution (Phase 2; default)
-        benchbox submit --last
-
-    \b
-        # Print exact result paths, then package one for PR contribution
-        benchbox results --paths
-        benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
-
-    \b
-        # Submit most recent result to the hosted platform (Phase 3)
-        benchbox submit --last --service
-
-    \b
-        # Submit a specific bundle to a non-default service URL
-        benchbox submit results/tpch_sf01_duckdb.json --service https://staging.benchbox.dev/v1
-
-    \b
-        # Preview what would be uploaded without sending bytes
-        benchbox submit --last --service --dry-run
-
-    Note: benchbox submit shares results publicly. To copy a result to
-    storage you control (local path, S3, etc.), use 'benchbox publish'.
-    """
     if submission_notes is not None and len(submission_notes) > SUBMISSION_NOTES_MAX_LEN:
         console.print(
             f"[red]--notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters "
@@ -761,19 +643,10 @@ def submit(
         ctx.exit(1)
         return
 
-    # Community publish requires a deployment-private public pseudonym salt.
-    # Empty OSS default remains for private/local export; submit is the
-    # community-facing gate (retained-field salt decision 2026-08-05).
     _refuse_missing_public_pseudonym_salt(ctx)
 
-    # Submit-classification policy is shared with UAT via
-    # benchbox.core.results.submit_classification so the two surfaces cannot
-    # drift. The CLI maps the terminal state to its own exit codes + messages.
     submit_state = classify_loaded_result(result)
 
-    # Compliance guardrail: refuse submission of unofficial results.
-    # Unofficial TPC-DS runs (subscale or non-standard SF) must not be submitted
-    # as they are not valid TPC-DS comparable results.
     if submit_state is SubmitTerminalState.unofficial:
         _compliance_class = getattr(result, "compliance_class", None)
         console.print(
@@ -794,9 +667,6 @@ def submit(
         p for suffix in COMPANION_SUFFIXES if (p := source_path.with_name(source_path.stem + suffix)).exists()
     ]
 
-    # Same gate for dry-run previews, PR packages, and hosted uploads: the
-    # CLI must not produce a submission that published-results CI will
-    # refuse (e.g. short query coverage on a clean-classified subset run).
     _validate_submission_bundle(ctx, source_path)
 
     if service_url is not None:
@@ -818,11 +688,6 @@ def submit(
 
     output_path = Path(output_dir)
     bundle_dir = output_path / "bundle"
-    # Per-bundle manifest filename: <bundle_stem>.manifest.json so two
-    # contributors submitting the same week cannot collide on a single
-    # `submission-manifest.json`. Readers (validate_submission.py,
-    # generate_corpus_inventory.py, explorer_pipeline) glob *.manifest.json
-    # and fall back to the legacy filename for backwards-compat.
     manifest_path = output_path / f"{source_path.stem}.manifest.json"
     contributing_path = output_path / "CONTRIBUTING.md"
 
@@ -846,9 +711,6 @@ def submit(
     for comp in companions:
         packaged_companions.append(_write_canonical_submission_file(comp, bundle_dir / comp.name))
 
-    # Per-file hashes are the contract used by scripts/validate_submission.py;
-    # using a directory-level hash would not survive copying into
-    # results-data/bundles/ where other bundles already live.
     manifest = _build_submission_manifest(
         source_path=packaged_source_path,
         companions=packaged_companions,

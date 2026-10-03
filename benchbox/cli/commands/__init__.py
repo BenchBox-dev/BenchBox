@@ -1,5 +1,3 @@
-"""Lazy command registration utilities for the BenchBox CLI."""
-
 from __future__ import annotations
 
 import importlib
@@ -133,8 +131,6 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
 
 
 class LazyCommand(click.Command):
-    """Click command proxy that imports the real command only when needed."""
-
     def __init__(self, spec: CommandSpec) -> None:
         super().__init__(
             spec.name, help=spec.help, short_help=spec.help, hidden=spec.hidden, deprecated=spec.deprecated
@@ -184,7 +180,6 @@ _EXTRA_EXPORTS = {
 
 
 def register_commands(cli: click.Group) -> None:
-    """Attach all CLI commands to the provided click group."""
     for command in COMMANDS:
         cli.add_command(command)
 

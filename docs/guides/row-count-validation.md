@@ -90,9 +90,46 @@ Validation was skipped because no expected result is available for this query/sc
 **Common reasons:**
 - Scale factor other than 1.0 (expected results only available for SF=1.0 currently)
 - Query variant not in answer files
-- Answer files not available locally and download failed or was disabled
+- Answer files are unavailable and the provider reports `FileNotFoundError`,
+  including a disabled download or an on-demand download that returned no files
   - run `benchbox download-answers` to pre-populate the cache
 - Non-standard benchmark
+
+### Missing Expectations and Provider Errors
+
+`SKIPPED` means no row-count comparison was certified. Query execution can
+remain `SUCCESS` while its `row_count_validation` block is `SKIPPED` and carries
+a warning. An explicit SKIP expectation, an absent answer set or query lookup,
+and a nonzero TPC reference stream use this unevaluated result.
+
+A registered EXACT expectation whose count lookup returns `None` also becomes
+SKIP with an `EXACT validation mode but no expected count available` warning.
+This is the current defensive lookup behavior; it does not establish that the
+returned rows are correct. Normal `ExpectedQueryResult` construction requires
+an exact count or a formula for EXACT mode, so a constructor rejection is a
+separate error, not this downgrade.
+
+Expected-results failures are classified. A provider `FileNotFoundError` is
+cached as absent answer data. The on-demand downloader currently converts its
+failures to no files, which the loader reports as `FileNotFoundError`; those
+failures therefore also become unevaluated skips. Other provider exceptions
+produce a failed validation result and may retry on a later request. A waiter
+timeout also fails validation while the background load continues. Neither an
+invalid SKIP-mode result nor a provider timeout is published as normal SKIPPED
+validation: the adapter records a failed query and validation error.
+
+Canonical query-result serialization preserves expected/actual counts and
+warning/error text. It downgrades PASSED evidence without an expected count to
+SKIPPED. Consequently, a successfully evaluated RANGE check, whose result has
+no single expected count, also appears as SKIPPED after this normalization.
+Inspect the available evidence; execution success alone is not correctness
+certification.
+
+TPC-DS DataFrame runs use a separate validation boundary because their expected
+row counts are not seed-aligned. Successful queries receive SKIPPED row-count
+evidence and an UNCERTAIN validation summary; execution failures remain visible
+as PARTIAL. SQL reference-stream validation does not certify those DataFrame
+streams.
 
 ## Supported Benchmarks
 

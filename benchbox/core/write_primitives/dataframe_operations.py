@@ -1,23 +1,6 @@
-"""DataFrame operations for Write Primitives benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides DataFrame implementations of Write Primitives operations,
-enabling benchmarking of write operations (INSERT, UPDATE, DELETE, MERGE, BULK_LOAD)
-on DataFrame platforms like Polars, Delta Lake, and Iceberg.
-
-The module leverages the existing maintenance interface infrastructure from
-benchbox.core.dataframe.maintenance_interface for row-level operations.
-
-Platform Support:
-    - Polars: Full support via read-modify-write pattern
-    - Delta Lake: Native ACID support via deltalake
-    - Iceberg: Native ACID support via pyiceberg
-    - PySpark: Via Delta Lake or file-based operations
-    - Pandas: File-level operations only (INSERT, BULK_LOAD)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,89 +25,43 @@ logger = logging.getLogger(__name__)
 
 
 class WriteOperationType(Enum):
-    """Types of write operations supported by the benchmark.
+    INSERT = "insert"
+    BULK_LOAD = "bulk_load"
 
-    These map to Write Primitives benchmark categories and the underlying
-    maintenance operations.
-    """
+    UPDATE = "update"
+    DELETE = "delete"
+    MERGE = "merge"
 
-    # File-level operations (all platforms)
-    INSERT = "insert"  # Append rows
-    BULK_LOAD = "bulk_load"  # Load from files with format options
-
-    # Row-level operations (Polars via rewrite, Delta Lake/Iceberg native)
-    UPDATE = "update"  # Modify existing rows
-    DELETE = "delete"  # Remove rows
-    MERGE = "merge"  # Upsert operations
-
-    # Transaction operations (ACID platforms only)
     TRANSACTION = "transaction"
 
-    # Aggregate-state operations (engines with DataFrame-layer sketch APIs).
-    # Modeled as two distinct ops because the persist and merge phases
-    # produce separate user-facing measurements (write latency + persisted
-    # state size vs. merge+extract latency). The persist phase builds
-    # per-group aggregate state and writes it durably; the merge phase
-    # reads that state, folds it across rows, and extracts a scalar.
     AGGREGATE_PERSIST = "aggregate_persist"
     AGGREGATE_MERGE = "aggregate_merge"
 
 
 @dataclass
 class DataFrameWriteCapabilities:
-    """Platform capabilities for DataFrame write operations.
-
-    Extended from DataFrameMaintenanceCapabilities to include
-    Write Primitives-specific features like BULK_LOAD, compression.
-
-    Attributes:
-        platform_name: Name of the platform
-        maintenance_caps: Underlying maintenance capabilities
-        supports_bulk_load: Can load from various file formats
-        supports_compression: Supports compression options
-        supported_compressions: List of supported compression codecs
-        supports_partitioning: Supports partition writes
-        supports_sorting: Supports sorted writes
-        notes: Platform-specific notes
-    """
-
     platform_name: str
     maintenance_caps: DataFrameMaintenanceCapabilities | None = None
-    supports_bulk_load: bool = True  # All DataFrame platforms can read files
-    supports_compression: bool = True  # Most platforms support compression
+    supports_bulk_load: bool = True
+    supports_compression: bool = True
     supported_compressions: list[str] = field(default_factory=lambda: ["zstd", "snappy", "gzip", "lz4"])
-    supports_partitioning: bool = False  # PySpark, Polars have partitioning
-    supports_sorting: bool = True  # Most platforms can sort before write
-    # DataFrame-layer aggregate-state ops require engine-native sketch APIs
-    # (e.g. PySpark `hll_sketch_agg`/`hll_union_agg`). Default False; engines
-    # that wire concrete sketch surfaces flip these on.
+    supports_partitioning: bool = False
+    supports_sorting: bool = True
     supports_aggregate_persist: bool = False
     supports_aggregate_merge: bool = False
     notes: str = ""
 
     def supports_operation(self, operation: WriteOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation type to check
-
-        Returns:
-            True if the operation is supported
-        """
-        # File-level operations always supported
         if operation == WriteOperationType.BULK_LOAD:
             return self.supports_bulk_load
         if operation == WriteOperationType.TRANSACTION:
             return self.maintenance_caps.supports_transactions if self.maintenance_caps else False
 
-        # Aggregate-state ops are decided by their own dedicated capability flags
-        # (no fallback to maintenance_caps because they are not row-level mutations).
         if operation == WriteOperationType.AGGREGATE_PERSIST:
             return self.supports_aggregate_persist
         if operation == WriteOperationType.AGGREGATE_MERGE:
             return self.supports_aggregate_merge
 
-        # Row-level operations depend on maintenance capabilities
         if self.maintenance_caps is None:
             return False
 
@@ -138,22 +75,16 @@ class DataFrameWriteCapabilities:
         return mapping.get(operation, False)
 
     def get_unsupported_operations(self) -> list[WriteOperationType]:
-        """Get list of operations not supported by this platform.
-
-        Returns:
-            List of unsupported WriteOperationType values
-        """
         return [op for op in WriteOperationType if not self.supports_operation(op)]
 
 
-# Pre-defined capabilities for common DataFrame platforms
 POLARS_WRITE_CAPABILITIES = DataFrameWriteCapabilities(
     platform_name="polars-df",
-    maintenance_caps=None,  # Set at runtime via get_maintenance_operations_for_platform
+    maintenance_caps=None,
     supports_bulk_load=True,
     supports_compression=True,
     supported_compressions=["zstd", "snappy", "gzip", "lz4"],
-    supports_partitioning=True,  # Polars has partition_by in write_parquet
+    supports_partitioning=True,
     supports_sorting=True,
     notes="Full operation support via read-modify-write. RAM-limited for large datasets.",
 )
@@ -171,16 +102,12 @@ PANDAS_WRITE_CAPABILITIES = DataFrameWriteCapabilities(
 
 PYSPARK_WRITE_CAPABILITIES = DataFrameWriteCapabilities(
     platform_name="pyspark-df",
-    maintenance_caps=None,  # Depends on underlying table format (Delta/Iceberg)
+    maintenance_caps=None,
     supports_bulk_load=True,
     supports_compression=True,
     supported_compressions=["zstd", "snappy", "gzip", "lz4"],
-    supports_partitioning=True,  # partitionBy
-    supports_sorting=True,  # orderBy
-    # PySpark exposes hll_sketch_agg / hll_union_agg / hll_sketch_estimate
-    # at the DataFrame layer (Spark 3.5+). Concrete sketch wiring lives in
-    # the pyspark-dataframe-surface TODO; the capability flag here marks
-    # the engine as eligible for the aggregate-state dispatch path.
+    supports_partitioning=True,
+    supports_sorting=True,
     supports_aggregate_persist=True,
     supports_aggregate_merge=True,
     notes="Row-level operations require Delta Lake or Iceberg table format.",
@@ -189,26 +116,6 @@ PYSPARK_WRITE_CAPABILITIES = DataFrameWriteCapabilities(
 
 @dataclass
 class DataFrameWriteResult:
-    """Result of a DataFrame write operation.
-
-    Extends MaintenanceResult with Write Primitives-specific metrics.
-
-    Attributes:
-        operation_type: Type of write operation
-        success: Whether the operation completed successfully
-        start_time: Operation start timestamp (Unix time)
-        end_time: Operation end timestamp (Unix time)
-        duration_ms: Operation duration in milliseconds
-        rows_affected: Number of rows written/modified
-        bytes_written: Bytes written (if available)
-        compression: Compression codec used
-        file_count: Number of files written
-        error_message: Error description if operation failed
-        validation_passed: Whether validation checks passed
-        validation_results: Details of validation checks
-        metrics: Additional platform-specific metrics
-    """
-
     operation_type: WriteOperationType
     success: bool
     start_time: float
@@ -230,22 +137,12 @@ class DataFrameWriteResult:
         operation_type: WriteOperationType,
         **extra_fields: Any,
     ) -> DataFrameWriteResult:
-        """Create from a MaintenanceResult.
-
-        Args:
-            maintenance_result: Underlying maintenance result
-            operation_type: Write operation type
-            **extra_fields: Additional fields to set
-
-        Returns:
-            DataFrameWriteResult instance
-        """
         return cls(
             operation_type=operation_type,
             success=maintenance_result.success,
             start_time=maintenance_result.start_time,
             end_time=maintenance_result.end_time,
-            duration_ms=maintenance_result.duration * 1000,  # Convert to ms
+            duration_ms=maintenance_result.duration * 1000,
             rows_affected=maintenance_result.rows_affected,
             error_message=maintenance_result.error_message,
             metrics=maintenance_result.metrics,
@@ -259,16 +156,6 @@ class DataFrameWriteResult:
         error_message: str,
         start_time: float | None = None,
     ) -> DataFrameWriteResult:
-        """Create a failure result.
-
-        Args:
-            operation_type: The operation that failed
-            error_message: Description of the failure
-            start_time: Optional start time (defaults to now)
-
-        Returns:
-            DataFrameWriteResult indicating failure
-        """
         now = time.time()
         return cls(
             operation_type=operation_type,
@@ -283,60 +170,16 @@ class DataFrameWriteResult:
 
 
 class DataFrameWriteOperationsManager:
-    """Manager for DataFrame write operations.
-
-    Wraps the maintenance operations interface with Write Primitives-specific
-    functionality including BULK_LOAD, validation, and result formatting.
-
-    Example:
-        manager = DataFrameWriteOperationsManager("polars-df")
-
-        # Check capabilities
-        if manager.supports_operation(WriteOperationType.UPDATE):
-            result = manager.execute_update(
-                table_path="/data/orders",
-                condition="status = 'pending'",
-                updates={"status": "'cancelled'"}
-            )
-
-        # Bulk load with options
-        result = manager.execute_bulk_load(
-            source_path="/data/raw/orders.csv",
-            target_path="/data/orders",
-            format="csv",
-            compression="zstd"
-        )
-    """
-
     def __init__(self, platform_name: str, spark_session: Any = None) -> None:
-        """Initialize the write operations manager.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-            spark_session: SparkSession instance (required for pyspark-df)
-
-        Raises:
-            ValueError: If platform is not supported for DataFrame operations
-        """
         self.platform_name = platform_name.lower()
         self.spark_session = spark_session
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Get maintenance operations handler
         self._maintenance_ops = self._get_maintenance_ops()
 
-        # Build capabilities
         self._capabilities = self._build_capabilities()
 
     def _get_maintenance_ops(self) -> Any:
-        """Get the appropriate maintenance operations handler.
-
-        For PySpark, uses the dedicated PySpark maintenance module.
-        For other platforms, uses the generic maintenance interface.
-
-        Returns:
-            Maintenance operations handler or None
-        """
         if "pyspark" in self.platform_name or "spark" in self.platform_name:
             if self.spark_session is not None:
                 try:
@@ -358,16 +201,10 @@ class DataFrameWriteOperationsManager:
         return get_maintenance_operations_for_platform(self.platform_name)
 
     def _build_capabilities(self) -> DataFrameWriteCapabilities:
-        """Build platform capabilities.
-
-        Returns:
-            DataFrameWriteCapabilities for this platform
-        """
         maintenance_caps = None
         if self._maintenance_ops is not None:
             maintenance_caps = self._maintenance_ops.get_capabilities()
 
-        # Use platform-specific defaults
         if "polars" in self.platform_name:
             caps = DataFrameWriteCapabilities(
                 platform_name=self.platform_name,
@@ -399,14 +236,11 @@ class DataFrameWriteOperationsManager:
                 supported_compressions=["zstd", "snappy", "gzip", "lz4"],
                 supports_partitioning=True,
                 supports_sorting=True,
-                # PySpark has DataFrame-layer sketch APIs (hll_sketch_agg etc., Spark 3.5+).
-                # See PYSPARK_WRITE_CAPABILITIES preset for rationale.
                 supports_aggregate_persist=True,
                 supports_aggregate_merge=True,
                 notes="Row-level operations require Delta Lake table format.",
             )
         else:
-            # Generic capabilities
             caps = DataFrameWriteCapabilities(
                 platform_name=self.platform_name,
                 maintenance_caps=maintenance_caps,
@@ -417,33 +251,12 @@ class DataFrameWriteOperationsManager:
         return caps
 
     def get_capabilities(self) -> DataFrameWriteCapabilities:
-        """Get platform write capabilities.
-
-        Returns:
-            DataFrameWriteCapabilities for this platform
-        """
         return self._capabilities
 
     def supports_operation(self, operation: WriteOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation to check
-
-        Returns:
-            True if supported
-        """
         return self._capabilities.supports_operation(operation)
 
     def get_unsupported_message(self, operation: WriteOperationType) -> str:
-        """Get error message for unsupported operation.
-
-        Args:
-            operation: The unsupported operation
-
-        Returns:
-            Helpful error message with alternatives
-        """
         if operation in (WriteOperationType.UPDATE, WriteOperationType.DELETE, WriteOperationType.MERGE):
             return (
                 f"{self.platform_name} does not support {operation.value} operations in the current configuration.\n"
@@ -474,17 +287,6 @@ class DataFrameWriteOperationsManager:
         partition_columns: list[str] | None = None,
         mode: str = "append",
     ) -> DataFrameWriteResult:
-        """Execute INSERT operation.
-
-        Args:
-            table_path: Path to the table directory
-            dataframe: DataFrame containing rows to insert
-            partition_columns: Columns to partition by
-            mode: Write mode ("append" or "overwrite")
-
-        Returns:
-            DataFrameWriteResult with operation outcome
-        """
         if not self.supports_operation(WriteOperationType.INSERT):
             return DataFrameWriteResult.failure(
                 WriteOperationType.INSERT,
@@ -515,16 +317,6 @@ class DataFrameWriteOperationsManager:
         condition: str,
         updates: dict[str, Any],
     ) -> DataFrameWriteResult:
-        """Execute UPDATE operation.
-
-        Args:
-            table_path: Path to the table directory
-            condition: SQL-like condition string
-            updates: Column name to new value mapping
-
-        Returns:
-            DataFrameWriteResult with operation outcome
-        """
         if not self.supports_operation(WriteOperationType.UPDATE):
             return DataFrameWriteResult.failure(
                 WriteOperationType.UPDATE,
@@ -553,15 +345,6 @@ class DataFrameWriteOperationsManager:
         table_path: Path | str,
         condition: str,
     ) -> DataFrameWriteResult:
-        """Execute DELETE operation.
-
-        Args:
-            table_path: Path to the table directory
-            condition: SQL-like condition string
-
-        Returns:
-            DataFrameWriteResult with operation outcome
-        """
         if not self.supports_operation(WriteOperationType.DELETE):
             return DataFrameWriteResult.failure(
                 WriteOperationType.DELETE,
@@ -592,18 +375,6 @@ class DataFrameWriteOperationsManager:
         when_matched: dict[str, Any] | None = None,
         when_not_matched: dict[str, Any] | None = None,
     ) -> DataFrameWriteResult:
-        """Execute MERGE (upsert) operation.
-
-        Args:
-            table_path: Path to the target table
-            source_dataframe: DataFrame containing source rows
-            merge_condition: Join condition for matching rows
-            when_matched: Updates to apply when matched
-            when_not_matched: Values for insert when not matched
-
-        Returns:
-            DataFrameWriteResult with operation outcome
-        """
         if not self.supports_operation(WriteOperationType.MERGE):
             return DataFrameWriteResult.failure(
                 WriteOperationType.MERGE,
@@ -639,22 +410,6 @@ class DataFrameWriteOperationsManager:
         partition_columns: list[str] | None = None,
         sort_columns: list[str] | None = None,
     ) -> DataFrameWriteResult:
-        """Execute BULK_LOAD operation.
-
-        Reads data from source files and writes to target with specified options.
-
-        Args:
-            source_path: Path to source data files
-            target_path: Path to write target data
-            source_format: Source file format ("parquet", "csv", "json")
-            target_format: Target file format ("parquet")
-            compression: Compression codec (None, "zstd", "snappy", "gzip", "lz4")
-            partition_columns: Columns to partition by
-            sort_columns: Columns to sort by before writing
-
-        Returns:
-            DataFrameWriteResult with operation outcome
-        """
         if not self.supports_operation(WriteOperationType.BULK_LOAD):
             return DataFrameWriteResult.failure(
                 WriteOperationType.BULK_LOAD,
@@ -666,7 +421,6 @@ class DataFrameWriteOperationsManager:
         target_path = Path(target_path)
 
         try:
-            # Platform-specific bulk load implementation
             if "polars" in self.platform_name:
                 rows, bytes_written, file_count = self._bulk_load_polars(
                     source_path,
@@ -734,17 +488,11 @@ class DataFrameWriteOperationsManager:
         partition_columns: list[str] | None,
         sort_columns: list[str] | None,
     ) -> tuple[int, int | None, int]:
-        """Polars-specific bulk load implementation.
-
-        Returns:
-            Tuple of (rows_written, bytes_written, file_count)
-        """
         try:
             import polars as pl
         except ImportError as e:
             raise ImportError("Polars is required for polars-df bulk load") from e
 
-        # Read source data
         if source_format == "parquet":
             df = pl.scan_parquet(source_path).collect()
         elif source_format == "csv":
@@ -756,15 +504,12 @@ class DataFrameWriteOperationsManager:
 
         row_count = df.height
 
-        # Apply sorting
         if sort_columns:
             df = df.sort(sort_columns)
 
-        # Write to target
         target_path.mkdir(parents=True, exist_ok=True)
 
         if partition_columns:
-            # Partitioned write
             for partition_vals, partition_df in df.group_by(partition_columns):
                 if isinstance(partition_vals, tuple):
                     parts = zip(partition_columns, partition_vals)
@@ -782,7 +527,6 @@ class DataFrameWriteOperationsManager:
                 )
             file_count = len(list(target_path.rglob("*.parquet")))
         else:
-            # Single file write
             output_file = target_path / "part-00000.parquet"
             df.write_parquet(
                 output_file,
@@ -790,7 +534,6 @@ class DataFrameWriteOperationsManager:
             )
             file_count = 1
 
-        # Estimate bytes written
         bytes_written = sum(f.stat().st_size for f in target_path.rglob("*.parquet"))
 
         return row_count, bytes_written, file_count
@@ -804,17 +547,11 @@ class DataFrameWriteOperationsManager:
         compression: str | None,
         sort_columns: list[str] | None,
     ) -> tuple[int, int | None, int]:
-        """Pandas-specific bulk load implementation.
-
-        Returns:
-            Tuple of (rows_written, bytes_written, file_count)
-        """
         try:
             import pandas as pd
         except ImportError as e:
             raise ImportError("Pandas is required for pandas-df bulk load") from e
 
-        # Read source data
         if source_format == "parquet":
             df = pd.read_parquet(source_path)
         elif source_format == "csv":
@@ -826,11 +563,9 @@ class DataFrameWriteOperationsManager:
 
         row_count = len(df)
 
-        # Apply sorting
         if sort_columns:
             df = df.sort_values(sort_columns)
 
-        # Write to target
         target_path.mkdir(parents=True, exist_ok=True)
         output_file = target_path / "part-00000.parquet"
         df.to_parquet(
@@ -853,13 +588,6 @@ class DataFrameWriteOperationsManager:
         partition_columns: list[str] | None,
         sort_columns: list[str] | None,
     ) -> tuple[int, int | None, int]:
-        """PySpark-specific bulk load implementation using DataFrame API.
-
-        Uses spark.read.format().load() and df.write.format().save() pattern.
-
-        Returns:
-            Tuple of (rows_written, bytes_written, file_count)
-        """
         if self.spark_session is None:
             raise ValueError(
                 "SparkSession is required for PySpark bulk load. "
@@ -870,7 +598,6 @@ class DataFrameWriteOperationsManager:
         source_str = str(source_path)
         target_str = str(target_path)
 
-        # Read source data using DataFrame API
         reader = spark.read.format(source_format)
 
         if source_format == "csv":
@@ -883,11 +610,9 @@ class DataFrameWriteOperationsManager:
             self.logger.info("No rows to load")
             return 0, 0, 0
 
-        # Apply sorting
         if sort_columns:
             df = df.orderBy(*sort_columns)
 
-        # Build writer
         writer = df.write.mode("overwrite")
 
         if partition_columns:
@@ -896,13 +621,11 @@ class DataFrameWriteOperationsManager:
         if compression:
             writer = writer.option("compression", compression)
 
-        # Write using DataFrame API
         if target_format == "delta":
             writer.format("delta").save(target_str)
         else:
             writer.parquet(target_str)
 
-        # Estimate bytes written and file count
         target_path.mkdir(parents=True, exist_ok=True)
         parquet_files = list(target_path.rglob("*.parquet"))
         file_count = len(parquet_files)
@@ -916,27 +639,6 @@ class DataFrameWriteOperationsManager:
         state_builder: Any,
         compression: str | None = "zstd",
     ) -> DataFrameWriteResult:
-        """Execute AGGREGATE_PERSIST: build per-group aggregate state and persist it.
-
-        Sketch-shaped DataFrame ops express the persist phase as a callable that
-        returns a DataFrame holding the per-group sketch state column(s). The
-        manager handles the durable write to ``target_path`` (Parquet) plus the
-        timing, byte, and file-count bookkeeping. Engine-specific sketch APIs
-        live in the callable; the manager stays agnostic.
-
-        Args:
-            target_path: Directory where the aggregate state is persisted.
-            state_builder: Callable taking no arguments and returning a DataFrame
-                whose columns include the aggregate-state output(s). For PySpark
-                the typical implementation calls ``df.groupBy(...).agg(F.hll_sketch_agg(...))``;
-                for engines without a DataFrame-layer sketch surface this method
-                is unsupported and is rejected upstream by ``supports_operation``.
-            compression: Parquet compression codec (default zstd).
-
-        Returns:
-            DataFrameWriteResult with rows_affected = number of state rows
-            persisted, bytes_written = persisted state size, and file_count.
-        """
         if not self.supports_operation(WriteOperationType.AGGREGATE_PERSIST):
             return DataFrameWriteResult.failure(
                 WriteOperationType.AGGREGATE_PERSIST,
@@ -945,8 +647,6 @@ class DataFrameWriteOperationsManager:
 
         start_time = time.time()
         target_path = Path(target_path)
-        # Track whether we created the directory ourselves so a failed persist
-        # doesn't leak an empty directory onto disk for the caller to clean up.
         target_existed_before = target_path.exists()
         try:
             state_df = state_builder()
@@ -991,25 +691,6 @@ class DataFrameWriteOperationsManager:
         source_path: Path | str,
         merge_extract: Any,
     ) -> DataFrameWriteResult:
-        """Execute AGGREGATE_MERGE: read persisted state, merge across rows, extract scalar.
-
-        The merge phase is the user-facing measurement that pairs with
-        AGGREGATE_PERSIST. The callable receives the path the persist phase wrote
-        to and is responsible for reading the state, folding it via the engine's
-        merge UDF (e.g. ``F.hll_union_agg`` on PySpark), and returning the final
-        scalar (e.g. via ``F.hll_sketch_estimate``). The manager handles the
-        timing and result envelope.
-
-        Args:
-            source_path: Directory the AGGREGATE_PERSIST run wrote to.
-            merge_extract: Callable taking ``Path`` and returning the extracted
-                scalar value. Engine-agnostic at this layer; concrete sketch
-                wiring lives in the callable.
-
-        Returns:
-            DataFrameWriteResult with rows_affected = 1 and the extracted scalar
-            in ``metrics["aggregate_value"]``.
-        """
         if not self.supports_operation(WriteOperationType.AGGREGATE_MERGE):
             return DataFrameWriteResult.failure(
                 WriteOperationType.AGGREGATE_MERGE,
@@ -1044,13 +725,6 @@ class DataFrameWriteOperationsManager:
         target_path: Path,
         compression: str | None,
     ) -> tuple[int, int, int]:
-        """Persist an arbitrary DataFrame to Parquet at ``target_path``.
-
-        Returns (row_count, bytes_written, file_count). Selects the writer based
-        on ``self.platform_name`` so engines expose their native partitioned
-        writers. Aggregate-state engines that introduce richer state shapes can
-        override this method later without touching the dispatch envelope.
-        """
         if "pyspark" in self.platform_name or "spark" in self.platform_name:
             row_count = state_df.count()
             (
@@ -1080,14 +754,6 @@ class DataFrameWriteOperationsManager:
         bytes_written: int | None,
         file_count: int | None,
     ) -> dict[str, Any]:
-        """Cross-check reported sketch-persist storage sizes against disk.
-
-        Mirrors the SQL surface's ``sketch_bytes`` bound validations: the
-        persisted Parquet payload is re-measured from ``target_path`` and
-        compared with the sizes reported by the persist writer. Returns a
-        validation entry with ``check="storage_size"`` for
-        ``DataFrameWriteResult.validation_results``.
-        """
         target = Path(target_path)
         parquet_files = list(target.rglob("*.parquet")) if target.exists() else []
         on_disk_bytes = sum(f.stat().st_size for f in parquet_files)
@@ -1121,16 +787,6 @@ def get_dataframe_write_manager(
     platform_name: str,
     spark_session: Any = None,
 ) -> DataFrameWriteOperationsManager | None:
-    """Get a DataFrame write operations manager for a platform.
-
-    Args:
-        platform_name: Platform name (e.g., "polars-df", "pandas-df", "pyspark-df")
-        spark_session: SparkSession instance (required for pyspark-df)
-
-    Returns:
-        DataFrameWriteOperationsManager if platform supports DataFrame writes,
-        None if platform is not a DataFrame platform.
-    """
     return get_dataframe_manager(
         platform_name,
         manager_class=DataFrameWriteOperationsManager,
@@ -1141,44 +797,7 @@ def get_dataframe_write_manager(
     )
 
 
-# ---------------------------------------------------------------------------
-# PySpark sketch helpers (write-primitives-sketch-pyspark-dataframe-surface)
-# ---------------------------------------------------------------------------
-#
-# Factory functions that produce the `state_builder` and `merge_extract`
-# callables expected by `DataFrameWriteOperationsManager.execute_aggregate_persist`
-# and `execute_aggregate_merge`. The factories let consumers close over the
-# spark session, source data path, group columns, and value column without
-# the manager needing to know about Spark.
-#
-# The CLI integration (`benchbox run --platform pyspark --queries
-# sketch_df_hll_persist_merge`) is intentionally NOT wired here — it requires
-# changes to operations.yaml and benchmark.py that are outside this TODO's
-# scope_limit. See the recorded blind-spot
-# `_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`
-# for the follow-up.
-
-
 def pyspark_supports_approx_top_k(spark_session: Any) -> bool:
-    """Return whether the active Spark runtime exposes approx_top_k_accumulate.
-
-    `pyspark.sql.functions.approx_top_k_accumulate` ships with Spark 4.1+.
-    BenchBox's PySpark adapter targets Spark 3.5+, so callers must guard
-    top-K aggregate-state ops on the runtime version. Returns False on
-    older Spark versions or when the function symbol is not available.
-
-    Note: this is a conservative version-then-attribute check. If a
-    distribution backports `approx_top_k_accumulate` to a 3.5.x build,
-    the `< (4, 1)` gate rejects it spuriously — callers in that
-    environment should bypass this guard or file a TODO to add the
-    backport-detection branch.
-
-    Args:
-        spark_session: A SparkSession.
-
-    Returns:
-        True if approx_top_k_accumulate is callable on this Spark runtime.
-    """
     if spark_session is None:
         return False
     try:
@@ -1208,24 +827,6 @@ def make_pyspark_hll_persist_builder(
     value_col: str,
     sketch_alias: str = "sketch",
 ) -> Any:
-    """Factory: build the `state_builder` callable for HLL persist on PySpark.
-
-    Reads the source table at `source_path`, groups by `group_cols`, and
-    builds an HLL sketch of `value_col` per group via `F.hll_sketch_agg`
-    (Spark 3.5+). The callable returned has no arguments — the manager
-    invokes it during `execute_aggregate_persist` and writes the resulting
-    DataFrame to Parquet.
-
-    Args:
-        spark_session: A SparkSession.
-        source_path: Parquet directory or table path the source rows live at.
-        group_cols: Group-by column names for per-partition state.
-        value_col: Column whose distinct count the sketch tracks.
-        sketch_alias: Output column name for the HLL state (default "sketch").
-
-    Returns:
-        A zero-arg callable suitable for `manager.execute_aggregate_persist`.
-    """
     source_str = str(source_path)
 
     def builder() -> Any:
@@ -1244,21 +845,6 @@ def make_pyspark_hll_merge_extract(
     spark_session: Any,
     sketch_col: str = "sketch",
 ) -> Any:
-    """Factory: build the `merge_extract` callable for HLL merge on PySpark.
-
-    Reads the persisted state from `state_path`, unions the per-partition
-    HLL sketches via `F.hll_union_agg`, extracts the distinct count via
-    `F.hll_sketch_estimate`, and returns the float estimate. The manager
-    times the call and records the value in `result.metrics["aggregate_value"]`.
-
-    Args:
-        spark_session: A SparkSession.
-        sketch_col: Column name holding the per-partition HLL state
-            (must match the alias used by the persist builder).
-
-    Returns:
-        A `(Path) -> float` callable suitable for `manager.execute_aggregate_merge`.
-    """
 
     def merge_extract(state_path: Path) -> float:
         from pyspark.sql import functions as F  # noqa: N812
@@ -1277,12 +863,6 @@ def make_pyspark_topk_persist_builder(
     value_col: str,
     sketch_alias: str = "sketch",
 ) -> Any:
-    """Factory: build the top-K `state_builder` callable on PySpark.
-
-    Requires Spark 4.1+ for `F.approx_top_k_accumulate`. Callers must
-    `pyspark_supports_approx_top_k(spark)` before invoking this factory;
-    otherwise it raises at call time inside the builder.
-    """
     source_str = str(source_path)
 
     def builder() -> Any:
@@ -1301,11 +881,6 @@ def make_pyspark_topk_merge_extract(
     spark_session: Any,
     sketch_col: str = "sketch",
 ) -> Any:
-    """Factory: build the top-K `merge_extract` callable on PySpark (Spark 4.1+).
-
-    Returns the count of frequent items in the merged sketch (i.e.,
-    `len(approx_top_k_estimate(...))`).
-    """
 
     def merge_extract(state_path: Path) -> float:
         from pyspark.sql import functions as F  # noqa: N812

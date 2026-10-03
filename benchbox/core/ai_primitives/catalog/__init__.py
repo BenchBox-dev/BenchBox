@@ -1,9 +1,6 @@
-"""AI Primitives catalog loader and data classes.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.ai_primitives.catalog.loader import (
     AICatalog,

@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.core.coffeeshop.benchmark import CoffeeShopBenchmark
+from benchbox.core.coffeeshop.queries import CoffeeShopQueryManager
 
 pytestmark = [
     pytest.mark.unit,
@@ -131,3 +132,17 @@ def test_run_benchmark_records_failed_iterations(tmp_path: Path) -> None:
     assert query_result["error"] == "boom"
     assert query_result["avg_time"] == 0.1
     assert query_result["total_rows"] == 1
+
+
+def test_query_manager_rejects_missing_format_parameter_and_accepts_explicit_override() -> None:
+    manager = CoffeeShopQueryManager()
+    manager._queries["SA1"]["defaults"].pop("start_date")
+
+    with pytest.raises(ValueError, match="Missing parameter 'start_date'") as failure:
+        manager.get_query("SA1")
+
+    assert isinstance(failure.value.__cause__, KeyError)
+    assert failure.value.__cause__.args == ("start_date",)
+    query = manager.get_query("SA1", params={"start_date": "2023-02-01"})
+    assert "DATE '2023-02-01'" in query
+    assert "{start_date}" not in query

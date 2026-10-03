@@ -1,5 +1,3 @@
-"""Unit tests for LakeSail Sail DataFrame adapter."""
-
 from __future__ import annotations
 
 import sys
@@ -21,7 +19,6 @@ pytestmark = [
 ]
 
 
-# Check if PySpark is available for tests that need real Spark
 try:
     from benchbox.platforms.pyspark import PYSPARK_AVAILABLE
 except ImportError:
@@ -29,11 +26,8 @@ except ImportError:
 
 
 class TestLakeSailDataFrameAdapterMocked:
-    """Tests for LakeSailDataFrameAdapter with mocked PySpark dependencies."""
-
     @pytest.fixture
     def mock_pyspark_env(self):
-        """Mock PySpark for adapter initialization tests."""
         mock_session = MagicMock()
         mock_session.version = "3.5.0"
         mock_builder = MagicMock()
@@ -75,35 +69,23 @@ class TestLakeSailDataFrameAdapterMocked:
             yield mock_session_class, mock_session, mock_functions
 
     def test_initialization_requires_pyspark(self):
-        """Test that missing PySpark raises ImportError."""
         with patch.dict("sys.modules", {"pyspark": None, "pyspark.sql": None}):
-            # Importing the module with pyspark unavailable should handle gracefully
-            # The actual adapter __init__ checks PYSPARK_AVAILABLE
             pass
 
     def test_platform_name(self, mock_pyspark_env):
 
-        # We need to test with real import since the module checks PYSPARK_AVAILABLE at import time
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
-        # Manually set required attributes to avoid full init
         adapter._endpoint = "sc://localhost:50051"
         assert adapter.platform_name == "LakeSail"
 
 
 @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
 class TestLakeSailDataFrameAdapterReal:
-    """Tests for LakeSailDataFrameAdapter with real PySpark (no Sail server needed).
-
-    These tests verify adapter initialization and configuration without
-    requiring a running LakeSail Sail server. They test the client-side
-    logic only.
-    """
-
     def test_initialization(self):
 
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
@@ -120,7 +102,6 @@ class TestLakeSailDataFrameAdapterReal:
 
     def test_type_aliases_defined(self):
 
-        # When PySpark is available, these should be real PySpark types
         from pyspark.sql import DataFrame
         from pyspark.sql.column import Column
 
@@ -149,8 +130,6 @@ class TestLakeSailDataFrameAdapterReal:
 
 
 class TestLakeSailDataFrameAdapterConfig:
-    """Tests for LakeSail DataFrame adapter configuration handling."""
-
     def test_default_endpoint(self):
 
         if not PYSPARK_AVAILABLE:
@@ -158,7 +137,6 @@ class TestLakeSailDataFrameAdapterConfig:
 
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
-        # Create adapter with __new__ to skip session creation
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
         adapter._endpoint = "sc://localhost:50051"
         assert adapter._endpoint == "sc://localhost:50051"
@@ -199,7 +177,6 @@ class TestLakeSailDataFrameAdapterConfig:
         assert "aqe_enabled" in info
 
     def test_tuning_config_overrides_shuffle_and_memory(self):
-        """Tuning config should update the locally testable LakeSail settings."""
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 
@@ -229,7 +206,6 @@ class TestLakeSailDataFrameAdapterConfig:
         adapter.close()
 
     def test_build_schema_uses_nullable_strings(self):
-        """CSV schema helper should map requested columns to nullable string fields."""
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 
@@ -244,11 +220,8 @@ class TestLakeSailDataFrameAdapterConfig:
 
 
 class TestLakeSailDataFrameAdapterLifecycle:
-    """Tests for mocked LakeSail session lifecycle and helper methods."""
-
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
     def test_session_builder_uses_endpoint_and_extra_configs(self):
-        """Spark Connect builder should receive endpoint, AQE, and extra config options once."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         mock_session = MagicMock()
@@ -285,7 +258,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
 
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
     def test_session_builder_disables_aqe_explicitly(self):
-        """Disabling AQE must write every key as false, not omit them."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         mock_session = MagicMock()
@@ -303,8 +275,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
 
             assert adapter.spark is mock_session
 
-        # Spark enables AQE by default since 3.2.0, so an omitted key would
-        # silently stay on.
         assert mock_builder.config.call_args_list == [
             (("spark.app.name", "BenchBox-LakeSail-DF"), {}),
             (("spark.sql.shuffle.partitions", str(adapter._shuffle_partitions)), {}),
@@ -315,7 +285,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
 
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
     def test_session_creation_failure_propagates(self):
-        """Connection failures should bubble up and leave the adapter unbound."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         mock_builder = MagicMock()
@@ -333,7 +302,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
         assert adapter._spark is None
 
     def test_close_ignores_stop_errors_and_clears_session(self):
-        """close() should swallow stop errors and always clear the cached session."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
@@ -346,7 +314,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
         assert adapter._spark is None
 
     def test_explain_and_get_query_plan_capture_modes(self):
-        """Plan helpers should capture both simple and extended explain output."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         class DummyFrame:
@@ -369,7 +336,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
         assert frame.calls == ["simple", "simple", "extended"]
 
     def test_sql_and_register_table_delegate_to_spark_objects(self):
-        """SQL execution and temp-view registration should delegate directly to Spark objects."""
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
@@ -385,10 +351,6 @@ class TestLakeSailDataFrameAdapterLifecycle:
         adapter.register_table("orders", df)
         df.createOrReplaceTempView.assert_called_once_with("orders")
 
-
-# ---------------------------------------------------------------------------
-# Fast-lane mocked coverage: all methods without needing real PySpark
-# ---------------------------------------------------------------------------
 
 from types import SimpleNamespace  # noqa: E402
 from unittest.mock import MagicMock, patch  # noqa: E402
@@ -446,7 +408,6 @@ def _new_lakesail_adapter(monkeypatch):
     monkeypatch.setattr(_pyspark_mod, "F", mock_F)
     monkeypatch.setattr(_pyspark_mod, "Window", mock_Window)
 
-    # Mock SparkSession.builder.remote chain
     mock_builder = MagicMock()
     mock_builder.remote.return_value = mock_builder
     mock_builder.config.return_value = mock_builder
@@ -460,8 +421,6 @@ def _new_lakesail_adapter(monkeypatch):
 
 
 class TestLakeSailMockedCoverage:
-    """Fast-lane coverage: all methods with PYSPARK_AVAILABLE patched True."""
-
     def test_init_and_platform_name(self, monkeypatch):
         adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
         assert adapter.platform_name == "LakeSail"
@@ -500,16 +459,13 @@ class TestLakeSailMockedCoverage:
         monkeypatch.setattr(_lakesail_mod, "SparkSession", MagicMock(builder=mock_builder))
 
         adapter = _lakesail_mod.LakeSailDataFrameAdapter(endpoint="sc://host:50051", verbose=True)
-        adapter._spark = None  # reset to force creation
+        adapter._spark = None
         session = adapter._get_or_create_session()
         assert session is mock_session
-        # Cached on second call
         assert adapter._get_or_create_session() is mock_session
 
-        # close()
         adapter.close()
         assert adapter._spark is None
-        # close when None is no-op
         adapter.close()
 
     def test_context_manager(self, monkeypatch):

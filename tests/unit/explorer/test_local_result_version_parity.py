@@ -1,18 +1,3 @@
-"""Drift guard: localResult.ts must track the canonical schema versions.
-
-Why a *test* and not a generated file: the explorer ships as a pre-built
-SPA and the canonical version set lives in
-``benchbox.core.results.schema_policy``. A code-gen step would add build
-coupling that doesn't pay for itself yet. A test is enough — it fires on
-develop the moment a schema version is added without updating the local
-preview gate, which is when the catch is needed. It also pins key-presence
-selection for the version aliases so an explicit null is not silently
-replaced by a legacy value.
-
-If a new canonical version appears here, update
-``SUPPORTED_SCHEMA_VERSIONS`` in ``results-explorer/src/lib/localResult.ts``.
-"""
-
 from __future__ import annotations
 
 import re
@@ -57,7 +42,6 @@ _LITERAL_RE = re.compile(r"""['"]2\.[012]['"]""")
 
 
 def test_transformer_funnels_versions_through_shared_policy() -> None:
-    """The pipeline must not hardcode bundle schema versions of its own."""
     source = TRANSFORMER_PY.read_text(encoding="utf-8")
     assert "EXPLORER_INPUT_SCHEMA_POLICY" in source
     assert "result_schema_version_value" in source
@@ -65,7 +49,6 @@ def test_transformer_funnels_versions_through_shared_policy() -> None:
 
 
 def test_consumer_policies_share_canonical_set() -> None:
-    """Every bundle-input policy must accept exactly the canonical family."""
     from benchbox.core.results.schema_policy import (
         EXPLORER_INPUT_SCHEMA_POLICY,
         LOADER_SCHEMA_POLICY,

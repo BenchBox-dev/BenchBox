@@ -23,6 +23,8 @@ The benchmark is particularly valuable for testing distributed computing framewo
 - **Realistic data distributions** - Web crawl and user behavior patterns
 - **Performance-oriented** - Emphasizes throughput and latency optimization
 
+BenchBox generates synthetic data with the AMPLab benchmark data characteristics for testing big data processing systems.
+
 ## Schema Description
 
 The AMPLab benchmark uses a simple three-table schema that models web analytics data:

@@ -1,5 +1,3 @@
-"""Local hosted-submission history sidecars."""
-
 from __future__ import annotations
 
 import json
@@ -9,7 +7,6 @@ from typing import Any, Mapping
 
 
 def submission_history_path(result_file: Path, *, idempotency_key: str | None = None) -> Path:
-    """Return the hosted-submission sidecar path for a primary result JSON."""
 
     key_suffix = f".{_safe_filename_token(idempotency_key)}" if idempotency_key else ""
     return result_file.with_name(f"{result_file.stem}{key_suffix}.submission.json")
@@ -26,7 +23,6 @@ def record_hosted_submission(
     public_result_id: str | None,
     public_url: str | None,
 ) -> Path:
-    """Persist hosted-submission metadata without modifying the result bundle."""
 
     record = {
         "version": 1,
@@ -51,7 +47,6 @@ def record_hosted_submission(
 
 
 def list_hosted_submissions(results_dir: Path, *, limit: int | None = None) -> list[dict[str, Any]]:
-    """List hosted-submission sidecars newest-first."""
 
     if not results_dir.exists():
         return []

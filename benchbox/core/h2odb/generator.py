@@ -1,19 +1,6 @@
-"""H2O DB benchmark data generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module generates synthetic taxi trip data that mimics the structure
-and characteristics of the NYC Taxi & Limousine Commission Trip Record Data
-used in the H2O DB benchmark.
-
-The generator creates realistic taxi trip records with:
-- Pickup and dropoff locations in NYC
-- Realistic fare amounts and trip distances
-- Proper datetime distributions
-- Payment types and other trip attributes
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

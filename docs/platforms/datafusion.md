@@ -81,7 +81,7 @@ benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
 
 ### Constructor Parameters
 
-```python
+```text
 DataFusionAdapter(
     working_dir: str = "./datafusion_working",
     memory_limit: str = "16G",

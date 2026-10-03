@@ -1,9 +1,6 @@
-"""Tests for AI Primitives cost estimation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -23,8 +20,6 @@ pytestmark = [
 
 
 class TestCostEstimate:
-    """Tests for CostEstimate dataclass."""
-
     def test_cost_estimate_creation(self):
 
         estimate = CostEstimate(
@@ -69,8 +64,6 @@ class TestCostEstimate:
 
 
 class TestCostTracker:
-    """Tests for CostTracker."""
-
     def test_tracker_creation(self):
 
         tracker = CostTracker(platform="snowflake", budget_usd=10.0)
@@ -117,34 +110,29 @@ class TestCostTracker:
         assert tracker.total_cost_usd == 0.006
 
     def test_check_budget_within(self):
-        """Test budget check when within budget."""
         tracker = CostTracker(budget_usd=1.0)
         tracker.total_cost_usd = 0.5
 
         assert tracker.check_budget(0.3) is True
 
     def test_check_budget_exceeded(self):
-        """Test budget check when exceeded."""
         tracker = CostTracker(budget_usd=1.0)
         tracker.total_cost_usd = 0.8
 
         assert tracker.check_budget(0.3) is False
 
     def test_check_budget_unlimited(self):
-        """Test budget check with no limit."""
         tracker = CostTracker(budget_usd=0)
 
         assert tracker.check_budget(1000.0) is True
 
     def test_get_budget_remaining(self):
-        """Test getting remaining budget."""
         tracker = CostTracker(budget_usd=10.0)
         tracker.total_cost_usd = 3.5
 
         assert tracker.get_budget_remaining() == 6.5
 
     def test_get_budget_remaining_unlimited(self):
-        """Test remaining budget when unlimited."""
         tracker = CostTracker(budget_usd=0)
 
         assert tracker.get_budget_remaining() == -1.0
@@ -164,8 +152,6 @@ class TestCostTracker:
 
 
 class TestEstimateQueryCost:
-    """Tests for estimate_query_cost function."""
-
     def test_estimate_basic(self):
 
         estimate = estimate_query_cost(
@@ -188,7 +174,6 @@ class TestEstimateQueryCost:
             estimated_tokens=1000,
         )
 
-        # llama3-8b rate is 0.0003 per 1k tokens
         expected_cost = (1000 / 1000) * 0.0003
         assert estimate.estimated_cost_usd == pytest.approx(expected_cost)
 
@@ -225,8 +210,6 @@ class TestEstimateQueryCost:
 
 
 class TestEstimateBenchmarkCost:
-    """Tests for estimate_benchmark_cost function."""
-
     def test_estimate_multiple_queries(self):
 
         queries = [
@@ -250,8 +233,6 @@ class TestEstimateBenchmarkCost:
 
 
 class TestGetPlatformPricing:
-    """Tests for get_platform_pricing function."""
-
     def test_get_snowflake_pricing(self):
 
         pricing = get_platform_pricing("snowflake")
@@ -281,8 +262,6 @@ class TestGetPlatformPricing:
 
 
 class TestFormatCostWarning:
-    """Tests for format_cost_warning function."""
-
     def test_format_basic(self):
 
         warning = format_cost_warning(0.05)
@@ -296,13 +275,11 @@ class TestFormatCostWarning:
         assert "snowflake" in warning
 
     def test_format_within_budget(self):
-        """Test warning when within budget."""
         warning = format_cost_warning(0.05, budget=1.0)
 
         assert "Within budget" in warning
 
     def test_format_exceeds_budget(self):
-        """Test warning when exceeding budget."""
         warning = format_cost_warning(1.5, budget=1.0)
 
         assert "WARNING" in warning or "Exceeds" in warning

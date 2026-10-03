@@ -1,35 +1,4 @@
 #!/usr/bin/env python3
-"""Decide whether a develop push SHA was already tested by the merge queue.
-
-A pushed SHA is *queue-certified* when ALL of the following hold:
-
-1. A workflow run with event ``merge_group``, workflow file
-   ``.github/workflows/pr.yml``, conclusion ``success``, and ``head_sha``
-   exactly equal to the pushed SHA exists.
-2. That run's ``ci-required-result`` job concluded ``success``.
-3. With ``--require-browser-gate``, a ``merge_group`` run of
-   ``.github/workflows/results-explorer-browser.yml`` for the same SHA also
-   concluded ``success`` and its ``Results Explorer browser gate`` job
-   concluded ``success``.
-
-Nothing else counts: no tree matching, no ``pull_request``-run evidence, no
-parent inheritance.
-
-Fail-open by design: any API error, pagination gap, missing permission,
-ambiguous match, or timeout reports ``certified=false`` with a reason, and
-the process still exits 0 so the lookup can never red a workflow on its
-own. Callers gate expensive jobs on ``certified == 'true'`` and run the
-full gates otherwise.
-
-The event/ref gate lives HERE, not in a workflow ``if:``: downstream jobs
-read this lookup's outputs on every event, and references to a skipped
-job's outputs do not evaluate reliably. The certify job therefore runs
-unconditionally and this script returns ``certified=false`` without any
-API call when the event or ref is ineligible.
-
-Stdlib-only (urllib, no ``gh`` dependency) so the lookup step needs no
-dependency sync; unit tests inject a fake ``urlopen``.
-"""
 
 from __future__ import annotations
 
@@ -84,7 +53,7 @@ REQUEST_TIMEOUT_SECONDS = 20
 
 
 class CertificationError(RuntimeError):
-    """The lookup could not complete; the caller must fail open."""
+    pass
 
 
 def _api_get(
@@ -145,12 +114,6 @@ def _job_conclusion(jobs: list[dict[str, Any]], name: str) -> str | None:
 
 
 def check_event_eligibility(event: str, ref: str, allow_ref: str) -> str | None:
-    """Return a not-certified reason when the event/ref is ineligible, else None.
-
-    Only pushes to the allowed ref can be queue-certified: schedule and
-    workflow_dispatch always run the full gates, and the manual dispatch
-    stays the full-run escape hatch. Decided before any API call.
-    """
     if event != "push":
         return f"event {event!r} is never queue-certified; running the full gates"
     if ref != allow_ref:
@@ -168,7 +131,6 @@ def find_certifying_run(
     ref: str = "",
     allow_ref: str = "refs/heads/develop",
 ) -> dict[str, Any]:
-    """Return ``{certified, run_id, reason}``; never raises on lookup failure."""
     ineligible = check_event_eligibility(event, ref, allow_ref)
     if ineligible is not None:
         return {"certified": False, "run_id": None, "reason": ineligible}
@@ -225,7 +187,6 @@ def _check_browser_gate(
     sha: str,
     urlopen: Callable[..., Any],
 ) -> int | None:
-    """Return the certifying browser run ID, or None when the gate is unmet."""
     candidates = sorted(
         _workflow_runs(repo, token, BROWSER_WORKFLOW_FILE, sha, urlopen),
         key=lambda run: str(run.get("created_at") or ""),

@@ -22,9 +22,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SUBQUERY, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
-# ---------------------------------------------------------------------------
 
 
 def q15_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -35,9 +33,7 @@ def q15_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q15_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter lineitem before revenue aggregation
-# ---------------------------------------------------------------------------
 
 
 def q15_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -93,9 +89,7 @@ def q15_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values("s_suppkey")
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before computing revenue
-# ---------------------------------------------------------------------------
 
 
 def q15_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -155,9 +149,7 @@ def q15_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values("s_suppkey")
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit named DataFrames for each step
-# ---------------------------------------------------------------------------
 
 
 def q15_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -192,9 +184,7 @@ def q15_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return q15_v2_pandas_impl(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add revenue column before groupby
-# ---------------------------------------------------------------------------
 
 
 def q15_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -229,9 +219,7 @@ def q15_v5_expression_impl(ctx: DataFrameContext) -> Any:
 q15_v5_pandas_impl = make_variant_delegate(q15_v2_pandas_impl, name="q15_v5_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style - maximum method chaining
-# ---------------------------------------------------------------------------
 
 
 def q15_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -261,9 +249,7 @@ def q15_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q15_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - join from revenue to supplier (reversed)
-# ---------------------------------------------------------------------------
 
 
 def q15_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -297,9 +283,7 @@ def q15_v7_expression_impl(ctx: DataFrameContext) -> Any:
 q15_v7_pandas_impl = make_variant_delegate(q15_v2_pandas_impl, name="q15_v7_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - apply date range as two separate filters
-# ---------------------------------------------------------------------------
 
 
 def q15_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -357,9 +341,7 @@ def q15_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values("s_suppkey")
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort - pass ascending=[True] explicitly
-# ---------------------------------------------------------------------------
 
 
 def q15_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -414,9 +396,7 @@ def q15_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values("s_suppkey", ascending=[True])
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - price - price*disc instead of price*(1-disc)
-# ---------------------------------------------------------------------------
 
 
 def q15_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -473,8 +453,7 @@ def q15_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values("s_suppkey")
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q15_VARIANTS = build_yaml_variants(__file__, globals(), 15, JOIN_AGG_SUBQUERY)

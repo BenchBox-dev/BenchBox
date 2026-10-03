@@ -1,19 +1,6 @@
-"""Firebolt platform adapter supporting both Firebolt Core (local) and Firebolt Cloud.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides unified access to Firebolt's vectorized query engine for analytical workloads.
-Firebolt Core is a free, self-hosted version that runs locally via Docker with the same
-distributed query engine as the cloud version.
-
-Deployment Modes:
-- Core (local): Free, Docker-based, no authentication, port 3473
-- Cloud: Managed service, requires client credentials and account
-
-Firebolt uses a PostgreSQL-compatible SQL dialect with extensions for analytics.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -66,10 +53,6 @@ except ImportError:
 def _resolve_firebolt_deployment_mode(
     config: dict, url: str | None, client_id: str | None, client_secret: str | None
 ) -> str:
-    """Resolve deployment mode from explicit config or inferred from credentials.
-
-    Priority: 1) deployment_mode, 2) infer from credentials, 3) default 'core'.
-    """
     deployment_mode = config.get("deployment_mode")
 
     if deployment_mode:
@@ -80,7 +63,6 @@ def _resolve_firebolt_deployment_mode(
     if url and not (client_id or client_secret):
         return "core"
     if client_id and client_secret:
-        # Guard against ambiguous config (both url and cloud credentials)
         if url:
             raise ValueError(
                 "Firebolt configuration is ambiguous: both Core URL and Cloud credentials provided. "
@@ -116,10 +98,8 @@ def _host_from_url(url: Any) -> str | None:
 
 
 def _validate_firebolt_mode_config(adapter: FireboltAdapter) -> None:
-    """Validate required configuration fields for the resolved deployment mode."""
     if adapter.deployment_mode == "core":
         if not adapter.url:
-            # Default to localhost for core mode
             adapter.url = "http://localhost:3473"
     else:
         missing = [
@@ -145,63 +125,21 @@ def _validate_firebolt_mode_config(adapter: FireboltAdapter) -> None:
 
 
 class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
-    """Firebolt platform adapter for vectorized analytical query execution.
-
-    Supports two deployment modes:
-    - **Firebolt Core (local)**: Free, self-hosted Docker deployment on port 3473
-    - **Firebolt Cloud**: Managed cloud service requiring authentication
-
-    Key Features:
-    - Vectorized query execution optimized for analytics
-    - PostgreSQL-compatible SQL dialect
-    - Same query engine in both Core and Cloud modes
-    - DBAPI 2.0 compliant Python SDK
-
-    Firebolt Core Docker Setup:
-
-        docker run -i --rm --ulimit memlock=8589934592:8589934592 \\
-          --security-opt seccomp=unconfined -p 127.0.0.1:3473:3473 \\
-          -v ./firebolt-core-data:/firebolt-core/volume \\
-          ghcr.io/firebolt-db/firebolt-core:preview-rc
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
-        """Initialize Firebolt adapter.
-
-        Args:
-            **config: Configuration options including:
-                Mode detection (auto-detected based on provided params):
-                - url: Firebolt Core URL (e.g., "http://localhost:3473")
-                - client_id + client_secret: Firebolt Cloud credentials
-
-                Core mode options:
-                - url: Core endpoint URL (default: http://localhost:3473)
-                - database: Database name
-
-                Cloud mode options:
-                - client_id: OAuth client ID
-                - client_secret: OAuth client secret
-                - account_name: Firebolt account name
-                - engine_name: Engine to use for queries
-                - database: Database name
-                - api_endpoint: API endpoint (default: api.app.firebolt.io)
-        """
         super().__init__(**config)
 
-        # Check dependencies
         if not FIREBOLT_AVAILABLE:
             available, missing = check_platform_dependencies("firebolt")
             if not available:
                 error_msg = get_dependency_error_message("firebolt", missing)
                 raise ImportError(error_msg)
 
-        self._dialect = "postgres"  # Firebolt uses PostgreSQL-compatible dialect
+        self._dialect = "postgres"
 
-        # Credential loading with env var fallbacks (config takes priority)
         self.url = config.get("url") or config.get("engine_url")
         self.client_id = (
             config.get("client_id") or os.environ.get("FIREBOLT_CLIENT_ID") or os.environ.get("SERVICE_ACCOUNT_ID")
@@ -214,10 +152,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         self.deployment_mode = _resolve_firebolt_deployment_mode(config, self.url, self.client_id, self.client_secret)
 
-        # Common configuration with env var fallback
         self.database = config.get("database") or os.environ.get("FIREBOLT_DATABASE") or "benchbox"
 
-        # Cloud-specific configuration with env var fallbacks
         self.account_name = config.get("account_name") or os.environ.get("FIREBOLT_ACCOUNT_NAME")
         self.engine_name = config.get("engine_name") or os.environ.get("FIREBOLT_ENGINE_NAME")
         self.api_endpoint = (
@@ -228,39 +164,31 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.engine_type = config.get("engine_type")
         self.engine_size = config.get("engine_size") or config.get("compute_size")
 
-        # Validate required fields per mode
         _validate_firebolt_mode_config(self)
 
-        # S3 staging configuration (for cloud-mode data loading via COPY FROM S3)
         self.s3_staging_url = config.get("s3_staging_url") or os.environ.get("FIREBOLT_S3_STAGING_URL") or None
         self.s3_region = config.get("s3_region") or os.environ.get("FIREBOLT_S3_REGION") or None
 
-        # Validate S3 URL format if provided
         if self.s3_staging_url:
             if not self.s3_staging_url.startswith("s3://"):
                 raise ConfigurationError(
                     f"Invalid S3 staging URL: '{self.s3_staging_url}'. "
                     "Must start with 's3://' (e.g., s3://my-bucket/benchbox-staging/)"
                 )
-            # Ensure trailing slash for consistent path joining
             if not self.s3_staging_url.endswith("/"):
                 self.s3_staging_url += "/"
 
-        # Benchmark options
         self.disable_result_cache = self._coerce_bool(config.get("disable_result_cache"), True)
         self.strict_validation = self._coerce_bool(config.get("strict_validation"), False)
 
     @property
     def platform_name(self) -> str:
-        """Return platform display name with mode indicator."""
         return f"Firebolt ({self.deployment_mode.title()})"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Firebolt-specific CLI arguments."""
         firebolt_group = parser.add_argument_group("Firebolt Arguments")
 
-        # Mode selection
         firebolt_group.add_argument(
             "--deployment-mode",
             type=str,
@@ -268,7 +196,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             help="Firebolt deployment mode (auto-detected if not specified)",
         )
 
-        # Core mode arguments
         firebolt_group.add_argument(
             "--url",
             type=str,
@@ -276,7 +203,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             help="Firebolt Core endpoint URL (default: http://localhost:3473)",
         )
 
-        # Cloud mode arguments
         firebolt_group.add_argument(
             "--client-id",
             type=str,
@@ -304,7 +230,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             help="Firebolt Cloud API endpoint",
         )
 
-        # Common arguments
         firebolt_group.add_argument(
             "--database",
             type=str,
@@ -312,7 +237,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             help="Database name (default: benchbox)",
         )
 
-        # S3 staging arguments (cloud mode data loading)
         firebolt_group.add_argument(
             "--firebolt-s3-staging-url",
             type=str,
@@ -324,7 +248,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             help="AWS region for the S3 staging bucket (e.g., us-east-1)",
         )
 
-        # Benchmark options
         firebolt_group.add_argument(
             "--disable-result-cache",
             action="store_true",
@@ -340,7 +263,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Firebolt adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         adapter_config = build_adapter_config(
@@ -368,7 +290,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             include_none=False,
         )
 
-        # Handle mode override
         if config.get("deployment_mode"):
             mode = config["deployment_mode"]
             if mode == "core" and "url" not in adapter_config:
@@ -377,14 +298,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Firebolt platform information.
-
-        Captures configuration including:
-        - Deployment mode (Core/Cloud)
-        - Connection endpoint
-        - Database name
-        - Engine information (Cloud mode)
-        """
         platform_info = {
             "platform_type": "firebolt",
             "platform_name": self.platform_name,
@@ -418,7 +331,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 }
             )
 
-        # Get SDK version
         try:
             import firebolt
 
@@ -426,12 +338,10 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         except (ImportError, AttributeError):
             platform_info["client_library_version"] = None
 
-        # Try to get server version from connection
         if connection:
             cursor = None
             try:
                 cursor = connection.cursor()
-                # Firebolt provides version info via information_schema
                 cursor.execute("SELECT version()")
                 result = cursor.fetchone()
                 platform_info["platform_version"] = result[0] if result else None
@@ -487,7 +397,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         connection: Any | None = None,
         platform_info: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return Firebolt-specific normalized Core and Cloud runtime metadata."""
         info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
         metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
@@ -631,18 +540,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return {"bucket": bucket, "prefix": prefix}
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Firebolt.
-
-        Firebolt uses a PostgreSQL-compatible SQL dialect.
-        """
         return "postgres"
 
     def _get_connection_params(self) -> dict[str, Any]:
-        """Get connection parameters based on mode.
-
-        For Core mode, uses FireboltCore auth and 'url' parameter.
-        For Cloud mode, uses ClientCredentials auth with account/engine settings.
-        """
         params: dict[str, Any] = {
             "database": self.database,
         }
@@ -650,7 +550,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         if self.deployment_mode == "core":
             if not FireboltCore:
                 raise ImportError("firebolt-sdk is required for Firebolt Core mode")
-            # Core mode requires FireboltCore auth and uses 'url' (not 'engine_url')
             params["auth"] = FireboltCore()
             params["url"] = self.url
         else:
@@ -665,20 +564,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return params
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists in Firebolt.
-
-        For Core mode, databases are auto-created on connection but we check
-        if there's existing data by looking for tables. An empty database
-        is considered "non-existent" for benchmark purposes (safe to recreate).
-
-        For Cloud mode, we query the information schema.
-        """
         database = connection_config.get("database", self.database)
 
         if self.deployment_mode == "core":
-            # Core mode: databases are auto-created on connection.
-            # We check for existing tables to determine if there's data to preserve.
-            # An empty database is treated as "not existing" for benchmark purposes.
             try:
                 params = self._get_connection_params()
                 if database:
@@ -686,7 +574,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 conn = firebolt_connect(**params)
                 cursor = conn.cursor()
                 try:
-                    # Try to list tables - if database doesn't exist, this will fail
                     cursor.execute("SHOW TABLES")
                     existing_tables = cursor.fetchall() or []
                     has_tables = len(existing_tables) > 0
@@ -698,13 +585,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     else:
                         self.log_very_verbose(f"Firebolt Core database '{database}' exists but is empty")
 
-                    # Return True only if there are tables (data to preserve)
                     return has_tables
                 finally:
                     cursor.close()
                     conn.close()
             except Exception as e:
-                # Connection failure usually means database doesn't exist
                 self.logger.debug(f"Core mode database existence check failed: {e}")
                 return False
 
@@ -712,7 +597,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         conn = None
         try:
             params = self._get_connection_params()
-            # Override database to check information_schema
             check_params = params.copy()
             check_params["database"] = "information_schema"
 
@@ -722,7 +606,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             database = connection_config.get("database", self.database)
             database_literal = database.replace("'", "''")
 
-            # Query information_schema for database existence
             cursor.execute(
                 f"SELECT database_name FROM information_schema.databases WHERE database_name = '{database_literal}'"
             )
@@ -740,11 +623,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 conn.close()
 
     def drop_database(self, **connection_config) -> None:
-        """Drop database in Firebolt.
-
-        Note: Firebolt Core creates databases implicitly.
-        Cloud mode supports explicit DROP DATABASE.
-        """
         database = connection_config.get("database", self.database)
 
         if self.deployment_mode == "core":
@@ -757,7 +635,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         try:
             params = self._get_connection_params()
-            # Connect to a system database to drop target
             params["database"] = "information_schema"
 
             conn = firebolt_connect(**params)
@@ -774,20 +651,13 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise RuntimeError(f"Failed to drop Firebolt database {database}: {e}") from e
 
     def create_connection(self, **connection_config) -> Any:
-        """Create Firebolt connection.
-
-        For Core mode, connects directly to the local endpoint.
-        For Cloud mode, authenticates and connects to specified engine.
-        """
         mode_str = "Core" if self.deployment_mode == "core" else "Cloud"
         self.log_operation_start(f"Firebolt {mode_str} connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
         params = self._get_connection_params()
 
-        # Override with connection_config if provided
         if "database" in connection_config:
             params["database"] = connection_config["database"]
 
@@ -798,13 +668,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         try:
             connection = firebolt_connect(**params)
 
-            # Test connection
             cursor = connection.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
             cursor.close()
 
-            # Disable result cache for accurate benchmarking (Cloud mode only)
             if self.disable_result_cache and self.deployment_mode == "cloud":
                 self._disable_result_cache(connection)
 
@@ -823,37 +691,25 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Firebolt-optimized table definitions.
-
-        Firebolt uses PostgreSQL-compatible DDL with some differences:
-        - TEXT instead of VARCHAR
-        - NUMERIC instead of DECIMAL
-        - No constraint enforcement
-        """
         start_time = mono_time()
 
         cursor = connection.cursor()
 
         try:
-            # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
                 if not statement:
                     continue
 
-                # Normalize table names to lowercase
                 statement = self._normalize_table_name_in_sql(statement)
-                # Optimize table definition for Firebolt
                 statement = self._optimize_table_definition(statement)
                 try:
                     cursor.execute(statement)
                     self.logger.debug(f"Executed schema statement: {statement[:100]}...")
                 except Exception as e:
-                    # If table already exists, drop and recreate
                     if "already exists" in str(e).lower():
                         table_name = self._extract_table_name(statement)
                         if table_name:
@@ -875,20 +731,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using INSERT batching or S3 staging (cloud mode).
-
-        Loading strategies:
-        - **S3 staging** (cloud mode with s3_staging_url): Upload CSV to S3, then use
-          Firebolt's external table function to ingest via INSERT INTO ... SELECT FROM s3().
-          This is significantly faster for large datasets.
-        - **INSERT batching** (default): Row-by-row INSERT batching via executemany.
-          Works for both Core and Cloud modes without external dependencies.
-
-        S3 staging is used when all conditions are met:
-        1. deployment_mode == "cloud"
-        2. s3_staging_url is configured
-        3. boto3 is available
-        """
         use_s3_staging = self.deployment_mode == "cloud" and self.s3_staging_url is not None
 
         if use_s3_staging:
@@ -898,14 +740,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     _normalize_existing_files = staticmethod(normalize_existing_files)
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
-        """Resolve data files via DataSourceResolver.
-
-        Returns:
-            Resolved DataSource with table_name -> list of file paths.
-
-        Raises:
-            ValueError: If no data files are found.
-        """
         from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
         resolver = DataSourceResolver(
@@ -917,9 +751,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         data_source = resolver.resolve(benchmark, data_dir)
         if not data_source or not data_source.tables:
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
-        # Return a fresh DataSource so we don't mutate the resolver-owned object;
-        # table_metadata and table_formats are forwarded so resolve_csv_dialect()
-        # still sees the manifest annotations downstream.
         return DataSource(
             source_type=data_source.source_type,
             tables={table: [Path(p) for p in paths] for table, paths in data_source.tables.items()},
@@ -930,11 +761,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def _load_data_via_insert(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using INSERT statement batching.
-
-        This is the default loading path that works for both Core and Cloud modes
-        without requiring any external storage or additional dependencies.
-        """
         start_time = mono_time()
         table_stats = {}
 
@@ -948,7 +774,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if not isinstance(data_source, DataSource):
                 data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
 
-            # Load data using INSERT statements in batches
             for table_name, file_paths in data_source.tables.items():
                 valid_files = self._normalize_existing_files(file_paths)
 
@@ -972,12 +797,10 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                         dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
                         delimiter = dialect.delimiter
 
-                        # Get compression handler (handles .zst, .gz, or uncompressed)
                         compression_handler = FileFormatRegistry.get_compression_handler(file_path)
 
-                        # Load data using parameterized batches
                         with compression_handler.open(file_path) as f:
-                            batch_size = 500  # Moderate batch size for Firebolt
+                            batch_size = 500
                             batch_rows: list[tuple[Any, ...]] = []
                             insert_sql: str | None = None
                             column_count: int | None = None
@@ -1017,12 +840,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                                     total_rows_loaded += len(batch_rows)
                                     batch_rows = []
 
-                            # Insert remaining batch
                             if batch_rows:
                                 self._execute_batch_insert(cursor, insert_sql, batch_rows)
                                 total_rows_loaded += len(batch_rows)
-
-                    # Firebolt doesn't have traditional transactions - no commit needed
 
                     table_stats[table_name_lower] = total_rows_loaded
 
@@ -1051,19 +871,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def _load_data_via_s3(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data via S3 staging using Firebolt's external table function.
-
-        Workflow per table:
-        1. Upload local CSV/TSV file(s) to S3 staging location
-        2. Execute INSERT INTO ... SELECT * FROM s3(...) to ingest from S3
-        3. Track row counts from cursor.rowcount or COUNT(*)
-
-        AWS credentials are resolved from:
-        1. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY environment variables
-        2. boto3 default credential chain (IAM role, ~/.aws/credentials, etc.)
-
-        Requires boto3 to be installed (lazy import with helpful error message).
-        """
         try:
             import boto3
         except ImportError:
@@ -1076,17 +883,14 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         start_time = mono_time()
         table_stats = {}
 
-        # Resolve AWS credentials for the Firebolt s3() function
         aws_key_id = os.environ.get("AWS_ACCESS_KEY_ID", "")
         aws_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 
-        # Create S3 client for file uploads
         s3_client_kwargs: dict[str, Any] = {}
         if self.s3_region:
             s3_client_kwargs["region_name"] = self.s3_region
         s3_client = boto3.client("s3", **s3_client_kwargs)
 
-        # Parse S3 staging URL into bucket and prefix
         s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
 
         cursor = connection.cursor()
@@ -1102,7 +906,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 if not isinstance(file_paths, list):
                     file_paths = [file_paths]
 
-                # Filter valid files
                 valid_files = []
                 for file_path in file_paths:
                     file_path = Path(file_path)
@@ -1129,24 +932,17 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                         dialect = resolve_csv_dialect(data_source, table_name, file_path, benchmark)
                         delimiter = dialect.delimiter
 
-                        # Determine the S3 key for this file
                         s3_key = f"{s3_prefix}{table_name_lower}/{file_path.name}"
                         s3_file_url = f"s3://{s3_bucket}/{s3_key}"
 
-                        # Upload file to S3
                         upload_start = mono_time()
                         self.log_verbose(f"Uploading {file_path.name} to {s3_file_url}")
                         s3_client.upload_file(str(file_path), s3_bucket, s3_key)
                         upload_time = elapsed_seconds(upload_start)
                         self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
 
-                        # Map delimiter to Firebolt s3() type parameter
                         s3_type = "CSV" if delimiter == "," else "TSV"
 
-                        # Build the INSERT INTO ... SELECT FROM s3() statement
-                        # Firebolt s3() function signature:
-                        #   s3(url, aws_key_id, aws_secret_key, type [, ...])
-                        # Escape single quotes in credentials for SQL safety
                         safe_key_id = aws_key_id.replace("'", "''")
                         safe_secret = aws_secret_key.replace("'", "''")
 
@@ -1164,7 +960,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                         cursor.execute(ingest_sql)
                         ingest_time = elapsed_seconds(ingest_start)
 
-                        # Get row count: prefer cursor.rowcount, fall back to COUNT(*)
                         rows_loaded = getattr(cursor, "rowcount", -1)
                         if rows_loaded is None or rows_loaded < 0:
                             cursor.execute(f"SELECT COUNT(*) FROM {table_name_quoted}")
@@ -1209,13 +1004,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @staticmethod
     def _parse_s3_url(s3_url: str) -> tuple[str, str]:
-        """Parse an S3 URL into (bucket, prefix) components."""
         from benchbox.utils.cloud_urls import parse_s3_url
 
         return parse_s3_url(s3_url)
 
     def _execute_batch_insert(self, cursor: Any, insert_sql: str, rows: list[tuple[Any, ...]]) -> None:
-        """Execute batch inserts with executemany fallback."""
         if not rows:
             return
 
@@ -1226,14 +1019,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 cursor.execute(insert_sql, row)
 
     def _get_parameter_placeholder(self, cursor: Any) -> str:
-        """Determine parameter placeholder style for the active cursor."""
         paramstyle = getattr(cursor, "paramstyle", None) or getattr(cursor, "paramstyle_name", None)
         if paramstyle in {"format", "pyformat"}:
             return "%s"
         return "?"
 
     def _coerce_bool(self, value: Any, default: bool) -> bool:
-        """Coerce potentially string config values to booleans."""
         if value is None:
             return default
         if isinstance(value, str):
@@ -1241,77 +1032,48 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return bool(value)
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Firebolt-specific optimizations based on benchmark type.
-
-        Firebolt's vectorized engine is optimized by default for analytical workloads.
-        Additional session-level tuning may be applied here.
-        """
-        # Firebolt is optimized for OLAP by default
-        # Log the configuration for informational purposes
         self.log_verbose(f"Configuring Firebolt for {benchmark_type} benchmark")
 
         if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
             self.log_verbose("Firebolt vectorized engine optimized for analytical workloads")
 
     def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
         from benchbox.core.sql_utils import extract_table_name
 
         return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
-        """Normalize table names in SQL to lowercase for Firebolt."""
         return normalize_table_name_in_sql(sql)
 
     def _quote_identifier(self, name: str) -> str:
-        """Safely quote identifiers for Firebolt."""
         if not isinstance(name, str) or not name:
             raise ValueError("Identifier must be a non-empty string")
         return '"' + name.replace('"', '""') + '"'
 
     def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Firebolt.
-
-        Firebolt-specific type mappings:
-        - VARCHAR(n) -> TEXT (Firebolt uses TEXT for all strings)
-        - DECIMAL(p,s) -> NUMERIC (Firebolt uses NUMERIC for exact decimals)
-        - Remove constraint clauses (Firebolt doesn't enforce constraints)
-        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Replace VARCHAR(n) with TEXT
         statement = re.sub(r"VARCHAR\s*\(\s*\d+\s*\)", "TEXT", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bVARCHAR\b", "TEXT", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bCHAR\s*\(\s*\d+\s*\)", "TEXT", statement, flags=re.IGNORECASE)
 
-        # Replace DECIMAL with NUMERIC (preserve precision/scale)
         statement = re.sub(r"\bDECIMAL\b", "NUMERIC", statement, flags=re.IGNORECASE)
 
-        # Remove PRIMARY KEY and FOREIGN KEY constraints
         statement = strip_primary_keys(statement)
         statement = strip_foreign_keys(statement)
 
-        # NOT NULL is preserved: Firebolt enforces NOT NULL on ENGINE tables.
-
-        # Clean up any double commas or trailing commas before closing paren
         statement = re.sub(r",\s*,", ",", statement)
         statement = re.sub(r",\s*\)", ")", statement)
 
         return statement
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan for analysis.
-
-        Returns ``None`` on EXPLAIN failure (never an error string; see
-        ``get_query_plan_from_cursor``).
-        """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         return get_query_plan_from_cursor(connection, query)
 
     def get_query_plan_parser(self):
-        """Get Firebolt query plan parser."""
         from benchbox.core.query_plans.parsers.firebolt import FireboltQueryPlanParser
 
         return FireboltQueryPlanParser()
@@ -1326,12 +1088,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query, then capture the structured plan.
-
-        The shared cursor-execution mixin does not capture plans, so this
-        override delegates to it and then merges plan fields into the result
-        (a no-op unless ``capture_plans`` is on and the query succeeded).
-        """
         return self.execute_query_with_plan_capture(
             super().execute_query,
             connection,
@@ -1344,7 +1100,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         )
 
     def close_connection(self, connection: Any) -> None:
-        """Close Firebolt connection."""
         try:
             if connection and hasattr(connection, "close"):
                 connection.close()
@@ -1352,11 +1107,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             self.logger.warning(f"Error closing connection: {e}")
 
     def test_connection(self) -> bool:
-        """Test connection to Firebolt.
-
-        Returns:
-            True if connection successful, False otherwise
-        """
         try:
             params = self._get_connection_params()
             conn = firebolt_connect(**params)
@@ -1376,16 +1126,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     _supported_tuning_type_names = ("PARTITIONING", "DISTRIBUTION")
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Firebolt-specific tuning clauses.
-
-        Firebolt table properties include:
-        - PRIMARY INDEX: Generated from DISTRIBUTION tuning columns. Controls data
-          distribution and is CRITICAL for query performance. Unlike PRIMARY KEY
-          constraints, PRIMARY INDEX affects physical data layout across nodes.
-        - PARTITION BY: Time-based or value-based partitioning for data organization.
-
-        Example output: PRIMARY INDEX (customer_id, order_date) PARTITION BY order_date
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
@@ -1394,15 +1134,12 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle DISTRIBUTION -> PRIMARY INDEX (most important for Firebolt performance)
-            # Firebolt's PRIMARY INDEX controls data distribution across nodes
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             if distribution_columns:
                 sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
                 clauses.append(f"PRIMARY INDEX ({', '.join(column_names)})")
 
-            # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -1415,27 +1152,16 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return " ".join(clauses) if clauses else ""
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Firebolt table.
-
-        Firebolt tuning is primarily handled at table creation time.
-        Post-creation optimization is limited.
-        """
         from benchbox.platforms.base.tuning_utils import log_partition_tunings
 
         log_partition_tunings(table_tuning, self.logger, "Firebolt")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Firebolt."""
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Firebolt-specific platform optimizations.
-
-        Firebolt's vectorized engine is pre-optimized for analytical workloads.
-        Session-level tuning is limited compared to traditional databases.
-        """
         if not platform_config:
             return
 
@@ -1449,32 +1175,18 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     _get_existing_tables = staticmethod(show_tables_lower)
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on table for query optimization.
-
-        Note: Firebolt may not support explicit ANALYZE commands.
-        Statistics are typically collected automatically.
-        """
         self.logger.debug(f"Firebolt collects statistics automatically - skipping explicit ANALYZE for {table_name}")
 
     def _disable_result_cache(self, connection: Any) -> None:
-        """Disable result cache for accurate benchmarking.
-
-        Firebolt Cloud caches query results by default. This must be disabled
-        for TPC compliance and accurate benchmark measurements.
-
-        Note: This only applies to Cloud mode - Core mode doesn't have result caching.
-        """
         if self.deployment_mode != "cloud":
             self.log_very_verbose("Result cache control only applicable to Cloud mode")
             return
 
         cursor = connection.cursor()
         try:
-            # Firebolt uses SET statements for session configuration
             cursor.execute("SET enable_result_cache = false")
             self.log_verbose("Disabled Firebolt result cache for accurate benchmarking")
 
-            # Validate the setting was applied
             if self.strict_validation:
                 self.validate_session_cache_control(connection)
 
@@ -1487,25 +1199,11 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def validate_session_cache_control(self, connection: Any) -> bool:
-        """Validate that result cache is disabled for the session.
-
-        Intentionally not delegating to ``cloud_shared.validate_session_cache_control``:
-        Firebolt uses ``SHOW enable_result_cache`` (Firebolt-specific DDL) and must
-        soft-fail with ``True`` when SHOW is unsupported, which differs from the
-        cloud_shared contract (structured-dict return, strict error propagation).
-
-        Returns:
-            True if cache is confirmed disabled, False otherwise.
-
-        Raises:
-            ConfigurationError: If strict_validation is enabled and validation fails.
-        """
         if self.deployment_mode != "cloud":
-            return True  # Core mode doesn't have result caching
+            return True
 
         cursor = connection.cursor()
         try:
-            # Query current session settings
             cursor.execute("SHOW enable_result_cache")
             result = cursor.fetchone()
 
@@ -1523,7 +1221,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         except Exception as e:
             if "SHOW" in str(e).upper():
-                # SHOW command might not be supported - log warning only
                 self.logger.debug(f"Could not validate cache settings (SHOW not supported): {e}")
                 return True
             if self.strict_validation:
@@ -1534,18 +1231,9 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def _create_admin_connection(self) -> Any:
-        """Create admin connection for database management operations.
-
-        For Cloud mode, connects to information_schema database.
-        For Core mode, uses the standard connection.
-
-        Returns:
-            Database connection for admin operations.
-        """
         params = self._get_connection_params()
 
         if self.deployment_mode == "cloud":
-            # Connect to information_schema for admin operations
             params["database"] = "information_schema"
 
         try:
@@ -1557,13 +1245,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
-        """Collect Firebolt-specific platform metadata.
-
-        Returns detailed information about the Firebolt instance including:
-        - Engine configuration (Cloud mode)
-        - Resource allocation
-        - Version information
-        """
         metadata: dict[str, Any] = {
             "mode": self.deployment_mode,
             "database": self.database,
@@ -1571,7 +1252,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         cursor = connection.cursor()
         try:
-            # Get version
             cursor.execute("SELECT version()")
             result = cursor.fetchone()
             if result:
@@ -1582,7 +1262,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 metadata["engine_name"] = self.engine_name
                 metadata["api_endpoint"] = self.api_endpoint
 
-                # Try to get engine details
                 try:
                     cursor.execute(
                         "SELECT engine_name, engine_type, status "

@@ -1,13 +1,3 @@
-"""Tests for AGGREGATE_PERSIST/AGGREGATE_MERGE op types (W2 of architecture-fixes).
-
-Covers:
-- Enum values
-- DataFrameWriteCapabilities default flags + platform presets
-- supports_operation routing for the new types
-- DataFrameWriteOperationsManager dispatch (success + failure paths)
-- Skip messaging for unsupported engines
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,9 +17,6 @@ from benchbox.core.write_primitives.dataframe_operations import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Enum
-# ---------------------------------------------------------------------------
 class TestAggregateStateEnum:
     def test_persist_value(self):
         assert WriteOperationType.AGGREGATE_PERSIST.value == "aggregate_persist"
@@ -41,9 +28,6 @@ class TestAggregateStateEnum:
         assert WriteOperationType.AGGREGATE_PERSIST != WriteOperationType.AGGREGATE_MERGE
 
 
-# ---------------------------------------------------------------------------
-# Capabilities defaults + platform presets
-# ---------------------------------------------------------------------------
 class TestAggregateStateCapabilities:
     def test_default_caps_have_aggregate_disabled(self):
         caps = DataFrameWriteCapabilities(platform_name="test")
@@ -55,7 +39,6 @@ class TestAggregateStateCapabilities:
         assert PYSPARK_WRITE_CAPABILITIES.supports_aggregate_merge is True
 
     def test_polars_preset_keeps_both_disabled(self):
-        # Polars has no DataFrame-layer sketch APIs today; preset must not opt in.
         assert POLARS_WRITE_CAPABILITIES.supports_aggregate_persist is False
         assert POLARS_WRITE_CAPABILITIES.supports_aggregate_merge is False
 
@@ -64,14 +47,11 @@ class TestAggregateStateCapabilities:
         assert PANDAS_WRITE_CAPABILITIES.supports_aggregate_merge is False
 
 
-# ---------------------------------------------------------------------------
-# supports_operation routing
-# ---------------------------------------------------------------------------
 class TestSupportsOperationAggregateStateRouting:
     def test_persist_consults_dedicated_flag_not_maintenance_caps(self):
         caps = DataFrameWriteCapabilities(
             platform_name="test",
-            maintenance_caps=None,  # row-level ops would all be False
+            maintenance_caps=None,
             supports_aggregate_persist=True,
         )
         assert caps.supports_operation(WriteOperationType.AGGREGATE_PERSIST) is True
@@ -109,15 +89,7 @@ class TestSupportsOperationAggregateStateRouting:
         assert WriteOperationType.AGGREGATE_MERGE not in unsupported
 
 
-# ---------------------------------------------------------------------------
-# Manager dispatch
-# ---------------------------------------------------------------------------
 def _make_manager_with_caps(caps: DataFrameWriteCapabilities) -> DataFrameWriteOperationsManager:
-    """Construct a manager bypassing the platform-detection __init__ logic.
-
-    The aggregate-state dispatch unit tests don't need a real maintenance
-    handler; they only need the capability flags and the dispatch methods.
-    """
     manager = DataFrameWriteOperationsManager.__new__(DataFrameWriteOperationsManager)
     manager.platform_name = caps.platform_name
     manager.spark_session = None
@@ -143,7 +115,6 @@ class TestExecuteAggregatePersist:
         sentinel_df = MagicMock(name="state_df")
         builder = MagicMock(return_value=sentinel_df)
 
-        # Bypass the engine-specific writer for this unit test.
         monkeypatch.setattr(
             manager,
             "_persist_dataframe_to_parquet",
@@ -160,7 +131,7 @@ class TestExecuteAggregatePersist:
         assert result.bytes_written == 4096
         assert result.file_count == 1
         assert result.compression == "zstd"
-        assert target.exists()  # mkdir was called
+        assert target.exists()
 
     def test_builder_exception_returns_failure(self, tmp_path: Path):
         caps = DataFrameWriteCapabilities(platform_name="test", supports_aggregate_persist=True)
@@ -187,7 +158,6 @@ class TestExecuteAggregatePersist:
         target = tmp_path / "state"
         result = manager.execute_aggregate_persist(target, builder)
         assert result.success is False
-        # Failed persist should not leak an empty directory.
         assert not target.exists()
 
     def test_persist_failure_preserves_pre_existing_target_dir(self, tmp_path: Path, monkeypatch):
@@ -205,7 +175,6 @@ class TestExecuteAggregatePersist:
         sentinel.write_text("preexisting")
         result = manager.execute_aggregate_persist(target, builder)
         assert result.success is False
-        # Caller-owned directories must not be removed even if persist fails.
         assert target.exists()
         assert sentinel.read_text() == "preexisting"
 
@@ -261,8 +230,6 @@ class TestUnsupportedAggregateStateMessage:
 
 
 class TestAggregatePersistStorageValidation:
-    """DataFrame mirror of the SQL sketch_bytes storage-size validations."""
-
     def test_persist_round_trip_reports_matching_on_disk_size(self, tmp_path: Path):
         pytest.importorskip("polars")
         import polars as pl
@@ -318,8 +285,6 @@ class TestAggregatePersistStorageValidation:
 
 
 class TestAggregateStateOpStorageValidationPropagation:
-    """Failed persist storage validation must fail the dispatch, not render SUCCESS."""
-
     def test_validation_failure_reports_validation_failed_without_merge(self, tmp_path: Path, monkeypatch) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock
@@ -379,5 +344,4 @@ class TestAggregateStateOpStorageValidationPropagation:
         assert "4096" in result["error"]
         assert result["rows_returned"] == 10
         merge_mock.assert_not_called()
-        # Evidence is preserved for diagnosis instead of merged and deleted.
         assert (tmp_path / "_aggregate_state" / "evidence.parquet").exists()

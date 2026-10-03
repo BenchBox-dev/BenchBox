@@ -13,7 +13,7 @@ TPCH_SKEW_DATAFRAME_QUERIES = QueryRegistry("tpch_skew")
 
 
 def get_tpch_skew_query(query_id: str) -> DataFrameQuery | None:
-    """Get a TPC-H Skew DataFrame query by ID."""
+
     return TPCH_SKEW_DATAFRAME_QUERIES.get(query_id)
 
 
@@ -21,10 +21,10 @@ def list_tpch_skew_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List TPC-H Skew DataFrame queries with optional filtering."""
+
     return TPCH_SKEW_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 
 def register_query(query: DataFrameQuery) -> None:
-    """Register a TPC-H Skew DataFrame query."""
+
     TPCH_SKEW_DATAFRAME_QUERIES.register(query)

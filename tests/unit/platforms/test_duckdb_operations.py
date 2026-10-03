@@ -1,10 +1,3 @@
-"""Tests for DuckDB adapter operations: version normalization, connection wrapper,
-external table scan expressions, and query plan capture integration.
-
-Covers gaps not in test_duckdb_adapter.py, test_duckdb_plan_capture.py,
-test_duckdb_real_connection.py, or test_duckdb_sorted_loading.py.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,14 +19,7 @@ from benchbox.platforms.duckdb import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Version normalization
-# ---------------------------------------------------------------------------
-
-
 class TestNormalizeDuckDBVersion:
-    """Unit tests for _normalize_duckdb_version helper."""
-
     def test_strips_v_prefix(self):
         assert _normalize_duckdb_version("v1.2.3") == "1.2.3"
 
@@ -53,27 +39,20 @@ class TestNormalizeDuckDBVersion:
         assert _normalize_duckdb_version("  v0.9.2  ") == "0.9.2"
 
     def test_v_not_followed_by_digit_is_kept(self):
-        """A string like 'vNext' should not have the 'v' stripped."""
+
         assert _normalize_duckdb_version("vNext") == "vNext"
 
     def test_integer_input_coerced_to_string(self):
-        """Non-string input is str()-ified."""
+
         assert _normalize_duckdb_version(123) == "123"
 
     def test_dev_version_string(self):
         assert _normalize_duckdb_version("v1.3.0-dev123") == "1.3.0-dev123"
 
 
-# ---------------------------------------------------------------------------
-# Connection wrapper (dry-run mode)
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBConnectionWrapper:
-    """Tests for the dry-run connection wrapper."""
-
     def test_execute_in_dry_run_captures_sql(self):
-        """In dry-run mode, execute should capture SQL, not run it."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         adapter.enable_dry_run()
 
@@ -82,14 +61,13 @@ class TestDuckDBConnectionWrapper:
 
         cursor = wrapper.execute("SELECT 42")
 
-        # Adapter should have captured the SQL
         assert any("SELECT 42" in entry.get("sql", "") for entry in adapter.captured_sql)
-        # Cursor should be the dry-run wrapper
+
         assert isinstance(cursor, DuckDBCursorWrapper)
         real_conn.close()
 
     def test_execute_in_normal_mode_delegates(self):
-        """When not in dry-run mode, wrapper delegates to real connection."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         adapter.dry_run_mode = False
 
@@ -102,18 +80,18 @@ class TestDuckDBConnectionWrapper:
         real_conn.close()
 
     def test_commit_noop_in_dry_run(self):
-        """commit() should be a no-op in dry-run mode."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         adapter.enable_dry_run()
 
         real_conn = duckdb.connect(":memory:")
         wrapper = DuckDBConnectionWrapper(real_conn, adapter)
-        # Should not raise
+
         wrapper.commit()
         real_conn.close()
 
     def test_close_noop_in_dry_run(self):
-        """close() should be a no-op in dry-run mode; real conn remains usable."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         adapter.enable_dry_run()
 
@@ -121,33 +99,23 @@ class TestDuckDBConnectionWrapper:
         wrapper = DuckDBConnectionWrapper(real_conn, adapter)
         wrapper.close()
 
-        # Real connection should still work because close was suppressed
         row = real_conn.execute("SELECT 1").fetchone()
         assert row == (1,)
         real_conn.close()
 
     def test_getattr_delegates_to_real_connection(self):
-        """Attribute access not on the wrapper itself should hit real connection."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         adapter.dry_run_mode = False
 
         real_conn = duckdb.connect(":memory:")
         wrapper = DuckDBConnectionWrapper(real_conn, adapter)
 
-        # DuckDB connections have a .description attribute (or other attrs).
-        # Just verify delegation works without error.
         assert wrapper._connection is real_conn
         real_conn.close()
 
 
-# ---------------------------------------------------------------------------
-# DuckDBCursorWrapper (dry-run cursor)
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBCursorWrapper:
-    """Tests for the dry-run cursor wrapper returned by DuckDBConnectionWrapper."""
-
     def test_fetchall_returns_provided_rows(self):
         adapter = Mock()
         cursor = DuckDBCursorWrapper([(1,), (2,), (3,)], adapter)
@@ -174,20 +142,7 @@ class TestDuckDBCursorWrapper:
         assert cursor.fetchmany() == [(1,), (2,)]
 
 
-# ---------------------------------------------------------------------------
-# CTAS sort SQL generation
-# ---------------------------------------------------------------------------
-
-
 class TestBuildDuckdbCtasSortSql:
-    """Unit tests for _build_duckdb_ctas_sort_sql (module-level helper).
-
-    Uses real TuningColumn instances (not Mocks): the helper now delegates to
-    core.tuning.generators.duckdb.DuckDBDDLGenerator via a TableTuning, whose
-    constructor validates that sorting columns are genuine TuningColumn
-    instances -- see the renderer-consolidation TODO's w2 duckdb migration.
-    """
-
     def test_single_column_sort(self):
         from benchbox.core.tuning.interface import TuningColumn
 
@@ -204,14 +159,7 @@ class TestBuildDuckdbCtasSortSql:
         assert "ORDER BY l_shipdate, l_orderkey" in sql
 
 
-# ---------------------------------------------------------------------------
-# External scan expression builder (Parquet)
-# ---------------------------------------------------------------------------
-
-
 class TestBuildExternalScanExpressionParquet:
-    """Tests for _build_duckdb_external_scan_expression with Parquet files."""
-
     def test_single_parquet_file(self, tmp_path):
         pq = tmp_path / "lineitem.parquet"
         pq.touch()
@@ -242,7 +190,7 @@ class TestBuildExternalScanExpressionParquet:
         conn.close()
 
     def test_parquet_directory_scan(self, tmp_path):
-        """A directory containing .parquet files should be scanned as parquet."""
+
         pq_dir = tmp_path / "data"
         pq_dir.mkdir()
         (pq_dir / "chunk_0.parquet").touch()
@@ -257,14 +205,7 @@ class TestBuildExternalScanExpressionParquet:
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# External scan expression builder (CSV/TBL text files)
-# ---------------------------------------------------------------------------
-
-
 class TestBuildExternalScanExpressionCSV:
-    """Tests for _build_duckdb_external_scan_expression with TBL/CSV text files."""
-
     def test_tbl_file_uses_read_csv(self, tmp_path):
         tbl = tmp_path / "orders.tbl"
         tbl.write_text("1|data|here|\n2|more|data|\n")
@@ -298,10 +239,10 @@ class TestBuildExternalScanExpressionCSV:
         conn.close()
 
     def test_empty_directory_raises(self, tmp_path):
-        """A directory with no recognized data files should raise RuntimeError."""
+
         empty_dir = tmp_path / "empty_data"
         empty_dir.mkdir()
-        # Create a non-data file so the directory isn't empty but has no parquet/csv/tbl
+
         (empty_dir / "readme.txt").write_text("not data")
 
         conn = duckdb.connect(":memory:")
@@ -312,14 +253,7 @@ class TestBuildExternalScanExpressionCSV:
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# CSV scan expression builder (direct)
-# ---------------------------------------------------------------------------
-
-
 class TestBuildCsvScanExpression:
-    """Tests for _build_csv_scan_expression helper."""
-
     def test_single_file_no_column_names(self, tmp_path):
         csv = tmp_path / "data.csv"
         csv.write_text("1,2,3\n4,5,6\n")
@@ -342,17 +276,10 @@ class TestBuildCsvScanExpression:
         csv1.write_text("1,a\n")
         csv2.write_text("2,b\n")
         expr = _build_csv_scan_expression([csv1, csv2], column_names=["id", "name"])
-        assert "[" in expr  # array syntax
-
-
-# ---------------------------------------------------------------------------
-# Real connection: EXPLAIN (FORMAT JSON) plan output
-# ---------------------------------------------------------------------------
+        assert "[" in expr
 
 
 class TestDuckDBGetQueryPlanJSON:
-    """Verify get_query_plan returns JSON (not text-box) format."""
-
     @pytest.fixture()
     def adapter(self):
         return DuckDBAdapter(database_path=":memory:", capture_plans=True)
@@ -384,25 +311,17 @@ class TestDuckDBGetQueryPlanJSON:
         try:
             raw = adapter.get_query_plan(conn, "SELECT 1")
             assert raw is not None
-            # Without ANALYZE, the JSON uses "timing" fields that should be 0 or absent.
-            # With ANALYZE, "operator_timing" would have nonzero values.
+
             assert "operator_timing" not in raw or '"operator_timing": 0' in raw
         finally:
             conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Real connection: execute_query dry-run mode
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBDryRunExecution:
-    """Verify execute_query returns synthetic result in dry-run mode."""
-
     def test_dry_run_returns_synthetic_result(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         conn = adapter.create_connection()
-        # Enable dry-run after creating connection (connection itself is real)
+
         adapter.enable_dry_run()
         try:
             result = adapter.execute_query(
@@ -420,14 +339,7 @@ class TestDuckDBDryRunExecution:
             conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Real connection: platform info
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBPlatformInfo:
-    """Verify get_platform_info populates version fields from live connection."""
-
     def test_platform_info_with_connection(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         conn = adapter.create_connection()
@@ -436,7 +348,7 @@ class TestDuckDBPlatformInfo:
             assert info["platform_type"] == "duckdb"
             assert info["platform_name"] == "DuckDB"
             assert info["platform_version"] is not None
-            # Should be a dotted version string
+
             assert "." in info["platform_version"]
         finally:
             conn.close()
@@ -445,7 +357,7 @@ class TestDuckDBPlatformInfo:
         adapter = DuckDBAdapter(database_path=":memory:")
         info = adapter.get_platform_info(connection=None)
         assert info["platform_type"] == "duckdb"
-        # Without a connection, should fall back to module __version__
+
         assert info["client_library_version"] is not None
 
     def test_connection_mode_in_platform_info(self):
@@ -460,23 +372,14 @@ class TestDuckDBPlatformInfo:
         assert info["connection_mode"] == "file"
 
 
-# ---------------------------------------------------------------------------
-# Real connection: external view creation end-to-end
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBExternalViewCreationReal:
-    """End-to-end tests creating external views with a real DuckDB connection."""
-
     def test_create_view_from_parquet(self, tmp_path):
-        """Create a view over a real Parquet file and query through it."""
-        # Write a small parquet file via DuckDB
+
         conn = duckdb.connect(":memory:")
         conn.execute("CREATE TABLE source AS SELECT i AS id, i * 10 AS val FROM range(5) t(i)")
         pq_path = tmp_path / "source.parquet"
         conn.execute(f"COPY source TO '{pq_path}' (FORMAT PARQUET)")
 
-        # Now create a view and query it
         scan_expr, _, _, _, fmt = _build_duckdb_external_scan_expression(
             conn, [pq_path], delta_extension_loaded=False, vortex_extension_loaded=False
         )
@@ -487,7 +390,7 @@ class TestDuckDBExternalViewCreationReal:
         conn.close()
 
     def test_create_view_from_csv(self, tmp_path):
-        """Create a view over a CSV file with column names."""
+
         csv_path = tmp_path / "region.csv"
         csv_path.write_text("0,AFRICA\n1,AMERICA\n2,ASIA\n")
 
@@ -507,14 +410,7 @@ class TestDuckDBExternalViewCreationReal:
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Real connection: supports_tuning_type
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBSupportsTuningType:
-    """Verify tuning type support declarations."""
-
     def test_sorting_is_supported(self):
         from benchbox.core.tuning.interface import TuningType
 

@@ -56,13 +56,6 @@ ClickBench Class
 Constructor
 ~~~~~~~~~~~
 
-.. code-block:: python
-
-    ClickBench(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 Parameters:
 

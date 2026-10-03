@@ -4,6 +4,7 @@ import json
 import re
 import shlex
 import textwrap
+from typing import Any
 
 import bashlex
 import bashlex.ast
@@ -34,7 +35,11 @@ FENCE_LANGUAGES = {
     "dockerfile": "docker",
     "json": "json",
     "ini": "ini",
+    "c": "c",
+    "powershell": "powershell",
     "console": "console",
+    "groovy": "groovy",
+    "sql+jinja": "sql+jinja",
 }
 DISPLAY_FENCES = {"", "text", "plaintext", "none", "output", "mermaid", "diff", "csv", "md", "markdown"}
 
@@ -508,7 +513,116 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
     return result
 
 
+def notebook_pip_install(line: str) -> bool:
+    words = line.split()
+    arguments = words[2:]
+    archives = (
+        ".whl",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".xz",
+        ".tgz",
+        ".tbz",
+        ".tbz2",
+        ".txz",
+        ".tlz",
+        ".lz",
+        ".lzma",
+        ".egg",
+    )
+    return (
+        words[:2] in [["%pip", "install"], ["!pip", "install"], ["!pip3", "install"]]
+        and any(word not in {"--quiet", "-q"} for word in arguments)
+        and all(
+            word in {"--quiet", "-q"}
+            or (
+                not ("[" in word and "." in word.split("[", 1)[0])
+                and not word.split("[", 1)[0].lower().endswith(archives)
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*(?:\[[A-Za-z0-9_.-]+(?:,[A-Za-z0-9_.-]+)*\])?", word)
+            )
+            for word in arguments
+        )
+    )
+
+
+def notebook_python_sources(path: str, source: str, symbol: str, ipython: bool) -> list[tuple[int, str, str, str, str]]:
+    import io
+    import tokenize
+
+    if not ipython:
+        return [(1, path + ".python", source, "python", symbol)]
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except (tokenize.TokenError, IndentationError) as exc:
+        raise ValueError("unresolved notebook Python tokenization") from exc
+    protected = {
+        line
+        for token in tokens
+        if token.type == tokenize.STRING and token.start[0] != token.end[0]
+        for line in range(token.start[0], token.end[0] + 1)
+    }
+    lines = source.splitlines(keepends=True)
+    shells = []
+    magic_lines = set()
+    for index, line in enumerate(lines):
+        if index + 1 in protected or not line.lstrip().startswith(("!", "%")):
+            continue
+        if line[0].isspace():
+            raise ValueError("unresolved indented notebook magic")
+        if line.startswith("!") and not line.startswith("!!"):
+            command = line[1:].rstrip("\r\n")
+            if not command.strip() or any(char in command for char in "${}\\"):
+                raise ValueError("unresolved notebook shell interpolation or continuation")
+            shells.append((index + 1, path + ".sh", command, "bash", symbol + ":shell"))
+            if not notebook_pip_install(line):
+                shells.append((index + 1, path + ".unsupported", command, "unsupported", symbol + ":shell-semantics"))
+        elif line.rstrip("\r\n") != "%matplotlib inline" and not notebook_pip_install(line):
+            raise ValueError("unresolved notebook magic")
+        magic_lines.add(index + 1)
+        lines[index] = "\n" if line.endswith("\n") else ""
+    python = "".join(lines)
+    depth = 0
+    for token in tokenize.generate_tokens(io.StringIO(python).readline):
+        if token.start[0] in magic_lines and depth:
+            raise ValueError("unresolved notebook magic in Python continuation")
+        if token.type == tokenize.OP:
+            depth += int(token.string in "([{") - int(token.string in ")]}")
+    if any(start > 1 and source.splitlines()[start - 2].rstrip().endswith(chr(92)) for start in magic_lines):
+        raise ValueError("unresolved notebook magic in Python continuation")
+    return [(1, path + ".python", python, "python", symbol), *shells]
+
+
+def notebook_sources(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
+    notebook = json.loads(source)
+    info = notebook.get("metadata", {}).get("language_info", {})
+    if not isinstance(info, dict):
+        raise ValueError("unresolved notebook language metadata")
+    declared = info.get("name", "python")
+    mode = info.get("codemirror_mode")
+    ipython = info.get("pygments_lexer") == "ipython3" or (isinstance(mode, dict) and mode.get("name") == "ipython")
+    result = []
+    for index, cell in enumerate(notebook["cells"]):
+        if cell["cell_type"] != "code":
+            continue
+        text = "".join(cell["source"])
+        symbol = f"cell:{cell.get('id', index)}"
+        if declared == "python":
+            try:
+                result.extend(notebook_python_sources(path, text, symbol, ipython))
+            except ValueError:
+                result.append((1, path + ".unsupported", text, "unsupported", symbol))
+        else:
+            result.append((1, path + "." + declared, text, FENCE_LANGUAGES.get(declared, "unsupported"), symbol))
+    return result
+
+
 def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, str, str, str]]:
+    if lang == "groovy":
+        return groovy_payloads(path, source)
+    if lang == "html+jinja":
+        parsed_template(source)
     if lang == "bash":
         return shell_payloads(path, source) + shell_command_payloads(path, source)
     if lang == "examples":
@@ -517,21 +631,9 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
             for start, tag, text, symbol in example_blocks(source)
         ]
     if lang == "notebook":
-        notebook = json.loads(source)
-        declared = notebook.get("metadata", {}).get("language_info", {}).get("name", "python")
-        return [
-            (
-                1,
-                path + "." + declared,
-                "".join(cell["source"]),
-                FENCE_LANGUAGES.get(declared, "unsupported"),
-                f"cell:{cell.get('id', index)}",
-            )
-            for index, cell in enumerate(notebook["cells"])
-            if cell["cell_type"] == "code"
-        ]
+        return notebook_sources(path, source)
     if lang in {"yaml", "json"}:
-        tree = yaml.compose(source)
+        trees = list(yaml.compose_all(source)) if lang == "yaml" else [yaml.compose(source)]
         result = []
 
         active: set[int] = set()
@@ -596,9 +698,11 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
                     visit(item, f"{symbol}[{identity}]")
             active.remove(id(node))
 
-        visit(tree)
+        for index, tree in enumerate(trees):
+            visit(tree, f"document:{index}" if len(trees) > 1 else "")
         return result
     if lang in {"html", "html+jinja"}:
+        spans = template_data_spans(source) if lang == "html+jinja" else [(0, len(source))]
         return [
             (
                 source[: match.start(2)].count("\n") + 1,
@@ -614,5 +718,207 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
                 f"{match.group(1)}:{index}",
             )
             for index, match in enumerate(re.finditer(r"<(script|style)\b[^>]*>(.*?)</\1\s*>", source, re.I | re.S))
+            if any(start <= match.start() and match.end() <= end for start, end in spans)
         ]
     return []
+
+
+def parsed_template(source: str) -> Any:
+    from jinja2 import Environment, TemplateSyntaxError
+
+    try:
+        return Environment().parse(source)
+    except TemplateSyntaxError as exc:
+        raise ValueError(f"invalid template syntax at line {exc.lineno}: {exc.message}") from exc
+
+
+def static_html_template(source: str) -> None:
+    from jinja2 import nodes
+
+    tree = parsed_template(source)
+    for statement in tree.body:
+        if not isinstance(statement, nodes.Output) or any(
+            not isinstance(expression, nodes.TemplateData) for expression in statement.nodes
+        ):
+            raise ValueError("unresolved emitted HTML template source")
+
+
+def _template_call(node: Any) -> str:
+    from jinja2 import nodes
+
+    if not isinstance(node.node, nodes.Name) or node.dyn_args is not None or node.dyn_kwargs is not None:
+        raise ValueError("unresolved SQL template call")
+    name = node.node.name
+    if name in {"source", "ref"}:
+        if node.kwargs or len(node.args) not in ({2} if name == "source" else {1, 2}):
+            raise ValueError("unresolved SQL template identifier")
+        if any(
+            not isinstance(arg, nodes.Const)
+            or not isinstance(arg.value, str)
+            or re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", arg.value) is None
+            for arg in node.args
+        ):
+            raise ValueError("unresolved SQL template identifier")
+        return "__dbt_identifier__"
+    if name == "is_incremental" and not node.args and not node.kwargs:
+        return "__dbt_flag__"
+    if name == "config":
+        if node.args:
+            raise ValueError("unresolved SQL template configuration")
+        values = {
+            "materialized": {"table", "view", "incremental", "ephemeral"},
+            "on_schema_change": {"ignore", "fail", "append_new_columns", "sync_all_columns"},
+        }
+        for keyword in node.kwargs:
+            if not isinstance(keyword.value, nodes.Const) or not isinstance(keyword.value.value, str):
+                raise ValueError("unresolved SQL template configuration")
+            value = keyword.value.value
+            valid = (
+                re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", value)
+                if keyword.key == "unique_key"
+                else value in values.get(keyword.key, set())
+            )
+            if not valid:
+                raise ValueError("unresolved SQL template configuration")
+        return ""
+    raise ValueError("unresolved SQL template call")
+
+
+def _template_literal(node: Any, bindings: dict[str, list[Any]], seen: frozenset[str] = frozenset()) -> Any:
+    from jinja2 import nodes
+
+    if isinstance(node, nodes.Const) and isinstance(node.value, (str, int, float, bool, type(None))):
+        return node.value
+    if isinstance(node, nodes.Name):
+        values = bindings.get(node.name, [])
+        if not values and node.name == "this":
+            return "__dbt_identifier__"
+        if len(values) != 1 or node.name in seen:
+            raise ValueError(f"unresolved SQL template output: {node.name}")
+        return _template_literal(values[0], bindings, seen | {node.name})
+    if isinstance(node, nodes.Concat):
+        return "".join(str(_template_literal(operand, bindings, seen)) for operand in node.nodes)
+    if isinstance(node, nodes.Add):
+        return _template_literal(node.left, bindings, seen) + _template_literal(node.right, bindings, seen)
+    if isinstance(node, nodes.Call):
+        return _template_call(node)
+    raise ValueError("unresolved SQL template output")
+
+
+def _template_append(text: str, line: int, original: bool, parts: list[str], line_map: list[int]) -> None:
+    parts.append(text)
+    for char in text:
+        line_map.append(line)
+        if original and char == "\n":
+            line += 1
+
+
+def _template_render(
+    body: list[Any], bindings: dict[str, list[Any]], variants: list[Any], branch: bool = False
+) -> list[Any]:
+    from jinja2 import nodes
+
+    for statement in body:
+        if isinstance(statement, nodes.Output):
+            for expression in statement.nodes:
+                original = isinstance(expression, nodes.TemplateData)
+                text = expression.data if original else str(_template_literal(expression, bindings))
+                for parts, line_map in variants:
+                    _template_append(text, expression.lineno, original, parts, line_map)
+        elif isinstance(statement, nodes.If):
+            bodies = [statement.body, *(item.body for item in statement.elif_), statement.else_]
+            expanded = []
+            for parts, line_map in variants:
+                for alternative in bodies:
+                    expanded.extend(
+                        _template_render(alternative, dict(bindings), [(parts.copy(), line_map.copy())], True)
+                    )
+                    if len(expanded) > 64:
+                        raise ValueError("SQL template branch limit exceeded")
+            variants = expanded
+        elif isinstance(statement, nodes.Assign):
+            if branch or not isinstance(statement.target, nodes.Name) or statement.target.name in bindings:
+                raise ValueError("unresolved SQL template assignment")
+            _template_literal(statement.node, bindings)
+            bindings[statement.target.name] = [statement.node]
+        else:
+            raise ValueError("unresolved SQL template statement")
+    return variants
+
+
+def sql_template_sources(source: str) -> list[tuple[str, list[int]]]:
+    from jinja2 import nodes
+
+    tree = parsed_template(source)
+    for call in tree.find_all(nodes.Call):
+        _template_call(call)
+    if next(tree.find_all(nodes.Filter), None) is not None:
+        raise ValueError("unresolved SQL template filter")
+    return [("".join(parts), line_map) for parts, line_map in _template_render(tree.body, {}, [([], [])])]
+
+
+def groovy_payloads(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
+    from pygments.lexers import get_lexer_by_name
+    from pygments.token import Comment, Name, Operator, String, Text
+
+    tokens = [
+        (offset, token, text)
+        for offset, token, text in get_lexer_by_name("groovy").get_tokens_unprocessed(source)
+        if token not in Text.Whitespace and token not in Comment
+    ]
+    result = []
+    for index, (_, token, text) in enumerate(tokens):
+        if (
+            token in String
+            and index
+            and tokens[index - 1][2] == "."
+            and text.strip("\"'") in {"sh", "execute", "bat", "powershell", "pwsh"}
+        ):
+            raise ValueError("unresolved quoted Groovy process callee")
+        if token in Name and text in {"execute", "ProcessBuilder", "bat", "powershell", "pwsh"}:
+            raise ValueError(f"unresolved Groovy process carrier: {text}")
+        if token not in Name or text != "sh":
+            continue
+        cursor = index + 1
+        parenthesized = cursor < len(tokens) and tokens[cursor][2] == "("
+        if parenthesized:
+            cursor += 1
+        if cursor < len(tokens) and tokens[cursor][2] == "script:":
+            cursor += 1
+        if cursor >= len(tokens) or tokens[cursor][1] not in String:
+            raise ValueError("unresolved Groovy sh source")
+        offset, _, value = tokens[cursor]
+        delimiter = next((quote for quote in ("'''", '"""', "'", '"') if value.startswith(quote)), None)
+        if delimiter is None or not value.endswith(delimiter):
+            raise ValueError("unresolved Groovy sh literal")
+        body = value[len(delimiter) : -len(delimiter)]
+        if "\\" in body or delimiter.startswith('"') and "$" in body:
+            raise ValueError("unresolved Groovy sh escapes or interpolation")
+        if (
+            cursor + 1 < len(tokens)
+            and tokens[cursor + 1][1] in Operator
+            and tokens[cursor + 1][2] not in {")", "}", ";", "]", ","}
+        ):
+            raise ValueError("unresolved Groovy sh expression")
+        if cursor + 1 < len(tokens) and tokens[cursor + 1][2] == ",":
+            raise ValueError("unresolved Groovy sh option arguments")
+        if parenthesized and (cursor + 1 >= len(tokens) or tokens[cursor + 1][2] != ")"):
+            raise ValueError("unresolved Groovy sh call boundary")
+        line = source[: offset + len(delimiter)].count("\n") + 1
+        result.append((line, path + ".sh", body, "bash", f"groovy:sh:{index}"))
+    return result
+
+
+def template_data_spans(source: str) -> list[tuple[int, int]]:
+    from jinja2 import Environment
+
+    cursor = 0
+    result = []
+    for _, token, value in Environment().lex(source):
+        start = source.find(value, cursor)
+        if start < 0:
+            raise ValueError("unresolved HTML template source mapping")
+        cursor = start + len(value)
+        if token == "data":
+            result.append((start, cursor))
+    return result

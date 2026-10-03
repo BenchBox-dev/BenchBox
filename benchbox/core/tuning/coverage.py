@@ -1,11 +1,3 @@
-"""Tuned-template coverage inventory helpers.
-
-The runtime `--tuning tuned` resolver first looks for
-`examples/tunings/{platform}/{benchmark}_tuned.yaml`; if no template exists,
-it falls back to an enabled but generic constraints-only configuration. These
-helpers make that contract auditable for UAT without making fallback an error.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -50,7 +42,6 @@ def _coverage_spec() -> dict:
 
 @cache
 def _high_priority_author_backlog() -> frozenset[tuple[str, str]]:
-    # The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
     return frozenset(
         (entry["platform"], entry["benchmark"]) for entry in _coverage_spec()["high_priority_author_backlog"]
     )
@@ -93,12 +84,10 @@ class RuntimeTuningObservation:
 
 
 def template_path_for(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> Path:
-    """Return the standard tuned-template path used by `--tuning tuned`."""
     return root / "examples" / "tunings" / platform.lower() / f"{benchmark.lower()}_tuned.yaml"
 
 
 def classify_template(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> tuple[str, str]:
-    """Classify one platform/benchmark pair from checked-in tuning templates."""
     template_path = template_path_for(platform, benchmark, root=root)
     if template_path.exists():
         return TUNED_TEMPLATE, _relpath(template_path, root)
@@ -111,7 +100,6 @@ def build_tuning_coverage_rows(
     *,
     root: Path = REPO_ROOT,
 ) -> list[TuningCoverageRow]:
-    """Build a deterministic coverage matrix for the supplied cells."""
     rows: list[TuningCoverageRow] = []
     for platform in platforms:
         for benchmark in benchmarks:
@@ -131,7 +119,6 @@ def build_tuning_coverage_rows(
 
 
 def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, str]:
-    """Return the matrix disposition for one platform/benchmark status."""
     if status == TUNED_TEMPLATE:
         return DECISION_DONE, "benchmark-specific tuned template exists"
     if (platform, benchmark) in _high_priority_author_backlog():
@@ -142,7 +129,6 @@ def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, s
 
 
 def write_tuning_coverage_tsv(rows: Iterable[TuningCoverageRow], path: Path) -> None:
-    """Write coverage rows as a stable tab-separated matrix."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=MATRIX_COLUMNS, delimiter="\t", lineterminator="\n")
@@ -152,7 +138,6 @@ def write_tuning_coverage_tsv(rows: Iterable[TuningCoverageRow], path: Path) -> 
 
 
 def read_tuning_coverage_tsv(path: Path) -> list[TuningCoverageRow]:
-    """Read and validate a saved tuning coverage matrix."""
     with path.open(encoding="utf-8") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
         missing = set(MATRIX_COLUMNS) - set(reader.fieldnames or ())
@@ -183,13 +168,6 @@ def static_matrix_drift(
     recorded_rows: Iterable[TuningCoverageRow],
     current_rows: Iterable[TuningCoverageRow],
 ) -> list[str]:
-    """Return checked-in matrix drift that would hide coverage regressions.
-
-    Flags three kinds of drift between the checked-in TSV and the
-    currently-derived inventory: (1) recorded keys missing from current,
-    (2) status downgrades vs. the recorded baseline, and (3) newly-derived
-    keys that have not yet been added to the matrix.
-    """
     recorded_by_key = {row.key: row for row in recorded_rows}
     current_by_key = {row.key: row for row in current_rows}
     drift: list[str] = []
@@ -212,7 +190,6 @@ def parse_runtime_tuning_logs(
     platforms: Iterable[str],
     benchmarks: Iterable[str],
 ) -> list[RuntimeTuningObservation]:
-    """Parse per-cell UAT logs for their observed tuning resolution status."""
     if not logs_dir.exists():
         raise FileNotFoundError(f"logs directory does not exist: {logs_dir}")
     known_platforms = set(platforms)
@@ -241,7 +218,6 @@ def parse_uat_cell_log_stem(
     platforms: Iterable[str],
     benchmarks: Iterable[str],
 ) -> tuple[str, str] | None:
-    """Parse `<platform>_<benchmark>_<scale>_<yyyymmdd>_<hhmmss>` UAT log stems."""
     parts = stem.split("_")
     if len(parts) < 5:
         return None
@@ -253,7 +229,6 @@ def parse_uat_cell_log_stem(
 
 
 def status_from_log_text(text: str) -> str | None:
-    """Extract the tuning resolver status recorded in one runtime log."""
     for marker, status in _RUNTIME_STATUS_MARKERS:
         if marker in text:
             return status
@@ -264,7 +239,6 @@ def runtime_mismatches(
     matrix_rows: Iterable[TuningCoverageRow],
     observations: Iterable[RuntimeTuningObservation],
 ) -> list[str]:
-    """Return observed UAT log statuses that disagree with the static matrix."""
     matrix_by_key: Mapping[tuple[str, str], TuningCoverageRow] = {row.key: row for row in matrix_rows}
     mismatches: list[str] = []
     for observation in observations:

@@ -51,41 +51,152 @@ API Reference
 DataFusionAdapter Class
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.datafusion.DataFusionAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.datafusion.DataFusionAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   In-process DataFusion adapter.  ``working_dir`` defaults to
+   ``"./datafusion_working"``, ``memory_limit`` to ``"16G"``,
+   ``target_partitions`` to the CPU count, ``data_format`` to ``"parquet"``,
+   and ``batch_size`` to ``8192``.  ``parquet_pushdown`` and
+   ``repartition_joins`` default to ``True``.  A missing optional driver raises
+   ``ImportError``; a locked working directory can raise ``RuntimeError``.
 
-.. code-block:: python
+   Example::
 
-    DataFusionAdapter(
-        working_dir: str = "./datafusion_working",
-        memory_limit: str = "16G",
-        target_partitions: Optional[int] = None,
-        data_format: str = "parquet",
-        temp_dir: Optional[str] = None,
-        batch_size: int = 8192,
-        force_recreate: bool = False,
-        tuning_config: Optional[Dict[str, Any]] = None,
-        verbose_enabled: bool = False,
-        very_verbose: bool = False
-    )
+      adapter = DataFusionAdapter(working_dir="./datafusion", data_format="parquet")
 
-Parameters:
+   This adapter uses ``NoConstraintEnforcementMixin``: constraint configuration
+   is accepted as informational rather than enforced.  See :doc:`common` for
+   the shared lifecycle.
 
-- **working_dir** (str): Working directory for DataFusion tables and Parquet data. Default: "./datafusion_working"
-- **memory_limit** (str): Maximum memory usage (e.g., "16G", "8GB", "4096MB"). Default: "16G"
-- **target_partitions** (int, optional): Number of parallel partitions. Default: CPU count
-- **data_format** (str): Data format: "parquet" (recommended) or "csv". Default: "parquet"
-- **temp_dir** (str, optional): Temporary directory for disk spilling. Default: None
-- **batch_size** (int): RecordBatch size for query execution. Default: 8192
-- **force_recreate** (bool): Force recreate existing data. Default: False
-- **tuning_config** (dict, optional): Additional tuning configuration
-- **verbose_enabled** (bool): Enable verbose logging. Default: False
-- **very_verbose** (bool): Enable very verbose logging. Default: False
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.create_connection(**connection_config) -> Any
+
+   Create DataFusion SessionContext with optimized configuration.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.create_schema(benchmark, connection: Any) -> float
+
+   Create schema using DataFusion.
+
+   Note: For DataFusion, actual table creation happens during load_data() via
+   CREATE EXTERNAL TABLE. This method validates the schema is available.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.materialize_schema_only_tables(benchmark, connection: Any) -> dict[str, int]
+
+   Creates the schema-only tables required by DataFusion and returns a table-to-row-count mapping.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
+
+   Load data into DataFusion.
+
+   Supports CSV, Parquet, Delta Lake, and Iceberg formats.
+   Directory-based formats (delta/iceberg) are auto-detected from the file path.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
+
+   Alias external-table mode to DataFusion's existing external registration path.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
+
+   Execute query with detailed timing and result collection.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.check_database_exists(**connection_config) -> bool
+
+   Check if DataFusion working directory exists with data.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.drop_database(**connection_config) -> None
+
+   Drop DataFusion working directory and all data.
+
+Static member inventory
+-----------------------
+
+.. py:property:: benchbox.platforms.datafusion.DataFusionAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.get_target_dialect(self) -> str
+
+   Get the target SQL dialect for DataFusion.
+
+   Returns platform dialect identifier so catalog variants can target DataFusion.
+   SQL translation normalizes this to PostgreSQL semantics where needed.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.preprocess_operation_sql(self, operation_id: str, operation: Any) -> str | None
+
+   Preprocess write operation SQL for DataFusion compatibility.
+
+   Rewrites COPY-based bulk load SQL to CREATE EXTERNAL TABLE pattern.
+   Returns None for non-bulk_load operations (no preprocessing needed).
+
+   :param operation_id: Operation identifier
+   :param operation: WriteOperation object with category, write_sql, file_dependencies
+
+   :returns: Transformed SQL string, or None if no preprocessing needed
+
+.. py:staticmethod:: benchbox.platforms.datafusion.DataFusionAdapter.add_cli_arguments(parser) -> None
+
+   Add DataFusion-specific CLI arguments.
+
+.. py:classmethod:: benchbox.platforms.datafusion.DataFusionAdapter.from_config(config: dict[str, Any])
+
+   Create DataFusion adapter from unified configuration.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get DataFusion platform information.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply DataFusion-specific optimizations based on benchmark type.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.get_query_plan(self, connection: Any, query: str) -> str | None
+
+   Get DataFusion query execution plan using EXPLAIN.
+
+   DataFusion's EXPLAIN returns a DataFrame with columns (plan_type, plan).
+   We reconstruct the pipe-delimited text format expected by DataFusionQueryPlanParser.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.get_query_plan_parser(self)
+
+   Get DataFusion query plan parser.
+
+.. py:method:: benchbox.platforms.datafusion.DataFusionAdapter.validate_platform_capabilities(self, benchmark_type: str)
+
+   Validate DataFusion-specific capabilities for the benchmark.
+
+.. py:attribute:: benchbox.platforms.datafusion.DataFusionAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.datafusion.DataFusionAdapter.supports_external_tables
+
+   Advertises whether the adapter implements external-table creation.
+
+.. py:attribute:: benchbox.platforms.datafusion.DataFusionAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:method:: benchbox.platforms.base.no_constraint_mixin.NoConstraintEnforcementMixin.apply_constraint_configuration(self, primary_key_config: Any, foreign_key_config: Any, connection: Any) -> None
+
+   Records that the adapter does not enforce primary- or foreign-key constraints; callers must not rely on these constraints.
+
+.. py:method:: benchbox.platforms.base.no_constraint_mixin.NoConstraintEnforcementMixin.apply_platform_optimizations(self, platform_config: Any, connection: Any) -> None
+
+   Applies the DataFusion platform optimizations supported by the active tuning configuration.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``DataFusionAdapter(**config)``.
+
+- ``working_dir`` defaults to ``"./datafusion_working"`` and is created
+  during construction.
+- ``memory_limit`` defaults to ``"16G"``; ``target_partitions`` defaults to
+  ``os.cpu_count()`` when the key is absent.
+- ``data_format`` defaults to ``"parquet"``; ``temp_dir`` is optional.
+- ``batch_size`` defaults to 8192. ``parquet_pushdown`` and
+  ``repartition_joins`` default to ``True``.
+- Inherited ``force_recreate`` defaults to ``False``; ``tuning_config``
+  supplies the shared tuning configuration. See :doc:`common`.
 
 Configuration Examples
 ----------------------
@@ -544,10 +655,10 @@ Performance Optimization
 
    **Batch Size Guidelines**:
 
-   - **4096**: Best for interactive queries and memory-constrained environments
-   - **8192** (default): Good balance for most analytical workloads
-   - **16384**: Optimal for high-throughput batch processing with sufficient RAM
-   - **Trade-off**: Larger batches = higher memory usage but better vectorized execution
+   **4096**: Best for interactive queries and memory-constrained environments
+   **8192** (default): Good balance for most analytical workloads
+   **16384**: Optimal for high-throughput batch processing with sufficient RAM
+   **Trade-off**: Larger batches = higher memory usage but better vectorized execution
 
 Scale Factor Recommendations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

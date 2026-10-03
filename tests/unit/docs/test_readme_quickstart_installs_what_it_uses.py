@@ -1,17 +1,3 @@
-"""The README Quick Start must install the platform its own steps then use.
-
-The Quick Start's step 1 offered `uv add benchbox` under the comment "For
-local development (DuckDB only)". That plain install ships SQLite only --
-DuckDB is the `[duckdb]` extra -- so step 3's `import duckdb` and
-`benchbox run --platform duckdb` could not work for anyone who followed it.
-The Installation section 180 lines further down said the opposite, correctly.
-
-Two separate things went wrong and this pins both: the install command was
-false, and the Quick Start sat at line 390 of 1303, behind the installation
-matrix and troubleshooting, so the contradiction was easy to miss and the
-first runnable command was most of the way down the page.
-"""
-
 from __future__ import annotations
 
 import re
@@ -40,7 +26,6 @@ def _core_dependency_names() -> set[str]:
 
 
 def test_duckdb_is_not_a_core_dependency() -> None:
-    """The premise. If this ever changes, the assertions below are moot."""
     assert "duckdb" not in _core_dependency_names()
 
 
@@ -62,7 +47,6 @@ def test_quickstart_uses_duckdb_so_it_must_install_duckdb() -> None:
 
 
 def test_quickstart_does_not_offer_a_bare_install_as_the_local_path() -> None:
-    """A bare `uv add benchbox` here is the exact claim that was false."""
     install_lines = [
         line.strip()
         for block in FENCE.findall(_quickstart())
@@ -78,14 +62,12 @@ def test_quickstart_does_not_offer_a_bare_install_as_the_local_path() -> None:
 
 
 def test_quickstart_comes_before_the_installation_deep_dive() -> None:
-    """A reader should reach a runnable command without scrolling past the matrix."""
     text = README.read_text(encoding="utf-8")
 
     assert text.index("## Quick Start") < text.index("\n## Installation")
 
 
 def test_quickstart_commands_work_after_the_pip_install() -> None:
-    """The pip path installs ``benchbox`` but does not install the uv command."""
     quickstart = _quickstart()
     execution_lines = [
         line.strip()
@@ -100,7 +82,6 @@ def test_quickstart_commands_work_after_the_pip_install() -> None:
 
 
 def test_quickstart_does_not_document_ignored_results_limit() -> None:
-    """The summary view currently ignores ``--limit`` and always caps at ten."""
     assert "benchbox results --limit" not in _quickstart()
 
 

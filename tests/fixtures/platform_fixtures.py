@@ -1,12 +1,6 @@
-"""Platform-specific test fixtures.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides DuckDB stubs, cloud adapter dependency mocks, and database
-connection fixtures. Registered as a pytest plugin in root conftest.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -18,8 +12,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _provide_fake_duckdb(_hermetic_state, monkeypatch):
-    """Provide a lightweight duckdb stub when the optional dependency is missing."""
-    from benchbox.platforms import duckdb as duckdb_module  # import late to honour patching
+    from benchbox.platforms import duckdb as duckdb_module
 
     if getattr(duckdb_module, "duckdb", None) is not None:
         yield
@@ -58,7 +51,6 @@ def _provide_fake_duckdb(_hermetic_state, monkeypatch):
 
 @pytest.fixture
 def duckdb_memory_db():
-    """Create an in-memory DuckDB database connection."""
     import duckdb
 
     conn = duckdb.connect(":memory:")
@@ -68,7 +60,6 @@ def duckdb_memory_db():
 
 @pytest.fixture(autouse=True)
 def mock_platform_dependency_checks(_hermetic_state):
-    """Provide default dependency stubs for cloud adapters in unit tests."""
 
     targets = [
         "benchbox.platforms.bigquery.check_platform_dependencies",
@@ -83,7 +74,6 @@ def mock_platform_dependency_checks(_hermetic_state):
             try:
                 stack.enter_context(patch(target, return_value=(True, [])))
             except AttributeError:
-                # Skip patching if the attribute doesn't exist (e.g., databricks is now a package)
                 pass
 
         try:
@@ -94,14 +84,12 @@ def mock_platform_dependency_checks(_hermetic_state):
             def _stub_add_cli_arguments(parser) -> None:
                 return None
 
-            # Expose the real implementation so CLI-option tests can prove it.
             _stub_add_cli_arguments.real = getattr(
                 real_add_cli_arguments.__func__, "real", real_add_cli_arguments.__func__
             )
             stack.enter_context(
                 patch.object(SnowflakeAdapter, "add_cli_arguments", staticmethod(_stub_add_cli_arguments))
             )
-            # Don't stub from_config - we want to test the real implementation
         except ImportError:
             pass
 

@@ -1,12 +1,6 @@
-"""Comprehensive tests for the BaseBenchmark class.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests BaseBenchmark class execution methods, error handling,
-timing functionality, result formatting, and database operations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from pathlib import Path
@@ -27,8 +21,6 @@ pytestmark = [
 
 
 class MockBaseBenchmark(BaseBenchmark):
-    """A concrete implementation of BaseBenchmark for testing."""
-
     def __init__(self, scale_factor: float = 1.0, **kwargs: Any) -> None:
         super().__init__(scale_factor=scale_factor, **kwargs)
         self._queries: dict[Union[int, str], str] = {
@@ -42,22 +34,18 @@ class MockBaseBenchmark(BaseBenchmark):
         self._load_data_called = False
 
     def generate_data(self) -> list[Union[str, Path]]:
-        """Generate mock data files."""
         self._data_generated = True
         return [Path("table1.csv"), Path("table2.csv"), Path("table3.csv")]
 
     def get_queries(self) -> dict[int | str, str]:
-        """Get all queries."""
         return self._queries
 
     def get_query(self, query_id: Union[int, str], *, params: Optional[dict[str, Any]] = None) -> str:
-        """Get a specific query."""
         if query_id not in self._queries:
             raise ValueError(f"Invalid query ID: {query_id}")
 
         query = self._queries[query_id]
 
-        # Simple parameter substitution for testing
         if params:
             for key, value in params.items():
                 query = query.replace(f"${key}", str(value))
@@ -65,9 +53,7 @@ class MockBaseBenchmark(BaseBenchmark):
         return query
 
     def _load_data(self, connection: DatabaseConnection) -> None:
-        """Load data into the database."""
         self._load_data_called = True
-        # Simulate loading data by executing CREATE TABLE statements
         connection.execute("CREATE TABLE IF NOT EXISTS table1 (id INT, name VARCHAR(50))")
         connection.execute("CREATE TABLE IF NOT EXISTS table2 (id INT, value DECIMAL(10,2))")
         connection.execute("INSERT INTO table1 VALUES (1, 'test1'), (2, 'test2')")
@@ -75,8 +61,6 @@ class MockBaseBenchmark(BaseBenchmark):
 
 
 class FailingBenchmark(BaseBenchmark):
-    """A benchmark that fails in various ways for testing error handling."""
-
     def __init__(self, fail_mode: str = "generate_data", **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.fail_mode = fail_mode
@@ -102,10 +86,7 @@ class FailingBenchmark(BaseBenchmark):
 
 
 class TestMockBaseBenchmarkInitialization:
-    """Test benchmark initialization and configuration."""
-
     def test_basic_initialization(self):
-        """Test basic benchmark initialization."""
         benchmark = MockBaseBenchmark(scale_factor=1.0)
         assert benchmark.scale_factor == 1.0
         assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
@@ -113,51 +94,40 @@ class TestMockBaseBenchmarkInitialization:
         assert not benchmark._load_data_called
 
     def test_custom_scale_factor(self):
-        """Test initialization with custom scale factor."""
         benchmark = MockBaseBenchmark(scale_factor=2)
         assert benchmark.scale_factor == 2
 
     def test_custom_output_dir(self):
-        """Test initialization with custom output directory."""
         custom_dir = Path("/tmp/test_output")
         benchmark = MockBaseBenchmark(output_dir=custom_dir)
         assert benchmark.output_dir == custom_dir
 
     def test_string_output_dir(self):
-        """Test initialization with string output directory."""
         benchmark = MockBaseBenchmark(output_dir="/tmp/test_output")
         assert benchmark.output_dir == Path("/tmp/test_output")
 
     def test_custom_kwargs(self):
-        """Test initialization with custom keyword arguments."""
         benchmark = MockBaseBenchmark(scale_factor=1.0, custom_param="test_value", another_param=42)
         assert benchmark.custom_param == "test_value"
         assert benchmark.another_param == 42
 
     def test_init_rejects_non_positive_scale_factor(self):
-        """Test that non-positive scale factors are rejected."""
         with pytest.raises(ValueError, match="Scale factor must be positive"):
             MockBaseBenchmark(scale_factor=0)
 
     def test_init_rejects_fractional_scale_factor_at_or_above_one(self):
-        """Test that scale factors >= 1 must be whole integers."""
         with pytest.raises(ValueError, match="must be whole integers"):
             MockBaseBenchmark(scale_factor=1.5)
 
 
 class TestMockBaseBenchmarkAbstractMethods:
-    """Test abstract method requirements and implementations."""
-
     def test_cannot_instantiate_abstract_class(self):
-        """Test that BaseBenchmark cannot be instantiated directly."""
         with pytest.raises(TypeError):
             BaseBenchmark()
 
     def test_concrete_class_implements_required_methods(self):
-        """Test that concrete class implements all required abstract methods."""
         benchmark = MockBaseBenchmark()
 
-        # Test that all abstract methods are implemented
         assert hasattr(benchmark, "generate_data")
         assert hasattr(benchmark, "get_queries")
         assert hasattr(benchmark, "get_query")
@@ -166,7 +136,6 @@ class TestMockBaseBenchmarkAbstractMethods:
         assert callable(benchmark.get_query)
 
     def test_unimplemented_load_data_raises_error(self):
-        """Test that _load_data raises NotImplementedError if not implemented."""
 
         class UnimplementedBenchmark(BaseBenchmark):
             def generate_data(self) -> list[Union[str, Path]]:
@@ -190,14 +159,12 @@ class TestMockBaseBenchmarkAbstractMethods:
             benchmark._load_data(mock_connection)
 
     def test_validate_scale_factor_type_requires_numeric_values(self):
-        """Test scale factor type validation helper."""
         benchmark = MockBaseBenchmark()
 
         with pytest.raises(TypeError, match="scale_factor must be a number"):
             benchmark._validate_scale_factor_type("1.0")  # type: ignore[arg-type]
 
     def test_initialize_benchmark_implementation_passes_common_options(self):
-        """Test implementation bootstrap helper forwards normalized kwargs."""
 
         class DummyImplementation:
             def __init__(self, **kwargs: Any) -> None:
@@ -225,7 +192,6 @@ class TestMockBaseBenchmarkAbstractMethods:
         }
 
     def test_benchmark_name_mapping_helpers_cover_special_and_default_cases(self):
-        """Test benchmark-name derivation helpers and defaults."""
         special_benchmark = type("TPCHBenchmark", (MockBaseBenchmark,), {})()
         generic_benchmark = type("AnalyticsBenchmark", (MockBaseBenchmark,), {})()
         base_benchmark = MockBaseBenchmark()
@@ -235,7 +201,6 @@ class TestMockBaseBenchmarkAbstractMethods:
         assert base_benchmark.get_data_source_benchmark() is None
 
     def test_run_with_platform_uses_default_benchmark_type(self):
-        """Test platform-run delegation uses the default benchmark type."""
         benchmark = MockBaseBenchmark()
         adapter = Mock()
         adapter.run_benchmark.return_value = "platform-result"
@@ -250,7 +215,6 @@ class TestMockBaseBenchmarkAbstractMethods:
         )
 
     def test_benchmark_name_prefers_impl_and_falls_back_locally(self):
-        """Test benchmark_name property precedence."""
         benchmark = MockBaseBenchmark()
 
         benchmark._impl = SimpleNamespace(_name="impl-name")
@@ -268,10 +232,7 @@ class TestMockBaseBenchmarkAbstractMethods:
 
 
 class TestMockBaseBenchmarkDatabaseSetup:
-    """Test database setup functionality."""
-
     def test_setup_database_success(self):
-        """Test successful database setup."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
 
@@ -280,10 +241,9 @@ class TestMockBaseBenchmarkDatabaseSetup:
 
         assert benchmark._data_generated
         assert benchmark._load_data_called
-        assert mock_connection.execute.call_count >= 2  # At least CREATE TABLE calls
+        assert mock_connection.execute.call_count >= 2
 
     def test_setup_database_skips_data_generation_if_already_generated(self):
-        """Test that setup skips data generation if already done."""
         benchmark = MockBaseBenchmark()
         benchmark._data_generated = True
         mock_connection = Mock(spec=DatabaseConnection)
@@ -295,7 +255,6 @@ class TestMockBaseBenchmarkDatabaseSetup:
         assert benchmark._load_data_called
 
     def test_setup_database_handles_data_generation_failure(self):
-        """Test setup handles data generation failure."""
         benchmark = FailingBenchmark(fail_mode="generate_data")
         mock_connection = Mock(spec=DatabaseConnection)
 
@@ -303,7 +262,6 @@ class TestMockBaseBenchmarkDatabaseSetup:
             benchmark.setup_database(mock_connection)
 
     def test_setup_database_handles_data_loading_failure(self):
-        """Test setup handles data loading failure."""
         benchmark = FailingBenchmark(fail_mode="load_data")
         mock_connection = Mock(spec=DatabaseConnection)
 
@@ -311,11 +269,9 @@ class TestMockBaseBenchmarkDatabaseSetup:
             benchmark.setup_database(mock_connection)
 
     def test_setup_database_logs_timing_info(self, caplog):
-        """Test that setup logs timing information."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
 
-        # Capture logs from the benchbox.base logger specifically
         with caplog.at_level(logging.INFO, logger="benchbox.base"):
             benchmark.setup_database(mock_connection)
 
@@ -324,10 +280,7 @@ class TestMockBaseBenchmarkDatabaseSetup:
 
 
 class TestMockBaseBenchmarkQueryExecution:
-    """Test query execution functionality."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.benchmark = MockBaseBenchmark()
         self.mock_connection = Mock(spec=DatabaseConnection)
         self.mock_cursor = Mock()
@@ -338,7 +291,6 @@ class TestMockBaseBenchmarkQueryExecution:
         ]
 
     def test_run_query_success_without_results(self):
-        """Test successful query execution without fetching results."""
         with patch("benchbox.base.elapsed_seconds", return_value=1.5):
             result = self.benchmark.run_query(1, self.mock_connection)
 
@@ -352,7 +304,6 @@ class TestMockBaseBenchmarkQueryExecution:
         self.mock_connection.fetchall.assert_not_called()
 
     def test_run_query_success_with_results(self):
-        """Test successful query execution with fetching results."""
         with patch("benchbox.base.elapsed_seconds", return_value=1.5):
             result = self.benchmark.run_query(1, self.mock_connection, fetch_results=True)
 
@@ -369,11 +320,9 @@ class TestMockBaseBenchmarkQueryExecution:
         self.mock_connection.fetchall.assert_called_once()
 
     def test_run_query_with_parameters(self):
-        """Test query execution with parameters."""
         params = {"limit": "10", "filter": "name"}
         query_with_params = "SELECT * FROM table1 WHERE $filter IS NOT NULL LIMIT $limit"
 
-        # Mock the query to include parameters
         self.benchmark._queries[1] = query_with_params
 
         result = self.benchmark.run_query(1, self.mock_connection, params=params)
@@ -383,33 +332,28 @@ class TestMockBaseBenchmarkQueryExecution:
         self.mock_connection.execute.assert_called_once_with(expected_query)
 
     def test_run_query_invalid_query_id(self):
-        """Test query execution with invalid query ID."""
         with pytest.raises(ValueError, match="Invalid query ID"):
             self.benchmark.run_query(999, self.mock_connection)
 
     def test_run_query_database_error(self):
-        """Test query execution with database error."""
         self.mock_connection.execute.side_effect = DatabaseError("Database connection failed")
 
         with pytest.raises(DatabaseError, match="Database connection failed"):
             self.benchmark.run_query(1, self.mock_connection)
 
     def test_run_query_logs_execution_info(self, caplog):
-        """Test that query execution logs appropriate information."""
         with caplog.at_level(logging.INFO, logger="benchbox.base"):
             self.benchmark.run_query(1, self.mock_connection)
 
         assert "Query 1 completed" in caplog.text
 
     def test_run_query_logs_results_info_when_fetched(self, caplog):
-        """Test that query execution logs result information when fetched."""
         with caplog.at_level(logging.DEBUG, logger="benchbox.base"):
             self.benchmark.run_query(1, self.mock_connection, fetch_results=True)
 
         assert "Query 1 returned 2 rows" in caplog.text
 
     def test_run_query_handles_empty_results(self):
-        """Test query execution with empty results."""
         self.mock_connection.fetchall.return_value = []
 
         result = self.benchmark.run_query(1, self.mock_connection, fetch_results=True)
@@ -418,7 +362,6 @@ class TestMockBaseBenchmarkQueryExecution:
         assert result["row_count"] == 0
 
     def test_run_query_handles_none_results(self):
-        """Test query execution with None results."""
         self.mock_connection.fetchall.return_value = None
 
         result = self.benchmark.run_query(1, self.mock_connection, fetch_results=True)
@@ -428,10 +371,7 @@ class TestMockBaseBenchmarkQueryExecution:
 
 
 class TestMockBaseBenchmarkBenchmarkExecution:
-    """Test full benchmark execution functionality."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.benchmark = MockBaseBenchmark()
         self.mock_connection = Mock(spec=DatabaseConnection)
         self.mock_cursor = Mock()
@@ -439,7 +379,6 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         self.mock_connection.fetchall.return_value = [{"result": "success"}]
 
     def test_run_benchmark_success_with_setup(self):
-        """Test successful benchmark execution with database setup."""
         with (
             patch.object(
                 self.benchmark,
@@ -476,7 +415,6 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         assert "max_query_time" in result
 
     def test_run_benchmark_success_without_setup(self):
-        """Test successful benchmark execution without database setup."""
         with (
             patch.object(
                 self.benchmark,
@@ -497,17 +435,13 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         assert result["successful_queries"] == 1
 
     def test_run_benchmark_all_queries_default(self):
-        """Test benchmark execution with all queries (default)."""
         result = self.benchmark.run_benchmark(self.mock_connection, setup_database=False)
 
-        # Should run all queries in the benchmark
         assert result["total_queries"] == len(self.benchmark.get_queries())
         assert result["successful_queries"] == len(self.benchmark.get_queries())
 
     def test_run_benchmark_partial_failure(self):
-        """Test benchmark execution with some query failures."""
 
-        # Mock connection to fail on specific queries
         def mock_execute(query):
             if "nonexistent_table" in query:
                 raise DatabaseError("Table does not exist")
@@ -521,20 +455,17 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         assert result["successful_queries"] == 1
         assert result["failed_queries"] == 1
 
-        # Check that failed query has error info
         failed_query = next(r for r in result["query_results"] if "error" in r)
         assert failed_query["query_id"] == "error_query"
         assert "Table does not exist" in failed_query["error"]
 
     def test_run_benchmark_setup_failure(self):
-        """Test benchmark execution with setup failure."""
         benchmark = FailingBenchmark(fail_mode="load_data")
 
         with pytest.raises(RuntimeError, match="Data loading failed"):
             benchmark.run_benchmark(self.mock_connection, query_ids=[1], setup_database=True)
 
     def test_run_benchmark_with_fetch_results(self):
-        """Test benchmark execution with result fetching."""
         result = self.benchmark.run_benchmark(
             self.mock_connection,
             query_ids=[1],
@@ -547,7 +478,6 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         assert query_result["row_count"] == 1
 
     def test_run_benchmark_logs_progress(self, caplog):
-        """Test that benchmark execution logs progress."""
         with caplog.at_level(logging.INFO, logger="benchbox.base"):
             self.benchmark.run_benchmark(self.mock_connection, query_ids=[1], setup_database=False)
 
@@ -555,7 +485,6 @@ class TestMockBaseBenchmarkBenchmarkExecution:
         assert "Benchmark completed" in caplog.text
 
     def test_run_benchmark_calculates_timing_statistics(self):
-        """Test that benchmark calculates timing statistics correctly."""
         with (
             patch.object(
                 self.benchmark,
@@ -590,13 +519,11 @@ class TestMockBaseBenchmarkBenchmarkExecution:
                 self.mock_connection, query_ids=[1, 2, "complex"], setup_database=False
             )
 
-        # Each query took 1.0s (end - start for each query)
         assert result["average_query_time"] == 1.0
         assert result["min_query_time"] == 1.0
         assert result["max_query_time"] == 1.0
 
     def test_run_benchmark_handles_empty_query_list(self):
-        """Test benchmark execution with empty query list."""
         with (
             patch("benchbox.base.mono_time", return_value=0.0),
             patch("benchbox.base.elapsed_seconds", return_value=1.0),
@@ -611,10 +538,7 @@ class TestMockBaseBenchmarkBenchmarkExecution:
 
 
 class TestMockBaseBenchmarkResultFormatting:
-    """Test result formatting functionality."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.benchmark = MockBaseBenchmark()
         self.sample_result = {
             "benchmark_name": "TestBenchmark",
@@ -634,7 +558,6 @@ class TestMockBaseBenchmarkResultFormatting:
         }
 
     def test_format_results_basic_structure(self):
-        """Test basic structure of formatted results."""
         formatted = self.benchmark.format_results(self.sample_result)
 
         assert "Benchmark: TestBenchmark" in formatted
@@ -648,7 +571,6 @@ class TestMockBaseBenchmarkResultFormatting:
         assert "Max Query Time: 3.000s" in formatted
 
     def test_format_results_query_details(self):
-        """Test formatting of individual query details."""
         formatted = self.benchmark.format_results(self.sample_result)
 
         assert "Query Details:" in formatted
@@ -657,7 +579,6 @@ class TestMockBaseBenchmarkResultFormatting:
         assert "Query 3: FAILED - Database connection failed" in formatted
 
     def test_format_results_no_setup_time(self):
-        """Test formatting when setup time is zero."""
         result = self.sample_result.copy()
         result["setup_time"] = 0.0
 
@@ -666,7 +587,6 @@ class TestMockBaseBenchmarkResultFormatting:
         assert "Setup Time:" not in formatted
 
     def test_format_results_no_failures(self):
-        """Test formatting when all queries succeed."""
         result = {
             "benchmark_name": "TestBenchmark",
             "total_queries": 2,
@@ -689,29 +609,21 @@ class TestMockBaseBenchmarkResultFormatting:
         assert "FAILED" not in formatted
 
     def test_format_time_utility(self):
-        """Test the _format_time utility method."""
-        # Test milliseconds
         assert self.benchmark._format_time(0.05) == "50.0ms"
         assert self.benchmark._format_time(0.5) == "500.0ms"
 
-        # Test seconds
         assert self.benchmark._format_time(1.0) == "1.00s"
         assert self.benchmark._format_time(30.5) == "30.50s"
 
-        # Test minutes
         assert self.benchmark._format_time(60.0) == "1m 0.0s"
         assert self.benchmark._format_time(125.5) == "2m 5.5s"
 
 
 class TestMockBaseBenchmarkQueryTranslation:
-    """Test query translation functionality."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.benchmark = MockBaseBenchmark()
 
     def test_translate_query_success(self):
-        """Test successful query translation."""
         with patch("benchbox.base.sqlglot") as mock_sqlglot:
             with patch("benchbox.utils.dialect_utils.normalize_dialect_for_sqlglot") as mock_normalize:
                 mock_normalize.return_value = "mysql"
@@ -726,17 +638,14 @@ class TestMockBaseBenchmarkQueryTranslation:
                 )
 
     def test_translate_query_invalid_query_id(self):
-        """Test translation with invalid query ID."""
         with pytest.raises(ValueError, match="Invalid query ID"):
             self.benchmark.translate_query(999, "mysql")
 
     def test_translate_query_no_sqlglot(self):
-        """Test translation when sqlglot is not available."""
         with patch("benchbox.base.sqlglot", None), pytest.raises(ImportError, match="sqlglot is required"):
             self.benchmark.translate_query(1, "mysql")
 
     def test_translate_query_unsupported_dialect(self):
-        """Test translation with unsupported dialect."""
         with patch("benchbox.base.sqlglot") as mock_sqlglot:
             mock_sqlglot.transpile.side_effect = ValueError("Unsupported dialect")
 
@@ -744,30 +653,22 @@ class TestMockBaseBenchmarkQueryTranslation:
                 self.benchmark.translate_query(1, "unsupported")
 
     def test_translate_query_with_parameters(self):
-        """Test translation with query parameters."""
         with patch("benchbox.base.sqlglot") as mock_sqlglot:
             mock_sqlglot.transpile.return_value = ["SELECT * FROM table1 WHERE name = 'test'"]
 
             result = self.benchmark.translate_query(1, "mysql")
 
-            # Should get the query first, then translate it
             mock_sqlglot.transpile.assert_called_once()
             assert result == "SELECT * FROM table1 WHERE name = 'test'"
 
 
 class TestMockBaseBenchmarkBackwardCompatibility:
-    """Test backward compatibility with existing benchmarks."""
-
     def test_existing_benchmark_pattern_still_works(self):
-        """Test existing benchmark patterns work."""
-        # Test the base class with existing code
         benchmark = MockBaseBenchmark()
 
-        # Test basic functionality that existing benchmarks rely on
         assert benchmark.scale_factor == 1.0
         assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
 
-        # Test query methods
         queries = benchmark.get_queries()
         assert isinstance(queries, dict)
         assert len(queries) > 0
@@ -777,14 +678,12 @@ class TestMockBaseBenchmarkBackwardCompatibility:
         assert len(query) > 0
 
     def test_custom_attributes_preserved(self):
-        """Test that custom attributes are preserved."""
         benchmark = MockBaseBenchmark(custom_param="test_value", another_param=42)
 
         assert benchmark.custom_param == "test_value"
         assert benchmark.another_param == 42
 
     def test_subclass_overrides_work(self):
-        """Test that subclass method overrides work properly."""
 
         class CustomBenchmark(MockBaseBenchmark):
             def get_queries(self) -> dict[str, str]:
@@ -796,7 +695,6 @@ class TestMockBaseBenchmarkBackwardCompatibility:
         assert queries == {"custom": "SELECT 'custom' as result"}
 
     def test_run_with_platform_keeps_structural_third_party_adapter_compatibility(self):
-        """External adapters keep working without inheriting capability protocols."""
 
         class ThirdPartyAdapter:
             def run_benchmark(self, benchmark, **run_config):
@@ -809,7 +707,6 @@ class TestMockBaseBenchmarkBackwardCompatibility:
         assert result["run_config"] == {"query_subset": ["q1"], "benchmark_type": "olap"}
 
     def test_load_data_override_works(self):
-        """Test that _load_data can be overridden properly."""
 
         class CustomLoadBenchmark(MockBaseBenchmark):
             def _load_data(self, connection: DatabaseConnection) -> None:
@@ -826,10 +723,7 @@ class TestMockBaseBenchmarkBackwardCompatibility:
 
 
 class TestMockBaseBenchmarkErrorHandling:
-    """Test comprehensive error handling scenarios."""
-
     def test_database_connection_error(self):
-        """Test handling of database connection errors."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_connection.execute.side_effect = DatabaseError("Connection failed")
@@ -838,7 +732,6 @@ class TestMockBaseBenchmarkErrorHandling:
             benchmark.run_query(1, mock_connection)
 
     def test_query_execution_timeout(self):
-        """Test handling of query execution timeouts."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_connection.execute.side_effect = TimeoutError("Query timed out")
@@ -847,7 +740,6 @@ class TestMockBaseBenchmarkErrorHandling:
             benchmark.run_query(1, mock_connection)
 
     def test_result_fetching_error(self):
-        """Test handling of result fetching errors."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_cursor = Mock()
@@ -858,7 +750,6 @@ class TestMockBaseBenchmarkErrorHandling:
             benchmark.run_query(1, mock_connection, fetch_results=True)
 
     def test_setup_logging_error_handling(self, caplog):
-        """Test error handling in setup with logging."""
         benchmark = FailingBenchmark(fail_mode="generate_data")
         mock_connection = Mock(spec=DatabaseConnection)
 
@@ -868,7 +759,6 @@ class TestMockBaseBenchmarkErrorHandling:
         assert "Database setup failed" in caplog.text
 
     def test_query_execution_logging_error_handling(self, caplog):
-        """Test error handling in query execution with logging."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_connection.execute.side_effect = DatabaseError("Query failed")
@@ -880,17 +770,13 @@ class TestMockBaseBenchmarkErrorHandling:
 
 
 class TestMockBaseBenchmarkIntegration:
-    """Integration tests for the enhanced BaseBenchmark class."""
-
     def test_full_benchmark_workflow(self):
-        """Test complete benchmark workflow from setup to results."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_cursor = Mock()
         mock_connection.execute.return_value = mock_cursor
         mock_connection.fetchall.return_value = [{"id": 1, "value": "test"}]
 
-        # Run complete benchmark
         result = benchmark.run_benchmark(
             mock_connection,
             query_ids=[1, 2],
@@ -898,26 +784,22 @@ class TestMockBaseBenchmarkIntegration:
             setup_database=True,
         )
 
-        # Verify complete workflow
         assert benchmark._data_generated
         assert benchmark._load_data_called
         assert result["successful_queries"] == 2
         assert result["failed_queries"] == 0
         assert len(result["query_results"]) == 2
 
-        # Verify results are formatted correctly
         formatted = benchmark.format_results(result)
         assert "Benchmark: MockBaseBenchmark" in formatted
         assert "Successful: 2" in formatted
         assert "Failed: 0" in formatted
 
     def test_benchmark_with_mixed_success_failure(self):
-        """Test benchmark with both successful and failed queries."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_cursor = Mock()
 
-        # Configure mock to fail on specific query
         def mock_execute(query):
             if "nonexistent_table" in query:
                 raise DatabaseError("Table does not exist")
@@ -937,13 +819,11 @@ class TestMockBaseBenchmarkIntegration:
         assert result["successful_queries"] == 2
         assert result["failed_queries"] == 1
 
-        # Check that error information is preserved
         error_result = next(r for r in result["query_results"] if "error" in r)
         assert error_result["query_id"] == "error_query"
         assert "Table does not exist" in error_result["error"]
 
     def test_benchmark_performance_metrics(self):
-        """Test that performance metrics are calculated correctly."""
         benchmark = MockBaseBenchmark()
         mock_connection = Mock(spec=DatabaseConnection)
         mock_cursor = Mock()
@@ -982,7 +862,6 @@ class TestMockBaseBenchmarkIntegration:
         ):
             result = benchmark.run_benchmark(mock_connection, query_ids=[1, 2, "complex"], setup_database=False)
 
-        # Verify timing calculations
         assert result["average_query_time"] == 1.0
         assert result["min_query_time"] == 1.0
         assert result["max_query_time"] == 1.0
@@ -990,10 +869,7 @@ class TestMockBaseBenchmarkIntegration:
 
 
 class TestMockBaseBenchmarkResultHelpers:
-    """Test the helper methods added around benchmark result construction."""
-
     def test_create_enhanced_benchmark_result_delegates_to_impl(self):
-        """Test wrapper delegates enhanced result construction when available."""
         benchmark = MockBaseBenchmark()
         expected = object()
         benchmark._impl = Mock()
@@ -1020,7 +896,6 @@ class TestMockBaseBenchmarkResultHelpers:
         )
 
     def test_create_enhanced_benchmark_result_builds_result_with_snapshot(self):
-        """Test fallback enhanced-result path builds a standardized result."""
         benchmark = MockBaseBenchmark()
         result = benchmark.create_enhanced_benchmark_result(
             platform="duckdb",
@@ -1089,7 +964,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert result.query_results[0]["execution_time_seconds"] == 1.25
 
     def test_create_minimal_benchmark_result_sets_metadata_override(self):
-        """Test minimal-result helper populates metadata and benchmark ID override."""
         benchmark = MockBaseBenchmark()
         benchmark.name = "TPC-H Wrapper"
 
@@ -1118,7 +992,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert result.query_results == []
 
     def test_resolve_output_dir_requires_configured_path(self):
-        """Test output-dir resolution raises when no output path is configured."""
         benchmark = MockBaseBenchmark()
         benchmark.output_dir = None
 
@@ -1126,7 +999,6 @@ class TestMockBaseBenchmarkResultHelpers:
             benchmark._resolve_output_dir()
 
     def test_validate_preflight_creates_and_validates_output_dir(self, tmp_path):
-        """Test preflight validation uses resolved output directory."""
         benchmark = MockBaseBenchmark()
         output_dir = tmp_path / "tpch-datagen"
 
@@ -1139,7 +1011,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert output_dir.exists()
 
     def test_validate_manifest_passes_string_paths_to_validation_engine(self, tmp_path):
-        """Test manifest validation normalizes explicit string paths to Path objects."""
         benchmark = MockBaseBenchmark()
         expected = SimpleNamespace(is_valid=True, errors=[], warnings=[], details={})
 
@@ -1155,7 +1026,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert manifest_arg == tmp_path / "manifest.json"
 
     def test_validate_manifest_handles_handlers_without_joinpath(self):
-        """Test manifest validation returns a structured failure without a joinpath handler."""
         benchmark = MockBaseBenchmark()
 
         with patch.object(benchmark, "_resolve_output_dir", return_value=object()):
@@ -1166,7 +1036,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert result.details == {"benchmark": "mockbase"}
 
     def test_validate_loaded_data_delegates_to_database_validation_engine(self):
-        """Test post-load validation delegates with the normalized benchmark ID."""
         benchmark = MockBaseBenchmark()
         connection = object()
         expected = SimpleNamespace(is_valid=True, errors=[], warnings=[], details={})
@@ -1181,7 +1050,6 @@ class TestMockBaseBenchmarkResultHelpers:
         mock_validate.assert_called_once_with(connection, "tpch", benchmark.scale_factor)
 
     def test_create_result_builder_populates_platform_and_run_config(self):
-        """Test builder helper populates normalized benchmark and run-config state."""
         benchmark = MockBaseBenchmark()
 
         builder = benchmark._create_result_builder(
@@ -1227,7 +1095,6 @@ class TestMockBaseBenchmarkResultHelpers:
         assert builder._run_config.table_mode == "external"
 
     def test_populate_builder_adds_query_results_and_metadata(self):
-        """Test populate helper wires query results, timings, and metadata into the builder."""
         benchmark = MockBaseBenchmark()
         builder = Mock()
 
@@ -1270,7 +1137,6 @@ class TestMockBaseBenchmarkResultHelpers:
         builder.add_plan_capture_stats.assert_called_once_with(2, 1, [{"query_id": "Q2"}])
 
     def test_apply_phases_to_builder_handles_phase_objects_and_dicts(self):
-        """Test phase helper supports both ExecutionPhases objects and plain dictionaries."""
         benchmark = MockBaseBenchmark()
         builder = Mock()
 
@@ -1293,7 +1159,6 @@ class TestMockBaseBenchmarkResultHelpers:
         )
 
     def test_attach_performance_snapshot_supports_snapshot_objects_and_fallbacks(self):
-        """Test performance snapshot helper supports both snapshot objects and summaries."""
         benchmark = MockBaseBenchmark()
         result = SimpleNamespace(performance_summary={}, performance_characteristics={})
 
@@ -1315,9 +1180,6 @@ class TestMockBaseBenchmarkResultHelpers:
         benchmark._attach_performance_snapshot(fallback_result, {"throughput": 7.5})
 
         assert fallback_result.performance_summary == {"throughput": 7.5}
-
-
-# Test markers for pytest
 
 
 if __name__ == "__main__":

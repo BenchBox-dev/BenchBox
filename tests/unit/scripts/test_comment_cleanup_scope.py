@@ -276,7 +276,23 @@ def test_obligation_requires_exactly_one_destination_reference(tmp_path: Path, p
         scope.validate_evidence(policy, tmp_path, base, {"src/a.py"})
 
 
-def test_validator_writes_only_to_ignored_output(tmp_path: Path, policy: dict) -> None:
+@pytest.mark.parametrize(
+    "legacy_policy",
+    [
+        "absent",
+        "candidate-only",
+        "malformed",
+        "missing-external",
+        "missing-required-schema",
+        "bad-external-entry",
+        "invalid-version",
+        "valid",
+        "candidate-only-ownership",
+    ],
+)
+def test_validator_writes_only_to_ignored_output(
+    tmp_path: Path, policy: dict, legacy_policy: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Test"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.com"], check=True)
@@ -291,25 +307,65 @@ def test_validator_writes_only_to_ignored_output(tmp_path: Path, policy: dict) -
     (tmp_path / ".todo-batch/tasks.txt").write_text(
         "".join(f"TODO: {owner}\n" for owner in sorted(owners)), encoding="utf-8"
     )
-    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    invalid_policies = {
+        "malformed",
+        "missing-external",
+        "missing-required-schema",
+        "bad-external-entry",
+        "invalid-version",
+    }
+    if legacy_policy not in {"absent", "candidate-only"}:
+        legacy = {"version": 1, "external": [], "completed": [], "exceptions": []}
+        if legacy_policy == "candidate-only-ownership":
+            legacy["external"] = [{"path": "src/", "owner": "upstream", "provenance": "fixture source archive"}]
+        if legacy_policy == "missing-required-schema":
+            legacy = {"external": []}
+        elif legacy_policy == "bad-external-entry":
+            legacy["external"] = [{"path": "src/", "owner": "upstream"}]
+        elif legacy_policy == "invalid-version":
+            legacy["version"] = 0
+        raw = (
+            "{" if legacy_policy == "malformed" else "{}" if legacy_policy == "missing-external" else json.dumps(legacy)
+        )
+        (tmp_path / "quality/comment-policy.json").write_text(raw)
+    if legacy_policy == "candidate-only-ownership":
+        subprocess.run(["git", "-C", str(tmp_path), "add", "src/a.py", "quality/comment-policy.json"], check=True)
+
+        def reject_dependency_admission(*args: object, **kwargs: object) -> None:
+            pytest.fail("candidate-only ownership must not grant legacy dependency exemptions")
+
+        monkeypatch.setattr(scope, "immutable_dependency_artifacts", reject_dependency_admission)
+    else:
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "fixture"], check=True)
     base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
-    assert (
-        scope.main(
-            [
-                "--root",
-                str(tmp_path),
-                "--base",
-                base,
-                "--task-set",
-                ".todo-batch/tasks.txt",
-                "--output",
-                ".todo-batch/manifest.json",
-            ]
-        )
-        == 0
-    )
-    assert (tmp_path / ".todo-batch/manifest.json").is_file()
+    if legacy_policy == "candidate-only-ownership":
+        base_paths = set(scope.tracked_paths(tmp_path, base))
+        assert "quality/comment-policy.json" in base_paths
+        assert "quality/comment-cleanup-scope.json" not in base_paths
+        assert scope.immutable_external_ownership(tmp_path, base, legacy["external"]) is None
+    if legacy_policy == "candidate-only":
+        (tmp_path / "quality/comment-policy.json").write_text("{")
+    assert scope.main(
+        [
+            "--root",
+            str(tmp_path),
+            "--base",
+            base,
+            "--task-set",
+            ".todo-batch/tasks.txt",
+            "--output",
+            ".todo-batch/manifest.json",
+        ]
+    ) == (2 if legacy_policy in invalid_policies else 0)
+    assert (tmp_path / ".todo-batch/manifest.json").is_file() == (legacy_policy not in invalid_policies)
+    if legacy_policy == "candidate-only-ownership":
+        report = json.loads((tmp_path / ".todo-batch/manifest.json").read_text())
+        assert all(record["state"] != "excluded" for record in report["paths"])
+        source = next(record for record in report["paths"] if record["path"] == "src/a.py")
+        assert source["owner"] == "comment-cleanup-core-bootstrap"
+        assert source["state"] == "blocked"
+
     assert (
         scope.main(
             [
@@ -1109,3 +1165,14 @@ def test_overlapping_external_prefixes_are_rejected(policy: dict) -> None:
     policy["external_entries"] = [_external(), _external(selector={"prefix": "vendor/sub/"})]
     with pytest.raises(scope.PolicyError, match="overlaps"):
         scope.validate_external_entries(policy, {"vendor/sub/a.c"})
+
+
+def test_native_checker_reuses_the_scope_schema_validator() -> None:
+    import check_comment_cleanup_scope as shared
+    import check_comment_policy as native
+
+    assert native.load_policy is shared.load_comment_policy
+    assert native.validate_path is shared.validate_comment_policy_path
+    assert native.matches is shared.comment_policy_matches
+    assert native.DIRECTIVES is shared.COMMENT_POLICY_DIRECTIVES
+    assert native.ENFORCEMENT_MODES is shared.COMMENT_POLICY_ENFORCEMENT_MODES

@@ -56,13 +56,6 @@ SSB Class
 Constructor
 ~~~~~~~~~~~
 
-.. code-block:: python
-
-    SSB(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 Parameters:
 
@@ -147,6 +140,8 @@ get_schema() -> dict[str, dict]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Get SSB schema information.
+
+The facade annotation says ``list[dict]``, but the delegated implementation returns a table-name mapping.
 
 .. code-block:: python
 

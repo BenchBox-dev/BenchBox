@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""Detect duplicate and near-duplicate functions across the benchbox codebase.
-
-Uses Python's built-in ``ast`` module to structurally hash every function body,
-then reports groups of functions whose AST structure is identical (Type-2 clones
-in the clone-detection literature: same structure, different identifiers/literals).
-
-Exit codes:
-  0 - duplicated lines within the absolute threshold, or delta does not increase
-  1 - absolute threshold exceeded, PR increased duplicated lines, or other error
-
-Integration points:
-  • ``make duplicate-check`` / ``duplicate-check-verbose`` / ``duplicate-check-json``
-  • ``make duplicate-check-delta`` (``--delta-vs``, PR base comparison)
-  • PR lint job: ``guard-duplicate-delta`` (and local ``make ci-lint``)
-
-Configuration lives in ``pyproject.toml`` under ``[tool.benchbox.duplicates]``.
-"""
 
 from __future__ import annotations
 
@@ -35,15 +18,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class FunctionInfo:
-    """A single function occurrence in the codebase."""
-
     name: str
     file: str
     line: int
@@ -56,8 +33,6 @@ class FunctionInfo:
 
 @dataclass
 class DuplicateGroup:
-    """A group of structurally-identical functions."""
-
     structural_hash: str
     functions: list[FunctionInfo] = field(default_factory=list)
 
@@ -71,14 +46,11 @@ class DuplicateGroup:
 
     @property
     def duplicated_lines(self) -> int:
-        """Lines that are duplicates (total minus the 'original')."""
         return self.representative_lines * (self.copies - 1)
 
 
 @dataclass(frozen=True)
 class IgnoreRule:
-    """Path-scoped ignore rule for function names."""
-
     function_names: frozenset[str]
     path_contains: tuple[str, ...]
 
@@ -90,19 +62,11 @@ class IgnoreRule:
         return any(marker in filepath for marker in self.path_contains)
 
 
-# ---------------------------------------------------------------------------
-# AST-based structural hashing
-# ---------------------------------------------------------------------------
-
-
 class _FunctionHasher(ast.NodeVisitor):
-    """Walk a module AST and collect structural hashes for every function."""
-
     def __init__(self, filepath: str) -> None:
         self.filepath = filepath
         self.results: list[tuple[str, FunctionInfo]] = []
 
-    # ------------------------------------------------------------------
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._process(node)
         self.generic_visit(node)
@@ -111,7 +75,6 @@ class _FunctionHasher(ast.NodeVisitor):
         self._process(node)
         self.generic_visit(node)
 
-    # ------------------------------------------------------------------
     def _process(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         if node.name in _IGNORE_FUNCTION_NAMES:
             return
@@ -134,15 +97,8 @@ class _FunctionHasher(ast.NodeVisitor):
         )
         self.results.append((h, info))
 
-    # ------------------------------------------------------------------
     @staticmethod
     def _structural_signature(node: ast.AST) -> str:
-        """Build a string that captures control-flow structure while ignoring names.
-
-        This deliberately *strips* identifiers, string literals, and numeric
-        constants so that two functions with identical logic but different
-        variable/column names hash to the same value (Type-2 clone detection).
-        """
         tokens: list[str] = []
         for child in ast.walk(node):
             kind = type(child).__name__
@@ -195,14 +151,9 @@ class _FunctionHasher(ast.NodeVisitor):
         return "|".join(tokens)
 
 
-_MIN_FUNCTION_LINES = 10  # default; overridden by config / CLI
+_MIN_FUNCTION_LINES = 10
 _IGNORE_FUNCTION_NAMES: set[str] = set()
 _IGNORE_RULES: list[IgnoreRule] = []
-
-
-# ---------------------------------------------------------------------------
-# Scanning
-# ---------------------------------------------------------------------------
 
 
 def scan_directory(
@@ -213,7 +164,6 @@ def scan_directory(
     ignore_function_names: list[str] | None = None,
     ignore_rules: list[dict[str, Any]] | None = None,
 ) -> dict[str, DuplicateGroup]:
-    """Scan *root* for Python files and return duplicate-function groups."""
     global _MIN_FUNCTION_LINES, _IGNORE_FUNCTION_NAMES, _IGNORE_RULES
     _MIN_FUNCTION_LINES = min_lines
     _IGNORE_FUNCTION_NAMES = set(ignore_function_names or [])
@@ -251,7 +201,6 @@ def scan_directory(
 
 
 def _parse_ignore_rules(raw_rules: list[dict[str, Any]]) -> list[IgnoreRule]:
-    """Parse path-scoped ignore rules from config."""
     parsed: list[IgnoreRule] = []
     for idx, raw in enumerate(raw_rules):
         if not isinstance(raw, dict):
@@ -276,7 +225,6 @@ def _parse_ignore_rules(raw_rules: list[dict[str, Any]]) -> list[IgnoreRule]:
 
 
 def compute_stats(groups: dict[str, DuplicateGroup]) -> dict[str, int | float]:
-    """Compute summary statistics from duplicate groups."""
     total_dup_lines = sum(g.duplicated_lines for g in groups.values())
     total_instances = sum(g.copies - 1 for g in groups.values())
     return {
@@ -286,22 +234,11 @@ def compute_stats(groups: dict[str, DuplicateGroup]) -> dict[str, int | float]:
     }
 
 
-# ---------------------------------------------------------------------------
-# Configuration loading
-# ---------------------------------------------------------------------------
-
-
 def _load_config(pyproject_path: Path) -> dict:
-    """Load [tool.benchbox.duplicates] from pyproject.toml."""
     if not pyproject_path.exists():
         return {}
     data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
     return data.get("tool", {}).get("benchbox", {}).get("duplicates", {})
-
-
-# ---------------------------------------------------------------------------
-# Reporting
-# ---------------------------------------------------------------------------
 
 
 def _format_report(
@@ -311,7 +248,6 @@ def _format_report(
     top_n: int = 20,
     verbose: bool = False,
 ) -> str:
-    """Format a human-readable report."""
     lines: list[str] = []
     lines.append("=" * 72)
     lines.append("Duplicate Code Report (AST structural clone detection)")
@@ -337,7 +273,6 @@ def _format_report(
             for func in group.functions:
                 lines.append(f"       {func.file}:{func.line}")
         else:
-            # Show first 3 locations
             for func in group.functions[:3]:
                 lines.append(f"       {func.file}:{func.line} - {func.name}()")
             if group.copies > 3:
@@ -347,18 +282,12 @@ def _format_report(
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# JSON output
-# ---------------------------------------------------------------------------
-
-
 def _json_report(
     groups: dict[str, DuplicateGroup],
     stats: dict[str, int | float],
     *,
     extra: dict[str, Any] | None = None,
 ) -> str:
-    """Produce a machine-readable JSON report."""
     ranked = sorted(groups.values(), key=lambda g: g.duplicated_lines, reverse=True)
     data: dict[str, Any] = {
         "summary": stats,
@@ -380,13 +309,7 @@ def _json_report(
     return json.dumps(data, indent=2)
 
 
-# ---------------------------------------------------------------------------
-# Delta (merge-base) comparison
-# ---------------------------------------------------------------------------
-
-
 def _repo_root(cwd: Path | None = None) -> Path:
-    """Return the git toplevel for *cwd* (default: process cwd)."""
     result = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=cwd or Path.cwd(),
@@ -400,11 +323,6 @@ def _repo_root(cwd: Path | None = None) -> Path:
 
 
 def resolve_delta_base_sha(repo: Path, ref: str) -> str:
-    """Resolve *ref* to the merge-base with HEAD (falls back to the ref tip).
-
-    Using the merge-base answers "did *this branch* increase duplicated lines?"
-    rather than comparing against a moving develop tip after the branch point.
-    """
     verify = subprocess.run(
         ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
         cwd=repo,
@@ -429,10 +347,6 @@ def resolve_delta_base_sha(repo: Path, ref: str) -> str:
 
 
 def materialize_source_at_ref(repo: Path, ref_sha: str, source_root_name: str, dest: Path) -> Path:
-    """Extract ``source_root_name`` from *ref_sha* into *dest* via ``git archive``.
-
-    Returns the path to the extracted source root (``dest / source_root_name``).
-    """
     archive = subprocess.run(
         ["git", "archive", "--format=tar", ref_sha, source_root_name],
         cwd=repo,
@@ -454,10 +368,6 @@ def materialize_source_at_ref(repo: Path, ref_sha: str, source_root_name: str, d
 
 
 def delta_verdict(base_lines: int, head_lines: int) -> tuple[bool, int]:
-    """Return ``(increased, delta)`` for duplicated-line counts.
-
-    *increased* is True only when head strictly exceeds base (epsilon 0).
-    """
     delta = head_lines - base_lines
     return delta > 0, delta
 
@@ -478,11 +388,6 @@ def _scan_stats(
         ignore_rules=ignore_rules,
     )
     return groups, compute_stats(groups)
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -559,10 +464,6 @@ Examples:
 
 
 def _resolve_head_source_root(repo: Path, configured: str) -> tuple[Path, str]:
-    """Return ``(head_path, archive_path)`` for the source root under *repo*.
-
-    *archive_path* is the path as stored in git (used by ``git archive``).
-    """
     head_root = Path(configured)
     if not head_root.is_dir():
         candidate = repo / configured
@@ -578,7 +479,6 @@ def _resolve_head_source_root(repo: Path, configured: str) -> tuple[Path, str]:
 
 
 def run_delta(args: argparse.Namespace, config: dict[str, Any]) -> int:
-    """Compare working-tree scan against a git ref (merge-base)."""
     configured_root = str(args.source_root or config.get("source_root", "benchbox"))
     try:
         repo = _repo_root()
@@ -650,7 +550,6 @@ def run_delta(args: argparse.Namespace, config: dict[str, Any]) -> int:
         print(f"Head:      {head_lines} duplicated lines in {head_stats['groups']} groups")
         print(f"Delta:     {delta:+d} duplicated lines")
         print("")
-        # Still show the head report for triage when something regressed.
         if increased or args.verbose:
             print(_format_report(head_groups, head_stats, top_n=args.top_n, verbose=args.verbose))
 
@@ -705,7 +604,7 @@ def run(args: argparse.Namespace) -> int:
     duplicated_lines = stats["duplicated_lines"]
 
     if args.json_output:
-        pass  # JSON consumers parse the output themselves
+        pass
     elif duplicated_lines > threshold:
         print(f"FAIL: {duplicated_lines} duplicated lines exceeds threshold of {threshold}")
         if not args.report_only:

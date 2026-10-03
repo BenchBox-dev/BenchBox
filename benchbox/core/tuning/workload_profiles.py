@@ -1,11 +1,3 @@
-"""Logical workload tuning profiles.
-
-Workload profiles describe reusable query-pattern evidence independent of any
-single platform's physical tuning vocabulary. Platform capability maps translate
-these logical candidates into partitioning, clustering, distribution, sorting,
-or an explicit unsupported/waived decision.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -43,8 +35,6 @@ VALID_ROLES = frozenset(
 
 @dataclass(frozen=True)
 class WorkloadTuningCandidate:
-    """One logical workload-level tuning candidate."""
-
     benchmark: str
     table: str
     column: str
@@ -85,8 +75,6 @@ class WorkloadTuningCandidate:
 
 @dataclass(frozen=True)
 class WorkloadTuningProfile:
-    """A reusable logical tuning profile for one workload family."""
-
     id: str
     version: str
     description: str
@@ -117,7 +105,6 @@ class WorkloadTuningProfile:
 
 
 def load_workload_tuning_profile(path: Path = DEFAULT_TPC_PROFILE) -> WorkloadTuningProfile:
-    """Load and validate a workload tuning profile YAML file."""
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     profile_data = data.get("profile")
     if not isinstance(profile_data, dict):
@@ -157,7 +144,6 @@ def load_workload_tuning_profile(path: Path = DEFAULT_TPC_PROFILE) -> WorkloadTu
 
 @lru_cache(maxsize=1)
 def load_tpc_tuning_profile() -> WorkloadTuningProfile:
-    """Load the bundled platform-neutral TPC tuning profile."""
     return load_workload_tuning_profile(DEFAULT_TPC_PROFILE)
 
 

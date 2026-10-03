@@ -1,13 +1,4 @@
-"""Unit tests for Pandas DataFrame adapter.
-
-Tests for:
-- PandasDataFrameAdapter initialization
-- Data loading (CSV, Parquet)
-- Query execution
-- Helper methods
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,7 +15,6 @@ pytestmark = [
 ]
 
 
-# Check if Pandas is available
 try:
     import pandas as pd
 
@@ -39,8 +29,6 @@ except ImportError:
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasDataFrameAdapter:
-    """Tests for PandasDataFrameAdapter."""
-
     def test_initialization(self):
 
         adapter = PandasDataFrameAdapter()
@@ -63,20 +51,16 @@ class TestPandasDataFrameAdapter:
 
     def test_initialization_with_copy_on_write(self):
 
-        # Get Pandas version
         pandas_version = tuple(int(x) for x in pd.__version__.split(".")[:2])
 
         adapter = PandasDataFrameAdapter(copy_on_write=True)
 
         if pandas_version >= (3, 0):
-            # In Pandas 3.0+, CoW is permanent and cannot be disabled
             assert adapter.copy_on_write is True
         elif pandas_version >= (2, 0):
-            # CoW should be enabled for Pandas 2.0+
             assert adapter.copy_on_write is True
             assert pd.options.mode.copy_on_write is True
         else:
-            # CoW not available before Pandas 2.0
             assert adapter.copy_on_write is False
 
     def test_initialization_with_copy_on_write_disabled(self):
@@ -86,7 +70,6 @@ class TestPandasDataFrameAdapter:
         adapter = PandasDataFrameAdapter(copy_on_write=False)
 
         if pandas_version >= (3, 0):
-            # In Pandas 3.0+, CoW is permanent and cannot be disabled
             assert adapter.copy_on_write is True
         elif pandas_version >= (2, 0):
             assert adapter.copy_on_write is False
@@ -101,7 +84,7 @@ class TestPandasDataFrameAdapter:
         assert info["platform"] == "Pandas"
         assert info["family"] == "pandas"
         assert "version" in info
-        assert "copy_on_write" in info  # Should include CoW status
+        assert "copy_on_write" in info
 
     def test_create_context(self):
 
@@ -115,13 +98,10 @@ class TestPandasDataFrameAdapter:
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasDataLoading:
-    """Tests for Pandas data loading methods."""
-
     def test_read_csv_basic(self, tmp_path):
 
         adapter = PandasDataFrameAdapter()
 
-        # Create a test CSV file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id,name,amount\n1,Alice,100\n2,Bob,200\n")
 
@@ -135,7 +115,6 @@ class TestPandasDataLoading:
 
         adapter = PandasDataFrameAdapter()
 
-        # Create a pipe-delimited file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id|name|amount\n1|Alice|100\n2|Bob|200\n")
 
@@ -147,7 +126,6 @@ class TestPandasDataLoading:
 
         adapter = PandasDataFrameAdapter()
 
-        # Create a headerless CSV
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("1,Alice,100\n2,Bob,200\n")
 
@@ -160,7 +138,6 @@ class TestPandasDataLoading:
         assert list(df.columns) == ["id", "name", "amount"]
 
     def test_read_csv_with_column_names_parses_dates(self, tmp_path):
-        """Explicit-schema raw CSV loads parse date columns without date surrogate keys."""
         adapter = PandasDataFrameAdapter()
 
         csv_path = tmp_path / "orders.tbl"
@@ -180,12 +157,6 @@ class TestPandasDataLoading:
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
     def test_read_csv_type_aware_date_parsing_by_declared_type(self, tmp_path):
-        """A declared TIMESTAMP column parses even when its name misses the suffix heuristic (w9).
-
-        ClickBench's ClientEventTime is TIMESTAMP but does not end in
-        date/timestamp, so the name-only heuristic read it as a raw string while
-        the SQL surface returned a datetime. Declared types are now authoritative.
-        """
         adapter = PandasDataFrameAdapter()
         csv_path = tmp_path / "hits.csv"
         csv_path.write_text("1|2013-07-01 00:01:34\n")
@@ -201,11 +172,6 @@ class TestPandasDataLoading:
         assert pd.api.types.is_datetime64_any_dtype(df["ClientEventTime"])
 
     def test_read_csv_declared_text_column_not_inferred_numeric(self, tmp_path):
-        """A declared TEXT column with numeric-looking values stays string (w9).
-
-        join-order movie_info_idx.info holds rating strings like "8.0"; pandas
-        would infer float64 and diverge from the VARCHAR SQL surface.
-        """
         adapter = PandasDataFrameAdapter()
         csv_path = tmp_path / "info.csv"
         csv_path.write_text("1|8.0\n2|10.0\n")
@@ -222,11 +188,6 @@ class TestPandasDataLoading:
         assert df["info"].iloc[0] == "8.0"
 
     def test_read_csv_empty_string_handling_follows_null_marker(self, tmp_path):
-        """Empty text fields stay "" when null_marker is None, NaN when "" (w9).
-
-        Matches the SQL surface per the benchmark's resolved CSV dialect:
-        ClickBench (null_marker=None) keeps ""; JoinOrder (null_marker="") nulls.
-        """
         adapter = PandasDataFrameAdapter()
         csv_path = tmp_path / "t.csv"
         csv_path.write_text("1|\n2|hello\n")
@@ -252,7 +213,6 @@ class TestPandasDataLoading:
         assert pd.isna(nulled["note"].iloc[0])
 
     def test_load_headered_csv_with_column_names_parses_dates(self, tmp_path):
-        """Headered CSV loads still use schema names for pandas date converters."""
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -273,20 +233,11 @@ class TestPandasDataLoading:
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
     def test_read_csv_all_digit_string_column_stays_text(self, tmp_path):
-        """An all-digit declared string column keeps its values as text, not numbers.
-
-        Without forcing the declared string dtype, pandas infers an all-digit
-        VARCHAR (e.g. a zip/id code) as float64, so '10' becomes 10.0 and diverges
-        from the SQL reference that stores the literal string.
-        """
         adapter = PandasDataFrameAdapter()
 
         csv_path = tmp_path / "codes.tbl"
         csv_path.write_text("1|007|x\n2|10|y\n3||z\n")
 
-        # null_marker=None (keep-empty dialect, e.g. ClickBench): an empty declared
-        # string field stays '' rather than NULL, so the all-digit-text contract can
-        # be asserted alongside the empty-field handling.
         df = adapter.read_csv(
             csv_path,
             delimiter="|",
@@ -296,8 +247,6 @@ class TestPandasDataLoading:
             column_types=["INTEGER", "VARCHAR", "VARCHAR"],
         )
 
-        # Leading zero preserved, value is the string '10' not the number 10, and
-        # the empty field is '' (not NaN) under the keep-empty dialect.
         assert list(df["code"]) == ["007", "10", ""]
         assert df["code"].dtype == object
 
@@ -305,7 +254,6 @@ class TestPandasDataLoading:
 
         adapter = PandasDataFrameAdapter()
 
-        # Create a test Parquet file
         parquet_path = tmp_path / "test.parquet"
         test_df = pd.DataFrame(
             {
@@ -371,8 +319,6 @@ class TestPandasDataLoading:
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasHelperMethods:
-    """Tests for Pandas helper methods."""
-
     def test_to_datetime(self):
 
         adapter = PandasDataFrameAdapter()
@@ -412,7 +358,7 @@ class TestPandasHelperMethods:
 
         merged = adapter.merge(left, right, on="id", how="left")
 
-        assert len(merged) == 3  # All left rows preserved
+        assert len(merged) == 3
 
     def test_groupby_agg(self):
 
@@ -507,14 +453,11 @@ class TestPandasHelperMethods:
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasQueryExecution:
-    """Tests for query execution with Pandas."""
-
     def test_simple_select_query(self):
 
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Register test data
         test_df = pd.DataFrame(
             {
                 "id": [1, 2, 3],
@@ -568,7 +511,7 @@ class TestPandasQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # 150 and 200
+        assert result["rows_returned"] == 2
 
     def test_groupby_query(self):
 
@@ -598,7 +541,7 @@ class TestPandasQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # Two categories
+        assert result["rows_returned"] == 2
 
     def test_join_query(self):
 
@@ -625,7 +568,6 @@ class TestPandasQueryExecution:
         def join_impl(ctx):
             orders = ctx.get_table("orders")
             customers = ctx.get_table("customers")
-            # Use UnifiedPandasFrame's merge method instead of pd.merge
             return orders.merge(customers, on="customer_id", how="left")
 
         query = DataFrameQuery(
@@ -655,7 +597,6 @@ class TestPandasQueryExecution:
 
         def helper_impl(ctx):
             data = ctx.get_table("data")
-            # Use context helpers (col returns string, lit returns value)
             col_name = ctx.col("value")
             threshold = ctx.lit(15)
             return data[data[col_name] > threshold]
@@ -670,19 +611,16 @@ class TestPandasQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # 20 and 30
+        assert result["rows_returned"] == 2
 
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasTableLoading:
-    """Tests for table loading functionality."""
-
     def test_load_table_parquet(self, tmp_path):
 
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         parquet_path = tmp_path / "orders.parquet"
         pd.DataFrame(
             {
@@ -701,7 +639,6 @@ class TestPandasTableLoading:
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         csv_path = tmp_path / "customers.csv"
         csv_path.write_text("id,name\n1,Alice\n2,Bob\n")
 
@@ -715,7 +652,6 @@ class TestPandasTableLoading:
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         for name, rows in [("orders", 5), ("customers", 3), ("products", 10)]:
             path = tmp_path / f"{name}.parquet"
             pd.DataFrame({"id": list(range(rows))}).to_parquet(path)
@@ -729,8 +665,6 @@ class TestPandasTableLoading:
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")
 class TestPandasScalarExtraction:
-    """Tests for Pandas scalar extraction optimization."""
-
     def test_scalar_single_value_dataframe(self):
 
         adapter = PandasDataFrameAdapter()
@@ -786,7 +720,6 @@ class TestPandasScalarExtraction:
         assert result == "hello"
 
     def test_scalar_via_context(self):
-        """Test scalar extraction via context (integration)."""
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -805,7 +738,6 @@ class TestPandasScalarExtraction:
             adapter.scalar(df)
 
     def test_scalar_two_rows_raises(self):
-        """Test that scalar extraction on 2-row DataFrame raises ValueError."""
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
@@ -815,24 +747,14 @@ class TestPandasScalarExtraction:
 
 
 class TestPandasNotAvailable:
-    """Tests for behavior when Pandas is not installed."""
-
     def test_pandas_available_flag(self):
 
         from benchbox.platforms.dataframe.pandas_df import PANDAS_AVAILABLE
 
-        # This just tests that the flag exists and is boolean
         assert isinstance(PANDAS_AVAILABLE, bool)
 
 
 class TestTypeAwareDateColumnInference:
-    """The CSV date heuristic must use schema types, not just column names.
-
-    Regression for SSB: ``lo_orderdate`` / ``lo_commitdate`` are INTEGER YYYYMMDD
-    datekeys whose names end in ``date``; the name-only heuristic tried to
-    date-parse them and crashed the pandas loader.
-    """
-
     def test_numeric_date_named_column_is_not_a_date(self):
         from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
 
@@ -845,7 +767,6 @@ class TestTypeAwareDateColumnInference:
     def test_string_date_named_column_is_still_a_date(self):
         from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
 
-        # SSB d_date is VARCHAR; a real string date must still be parsed.
         names = ["d_datekey", "d_date"]
         types = ["INTEGER", "VARCHAR(18)"]
         date_cols, _ = _pandas_parse_date_columns(names, types)
@@ -854,7 +775,6 @@ class TestTypeAwareDateColumnInference:
     def test_without_types_falls_back_to_name_heuristic(self):
         from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
 
-        # No types supplied -> unchanged legacy behavior (name-only).
         names = ["o_orderdate", "o_custkey"]
         date_cols, _ = _pandas_parse_date_columns(names, None)
         assert date_cols == ["o_orderdate"]
@@ -862,9 +782,8 @@ class TestTypeAwareDateColumnInference:
     def test_mismatched_types_length_is_ignored(self):
         from benchbox.platforms.dataframe.pandas_df import _pandas_parse_date_columns
 
-        # A types list that does not align with names is ignored (safe fallback).
         names = ["o_orderdate", "o_custkey"]
-        date_cols, _ = _pandas_parse_date_columns(names, ["INTEGER"])  # wrong length
+        date_cols, _ = _pandas_parse_date_columns(names, ["INTEGER"])
         assert date_cols == ["o_orderdate"]
 
     def test_is_numeric_sql_type(self):
@@ -879,7 +798,6 @@ class TestTypeAwareDateColumnInference:
         assert not _is_numeric_sql_type(None)
 
     def test_read_csv_does_not_date_parse_integer_datekeys(self, tmp_path):
-        """End-to-end: read_csv with an integer datekey column must not crash or coerce."""
         from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
         csv = tmp_path / "lineorder.tbl"
@@ -892,5 +810,4 @@ class TestTypeAwareDateColumnInference:
             names=["lo_orderkey", "lo_orderdate", "lo_revenue"],
             column_types=["INTEGER", "INTEGER", "INTEGER"],
         )
-        # lo_orderdate stays an integer datekey (not a date) and loads cleanly.
         assert df["lo_orderdate"].tolist() == [19920101, 19980815]

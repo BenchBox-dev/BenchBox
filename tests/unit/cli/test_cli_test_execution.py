@@ -1,9 +1,6 @@
-"""Tests for CLI test execution functionality (Power, Throughput, Maintenance tests).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from unittest.mock import Mock, patch
@@ -23,10 +20,7 @@ pytestmark = [
 
 @pytest.mark.xdist_group("cli_phase_validation")
 class TestCLITestExecution:
-    """Test CLI test execution functionality."""
-
     def setup_method(self):
-        """Set up test environment."""
         self.runner = CliRunner()
 
     def test_power_phase_validation(self, cli_benchmark_mocks):
@@ -116,30 +110,24 @@ class TestCLITestExecution:
         assert "running tpch on duckdb" in result.output.lower() or "combined test execution" in result.output.lower()
 
     def test_phase_requires_benchmark(self):
-        """Test that providing phases without required benchmark is rejected."""
         result = self.runner.invoke(cli, ["run", "--phases", "power,throughput"], catch_exceptions=False)
         assert result.exit_code != 0
         assert "benchmark" in result.output.lower() or "required" in result.output.lower()
 
     def test_benchmark_config_test_execution_type_setting(self):
 
-        # Test power test
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="power")
         assert config.test_execution_type == "power"
 
-        # Test throughput test
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="throughput")
         assert config.test_execution_type == "throughput"
 
-        # Test maintenance test
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="maintenance")
         assert config.test_execution_type == "maintenance"
 
-        # Test combined test
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="combined")
         assert config.test_execution_type == "combined"
 
-        # Test default (standard)
         config = BenchmarkConfig(name="tpch", display_name="TPC-H")
         assert config.test_execution_type == "standard"
 
@@ -166,10 +154,7 @@ class TestCLITestExecution:
 
 
 class TestCLIOrchestrator:
-    """Test CLI orchestrator test execution delegation."""
-
     def setup_method(self):
-        """Set up test environment."""
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
 
         self.orchestrator = BenchmarkOrchestrator()
@@ -198,7 +183,6 @@ class TestCLIOrchestrator:
             from pathlib import Path
 
             mock_bench.return_value = Mock(_name="tpch", scale_factor=0.01)
-            # Provide pre-generated tables to skip generation
             mock_bench.return_value.tables = {"customer": Path("customer.tbl")}
             mock_bench.return_value.generate_data = Mock(return_value={"customer": Path("customer.tbl")})
             mock_bench.return_value.get_data_source_benchmark.return_value = None
@@ -343,7 +327,6 @@ class TestCLIOrchestrator:
         assert res.power_at_size == 123.0
 
     def test_tpc_metrics_none_when_not_provided(self):
-        """When adapter doesn't provide metrics, fields remain unset/None."""
         res = make_benchmark_results(
             benchmark_name="TPC-DS",
             platform="duckdb",
@@ -363,8 +346,6 @@ class TestCLIOrchestrator:
 
 
 class TestResultHandling:
-    """Test TPC result handling and metrics."""
-
     def test_benchmark_results_tpc_fields(self):
 
         result = make_benchmark_results(
@@ -387,10 +368,9 @@ class TestResultHandling:
             geometric_mean_execution_time=18.5,
         )
 
-        # Verify TPC fields are properly set
         assert result.test_execution_type == "power"
         assert result.power_at_size == 1500.0
-        assert result.throughput_at_size is None  # Not set for power test
+        assert result.throughput_at_size is None
         assert result.geometric_mean_execution_time == 18.5
 
     def test_cli_benchmark_results_tpc_fields(self):
@@ -406,10 +386,9 @@ class TestResultHandling:
             geometric_mean_execution_time=15.2,
         )
 
-        # Verify TPC fields are properly set
         assert isinstance(result, BenchmarkResults)
         assert result.test_execution_type == "throughput"
-        assert result.power_at_size is None  # Not set for throughput test
+        assert result.power_at_size is None
         assert result.throughput_at_size == 2500.0
         assert result.geometric_mean_execution_time == 15.2
 

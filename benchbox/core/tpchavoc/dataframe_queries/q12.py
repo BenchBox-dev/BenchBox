@@ -21,9 +21,7 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
-# ---------------------------------------------------------------------------
 
 
 def q12_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -34,9 +32,7 @@ def q12_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q12_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - apply all lineitem predicates before joining orders
-# ---------------------------------------------------------------------------
 
 
 def q12_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -107,9 +103,7 @@ def q12_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before joining
-# ---------------------------------------------------------------------------
 
 
 def q12_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -181,9 +175,7 @@ def q12_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit DataFrames for each step
-# ---------------------------------------------------------------------------
 
 
 def q12_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -253,9 +245,7 @@ def q12_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return aggregated.sort_values("l_shipmode")
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add priority flag columns before groupby
-# ---------------------------------------------------------------------------
 
 
 def q12_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -319,9 +309,7 @@ def q12_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style - maximum method chaining, no named intermediates
-# ---------------------------------------------------------------------------
 
 
 def q12_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -357,9 +345,7 @@ def q12_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q12_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - join orders first, then filter lineitem predicates
-# ---------------------------------------------------------------------------
 
 
 def q12_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -429,9 +415,7 @@ def q12_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - split date filter and mode filter as separate calls
-# ---------------------------------------------------------------------------
 
 
 def q12_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -492,9 +476,7 @@ def q12_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort - pass descending=[False] explicitly
-# ---------------------------------------------------------------------------
 
 
 def q12_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -561,9 +543,7 @@ def q12_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - use shipmode in-list as two separate equality checks
-# ---------------------------------------------------------------------------
 
 
 def q12_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -632,8 +612,7 @@ def q12_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q12_VARIANTS = build_yaml_variants(__file__, globals(), 12, JOIN_AGG_FILTER)

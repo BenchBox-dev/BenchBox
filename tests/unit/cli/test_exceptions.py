@@ -1,9 +1,6 @@
-"""Tests for CLI exception handling and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from io import StringIO
 
@@ -32,17 +29,13 @@ pytestmark = [
 
 
 def _assert_version_metadata(payload: dict) -> None:
-    """Assert that version metadata is present and correct."""
 
     assert payload.get("benchbox_version") == benchbox.__version__
     assert payload.get("release_tag") == f"v{benchbox.__version__}"
-    # Presence of the consistency flag is sufficient; value may vary in tests
     assert "version_consistent" not in payload or isinstance(payload["version_consistent"], bool)
 
 
 class TestBenchboxCLIErrors:
-    """Test CLI exception hierarchy."""
-
     def test_base_cli_error(self):
 
         error = BenchboxCLIError("Test error", {"key": "value"})
@@ -107,8 +100,6 @@ class TestBenchboxCLIErrors:
 
 
 class TestErrorContext:
-    """Test ErrorContext dataclass."""
-
     def test_error_context_creation(self):
 
         context = ErrorContext(
@@ -142,8 +133,6 @@ class TestErrorContext:
 
 
 class TestErrorHandler:
-    """Test ErrorHandler functionality."""
-
     def test_error_handler_creation(self):
 
         console = Console(file=StringIO(), force_terminal=True)
@@ -229,11 +218,7 @@ class TestErrorHandler:
 
 
 class TestValidationRules:
-    """Test ValidationRules functionality."""
-
     def test_validate_scale_factor_positive(self):
-        """Test scale factor validation with positive value."""
-        # Should not raise exception
         ValidationRules.validate_scale_factor(0.01)
         ValidationRules.validate_scale_factor(1.0)
         ValidationRules.validate_scale_factor(10.0)
@@ -264,12 +249,10 @@ class TestValidationRules:
         assert "recommended_range" in exc_info.value.details
 
     def test_validate_benchmark_name_valid(self):
-        """Test benchmark name validation with valid names."""
         available = ["tpch", "tpcds", "ssb"]
 
-        # Should not raise exceptions
         ValidationRules.validate_benchmark_name("tpch", available)
-        ValidationRules.validate_benchmark_name("TPCH", available)  # Case insensitive
+        ValidationRules.validate_benchmark_name("TPCH", available)
         ValidationRules.validate_benchmark_name("TpcDs", available)
 
     def test_validate_benchmark_name_empty(self):
@@ -291,16 +274,9 @@ class TestValidationRules:
         assert exc_info.value.details["available_benchmarks"] == available
 
     def test_validate_output_directory_local_valid(self, tmp_path):
-        """Test output directory validation with valid local path."""
-        # Should not raise exception
         ValidationRules.validate_output_directory(str(tmp_path))
 
     def test_validate_output_directory_local_invalid(self, tmp_path):
-        """Test output directory validation with invalid local path.
-
-        The invalid path sits under a regular FILE so creation fails for
-        every uid - root can mkdir /invalid, which made an absolute-path
-        probe pass vacuously as non-root and fail as root."""
         blocker = tmp_path / "blocker"
         blocker.write_text("")
         invalid = str(blocker / "sub")
@@ -312,12 +288,10 @@ class TestValidationRules:
 
     def test_validate_output_directory_cloud_invalid_credentials(self):
 
-        # This should fail because we don't have S3 credentials set up
         with pytest.raises(CloudStorageError) as exc_info:
             ValidationRules.validate_output_directory("s3://test-bucket/path")
 
         assert "Cloud storage credentials validation failed" in str(exc_info.value)
-        # Provider can be 's3' (cloudpathlib installed) or 'unknown' (not installed)
         assert exc_info.value.details["provider"] in ("s3", "unknown")
 
     def test_validate_output_directory_allows_user_stage_for_native_snowflake(self):

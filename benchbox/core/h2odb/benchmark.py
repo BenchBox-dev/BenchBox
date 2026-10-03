@@ -1,11 +1,6 @@
-"""H2O DB benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides H2O DB benchmark implementation that tests analytical database performance using taxi trip data.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
@@ -66,7 +61,6 @@ class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerati
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
 
-        import benchbox.sql_compat.rules.query_source.h2odb_variants  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
@@ -104,7 +98,7 @@ class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerati
             registry_decision = REGISTRY.resolve(ctx)
             if registry_decision is not None:
                 if registry_decision.action is CompatAction.SELECT_VARIANT:
-                    queries["Q9"] = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                    queries["Q9"] = registry_decision.payload.variant_sql
             else:
                 queries["Q9"] = legacy_sql
 
@@ -198,7 +192,7 @@ class H2OBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerati
                         }
                     )
 
-            iterations_list: list[dict[str, Any]] = query_results["iterations"]  # type: ignore[assignment]
+            iterations_list: list[dict[str, Any]] = query_results["iterations"]
             successful_iterations = [iter_result for iter_result in iterations_list if iter_result["success"]]
             if successful_iterations:
                 successful_times = [iter_result["time"] for iter_result in successful_iterations]

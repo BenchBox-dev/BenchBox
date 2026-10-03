@@ -1,9 +1,6 @@
-"""Unit tests for the DuckLake platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,8 +27,6 @@ pytestmark = [
 
 
 class TestDuckLakeVersionGuard:
-    """Test the DuckDB >= 1.3 runtime version parser/guard used by DuckLake."""
-
     @pytest.mark.parametrize(
         "version,expected",
         [
@@ -69,8 +64,6 @@ class TestDuckLakeVersionGuard:
 
 
 class TestDuckLakeFromConfig:
-    """Test DuckLakeAdapter.from_config() path resolution."""
-
     def test_resolves_default_paths_under_benchmark_runs(self, tmp_path):
         config = {
             "benchmark": "tpch",
@@ -82,10 +75,7 @@ class TestDuckLakeFromConfig:
         assert adapter.metadata_path.suffix == ".ducklake"
         assert str(adapter.metadata_path).startswith(str(tmp_path))
         assert adapter.data_path.name != ""
-        # Data path is a sibling "ducklake_data" dir alongside the metadata db.
         assert "ducklake_data" in adapter.data_path.parts
-        # from_config resolves paths only; directory creation is lazy (deferred
-        # to create_connection), so nothing is written to disk here.
         assert not adapter.metadata_path.parent.exists()
         assert not adapter.data_path.exists()
 
@@ -132,13 +122,6 @@ class TestDuckLakeFromConfig:
         assert adapter.metadata_path == preferred
 
     def test_honors_metadata_and_data_path_from_nested_options(self, tmp_path):
-        """#1082 review: benchbox run --platform ducklake --platform-option
-        metadata_path=... --platform-option data_path=... nests those values
-        under config["options"] (DuckLake has no registered PlatformHookRegistry
-        config builder to promote them to top-level flat keys), but the old
-        code only ever read the flat config.get("metadata_path")/
-        ("data_path"), so a real CLI-supplied catalog/data location was
-        silently ignored and the generated-default paths were used instead."""
         metadata_path = tmp_path / "nested" / "catalog.ducklake"
         data_path = tmp_path / "nested" / "data"
         config = {
@@ -153,8 +136,6 @@ class TestDuckLakeFromConfig:
 
 
 class TestDuckLakeAdapterBasics:
-    """Test basic adapter properties and construction."""
-
     def test_platform_name(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -171,22 +152,16 @@ class TestDuckLakeAdapterBasics:
         assert resolve_dialect_for_query_translation("ducklake") == "duckdb"
 
     def test_init_does_not_create_directories(self, tmp_path):
-        # Directory creation is lazy (deferred to create_connection): merely
-        # constructing an adapter must not touch the filesystem.
         metadata_path = tmp_path / "nested" / "catalog.ducklake"
         data_path = tmp_path / "nested" / "data"
         adapter = DuckLakeAdapter(metadata_path=str(metadata_path), data_path=str(data_path))
 
         assert adapter.metadata_path == metadata_path
         assert adapter.data_path == data_path
-        # No eager mkdir: neither the parent nor the data dir should exist yet.
         assert not metadata_path.parent.exists()
         assert not data_path.exists()
 
     def test_constructs_with_fallback_paths_without_touching_disk(self, tmp_path, monkeypatch):
-        # Direct construction without metadata_path/data_path should not raise
-        # and must not write real dirs. Redirect the fallback root into tmp_path
-        # and assert nothing is created on disk by construction alone.
         import benchbox.utils.path_utils as path_utils
 
         monkeypatch.setattr(
@@ -198,22 +173,13 @@ class TestDuckLakeAdapterBasics:
         adapter = DuckLakeAdapter()
         assert adapter.metadata_path.suffix == ".ducklake"
         assert str(adapter.metadata_path).startswith(str(tmp_path))
-        # Lazy: construction created nothing on disk.
         assert not (tmp_path / "fallback").exists()
 
     def test_create_connection_rejects_old_duckdb_version(self, tmp_path, monkeypatch):
-        # No live INSTALL/ATTACH: the guard is patched to reject before any
-        # network call, so this stays in the hermetic fast lane.
         metadata_path = tmp_path / "catalog.ducklake"
         data_path = tmp_path / "data"
         adapter = DuckLakeAdapter(metadata_path=str(metadata_path), data_path=str(data_path))
 
-        # DuckDBAdapter.create_connection() re-detects the live version from
-        # the real connection (SELECT version()) and overwrites
-        # driver_version_actual, so pre-seeding that attribute wouldn't stick.
-        # Patch the version-support predicate itself to exercise the
-        # create_connection wiring (guard runs, raises before INSTALL/ATTACH)
-        # without needing to actually downgrade the installed duckdb package.
         import benchbox.platforms.ducklake as ducklake_module
 
         monkeypatch.setattr(ducklake_module, "_duckdb_version_supports_ducklake", lambda version: False)
@@ -223,8 +189,6 @@ class TestDuckLakeAdapterBasics:
 
 
 class TestDuckLakeSchemaRewrite:
-    """DuckLake shares the DuckDB dialect but rejects PRIMARY KEY constraints."""
-
     def test_rewrite_strips_inline_and_table_level_primary_keys(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -267,7 +231,6 @@ class TestDuckLakeSchemaRewrite:
         assert adapter.operation_platform_key == "ducklake"
 
     def test_operation_platform_fallback_key_resolves_duckdb(self, tmp_path):
-        """Missing ducklake catalog entries inherit the shared duckdb dialect's."""
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -283,8 +246,6 @@ class TestDuckLakeSchemaRewrite:
 
 
 class TestDuckLakeCatalogValidation:
-    """Test the ``catalog`` platform option validation (w1)."""
-
     def test_default_catalog_is_duckdb(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -311,8 +272,6 @@ class TestDuckLakeCatalogValidation:
             )
 
     def test_empty_string_catalog_defaults_to_duckdb(self, tmp_path):
-        # An empty/falsy catalog value is treated as "unset" (same as
-        # omitting the option entirely), not as an invalid value.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -330,8 +289,6 @@ class TestDuckLakeCatalogValidation:
 
 
 class TestDuckLakeSqliteCatalog:
-    """Test sqlite catalog metadata-path resolution and ATTACH target (w1)."""
-
     def test_default_derived_ducklake_suffix_swapped_to_sqlite(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -350,7 +307,6 @@ class TestDuckLakeSqliteCatalog:
         assert adapter.metadata_path == explicit
 
     def test_duckdb_catalog_keeps_ducklake_suffix(self, tmp_path):
-        # Regression: the suffix swap must only apply to catalog="sqlite".
         explicit = tmp_path / "catalog.ducklake"
         adapter = DuckLakeAdapter(
             metadata_path=str(explicit),
@@ -360,8 +316,6 @@ class TestDuckLakeSqliteCatalog:
 
 
 class TestDuckLakeAttachTargetBuilder:
-    """Unit-test the per-backend ATTACH-string builder directly (w1/w2)."""
-
     def test_duckdb_attach_target_is_bare_metadata_path(self, tmp_path):
         metadata_path = tmp_path / "catalog.ducklake"
         adapter = DuckLakeAdapter(metadata_path=str(metadata_path), data_path=str(tmp_path / "data"))
@@ -391,8 +345,6 @@ class TestDuckLakeAttachTargetBuilder:
         assert target == "postgres:dbname=mydb host=pg.example.com user=alice password=s3cr3t port=5433"
 
     def test_postgres_attach_target_applies_defaults(self, tmp_path):
-        # No pg_* options supplied: host/port/user default via the shared
-        # PG-family helper; database defaults to the DuckLake-specific name.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -416,30 +368,21 @@ class TestDuckLakeAttachTargetBuilder:
         )
         connstring = adapter._build_postgres_connstring()
         assert "dbname='my db'" in connstring
-        # Embedded single quote is backslash-escaped per libpq quoting rules.
         assert r"password='pa\'ss'" in connstring
 
 
 class TestLibpqQuoteValue:
-    """Directly unit-test the libpq component quoter (w2 soundness)."""
-
     @pytest.mark.parametrize(
         "value,expected",
         [
-            # Simple values with no whitespace/quote/backslash pass through bare.
             ("localhost", "localhost"),
             ("5432", "5432"),
             ("my_db-1", "my_db-1"),
-            # Empty value must be quoted (bare `keyword=` is a libpq syntax error).
             ("", "''"),
-            # Whitespace triggers quoting.
             ("my db", "'my db'"),
             ("a\tb", "'a\tb'"),
-            # A single quote inside is backslash-escaped AND the value is wrapped.
             ("pa'ss", r"'pa\'ss'"),
-            # A backslash inside is doubled AND the value is wrapped.
             ("a\\b", r"'a\\b'"),
-            # Both together: backslash doubled, quote escaped, order preserved.
             ("a\\'b", r"'a\\\'b'"),
         ],
     )
@@ -448,24 +391,7 @@ class TestLibpqQuoteValue:
 
 
 class TestDuckLakePostgresAttachInjection:
-    """Adversarial coverage: a malicious PG password/param cannot break out of
-    either the libpq value or the outer single-quoted SQL string literal (w2).
-
-    The final ATTACH literal DuckDB executes is
-    ``'ducklake:<escape_sql_string_literal(attach_target)>'``, so these tests
-    assert the FULLY-escaped literal (libpq quoting THEN SQL quote-doubling),
-    not just the intermediate connstring - i.e. the exact composition the
-    reviewer asked to pin down.
-    """
-
     def _final_attach_literal(self, adapter):
-        """Reproduce create_connection()'s exact escaping of the ATTACH target.
-
-        Mirrors: escaped = escape_sql_string_literal(attach_target);
-                 sql = f"ATTACH 'ducklake:{escaped}' AS lake (...)".
-        Returns the single-quoted literal ``'ducklake:...'`` (including the
-        surrounding quotes) so balance/breakout can be asserted directly.
-        """
         target = adapter._build_catalog_attach_target()
         return "'ducklake:" + escape_sql_string_literal(target) + "'"
 
@@ -489,34 +415,16 @@ class TestDuckLakePostgresAttachInjection:
         )
         literal = self._final_attach_literal(adapter)
 
-        # 1. The literal is a single balanced SQL string: it starts and ends
-        #    with a quote, and every interior quote is doubled ('') - so the
-        #    count of standalone (odd-run) quotes is zero. Strip the outer pair,
-        #    then every remaining ' must be part of a '' pair.
         assert literal.startswith("'") and literal.endswith("'")
         interior = literal[1:-1]
-        # After SQL escaping, every single quote in the interior is doubled.
-        # Removing all '' pairs must leave NO stray single quote behind - that
-        # is exactly the property that prevents breaking out of the literal.
         assert "'" not in interior.replace("''", "")
 
-        # 2. The malicious payload's own quote/keyword material did not create a
-        #    real libpq keyword boundary: the connstring keeps password=... as
-        #    a single quoted value, so no injected `host=`/`sslmode=` keyword
-        #    escaped into the connection string as an unquoted token.
         connstring = adapter._build_postgres_connstring()
-        # The user/db we set are the only bare keyword tokens; the payload sits
-        # inside the quoted password value.
         assert connstring.count("password=") == 1
         assert connstring.startswith("dbname=benchdb host=") or "dbname=benchdb" in connstring
-        # The password value is single-quoted (payload contains a quote/space),
-        # so its content is contained, not a run of bare keyword=value tokens.
         assert "password='" in connstring
 
     def test_backslash_in_password_survives_both_escaping_layers(self, tmp_path):
-        # A backslash is libpq-doubled (\\) then passes through
-        # escape_sql_string_literal (which only doubles single quotes),
-        # so the final literal keeps the doubled backslash and stays balanced.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -525,34 +433,17 @@ class TestDuckLakePostgresAttachInjection:
             pg_password="a\\b'c",
         )
         connstring = adapter._build_postgres_connstring()
-        # libpq layer: backslash doubled, quote escaped, whole value wrapped.
         assert r"password='a\\b\'c'" in connstring
 
         literal = self._final_attach_literal(adapter)
-        # Outer SQL layer only doubles single quotes; balance still holds.
         assert literal.startswith("'") and literal.endswith("'")
         assert "'" not in literal[1:-1].replace("''", "")
 
 
 class TestDuckLakeCredentialRedaction:
-    """Regression: no credential material may reach a DuckLake ATTACH-failure.
-
-    The postgres catalog embeds the libpq connstring (password included) in the
-    ATTACH literal, so a driver error that echoes the failing statement carries
-    the password with it. These tests pin the redaction at both egress points:
-    the raised message AND the chained ``__cause__`` a traceback would print.
-    """
-
     SENTINEL = "s3nt1nel-pg-passw0rd"
 
     def _failing_adapter(self, tmp_path, monkeypatch, error_message, **kwargs):
-        """Adapter whose ATTACH fails with ``error_message`` (no live DuckDB).
-
-        Mirrors test_cloud_data_path_skips_local_mkdir_on_connect's stub: the
-        base DuckDBAdapter.create_connection() is replaced so the fast lane
-        stays hermetic, and the stub raises on ATTACH the way a real postgres
-        connection failure does - by quoting the statement back at us.
-        """
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckLakeAdapter(
@@ -577,16 +468,12 @@ class TestDuckLakeCredentialRedaction:
         "password",
         [
             "s3nt1nel-pg-passw0rd",
-            # Quoting-sensitive shapes: these reach DuckDB libpq-quoted and then
-            # SQL-escaped, so an exact-value replace of the raw form alone would
-            # miss them.
             "pass word with spaces",
             "pass'word",
             "a\\b'c",
         ],
     )
     def test_postgres_attach_failure_never_leaks_the_password(self, tmp_path, monkeypatch, password):
-        # The driver echoes the failing statement - the classic leak path.
         adapter = self._failing_adapter(
             tmp_path,
             monkeypatch,
@@ -602,14 +489,10 @@ class TestDuckLakeCredentialRedaction:
 
         message = str(excinfo.value)
         assert password not in message
-        # Every encoding this adapter can emit the password in is gone too.
         libpq_quoted = _libpq_quote_value(password)
         assert libpq_quoted not in message
         assert escape_sql_string_literal(libpq_quoted) not in message
-        # The chained cause would re-print the unredacted driver text in a
-        # traceback, so it must be suppressed for a credential-bearing run.
         assert excinfo.value.__cause__ is None
-        # Redacted, not merely truncated: the useful context survives.
         assert "Failed to initialize the DuckLake catalog" in message
         assert "catalog=postgres" in message
 
@@ -633,13 +516,9 @@ class TestDuckLakeCredentialRedaction:
 
         message = str(excinfo.value)
         assert self.SENTINEL not in message
-        # A driver error carrying no credential material is passed through
-        # intact - redaction must not swallow the diagnosis.
         assert "connection to server at 'db.example.com' failed: refused" in message
 
     def test_non_postgres_attach_failure_keeps_paths_and_cause(self, tmp_path, monkeypatch):
-        # Must-preserve: duckdb/sqlite catalogs hold no credentials, so they
-        # keep both the metadata_path/data_path context and the chained cause.
         adapter = self._failing_adapter(
             tmp_path,
             monkeypatch,
@@ -656,7 +535,6 @@ class TestDuckLakeCredentialRedaction:
         assert isinstance(excinfo.value.__cause__, RuntimeError)
 
     def test_s3_secret_never_leaks_through_attach_failure(self, tmp_path, monkeypatch):
-        # w3 sweep: explicit S3 key material takes the same egress path.
         adapter = self._failing_adapter(
             tmp_path,
             monkeypatch,
@@ -676,8 +554,6 @@ class TestDuckLakeCredentialRedaction:
 
 
 class TestRedactSecretsHelper:
-    """Unit coverage for the redaction primitive itself (w1/w3)."""
-
     def test_redacts_every_encoding_of_a_supplied_secret(self):
         secret = "pass word'x"
         quoted = _libpq_quote_value(secret)
@@ -687,9 +563,6 @@ class TestRedactSecretsHelper:
         assert quoted not in redacted
 
     def test_redacts_password_component_without_knowing_the_value(self):
-        # Backstop layer: the driver re-encoded the value, so no exact match
-        # is available - the `password=` component is still cut out, and the
-        # following libpq keyword bounds the redaction.
         message = "dbname=benchdb host=db user=alice password=hunter2 port=5432: FATAL"
         redacted = _redact_secrets(message)
         assert "hunter2" not in redacted
@@ -706,8 +579,6 @@ class TestRedactSecretsHelper:
         message = "CREATE OR REPLACE SECRET benchbox_ducklake_s3 (TYPE s3, KEY_ID 'AKIA', SECRET 'topsecret')"
         redacted = _redact_secrets(message)
         assert "topsecret" not in redacted
-        # The secret NAME is an unquoted identifier and is not credential
-        # material - it stays, so the message still says what failed.
         assert "benchbox_ducklake_s3" in redacted
 
     def test_leaves_credential_free_messages_untouched(self):
@@ -716,14 +587,6 @@ class TestRedactSecretsHelper:
 
 
 class TestDuckLakeDeploymentModeIsApplied:
-    """A selected deployment mode must actually select something.
-
-    Regression: adapter_factory resolved `--platform ducklake:<mode>` and passed
-    config["deployment_mode"], but the adapter never read it - so
-    `ducklake:postgres_catalog_s3` silently ran a local DuckDB-file catalog on
-    local disk. The caller got a different deployment than the one they named.
-    """
-
     def _from_config(self, tmp_path, **extra):
         config = {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
         config.update(extra)
@@ -742,12 +605,9 @@ class TestDuckLakeDeploymentModeIsApplied:
         assert self._from_config(tmp_path, deployment_mode=mode).catalog == expected_catalog
 
     def test_no_deployment_mode_leaves_behaviour_unchanged(self, tmp_path):
-        # Must-preserve: runs that pass no mode keep working exactly as today.
         assert self._from_config(tmp_path).catalog == "duckdb"
 
     def test_explicit_catalog_option_beats_the_mode(self, tmp_path, caplog):
-        # Must-preserve: explicit --platform-option stays authoritative. The
-        # contradiction is warned, not silently resolved either way.
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
             adapter = self._from_config(tmp_path, deployment_mode="postgres_catalog", options={"catalog": "sqlite"})
 
@@ -756,8 +616,6 @@ class TestDuckLakeDeploymentModeIsApplied:
         assert "using the explicit catalog=sqlite" in caplog.text
 
     def test_s3_mode_with_a_local_data_path_warns_and_uses_the_given_path(self, tmp_path, caplog):
-        # The storage axis cannot be defaulted - an s3:// mode needs a bucket
-        # and inventing one would be worse than saying nothing.
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
             adapter = self._from_config(tmp_path, deployment_mode="postgres_catalog_s3")
 
@@ -786,14 +644,9 @@ class TestDuckLakeDeploymentModeIsApplied:
         assert "implies" not in caplog.text
 
     def test_unknown_mode_is_ignored_rather_than_crashing(self, tmp_path):
-        # adapter_factory validates modes against the registry, so an unknown
-        # one should not reach here - but a stray value must not break a run.
         assert self._from_config(tmp_path, deployment_mode="not-a-mode").catalog == "duckdb"
 
     def test_every_registered_mode_is_mapped(self):
-        # Guard against the registry and the adapter drifting apart: a mode
-        # added to platform_registry.py without an axis mapping here would
-        # silently go back to selecting nothing.
         from benchbox.core.platform_registry import PlatformRegistry
         from benchbox.platforms.ducklake import _DEPLOYMENT_MODE_AXES
 
@@ -804,14 +657,6 @@ class TestDuckLakeDeploymentModeIsApplied:
 
 
 class TestDuckLakeFromConfigCatalogOptions:
-    """Test from_config() resolves catalog/pg_*/s3_* from both config shapes (w1-w3).
-
-    The real CLI --platform-option path nests values under config["options"]
-    (DuckLake has no registered PlatformHookRegistry config builder to promote
-    them to flat top-level keys - see from_config()'s _resolve_option
-    docstring), so both shapes must be exercised.
-    """
-
     def test_resolves_catalog_from_flat_config(self, tmp_path):
         config = {
             "benchmark": "tpch",
@@ -852,12 +697,6 @@ class TestDuckLakeFromConfigCatalogOptions:
         assert adapter.s3_region == "us-east-1"
 
     def test_resolves_force_recreate_from_nested_options(self, tmp_path):
-        """#1082 review: the real --force CLI flag threads through as
-        force_recreate nested in config["options"] (via PlatformHookRegistry's
-        default config builder), not as a flat "force" key. The old code only
-        read config.get("force", False), so a real --force request was
-        silently reset to False and an existing catalog would be reused
-        instead of wiped for a clean rebuild."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -868,9 +707,6 @@ class TestDuckLakeFromConfigCatalogOptions:
         assert adapter.force_recreate is True
 
     def test_resolves_force_recreate_from_legacy_flat_force_key(self, tmp_path):
-        """Back-compat: the legacy config_utils.py build_config() path passes
-        a flat "force" key (not "force_recreate") - must keep working
-        alongside the nested force_recreate resolution above."""
         config = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -887,8 +723,6 @@ class TestDuckLakeFromConfigCatalogOptions:
 
 
 class TestDuckLakeRunIdentity:
-    """The persistence marker must use DDL supported by DuckLake itself."""
-
     class _StubConn:
         def __init__(self):
             self.executed: list[str] = []
@@ -921,18 +755,7 @@ class TestDuckLakeRunIdentity:
 
 
 class TestDuckLakePostgresCatalogReuse:
-    """Reuse/force for a server-side catalog, resolved post-ATTACH (w6).
-
-    The inherited pre-connection hook keys off a local metadata_path file that a
-    postgres catalog never has, so before this every rerun looked like a fresh
-    run: the runner then issued the inherited plain CREATE TABLE against an
-    already-populated catalog and crashed with "table already exists", and
-    --force silently did nothing server-side.
-    """
-
     class _StubConn:
-        """Minimal setup-connection stub recording the SQL it is given."""
-
         def __init__(self, tables: list[str] | list[tuple[str, str]]):
             self._tables = tables
             self.executed: list[str] = []
@@ -959,8 +782,6 @@ class TestDuckLakePostgresCatalogReuse:
 
         adapter._resolve_postgres_catalog_reuse(conn)
 
-        # Reuse routes the runner past schema creation + data loading, which is
-        # exactly what stops the rerun crash.
         assert adapter.database_was_reused is True
         assert not any(sql.startswith("DROP TABLE") for sql in conn.executed)
 
@@ -978,11 +799,6 @@ class TestDuckLakePostgresCatalogReuse:
         ]
 
     def test_force_also_clears_the_local_data_path(self, tmp_path):
-        # Regression (found by running w1 against live PostgreSQL 18): dropping
-        # the catalog entries is only half of --force. Before this, a postgres
-        # catalog with a local data_path dropped its tables and then left the
-        # superseded Parquet on disk, while every other backend cleared it -
-        # the same flag meaning two different things by catalog backend.
         data_path = tmp_path / "data"
         data_path.mkdir(parents=True)
         (data_path / "part-0.parquet").write_text("superseded")
@@ -992,8 +808,6 @@ class TestDuckLakePostgresCatalogReuse:
         adapter._resolve_postgres_catalog_reuse(self._StubConn(["lineitem"]))
 
         assert list(data_path.rglob("*.parquet")) == []
-        # Still a usable directory: this runs AFTER the ATTACH, and DuckLake
-        # writes into an existing DATA_PATH.
         assert data_path.is_dir()
 
     def test_force_on_cloud_data_path_does_not_delete_but_warns(self, tmp_path, caplog):
@@ -1016,16 +830,6 @@ class TestDuckLakePostgresCatalogReuse:
         assert not any(sql.startswith("DROP TABLE") for sql in conn.executed)
 
     def test_stale_local_metadata_file_does_not_mark_a_postgres_run_reused(self, tmp_path):
-        """A leftover .ducklake file must not stand in for a server-side catalog.
-
-        Regression found by the first TPC-H SF=1 postgres run: metadata_path is
-        always computed to a default even for catalog=postgres, so a file left
-        by an earlier duckdb-catalog run at the same benchmark/scale made
-        handle_existing_database() report the database as reused. The runner
-        then skipped schema creation and data loading and failed validation
-        against an empty PostgreSQL catalog - "Empty tables detected: region,
-        nation, supplier, ...".
-        """
         adapter = self._adapter(tmp_path)
         adapter.metadata_path.parent.mkdir(parents=True, exist_ok=True)
         adapter.metadata_path.write_text("stale catalog from a duckdb-backed run")
@@ -1033,11 +837,9 @@ class TestDuckLakePostgresCatalogReuse:
         adapter.handle_existing_database()
 
         assert adapter.database_was_reused is False
-        # ...and the stale file is left alone: it is not this backend's to delete.
         assert adapter.metadata_path.exists()
 
     def test_local_catalog_still_decides_reuse_from_metadata_path(self, tmp_path):
-        # Must-preserve: duckdb/sqlite keep the pre-connection behaviour.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -1058,9 +860,6 @@ class TestDuckLakePostgresCatalogReuse:
         assert conn.executed == []
 
     def test_table_listing_is_scoped_to_the_lake_catalog(self, tmp_path):
-        # duckdb_tables() spans every attached catalog; the base memory/file
-        # catalog of the shell connection is not part of DuckLake's persistence
-        # unit, so an unscoped query would misread it as a populated catalog.
         adapter = self._adapter(tmp_path)
         conn = self._StubConn(["lineitem"])
 
@@ -1070,12 +869,6 @@ class TestDuckLakePostgresCatalogReuse:
         assert "database_name = 'lake'" in conn.executed[0]
 
     def _connect_with_stub(self, adapter, monkeypatch, tables):
-        """Drive create_connection() against a stubbed DuckDB, returning the stub.
-
-        Without this the resolver could be unit-tested green while nothing
-        actually called it from create_connection() - deleting the call site
-        would go unnoticed.
-        """
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         outer = self
@@ -1099,9 +892,6 @@ class TestDuckLakePostgresCatalogReuse:
         assert adapter.database_was_reused is True
 
     def test_create_connection_does_not_resolve_for_local_catalogs(self, tmp_path, monkeypatch):
-        # duckdb/sqlite catalogs keep the pre-connection metadata_path check, so
-        # the post-ATTACH resolver must not second-guess it. The stub reports a
-        # populated catalog; a duckdb-backed adapter must ignore that.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path=str(tmp_path / "data"),
@@ -1113,8 +903,6 @@ class TestDuckLakePostgresCatalogReuse:
 
 
 class TestDuckLakeForceWithCloudDataPath:
-    """--force must not silently leave orphaned Parquet behind (w7)."""
-
     def test_force_warns_that_the_cloud_prefix_was_not_cleared(self, tmp_path, caplog):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -1127,10 +915,7 @@ class TestDuckLakeForceWithCloudDataPath:
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
             adapter._reset_ducklake_catalog()
 
-        # The catalog itself is still reset...
         assert not adapter.metadata_path.exists()
-        # ...but the operator is told the bucket prefix was left alone, because
-        # unreferenced Parquet keeps costing money until someone removes it.
         assert "did NOT clear the cloud DATA_PATH" in caplog.text
         assert "s3://my-bucket/bench/" in caplog.text
 
@@ -1148,24 +933,18 @@ class TestDuckLakeForceWithCloudDataPath:
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
             adapter._reset_ducklake_catalog()
 
-        # Contents gone, directory retained: the postgres path shares this
-        # helper and runs after the ATTACH, where DuckLake needs a writable
-        # DATA_PATH to still exist.
         assert list(data_path.rglob("*.parquet")) == []
         assert data_path.is_dir()
         assert "did NOT clear" not in caplog.text
 
 
 class TestDuckLakeS3Routing:
-    """Test S3/cloud DATA_PATH routing and secret-SQL construction (w3)."""
-
     def test_cloud_data_path_detected(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path="s3://my-bucket/bench/",
         )
         assert adapter._data_path_is_cloud is True
-        # Path() would have mangled "s3://" to "s3:/" - assert it did not.
         assert str(adapter.data_path) == "s3://my-bucket/bench/"
 
     def test_local_data_path_not_flagged_cloud(self, tmp_path):
@@ -1176,11 +955,6 @@ class TestDuckLakeS3Routing:
         assert adapter._data_path_is_cloud is False
 
     def test_cloud_data_path_skips_local_mkdir_on_connect(self, tmp_path, monkeypatch):
-        # Regression: create_connection() must not attempt Path.mkdir() on a
-        # cloud data_path (a plain str has no .mkdir()). Stub out the base
-        # DuckDBAdapter.create_connection() (the super() call, which would
-        # otherwise open a real DuckDB connection) so this stays hermetic;
-        # the real installed duckdb module/version satisfies the >=1.3 guard.
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckLakeAdapter(
@@ -1195,9 +969,6 @@ class TestDuckLakeS3Routing:
             def execute(self, sql):
                 self.executed.append(sql)
                 if sql.startswith("ATTACH"):
-                    # Stop before USE lake / the return wrapper - we only care
-                    # that mkdir was never attempted and the SQL sequence up
-                    # to ATTACH is sane.
                     raise RuntimeError("stop-after-attach (test stub)")
                 return self
 
@@ -1210,10 +981,6 @@ class TestDuckLakeS3Routing:
         with pytest.raises(RuntimeError, match="Failed to initialize the DuckLake catalog"):
             adapter.create_connection()
 
-        # data_path is a bare string (no mkdir attempted/possible - it would
-        # have raised AttributeError before reaching the SQL sequence below),
-        # and the executed SQL sequence installed httpfs + created a
-        # credential_chain secret before ATTACH.
         assert any("INSTALL httpfs" in sql for sql in stub_conn.executed)
         assert any("CREATE OR REPLACE SECRET" in sql and "credential_chain" in sql for sql in stub_conn.executed)
         assert any(sql.startswith("ATTACH") for sql in stub_conn.executed)
@@ -1242,8 +1009,6 @@ class TestDuckLakeS3Routing:
         assert "credential_chain" not in sql
 
     def test_s3_secret_sql_omits_key_id_form_without_both_creds(self, tmp_path):
-        # Only one of key_id/secret supplied - falls back to credential_chain
-        # rather than sending a half-formed KEY_ID/SECRET pair.
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
             data_path="s3://my-bucket/bench/",
@@ -1261,8 +1026,6 @@ class TestDuckLakeS3Routing:
 
 
 class TestDuckLakeGcsAzureBackends:
-    """GCS and Azure DATA_PATH routing, secret SQL, and credential hygiene."""
-
     def test_gcs_data_path_detected_as_cloud(self, tmp_path):
         adapter = DuckLakeAdapter(
             metadata_path=str(tmp_path / "catalog.ducklake"),
@@ -1438,10 +1201,6 @@ class TestDuckLakeGcsAzureBackends:
         assert "myaccount" not in redacted
 
     def test_azure_secret_failure_never_leaks_account_name(self, tmp_path, monkeypatch):
-        # Regression: the credential_chain secret CREATE echoes ACCOUNT_NAME
-        # back through the driver error, and the inner redactor was called
-        # without the account name while the outer cause-suppression flag
-        # ignored it too - so the name reached the raised exception.
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         adapter = DuckLakeAdapter(
@@ -1466,15 +1225,10 @@ class TestDuckLakeGcsAzureBackends:
 
         message = str(excinfo.value)
         assert "myaccount" not in message
-        # Explicit credential material takes the provider-only branch: the
-        # driver text never rides out, and the chained cause is suppressed.
         assert "explicit key/secret" in message
         assert excinfo.value.__cause__ is None
 
     def test_azure_attach_failure_never_leaks_account_name(self, tmp_path, monkeypatch):
-        # Same leak through the outer ATTACH-failure handler: the account name
-        # is classified credential material, so it must be redacted from the
-        # message and must suppress the chained cause.
         adapter = TestDuckLakeCredentialRedaction()._failing_adapter(
             tmp_path,
             monkeypatch,
@@ -1505,14 +1259,6 @@ class TestDuckLakeGcsAzureBackends:
 
 
 class TestDuckLakeResultMetadataRecordsBacking:
-    """Exported results must say which DuckLake deployment produced them.
-
-    ADR decision w12 makes remote-backed DuckLake results publishable and
-    ranking-eligible ON CONDITION that the backing is recorded - a
-    DuckLake-on-S3 number partly measures object-store latency and must never
-    be silently ranked against DuckLake-on-local-disk as the same system.
-    """
-
     def _metadata(self, tmp_path, **options):
         adapter = DuckLakeAdapter.from_config(
             {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path), "options": options}
@@ -1537,11 +1283,6 @@ class TestDuckLakeResultMetadataRecordsBacking:
         assert storage["storage_location"] == location
 
     def test_no_credential_material_reaches_result_metadata(self, tmp_path):
-        # Regression: pg_user was reaching exported metadata. get_platform_info()
-        # omits it deliberately, but the normalized metadata is also built from
-        # adapter.platform_config - the unfiltered constructor config - where
-        # pg_password happens to match the shared secret-key matcher and
-        # pg_user does not.
         metadata = self._metadata(
             tmp_path,
             catalog="postgres",
@@ -1557,8 +1298,6 @@ class TestDuckLakeResultMetadataRecordsBacking:
             assert sentinel not in blob, f"{sentinel} leaked into exported result metadata"
 
     def test_non_credential_config_still_exported(self, tmp_path):
-        # The scrub must not gut the raw-config block: pg_host/pg_port/
-        # pg_database are how a reader tells two postgres-backed runs apart.
         metadata = self._metadata(
             tmp_path, catalog="postgres", pg_host="db.example.com", pg_port=5433, pg_database="benchdb"
         )
@@ -1569,8 +1308,6 @@ class TestDuckLakeResultMetadataRecordsBacking:
 
 
 class TestDuckLakeRegistration:
-    """Test DuckLake platform is properly registered."""
-
     def test_platform_registered_in_registry(self):
         caps = PlatformRegistry.get_platform_capabilities("ducklake")
         assert caps is not None
@@ -1587,11 +1324,6 @@ class TestDuckLakeRegistration:
         assert "ducklake" in available
 
     def test_support_status_is_beta(self):
-        # Promoted from experimental on 2026-07-30 once every criterion in
-        # docs/development/adr/adr-ducklake-maturity-and-publishability.md
-        # (decision w11) was met - including TPC-H SF=1 validated on all four
-        # deployment modes. Do not relax this to experimental to make a change
-        # pass; the ADR records what promotion required.
         assert PlatformRegistry.get_platform_support_status("ducklake") == "beta"
 
     def test_adapter_class_resolves(self):

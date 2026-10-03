@@ -1,5 +1,4 @@
 # ruff: noqa: SIM905
-"""Normalized runtime/deployment metadata helpers for platform adapters."""
 
 from __future__ import annotations
 
@@ -68,7 +67,6 @@ def build_default_normalized_result_metadata(
     execution_mode: str | None = None,
     docker_runner: DockerCommandRunner | None = None,
 ) -> dict[str, Any]:
-    """Build normalized result metadata from existing adapter/platform info."""
     info = _collect_platform_info(adapter, connection, platform_info)
     config = _merge_platform_config(adapter, info, platform_config)
     mode = _normalize_token(execution_mode or info.get("execution_mode") or _adapter_execution_mode(adapter))
@@ -130,7 +128,6 @@ def collect_normalized_result_metadata(
     platform_config: Mapping[str, Any] | None = None,
     execution_mode: str | None = None,
 ) -> dict[str, Any]:
-    """Call an adapter hook when present, otherwise use the default metadata mapping."""
     hook = getattr(adapter, "get_normalized_result_metadata", None) if adapter is not None else None
     if callable(hook):
         try:
@@ -157,7 +154,6 @@ def collect_normalized_result_metadata(
 
 
 def _merge_adapter_client_link(metadata: dict[str, Any], adapter: Any | None) -> None:
-    """Merge adapter _client_link_metadata into execution_environment when present."""
     client_link = getattr(adapter, "_client_link_metadata", None)
     if not isinstance(client_link, Mapping) or not client_link:
         return
@@ -174,7 +170,6 @@ def _merge_adapter_client_link(metadata: dict[str, Any], adapter: Any | None) ->
 
 
 def _metadata_hook_failure(exc: Exception) -> dict[str, Any]:
-    """Return explicit unavailable metadata when adapter runtime capture fails."""
     return _compact_mapping(
         {
             "execution_environment": NormalizedExecutionEnvironment(
@@ -200,7 +195,6 @@ def apply_normalized_result_metadata(
     result: Any,
     metadata: Mapping[str, Any] | None,
 ) -> Any:
-    """Merge normalized metadata onto an existing BenchmarkResults-like object."""
     if not metadata:
         return result
 

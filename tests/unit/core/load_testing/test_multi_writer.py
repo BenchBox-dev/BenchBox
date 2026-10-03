@@ -1,12 +1,3 @@
-"""Multi-client concurrent-writer stress test ("multiplayer DuckDB" story).
-
-Spawns N writer threads issuing INSERTs against one DuckDB table while M
-reader threads run SELECTs, then asserts every write landed and no stream
-errored. DuckDB serializes concurrent writers internally, so the scenario
-proves the client-side fan-out works rather than asserting any particular
-isolation level.
-"""
-
 from __future__ import annotations
 
 import threading
@@ -144,19 +135,6 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
         except Exception as exc:  # noqa: BLE001 - surfaced as stream failure
             return (False, 0, str(exc))
 
-    # One database instance, one cursor per stream: DuckDB's documented
-    # multi-threaded pattern
-    # (https://duckdb.org/docs/stable/guides/python/multiple_threads,
-    # duckdb 1.5.5). The prior per-stream duckdb.connect(path) failed in CI
-    # with "Unique file handle conflict" when streams opened and closed the
-    # same file concurrently. A cursor from the one anchored connection cannot
-    # hit that open/close race; cursors are independent handles whose close
-    # never closes the anchor, and run() joins every stream before anchor
-    # teardown, so no stream outlives the connection.
-    #
-    # This is the one supported exception to ConcurrentLoadConfig's
-    # independent-connection contract: DuckDB documents connection-plus-cursors
-    # as its thread-safe unit, and _execute_stream closes only its cursor.
     with duckdb.connect(db_path) as anchor:
         config = ConcurrentLoadConfig(
             query_factory=lambda index: (f"q{index}", "SELECT 1"),
@@ -180,8 +158,6 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
         if not execution.success
     ]
     assert result.total_queries_succeeded == result.total_queries_executed > 0
-    # Queue waits mix no clocks: every recorded wait must be a small
-    # non-negative duration, never a billion-second wall-vs-monotonic gap.
     for stream in result.streams:
         for execution in stream.query_executions:
             assert 0 <= execution.queue_wait_time < 3600

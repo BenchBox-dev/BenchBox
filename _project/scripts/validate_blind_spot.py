@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""Validate blind-spot finding files in _project/blind-spots/.
-
-Each finding is a markdown file with YAML frontmatter (delimited by ``---``
-lines). The frontmatter schema is small and strict — see
-``_project/blind-spots/README.md`` for the protocol.
-
-Usage::
-
-    uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py <path>
-    uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --all
-    uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --drafts-dir ~/.benchbox/finding-drafts
-
-``--all`` validates the tracked legacy corpus under ``_project/blind-spots/``.
-``--drafts-dir`` validates the out-of-tree capture directory (findings domain);
-an absent or empty drafts directory is a valid state (exit 0) — capturing
-findings needs no credentials and no network.
-"""
 
 from __future__ import annotations
 
@@ -37,10 +20,6 @@ ALLOWED_KIND = {
     "other",
 }
 REQUIRED_FIELDS = {"id", "date", "status", "finding_kind", "review_context"}
-# Optional at capture only. The findings-domain (phase 1) additions carry
-# provenance (observed_sha, evidence) or triage judgment (urgency, breadth,
-# confidence) — the judgment fields are assigned later at triage (phase 3
-# `todo finding triage`), never required when a finding is first captured.
 OPTIONAL_FIELDS = {
     "related_paths",
     "suggested_sweep",
@@ -53,31 +32,20 @@ OPTIONAL_FIELDS = {
 }
 ALLOWED_FIELDS = REQUIRED_FIELDS | OPTIONAL_FIELDS
 
-# Keys permitted inside each `evidence` entry. Grep-pattern-based per the
-# suggested_sweep precedent; line ranges are permitted but discouraged (they
-# rot), matching the phase-3 finding_evidence table shape.
 EVIDENCE_KEYS = {"path", "pattern", "note", "line_start", "line_end"}
 
-# Default per-machine drafts directory, outside every worktree (survives
-# worktree churn; zero-credential capture).
 DEFAULT_DRAFTS_DIR = "~/.benchbox/finding-drafts"
 
-# YYYY-MM-DD-HHMMSS-<slug>; slug is kebab-case, lowercase letters/digits.
 FILENAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)(.*)\Z", re.DOTALL)
 REQUIRED_BODY_HEADINGS = ("## Finding", "## Why this matters", "## Suggested next steps")
 
 
 def normalize_newlines(text: str) -> str:
-    """Normalize markdown line endings before frontmatter parsing."""
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def parse_frontmatter(text: str) -> tuple[dict | None, str, list[str]]:
-    """Split a markdown file into (frontmatter_dict, body, errors).
-
-    Returns ``(None, [...])`` if the frontmatter block is missing or malformed.
-    """
     errors: list[str] = []
     text = normalize_newlines(text)
     if not text.startswith("---\n"):
@@ -215,8 +183,6 @@ def _check_evidence(data: dict) -> list[str]:
 
 
 def _check_judgment_fields(data: dict) -> list[str]:
-    # urgency / breadth / confidence are optional at capture (assigned at
-    # triage). Accept a string label or an integer scale; reject other shapes.
     errors: list[str] = []
     for field in ("urgency", "breadth", "confidence"):
         if field not in data or data[field] is None:
@@ -237,7 +203,6 @@ def _check_status_invariants(data: dict) -> list[str]:
 
 
 def validate_frontmatter(data: dict, file_path: Path) -> list[str]:
-    """Validate a frontmatter dict against the blind-spot schema."""
     errors: list[str] = []
     errors.extend(f"unknown field '{f}'" for f in sorted(set(data) - ALLOWED_FIELDS))
     errors.extend(f"missing required field '{f}'" for f in sorted(REQUIRED_FIELDS - data.keys()))
@@ -250,7 +215,6 @@ def validate_frontmatter(data: dict, file_path: Path) -> list[str]:
 
 
 def validate_body(body: str) -> list[str]:
-    """Validate the required short markdown body shape."""
     errors: list[str] = []
     lines = [line.strip() for line in body.splitlines()]
     if not any(line.startswith("# ") and line[2:].strip() for line in lines):
@@ -267,7 +231,7 @@ def validate_file(file_path: Path) -> list[str]:
     if file_path.suffix != ".md":
         return [f"not a markdown file: {file_path}"]
     if file_path.name == "README.md":
-        return []  # README is the protocol doc, not a finding
+        return []
 
     text = file_path.read_text(encoding="utf-8")
     data, body, parse_errors = parse_frontmatter(text)
@@ -328,8 +292,6 @@ def main() -> int:
             targets.append(path)
 
     if not targets:
-        # A requested but empty drafts directory is success (no findings captured
-        # yet), not a usage error.
         if args.drafts_dir is not None:
             print("No draft findings to validate.")
             return 0

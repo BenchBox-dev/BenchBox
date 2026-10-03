@@ -1,5 +1,3 @@
-"""SQL-backed TPC-DI ETL backend implementation."""
-
 from __future__ import annotations
 
 import re
@@ -12,8 +10,6 @@ from benchbox.core.tpcdi.schema import TABLES
 
 
 class SQLETLBackend:
-    """TPC-DI ETL backend that loads and validates through SQL connections."""
-
     def __init__(
         self,
         *,
@@ -28,7 +24,6 @@ class SQLETLBackend:
         self._validation_query_ids = validation_query_ids
 
     def create_schema(self) -> None:
-        """Create warehouse schema when absent."""
         if hasattr(self.connection, "executescript"):
             self.connection.executescript(self._create_tables_sql)
             return
@@ -38,11 +33,6 @@ class SQLETLBackend:
                 cursor.execute(statement)
 
     def load_dataframes(self, staged_data: dict[str, pd.DataFrame], batch_type: str) -> dict[str, Any]:
-        """Load transformed DataFrames into SQL tables.
-
-        ``batch_type`` is currently reserved for backend-specific partitioning
-        or lineage metadata and is intentionally unused in this implementation.
-        """
         _ = batch_type
         results: dict[str, Any] = {"records_loaded": 0, "tables_updated": []}
         self.create_schema()
@@ -57,7 +47,6 @@ class SQLETLBackend:
         return results
 
     def validate_results(self) -> dict[str, Any]:
-        """Validate SQL-loaded data using benchmark validation queries + checks."""
         validation_results: dict[str, Any] = {
             "validation_queries": {},
             "data_quality_issues": [],
@@ -88,7 +77,6 @@ class SQLETLBackend:
         return validation_results
 
     def execute_scd2_expire(self, table_name: str, condition: str | Any, updates: dict[str, Any]) -> dict[str, Any]:
-        """Expire current rows with SQL UPDATE."""
         if not updates:
             return {"success": True, "rows_affected": 0}
 
@@ -105,15 +93,11 @@ class SQLETLBackend:
         return {"success": True, "rows_affected": int(getattr(cursor, "rowcount", 0) or 0)}
 
     def execute_scd2_insert(self, table_name: str, dataframe: pd.DataFrame) -> dict[str, Any]:
-        """Insert new SCD2 rows through normal table load path."""
         return {"success": True, "rows_affected": self._load_table_dataframe(table_name, dataframe)}
 
     def load_customer_scd2_batch(self, dataframe: pd.DataFrame, *, batch_type: str) -> dict[str, Any]:
-        """Atomically expire and replace current customer rows for one source batch."""
         self.create_schema()
         customers = dataframe.copy()
-        # Run BEGIN, the writes and COMMIT on one handle. DuckDB's cursor() opens
-        # a separate connection whose transaction the parent's commit never covers.
         cursor = self.connection
         if not hasattr(cursor, "execute") and hasattr(cursor, "cursor"):
             cursor = cursor.cursor()
@@ -153,7 +137,6 @@ class SQLETLBackend:
 
     @staticmethod
     def _next_effective_date(latest_effective: Any, source_effective: Any) -> date:
-        """Return the first day after the latest durable customer version."""
         if latest_effective is None:
             latest_effective = source_effective
             if isinstance(latest_effective, datetime):
@@ -168,7 +151,6 @@ class SQLETLBackend:
         return date.fromisoformat(str(latest_effective)[:10]) + timedelta(days=1)
 
     def read_current_dimension(self, table_name: str) -> pd.DataFrame | None:
-        """Read current dimension rows when IsCurrent column exists."""
         try:
             validated_table = self._validate_table_name(table_name)
             if not self._column_exists(validated_table, "IsCurrent"):
@@ -199,7 +181,6 @@ class SQLETLBackend:
         return loaded
 
     def _insert_table_dataframe(self, cursor: Any, table_name: str, dataframe: pd.DataFrame) -> int:
-        """Insert a DataFrame through an existing transaction cursor."""
         validated_table = self._validate_table_name(table_name)
         headers = dataframe.columns.tolist()
         if not headers:

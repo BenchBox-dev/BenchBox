@@ -1,5 +1,3 @@
-"""Unit tests for CPU hardware identity and normalization in the explorer pipeline."""
-
 from __future__ import annotations
 
 import pytest
@@ -13,7 +11,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def test_closed_cpu_families_contains_expected_members() -> None:
-    """The CPU family vocabulary must be a small, closed, explicit set."""
     expected = {
         "apple_silicon",
         "graviton",
@@ -53,14 +50,12 @@ def test_closed_cpu_families_contains_expected_members() -> None:
     ],
 )
 def test_normalize_cpu_family_known_patterns(raw_model: str, expected_family: str) -> None:
-    """Known CPU models must normalize to their specific closed family."""
     actual = normalize_cpu_family(raw_model)
     assert actual == expected_family
     assert actual in CLOSED_CPU_FAMILIES
 
 
 def test_normalize_cpu_family_unmatched_maps_to_explicit_unknown() -> None:
-    """Anything unmatched maps to an explicit 'unknown', never to a nearest guess."""
     unmatched_models = [
         "QuantumCore 9000",
         "RISC-V Generic Processor",
@@ -75,21 +70,16 @@ def test_normalize_cpu_family_unmatched_maps_to_explicit_unknown() -> None:
 
 
 def test_normalize_cpu_family_absent_or_empty_maps_to_none() -> None:
-    """Missing or empty CPU model maps to None ('not recorded'), never 'unknown'."""
     assert normalize_cpu_family(None) is None
     assert normalize_cpu_family("") is None
     assert normalize_cpu_family("   ") is None
 
 
 def test_transformer_cleans_empty_cpu_model() -> None:
-    """A bundle with empty or whitespace cpu_model normalizes both model and family to None."""
     from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 
-    # Empty string
     raw_env_empty = {"cpu_model": ""}
-    # Whitespace string
     raw_env_spaces = {"cpu_model": "   "}
-    # Valid string
     raw_env_valid = {"cpu_model": "Apple M1"}
 
     for env in (raw_env_empty, raw_env_spaces):

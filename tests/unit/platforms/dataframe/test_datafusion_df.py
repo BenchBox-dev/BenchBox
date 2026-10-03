@@ -1,14 +1,4 @@
-"""Unit tests for DataFusion DataFrame adapter.
-
-Tests for:
-- DataFusionDataFrameAdapter initialization
-- Expression methods (col, lit, date operations)
-- Data loading (CSV, Parquet)
-- Query execution
-- Window functions
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,7 +14,6 @@ pytestmark = [
 ]
 
 
-# Check if DataFusion is available
 try:
     import datafusion
     import pyarrow as pa
@@ -41,15 +30,12 @@ except ImportError:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionDataFrameAdapter:
-    """Tests for DataFusionDataFrameAdapter."""
-
     def test_initialization(self):
 
         adapter = DataFusionDataFrameAdapter()
 
         assert adapter.platform_name == "DataFusion"
         assert adapter.family == "expression"
-        # Check via platform info
         info = adapter.get_platform_info()
         assert info["repartition_joins"] is True
         assert info["parquet_pushdown"] is True
@@ -68,7 +54,6 @@ class TestDataFusionDataFrameAdapter:
 
         assert adapter.working_dir == Path("/tmp/datafusion")
         assert adapter.verbose is True
-        # Check via platform info
         info = adapter.get_platform_info()
         assert info["target_partitions"] == 4
         assert info["repartition_joins"] is False
@@ -98,20 +83,15 @@ class TestDataFusionDataFrameAdapter:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionExpressionMethods:
-    """Tests for DataFusion expression methods."""
-
     def test_col(self):
-        """Test col() creates a DataFusion column expression."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.col("amount")
 
-        # DataFusion returns Expr type
         assert expr is not None
         assert hasattr(expr, "alias")
 
     def test_lit_integer(self):
-        """Test lit() with integer value."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.lit(100)
@@ -119,7 +99,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_lit_string(self):
-        """Test lit() with string value."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.lit("test")
@@ -127,7 +106,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_lit_float(self):
-        """Test lit() with float value."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.lit(3.14)
@@ -135,7 +113,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_cast_date(self):
-        """Test cast_date() method."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.cast_date(adapter.col("date_str"))
@@ -143,7 +120,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_cast_string(self):
-        """Test cast_string() method."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.cast_string(adapter.col("number"))
@@ -151,7 +127,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_date_sub(self):
-        """Test date_sub() method."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.date_sub(adapter.col("date"), 7)
@@ -159,7 +134,6 @@ class TestDataFusionExpressionMethods:
         assert expr is not None
 
     def test_date_add(self):
-        """Test date_add() method."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.date_add(adapter.col("date"), 30)
@@ -169,19 +143,15 @@ class TestDataFusionExpressionMethods:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionDataLoading:
-    """Tests for DataFusion data loading methods."""
-
     def test_read_csv_basic(self, tmp_path):
 
         adapter = DataFusionDataFrameAdapter()
 
-        # Create a test CSV file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id,name,amount\n1,Alice,100\n2,Bob,200\n")
 
         df = adapter.read_csv(csv_path)
 
-        # DataFusion returns a DataFrame, collect to get the result
         result = adapter.collect(df)
         assert isinstance(result, pa.Table)
         assert result.num_rows == 2
@@ -191,7 +161,6 @@ class TestDataFusionDataLoading:
 
         adapter = DataFusionDataFrameAdapter()
 
-        # Create a pipe-delimited file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id|name|amount\n1|Alice|100\n2|Bob|200\n")
 
@@ -201,26 +170,15 @@ class TestDataFusionDataLoading:
         assert result.num_rows == 2
 
     def test_read_csv_headerless_with_schema_string_columns_does_not_raise(self, tmp_path):
-        """Headerless non-.tbl CSV with declared schema names.
-
-        ClickBench's generated hits.csv is written without a header and the
-        non-.tbl CSV path never applies `column_names`, so the frame columns
-        are DataFusion's inferred names (column_1, …). The empty-string
-        coalesce for declared `string_columns` must guard on the frame's
-        actual columns instead of calling col(<schema_name>) blindly, which
-        would raise and abort the load before any rows are counted.
-        """
         adapter = DataFusionDataFrameAdapter()
 
         csv_path = tmp_path / "hits.csv"
-        # Headerless: column_2 (the would-be string column) has an empty field.
         csv_path.write_text("1,Alice\n2,\n")
 
         df = adapter.read_csv(
             csv_path,
             has_header=False,
             null_marker=None,
-            # Declared benchmark schema name that is NOT a frame column.
             string_columns=["url"],
         )
 
@@ -228,7 +186,6 @@ class TestDataFusionDataLoading:
         assert result.num_rows == 2
 
     def test_read_csv_coalesces_present_string_columns_to_empty(self, tmp_path):
-        """Columns that ARE present keep the empty-string coalesce contract."""
         adapter = DataFusionDataFrameAdapter()
 
         csv_path = tmp_path / "with_header.csv"
@@ -247,20 +204,9 @@ class TestDataFusionDataLoading:
         assert None not in names
 
     def test_read_csv_headerless_with_column_names_coalesces_declared_string_columns(self, tmp_path):
-        """The real ClickBench path: headerless CSV + column_names + string_columns.
-
-        DataFusion's non-.tbl read_csv ignores column_names, so without
-        re-applying them the declared schema-named string columns are not frame
-        columns (the frame has column_1, …) and the empty-string coalesce is
-        skipped, leaving empty text fields as NULL. The real benchmark run passes
-        column_names (unlike the does-not-raise test above), so a declared string
-        column's empty field must come back as "" addressed by its schema name —
-        ClickBench filters SearchPhrase <> '' and would otherwise lose those rows.
-        """
         adapter = DataFusionDataFrameAdapter()
 
         csv_path = tmp_path / "hits.csv"
-        # Headerless: id, then a string column whose 2nd row is an empty field.
         csv_path.write_text("1,Alice\n2,\n")
 
         df = adapter.read_csv(
@@ -278,12 +224,6 @@ class TestDataFusionDataLoading:
         assert None not in phrases
 
     def test_read_tbl_with_column_names(self, tmp_path):
-        """Test reading TPC-style .tbl with a genuine trailing delimiter.
-
-        Each row ends with a trailing `|`, so it splits into 3 fields for 2
-        columns — the field-terminating framing raw dbgen emits. read_csv must
-        drop the extra field rather than surface it as a third column.
-        """
         adapter = DataFusionDataFrameAdapter()
 
         tbl_path = tmp_path / "test.tbl"
@@ -304,7 +244,6 @@ class TestDataFusionDataLoading:
 
         adapter = DataFusionDataFrameAdapter()
 
-        # Create a test Parquet file
         parquet_path = tmp_path / "test.parquet"
         test_table = pa.table(
             {
@@ -327,7 +266,6 @@ class TestDataFusionDataLoading:
 
         adapter = DataFusionDataFrameAdapter()
 
-        # Register test data and get DataFrame
         adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
         df = adapter.session_ctx.table("test")
 
@@ -372,25 +310,16 @@ class TestDataFusionDataLoading:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionWindowFunctions:
-    """Tests for DataFusion window functions.
-
-    Window functions return expressions that can be used in select() operations.
-    The expression is applied over a window defined by partition_by and order_by.
-    """
-
     def test_window_row_number(self):
 
         adapter = DataFusionDataFrameAdapter()
 
-        # window_row_number returns an expression
         expr = adapter.window_row_number(
             order_by=[("value", True)],
             partition_by=["category"],
         )
 
-        # Verify it returns a valid expression
         assert expr is not None
-        # Can use the expression in a select
         adapter.register_table("test", pa.table({"category": ["A", "B"], "value": [1, 2]}))
         df = adapter.session_ctx.table("test")
         result = df.select(adapter.col("category"), adapter.col("value"), expr.alias("rn"))
@@ -464,8 +393,6 @@ class TestDataFusionWindowFunctions:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionDataFrameOperations:
-    """Tests for DataFusion DataFrame operations."""
-
     def test_union_all(self):
 
         adapter = DataFusionDataFrameAdapter()
@@ -497,14 +424,11 @@ class TestDataFusionDataFrameOperations:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionQueryExecution:
-    """Tests for query execution with DataFusion."""
-
     def test_simple_select_query(self):
 
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Register test data
         test_table = pa.table(
             {
                 "id": [1, 2, 3],
@@ -514,7 +438,6 @@ class TestDataFusionQueryExecution:
         )
         adapter.register_table("customers", test_table)
 
-        # Register in context for query access
         ctx.register_table("customers", adapter.session_ctx.table("customers"))
 
         def select_impl(ctx):
@@ -562,19 +485,16 @@ class TestDataFusionQueryExecution:
         result = adapter.execute_query(ctx, query)
 
         assert result["status"] == "SUCCESS"
-        assert result["rows_returned"] == 2  # 150 and 200
+        assert result["rows_returned"] == 2
 
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionTableLoading:
-    """Tests for table loading functionality."""
-
     def test_load_table_parquet(self, tmp_path):
 
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         parquet_path = tmp_path / "orders.parquet"
         test_table = pa.table(
             {
@@ -596,7 +516,6 @@ class TestDataFusionTableLoading:
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         csv_path = tmp_path / "customers.csv"
         csv_path.write_text("id,name\n1,Alice\n2,Bob\n")
 
@@ -610,7 +529,6 @@ class TestDataFusionTableLoading:
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
-        # Create test data
         import pyarrow.parquet as pq
 
         for name, rows in [("orders", 5), ("customers", 3), ("products", 10)]:
@@ -627,13 +545,10 @@ class TestDataFusionTableLoading:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionSpecificFeatures:
-    """Tests for DataFusion-specific features."""
-
     def test_sql_execution(self):
 
         adapter = DataFusionDataFrameAdapter()
 
-        # Register test data
         test_table = pa.table({"id": [1, 2, 3], "value": [10, 20, 30]})
         adapter.register_table("test", test_table)
 
@@ -712,7 +627,6 @@ class TestDataFusionSpecificFeatures:
         assert polars_df.to_dict(as_series=False) == {"a": [2, 3]}
 
     def test_lit_returns_existing_expression(self):
-        """Test lit() returns DataFusion expressions without double-wrapping."""
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.col("value")
@@ -750,8 +664,6 @@ class TestDataFusionSpecificFeatures:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionScalarExtraction:
-    """Tests for DataFusion scalar extraction optimization."""
-
     def test_scalar_from_pyarrow_table(self):
 
         adapter = DataFusionDataFrameAdapter()
@@ -771,10 +683,8 @@ class TestDataFusionScalarExtraction:
         assert result == 2
 
     def test_scalar_from_datafusion_dataframe(self):
-        """Test scalar extraction from DataFusion DataFrame (auto-collects)."""
         adapter = DataFusionDataFrameAdapter()
 
-        # Create DataFrame through DataFusion context
         table = pa.table({"value": [100]})
         adapter.session_ctx.register_record_batches("test_table", [table.to_batches()])
         df = adapter.session_ctx.sql("SELECT value FROM test_table")
@@ -820,7 +730,6 @@ class TestDataFusionScalarExtraction:
         assert result == "hello"
 
     def test_scalar_via_context(self):
-        """Test scalar extraction via context (integration)."""
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -839,7 +748,6 @@ class TestDataFusionScalarExtraction:
             adapter.scalar(table)
 
     def test_scalar_two_rows_raises(self):
-        """Test that scalar extraction on 2-row DataFrame raises ValueError."""
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"a": [1, 2], "b": [3, 4]})
@@ -850,23 +758,12 @@ class TestDataFusionScalarExtraction:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionUnifiedFrameMethods:
-    """Tests for DataFusion code paths in unified_frame.py.
-
-    Validates the new methods added for DataFusion compatibility:
-    quantile, total_seconds, truncate, weekday, hour, minute, floor,
-    cast_int, and the tuple-sort path in UnifiedLazyFrame.sort().
-    """
-
     def _collect_expr(self, adapter, table_name, expr):
-        """Helper: register table, select expr, collect result."""
         df = adapter.session_ctx.table(table_name)
         result_df = df.select(expr.native.alias("result"))
         return adapter.collect(result_df)
 
-    # ----- UnifiedExpr methods -----
-
     def test_quantile_aggregation(self):
-        """Test quantile() passes raw float to approx_percentile_cont."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
         adapter = DataFusionDataFrameAdapter()
@@ -882,11 +779,9 @@ class TestDataFusionUnifiedFrameMethods:
 
         assert result.num_rows == 1
         median_val = result.column("median")[0].as_py()
-        # approx_percentile_cont is approximate, so check it's in a reasonable range
         assert 20.0 <= median_val <= 40.0
 
     def test_floor(self):
-        """Test floor() uses DataFusion functions.floor()."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
         adapter = DataFusionDataFrameAdapter()
@@ -902,7 +797,6 @@ class TestDataFusionUnifiedFrameMethods:
         assert values == [1.0, 2.0, -1.0, 3.0]
 
     def test_cast_int(self):
-        """Test cast_int() casts to int32 via DataFusion."""
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
         adapter = DataFusionDataFrameAdapter()
@@ -918,10 +812,7 @@ class TestDataFusionUnifiedFrameMethods:
         assert values == [1, 2, 3]
         assert result.schema.field("result").type == pa.int32()
 
-    # ----- UnifiedDtExpr methods -----
-
     def test_hour(self):
-        """Test hour() extracts hour via DataFusion date_part."""
         from datetime import datetime
 
         from datafusion import col as df_col
@@ -941,7 +832,6 @@ class TestDataFusionUnifiedFrameMethods:
         assert values == [14, 9]
 
     def test_minute(self):
-        """Test minute() extracts minute via DataFusion date_part."""
         from datetime import datetime
 
         from datafusion import col as df_col
@@ -961,7 +851,6 @@ class TestDataFusionUnifiedFrameMethods:
         assert values == [30, 45]
 
     def test_weekday(self):
-        """Test weekday() returns ISO weekday (0=Mon..6=Sun) via DataFusion."""
         from datetime import datetime
 
         from datafusion import col as df_col
@@ -969,7 +858,6 @@ class TestDataFusionUnifiedFrameMethods:
         from benchbox.platforms.dataframe.unified_frame import UnifiedDtExpr
 
         adapter = DataFusionDataFrameAdapter()
-        # 2024-06-10 is Monday, 2024-06-15 is Saturday, 2024-06-16 is Sunday
         timestamps = [datetime(2024, 6, 10, 12, 0, 0), datetime(2024, 6, 15, 12, 0, 0), datetime(2024, 6, 16, 12, 0, 0)]
         adapter.register_table("ts", pa.table({"dt": pa.array(timestamps, type=pa.timestamp("us"))}))
 
@@ -979,11 +867,9 @@ class TestDataFusionUnifiedFrameMethods:
         result = self._collect_expr(adapter, "ts", wd_expr)
 
         values = [v.as_py() for v in result.column("result")]
-        # ISO weekday: Monday=0, Saturday=5, Sunday=6
         assert values == [0, 5, 6]
 
     def test_truncate(self):
-        """Test truncate() maps Polars interval syntax to DataFusion date_trunc."""
         from datetime import datetime
 
         from datafusion import col as df_col
@@ -1000,13 +886,11 @@ class TestDataFusionUnifiedFrameMethods:
         result = self._collect_expr(adapter, "ts", trunc_expr)
 
         val = result.column("result")[0].as_py()
-        # Truncated to hour should be 14:00:00
         assert val.hour == 14
         assert val.minute == 0
         assert val.second == 0
 
     def test_total_seconds(self):
-        """Test total_seconds() uses correct extract(lit('epoch'), expr) order."""
         from datetime import datetime
 
         from datafusion import col as df_col
@@ -1023,14 +907,10 @@ class TestDataFusionUnifiedFrameMethods:
         result = self._collect_expr(adapter, "ts", secs_expr)
 
         val = result.column("result")[0].as_py()
-        # epoch of 2024-01-01T00:01:00 UTC should be a large positive number
         assert isinstance(val, (int, float))
         assert val > 0
 
-    # ----- UnifiedLazyFrame.sort() tuple path -----
-
     def test_sort_tuple_syntax(self):
-        """Test sort() with tuple (column, direction) syntax on DataFusion."""
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -1047,7 +927,6 @@ class TestDataFusionUnifiedFrameMethods:
         assert ids == [1, 2, 3]
 
     def test_sort_tuple_descending(self):
-        """Test sort() with descending tuple syntax on DataFusion."""
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -1063,14 +942,7 @@ class TestDataFusionUnifiedFrameMethods:
         ids = [v.as_py() for v in result.column("id")]
         assert ids == [3, 2, 1]
 
-    # ----- UnifiedListExpr.get() index path -----
-
     def test_list_get_with_expression_index(self):
-        """Test list.get() with a per-row UInt64 index casts to Int64.
-
-        A UInt64 index (e.g. from array_length) plus a Python int coerces
-        to Decimal128, which array_element rejects during planning.
-        """
         from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
         adapter = DataFusionDataFrameAdapter()
@@ -1084,64 +956,41 @@ class TestDataFusionUnifiedFrameMethods:
 
 
 class TestDataFusionNotAvailable:
-    """Tests for behavior when DataFusion is not installed."""
-
     def test_datafusion_available_flag(self):
 
         from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE
 
-        # This just tests that the flag exists and is boolean
         assert isinstance(DATAFUSION_DF_AVAILABLE, bool)
 
 
-# =============================================================================
-# DataFusion AST Parsing Tests (for aggregate arithmetic extraction)
-# =============================================================================
-
-
 class TestDataFusionASTRegexPatterns:
-    """Tests for DataFusion AST parsing regex patterns.
-
-    These tests verify the regex patterns used in the experimental aggregate
-    arithmetic extraction feature. The patterns are designed to extract
-    information from DataFusion error messages.
-
-    Tested against: DataFusion 43.0.0
-    """
-
     def test_extract_alias_name_simple(self):
 
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_alias_name
 
-        # Sample AST string matching actual DataFusion error message format
-        # Format: Column { relation: None, name: \"col_name\" } and Alias { ... name: \"alias_name\" }
         ast_str = 'Alias(Alias { expr: ..., relation: None, name: \\"avg_result\\", metadata: None })'
         result = _extract_datafusion_alias_name(ast_str)
         assert result == "avg_result"
 
     def test_extract_alias_name_with_nested_column(self):
-        """Test alias name extraction when there's also a column reference."""
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_alias_name
 
-        # Matches actual format: Column { name: \"col\" } ... name: \"alias\"
         ast_str = (
             "Alias(Alias { expr: AggregateFunction(...Column { relation: None, "
             'name: \\"test_col\\" }...), relation: None, name: \\"avg_result\\", metadata: None })'
         )
         result = _extract_datafusion_alias_name(ast_str)
-        # Should return the last name: match (the alias name)
         assert result == "avg_result"
 
     def test_extract_alias_name_no_match(self):
 
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_alias_name
 
-        ast_str = "Column { relation: None }"  # No escaped quotes with name:
+        ast_str = "Column { relation: None }"
         result = _extract_datafusion_alias_name(ast_str)
         assert result is None
 
     def test_extract_multiplier_float64(self):
-        """Test multiplier extraction for Float64 multiply."""
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_multiplier
 
         ast_str = "BinaryExpr { left: ..., op: Multiply, right: Literal(Float64(0.2), None) }"
@@ -1150,7 +999,6 @@ class TestDataFusionASTRegexPatterns:
         assert operation == "multiply"
 
     def test_extract_multiplier_int64_divide(self):
-        """Test multiplier extraction for Int64 divide."""
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_multiplier
 
         ast_str = "BinaryExpr { left: ..., op: Divide, right: Literal(Int64(100), None) }"
@@ -1179,23 +1027,15 @@ class TestDataFusionASTRegexPatterns:
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
 class TestDataFusionASTExtractionIntegration:
-    """Integration tests for DataFusion AST extraction.
-
-    These tests verify that the AST extraction works with actual DataFusion
-    expressions, validating the full pipeline.
-    """
-
     def test_get_ast_string_for_alias(self):
 
         from datafusion import col as df_col, functions as df_f
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string
 
-        # Create an aggregate expression with alias
         expr = df_f.avg(df_col("test_col")).alias("avg_result")
         ast_str = _get_datafusion_ast_string(expr)
 
-        # Should return a non-None string containing expected keywords
         assert ast_str is not None
         assert "Alias" in ast_str or "AggregateFunction" in ast_str
 
@@ -1205,13 +1045,10 @@ class TestDataFusionASTExtractionIntegration:
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string
 
-        # Create a binary expression (aggregate * literal)
         expr = (df_f.avg(df_col("test_col")) * df_lit(0.2)).alias("scaled_avg")
         ast_str = _get_datafusion_ast_string(expr)
 
-        # Should return a parseable string
         assert ast_str is not None
-        # Should contain either Alias or BinaryExpr
         assert "Alias" in ast_str or "BinaryExpr" in ast_str
 
     def test_get_ast_string_returns_none_for_simple_column(self):
@@ -1220,10 +1057,7 @@ class TestDataFusionASTExtractionIntegration:
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string
 
-        # Simple column reference
         expr = df_col("test_col")
         ast_str = _get_datafusion_ast_string(expr)
 
-        # May return None or a string depending on DataFusion version
-        # The important thing is it doesn't crash
         assert ast_str is None or isinstance(ast_str, str)

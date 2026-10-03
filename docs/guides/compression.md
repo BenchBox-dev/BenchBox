@@ -366,6 +366,7 @@ info = manager.get_compression_info(original_file, compressed_file)
 from benchbox.utils.compression_mixin import CompressionMixin
 
 class MyGenerator(CompressionMixin):
+    pass
     # Mixin methods available:
     # - get_compressed_filename(filename) -> str
     # - open_output_file(path, mode) -> file_object

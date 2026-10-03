@@ -227,6 +227,35 @@ Format recommendations as:
 Include example configuration snippets where applicable."""
 
 
+ANALYZE_RESULTS_DESCRIPTION = "Analyze benchmark results. (benchmark=tpch, platform=duckdb, focus=optional)"
+
+
+COMPARE_PLATFORMS_DESCRIPTION = (
+    "Compare performance across platforms. (benchmark=tpch, platforms=duckdb,polars-df, scale_factor=0.01)"
+)
+
+
+IDENTIFY_REGRESSIONS_DESCRIPTION = (
+    "Find performance regressions between runs. (baseline_run, comparison_run, threshold_percent=10)"
+)
+
+
+BENCHMARK_PLANNING_DESCRIPTION = (
+    "Plan a benchmark strategy. (use_case=testing|production|comparison, platforms, time_budget_minutes=30)"
+)
+
+
+TROUBLESHOOT_FAILURE_DESCRIPTION = "Diagnose benchmark failures. (error_message, platform, benchmark)"
+
+
+BENCHMARK_RUN_DESCRIPTION = (
+    "Execute a planned benchmark. (platform=duckdb, benchmark=tpch, scale_factor=0.01, queries=optional)"
+)
+
+
+PLATFORM_TUNING_DESCRIPTION = "Get tuning recommendations for a platform. (platform=duckdb, workload=optional)"
+
+
 def register_all_prompts(mcp: MCPServer) -> None:
     """Register all MCP prompts with the server.
 
@@ -234,7 +263,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         mcp: The MCPServer instance to register prompts with.
     """
 
-    @mcp.prompt()
+    @mcp.prompt(description=ANALYZE_RESULTS_DESCRIPTION)
     def analyze_results(
         benchmark: str = "tpch",
         platform: str = "duckdb",
@@ -243,7 +272,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Analyze benchmark results. (benchmark=tpch, platform=duckdb, focus=optional)"""
         return _build_analyze_results_prompt(benchmark, platform, focus)
 
-    @mcp.prompt()
+    @mcp.prompt(description=COMPARE_PLATFORMS_DESCRIPTION)
     def compare_platforms(
         benchmark: str = "tpch",
         platforms: str = "duckdb,polars-df",
@@ -252,7 +281,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Compare performance across platforms. (benchmark=tpch, platforms=duckdb,polars-df, scale_factor=0.01)"""
         return _build_compare_platforms_prompt(benchmark, platforms, scale_factor)
 
-    @mcp.prompt()
+    @mcp.prompt(description=IDENTIFY_REGRESSIONS_DESCRIPTION)
     def identify_regressions(
         baseline_run: str | None = None,
         comparison_run: str | None = None,
@@ -261,7 +290,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Find performance regressions between runs. (baseline_run, comparison_run, threshold_percent=10)"""
         return _build_regressions_prompt(baseline_run, comparison_run, threshold_percent)
 
-    @mcp.prompt()
+    @mcp.prompt(description=BENCHMARK_PLANNING_DESCRIPTION)
     def benchmark_planning(
         use_case: str = "testing",
         platforms: str | None = None,
@@ -270,7 +299,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Plan a benchmark strategy. (use_case=testing|production|comparison, platforms, time_budget_minutes=30)"""
         return _build_benchmark_planning_prompt(use_case, platforms, time_budget_minutes)
 
-    @mcp.prompt()
+    @mcp.prompt(description=TROUBLESHOOT_FAILURE_DESCRIPTION)
     def troubleshoot_failure(
         error_message: str | None = None,
         platform: str | None = None,
@@ -279,7 +308,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Diagnose benchmark failures. (error_message, platform, benchmark)"""
         return _build_troubleshoot_prompt(error_message, platform, benchmark)
 
-    @mcp.prompt()
+    @mcp.prompt(description=BENCHMARK_RUN_DESCRIPTION)
     def benchmark_run(
         platform: str = "duckdb",
         benchmark: str = "tpch",
@@ -289,7 +318,7 @@ def register_all_prompts(mcp: MCPServer) -> None:
         """Execute a planned benchmark. (platform=duckdb, benchmark=tpch, scale_factor=0.01, queries=optional)"""
         return _build_benchmark_run_prompt(platform, benchmark, scale_factor, queries)
 
-    @mcp.prompt()
+    @mcp.prompt(description=PLATFORM_TUNING_DESCRIPTION)
     def platform_tuning(
         platform: str = "duckdb",
         workload: str | None = None,

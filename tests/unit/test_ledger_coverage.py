@@ -1,13 +1,3 @@
-"""Fail if a workflow file or process test exists that the ledger does not list.
-
-Guardrail G3 backstop for the development loop modernization: every file in
-the ledger's scope must appear in docs/development/dev-loop-property-ledger.md
-so deletions cannot silently drop coverage. The ledger may list a file by
-exact relative path or, for the large scripts directories, by an explicit
-per-directory catch-all row that forces individual reclassification before
-any deletion.
-"""
-
 from __future__ import annotations
 
 import re
@@ -29,9 +19,6 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 PROJECT_SCRIPTS_DIR = REPO_ROOT / "_project" / "scripts"
 HOOKS_FILE = REPO_ROOT / ".pre-commit-config.yaml"
 
-# Section headers in the ledger mapped to the directory their rows resolve
-# against. Bare filenames in a row resolve inside that directory; entries
-# containing a slash resolve from the repository root.
 SECTION_DIRS = {
     "### `.github/workflows/`": WORKFLOW_DIR,
     "### `tests/unit/workflows/`": WORKFLOWS_TEST_DIR,
@@ -42,8 +29,6 @@ SECTION_DIRS = {
     "### `scripts/`": SCRIPTS_DIR,
     "### `_project/scripts/`": PROJECT_SCRIPTS_DIR,
 }
-# Sections whose rows name hooks or globs rather than files in a directory;
-# the reverse file-existence check skips them.
 NON_FILE_SECTIONS = {"### `.pre-commit-config.yaml` hooks"}
 
 
@@ -53,7 +38,6 @@ def _ledger_text() -> str:
 
 
 def _section_rows(text: str) -> dict[str, list[str]]:
-    """Map each known section header to its table row texts."""
     sections: dict[str, list[str]] = {}
     current: str | None = None
     for line in text.splitlines():
@@ -134,14 +118,6 @@ def test_ledger_lists_every_script() -> None:
 
 
 def test_ledger_covers_only_existing_files() -> None:
-    """Reverse check: every ledger row must resolve to a file on disk.
-
-    The forward tests catch additions missing from the ledger. This test
-    catches the deletion scenario: removing a guarded file while leaving
-    its row unchanged fails here because the row no longer resolves.
-    Bare filenames resolve inside their section directory; slashed entries
-    resolve from the repository root.
-    """
     text = _ledger_text()
     sections = _section_rows(text)
     orphaned = []
@@ -149,8 +125,6 @@ def test_ledger_covers_only_existing_files() -> None:
         if section in NON_FILE_SECTIONS:
             continue
         for row in sections.get(section, []):
-            # The file entry is the first backtick span in the row; later
-            # spans name guards or reasons, not files in this directory.
             match = re.search(r"`([^`]+)`", row)
             if not match:
                 continue
@@ -159,9 +133,6 @@ def test_ledger_covers_only_existing_files() -> None:
                 continue
             if "*" in entry:
                 continue
-            # Entries are ledger-relative: bare names and section-relative
-            # subpaths resolve inside the section directory; anything else
-            # resolves from the repository root.
             section_candidate = source_dir / entry
             if section_candidate.is_file():
                 continue

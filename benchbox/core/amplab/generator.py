@@ -1,20 +1,6 @@
-"""AMPLab Big Data Benchmark data generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module generates synthetic web analytics data for the AMPLab benchmark,
-including web page rankings, user visits, and document content.
-
-The generator creates:
-- RANKINGS table with page URLs and PageRank-style scores
-- USERVISITS table with user interaction logs
-- DOCUMENTS table with web page content
-
-Data characteristics match the original AMPLab benchmark specification
-for testing big data processing systems.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

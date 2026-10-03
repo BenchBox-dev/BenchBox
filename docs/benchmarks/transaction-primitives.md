@@ -212,7 +212,7 @@ benchbox run --benchmark transaction_primitives --platform duckdb \
 
 #### Constructor
 
-```python
+```text
 TransactionPrimitives(
     scale_factor: float = 1.0,
     output_dir: str = "_project/data",

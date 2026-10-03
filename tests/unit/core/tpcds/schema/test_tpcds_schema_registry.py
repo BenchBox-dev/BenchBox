@@ -1,5 +1,3 @@
-"""Coverage tests for TPC-DS schema registry helpers."""
-
 from __future__ import annotations
 
 import pytest

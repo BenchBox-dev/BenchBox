@@ -1,11 +1,6 @@
-"""Tests for platform setup wizard UX improvements.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests for numbered list selection functionality in the platform setup wizard.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from unittest.mock import MagicMock, patch
@@ -25,8 +20,6 @@ pytestmark = [
 
 
 class TestNumberedSelectPrompt:
-    """Tests for NumberedSelectPrompt class."""
-
     def test_process_response_number_selection(self):
 
         options = [
@@ -150,12 +143,9 @@ class TestNumberedSelectPrompt:
 
 
 class TestNumberedPlatformSelect:
-    """Tests for numbered_platform_select function."""
-
     def _create_platform_info(
         self, name: str, display_name: str, available: bool = True, enabled: bool = False
     ) -> PlatformInfo:
-        """Helper to create PlatformInfo objects."""
         return PlatformInfo(
             name=name,
             display_name=display_name,
@@ -189,7 +179,7 @@ class TestNumberedPlatformSelect:
         result = numbered_platform_select(
             "Select",
             platforms,
-            filter_func=lambda info: False,  # Exclude all
+            filter_func=lambda info: False,
             console_instance=mock_console,
         )
         assert result is None
@@ -211,7 +201,6 @@ class TestNumberedPlatformSelect:
             console_instance=mock_console,
         )
 
-        # Should return first platform alphabetically (DuckDB comes before SQLite)
         assert result == "duckdb"
 
     @patch("benchbox.cli.platform.Prompt.ask")
@@ -241,7 +230,7 @@ class TestNumberedPlatformSelect:
             "duckdb": self._create_platform_info("duckdb", "DuckDB"),
         }
         mock_console = MagicMock()
-        mock_ask.return_value = "pg"  # Alias for postgresql
+        mock_ask.return_value = "pg"
 
         result = numbered_platform_select(
             "Select",
@@ -265,7 +254,7 @@ class TestNumberedPlatformSelect:
         result = numbered_platform_select(
             "Select",
             platforms,
-            filter_func=lambda info: info.available,  # Only available platforms
+            filter_func=lambda info: info.available,
             group_by_status=False,
             console_instance=mock_console,
         )
@@ -308,7 +297,6 @@ class TestNumberedPlatformSelect:
             console_instance=mock_console,
         )
 
-        # Check that section headers were printed
         print_calls = [str(call) for call in mock_console.print.call_args_list]
         print_output = " ".join(print_calls)
         assert "Enabled" in print_output
@@ -317,8 +305,6 @@ class TestNumberedPlatformSelect:
 
 
 class TestSetupWizardIntegration:
-    """Integration tests for the setup wizard with numbered selection."""
-
     @patch("benchbox.cli.platform.get_platform_manager")
     @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
     def test_setup_wizard_uses_numbered_prompt(self, mock_ask, mock_get_manager):
@@ -331,16 +317,13 @@ class TestSetupWizardIntegration:
         mock_manager.detect_platforms.return_value = {}
         mock_get_manager.return_value = mock_manager
 
-        # User immediately selects "done" (option 5)
         mock_ask.return_value = "done"
 
         runner = CliRunner()
         runner.invoke(setup_platforms, ["--interactive"])
 
-        # Verify NumberedSelectPrompt was called
         mock_ask.assert_called()
 
-        # Check the call was made with expected options structure
         call_args = mock_ask.call_args
         assert call_args is not None
         assert "options" in call_args.kwargs

@@ -1,12 +1,6 @@
-"""Stub-based smoke tests for LakeSail Sail platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests adapter wiring against a fake PySpark Spark Connect session.
-For live tests against a real Sail server, see test_lakesail_live.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -22,10 +16,8 @@ pytestmark = [
 
 @pytest.mark.platform_smoke
 class TestLakeSailStubConnection:
-    """Test LakeSail adapter connection lifecycle with stubs."""
-
     def test_create_and_close_connection(self, monkeypatch):
-        """Test adapter creates and closes a Spark Connect session."""
+
         state = install_lakesail_stub(monkeypatch)
 
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -40,7 +32,7 @@ class TestLakeSailStubConnection:
         adapter.close_connection(connection)
 
     def test_platform_info(self, monkeypatch):
-        """Test platform info collection returns expected fields."""
+
         state = install_lakesail_stub(monkeypatch)
 
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -60,7 +52,7 @@ class TestLakeSailStubConnection:
             adapter.close_connection(connection)
 
     def test_execute_query(self, monkeypatch):
-        """Test basic query execution returns result dict."""
+
         state = install_lakesail_stub(monkeypatch)
 
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -78,7 +70,7 @@ class TestLakeSailStubConnection:
             adapter.close_connection(connection)
 
     def test_check_database_exists(self, monkeypatch):
-        """Test database existence check against stub catalog."""
+
         state = install_lakesail_stub(monkeypatch)
 
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -91,7 +83,7 @@ class TestLakeSailStubConnection:
         assert adapter.check_server_database_exists(database="nonexistent_db") is False
 
     def test_spark_connect_endpoint_configured(self, monkeypatch):
-        """Test that the adapter configures the Spark Connect endpoint."""
+
         state = install_lakesail_stub(monkeypatch, endpoint="sc://custom:9999")
 
         from benchbox.platforms.lakesail import LakeSailAdapter

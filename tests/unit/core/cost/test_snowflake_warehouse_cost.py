@@ -1,12 +1,3 @@
-"""Tests for Snowflake warehouse runtime cost estimation.
-
-Snowflake's QUERY_HISTORY exposes only cloud-services credits, never
-warehouse compute credits, so the cost model estimates warehouse credits from
-measured execution time and the warehouse size's credits/hour rate. These tests
-pin the estimation math, the explicit-credits precedence, the fallback
-stamping, and the end-to-end normalized gate.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -117,7 +108,6 @@ class TestSnowflakeWarehouseCreditsPerHour:
 
 class TestSnowflakeEstimation:
     def test_one_hour_on_medium_matches_four_metered_credits(self) -> None:
-        """1 hour on Medium burns 4 credits; estimation must equal metering."""
         calculator = CostCalculator()
         estimated = calculator.calculate_query_cost("snowflake", {"execution_time_seconds": 3600.0}, _config())
         metered = calculator.calculate_query_cost("snowflake", {"credits_used": 4.0}, _config())
@@ -173,14 +163,12 @@ class TestSnowflakeEstimation:
         assert cost.pricing_details["credits_per_hour"] == 8.0
 
     def test_runtime_without_any_size_returns_none(self) -> None:
-        """Runtime alone is not enough when neither usage nor config names a size."""
         resource_usage: dict[str, object] = {"execution_time_seconds": 60.0}
         config = _config()
         del config["warehouse_size"]
         assert CostCalculator().calculate_query_cost("snowflake", resource_usage, config) is None
 
     def test_config_size_backs_estimation(self) -> None:
-        """A config-level size still yields a per-query estimate (never normalized)."""
         cost = CostCalculator().calculate_query_cost("snowflake", {"execution_time_seconds": 60.0}, _config())
         assert isinstance(cost, QueryCost)
         assert cost.pricing_details["credits_per_hour"] == 4.0
@@ -195,7 +183,6 @@ class TestSnowflakeEstimation:
         ],
     )
     def test_no_estimable_signal_returns_none(self, resource_usage: dict[str, object]) -> None:
-        """Cloud-services credits alone must never price as warehouse compute."""
         assert CostCalculator().calculate_query_cost("snowflake", resource_usage, _config()) is None
 
     def test_unknown_size_stamps_price_unavailable(self) -> None:
@@ -210,7 +197,6 @@ class TestSnowflakeEstimation:
         assert marker["table"] == "snowflake_warehouse_credits_per_hour"
 
     def test_both_fallbacks_name_the_credit_price_table(self) -> None:
-        """The marker holds one table; the pinned edition/price warning wins."""
         calculator = CostCalculator()
         cost = calculator.calculate_query_cost(
             "snowflake",
@@ -273,7 +259,6 @@ class TestSnowflakeNormalizedGate:
         assert normalized["deployment"]["warehouse_size"] == "X-Small"
 
     def test_missing_edition_stays_unavailable(self) -> None:
-        """The edition is not service-observable; guessing it must not publish."""
         results = _results(
             platform_info={
                 "platform_type": "snowflake",
@@ -300,7 +285,6 @@ class TestSnowflakeNormalizedGate:
         assert normalized["normalized_cost_usd"] is None
 
     def test_cloud_services_credits_alone_stay_unavailable(self) -> None:
-        """A live-shaped bundle with only cloud-services credits is not $0."""
         results = _results(
             platform_info={
                 "platform_type": "snowflake",
@@ -377,7 +361,6 @@ class TestSnowflakeEstimatedConcurrencyWarning:
         assert not any("concurrent streams" in warning for warning in cost.warnings)
 
     def test_concurrent_metered_run_does_not_warn(self) -> None:
-        """Metered credits attribute shared-warehouse cost exactly; no bias."""
         assert _snowflake_phase_has_estimated_concurrent_cost(_benchmark_cost(4, False)) is False
 
 

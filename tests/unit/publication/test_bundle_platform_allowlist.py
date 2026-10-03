@@ -1,9 +1,6 @@
-"""Bundle platform allowlist coverage for newly admitted platforms.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -22,8 +19,6 @@ def _validate_platform_name(name: str) -> ValidationResult:
 
 
 class TestBundlePlatformAllowlist:
-    """Corpus-admitted platforms must validate without unknown-name warnings."""
-
     def test_ducklake_is_known(self):
         assert "ducklake" in KNOWN_PLATFORMS
 

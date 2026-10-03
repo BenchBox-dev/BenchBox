@@ -229,10 +229,14 @@ class TestChartOutputContract:
 
         assert "ChartOptions(use_color=False)" in source
 
-    def test_generate_chart_docstring_matches_the_renderer(self):
-        from benchbox.mcp.tools import visualization as visualization_module
+    def test_generate_chart_description_matches_the_renderer(self, tmp_path: Path):
+        from benchbox.mcp import create_server
+        from tests.unit.mcp.public_api import list_tools_by_name
 
-        source = inspect.getsource(visualization_module.register_visualization_tools)
+        server = create_server(results_dir=tmp_path, charts_dir=tmp_path, log_level="ERROR")
+        description = list_tools_by_name(server)["generate_chart"].description
 
-        assert "ANSI colors for terminal display" not in source
-        assert "ANSI-color-free" in source
+        assert description is not None
+        assert "Generate ASCII chart output" in description
+        assert "non-ASCII formats are rejected" in description
+        assert "ANSI colors for terminal display" not in description

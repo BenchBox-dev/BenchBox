@@ -1,15 +1,6 @@
-"""Historical result database for time-series analysis and ranking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides SQLite-based storage for benchmark results, enabling:
-- Historical tracking and time-series analysis
-- Performance trend detection and regression alerts
-- Automated platform rankings
-- Year-over-year comparisons
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,10 +24,8 @@ from benchbox.core.results.regression_policy import is_regression
 
 logger = logging.getLogger(__name__)
 
-# Default database location
 DEFAULT_DB_PATH = Path.home() / ".benchbox" / "results.db"
 
-# Schema version for migrations
 SCHEMA_VERSION = 2
 _RANKING_METRIC_CONFIG = {
     "geometric_mean": ("geometric_mean_ms", "ASC"),
@@ -47,7 +36,6 @@ _BACKUP_TABLE_NAME_PATTERN = re.compile(r"^queries_orphan_backup_\d{20}$")
 
 
 def _validate_backup_table_name(table_name: str) -> str:
-    """Validate a generated orphan-backup table name before SQL interpolation."""
     if _BACKUP_TABLE_NAME_PATTERN.fullmatch(table_name) is None:
         raise ValueError(f"Unsafe SQLite backup table name: {table_name!r}")
     return table_name
@@ -55,8 +43,6 @@ def _validate_backup_table_name(table_name: str) -> str:
 
 @dataclass
 class StoredResult:
-    """A result stored in the database."""
-
     id: int
     execution_id: str
     platform: str
@@ -80,7 +66,6 @@ class StoredResult:
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> StoredResult:
-        """Create StoredResult from database row."""
         keys = row.keys()
         return cls(
             id=row["id"],
@@ -108,8 +93,6 @@ class StoredResult:
 
 @dataclass
 class StoredQuery:
-    """A query result stored in the database."""
-
     id: int
     result_id: int
     query_id: str
@@ -123,7 +106,6 @@ class StoredQuery:
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> StoredQuery:
-        """Create StoredQuery from database row."""
         return cls(
             id=row["id"],
             result_id=row["result_id"],
@@ -140,8 +122,6 @@ class StoredQuery:
 
 @dataclass
 class PlatformRanking:
-    """Platform ranking for a specific benchmark and metric."""
-
     rank: int
     platform: str
     platform_version: str | None
@@ -150,14 +130,12 @@ class PlatformRanking:
     score: float
     sample_count: int
     latest_timestamp: datetime
-    trend: str  # "up", "down", "stable", "new"
-    trend_change: float | None  # Percentage change from previous period
+    trend: str
+    trend_change: float | None
 
 
 @dataclass
 class PerformanceTrend:
-    """Performance trend for a platform over time."""
-
     platform: str
     benchmark: str
     scale_factor: float
@@ -167,43 +145,26 @@ class PerformanceTrend:
     min_geometric_mean_ms: float
     max_geometric_mean_ms: float
     sample_count: int
-    change_pct: float | None  # Change from previous period
-    is_regression: bool  # Per benchbox.core.results.regression_policy
+    change_pct: float | None
+    is_regression: bool
 
 
 @dataclass
 class RankingConfig:
-    """Configuration for ranking calculations."""
-
-    metric: str = "geometric_mean"  # geometric_mean, power_at_size, cost_efficiency
-    min_samples: int = 1  # Minimum samples to include in ranking
-    lookback_days: int = 90  # Only consider results from last N days
-    require_success: bool = True  # Only include successful runs
+    metric: str = "geometric_mean"
+    min_samples: int = 1
+    lookback_days: int = 90
+    require_success: bool = True
 
 
 class ResultDatabase:
-    """SQLite database for historical benchmark results.
-
-    Provides storage, retrieval, and analysis of benchmark results including:
-    - Result storage with deduplication
-    - Time-series queries
-    - Performance trend detection
-    - Platform ranking calculations
-    """
-
     def __init__(self, db_path: Path | str | None = None):
-        """Initialize the result database.
-
-        Args:
-            db_path: Path to SQLite database file. Uses default if None.
-        """
         self.db_path = Path(db_path) if db_path else DEFAULT_DB_PATH
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
-        """Get a database connection with row factory."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -213,11 +174,9 @@ class ResultDatabase:
             conn.close()
 
     def _init_schema(self) -> None:
-        """Initialize or migrate database schema."""
         with self._connection() as conn:
             cursor = conn.cursor()
 
-            # Check current schema version
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS schema_version (
@@ -234,7 +193,6 @@ class ResultDatabase:
                 if current_version == 0:
                     self._create_tables(cursor)
                 else:
-                    # Incremental migrations
                     if current_version < 2:
                         self._migrate_to_v2(cursor)
                 cursor.execute("DELETE FROM schema_version")
@@ -246,8 +204,6 @@ class ResultDatabase:
                 logger.info(f"Database schema migrated to version {SCHEMA_VERSION}")
 
     def _create_tables(self, cursor: sqlite3.Cursor) -> None:
-        """Create all database tables."""
-        # Main results table
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS results (
@@ -276,7 +232,6 @@ class ResultDatabase:
         """
         )
 
-        # Query results table
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS queries (
@@ -295,7 +250,6 @@ class ResultDatabase:
         """
         )
 
-        # Platforms table for version tracking
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS platforms (
@@ -310,7 +264,6 @@ class ResultDatabase:
         """
         )
 
-        # Create indexes for common queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_results_platform ON results(platform)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_results_benchmark ON results(benchmark)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_results_timestamp ON results(timestamp)")
@@ -321,16 +274,13 @@ class ResultDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_queries_query_id ON queries(query_id)")
 
     def _migrate_to_v2(self, cursor: sqlite3.Cursor) -> None:
-        """Apply schema v2 migration: add compliance_class column to results."""
         try:
             cursor.execute("ALTER TABLE results ADD COLUMN compliance_class TEXT")
             logger.info("Schema v2: added compliance_class column to results table")
         except sqlite3.OperationalError:
-            # Column already exists - no-op
             pass
 
     def _compute_config_hash(self, result: BenchmarkResults) -> str:
-        """Compute a hash of the configuration for deduplication."""
         config_data = {
             "platform": result.platform,
             "benchmark": result.benchmark_name,
@@ -341,47 +291,21 @@ class ResultDatabase:
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]
 
     def store_result(self, result: BenchmarkResults) -> int:
-        """Store a benchmark result in the database.
-
-        Args:
-            result: BenchmarkResults to store
-
-        Returns:
-            Database ID of the stored result
-
-        Raises:
-            ValueError: If result with same execution_id already exists
-        """
         config_hash = self._compute_config_hash(result)
 
-        # Extract platform version
         platform_version = None
         if result.platform_info:
             platform_version = result.platform_info.get("platform_version")
 
-        # Extract cost. An unavailable-status run persists no total: a cost
-        # that is not fit to publish is not fit to persist.
         total_cost = published_total_cost(result.cost_summary)
-        # Per-query execution costs predate the per-query stamp point (they
-        # are fixed when the result is built), so gate them here on the
-        # run-level status. Summaries with no status signal keep the legacy
-        # behavior and persist as-is.
         persist_per_query_costs = cost_status_of(result.cost_summary) != "unavailable"
 
-        # Build metadata
         metadata: dict[str, Any] = {
             "system_profile": result.system_profile,
-            # ~/.benchbox/results.db outlives the run; sanitize so a
-            # convention slip in an adapter's platform_info never persists a
-            # secret to the local sink.
             "platform_info": sanitize_platform_options(result.platform_info or {}),
             "tunings_applied": result.tunings_applied,
             "test_execution_type": result.test_execution_type,
         }
-        # Persist filtered platform metadata when the result carries explicit
-        # blocks so the local DB is not a silent egress channel for raw_config,
-        # raw_metadata, or the normalized deployment/cloud/compute/storage
-        # mappings. Same structural boundary as public/private payloads.
         has_explicit_platform_meta = any(
             getattr(result, name, None) is not None
             for name in (
@@ -408,7 +332,6 @@ class ResultDatabase:
         with self._connection() as conn:
             cursor = conn.cursor()
 
-            # Check for duplicate
             cursor.execute(
                 "SELECT id FROM results WHERE execution_id = ?",
                 (result.execution_id,),
@@ -416,17 +339,14 @@ class ResultDatabase:
             if cursor.fetchone():
                 raise ValueError(f"Result with execution_id '{result.execution_id}' already exists")
 
-            # Convert geometric_mean from seconds to milliseconds for storage
             geometric_mean_ms = None
             if result.geometric_mean_execution_time is not None:
                 geometric_mean_ms = result.geometric_mean_execution_time * 1000.0
 
-            # Normalize compliance_class to plain string (enum.value if enum, else as-is)
             compliance_class = getattr(result, "compliance_class", None)
             if compliance_class is not None:
                 compliance_class = str(compliance_class)
 
-            # Insert result
             cursor.execute(
                 """
                 INSERT INTO results (
@@ -461,7 +381,6 @@ class ResultDatabase:
             )
             result_id = cursor.lastrowid or 0
 
-            # Insert query results
             if result.execution_phases and result.execution_phases.power_test:
                 for execution in result.execution_phases.power_test.query_executions:
                     cursor.execute(
@@ -484,7 +403,6 @@ class ResultDatabase:
                         ),
                     )
 
-            # Update platforms table
             cursor.execute(
                 """
                 INSERT INTO platforms (name, version, config_hash, first_seen, last_seen)
@@ -506,14 +424,6 @@ class ResultDatabase:
             return result_id
 
     def get_result(self, execution_id: str) -> StoredResult | None:
-        """Get a result by execution ID.
-
-        Args:
-            execution_id: Unique execution identifier
-
-        Returns:
-            StoredResult or None if not found
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -524,14 +434,6 @@ class ResultDatabase:
             return StoredResult.from_row(row) if row else None
 
     def get_result_by_id(self, result_id: int) -> StoredResult | None:
-        """Get a result by database ID.
-
-        Args:
-            result_id: Database ID
-
-        Returns:
-            StoredResult or None if not found
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM results WHERE id = ?", (result_id,))
@@ -539,14 +441,6 @@ class ResultDatabase:
             return StoredResult.from_row(row) if row else None
 
     def get_queries(self, result_id: int) -> list[StoredQuery]:
-        """Get all queries for a result.
-
-        Args:
-            result_id: Database ID of the result
-
-        Returns:
-            List of StoredQuery objects
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -566,21 +460,6 @@ class ResultDatabase:
         limit: int = 1000,
         offset: int = 0,
     ) -> list[StoredResult]:
-        """Query results with filters.
-
-        Args:
-            platform: Filter by platform name
-            benchmark: Filter by benchmark name
-            scale_factor: Filter by scale factor
-            start_date: Filter results after this date
-            end_date: Filter results before this date
-            validation_status: Filter by validation status
-            limit: Maximum results to return
-            offset: Number of results to skip
-
-        Returns:
-            List of matching StoredResult objects
-        """
         conditions = []
         params: list[Any] = []
 
@@ -624,15 +503,6 @@ class ResultDatabase:
         platform: str | None = None,
         benchmark: str | None = None,
     ) -> int:
-        """Count results matching filters.
-
-        Args:
-            platform: Filter by platform name
-            benchmark: Filter by benchmark name
-
-        Returns:
-            Number of matching results
-        """
         conditions = []
         params: list[Any] = []
 
@@ -654,36 +524,18 @@ class ResultDatabase:
             return cursor.fetchone()[0]
 
     def get_platforms(self) -> list[str]:
-        """Get list of all platforms in the database.
-
-        Returns:
-            List of platform names
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT platform FROM results ORDER BY platform")
             return [row[0] for row in cursor.fetchall()]
 
     def get_benchmarks(self) -> list[str]:
-        """Get list of all benchmarks in the database.
-
-        Returns:
-            List of benchmark names
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT benchmark FROM results ORDER BY benchmark")
             return [row[0] for row in cursor.fetchall()]
 
     def delete_result(self, execution_id: str) -> bool:
-        """Delete a result by execution ID.
-
-        Args:
-            execution_id: Unique execution identifier
-
-        Returns:
-            True if deleted, False if not found
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -697,7 +549,6 @@ class ResultDatabase:
             return deleted
 
     def count_orphaned_queries(self) -> int:
-        """Count query rows whose parent result no longer exists."""
         with self._connection() as conn:
             row = conn.execute(
                 """
@@ -711,15 +562,6 @@ class ResultDatabase:
             return int(row[0])
 
     def repair_orphaned_queries(self, *, dry_run: bool = True) -> int:
-        """Back up and remove orphaned query rows when explicitly requested.
-
-        Args:
-            dry_run: Return the orphan count without changing the database.
-
-        Returns:
-            Number of orphaned query rows found (and removed when ``dry_run`` is
-            false). A timestamped backup table is created before deletion.
-        """
         with self._connection() as conn:
             row = conn.execute(
                 """
@@ -766,19 +608,8 @@ class ResultDatabase:
         config: RankingConfig | None = None,
         include_unofficial: bool = False,
     ) -> list[PlatformRanking]:
-        """Calculate platform rankings for a benchmark.
-
-        Args:
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            config: Ranking configuration
-
-        Returns:
-            List of PlatformRanking sorted by rank
-        """
         config = config or RankingConfig()
 
-        # Calculate cutoff date
         cutoff = datetime.now(timezone.utc)
         from datetime import timedelta
 
@@ -787,20 +618,16 @@ class ResultDatabase:
         with self._connection() as conn:
             cursor = conn.cursor()
 
-            # Build query based on metric
             metric_col, order = _RANKING_METRIC_CONFIG.get(config.metric, _RANKING_METRIC_CONFIG["geometric_mean"])
 
             validation_filter = ""
             if config.require_success:
                 validation_filter = "AND validation_status = 'PASSED'"
 
-            # By default exclude unofficial TPC-DS results (compliance_class in unofficial set).
-            # NULL compliance_class means a non-TPC-DS result or a legacy file - always included.
             unofficial_filter = (
                 "" if include_unofficial else "AND (compliance_class = 'official' OR compliance_class IS NULL)"
             )
 
-            # Get current period rankings
             cursor.execute(
                 f"""
                 SELECT
@@ -825,7 +652,6 @@ class ResultDatabase:
 
             current_results = cursor.fetchall()
 
-            # Get previous period for trend calculation
             prev_cutoff = cutoff - timedelta(days=config.lookback_days)
             cursor.execute(
                 f"""
@@ -852,7 +678,6 @@ class ResultDatabase:
 
             previous_scores = {row["platform"]: row["avg_score"] for row in cursor.fetchall()}
 
-            # Build rankings
             rankings = []
             for rank, row in enumerate(current_results, 1):
                 platform = row["platform"]
@@ -883,7 +708,6 @@ class ResultDatabase:
         previous_score: float | None,
         metric: str,
     ) -> tuple[str, float | None]:
-        """Determine the trend between the current and previous ranking windows."""
         if previous_score is None:
             return "new", None
         if previous_score == 0:
@@ -911,18 +735,6 @@ class ResultDatabase:
         periods: int = 6,
         period_days: int = 30,
     ) -> list[PerformanceTrend]:
-        """Get performance trends for a platform over time.
-
-        Args:
-            platform: Platform name
-            benchmark: Benchmark name
-            scale_factor: Scale factor
-            periods: Number of periods to analyze
-            period_days: Days per period
-
-        Returns:
-            List of PerformanceTrend objects, newest first
-        """
         from datetime import timedelta
 
         now = datetime.now(timezone.utc)
@@ -976,12 +788,11 @@ class ResultDatabase:
                         min_geometric_mean_ms=row["min_gm"],
                         max_geometric_mean_ms=row["max_gm"],
                         sample_count=row["sample_count"],
-                        change_pct=None,  # Calculated below
-                        is_regression=False,  # Calculated below
+                        change_pct=None,
+                        is_regression=False,
                     )
                 )
 
-        # Calculate period-over-period changes
         for i in range(len(trends) - 1):
             current = trends[i]
             previous = trends[i + 1]
@@ -1010,15 +821,6 @@ class ResultDatabase:
         threshold_pct: float = 10.0,
         lookback_days: int = 30,
     ) -> list[PerformanceTrend]:
-        """Detect performance regressions across all platforms.
-
-        Args:
-            threshold_pct: Percentage slowdown to consider a regression
-            lookback_days: Compare current period to this many days ago
-
-        Returns:
-            List of PerformanceTrend objects where regression was detected
-        """
         regressions = []
 
         platforms = self.get_platforms()
@@ -1026,7 +828,6 @@ class ResultDatabase:
 
         for platform in platforms:
             for benchmark in benchmarks:
-                # Get scale factors for this combination
                 with self._connection() as conn:
                     cursor = conn.cursor()
                     cursor.execute(
@@ -1043,25 +844,12 @@ class ResultDatabase:
                     trends = self.get_performance_trends(platform, benchmark, sf, periods=2, period_days=lookback_days)
 
                     for trend in trends:
-                        # Evaluate against the caller's threshold only.
-                        # Previously this also required trend.is_regression,
-                        # which get_performance_trends computes at the default
-                        # 10% -- so any threshold below 10 was silently inert
-                        # (a 7% slowdown could never be reported at
-                        # --threshold 5). is_regression is recomputed here so
-                        # the returned records agree with the filter that
-                        # selected them.
                         if is_regression(trend.change_pct, threshold_pct):
                             regressions.append(replace(trend, is_regression=True))
 
         return regressions
 
     def get_summary_stats(self) -> dict[str, Any]:
-        """Get summary statistics for the database.
-
-        Returns:
-            Dictionary with summary stats
-        """
         with self._connection() as conn:
             cursor = conn.cursor()
 
@@ -1099,18 +887,6 @@ class ResultDatabase:
         pattern: str = "**/*.json",
         include_unofficial: bool = False,
     ) -> tuple[int, int, int]:
-        """Import results from JSON files in a directory.
-
-        Args:
-            directory: Directory containing result files
-            pattern: Glob pattern for files
-            include_unofficial: If False (default), unofficial TPC-DS results
-                (compliance_class in unofficial_nonstandard, unofficial_subscale)
-                are excluded from the database to prevent contaminating rankings.
-
-        Returns:
-            Tuple of (imported_count, skipped_count, excluded_count)
-        """
         from benchbox.core.results.loader import load_result_file
 
         _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
@@ -1126,8 +902,6 @@ class ResultDatabase:
                     if compliance_class in _unofficial_classes:
                         excluded += 1
                         continue
-                # Warn when importing a TPC-DS result file that pre-dates the compliance_class
-                # field - it may contain non-official metrics stored without tagging.
                 if compliance_class is None and getattr(result, "benchmark_name", "").lower() in (
                     "tpc-ds",
                     "tpcds",

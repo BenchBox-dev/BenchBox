@@ -245,6 +245,24 @@ def _build_system_profile() -> str:
     )
 
 
+LIST_BENCHMARKS_RESOURCE_DESCRIPTION = "List all available benchmarks."
+
+
+GET_BENCHMARK_RESOURCE_DESCRIPTION = "Get detailed information about a specific benchmark."
+
+
+LIST_PLATFORMS_RESOURCE_DESCRIPTION = "List all available database platforms."
+
+
+GET_PLATFORM_RESOURCE_DESCRIPTION = "Get detailed information about a specific platform."
+
+
+GET_RECENT_RESULTS_RESOURCE_DESCRIPTION = "Get list of recent benchmark results."
+
+
+GET_SYSTEM_PROFILE_RESOURCE_DESCRIPTION = "Get current system profile information."
+
+
 def register_all_resources(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register all MCP resources with the server.
 
@@ -252,32 +270,32 @@ def register_all_resources(mcp: MCPServer, *, results_dir: PathProvider) -> None
         mcp: The MCPServer instance to register resources with.
     """
 
-    @mcp.resource("benchbox://benchmarks")
+    @mcp.resource("benchbox://benchmarks", description=LIST_BENCHMARKS_RESOURCE_DESCRIPTION)
     def list_benchmarks_resource() -> str:
         """List all available benchmarks."""
         return _build_benchmarks_list()
 
-    @mcp.resource("benchbox://benchmarks/{name}")
+    @mcp.resource("benchbox://benchmarks/{name}", description=GET_BENCHMARK_RESOURCE_DESCRIPTION)
     def get_benchmark_resource(name: str) -> str:
         """Get detailed information about a specific benchmark."""
         return _build_benchmark_detail(name)
 
-    @mcp.resource("benchbox://platforms")
+    @mcp.resource("benchbox://platforms", description=LIST_PLATFORMS_RESOURCE_DESCRIPTION)
     def list_platforms_resource() -> str:
         """List all available database platforms."""
         return _build_platforms_list()
 
-    @mcp.resource("benchbox://platforms/{name}")
+    @mcp.resource("benchbox://platforms/{name}", description=GET_PLATFORM_RESOURCE_DESCRIPTION)
     def get_platform_resource(name: str) -> str:
         """Get detailed information about a specific platform."""
         return _build_platform_detail(name)
 
-    @mcp.resource("benchbox://results/recent")
+    @mcp.resource("benchbox://results/recent", description=GET_RECENT_RESULTS_RESOURCE_DESCRIPTION)
     def get_recent_results_resource() -> str:
         """Get list of recent benchmark results."""
         return _build_recent_results(resolve_path_provider(results_dir).expanduser())
 
-    @mcp.resource("benchbox://system/profile")
+    @mcp.resource("benchbox://system/profile", description=GET_SYSTEM_PROFILE_RESOURCE_DESCRIPTION)
     def get_system_profile_resource() -> str:
         """Get current system profile information."""
         return _build_system_profile()

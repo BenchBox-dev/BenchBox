@@ -1,9 +1,6 @@
-"""Tests for CLI benchmark orchestrator functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import shutil
 import tempfile
@@ -24,26 +21,20 @@ pytestmark = [
 
 
 class TestBenchmarkOrchestrator:
-    """Test the BenchmarkOrchestrator class."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.orchestrator = BenchmarkOrchestrator(base_dir=self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_orchestrator_initialization(self, tmp_path: Path):
 
-        # Test with base directory
         base_dir = tmp_path / "benchmark-output"
         orchestrator = BenchmarkOrchestrator(base_dir=base_dir)
         assert orchestrator.directory_manager.base_dir == base_dir
         assert orchestrator.custom_output_dir is None
 
-        # Test without base directory
         orchestrator_default = BenchmarkOrchestrator()
         assert orchestrator_default.directory_manager.base_dir is not None
 
@@ -69,7 +60,6 @@ class TestBenchmarkOrchestrator:
         database_config.name = "test_db"
         database_config.options = {"tuning_enabled": True}
         database_config.connection_params = {}
-        # Mock model_dump() properly
         database_config.model_dump.return_value = {
             "type": "duckdb",
             "name": "test_db",
@@ -82,7 +72,6 @@ class TestBenchmarkOrchestrator:
         mock_benchmark.scale_factor = 0.01
         mock_benchmark.generate_data.return_value = {"customer": "customer.csv"}
 
-        # Mock the centralized result creation method to return BenchmarkResults
         def mock_create_enhanced_result(platform, query_results, **kwargs):
             from datetime import datetime
 
@@ -108,7 +97,6 @@ class TestBenchmarkOrchestrator:
 
         mock_benchmark.create_enhanced_benchmark_result = mock_create_enhanced_result
 
-        # Mock platform adapter
         mock_adapter = Mock()
         mock_adapter.platform_name = "duckdb"
         mock_adapter.create_connection.return_value = Mock()
@@ -119,7 +107,6 @@ class TestBenchmarkOrchestrator:
 
         mock_get_adapter.return_value = mock_adapter
 
-        # Return a ready BenchmarkResults from lifecycle to avoid deep core coupling
         mock_lifecycle.return_value = mock_benchmark.create_enhanced_benchmark_result("duckdb", [])
 
         with patch.object(self.orchestrator, "_get_benchmark_instance", return_value=mock_benchmark):
@@ -130,13 +117,11 @@ class TestBenchmarkOrchestrator:
         assert result.benchmark_name == "TPC-H"
         assert result.validation_status == "PASSED"
 
-        # Verify platform adapter was called
         mock_get_adapter.assert_called_once()
 
     @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_execute_benchmark_enriches_driver_metadata_on_canonical_path(self, mock_get_adapter, mock_lifecycle):
-        """Driver metadata is propagated on orchestrator/lifecycle path."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
         system_profile = Mock(spec=SystemProfile)
         system_profile.cpu_cores_logical = 8
@@ -206,7 +191,6 @@ class TestBenchmarkOrchestrator:
         system_profile.cpu_cores_logical = 4
         system_profile.memory_total_gb = 8
 
-        # Create minimal execution phases for data-only mode
         from benchbox.platforms.base import (
             DataGenerationPhase,
             ExecutionPhases,
@@ -235,7 +219,6 @@ class TestBenchmarkOrchestrator:
 
         execution_phases = ExecutionPhases(setup=setup_phase)
 
-        # Create a mock enhanced result to return from the benchmark
         mock_enhanced_result = BenchmarkResults(
             benchmark_name="TPC-H",
             platform="data_only",
@@ -272,13 +255,11 @@ class TestBenchmarkOrchestrator:
         system_profile = Mock(spec=SystemProfile)
         database_config = Mock()
 
-        # Mock benchmark instance to raise exception
         with patch.object(self.orchestrator, "_get_benchmark_instance") as mock_get_bench:
             mock_get_bench.side_effect = ValueError("Unknown benchmark: invalid")
 
             result = self.orchestrator.execute_benchmark(config, system_profile, database_config)
 
-        # Verify error result
         assert result.validation_status == "FAILED"
         assert "Unknown benchmark: invalid" in result.validation_details["error"]
 
@@ -288,7 +269,6 @@ class TestBenchmarkOrchestrator:
         system_profile = Mock()
         system_profile.cpu_cores_logical = 4
 
-        # Mock the _get_benchmark_class method to return a mock class
         mock_benchmark_class = Mock()
         mock_instance = Mock()
         mock_benchmark_class.return_value = mock_instance
@@ -310,7 +290,6 @@ class TestBenchmarkOrchestrator:
         system_profile = Mock()
         system_profile.cpu_cores_logical = 8
 
-        # Mock the _get_benchmark_class method to return a mock class
         mock_benchmark_class = Mock()
         mock_instance = Mock()
         mock_benchmark_class.return_value = mock_instance
@@ -319,7 +298,6 @@ class TestBenchmarkOrchestrator:
             result = self.orchestrator._get_benchmark_instance(config, system_profile)
             assert result == mock_instance
 
-            # Verify the expected subset of parameters was passed
             called_kwargs = mock_benchmark_class.call_args.kwargs
             assert called_kwargs["parallel"] == 8
             assert called_kwargs["scale_factor"] == 0.1
@@ -370,7 +348,6 @@ class TestBenchmarkOrchestrator:
         assert "Benchmark 'unknown' not supported yet" in str(exc_info.value)
 
     def test_get_benchmark_instance_delegates_to_shared_loader(self):
-        """Test that orchestrator delegates benchmark instance construction to shared loader."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
         system_profile = Mock()
         mock_instance = Mock()
@@ -390,7 +367,6 @@ class TestBenchmarkOrchestrator:
         database_config.name = "test_db"
         database_config.connection_params = {"host": "localhost", "port": 5432}
         database_config.options = {"tuning_enabled": True, "force_recreate": False}
-        # Mock model_dump() to return the config dict
         database_config.model_dump.return_value = {
             "type": "duckdb",
             "name": "test_db",
@@ -404,23 +380,16 @@ class TestBenchmarkOrchestrator:
 
         config = self.orchestrator._get_platform_config(database_config, system_profile)
 
-        # Verify configuration includes all expected elements
         assert config["connection_params"]["host"] == "localhost"
         assert config["connection_params"]["port"] == 5432
-        # options dict is included nested
         assert config["options"]["tuning_enabled"] is True
         assert config["options"]["force_recreate"] is False
-        assert config["memory_limit"] == "16GB"  # 80% of 32GB, capped at 16GB
-        assert config["thread_limit"] == 8  # min(16, 8)
-        # database_path is NOT set by get_platform_config() - it's handled by adapter's from_config()
+        assert config["memory_limit"] == "16GB"
+        assert config["thread_limit"] == 8
         assert "database_path" not in config
 
     @patch("benchbox.cli.orchestrator.get_adapter")
     def test_build_platform_adapter_forwards_dataframe_platform_options(self, mock_get_adapter):
-        """#1054 review: --platform-option values (e.g. target_partitions=4)
-        parsed onto database_config.options must reach the DataFrame adapter
-        constructor via get_adapter(), not just DatabaseManager.create_config -
-        the adapter construction is what actually controls execution."""
         database_config = Mock()
         database_config.type = "datafusion"
         database_config.options = {"target_partitions": 4}
@@ -444,15 +413,6 @@ class TestBenchmarkOrchestrator:
 
     @patch("benchbox.cli.orchestrator.get_adapter")
     def test_build_platform_adapter_filters_runtime_overrides_from_dataframe_options(self, mock_get_adapter):
-        """#1062 review: database_config.options also carries runtime-only
-        overrides (verbose, very_verbose, tuning_enabled, force_recreate, ...)
-        merged in by PlatformHookRegistry.build_database_config(), not just
-        user --platform-option values. Forwarding the whole options dict
-        collides with the explicit verbose=/very_verbose= kwargs below
-        (TypeError: multiple values for keyword argument) and would pass
-        unexpected kwargs to DataFrame adapters' narrow constructors. Only
-        keys registered as this platform's --platform-option specs may
-        reach get_adapter()."""
         database_config = Mock()
         database_config.type = "datafusion"
         database_config.options = {
@@ -509,7 +469,6 @@ class TestBenchmarkOrchestrator:
 
         run_config = self.orchestrator._prepare_run_config(config, database_config)
 
-        # Verify configuration (access dataclass fields directly)
         assert run_config.query_subset == ["Q1", "Q2", "Q3"]
         assert run_config.concurrent_streams == 2
         assert run_config.connection is not None
@@ -521,7 +480,6 @@ class TestBenchmarkOrchestrator:
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
         system_profile = Mock(spec=SystemProfile)
 
-        # Minimal BenchmarkResults for data-only success
         success = BenchmarkResults(
             benchmark_name="TPC-H",
             platform="data_only",
@@ -578,28 +536,20 @@ class TestBenchmarkOrchestrator:
 
 
 class TestBenchmarkOrchestratorIntegration:
-    """Test benchmark orchestrator integration scenarios."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.orchestrator = BenchmarkOrchestrator(base_dir=self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
 
 class TestBenchmarkOrchestratorErrorHandling:
-    """Test orchestrator error handling and edge cases."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.orchestrator = BenchmarkOrchestrator(base_dir=self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_singlestore_missing_credentials_offers_guided_setup(self):
@@ -626,11 +576,8 @@ class TestBenchmarkOrchestratorErrorHandling:
         config = self.orchestrator._get_platform_config(database_config, None)
 
         assert config["connection_params"]["host"] == "localhost"
-        # options are nested
         assert config["options"]["tuning_enabled"] is True
-        # database_path is NOT set by get_platform_config() - it's handled by adapter's from_config()
         assert "database_path" not in config
-        # Should not have memory_limit or thread_limit without system profile
         assert "memory_limit" not in config
         assert "thread_limit" not in config
 
@@ -640,7 +587,7 @@ class TestBenchmarkOrchestratorErrorHandling:
         database_config.type = "sqlite"
         database_config.name = "test"
         database_config.connection_params = {}
-        database_config.options = None  # No options
+        database_config.options = None
         database_config.model_dump.return_value = {
             "type": "sqlite",
             "name": "test",
@@ -654,19 +601,11 @@ class TestBenchmarkOrchestratorErrorHandling:
 
         config = self.orchestrator._get_platform_config(database_config, system_profile)
 
-        # Should still include system-based config
-        assert config["memory_limit"] == "6GB"  # 80% of 8GB
-        assert config["thread_limit"] == 4  # min(4, 8)
-        # SQLite doesn't get database_path by default
+        assert config["memory_limit"] == "6GB"
+        assert config["thread_limit"] == 4
         assert "database_path" not in config
 
     def test_system_profile_attribute_mapping(self):
-        """Test that system profile attributes are correctly mapped to platform config.
-
-        This test ensures we use the correct SystemProfile attribute names
-        (memory_total_gb, cpu_cores_logical) rather than incorrect names that
-        would cause fallback to default values.
-        """
         database_config = Mock()
         database_config.connection_params = {}
         database_config.options = {}
@@ -680,36 +619,25 @@ class TestBenchmarkOrchestratorErrorHandling:
             "options": {},
         }
 
-        # Create a system profile with realistic values
         system_profile = Mock()
-        system_profile.memory_total_gb = 16.0  # 16GB system memory
-        system_profile.cpu_cores_logical = 10  # 10 logical CPU cores
+        system_profile.memory_total_gb = 16.0
+        system_profile.cpu_cores_logical = 10
 
         config = self.orchestrator._get_platform_config(database_config, system_profile)
 
-        # Verify that actual system resources are used, not fallback defaults
-        # Memory: min(int(16 * 0.8), 16) = 12GB (not the 3GB fallback from 4GB default)
         assert config["memory_limit"] == "12GB"
 
-        # Threads: min(10, 8) = 8 (not the 2 thread fallback from 2 CPU default)
         assert config["thread_limit"] == 8
 
-        # Test edge cases with high memory system (should cap at 16GB)
-        system_profile.memory_total_gb = 32.0  # 32GB system
+        system_profile.memory_total_gb = 32.0
         config_high_mem = self.orchestrator._get_platform_config(database_config, system_profile)
-        assert config_high_mem["memory_limit"] == "16GB"  # Capped at 16GB max
+        assert config_high_mem["memory_limit"] == "16GB"
 
-        # Test system with many CPU cores (should cap at 8 threads)
         system_profile.cpu_cores_logical = 32
         config_high_cpu = self.orchestrator._get_platform_config(database_config, system_profile)
-        assert config_high_cpu["thread_limit"] == 8  # Capped at 8 max
+        assert config_high_cpu["thread_limit"] == 8
 
     def test_system_profile_fallback_values(self):
-        """Test that fallback values are reasonable when system profile attributes are missing.
-
-        This test ensures that if SystemProfile attributes are missing or incorrect,
-        we get reasonable fallback values (4GB memory, 2 threads).
-        """
         database_config = Mock()
         database_config.type = "duckdb"
         database_config.name = "test"
@@ -722,8 +650,6 @@ class TestBenchmarkOrchestratorErrorHandling:
             "options": {},
         }
 
-        # System profile without the expected attributes (simulating old bug)
-        # Create a simple object without the expected attributes
         class EmptyProfile:
             pass
 
@@ -731,9 +657,8 @@ class TestBenchmarkOrchestratorErrorHandling:
 
         config = self.orchestrator._get_platform_config(database_config, system_profile)
 
-        # Should fall back to defaults: memory_limit from 4GB default, thread_limit from 2 cores default
-        assert config["memory_limit"] == "3GB"  # int(4 * 0.8) = 3GB
-        assert config["thread_limit"] == 2  # min(2, 8) = 2
+        assert config["memory_limit"] == "3GB"
+        assert config["thread_limit"] == 2
 
     def test_prepare_run_config_minimal(self):
 
@@ -743,9 +668,7 @@ class TestBenchmarkOrchestratorErrorHandling:
 
         run_config = self.orchestrator._prepare_run_config(config, database_config)
 
-        # Should have connection but no query_subset or concurrent_streams
         assert run_config.connection is not None
-        # For dataclass fields that might be None, we check if they're None or have default values
         assert run_config.query_subset is None or run_config.query_subset == []
 
 

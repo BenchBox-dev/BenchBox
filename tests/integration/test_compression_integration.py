@@ -1,9 +1,6 @@
-"""Integration tests for compression functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -22,8 +19,6 @@ pytestmark = [
 
 
 class TestCompressionIntegration:
-    """Integration tests for compression across the system."""
-
     def test_benchmark_config_compression_params(self):
 
         config = BenchmarkConfig(
@@ -49,7 +44,6 @@ class TestCompressionIntegration:
                 compression_level=9,
             )
 
-            # Check that data generator has compression settings
             assert benchmark.data_generator.compress_data is True
             assert benchmark.data_generator.compression_type == "gzip"
             assert benchmark.data_generator.compression_level == 9
@@ -64,19 +58,16 @@ class TestCompressionIntegration:
                 compression_type="gzip",
             )
 
-            # Generate data (just one table for speed)
             data_files = benchmark.generate_data(tables=["date"])
 
-            # Check that compressed files were generated
             assert "date" in data_files
             date_file_path = Path(data_files["date"])
             assert date_file_path.exists()
             assert str(date_file_path).endswith(".gz")
 
-            # Verify file is actually compressed (smaller than typical CSV)
             compressed_size = date_file_path.stat().st_size
             assert compressed_size > 0
-            assert compressed_size < 100000  # Should be much smaller than uncompressed
+            assert compressed_size < 100000
 
     def test_compression_with_multiple_tables_zstd(self):
 
@@ -90,7 +81,6 @@ class TestCompressionIntegration:
 
             data_files = benchmark.generate_data(tables=["date", "customer"])
 
-            # Check all files are compressed
             for _table_name, file_path in data_files.items():
                 path = Path(file_path)
                 assert path.exists()
@@ -109,7 +99,6 @@ class TestCompressionIntegration:
 
             data_files = benchmark.generate_data(tables=["date", "customer"])
 
-            # Check all files are compressed
             for _table_name, file_path in data_files.items():
                 path = Path(file_path)
                 assert path.exists()
@@ -125,16 +114,14 @@ class TestCompressionIntegration:
 
             data_files = benchmark.generate_data(tables=["date"])
 
-            # Check that uncompressed files were generated
             assert "date" in data_files
             date_file_path = Path(data_files["date"])
             assert date_file_path.exists()
-            assert str(date_file_path).endswith(".tbl")  # No compression extension
+            assert str(date_file_path).endswith(".tbl")
 
     def test_compression_error_handling(self):
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Test with invalid compression type
             with pytest.raises(ValueError, match="Unsupported compression type"):
                 SSBBenchmark(
                     scale_factor=0.01,
@@ -148,11 +135,9 @@ class TestCompressionIntegration:
         manager = CompressionManager()
         available = manager.get_available_compressors()
 
-        # Should always have 'none' and 'gzip'
         assert "none" in available
         assert "gzip" in available
 
-        # 'zstd' is only available if zstandard library is installed
         if ZSTD_AVAILABLE:
             assert "zstd" in available
         else:
@@ -170,7 +155,6 @@ class TestCompressionIntegration:
 
         manager = CompressionManager()
 
-        # Skip zstd test if not available
         if compression_type == "zstd":
             try:
                 compressor = manager.get_compressor(compression_type)
@@ -190,24 +174,19 @@ class TestCompressionIntegration:
             original_file = temp_path / "test.csv"
             original_file.write_text(test_data)
 
-            # Test gzip compression/decompression
             manager = CompressionManager()
             gzip_compressor = manager.get_compressor("gzip")
 
-            # Compress
             compressed_file = gzip_compressor.compress_file(original_file)
             assert compressed_file.exists()
             assert compressed_file != original_file
 
-            # Decompress
             decompressed_file = gzip_compressor.decompress_file(compressed_file)
             assert decompressed_file.exists()
 
-            # Verify data integrity
             decompressed_data = decompressed_file.read_text()
             assert decompressed_data == test_data
 
-            # Test zstd if available
             try:
                 zstd_compressor = manager.get_compressor("zstd")
                 zstd_compressed = zstd_compressor.compress_file(original_file, temp_path / "test.csv.zst")
@@ -221,7 +200,7 @@ class TestCompressionIntegration:
 
     def test_compression_with_different_scale_factors(self):
 
-        scale_factors = [0.01, 0.1]  # Keep small for test speed
+        scale_factors = [0.01, 0.1]
 
         for scale_factor in scale_factors:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -234,19 +213,15 @@ class TestCompressionIntegration:
 
                 data_files = benchmark.generate_data(tables=["date"])
 
-                # Verify compression worked
                 date_file = Path(data_files["date"])
                 assert date_file.exists()
                 assert str(date_file).endswith(".gz")
 
-                # Larger scale factors should produce larger compressed files
                 compressed_size = date_file.stat().st_size
                 assert compressed_size > 0
 
 
 class TestOrchestrator:
-    """Test orchestrator compression parameter passing."""
-
     @patch("benchbox.core.ssb.benchmark.SSBBenchmark")
     def test_orchestrator_passes_compression_params(self, mock_benchmark_class):
 
@@ -258,7 +233,6 @@ class TestOrchestrator:
         mock_database_config = MagicMock()
         mock_database_config.type = "duckdb"
 
-        # Create benchmark config with compression (use gzip for portability)
         config = BenchmarkConfig(
             name="ssb",
             display_name="SSB",
@@ -268,24 +242,15 @@ class TestOrchestrator:
             compression_level=5,
         )
 
-        # Create orchestrator and test benchmark creation
         orchestrator = BenchmarkOrchestrator()
 
         mock_benchmark_instance = MagicMock()
         mock_benchmark_class.return_value = mock_benchmark_instance
-        # SSB generates its own data (no shared source). Give the mocked class
-        # the real class attribute so the orchestrator resolves the managed
-        # datagen root, and make the instance report no data sharing so the
-        # post-construction redirect stays inactive.
         mock_benchmark_class.DATA_SOURCE_BENCHMARK = None
         mock_benchmark_instance.get_data_source_benchmark.return_value = None
 
-        # This would call _get_benchmark_instance internally
         result = orchestrator._get_benchmark_instance(config, mock_system_profile)
 
-        # Verify benchmark was called with compression parameters. The
-        # orchestrator now resolves the datagen root before construction and
-        # injects it as output_dir (alongside verbose/quiet flags).
         expected_output_dir = orchestrator.directory_manager.get_datagen_path("ssb", 0.01)
         mock_benchmark_class.assert_called_once_with(
             parallel=4,

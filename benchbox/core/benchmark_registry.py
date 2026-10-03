@@ -1,13 +1,6 @@
-"""Benchmark registry - single source of truth for benchmark metadata.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides centralized metadata for all benchmarks in BenchBox.
-Both CLI and MCP modules should import from here rather than maintaining
-their own copies of benchmark metadata.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,12 +26,6 @@ BENCHMARK_SUPPORT_STATUS_VALUES: tuple[BenchmarkSupportStatus, ...] = (
     "document_only",
 )
 
-# Benchmark metadata is stored as package data so this module keeps only
-# behavior and validation logic in Python. The payload is loaded lazily and
-# cached on first access (see _registry) so the file I/O + YAML parse stay off
-# the import-critical path -- benchmark_loader imports this module -- matching
-# the repo's other catalog loaders (e.g. write_primitives/catalog/loader.py).
-
 
 def _load_registry_payload() -> dict[str, Any]:
     with resources.files(__package__).joinpath("benchmark_registry.yaml").open(encoding="utf-8") as handle:
@@ -57,8 +44,6 @@ def _normalize_benchmark_metadata(raw: dict[str, Any]) -> dict[str, Any]:
 
 @runtime_checkable
 class BenchmarkFamilyPlugin(Protocol):
-    """Small registry-backed family seam. This is not a BaseBenchmark subclass."""
-
     benchmark_id: str
     public_class_name: str | None
     surface: str
@@ -86,8 +71,6 @@ _FAMILY_PLUGIN_REQUIRED_ATTRS = (
     "result_metadata",
 )
 
-# Kept in the registry module rather than YAML: BenchmarkRegistryCatalog
-# forbids unknown top-level keys, and this item cannot expand that schema.
 FAMILY_PLUGIN_IMPORTS: dict[str, str] = {
     "ssb": "benchbox.core.ssb.family:SSBFamily",
 }
@@ -95,8 +78,6 @@ FAMILY_PLUGIN_IMPORTS: dict[str, str] = {
 
 @dataclass(frozen=True)
 class _RegistryData:
-    """Derived registry structures, built once from the YAML payload."""
-
     category_order: list[str]
     benchmark_order: dict[str, list[str]]
     benchmark_class_names: dict[str, str]
@@ -109,7 +90,6 @@ class _RegistryData:
 
 
 def _build_registry() -> _RegistryData:
-    """Load, derive, and validate benchmark metadata once, on first access."""
     payload = _load_registry_payload()
     benchmark_class_names = dict(payload["benchmark_class_names"])
     core_class_name_overrides = dict(payload["core_class_name_overrides"])
@@ -142,9 +122,6 @@ def _build_registry() -> _RegistryData:
 
 _registry = SingleFlightValueCache(_build_registry)
 
-# Public module constants resolve to the lazily built, cached payload above via
-# PEP 562 module __getattr__, so importers keep their names while the file I/O
-# stays off the import path.
 _PUBLIC_REGISTRY_ATTRS = {
     "CATEGORY_ORDER": "category_order",
     "BENCHMARK_ORDER": "benchmark_order",
@@ -234,7 +211,6 @@ def _is_valid_base_memory(value: Any) -> bool:
 
 
 def _validate_family_plugins(benchmark_ids: set[str], family_plugins: dict[str, str]) -> None:
-    """Reject plugin rows that do not name a registry benchmark or import spec."""
     unknown = sorted(plugin_id for plugin_id in family_plugins if plugin_id not in benchmark_ids)
     invalid = sorted(
         f"{plugin_id}={spec!r}" for plugin_id, spec in family_plugins.items() if not spec or ":" not in spec
@@ -249,35 +225,20 @@ def _validate_family_plugins(benchmark_ids: set[str], family_plugins: dict[str, 
 
 
 def _validate_registry(metadata: dict[str, dict[str, Any]]) -> None:
-    """Run all metadata validations; called once from the cached loader."""
     _validate_benchmark_data_sources(metadata)
     _validate_benchmark_estimate_metadata(metadata)
     _validate_benchmark_support_status(metadata)
 
 
 def get_all_benchmarks() -> dict[str, dict[str, Any]]:
-    """Get metadata for all available benchmarks.
-
-    Returns:
-        Dictionary mapping benchmark IDs to their metadata.
-    """
     return _registry().benchmark_metadata.copy()
 
 
 def get_benchmark_metadata(benchmark_id: str) -> dict[str, Any] | None:
-    """Get metadata for a specific benchmark.
-
-    Args:
-        benchmark_id: Benchmark identifier (e.g., 'tpch', 'tpcds')
-
-    Returns:
-        Benchmark metadata dict, or None if not found.
-    """
     return _registry().benchmark_metadata.get(benchmark_id.lower())
 
 
 def get_benchmark_default_scale(benchmark_id: str, fallback: float = 0.01) -> float:
-    """Return a valid default scale factor for benchmark instantiation."""
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
         return fallback
@@ -291,45 +252,18 @@ def get_benchmark_default_scale(benchmark_id: str, fallback: float = 0.01) -> fl
 
 
 def get_benchmark_class_name(benchmark_id: str) -> str | None:
-    """Get the class name for a benchmark in the benchbox module.
-
-    Args:
-        benchmark_id: Benchmark identifier (e.g., 'tpch', 'tpcds')
-
-    Returns:
-        Class name (e.g., 'TPCH', 'TPCDS'), or None if not found.
-    """
     return _registry().benchmark_class_names.get(benchmark_id.lower())
 
 
 def get_core_benchmark_class_name(benchmark_id: str) -> str | None:
-    """Get the class name for a benchmark in benchbox.core.<id>.benchmark.
-
-    Args:
-        benchmark_id: Benchmark identifier (e.g., 'tpch', 'tpcds')
-
-    Returns:
-        Core benchmark class name (e.g., 'TPCHBenchmark'), or None if not found.
-    """
     return _registry().core_benchmark_class_names.get(benchmark_id.lower())
 
 
 def get_benchmark_id_for_class_name(class_name: str) -> str | None:
-    """Return the canonical benchmark ID for a public or core benchmark class."""
     return _registry().benchmark_id_by_class_name.get(class_name)
 
 
 def get_public_benchmark_class(benchmark_id: str):
-    """Get the public benchmark class from the benchbox module.
-
-    Uses benchbox module's lazy loading mechanism.
-
-    Args:
-        benchmark_id: Benchmark identifier (e.g., 'tpch', 'tpcds')
-
-    Returns:
-        Benchmark class, or None if not available.
-    """
     import benchbox
 
     benchmark_id = benchmark_id.lower()
@@ -340,8 +274,6 @@ def get_public_benchmark_class(benchmark_id: str):
     try:
         return getattr(benchbox, class_name)
     except (AttributeError, ImportError):
-        # Fallback for benchmarks that are implemented in core but not exported
-        # by the top-level benchbox lazy registry.
         core_class_name = get_core_benchmark_class_name(benchmark_id)
         if core_class_name is None:
             return None
@@ -355,47 +287,26 @@ def get_public_benchmark_class(benchmark_id: str):
 
 
 def get_benchmark_class(benchmark_id: str):
-    """Compatibility alias for :func:`get_public_benchmark_class`."""
     return get_public_benchmark_class(benchmark_id)
 
 
 def is_benchmark_available(benchmark_id: str) -> bool:
-    """Check if a benchmark is available (can be imported).
-
-    Args:
-        benchmark_id: Benchmark identifier
-
-    Returns:
-        True if benchmark class can be imported.
-    """
     return get_public_benchmark_class(benchmark_id) is not None
 
 
 def list_benchmark_ids() -> list[str]:
-    """Get list of all benchmark IDs.
-
-    Returns:
-        List of benchmark identifiers.
-    """
     return list(_registry().benchmark_metadata.keys())
 
 
 def list_public_benchmark_ids() -> list[str]:
-    """Get benchmark IDs visible on public discovery surfaces."""
     return [bid for bid in list_benchmark_ids() if get_benchmark_surface(bid) == "public"]
 
 
 def list_loader_benchmark_ids() -> list[str]:
-    """Get benchmark IDs supported by the core benchmark loader.
-
-    Returns:
-        List of benchmark identifiers loadable via benchbox.core.benchmark_loader.
-    """
     return list(_registry().core_benchmark_class_names.keys())
 
 
 def get_benchmark_support_status(benchmark_id: str) -> BenchmarkSupportStatus | None:
-    """Return the registry-declared product support status for a benchmark."""
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
         return None
@@ -403,7 +314,6 @@ def get_benchmark_support_status(benchmark_id: str) -> BenchmarkSupportStatus | 
 
 
 def get_benchmarks_by_support_status(status: BenchmarkSupportStatus) -> list[str]:
-    """Return benchmark IDs classified with *status*."""
     if status not in BENCHMARK_SUPPORT_STATUS_VALUES:
         raise ValueError(
             f"Unknown benchmark support_status {status!r}. "
@@ -414,7 +324,6 @@ def get_benchmarks_by_support_status(status: BenchmarkSupportStatus) -> list[str
 
 
 def get_benchmark_registry_summary() -> dict[str, Any]:
-    """Return count summaries for benchmark contract and docs drift checks."""
     metadata = _registry().benchmark_metadata
     support_counts = Counter(cast(BenchmarkSupportStatus, meta["support_status"]) for meta in metadata.values())
     surface_counts = Counter(str(meta.get("surface", "public")) for meta in metadata.values())
@@ -429,30 +338,15 @@ def get_benchmark_registry_summary() -> dict[str, Any]:
 
 
 def get_benchmarks_by_category(category: str) -> dict[str, dict[str, Any]]:
-    """Get benchmarks filtered by category.
-
-    Args:
-        category: Category name (e.g., 'TPC', 'Academic')
-
-    Returns:
-        Dictionary of benchmarks in that category.
-    """
     return {bid: meta for bid, meta in _registry().benchmark_metadata.items() if meta.get("category") == category}
 
 
 def get_categories() -> list[str]:
-    """Get list of all categories in display order.
-
-    Returns:
-        List of category names.
-    """
-    # Return categories that actually have benchmarks
     registry = _registry()
     categories_with_benchmarks = set()
     for meta in registry.benchmark_metadata.values():
         categories_with_benchmarks.add(meta.get("category", "Unknown"))
 
-    # Return in preferred order, adding any extras at the end
     result = [c for c in registry.category_order if c in categories_with_benchmarks]
     for c in categories_with_benchmarks:
         if c not in result:
@@ -464,40 +358,9 @@ def validate_scale_factor(
     benchmark_id: str,
     scale_factor: float,
 ) -> None:
-    """Validate scale factor against benchmark requirements.
-
-    Resolution order:
-
-    1. TPC-DS delegates to the compliance classifier in
-       ``benchbox.core.tpcds.compliance``.
-    2. If the benchmark declares ``scale_options`` (a list of canonical
-       scales), require ``scale_factor`` to be one of those values. This
-       is the primary gate — single-element lists like joinorder's
-       ``[1.0]`` reject everything else, multi-element lists like
-       tpch's development subscales plus official TPC scale ladder reject
-       any non-canonical SF.
-       ClickBench is the exception: its synthetic generator accepts any
-       scale factor at or above ``min_scale``; its list is for common CLI
-       choices, not an exhaustive restriction.
-    3. Otherwise fall back to the legacy ``min_scale`` key, which only
-       enforces a lower bound.
-
-    Args:
-        benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch').
-        scale_factor: The requested scale factor.
-
-    Raises:
-        ScaleFactorNotSupportedError: If the benchmark declares
-            ``scale_options`` and ``scale_factor`` is not in that list.
-        ValueError: If ``benchmark_id`` is unknown or the legacy ``min_scale``
-            lower bound is violated (subclass-compatible —
-            ``ScaleFactorNotSupportedError`` inherits from ``ValueError`` so
-            existing handlers keep working).
-    """
     from benchbox.core.errors import ScaleFactorNotSupportedError
 
     if benchmark_id == "tpcds":
-        # TPC-DS uses the shared compliance classifier - not a simple min_scale check.
         from benchbox.core.tpcds.compliance import validate_tpcds_scale
 
         validate_tpcds_scale(scale_factor)
@@ -522,8 +385,6 @@ def validate_scale_factor(
 
     scale_options = meta.get("scale_options")
     if scale_options:
-        # Compare as floats to avoid 1 vs 1.0 mismatches (e.g., when callers
-        # pass int literals).
         try:
             sf = float(scale_factor)
         except (TypeError, ValueError) as exc:
@@ -538,13 +399,6 @@ def validate_scale_factor(
 
 
 def get_presort_table_configs(benchmark_id: str) -> dict[str, Any] | None:
-    """Return a benchmark's default presort sort keys, or None.
-
-    A benchmark supports `benchbox run --presort` exactly when it declares
-    `presort_table_configs` in the registry. These lived as hardcoded column
-    literals in benchbox/cli/commands/run.py; which column to sort on is
-    benchmark knowledge, not CLI knowledge.
-    """
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
         return None
@@ -553,24 +407,16 @@ def get_presort_table_configs(benchmark_id: str) -> dict[str, Any] | None:
 
 
 def presort_capable_benchmarks() -> tuple[str, ...]:
-    """Return every benchmark id that declares presort defaults."""
     return tuple(
         sorted(bid for bid, meta in _registry().benchmark_metadata.items() if meta.get("presort_table_configs"))
     )
 
 
 def list_family_plugin_ids() -> list[str]:
-    """Return registry keys that declare a family plugin import spec."""
     return sorted(_registry().family_plugin_imports)
 
 
 def get_family_plugin(benchmark_id: str) -> BenchmarkFamilyPlugin | None:
-    """Load the registry-backed family plugin for *benchmark_id*, if declared.
-
-    Plugin imports stay lazy so registry metadata load does not import family
-    packages. A declared spec that cannot be imported or does not match the
-    seam shape fails closed.
-    """
     spec = _registry().family_plugin_imports.get(benchmark_id.lower())
     if spec is None:
         return None
@@ -593,16 +439,6 @@ def get_family_plugin(benchmark_id: str) -> BenchmarkFamilyPlugin | None:
 
 
 def get_benchmark_surface(benchmark_id: str) -> str:
-    """Return the registry-declared surface visibility for a benchmark.
-
-    "public" (default) means the benchmark is visible to public discovery
-    surfaces: CLI listing/filter/category selection, MCP listings, result
-    publisher discovery, and the result explorer. "internal" means those
-    discovery surfaces hide the benchmark, but explicit callers can still run
-    it by ID; result bundles publish locally.
-
-    Returns "public" for unregistered benchmarks (defensive default).
-    """
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
         return "public"

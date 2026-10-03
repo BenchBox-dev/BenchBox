@@ -1,5 +1,3 @@
-"""Tests for sanitized platform-option capture in result metadata."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -53,9 +51,6 @@ def test_platform_options_capture_merges_values_and_records_sources() -> None:
     assert sources == {
         "warehouse": "cli_option",
         "region": "saved_config",
-        # cache_enabled was already populated from database_options; a registered
-        # default that happens to match must not rewrite the saved_config
-        # provenance.
         "cache_enabled": "saved_config",
         "access_token": "saved_config",
         "password": "cli_option",
@@ -63,9 +58,6 @@ def test_platform_options_capture_merges_values_and_records_sources() -> None:
 
 
 def test_registered_default_does_not_overwrite_saved_config_provenance() -> None:
-    """w17 regression: when a saved value matches a registered default, the
-    source must remain ``saved_config`` so debugging/audit flows that rely on
-    origin tracking aren't misled."""
     values, sources = build_platform_options_capture(
         requested_options={"foo": "bar"},
         requested_sources={"foo": "registered_default"},
@@ -77,8 +69,6 @@ def test_registered_default_does_not_overwrite_saved_config_provenance() -> None
 
 
 def test_registered_default_recorded_when_no_saved_value() -> None:
-    """w17: registered defaults should still be recorded as such when there is
-    no prior saved_config value to preserve."""
     values, sources = build_platform_options_capture(
         requested_options={"foo": "bar"},
         requested_sources={"foo": "registered_default"},
@@ -119,16 +109,12 @@ def test_capture_retains_usernames_until_the_export_boundary() -> None:
     ],
 )
 def test_camelcase_kebabcase_secret_keys_are_redacted(key: str) -> None:
-    """w3 regression: secret-key matching must collapse non-alphanumerics so
-    camelCase / PascalCase / kebab-case credential keys are detected."""
     from benchbox.core.results.platform_options import is_secret_option_key
 
     assert is_secret_option_key(key), f"{key!r} should be classified as a secret key"
 
 
 def test_sanitize_redacts_camelcase_secret_values() -> None:
-    """w3 regression: end-to-end check that camelCase secret keys are redacted
-    in the sanitized output."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
@@ -149,9 +135,6 @@ def test_sanitize_redacts_camelcase_secret_values() -> None:
 @pytest.mark.parametrize(
     "key",
     [
-        # Provider-prefixed key-id spellings. `accessKeyId` already matched
-        # because it contains "accesskey"; these do not, so they exported
-        # verbatim until "key_id" joined _SECRET_KEY_PARTS.
         "s3_key_id",
         "kms_key_id",
         "KmsKeyId",
@@ -161,12 +144,6 @@ def test_sanitize_redacts_camelcase_secret_values() -> None:
     ],
 )
 def test_provider_prefixed_key_id_keys_are_redacted(key: str) -> None:
-    """Regression: a *_key_id option reached exported result metadata in clear.
-
-    Found by the credential-egress sweep on the DuckLake ATTACH leak (#1333):
-    `--platform-option s3_key_id=AKIA...` was published as-is because the
-    matcher only knew "access_key".
-    """
     from benchbox.core.results.platform_options import is_secret_option_key
 
     assert is_secret_option_key(key), f"{key!r} should be classified as a secret key"
@@ -175,9 +152,6 @@ def test_provider_prefixed_key_id_keys_are_redacted(key: str) -> None:
 @pytest.mark.parametrize(
     "key",
     [
-        # Data-modelling and tuning option names that merely contain "key".
-        # The "keyid" part must not swallow these - over-redaction would strip
-        # real, useful provenance out of published results.
         "sort_key",
         "sortKey",
         "partition_key",
@@ -196,8 +170,6 @@ def test_non_credential_key_names_are_not_redacted(key: str) -> None:
 
 
 def test_sanitize_redacts_key_id_end_to_end_without_touching_sort_keys() -> None:
-    """End-to-end companion: the sanitized payload hides key material and keeps
-    the tuning options a reader needs to interpret the run."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
@@ -262,18 +234,11 @@ def test_uri_userinfo_credentials_are_redacted_without_touching_public_values() 
 
 
 def test_uri_username_only_identity_is_preserved() -> None:
-    """Username-only userinfo is identity, not a secret — do not replace with ****.
-
-    Successor of the query-credential scrub TODO: earlier userinfo redaction
-    treated every authority userinfo as credential-bearing and over-redacted
-    ``https://public-user@host/path`` in exported platform options.
-    """
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
         {
             "username_only": "https://public-user@example.invalid/export",
-            # Key must not itself be secret-named; this tests value-level URI scrub.
             "export_url": "https://public-user:URI_USERINFO_GATE@example.invalid/export",
         }
     )
@@ -285,13 +250,6 @@ def test_uri_username_only_identity_is_preserved() -> None:
 
 
 def test_uri_query_and_fragment_credential_params_are_scrubbed() -> None:
-    """Credential-named query/fragment params must not reach serialized payloads.
-
-    Structural key filtering already redacts options named ``access_token``;
-    this covers the same names embedded as URI components on non-secret keys
-    (export URLs, connection URIs with sslpassword, OAuth-style fragments).
-    Ordinary params such as ``x=1`` stay intact for downstream routing.
-    """
     import json
 
     from benchbox.core.results.platform_options import sanitize_platform_options
@@ -300,7 +258,6 @@ def test_uri_query_and_fragment_credential_params_are_scrubbed() -> None:
         "query": "https://example.invalid/export?access_token=URI_QUERY_GATE&x=1",
         "ssl": "postgresql://host.example/db?sslpassword=URI_SSL_GATE&application_name=bb",
         "fragment": "https://example.invalid/export#access_token=URI_FRAG_GATE&section=results",
-        # Non-secret option key: credential lives only in the URI query component.
         "endpoint": "https://example.invalid/x?password=URI_PW_GATE&region=us-east-1",
         "combined": "postgresql://u:URI_USERINFO_GATE@example.invalid/db?sslpassword=URI_SSL2_GATE&x=1",
         "ordinary": "https://example.invalid/export?x=1&region=us-east-1",
@@ -330,20 +287,11 @@ def test_uri_query_and_fragment_credential_params_are_scrubbed() -> None:
 
 
 def test_uri_userinfo_redaction_consumes_an_unescaped_at_in_the_password() -> None:
-    """Review follow-up: a password may legally contain an unescaped '@'.
-
-    urlparse reads ``postgres://user:pa@ss@host/db`` as password ``pa@ss``, but a
-    pattern that stopped at the FIRST '@' exported ``postgres://****@ss@host/db``
-    -- still leaking the tail of the credential into result metadata. Redaction
-    must run through the authority's LAST userinfo delimiter.
-    """
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
         {
             "database_path": "postgres://user:pa@ss@host/db",
-            # The authority ends at '?', so a later '@' in the query string must
-            # not drag the host into the redaction.
             "output_location": "postgres://user:pw@host?opt=a@b",
         }
     )
@@ -364,12 +312,6 @@ def test_uri_userinfo_redaction_consumes_an_unescaped_at_in_the_password() -> No
     ],
 )
 def test_azure_storage_container_authority_is_preserved(uri: str) -> None:
-    """Review follow-up: ``container@account`` is ABFS/WASB authority syntax, not
-    credentials, so redacting it would strip the container (or Fabric workspace)
-    identifier out of exported provenance while protecting nothing -- those
-    schemes carry their secret in a separate account_key/sas option, which the
-    key-name redaction already covers.
-    """
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options({"staging_root": uri})
@@ -453,8 +395,6 @@ def test_lifecycle_run_config_preserves_requested_phases() -> None:
 
 
 def test_sanitize_excludes_internal_keys_when_requested() -> None:
-    """w1: exported paths must drop internal bookkeeping keys, matching
-    ``_iter_public_options`` semantics, instead of publishing them."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
@@ -477,8 +417,6 @@ def test_sanitize_excludes_internal_keys_when_requested() -> None:
 
 
 def test_sanitize_without_exclude_internal_preserves_existing_behavior() -> None:
-    """Non-export call sites keep receiving internal keys unless they opt in,
-    so this is an additive/opt-in change rather than a behavior break."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options({"warehouse": "WH", "tuning_enabled": True})
@@ -488,8 +426,6 @@ def test_sanitize_without_exclude_internal_preserves_existing_behavior() -> None
 
 
 def test_sanitize_uses_to_dict_for_objects_that_support_it() -> None:
-    """w2: an object with ``to_dict`` must serialize as that dict (recursively
-    sanitized), never as a repr string."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     class _Config:
@@ -502,8 +438,6 @@ def test_sanitize_uses_to_dict_for_objects_that_support_it() -> None:
 
 
 def test_sanitize_marks_unserializable_values_instead_of_using_repr() -> None:
-    """w2/w3: objects without ``to_dict`` become an explicit marker string,
-    never a Python repr(), so capture gaps stay visible rather than opaque."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     class _Opaque:
@@ -518,7 +452,6 @@ def test_sanitize_marks_unserializable_values_instead_of_using_repr() -> None:
 
 
 def test_sanitize_never_raises_when_to_dict_itself_fails() -> None:
-    """Bundle emission must never raise because an option value is unserializable."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     class _Broken:
@@ -531,10 +464,6 @@ def test_sanitize_never_raises_when_to_dict_itself_fails() -> None:
 
 
 def test_sanitize_never_raises_when_to_dict_lookup_itself_fails() -> None:
-    """A ``to_dict`` descriptor that raises on attribute access (not just on
-    call) must be caught too -- the ``getattr(value, "to_dict", None)`` lookup
-    happens outside the call's try/except, so a raising property previously
-    escaped uncaught."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     class _BrokenDescriptor:
@@ -548,7 +477,6 @@ def test_sanitize_never_raises_when_to_dict_lookup_itself_fails() -> None:
 
 
 def test_secret_redaction_unaffected_by_internal_key_filtering() -> None:
-    """Secret redaction must remain exact regardless of exclude_internal."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     sanitized = sanitize_platform_options(
@@ -594,7 +522,6 @@ def test_result_payload_exports_platform_option_sources_from_run_config() -> Non
 
 
 def test_result_payload_serializes_dataframe_tuning_config() -> None:
-    """DataFrame tuning objects must not make the primary result non-JSON-serializable."""
     import json
 
     from benchbox.core.dataframe.tuning.interface import DataFrameTuningConfiguration
@@ -639,14 +566,6 @@ def test_result_payload_serializes_dataframe_tuning_config() -> None:
 
 
 class TestUsernameRedactionInternalPath:
-    """Connection usernames must not ride into internal bundles verbatim.
-
-    They are identity, not secrets: the public path pseudonymizes them for
-    grouping, but the internal capture path has no pseudonymizer, so it
-    redacts them instead. Exact normalized match only, so user_agent-class
-    option keys keep their real values.
-    """
-
     def test_username_keys_are_redacted(self):
         from benchbox.core.results.platform_options import sanitize_platform_options
 
@@ -681,10 +600,6 @@ class TestUsernameRedactionInternalPath:
 
 
 class TestServiceAccountRedaction:
-    """service_account carries an IAM principal email (dataproc); the public
-    layer caught it only when the VALUE was email-shaped, and the internal
-    layer exported it verbatim."""
-
     def test_service_account_is_redacted_internally(self):
         from benchbox.core.results.platform_options import sanitize_platform_options
 
@@ -710,10 +625,6 @@ class TestServiceAccountRedaction:
 
 
 class TestApiKeyAndAccountKeyRedaction:
-    """api_key and *_account_key are credentials and must never export
-    verbatim (2026-07-31 sentinel-sweep finding: they leaked through both
-    the internal and the public layer)."""
-
     def test_api_key_variants_are_redacted(self):
         from benchbox.core.results.platform_options import sanitize_platform_options
 
@@ -752,14 +663,12 @@ class TestApiKeyAndAccountKeyRedaction:
     ],
 )
 def test_dsn_and_sas_credential_keys_are_redacted(key: str) -> None:
-    """Connection DSNs and Azure SAS settings can both carry bearer secrets."""
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     assert sanitize_platform_options({key: "CREDENTIAL-SENTINEL"})[key] == REDACTED_VALUE
 
 
 def test_lifecycle_run_config_carries_show_query_plans_from_database_options() -> None:
-    """--show-plans reaches the adapter through RunConfig, not BenchmarkConfig."""
     benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
     database_config = DatabaseConfig(
         type="duckdb",
@@ -782,11 +691,6 @@ def test_lifecycle_run_config_carries_show_query_plans_from_database_options() -
 
 
 def test_lifecycle_run_config_show_query_plans_defaults_none() -> None:
-    """Runs without --show-plans leave the adapter's own setting untouched.
-
-    The runner passes None (not False) so _apply_run_plan_flags preserves a
-    preconfigured adapter value (e.g. from platform_config).
-    """
     benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
 
     run_config = _build_run_config_from_options(
@@ -804,12 +708,6 @@ def test_lifecycle_run_config_show_query_plans_defaults_none() -> None:
 
 
 def test_lifecycle_run_config_carries_show_query_plans_from_database_extra() -> None:
-    """The interactive path sets show_query_plans as a DatabaseConfig extra.
-
-    Mirrors benchbox/cli/commands/run.py, where the flag is assigned onto the
-    config object instead of going through options. Guards against
-    _database_platform_options losing extra fields after schema changes.
-    """
     benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
     database_config = DatabaseConfig(type="duckdb", name="DuckDB", options={})
     database_config.show_query_plans = True
@@ -829,7 +727,6 @@ def test_lifecycle_run_config_carries_show_query_plans_from_database_extra() -> 
 
 
 def test_lifecycle_run_config_explicit_false_show_query_plans_overrides_adapter() -> None:
-    """An explicit False database option still overrides the adapter setting."""
     benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
     database_config = DatabaseConfig(
         type="duckdb",

@@ -1,9 +1,6 @@
-"""Setup command for interactive platform credentials configuration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 
@@ -75,43 +72,18 @@ PLATFORM_DISPLAY_NAMES = {
 @click.option("--diagnose", is_flag=True, help="Run diagnostics on platform connectivity (Redshift only)")
 @click.pass_context
 def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_status, remove, diagnose):
-    """Interactive setup for cloud platform credentials.
-
-    Guides you through setting up authentication for Databricks, Snowflake,
-    BigQuery, Redshift, Athena, MotherDuck, and SingleStore platforms. Most platforms use
-    secure local credential storage; MotherDuck validates MOTHERDUCK_TOKEN
-    without storing the token.
-
-    This is about CREDENTIALS. `benchbox platforms setup` is a different
-    command that enables and installs local platform adapters. The two share
-    the word "setup"; this is the one for cloud authentication, and
-    `benchbox platforms setup --platform <name>` delegates here.
-
-    \b
-    Examples:
-        benchbox setup --platform databricks    # Interactive Databricks setup
-        benchbox setup --platform motherduck    # Validate MOTHERDUCK_TOKEN
-        benchbox setup --list-platforms         # Show all platforms
-        benchbox setup --status                 # Check credential status
-        benchbox setup --platform databricks --validate-only  # Validate only
-        benchbox setup --platform redshift --diagnose         # Run connectivity diagnostics
-        benchbox setup --platform databricks --remove         # Remove credentials
-    """
     from benchbox.utils.dependencies import DEPENDENCY_GROUPS
 
     cred_manager = CredentialManager()
 
-    # Handle list platforms
     if list_platforms_flag:
         _list_platforms(cred_manager)
         return
 
-    # Handle status display
     if show_status:
         _show_credential_status(cred_manager)
         return
 
-    # Require platform for other operations
     if not platform:
         console.print("[red]❌ Error: --platform is required[/red]")
         console.print(f"\nAvailable platforms: {', '.join(SUPPORTED_SETUP_PLATFORMS)}")
@@ -121,22 +93,18 @@ def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_st
 
     platform_lower = platform.lower()
 
-    # Handle remove operation
     if remove:
         _remove_credentials(cred_manager, platform_lower)
         return
 
-    # Handle diagnose operation
     if diagnose:
         _diagnose_platform(cred_manager, platform_lower)
         return
 
-    # Handle validate-only operation
     if validate_only:
         _validate_credentials(cred_manager, platform_lower)
         return
 
-    # Check if dependencies are installed
     if platform_lower in DEPENDENCY_GROUPS:
         from benchbox.utils.dependencies import check_platform_dependencies
 
@@ -150,27 +118,20 @@ def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_st
             console.print(f"   {escape(get_install_command(platform_lower))}")
             return
 
-    # Interactive setup
     run_platform_credential_setup(platform_lower, console, show_welcome=True)
 
 
 def _list_platforms(cred_manager: CredentialManager):
-    """List all supported platforms with setup instructions."""
     console.print("\n[bold]Cloud Platforms Requiring Credentials:[/bold]\n")
 
-    # Platform list and required credential fields are derived from the
-    # platform registry, which owns that knowledge; setup.py keeps only its own
-    # short display copy. The previous hardcoded table duplicated both.
     platforms_info = credential_platforms()
 
-    # Get current status
     current_platforms = cred_manager.list_platforms()
 
     for platform_info in platforms_info:
         key = platform_info["key"]
         status = current_platforms.get(key, CredentialStatus.MISSING)
 
-        # Status indicator
         if status == CredentialStatus.VALID:
             status_icon = "[green]✅ Configured[/green]"
         elif status == CredentialStatus.INVALID:
@@ -185,9 +146,6 @@ def _list_platforms(cred_manager: CredentialManager):
         console.print(f"   Setup: [cyan]benchbox setup --platform {key}[/cyan]\n")
 
 
-# Short display copy for the credential setup table. This is presentation text,
-# not platform metadata: the registry owns display_name and required_credentials,
-# and these one-liners stay here so the table reads the way it always has.
 CREDENTIAL_PLATFORM_BLURBS = {
     "databricks": "Lakehouse platform with Unity Catalog",
     "snowflake": "Cloud data warehouse",
@@ -198,9 +156,6 @@ CREDENTIAL_PLATFORM_BLURBS = {
     "singlestore": "Distributed SQL database",
 }
 
-# Display names the setup table uses. The registry's display_name is the
-# canonical product name ("Databricks SQL", "Google BigQuery"); the setup table
-# has always used the shorter platform name.
 CREDENTIAL_PLATFORM_NAMES = {
     "databricks": "Databricks",
     "snowflake": "Snowflake",
@@ -213,12 +168,6 @@ CREDENTIAL_PLATFORM_NAMES = {
 
 
 def credential_platforms() -> list[dict[str, Any]]:
-    """Return the credential-requiring platforms, derived from the registry.
-
-    A platform appears here because it declares `required_credentials` in
-    benchbox.core.platform_registry -- not because it was typed into a list in
-    this file. Adding a credentialed platform to the registry adds it here.
-    """
     from benchbox.core.platform_registry import PlatformRegistry
 
     platforms = []
@@ -234,14 +183,10 @@ def credential_platforms() -> list[dict[str, Any]]:
                 "required": list(required),
             }
         )
-    # Alphabetical rather than registry insertion order: derived output must be
-    # deterministic, and insertion order is an implementation detail of the
-    # metadata blob.
     return sorted(platforms, key=lambda platform: platform["name"])
 
 
 def _show_credential_status(cred_manager: CredentialManager):
-    """Show detailed credential status for all platforms."""
     platforms = cred_manager.list_platforms()
 
     if not platforms:
@@ -260,7 +205,6 @@ def _show_credential_status(cred_manager: CredentialManager):
     for platform_name, status in platforms.items():
         creds = cred_manager.get_platform_credentials(platform_name)
 
-        # Status with icon
         if status == CredentialStatus.VALID:
             status_str = "[green]✅ Valid[/green]"
         elif status == CredentialStatus.INVALID:
@@ -273,7 +217,6 @@ def _show_credential_status(cred_manager: CredentialManager):
         last_updated = creds.get("last_updated", "Never") if creds else "Never"
         last_validated = creds.get("last_validated", "Never") if creds else "Never"
 
-        # Format timestamps
         if last_updated != "Never":
             last_updated = last_updated.split("T")[0]
         if last_validated != "Never":
@@ -286,7 +229,6 @@ def _show_credential_status(cred_manager: CredentialManager):
 
 
 def _remove_credentials(cred_manager: CredentialManager, platform: str):
-    """Remove credentials for a platform."""
     if not cred_manager.has_credentials(platform):
         console.print(f"[yellow]No credentials found for {platform}[/yellow]")
         return
@@ -302,7 +244,6 @@ def _remove_credentials(cred_manager: CredentialManager, platform: str):
 
 
 def _diagnose_platform(cred_manager: CredentialManager, platform: str):
-    """Run diagnostics on platform connectivity."""
     if platform != "redshift":
         console.print(f"[yellow]❌ Diagnostics not available for {platform} yet[/yellow]")
         console.print("[dim]Currently only supported for Redshift[/dim]")
@@ -315,7 +256,6 @@ def _diagnose_platform(cred_manager: CredentialManager, platform: str):
 
     console.print(f"\n[bold]Running diagnostics for {platform}...[/bold]\n")
 
-    # Import Redshift-specific diagnostic helpers
     try:
         from benchbox.platforms.credentials.redshift import (
             _diagnose_redshift_connectivity,
@@ -325,14 +265,13 @@ def _diagnose_platform(cred_manager: CredentialManager, platform: str):
         )
 
         creds = cred_manager.get_platform_credentials(platform)
-        assert creds is not None  # Validated by has_credentials check above
+        assert creds is not None
         host = creds["host"]
         port = creds.get("port", 5439)
         aws_access_key_id = creds.get("aws_access_key_id")
         aws_secret_access_key = creds.get("aws_secret_access_key")
         aws_region = creds.get("aws_region", "us-east-1")
 
-        # Test TCP connectivity
         console.print("[dim]Testing network connectivity...[/dim]")
         tcp_reachable, tcp_error = _test_tcp_connectivity(host, port, timeout=10)
 
@@ -341,13 +280,10 @@ def _diagnose_platform(cred_manager: CredentialManager, platform: str):
         else:
             console.print(f"[red]✗ TCP connection failed: {tcp_error}[/red]")
 
-        # Run AWS API diagnostics
         diagnostics = _diagnose_redshift_connectivity(host, port, aws_access_key_id, aws_secret_access_key, aws_region)
 
-        # Display diagnostic results
         _format_diagnostic_output(console, host, port, aws_region, diagnostics)
 
-        # Show remediation steps if there are issues
         if not tcp_reachable or diagnostics.get("publicly_accessible") is False:
             _format_remediation_steps(console, host, port, aws_region, diagnostics, tcp_reachable)
         else:
@@ -362,7 +298,6 @@ def _diagnose_platform(cred_manager: CredentialManager, platform: str):
 
 
 def _validate_credentials(cred_manager: CredentialManager, platform: str):
-    """Validate existing credentials for a platform."""
     if platform != "motherduck" and not cred_manager.has_credentials(platform):
         console.print(f"[red]❌ No credentials found for {platform}[/red]")
         console.print(f"\nSetup credentials: benchbox setup --platform {platform}")
@@ -370,7 +305,6 @@ def _validate_credentials(cred_manager: CredentialManager, platform: str):
 
     console.print(f"\n[bold]Validating {platform} credentials...[/bold]\n")
 
-    # Get platform-specific validator
     try:
         if platform == "databricks":
             from benchbox.platforms.databricks.credentials import validate_databricks_credentials
@@ -436,32 +370,19 @@ def _validate_credentials(cred_manager: CredentialManager, platform: str):
 
 
 def run_platform_credential_setup(platform: str, console_obj, show_welcome: bool = True) -> bool:
-    """Run interactive credential setup for a platform.
-
-    Args:
-        platform: Platform name (snowflake, bigquery, databricks, redshift, singlestore)
-        console_obj: Console object for output
-        show_welcome: Whether to show welcome panel (False when called from run command)
-
-    Returns:
-        True if credentials were successfully set up and validated, False otherwise
-    """
     cred_manager = CredentialManager()
 
-    # Display welcome panel
     if show_welcome:
         platform_name = _platform_display_name(platform)
         welcome_text = f"[bold]{platform_name} Credentials Setup[/bold]\n\n"
         welcome_text += f"BenchBox will guide you through setting up {platform_name} credentials."
         console_obj.print(Panel(welcome_text, border_style="blue"))
 
-    # Get platform-specific setup handler
     try:
         if platform == "databricks":
             from benchbox.platforms.databricks.credentials import setup_databricks_credentials
 
             setup_databricks_credentials(cred_manager, console_obj)
-            # Check if credentials were saved (successful setup)
             return cred_manager.has_credentials(platform)
         elif platform == "snowflake":
             from benchbox.platforms.credentials.snowflake import setup_snowflake_credentials
@@ -507,7 +428,6 @@ def run_platform_credential_setup(platform: str, console_obj, show_welcome: bool
 
 
 def _platform_display_name(platform: str) -> str:
-    """Return a user-facing platform name."""
     return PLATFORM_DISPLAY_NAMES.get(platform.lower(), platform.capitalize())
 
 

@@ -45,21 +45,65 @@ API Reference
 TPCDS Class
 ~~~~~~~~~~~
 
-.. autoclass:: benchbox.tpcds.TPCDS
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:module:: benchbox.tpcds
+.. py:class:: TPCDS(scale_factor: float = 1.0, output_dir: Optional[Union[str, Path]] = None, **kwargs)
+
+   TPC-DS facade. The constructor rejects non-numeric or non-positive scale
+   factors. Query, table, and stream availability comes from the live
+   implementation.
+
+   .. py:method:: generate_data() -> list[Union[str, Path]]
+
+      Generate configured data and return generated file paths.
+   .. py:method:: get_queries(dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]
+
+      Return all available queries, optionally translated between dialects.
+   .. py:method:: get_query(query_id: int, *, params: Optional[dict[str, Any]] = None, seed: Optional[int] = None, scale_factor: Optional[float] = None, dialect: Optional[str] = None, **kwargs) -> str
+
+      Return one query. ``query_id`` must be an integer in the implementation's
+      supported range; invalid type/range raises ``TypeError``/``ValueError``.
+   .. py:attribute:: queries
+
+      Underlying ``TPCDSQueryManager``.
+   .. py:attribute:: generator
+
+      Underlying ``TPCDSDataGenerator``.
+   .. py:method:: get_available_tables() -> list[str]
+
+      Return the table names exposed by the current TPC-DS schema.
+
+   .. py:method:: get_available_queries() -> list[int]
+
+      Return the query identifiers exposed by the current TPC-DS query manager.
+   .. py:method:: generate_table_data(table_name: str, output_dir: Optional[str] = None) -> str
+
+      Delegate generation for one table. The facade annotation says ``str``;
+      the delegated implementation may return generated rows when no output
+      directory is supplied, so callers should use the runtime value.
+   .. py:method:: get_schema() -> list[dict]
+
+      Return schema metadata. The delegated implementation currently returns a
+      lower-case table-name mapping despite the facade annotation.
+   .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config=None) -> str
+
+      Return CREATE TABLE SQL.
+   .. py:method:: generate_streams(num_streams: int = 1, rng_seed: Optional[int] = None, streams_output_dir: Optional[Union[str, Path]] = None) -> list[Path]
+
+      Generate query streams with the requested count, optional seed, and output directory, then return their paths.
+
+   .. py:method:: get_stream_info(stream_id: int) -> dict[str, Any]
+
+      Return metadata for the requested stream identifier.
+
+   .. py:method:: get_all_streams_info() -> list[dict[str, Any]]
+
+      Return metadata for all streams known to the current implementation.
+   .. py:method:: get_benchmark_info() -> dict[str, Any]
+
+      Return implementation metadata, including live table/query and C-tool information.
 
 Constructor
 ~~~~~~~~~~~
-
-.. code-block:: python
-
-    TPCDS(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 Parameters:
 

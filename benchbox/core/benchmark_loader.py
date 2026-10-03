@@ -1,13 +1,6 @@
-"""Benchmark loading functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module is an internal runtime loader. Public callers should use the CLI,
-top-level benchmark wrappers, or ``benchbox.base.BaseBenchmark`` orchestration
-hooks instead of importing loader internals directly.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,21 +20,10 @@ from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 BENCHMARK_LOADER_API_SURFACE = "internal"
 
 
-# Benchmarks whose result carries a compliance classification. Only these accept
-# `official`; passing it wholesale is unsafe because constructor_accepts_argument()
-# is satisfied by a bare **kwargs, so any benchmark with one would swallow it.
-# TPC-DI is not gated: it has no official-scale methodology to classify against.
 COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds", "tpch"})
 
 
 def compliance_mode_kwargs(config: BenchmarkConfig) -> dict[str, Any]:
-    """Return constructor kwargs that carry compliance mode for *config*.
-
-    Both construction paths -- :func:`get_benchmark_instance` and the CLI
-    orchestrator's own builder -- must apply this. A run that does not receive
-    `official` classifies as ``unofficial_nonstandard`` and is then refused by
-    ``benchbox submit``, so dropping it silently makes results unpublishable.
-    """
     if config.name.lower() not in COMPLIANCE_GATED_BENCHMARKS:
         return {}
     return {"official": bool(getattr(config, "official", False))}
@@ -59,7 +41,6 @@ def get_benchmark_instance(
     extra_kwargs: dict[str, Any] | None = None,
     instantiate_fn: Any | None = None,
 ) -> Any:
-    """Get benchmark instance based on configuration."""
     if benchmark_class is None:
         validate_scale_factor(config.name, config.scale_factor)
         plugin = get_family_plugin(config.name)
@@ -94,7 +75,6 @@ def get_benchmark_instance(
     if benchmark_id in {"tpcds", "joinorder", "joinorder_synthetic"}:
         optional_kwargs["force_regenerate"] = force_regenerate
 
-    # Forward benchmark-specific options
     options_to_forward = (
         dict(benchmark_options) if benchmark_options is not None else dict(opts.get("benchmark_options", {}))
     )
@@ -114,7 +94,6 @@ def instantiate_benchmark_class(
     required_kwargs: dict[str, Any],
     optional_kwargs: dict[str, Any],
 ) -> Any:
-    """Instantiate a benchmark class with only supported optional constructor kwargs."""
     constructor_kwargs = dict(required_kwargs)
     for name, value in optional_kwargs.items():
         if constructor_accepts_argument(benchmark_class, name):
@@ -123,16 +102,6 @@ def instantiate_benchmark_class(
 
 
 def constructor_accepts_argument(benchmark_class: type[Any], argument_name: str) -> bool:
-    """Return whether a benchmark constructor accepts a named argument.
-
-    A bare ``**kwargs`` counts as acceptance: several concrete
-    benchmarks intentionally consume documented options (``quiet``,
-    ``parallel``) through ``**kwargs``, so filtering those out would
-    silently drop live CLI options. Spec-level safety belongs to
-    registration-time validation
-    (:meth:`BenchmarkHookRegistry.register_option_specs`), which fails
-    fast on mismatches without changing runtime forwarding.
-    """
     try:
         parameters = inspect.signature(benchmark_class).parameters
     except (TypeError, ValueError):
@@ -143,7 +112,6 @@ def constructor_accepts_argument(benchmark_class: type[Any], argument_name: str)
 
 
 def get_core_benchmark_class(benchmark_name: str) -> Any:
-    """Dynamically load benchmark class using importlib."""
     benchmark_name = benchmark_name.lower()
     plugin = get_family_plugin(benchmark_name)
     if plugin is not None:
@@ -161,5 +129,4 @@ def get_core_benchmark_class(benchmark_name: str) -> Any:
 
 
 def get_benchmark_class(benchmark_name: str) -> Any:
-    """Compatibility alias for :func:`get_core_benchmark_class`."""
     return get_core_benchmark_class(benchmark_name)

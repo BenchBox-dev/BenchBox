@@ -54,6 +54,20 @@ from scripts.publication.transaction import (
     canonical_json,
 )
 
+CLI_DESCRIPTION = (
+    "Canonical CLI and execution engine for publication transactions.\n"
+    "\n"
+    "Drives the transactional publication lifecycle:\n"
+    "- prepare: validates candidate bytes or restore source, queries journal, generates canonical permit\n"
+    "- authenticate-approval: validates the protected GitHub environment approval\n"
+    "- record-prepared: atomically reserves generation and commits 'prepared' state to the journal via CAS\n"
+    "- start-write: creates unique intent commit OID, records 'write-started' in journal\n"
+    "- acknowledge-write: records provider deployment outcome in journal ('write-acknowledged')\n"
+    "- record-verification: records probe results and attestation ('externally-verified')\n"
+    "- finalize: atomically advances durable head to 'durable'\n"
+    "- record-failure: escalates transaction to 'recovery-required' or 'terminal-failure'\n"
+)
+
 WATCHDOG_MAX_AGE_MINUTES = 10
 
 
@@ -898,7 +912,7 @@ def cmd_watchdog_scan(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)

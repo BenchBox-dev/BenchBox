@@ -1,12 +1,3 @@
-"""Tests for the receipt-bound medium-tier preflight stage.
-
-`make pr-preflight-medium-tests` runs impact-selected local medium tests
-through local_validation's medium-tier gate when the path classifier says
-the diff needs code CI, and skips otherwise. Merge-group CI still runs
-the full `make test-medium` target. Failure propagates: the stage fails
-pr-preflight and leaves no receipt behind.
-"""
-
 from __future__ import annotations
 
 import json
@@ -84,11 +75,6 @@ def test_medium_stage_uses_classifier_and_receipt_bound_impact_selection() -> No
 
 
 def test_medium_stage_scrubs_control_vars_from_gate_env() -> None:
-    # GNU make exports command-line variables to recipe environments and
-    # smuggles their assignments inside MAKEFLAGS. A leaked PATH_DECISION
-    # makes test-spawned makes take the caller-supplied branch with no
-    # lists dir ("PATH_LISTS is required"); a leaked SKIP_FAST_TESTS flips
-    # the route into its skip branch inside the suite.
     body = _makefile_target_body("pr-preflight-medium-tests")
     assert "env -u PATH_DECISION" in body
     assert "-u PATH_LISTS" in body

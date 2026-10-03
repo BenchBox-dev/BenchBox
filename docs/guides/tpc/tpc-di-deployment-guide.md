@@ -265,59 +265,32 @@ export TPCDI_ENABLE_METRICS=true
 
 ### Configuration File
 
-Create a `tpcdi_config.yaml` file:
+Create a `tpcdi_config.yaml` file with supported ``TPCDIConfig`` fields:
 
 ```yaml
-# TPC-DI Configuration
-benchmark:
-  scale_factor: 1.0
-  output_directory: "/data/tpcdi"
-
-database:
-  url: "duckdb:///data/tpcdi.duckdb"
-  pool_size: 10
-  timeout: 30
-
+scale_factor: 1.0
+output_dir: "/data/tpcdi"
 enable_parallel: true
 max_workers: 4
 chunk_size: 50000
+enable_validation: true
+strict_validation: false
+optimize_memory: true
+log_level: "INFO"
+```
 
-  # Query execution parallelization
-  enable_parallel_queries: true
-  query_batch_size: 5
+Load the mapping with ``TPCDIConfig.from_dict``. It converts a string
+``output_dir`` to a path and filters out unknown keys.
 
-performance:
-  batch_size: 10000
-  memory_limit_mb: 8192
-  timeout_seconds: 3600
-  enable_performance_monitoring: true
-  progress_reporting_interval: 5.0
+```python
+from pathlib import Path
 
-error_handling:
-  enable_error_recovery: true
-  max_retries: 3
-  retry_delay_seconds: 1.0
+import yaml
 
-logging:
-  level: "INFO"
-  file: "/var/log/tpcdi.log"
-  enable_metrics: true
-  metric_collection_interval: 10
+from benchbox.core.tpcdi.config import TPCDIConfig
 
-data_formats:
-  csv:
-    delimiter: "|"
-    quote_char: "\""
-    escape_char: "\\"
-  xml:
-    encoding: "utf-8"
-    validate: true
-  json:
-    pretty_print: false
-    encoding: "utf-8"
-  fixed_width:
-    encoding: "utf-8"
-    strip_whitespace: true
+payload = yaml.safe_load(Path("tpcdi_config.yaml").read_text())
+config = TPCDIConfig.from_dict(payload)
 ```
 
 ### Python Configuration

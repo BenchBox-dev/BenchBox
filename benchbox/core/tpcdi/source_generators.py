@@ -1,34 +1,9 @@
-"""TPC-DI source system data generators.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module generates source system data files for the TPC-DI benchmark,
-simulating the various source systems that feed into a financial services
-data warehouse. Unlike the main generator.py which creates target warehouse
-data, this module creates realistic source data in various formats that
-would typically be processed through ETL pipelines.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-The TPC-DI benchmark simulates data from these source systems:
-- OLTP Database extracts (customer transactions, account changes)
-- HR System (employee/broker data)
-- CRM System (customer relationship data)
-- External Data Providers (market prices, tax rates)
-
-Each source system generates data in different formats:
-- CSV files with different delimiters
-- XML hierarchical data
-- Fixed-width legacy formats
-- JSON for modern APIs
-
-The data generated is realistic for the financial services domain and includes
-proper data quality issues, temporal consistency, and referential integrity
-that ETL processes must handle.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import random
@@ -46,20 +21,6 @@ def _lines(values: str) -> list[str]:
 
 
 class TPCDISourceDataGenerator:
-    """Generator for TPC-DI source system data files.
-
-    This class generates realistic source data files that simulate the various
-    systems feeding into a financial services data warehouse. The data includes
-    intentional data quality issues and realistic patterns found in real-world
-    source systems.
-
-    Attributes:
-        scale_factor: Scale factor for data generation (1.0 = standard size)
-        output_dir: Directory to write generated data files
-        start_date: Start date for temporal data generation
-        end_date: End date for temporal data generation
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -68,25 +29,14 @@ class TPCDISourceDataGenerator:
         end_date: Optional[date] = None,
         seed: int = 42,
     ):
-        """Initialize the TPC-DI source data generator.
-
-        Args:
-            scale_factor: Scale factor for data generation (1.0 = standard size)
-            output_dir: Directory to write generated data files
-            start_date: Start date for temporal data (defaults to 2020-01-01)
-            end_date: End date for temporal data (defaults to 2023-12-31)
-            seed: Seed for the generator-owned random stream.
-        """
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
 
-        # Date range for temporal data
         self.start_date = start_date or date(2020, 1, 1)
         self.end_date = end_date or date(2023, 12, 31)
         self.generation_seed = int(seed)
         self._rng = random.Random(self.generation_seed)
 
-        # Base record counts (scale_factor = 1.0)
         self.base_customers = 50000
         self.base_accounts = 100000
         self.base_trades = 1000000
@@ -96,14 +46,9 @@ class TPCDISourceDataGenerator:
         self.base_tax_rates = 100
         self.base_market_prices = 1000000
 
-        # Source-table methods use this private RNG; they never seed or mutate
-        # the process-global random generator.
-
-        # Reference data for realistic generation
         self._init_reference_data()
 
     def _init_reference_data(self) -> None:
-        """Initialize reference data for realistic data generation."""
         self.industries = _lines(
             """
             Technology
@@ -273,47 +218,30 @@ class TPCDISourceDataGenerator:
         )
 
     def generate_all_source_data(self) -> dict[str, list[str]]:
-        """Generate all source system data files.
-
-        Returns:
-            Dictionary mapping source system names to lists of generated file paths
-        """
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._rng = random.Random(self.generation_seed)
 
         file_paths = {}
 
-        # Generate OLTP system data (CSV format)
         file_paths["oltp_system"] = self._generate_oltp_data()
 
-        # Generate HR system data (XML format)
         file_paths["hr_system"] = self._generate_hr_data()
 
-        # Generate CRM system data (JSON format)
         file_paths["crm_system"] = self._generate_crm_data()
 
-        # Generate external data (mixed formats)
         file_paths["external_data"] = self._generate_external_data()
 
         return file_paths
 
     def _generate_oltp_data(self) -> list[str]:
-        """Generate OLTP database extract files in CSV format.
-
-        Returns:
-            List of file paths for OLTP data files
-        """
         return [self._generate_customer_extract(), self._generate_account_extract(), self._generate_trade_extract()]
 
     def _generate_customer_extract(self) -> str:
-        """Generate customer data extract from OLTP system."""
         file_path = self.output_dir / "oltp_customer_extract.csv"
         num_customers = int(self.base_customers * self.scale_factor)
 
-        # Generate data in batch using pandas
         data = []
         for i in range(1, num_customers + 1):
-            # Basic customer info
             customer_id = i
             tax_id = f"{self._rng.randint(100000000, 999999999)}"
             status = self._rng.choice(self.statuses)
@@ -323,19 +251,16 @@ class TPCDISourceDataGenerator:
             gender = self._rng.choice(["M", "F"])
             tier = self._rng.choices([1, 2, 3], weights=[0.6, 0.3, 0.1])[0]
 
-            # Birth date (age 18-80)
             birth_year = datetime.now().year - self._rng.randint(18, 80)
             date_of_birth = date(birth_year, self._rng.randint(1, 12), self._rng.randint(1, 28))
 
-            # Address (with some data quality issues)
             address_line1 = f"{self._rng.randint(1, 9999)} {self._rng.choice(['Main', 'Oak', 'First', 'Second', 'Park', 'Washington'])} St"
             address_line2 = "" if self._rng.random() > 0.3 else f"Apt {self._rng.randint(1, 999)}"
-            postal_code = f"{self._rng.randint(10000, 99999)}" if self._rng.random() > 0.05 else ""  # 5% missing
+            postal_code = f"{self._rng.randint(10000, 99999)}" if self._rng.random() > 0.05 else ""
             city = f"City{self._rng.randint(1, 1000)}"
             state_province = self._rng.choice(self.us_states)
             country = "USA"
 
-            # Contact info (with realistic patterns)
             phone1 = f"{self._rng.randint(200, 999)}-{self._rng.randint(200, 999)}-{self._rng.randint(1000, 9999)}"
             phone2 = (
                 ""
@@ -355,11 +280,9 @@ class TPCDISourceDataGenerator:
                 else f"{first_name.lower()}{i}@{self._rng.choice(['company.com', 'business.org'])}"
             )
 
-            # Financial info
             credit_rating = self._rng.choice(self.credit_ratings)
             net_worth = self._rng.randint(10000, 10000000) if tier == 3 else self._rng.randint(1000, 1000000)
 
-            # Temporal info
             created_date = self.start_date + timedelta(
                 days=self._rng.randint(0, (self.end_date - self.start_date).days)
             )
@@ -394,7 +317,6 @@ class TPCDISourceDataGenerator:
                 ]
             )
 
-        # Create DataFrame and save to CSV using pandas
         columns = [
             "customer_id",
             "tax_id",
@@ -423,17 +345,15 @@ class TPCDISourceDataGenerator:
         ]
 
         df = pd.DataFrame(data, columns=columns)
-        df.to_csv(file_path, index=False, quoting=1)  # quoting=1 is equivalent to csv.QUOTE_ALL
+        df.to_csv(file_path, index=False, quoting=1)
 
         return str(file_path)
 
     def _generate_account_extract(self) -> str:
-        """Generate account data extract from OLTP system."""
         file_path = self.output_dir / "oltp_account_extract.csv"
         num_accounts = int(self.base_accounts * self.scale_factor)
         num_customers = int(self.base_customers * self.scale_factor)
 
-        # Generate data in batch using pandas
         data = []
         for i in range(1, num_accounts + 1):
             account_id = i
@@ -441,9 +361,8 @@ class TPCDISourceDataGenerator:
             account_type = self._rng.choice(self.account_types)
             account_description = f"{account_type} Account #{i:06d}"
             status = self._rng.choice(self.statuses)
-            tax_status = self._rng.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
+            tax_status = self._rng.randint(0, 2)
 
-            # Account balance (realistic distribution)
             if account_type == "Retirement":
                 balance = self._rng.uniform(1000, 2000000)
             elif account_type == "Corporate":
@@ -451,7 +370,6 @@ class TPCDISourceDataGenerator:
             else:
                 balance = self._rng.uniform(100, 1000000)
 
-            # Dates
             open_date = self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
             close_date = "" if status != "Closed" else open_date + timedelta(days=self._rng.randint(30, 1000))
             created_date = open_date
@@ -473,7 +391,6 @@ class TPCDISourceDataGenerator:
                 ]
             )
 
-        # Create DataFrame and save to CSV using pandas
         columns = [
             "account_id",
             "customer_id",
@@ -494,7 +411,6 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def _generate_trade_extract(self) -> str:
-        """Generate trade data extract from OLTP system with fixed-width format."""
         file_path = self.output_dir / "oltp_trade_extract.txt"
         num_trades = int(self.base_trades * self.scale_factor)
         num_accounts = int(self.base_accounts * self.scale_factor)
@@ -509,7 +425,6 @@ class TPCDISourceDataGenerator:
                 quantity = self._rng.randint(1, 10000)
                 price = round(self._rng.uniform(10.0, 500.0), 2)
 
-                # Trade datetime
                 trade_date = self.start_date + timedelta(
                     days=self._rng.randint(0, (self.end_date - self.start_date).days)
                 )
@@ -517,7 +432,6 @@ class TPCDISourceDataGenerator:
 
                 status = self._rng.choices(["COMPLETED", "PENDING", "CANCELLED"], weights=[0.85, 0.1, 0.05])[0]
 
-                # Fixed-width format (common in legacy systems)
                 line = (
                     f"{trade_id:010d}"
                     f"{account_id:010d}"
@@ -536,19 +450,12 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def _generate_hr_data(self) -> list[str]:
-        """Generate HR system data in XML format.
-
-        Returns:
-            List of file paths for HR data files
-        """
         return [self._generate_employee_xml()]
 
     def _generate_employee_xml(self) -> str:
-        """Generate employee/broker data in XML format."""
         file_path = self.output_dir / "hr_employees.xml"
         num_brokers = int(self.base_brokers * self.scale_factor)
 
-        # Create XML structure
         root = ET.Element("employees")
         root.set("export_date", datetime.now().strftime("%Y-%m-%d"))
         root.set("system", "HR_SYSTEM_v2.1")
@@ -558,7 +465,6 @@ class TPCDISourceDataGenerator:
             employee.set("id", str(i))
             employee.set("type", "broker")
 
-            # Personal information
             personal = ET.SubElement(employee, "personal_info")
             ET.SubElement(personal, "employee_id").text = str(i)
             ET.SubElement(personal, "first_name").text = self._rng.choice(self.first_names)
@@ -566,12 +472,10 @@ class TPCDISourceDataGenerator:
             ET.SubElement(personal, "middle_initial").text = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
             ET.SubElement(personal, "gender").text = self._rng.choice(["M", "F"])
 
-            # Birth date
             birth_year = datetime.now().year - self._rng.randint(25, 65)
             birth_date = date(birth_year, self._rng.randint(1, 12), self._rng.randint(1, 28))
             ET.SubElement(personal, "date_of_birth").text = birth_date.strftime("%Y-%m-%d")
 
-            # Employment information
             employment = ET.SubElement(employee, "employment_info")
             ET.SubElement(employment, "hire_date").text = (
                 self.start_date + timedelta(days=self._rng.randint(0, 1000))
@@ -583,15 +487,13 @@ class TPCDISourceDataGenerator:
             ET.SubElement(employment, "status").text = self._rng.choice(["Active", "Inactive", "Leave"])
             ET.SubElement(employment, "salary").text = str(self._rng.randint(50000, 200000))
 
-            # License information
             licenses = ET.SubElement(employee, "licenses")
             for license_type in ["Series 7", "Series 63", "Series 66"]:
-                if self._rng.random() > 0.3:  # Not all brokers have all licenses
+                if self._rng.random() > 0.3:
                     license_elem = ET.SubElement(licenses, "license")
                     license_elem.set("type", license_type)
                     license_elem.text = f"{license_type}-{self._rng.randint(100000, 999999)}"
 
-        # Write XML file
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ", level=0)
         tree.write(file_path, encoding="utf-8", xml_declaration=True)
@@ -599,19 +501,12 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def _generate_crm_data(self) -> list[str]:
-        """Generate CRM system data in JSON format.
-
-        Returns:
-            List of file paths for CRM data files
-        """
         return [self._generate_customer_relationships_json(), self._generate_marketing_campaigns_json()]
 
     def _generate_customer_relationships_json(self) -> str:
-        """Generate customer relationship data in JSON format."""
         file_path = self.output_dir / "crm_customer_relationships.json"
-        num_customers = int(self.base_customers * self.scale_factor * 0.7)  # Not all customers in CRM
+        num_customers = int(self.base_customers * self.scale_factor * 0.7)
 
-        # Generate data using pandas
         data = []
         for i in range(1, num_customers + 1):
             customer = {
@@ -637,10 +532,8 @@ class TPCDISourceDataGenerator:
             }
             data.append(customer)
 
-        # Create DataFrame and save to JSON using pandas
         df = pd.DataFrame(data)
 
-        # Create the complete JSON structure
         json_data = {
             "export_metadata": {
                 "system": "CRM_SYSTEM_v3.2",
@@ -650,21 +543,18 @@ class TPCDISourceDataGenerator:
             "customers": df.to_dict("records"),
         }
 
-        # Write JSON file
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=2, default=str)
 
         return str(file_path)
 
     def _generate_marketing_campaigns_json(self) -> str:
-        """Generate marketing campaign data in JSON format."""
         file_path = self.output_dir / "crm_marketing_campaigns.json"
 
-        # Generate data using pandas
         campaign_types = ["Email", "Direct Mail", "Phone", "Online Ad", "Social Media"]
         data = []
 
-        for i in range(1, 21):  # 20 campaigns
+        for i in range(1, 21):
             campaign = {
                 "campaign_id": f"CAMP_{i:04d}",
                 "campaign_name": f"Campaign {i} - {self._rng.choice(['Q1 Promotion', 'New Account', 'Retention', 'Cross-sell', 'Upgrade'])}",
@@ -679,10 +569,8 @@ class TPCDISourceDataGenerator:
             }
             data.append(campaign)
 
-        # Create DataFrame and save to JSON using pandas
         df = pd.DataFrame(data)
 
-        # Create the complete JSON structure
         json_data = {
             "export_metadata": {
                 "system": "CRM_SYSTEM_v3.2",
@@ -692,27 +580,19 @@ class TPCDISourceDataGenerator:
             "campaigns": df.to_dict("records"),
         }
 
-        # Write JSON file
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(json_data, f, indent=2)
 
         return str(file_path)
 
     def _generate_external_data(self) -> list[str]:
-        """Generate external data provider files in mixed formats.
-
-        Returns:
-            List of file paths for external data files
-        """
         return [self._generate_market_prices(), self._generate_tax_rates(), self._generate_company_data_xml()]
 
     def _generate_market_prices(self) -> str:
-        """Generate market price data with pipe delimiter."""
         file_path = self.output_dir / "external_market_prices.csv"
         num_securities = int(self.base_securities * self.scale_factor)
         num_prices = int(self.base_market_prices * self.scale_factor)
 
-        # Generate data in batch using pandas
         symbols = [f"SYM{i:04d}" for i in range(1, num_securities + 1)]
 
         data = []
@@ -720,7 +600,6 @@ class TPCDISourceDataGenerator:
             symbol = self._rng.choice(symbols)
             trade_date = self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
 
-            # Generate realistic OHLC prices
             base_price = self._rng.uniform(10.0, 500.0)
             open_price = base_price
             high_price = open_price * self._rng.uniform(1.0, 1.05)
@@ -744,7 +623,6 @@ class TPCDISourceDataGenerator:
                 ]
             )
 
-        # Create DataFrame and save to CSV using pandas
         columns = [
             "symbol",
             "date",
@@ -763,10 +641,8 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def _generate_tax_rates(self) -> str:
-        """Generate tax rate data with tab delimiter."""
         file_path = self.output_dir / "external_tax_rates.tsv"
 
-        # Generate data in batch using pandas
         data = []
         for jurisdiction in self.tax_jurisdictions:
             for tax_type in ["Income", "Capital Gains", "Dividend", "Interest"]:
@@ -787,7 +663,6 @@ class TPCDISourceDataGenerator:
                     ]
                 )
 
-        # Create DataFrame and save to TSV using pandas
         columns = [
             "jurisdiction",
             "tax_type",
@@ -803,11 +678,9 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def _generate_company_data_xml(self) -> str:
-        """Generate company reference data in XML format."""
         file_path = self.output_dir / "external_company_data.xml"
         num_companies = int(self.base_companies * self.scale_factor)
 
-        # Generate company data using pandas first, then convert to XML
         company_data = []
         for i in range(1, num_companies + 1):
             company = {
@@ -869,10 +742,8 @@ class TPCDISourceDataGenerator:
             }
             company_data.append(company)
 
-        # Create DataFrame for easier data manipulation
         df = pd.DataFrame(company_data)
 
-        # Create XML structure manually (pandas to_xml doesn't provide enough control for hierarchical structure)
         root = ET.Element("companies")
         root.set("data_provider", "EXTERNAL_DATA_CORP")
         root.set("export_date", datetime.now().strftime("%Y-%m-%d"))
@@ -881,26 +752,22 @@ class TPCDISourceDataGenerator:
             company = ET.SubElement(root, "company")
             company.set("id", str(row["id"]))
 
-            # Basic company info
             ET.SubElement(company, "name").text = row["name"]
             ET.SubElement(company, "ticker").text = row["ticker"]
             ET.SubElement(company, "industry").text = row["industry"]
             ET.SubElement(company, "sector").text = row["sector"]
             ET.SubElement(company, "market_cap").text = str(row["market_cap"])
 
-            # Financial metrics
             financials = ET.SubElement(company, "financials")
             ET.SubElement(financials, "revenue").text = str(row["revenue"])
             ET.SubElement(financials, "net_income").text = str(row["net_income"])
             ET.SubElement(financials, "total_assets").text = str(row["total_assets"])
             ET.SubElement(financials, "total_debt").text = str(row["total_debt"])
 
-            # Ratings
             ratings = ET.SubElement(company, "ratings")
             ET.SubElement(ratings, "sp_rating").text = row["sp_rating"]
             ET.SubElement(ratings, "moody_rating").text = row["moody_rating"]
 
-            # Address
             address = ET.SubElement(company, "address")
             ET.SubElement(address, "street").text = row["street"]
             ET.SubElement(address, "city").text = row["city"]
@@ -908,7 +775,6 @@ class TPCDISourceDataGenerator:
             ET.SubElement(address, "zip_code").text = row["zip_code"]
             ET.SubElement(address, "country").text = row["country"]
 
-        # Write XML file
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ", level=0)
         tree.write(file_path, encoding="utf-8", xml_declaration=True)
@@ -916,32 +782,10 @@ class TPCDISourceDataGenerator:
         return str(file_path)
 
     def generate_data_quality_issues(self, file_path: str, issue_rate: float = 0.05) -> str:  # noqa: ARG002
-        """Introduce realistic data quality issues into a generated file.
 
-        Args:
-            file_path: Path to the file to modify
-            issue_rate: Percentage of records to introduce issues into (0.0-1.0)
-
-        Returns:
-            Path to the modified file with data quality issues
-        """
-        # This method would introduce realistic data quality issues like:
-        # - Missing values
-        # - Inconsistent formats
-        # - Duplicate records
-        # - Invalid data types
-        # - Referential integrity violations
-
-        # For brevity, returning the original file path
-        # In a full implementation, this would create a modified version
         return file_path
 
     def get_file_format_info(self) -> dict[str, dict[str, Any]]:
-        """Get information about the file formats and structures generated.
-
-        Returns:
-            Dictionary describing each generated file format
-        """
         rows = """
         oltp_customer_extract.csv|CSV|,|Customer data from OLTP database
         oltp_account_extract.csv|CSV|,|Account data from OLTP database
@@ -966,20 +810,15 @@ class TPCDISourceDataGenerator:
         return info
 
     def _generate_customer_extract_parallel(self) -> str:
-        """Generate customer data extract using parallel chunking."""
         file_path = self.output_dir / "oltp_customer_extract.csv"
         num_customers = int(self.base_customers * self.scale_factor)
 
-        # Use chunked generation for large datasets
         if self.enable_parallel and num_customers > self.parallel_config.chunk_size:
             return self._generate_customer_extract_chunked(file_path, num_customers)
         else:
             return self._generate_customer_extract()
 
-    # Removed complex worker pool management - now using context managers
-
     def get_parallel_generation_metrics(self) -> dict[str, Any]:
-        """Get parallel generation performance metrics."""
         if not self.enable_parallel:
             return {"error": "Parallel generation not enabled"}
 
@@ -988,7 +827,7 @@ class TPCDISourceDataGenerator:
         report = {
             "configuration": {
                 "max_workers": self.parallel_config.max_workers,
-                "use_process_pool": False,  # Simplified to use only ThreadPoolExecutor
+                "use_process_pool": False,
                 "chunk_size": self.parallel_config.chunk_size,
                 "concurrent_formats": self.parallel_config.enable_concurrent_formats,
                 "parallel_batches": self.parallel_config.enable_parallel_batches,
@@ -1000,10 +839,8 @@ class TPCDISourceDataGenerator:
         return report
 
     def __enter__(self) -> "TPCDISourceDataGenerator":
-        """Context manager entry."""
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit with cleanup."""
         if self.enable_parallel:
             self.shutdown_worker_pools()

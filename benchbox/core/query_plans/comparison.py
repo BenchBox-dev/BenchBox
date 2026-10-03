@@ -1,13 +1,3 @@
-"""
-Query plan comparison engine.
-
-Implements algorithms for comparing query plans:
-- Logical plan structure comparison (tree diff)
-- Similarity scoring (tree edit distance)
-- Cross-platform comparison
-- Cross-run regression detection
-"""
-
 from __future__ import annotations
 
 import logging
@@ -29,35 +19,6 @@ from benchbox.core.results.query_plan_models import (
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Cross-engine operator-shape harmonization (wrapper-stripped structural backbone)
-# ---------------------------------------------------------------------------
-#
-# The raw plan_fingerprint is a PER-ENGINE within-version key and is deliberately
-# NOT comparable across engines (see the stability contract in
-# query_plan_models.py): engines emit different wrapper/exchange/codegen operators
-# and harmonize names differently (ClickHouse Expression -> Project, Presto Output
-# -> Project, Spark Exchange -> Other), so the same logical query hashes differently
-# on each engine.
-#
-# This projection provides the SEPARATE, opt-in cross-engine operator-shape view:
-# it reduces a harmonized DAG to its structural backbone — the relational skeleton
-# of base scans, joins, aggregates and set operations — by
-#   1. dropping engine-variable wrapper nodes (Project/Filter/CTE/Subquery/Other),
-#      which carry no cross-engine-stable structural meaning, and
-#   2. collapsing a parent->child run of the SAME backbone type into one node, so a
-#      partial+final aggregate (Spark/Databend) or a multi-stage sort (Doris) counts
-#      once — the single logical operation it represents.
-#
-# The result is a multiset of backbone operator types that can be harmonized across
-# engines for the same logical query. It is intentionally weaker than plan
-# equivalence: it ignores table identity, predicates, join conditions and most
-# physical operators. It is kept separate from the raw fingerprint, which remains
-# unchanged for within-engine regression detection.
-
-# Operator types that form the cross-engine structural backbone. Everything else
-# (Project / Filter / CTE / Subquery / Other) is treated as engine-variable wrapper
-# noise and dropped from the comparable subset.
 BACKBONE_OPERATOR_TYPES: frozenset[str] = frozenset(
     {
         LogicalOperatorType.SCAN.value,
@@ -72,12 +33,6 @@ BACKBONE_OPERATOR_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Backbone operators that engines split into a parent->child run of the SAME type as
-# stages of ONE logical operation: a partial+final aggregate (Spark/Databend) or a
-# multi-stage / merge sort (Doris). Only these collapse. JOIN, SCAN and the set
-# operators are NOT collapsed: a parent Join over a child Join is a multi-table join
-# (two distinct joins), and a Scan over a Scan is two distinct base scans — collapsing
-# those would undercount the relational skeleton the projection exists to measure.
 COLLAPSIBLE_OPERATOR_TYPES: frozenset[str] = frozenset(
     {
         LogicalOperatorType.AGGREGATE.value,
@@ -85,13 +40,6 @@ COLLAPSIBLE_OPERATOR_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Dropped wrapper types that are pure physical pass-throughs (exchanges, repartitions
-# and codegen stages, all harmonized to ``Other``). A collapsible backbone run separated
-# only by these still collapses — ``Aggregate -> Exchange -> Aggregate`` is the partial+
-# final stages of ONE aggregate. Every other dropped wrapper (Filter/Project/Subquery/CTE)
-# is a real relational boundary and is NOT transparent: it resets the collapse context so
-# separate aggregations/sorts on either side (e.g. a grouped subquery filtered before an
-# outer aggregate, ``Aggregate -> Filter -> Aggregate``) are counted as two operators.
 TRANSPARENT_WRAPPER_TYPES: frozenset[str] = frozenset(
     {
         LogicalOperatorType.OTHER.value,
@@ -100,7 +48,6 @@ TRANSPARENT_WRAPPER_TYPES: frozenset[str] = frozenset(
 
 
 def _backbone_type(node: LogicalOperator) -> str | None:
-    """Return the backbone operator-type string for a node, or None if it is wrapper noise."""
     type_str = get_operator_type_str(node.operator_type, warn_unknown=False)
     return type_str if type_str in BACKBONE_OPERATOR_TYPES else None
 
@@ -110,30 +57,6 @@ def structural_backbone_counts(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> dict[str, int]:
-    """Reduce a harmonized DAG to a cross-engine operator-shape multiset.
-
-    Wrapper/engine-variable nodes (Project/Filter/CTE/Subquery/Other) are dropped. A
-    parent->child run of the same *collapsible* backbone type
-    (``COLLAPSIBLE_OPERATOR_TYPES`` — aggregate, sort) is collapsed to a single node,
-    so a partial+final aggregate or a multi-stage sort counts once. The collapse looks
-    through transparent physical wrappers (exchanges), so ``Aggregate -> Exchange ->
-    Aggregate`` still counts as one aggregate, but a semantic boundary resets it, so
-    ``Aggregate -> Filter -> Aggregate`` correctly counts two. Non-collapsible backbone
-    operators (joins, scans, set
-    operators) are always counted per node, so a left-deep 3-table join correctly
-    reports two joins.
-
-    Args:
-        root: Root of the harmonized logical operator tree.
-        only: Optional set of backbone operator-type strings to restrict the result to
-            (keys not present are reported as 0). Use to compare a declared invariant
-            subset (e.g. {"Scan", "Join", "Aggregate"}) across engines. This is an
-            operator-shape harmonization check, not plan equivalence. Must be
-            non-empty when provided.
-
-    Returns:
-        Mapping of backbone operator-type string -> count.
-    """
     if only is not None and not only:
         raise ValueError("`only` must be a non-empty set of operator types, or None to include all")
 
@@ -142,21 +65,13 @@ def structural_backbone_counts(
     def walk(node: LogicalOperator, collapsing_type: str | None) -> None:
         backbone = _backbone_type(node)
         if backbone is None:
-            # Wrapper node: drop it. Keep the collapse context only through transparent
-            # physical pass-throughs (exchanges harmonized to ``Other``) so a partial+
-            # final aggregate still collapses; reset it through semantic relational
-            # boundaries (Filter/Project/Subquery/CTE) so separate aggregations/sorts on
-            # either side are counted independently.
             wrapper_type = get_operator_type_str(node.operator_type, warn_unknown=False)
             child_collapsing = collapsing_type if wrapper_type in TRANSPARENT_WRAPPER_TYPES else None
             for child in node.children:
                 walk(child, child_collapsing)
             return
-        # Count the node unless it continues a collapsible same-type run.
         if not (backbone in COLLAPSIBLE_OPERATOR_TYPES and backbone == collapsing_type):
             counts[backbone] = counts.get(backbone, 0) + 1
-        # Only propagate a collapse context for collapsible types; otherwise reset it so
-        # an unrelated descendant of the same type is still counted.
         next_collapsing = backbone if backbone in COLLAPSIBLE_OPERATOR_TYPES else None
         for child in node.children:
             walk(child, next_collapsing)
@@ -173,21 +88,6 @@ def comparable_subset_signature(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> str:
-    """Deterministic string signature of the cross-engine operator-shape backbone.
-
-    Unlike ``QueryPlanDAG.plan_fingerprint`` (per-engine, not cross-engine comparable),
-    this signature can align across engines for the same logical query because it is
-    built from the wrapper-stripped, collapsed backbone. Two plans from different
-    engines that share a signature have the same backbone operator-shape multiset;
-    that does not prove table/predicate/condition equivalence.
-
-    Args:
-        root: Root of the harmonized logical operator tree.
-        only: Optional restriction set (see ``structural_backbone_counts``).
-
-    Returns:
-        Signature like ``"Aggregate:1|Join:1|Scan:2"`` (sorted by operator type).
-    """
     counts = structural_backbone_counts(root, only=only)
     return "|".join(f"{op_type}:{counts[op_type]}" for op_type in sorted(counts))
 
@@ -198,35 +98,24 @@ def structural_backbones_match(
     *,
     only: set[str] | frozenset[str] | None = None,
 ) -> bool:
-    """Return True if two plans share the same cross-engine operator-shape backbone.
-
-    This compares the wrapper-stripped backbone multisets, so it is a useful
-    cross-engine harmonization check for the same logical query. It is deliberately
-    weaker than ``plan_fingerprint`` equality and is not a plan-equivalence proof.
-    """
     return structural_backbone_counts(left, only=only) == structural_backbone_counts(right, only=only)
 
 
 @dataclass
 class OperatorDiff:
-    """Represents a difference between two operators."""
-
     operator_id_left: str
     operator_id_right: str
-    diff_type: str  # "match", "type_mismatch", "property_mismatch", "structure_mismatch"
+    diff_type: str
     differences: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class SimilarityScore:
-    """Similarity score between two query plans."""
+    overall_similarity: float
+    structural_similarity: float
+    operator_similarity: float
+    property_similarity: float
 
-    overall_similarity: float  # 0.0 to 1.0
-    structural_similarity: float  # Based on tree structure
-    operator_similarity: float  # Based on operator types
-    property_similarity: float  # Based on operator properties
-
-    # Details
     total_operators_left: int
     total_operators_right: int
     matching_operators: int
@@ -237,22 +126,16 @@ class SimilarityScore:
 
 @dataclass
 class PlanComparison:
-    """Result of comparing two query plans."""
-
     plan_left: QueryPlanDAG
     plan_right: QueryPlanDAG
 
-    # High-level comparison
     plans_identical: bool
     fingerprints_match: bool
 
-    # Similarity metrics
     similarity: SimilarityScore
 
-    # Detailed differences
     operator_diffs: list[OperatorDiff] = field(default_factory=list)
 
-    # Summary
     summary: str = ""
 
 
@@ -270,11 +153,6 @@ def _compare_join(left: LogicalOperator, right: LogicalOperator, diffs: dict[str
 
 
 def _compare_set_diff(left: LogicalOperator, right: LogicalOperator, diffs: dict[str, Any], attr: str) -> None:
-    """Compare an attribute as an unordered set (membership only, not position).
-
-    Use for attributes where order is irrelevant (filter_expressions, aggregation_functions).
-    For order-significant attributes (group_by_keys, projection_expressions), use direct ``!=``.
-    """
     left_vals = set(getattr(left, attr) or [])
     right_vals = set(getattr(right, attr) or [])
     if left_vals != right_vals:
@@ -291,7 +169,6 @@ def _compare_sort(left: LogicalOperator, right: LogicalOperator, diffs: dict[str
 
 def _compare_aggregate(left: LogicalOperator, right: LogicalOperator, diffs: dict[str, Any]) -> None:
     _compare_set_diff(left, right, diffs, "aggregation_functions")
-    # group_by_keys is order-significant (affects output row grouping)
     if (left.group_by_keys or []) != (right.group_by_keys or []):
         diffs["group_by_keys"] = {"left": left.group_by_keys, "right": right.group_by_keys}
 
@@ -304,7 +181,6 @@ def _compare_limit(left: LogicalOperator, right: LogicalOperator, diffs: dict[st
 
 
 def _compare_project(left: LogicalOperator, right: LogicalOperator, diffs: dict[str, Any]) -> None:
-    # projection_expressions is order-significant (affects output columns)
     if (left.projection_expressions or []) != (right.projection_expressions or []):
         diffs["projection_expressions"] = {
             "left": left.projection_expressions,
@@ -324,15 +200,6 @@ _OPERATOR_COMPARATORS: dict[str, Callable[[LogicalOperator, LogicalOperator, dic
 
 
 def _truncation_caveat(plan_left: QueryPlanDAG, plan_right: QueryPlanDAG) -> OperatorDiff | None:
-    """Flag a below-truncation difference the persisted trees cannot show.
-
-    Returns a structural mismatch when either plan carries depth-truncation
-    markers yet the stored full-tree fingerprints differ — the full plans then
-    necessarily differed below the cut, and without this record the pair
-    scores 100% with zero mismatches. Returns None when neither plan is
-    truncated, or when the stored prints are absent or agree (identically
-    truncated trees of identical plans compare clean).
-    """
     cuts = [
         depth
         for depth in (
@@ -367,40 +234,17 @@ def _root_operator_id(plan: QueryPlanDAG) -> str:
 
 
 class QueryPlanComparator:
-    """Compares query plans and computes similarity scores."""
-
     def compare_plans(
         self,
         plan_left: QueryPlanDAG,
         plan_right: QueryPlanDAG,
     ) -> PlanComparison:
-        """
-        Compare two query plans.
-
-        Uses fingerprint fast-path when both plans have trusted fingerprints.
-        Falls back to full tree comparison when fingerprints are unverified or stale.
-
-        Args:
-            plan_left: First query plan
-            plan_right: Second query plan
-
-        Returns:
-            PlanComparison with detailed differences and similarity score
-        """
-        # Check if fingerprints can be trusted for fast-path comparison
         left_trusted = plan_left.is_fingerprint_trusted()
         right_trusted = plan_right.is_fingerprint_trusted()
-        # Fingerprints are only comparable within the same encoding version: a
-        # v1 and a v2 fingerprint hash different encodings of the same logical
-        # plan, so equality across versions is meaningless. When versions
-        # differ (e.g. an old bundle vs a freshly captured plan) we must fall
-        # through to the full tree walk (qpc-03 anti-pattern: never compare
-        # across fingerprint_version for equality).
         same_version = getattr(plan_left, "fingerprint_version", None) == getattr(
             plan_right, "fingerprint_version", None
         )
 
-        # Quick fingerprint check (only if both are trusted AND same-version)
         fingerprints_match = False
         if left_trusted and right_trusted and same_version:
             fingerprints_match = (
@@ -409,7 +253,6 @@ class QueryPlanComparator:
                 else False
             )
 
-            # If fingerprints match and both are trusted, plans are identical
             if fingerprints_match:
                 return self._create_identical_comparison(plan_left, plan_right)
         else:
@@ -419,7 +262,6 @@ class QueryPlanComparator:
                     f"{getattr(plan_left, 'fingerprint_version', None)} != "
                     f"{getattr(plan_right, 'fingerprint_version', None)}; using full comparison"
                 )
-            # Log a warning about untrusted fingerprints
             if not left_trusted:
                 logger.debug(
                     f"Plan {plan_left.query_id} has untrusted fingerprint "
@@ -431,32 +273,21 @@ class QueryPlanComparator:
                     f"(integrity={plan_right.fingerprint_integrity}), using full comparison"
                 )
 
-        # Perform detailed tree comparison
         operator_diffs = self._compare_operator_trees(
             plan_left.logical_root,
             plan_right.logical_root,
         )
 
-        # A below-cut difference survives nowhere in truncated trees: their
-        # reloaded fingerprints are STALE, so the stored full-tree prints are
-        # never equality-tested above. When truncation markers are present yet
-        # the stored full-tree fingerprints differ, the full plans necessarily
-        # differed below the cut — record it so the pair scores below 100%
-        # instead of reading as identical. Matching (or absent) stored prints
-        # stay silent: identically truncated trees of identical plans compare
-        # clean.
         truncation_diff = _truncation_caveat(plan_left, plan_right)
         if truncation_diff is not None:
             operator_diffs.append(truncation_diff)
 
-        # Calculate similarity score
         similarity = self._calculate_similarity(
             plan_left.logical_root,
             plan_right.logical_root,
             operator_diffs,
         )
 
-        # Generate summary
         summary = self._generate_summary(similarity, operator_diffs)
 
         return PlanComparison(
@@ -474,7 +305,6 @@ class QueryPlanComparator:
         plan_left: QueryPlanDAG,
         plan_right: QueryPlanDAG,
     ) -> PlanComparison:
-        """Create comparison result for identical plans."""
         total_ops = self._count_operators(plan_left.logical_root)
 
         similarity = SimilarityScore(
@@ -505,27 +335,13 @@ class QueryPlanComparator:
         left: LogicalOperator,
         right: LogicalOperator,
     ) -> list[OperatorDiff]:
-        """
-        Compare two operator trees and generate list of differences.
-
-        Uses a top-down traversal to compare structure and properties.
-
-        Args:
-            left: Left operator tree
-            right: Right operator tree
-
-        Returns:
-            List of operator differences
-        """
         diffs: list[OperatorDiff] = []
 
-        # Compare using BFS traversal
         queue: deque[tuple[LogicalOperator | None, LogicalOperator | None]] = deque([(left, right)])
 
         while queue:
             op_left, op_right = queue.popleft()
 
-            # Handle cases where one side is None
             if op_left is None and op_right is None:
                 continue
 
@@ -540,7 +356,6 @@ class QueryPlanComparator:
                 )
                 continue
 
-            # Compare operator types (handle both enum and string forms)
             if not is_operator_type_match(op_left.operator_type, op_right.operator_type):
                 diffs.append(
                     OperatorDiff(
@@ -554,7 +369,6 @@ class QueryPlanComparator:
                     )
                 )
             else:
-                # Same type - compare properties
                 property_diffs = self._compare_operator_properties(op_left, op_right)
                 if property_diffs:
                     diffs.append(
@@ -566,7 +380,6 @@ class QueryPlanComparator:
                         )
                     )
                 else:
-                    # Exact match
                     diffs.append(
                         OperatorDiff(
                             operator_id_left=op_left.operator_id,
@@ -576,11 +389,9 @@ class QueryPlanComparator:
                         )
                     )
 
-            # Compare children
             left_children = op_left.children or []
             right_children = op_right.children or []
 
-            # Check for structure mismatch (different number of children)
             if len(left_children) != len(right_children):
                 diffs.append(
                     OperatorDiff(
@@ -594,7 +405,6 @@ class QueryPlanComparator:
                     )
                 )
 
-            # Queue children for comparison
             max_children = max(len(left_children), len(right_children))
             for i in range(max_children):
                 left_child = left_children[i] if i < len(left_children) else None
@@ -608,18 +418,6 @@ class QueryPlanComparator:
         left: LogicalOperator,
         right: LogicalOperator,
     ) -> dict[str, Any]:
-        """
-        Compare properties of two operators of the same type.
-
-        Handles both enum and string operator types gracefully.
-
-        Args:
-            left: Left operator
-            right: Right operator
-
-        Returns:
-            Dictionary of property differences (empty if identical)
-        """
         diffs: dict[str, Any] = {}
 
         op_type_str = get_operator_type_str(left.operator_type)
@@ -627,7 +425,6 @@ class QueryPlanComparator:
         if comparator:
             comparator(left, right, diffs)
 
-        # Compare generic properties dictionary
         left_props = left.properties or {}
         right_props = right.properties or {}
 
@@ -648,42 +445,23 @@ class QueryPlanComparator:
         right: LogicalOperator,
         diffs: list[OperatorDiff],
     ) -> SimilarityScore:
-        """
-        Calculate similarity score based on operator diffs.
-
-        Args:
-            left: Left operator tree
-            right: Right operator tree
-            diffs: List of operator differences
-
-        Returns:
-            SimilarityScore
-        """
-        # Count operators
         total_left = self._count_operators(left)
         total_right = self._count_operators(right)
 
-        # Count different types of diffs
         matches = sum(1 for d in diffs if d.diff_type == "match")
         type_mismatches = sum(1 for d in diffs if d.diff_type == "type_mismatch")
         property_mismatches = sum(1 for d in diffs if d.diff_type == "property_mismatch")
         structure_mismatches = sum(1 for d in diffs if d.diff_type == "structure_mismatch")
 
-        # Calculate component similarities
         total_comparisons = max(total_left, total_right)
 
-        # Structural similarity: based on tree structure (presence of operators)
         structural_similarity = 1.0 - (structure_mismatches / total_comparisons) if total_comparisons > 0 else 1.0
 
-        # Operator similarity: based on operator types matching
         operator_similarity = (matches + property_mismatches) / total_comparisons if total_comparisons > 0 else 1.0
 
-        # Property similarity: based on properties matching when types are same
-        # Only count matches out of operators with matching types
         operators_with_same_type = matches + property_mismatches
         property_similarity = matches / operators_with_same_type if operators_with_same_type > 0 else 1.0
 
-        # Overall similarity: weighted average
         overall_similarity = 0.4 * structural_similarity + 0.4 * operator_similarity + 0.2 * property_similarity
 
         return SimilarityScore(
@@ -700,7 +478,6 @@ class QueryPlanComparator:
         )
 
     def _count_operators(self, operator: LogicalOperator) -> int:
-        """Count total operators in tree."""
         count = 1
         if operator.children:
             for child in operator.children:
@@ -712,7 +489,6 @@ class QueryPlanComparator:
         similarity: SimilarityScore,
         diffs: list[OperatorDiff],
     ) -> str:
-        """Generate human-readable summary of comparison."""
         if similarity.overall_similarity >= 0.95:
             level = "nearly identical"
         elif similarity.overall_similarity >= 0.75:
@@ -742,48 +518,30 @@ def compare_query_plans(
     plan_left: QueryPlanDAG,
     plan_right: QueryPlanDAG,
 ) -> PlanComparison:
-    """
-    Compare two query plans.
-
-    Convenience function that creates a comparator and performs comparison.
-
-    Args:
-        plan_left: First query plan
-        plan_right: Second query plan
-
-    Returns:
-        PlanComparison with detailed differences and similarity score
-    """
     comparator = QueryPlanComparator()
     return comparator.compare_plans(plan_left, plan_right)
 
 
 @dataclass
 class QueryPlanChange:
-    """Represents a query plan change between two runs."""
-
     query_id: str
-    change_type: str  # "unchanged", "type_change", "property_change", "structure_change"
+    change_type: str
     similarity: float
     details: str
 
 
 @dataclass
 class PerformanceCorrelation:
-    """Correlation between plan change and performance impact."""
-
     query_id: str
     plan_changed: bool
     baseline_time_ms: float
     current_time_ms: float
     perf_change_pct: float
-    is_regression: bool  # plan changed AND perf degraded >20%
+    is_regression: bool
 
 
 @dataclass
 class PlanComparisonSummary:
-    """Summary of plan comparison between two benchmark runs."""
-
     baseline_run_id: str
     current_run_id: str
     plans_compared: int
@@ -793,7 +551,6 @@ class PlanComparisonSummary:
     performance_correlations: list[PerformanceCorrelation]
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary."""
         return {
             "baseline_run_id": self.baseline_run_id,
             "current_run_id": self.current_run_id,
@@ -824,7 +581,6 @@ class PlanComparisonSummary:
 
 
 def _build_execution_map(results: Any) -> dict[str, Any]:
-    """Collect the first execution per query ID across all phases."""
     execution_map: dict[str, Any] = {}
     for execution in iter_query_results(results):
         query_id = execution.get("query_id")
@@ -834,30 +590,14 @@ def _build_execution_map(results: Any) -> dict[str, Any]:
 
 
 def generate_plan_comparison_summary(
-    baseline_results: Any,  # BenchmarkResults
-    current_results: Any,  # BenchmarkResults
+    baseline_results: Any,
+    current_results: Any,
     *,
     regression_threshold_pct: float = 20.0,
 ) -> PlanComparisonSummary:
-    """
-    Generate a comparison summary between two benchmark runs.
-
-    Compares query plans and correlates plan changes with performance changes.
-    Identifies regressions where plan changed AND performance degraded.
-
-    Args:
-        baseline_results: Baseline BenchmarkResults
-        current_results: Current BenchmarkResults
-        regression_threshold_pct: Performance degradation threshold for regression (default 20%)
-
-    Returns:
-        PlanComparisonSummary with detailed comparison information
-    """
-    # Build execution maps for both runs
     baseline_map = _build_execution_map(baseline_results)
     current_map = _build_execution_map(current_results)
 
-    # Find common queries
     common_queries = set(baseline_map.keys()) & set(current_map.keys())
 
     plans_compared = 0
@@ -875,18 +615,11 @@ def generate_plan_comparison_summary(
         baseline_plan = baseline_exec.get("query_plan")
         current_plan = current_exec.get("query_plan")
 
-        # Skip if either run doesn't have a plan
         if not baseline_plan or not current_plan:
             continue
 
         plans_compared += 1
 
-        # Compare fingerprints first (fast path) - but ONLY when they are
-        # actually comparable: same encoding version and both trusted. A v1 vs
-        # v2 fingerprint (or a stale/tampered one) must never be equality-tested
-        # to decide "changed", or a pure encoding bump would be misreported as a
-        # plan flap (qpc-03 anti-pattern). When not comparable, fall through to
-        # the full tree walk and let it decide.
         baseline_fp = getattr(baseline_plan, "plan_fingerprint", None)
         current_fp = getattr(current_plan, "plan_fingerprint", None)
         same_version = getattr(baseline_plan, "fingerprint_version", None) == getattr(
@@ -900,9 +633,6 @@ def generate_plan_comparison_summary(
             and current_plan.is_fingerprint_trusted()
         )
 
-        # "Unchanged" is only assertable from comparable, equal fingerprints;
-        # anything else (different, or not comparable across version/trust) is
-        # treated as changed and routed through the full tree walk.
         plan_changed = not (fingerprints_comparable and baseline_fp == current_fp)
 
         if not plan_changed:
@@ -914,16 +644,8 @@ def generate_plan_comparison_summary(
                 details="Plans are identical",
             )
         else:
-            # Perform detailed comparison
             comparison = comparator.compare_plans(baseline_plan, current_plan)
 
-            # When fingerprints weren't comparable (different encoding version,
-            # or an untrusted/stale fingerprint), the plan_changed=True above is
-            # only a "the fast path can't be trusted" signal, not a verdict.
-            # Correct it against the full tree-walk result so a pure
-            # fingerprint-encoding-version bump on an otherwise-identical plan
-            # is never misreported as a changed plan / regression (qpc-03
-            # anti-pattern).
             if not fingerprints_comparable and (
                 comparison.similarity.type_mismatches == 0
                 and comparison.similarity.property_mismatches == 0
@@ -942,7 +664,6 @@ def generate_plan_comparison_summary(
             else:
                 plans_changed += 1
 
-                # Determine primary change type
                 if comparison.similarity.structure_mismatches > 0:
                     change_type = "structure_change"
                 elif comparison.similarity.type_mismatches > 0:
@@ -959,7 +680,6 @@ def generate_plan_comparison_summary(
 
         structural_differences.append(change)
 
-        # Calculate performance correlation
         baseline_time = baseline_exec.get("execution_time_ms", 0.0) or 0.0
         current_time = current_exec.get("execution_time_ms", 0.0) or 0.0
 
@@ -968,7 +688,6 @@ def generate_plan_comparison_summary(
         else:
             perf_change_pct = 0.0
 
-        # Regression: plan changed AND performance degraded beyond threshold
         is_regression = plan_changed and perf_change_pct > regression_threshold_pct
 
         correlation = PerformanceCorrelation(

@@ -1,12 +1,6 @@
-"""Integration tests for TSBS DevOps benchmark with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module tests the TSBS DevOps implementation with a real DuckDB database,
-focusing on data generation, schema creation, and query execution.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime
 
@@ -24,22 +18,18 @@ pytestmark = [
 @pytest.mark.duckdb
 @pytest.mark.tsbs_devops
 class TestTSBSDevOpsDuckDBIntegration:
-    """Integration tests for TSBS DevOps benchmark with DuckDB."""
-
     @pytest.fixture
     def tsbs_benchmark(self, temp_dir):
-        """Create a minimal TSBS DevOps instance for testing."""
         return TSBSDevOps(
             scale_factor=0.1,
             output_dir=temp_dir,
             num_hosts=5,
             duration_days=1,
-            interval_seconds=3600,  # 1-hour intervals for smaller data
+            interval_seconds=3600,
         )
 
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
@@ -54,7 +44,6 @@ class TestTSBSDevOpsDuckDBIntegration:
 
         info = tsbs_benchmark.get_benchmark_info()
 
-        # Check required fields
         assert "name" in info
         assert "description" in info
         assert "scale_factor" in info
@@ -64,7 +53,6 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "query_categories" in info
         assert "tables" in info
 
-        # Check values
         assert info["name"] == "TSBS DevOps"
         assert info["scale_factor"] == 0.1
         assert info["num_hosts"] == 5
@@ -74,10 +62,8 @@ class TestTSBSDevOpsDuckDBIntegration:
 
         queries = tsbs_benchmark.get_queries()
 
-        # Should have 18 queries
         assert len(queries) == 18
 
-        # Each query should be a non-empty SQL string
         for query_id, query_text in queries.items():
             assert isinstance(query_text, str), f"Query {query_id} should be a string"
             assert len(query_text.strip()) > 0, f"Query {query_id} should not be empty"
@@ -85,7 +71,6 @@ class TestTSBSDevOpsDuckDBIntegration:
 
     def test_get_query_by_id(self, tsbs_benchmark):
 
-        # Test a known query ID
         query = tsbs_benchmark.get_query("single-host-12-hr")
         assert isinstance(query, str)
         assert "SELECT" in query.upper()
@@ -93,15 +78,12 @@ class TestTSBSDevOpsDuckDBIntegration:
 
     def test_get_queries_by_category(self, tsbs_benchmark):
 
-        # Test aggregation category
         aggregation_queries = tsbs_benchmark.get_queries_by_category("aggregation")
         assert len(aggregation_queries) > 0
 
-        # Test threshold category
         threshold_queries = tsbs_benchmark.get_queries_by_category("threshold")
         assert len(threshold_queries) > 0
 
-        # Test single-host category
         single_host_queries = tsbs_benchmark.get_queries_by_category("single-host")
         assert len(single_host_queries) > 0
 
@@ -116,16 +98,13 @@ class TestTSBSDevOpsDuckDBIntegration:
 
     def test_schema_creation(self, tsbs_benchmark, duckdb_conn):
 
-        # Get schema SQL
         sql = tsbs_benchmark.get_create_tables_sql(dialect="duckdb")
 
-        # Execute schema creation (split by semicolons)
         for statement in sql.strip().split(";"):
             stmt = statement.strip()
             if stmt and not stmt.startswith("--"):
                 duckdb_conn.execute(stmt)
 
-        # Verify tables were created
         tables_result = duckdb_conn.execute("""
             SELECT table_name
             FROM information_schema.tables
@@ -135,7 +114,6 @@ class TestTSBSDevOpsDuckDBIntegration:
 
         table_names = [row[0].lower() for row in tables_result]
 
-        # TSBS DevOps should have these tables
         assert "tags" in table_names, "tags table should exist"
         assert "cpu" in table_names, "cpu table should exist"
         assert "mem" in table_names, "mem table should exist"
@@ -173,16 +151,13 @@ class TestTSBSDevOpsDuckDBIntegration:
         queries = tsbs_benchmark.get_queries()
 
         for query_id, query_text in queries.items():
-            # Basic SQL syntax checks
             upper_sql = query_text.upper()
             assert "SELECT" in upper_sql, f"Query {query_id} should have SELECT"
             assert "FROM" in upper_sql, f"Query {query_id} should have FROM"
 
-            # Should be well-formed (basic check)
             assert query_text.count("(") == query_text.count(")"), f"Query {query_id} should have balanced parentheses"
 
     def test_lastpoint_query_executes(self, tsbs_benchmark, duckdb_conn):
-        """The joined last-point query must qualify columns shared by both relations."""
         duckdb_conn.execute("""
             CREATE TABLE cpu (
                 time TIMESTAMP,
@@ -227,11 +202,8 @@ class TestTSBSDevOpsDuckDBIntegration:
 @pytest.mark.tsbs_devops
 @pytest.mark.slow
 class TestTSBSDevOpsDataGeneration:
-    """Integration tests for TSBS DevOps data generation (slower tests)."""
-
     @pytest.fixture
     def tsbs_with_data(self, temp_dir):
-        """Create TSBS DevOps instance and generate data."""
         benchmark = TSBSDevOps(
             scale_factor=0.1,
             output_dir=temp_dir,
@@ -252,7 +224,6 @@ class TestTSBSDevOpsDataGeneration:
         assert "disk" in tables
         assert "net" in tables
 
-        # Files should exist
         for table_name, file_path in tables.items():
             assert file_path.exists(), f"{table_name} data file should exist"
             assert file_path.stat().st_size > 0, f"{table_name} data file should not be empty"
@@ -267,7 +238,6 @@ class TestTSBSDevOpsDataGeneration:
             reader = csv.reader(f)
             header = next(reader)
 
-            # Should have expected columns
             expected_columns = [
                 "hostname",
                 "region",
@@ -282,9 +252,8 @@ class TestTSBSDevOpsDataGeneration:
             for col in expected_columns:
                 assert col in header, f"Column {col} should be in tags header"
 
-            # Should have correct number of rows
             rows = list(reader)
-            assert len(rows) == 3  # num_hosts = 3
+            assert len(rows) == 3
 
     def test_cpu_data_structure(self, tsbs_with_data):
 
@@ -296,7 +265,6 @@ class TestTSBSDevOpsDataGeneration:
             reader = csv.reader(f)
             header = next(reader)
 
-            # Should have expected columns
             expected_columns = [
                 "time",
                 "hostname",
@@ -308,7 +276,6 @@ class TestTSBSDevOpsDataGeneration:
             for col in expected_columns:
                 assert col in header, f"Column {col} should be in cpu header"
 
-            # Sample first row
             first_row = next(reader)
             assert len(first_row) == len(header)
 
@@ -317,23 +284,20 @@ class TestTSBSDevOpsDataGeneration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Create schema
             sql = tsbs_with_data.get_create_tables_sql(dialect="duckdb")
             for statement in sql.strip().split(";"):
                 stmt = statement.strip()
                 if stmt and not stmt.startswith("--"):
                     conn.execute(stmt)
 
-            # Load data
             for table_name, file_path in tsbs_with_data.tables.items():
                 conn.execute(f"""
                     INSERT INTO {table_name}
                     SELECT * FROM read_csv('{file_path}', header=true, auto_detect=true)
                 """)
 
-            # Verify data was loaded
             tags_count = conn.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
-            assert tags_count == 3  # num_hosts
+            assert tags_count == 3
 
             cpu_count = conn.execute("SELECT COUNT(*) FROM cpu").fetchone()[0]
             assert cpu_count > 0
@@ -349,7 +313,6 @@ class TestTSBSDevOpsDataGeneration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Create schema and load data
             sql = tsbs_with_data.get_create_tables_sql(dialect="duckdb")
             for statement in sql.strip().split(";"):
                 stmt = statement.strip()
@@ -362,7 +325,6 @@ class TestTSBSDevOpsDataGeneration:
                     SELECT * FROM read_csv('{file_path}', header=true, auto_detect=true)
                 """)
 
-            # Try executing some queries
             test_queries = [
                 "cpu-max-all-1-hr",
                 "mem-by-host-1-hr",
@@ -371,7 +333,6 @@ class TestTSBSDevOpsDataGeneration:
             for query_id in test_queries:
                 query_sql = tsbs_with_data.get_query(query_id)
                 result = conn.execute(query_sql).fetchall()
-                # Query should execute without error and return results
                 assert isinstance(result, list), f"Query {query_id} should return results"
 
         finally:

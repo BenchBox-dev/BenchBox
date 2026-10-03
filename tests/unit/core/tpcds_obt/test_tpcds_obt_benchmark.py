@@ -57,7 +57,6 @@ class StubCursor:
 
 
 def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None:
-    """Explicit dat format: generator and transformer are invoked correctly."""
     benchmark = TPCDSOBTBenchmark(
         scale_factor=1.0,
         output_dir=tmp_path / "out",
@@ -84,7 +83,6 @@ def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None
 
 
 def test_generate_data_default_format_is_parquet(tmp_path: Path) -> None:
-    """Default output_format should produce a .parquet artifact."""
     benchmark = TPCDSOBTBenchmark(
         scale_factor=1.0,
         output_dir=tmp_path / "out",
@@ -103,7 +101,6 @@ def test_generate_data_default_format_is_parquet(tmp_path: Path) -> None:
 
 
 def test_existing_obt_logs_stale_dat_when_parquet_requested(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    """_existing_obt should log an INFO message when a stale .dat is found but parquet was requested."""
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     stale_dat = out_dir / "tpcds_sales_returns_obt.dat"
@@ -121,7 +118,6 @@ def test_existing_obt_logs_stale_dat_when_parquet_requested(tmp_path: Path, capl
 def test_existing_obt_logs_when_dat_requested_but_parquet_exists(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """_existing_obt should log an INFO message when parquet exists but dat was explicitly requested."""
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     existing_parquet = out_dir / "tpcds_sales_returns_obt.parquet"
@@ -137,28 +133,22 @@ def test_existing_obt_logs_when_dat_requested_but_parquet_exists(
 
 
 class TestDataFrameMode:
-    """Tests for DataFrame execution mode support."""
-
     def test_supports_dataframe_mode(self) -> None:
-        """TPCDSOBTBenchmark should declare DataFrame mode support."""
         benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
         assert benchmark.supports_dataframe_mode() is True
 
     def test_get_dataframe_queries_returns_all_17(self) -> None:
-        """get_dataframe_queries should return all 17 OBT queries."""
         benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
         queries = benchmark.get_dataframe_queries()
         assert len(queries) == 17
 
     def test_dataframe_queries_have_both_implementations(self) -> None:
-        """Each query should have both expression and pandas implementations."""
         benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
         for query in benchmark.get_dataframe_queries():
             assert query.expression_impl is not None, f"{query.query_id} missing expression_impl"
             assert query.pandas_impl is not None, f"{query.query_id} missing pandas_impl"
 
     def test_dataframe_query_ids(self) -> None:
-        """DataFrame query IDs should be Q1-Q17."""
         benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
         ids = sorted(
             (q.query_id for q in benchmark.get_dataframe_queries()),
@@ -167,7 +157,6 @@ class TestDataFrameMode:
         assert ids == [f"Q{i}" for i in range(1, 18)]
 
     def test_normalize_does_not_confuse_obt_with_tpcds(self) -> None:
-        """normalize_benchmark_id must not resolve tpcds_obt to tpcds."""
         from benchbox.core.results.builder import normalize_benchmark_id
 
         assert normalize_benchmark_id("tpcds_obt") == "tpcds_obt"
@@ -185,10 +174,6 @@ def test_get_create_tables_sql_includes_source_tables() -> None:
     ddl = benchmark.get_create_tables_sql()
     statements = [stmt.strip() for stmt in ddl.split(";") if stmt.strip()]
 
-    # 25 TPC-DS source tables plus the single OBT table: cloud loaders
-    # resolve per-table source files from benchmark.tables, so the source
-    # DDL must ship with the OBT DDL. Source CREATEs carry IF NOT EXISTS
-    # because cloud runs share the TPC-DS schema with prior loads.
     assert len(statements) == 26
     lowered = ddl.lower()
     assert "create table if not exists call_center" in lowered
@@ -199,7 +184,6 @@ def test_get_create_tables_sql_includes_source_tables() -> None:
 def test_get_query_and_execute_query(tmp_path: Path) -> None:
     benchmark = TPCDSOBTBenchmark(scale_factor=1.0, output_dir=tmp_path / "out", force_regenerate=True)
 
-    # Use TPC-DS query 3 - a simple store sales query
     sql = benchmark.get_query(3)
     assert OBT_TABLE_NAME in sql
 

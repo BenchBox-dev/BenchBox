@@ -869,7 +869,7 @@ def benchmark_duckdb_tpch():
     # Load data
     print("3. Loading data...")
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem  # Get filename without extension
         start_load = time.time()
         conn.execute(f"""
             INSERT INTO {table_name}
@@ -1034,7 +1034,7 @@ def benchmark_sqlite_tpch():
     # Load data with progress tracking
     total_rows = 0
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem  # Get filename without extension
         print(f"Loading {table_name}...", end="")
         start_time = time.time()
 
@@ -1432,7 +1432,7 @@ class RegressionTester:
 
         # Load data
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem  # Get filename without extension
             conn.execute(f"""
                 INSERT INTO {table_name}
                 SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
@@ -1647,7 +1647,7 @@ def load_data_for_database(conn, db_name, data_files):
     """Load data into database (simplified version)."""
     if db_name == "duckdb":
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem  # Get filename without extension
             conn.execute(f"""
                 INSERT INTO {table_name}
                 SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
@@ -1656,7 +1656,7 @@ def load_data_for_database(conn, db_name, data_files):
         # Simplified SQLite loading (in practice, would use proper CSV loading)
         import csv
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem  # Get filename without extension
             with open(file_path, 'r') as f:
                 reader = csv.reader(f, delimiter='|')
                 # Get column count
@@ -1837,7 +1837,7 @@ def setup_database(primitives, conn):
 
     # Load data
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem  # Get filename without extension
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
@@ -1971,7 +1971,7 @@ def test_custom_benchmark():
 
     # Load data
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem  # Get filename without extension
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false)

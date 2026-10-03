@@ -1,12 +1,6 @@
-"""DuckDB platform adapter with data loading and query execution.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides DuckDB-specific optimizations including fast bulk data loading
-using DuckDB's native CSV reading capabilities.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,11 +29,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Adapter-level memory-size validation: broader than the MCP request contract
-# (which is intentionally narrow for remote admission) but still bounded and
-# injection-safe. Accepts DuckDB's supported decimal and binary spellings,
-# including long-form decimal units, optional spaces, and scientific notation,
-# while rejecting SQL metacharacters. See duckdb-set-statement-value-hardening.
 _DUCKDB_MEMORY_SIZE_PATTERN = (
     r"\s*[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\s*"
     r"(?:B|bytes?|K|KB|kilobytes?|M|MB|megabytes?|G|GB|gigabytes?|T|TB|terabytes?|KiB|MiB|GiB|TiB)\s*"
@@ -55,7 +44,6 @@ _MAX_TEMP_DIRECTORY_SIZE_PATTERN = re.compile(
 
 
 def _normalize_duckdb_version(raw_version: Any) -> str | None:
-    """Normalize DuckDB version strings (e.g., 'v1.2.2' -> '1.2.2')."""
     if raw_version is None:
         return None
     version = str(raw_version).strip()
@@ -67,41 +55,30 @@ def _normalize_duckdb_version(raw_version: Any) -> str | None:
 
 
 class DuckDBConnectionWrapper:
-    """Wrapper for DuckDB connection that supports dry-run mode."""
-
     def __init__(self, connection, platform_adapter):
         self._connection = connection
         self._platform_adapter = platform_adapter
 
     def execute(self, query: str, parameters=None):
-        """Execute query, capturing SQL in dry-run mode."""
         if self._platform_adapter.dry_run_mode:
-            # Capture SQL instead of executing
             self._platform_adapter.capture_sql(query, "query", None)
-            # Return a lightweight cursor wrapper for dry-run flows.
             return DuckDBCursorWrapper([], self._platform_adapter)
         else:
-            # Normal execution
             return self._connection.execute(query, parameters)
 
     def commit(self):
-        """Commit transaction (no-op in dry-run mode)."""
         if not self._platform_adapter.dry_run_mode and hasattr(self._connection, "commit"):
             self._connection.commit()
 
     def close(self):
-        """Close connection (no-op in dry-run mode)."""
         if not self._platform_adapter.dry_run_mode:
             self._connection.close()
 
     def __getattr__(self, name):
-        """Delegate other attributes to the real connection."""
         return getattr(self._connection, name)
 
 
 class DuckDBCursorWrapper:
-    """Cursor wrapper used in dry-run mode."""
-
     def __init__(self, rows, platform_adapter):
         self._rows = rows
         self._platform_adapter = platform_adapter
@@ -117,19 +94,6 @@ class DuckDBCursorWrapper:
 
 
 def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
-    """Build DuckDB-compatible CTAS sort SQL shared by DuckDB and MotherDuck adapters.
-
-    ``sort_columns`` must be pre-sorted by the caller (ascending by ``column.order``).
-
-    Per the tuning-renderer-consolidation TODO (ADR-3 "single renderer"),
-    this delegates to ``core.tuning.generators.duckdb.DuckDBDDLGenerator`` --
-    the same generator dry-run preview uses (see ``core/dryrun.py``'s
-    ``_extract_ddl_preview``) -- instead of building the ORDER BY clause
-    independently. The generator's ``TableTuning`` input requires real
-    ``TuningColumn`` instances (it validates column identifiers), so this
-    only accepts genuine ``TuningColumn`` objects; the one real caller
-    (``SortedIngestionMixin.apply_ctas_sort``) always supplies them.
-    """
     from benchbox.core.tuning.ddl_generator import get_ddl_generator
     from benchbox.core.tuning.interface import TableTuning
 
@@ -145,19 +109,11 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
 
 
 def _duckdb_sort_index_sql(table_name_upper: str, column_names: list[str]) -> str:
-    """CREATE INDEX DDL for a DuckDB sort index.
-
-    Shared by the pre-load tuning path (``apply_table_tunings``) and the
-    post-CTAS re-creation (``_recreate_sort_index_after_ctas``) so both land the
-    SAME ``idx_<table>_sort`` footprint -- the one ``duckdb_indexes()`` (and thus
-    the introspection receipt) corroborates.
-    """
     index_name = f"idx_{table_name_upper.lower()}_sort"
     return f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
 
 
 def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:
-    """Resolve the DataSource for external table/view registration."""
     from benchbox.platforms.base.data_loading import DataSourceResolver
 
     return DataSourceResolver(
@@ -169,7 +125,6 @@ def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any =
 
 
 def _external_table_sources_from_data_source(source: Any) -> dict[str, list[Path]]:
-    """Normalize a resolved DataSource into table->existing paths for external views."""
     if source is None:
         return {}
 
@@ -188,7 +143,6 @@ def _try_delta_scan(
     source_paths: list[Path],
     ext_loaded: bool,
 ) -> tuple[str, bool] | None:
-    """Try Delta scan if source is a single directory with _delta_log."""
     from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
     if len(source_paths) != 1 or not source_paths[0].is_dir() or not (source_paths[0] / "_delta_log").is_dir():
@@ -205,7 +159,6 @@ def _try_iceberg_scan(
     source_paths: list[Path],
     ext_loaded: bool,
 ) -> tuple[str, bool] | None:
-    """Try Iceberg scan if source is a single directory with metadata/."""
     from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
     if len(source_paths) != 1 or not source_paths[0].is_dir() or not (source_paths[0] / "metadata").is_dir():
@@ -222,7 +175,6 @@ def _try_vortex_scan(
     source_paths: list[Path],
     ext_loaded: bool,
 ) -> tuple[str, bool] | None:
-    """Try Vortex scan if any source paths are .vortex files."""
     from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
     vortex_paths: list[Path] = []
@@ -266,7 +218,6 @@ def _try_vortex_scan(
 
 
 def _try_parquet_scan(source_paths: list[Path]) -> str | None:
-    """Try Parquet scan if any source paths are .parquet files."""
     from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
     parquet_paths: list[Path] = []
@@ -293,7 +244,6 @@ def _try_text_scan(
     table_name: str | None = None,
     benchmark: Any | None = None,
 ) -> tuple[str, str] | None:
-    """Try text file scan (TBL/CSV/DAT) if any source paths match."""
     from benchbox.utils.file_format import detect_data_format
 
     text_paths: list[Path] = []
@@ -331,16 +281,6 @@ def _build_duckdb_external_scan_expression(
     table_name: str | None = None,
     benchmark: Any | None = None,
 ) -> tuple[str, bool, bool, bool, str]:
-    """Build DuckDB scan expression for external table/view creation.
-
-    Supports Parquet, Vortex, Delta, Iceberg, and delimited text files (TBL/CSV/DAT).
-    For text files, ``column_names`` should be provided so the VIEW has
-    correct column names (text files have no embedded schema).
-
-    Returns:
-        Tuple of (scan_expression, delta_ext_loaded, vortex_ext_loaded, iceberg_ext_loaded, format_name)
-        where format_name is one of "parquet", "vortex", "delta", "iceberg", "tbl", or "csv".
-    """
     result = _try_delta_scan(connection, source_paths, delta_extension_loaded)
     if result:
         return result[0], True, vortex_extension_loaded, iceberg_extension_loaded, "delta"
@@ -382,7 +322,6 @@ def _build_csv_scan_expression(
     table_name: str | None = None,
     benchmark: Any | None = None,
 ) -> str:
-    """Build a ``read_csv()`` scan expression for DuckDB external views."""
     from benchbox.platforms.base.data_loading import (
         DUCKDB_NO_NULL_CONVERSION_SENTINEL,
         NO_BENCHMARK,
@@ -420,10 +359,6 @@ def _build_csv_scan_expression(
     csv_params.append(f"nullstr='{escape_sql_string_literal(null_marker)}'")
 
     if column_names and not dialect.has_header:
-        # Trailing-delimiter probing is only relevant for TPC-style sources where
-        # rows look like `1|foo|` and need an absorbing dummy column. CSV dialects
-        # without a null marker (e.g. ClickBench) never have trailing delimiters,
-        # so we skip the disk read.
         trailing = dialect.null_marker is not None and has_trailing_delimiter(text_paths[0], delimiter, column_names)
         all_names = get_column_names_with_trailing(column_names, trailing)
         names_param = ", ".join(f"'{col}'" for col in all_names)
@@ -434,13 +369,11 @@ def _build_csv_scan_expression(
             return f"(SELECT {select_cols} FROM {scan_expr})"
         return scan_expr
 
-    # No column names - fall back to auto_detect (columns will be column0, column1, …).
     csv_params.append("auto_detect=true")
     return f"read_csv({path_expr}, {', '.join(csv_params)})"
 
 
 def _get_benchmark_column_names(benchmark: Any, table_name: str) -> list[str] | None:
-    """Extract column names for *table_name* from benchmark schema, if available."""
     schema: dict | None = None
     if hasattr(benchmark, "_impl") and hasattr(benchmark._impl, "get_schema"):
         raw = benchmark._impl.get_schema()
@@ -464,7 +397,6 @@ def _create_duckdb_external_views(
     connection: Any,
     data_dir: Path,
 ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-    """Create external DuckDB views over Parquet/Delta/text sources and return table stats."""
     from benchbox.platforms.base.data_loading import validate_sql_identifier
 
     start_time = mono_time()
@@ -504,8 +436,6 @@ def _create_duckdb_external_views(
         if detected_format is None:
             detected_format = fmt
 
-        # DuckDB cannot CREATE OR REPLACE VIEW when a TABLE with the same name exists
-        # (and vice-versa). Drop whichever object type currently occupies the name.
         existing = connection.execute(
             f"SELECT table_type FROM information_schema.tables "
             f"WHERE table_schema = 'main' AND table_name = '{validated_table}'"
@@ -526,18 +456,9 @@ def _create_duckdb_external_views(
 
 
 class DuckDBAdapter(PlatformAdapter):
-    """DuckDB platform adapter with optimized bulk loading and execution."""
-
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
     plan_capture_phase_eligible = True
-    # DuckDB's Python client is documented thread-safe at cursor level against
-    # one process-local database
-    # (https://duckdb.org/docs/stable/guides/python/multiple_threads), so
-    # concurrent throughput streams share cursors of the single connection
-    # instead of opening N connections (which the TPC-DI work explicitly
-    # forbids for embedded DuckDB). Proven by
-    # tests/integration/test_throughput_session_isolation.py.
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
@@ -545,41 +466,29 @@ class DuckDBAdapter(PlatformAdapter):
         return "DuckDB"
 
     def get_tuning_introspector(self):
-        """Corroborate the applied ledger against ``duckdb_indexes()``.
-
-        Enables the ``applied_unverified -> applied_verified`` upgrade for DuckDB
-        when the recorded ``CREATE INDEX`` statements are confirmed present in
-        the catalog (see ``benchbox.platforms.duckdb_introspection``).
-        """
         from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
 
         return DuckDBTuningIntrospector()
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add DuckDB-specific CLI arguments."""
         duckdb_group = parser.add_argument_group("DuckDB Arguments")
         duckdb_group.add_argument("--duckdb-database-path", type=str, help="Path to DuckDB database file")
         duckdb_group.add_argument("--memory-limit", type=str, default="4GB", help="DuckDB memory limit")
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create DuckDB adapter from unified configuration."""
         from pathlib import Path
 
         from benchbox.utils.database_naming import generate_database_filename
 
-        # Extract DuckDB-specific configuration
         adapter_config = {}
 
-        # Database path handling
         if config.get("database_path"):
             adapter_config["database_path"] = config["database_path"]
         else:
-            # Generate database path using naming utilities
             from benchbox.utils.path_utils import get_benchmark_runs_databases_path
 
-            # Place local database artifacts in canonical benchmark_runs/databases.
             if config.get("output_dir"):
                 data_dir = get_benchmark_runs_databases_path(
                     config["benchmark"],
@@ -598,22 +507,10 @@ class DuckDBAdapter(PlatformAdapter):
             adapter_config["database_path"] = str(data_dir / db_filename)
             data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Memory limit
         adapter_config["memory_limit"] = config.get("memory_limit", "4GB")
 
-        # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other relevant config.  `thread_limit` is read by
-        # `__init__` and applied as a DuckDB `SET threads` statement; omitting it
-        # here silently discards the caller's request, because `__init__` only
-        # ever sees this rebuilt config, never the original.
-        # Plan flags ride along too: `show_query_plans` (CLI --show-plans)
-        # controls console plan display, while the capture_* keys control
-        # result-bundle plan capture. Dropping them here silently disables
-        # both even when the caller requested them. Shared PLAN_FORWARD_KEYS
-        # (skipping None so adapter defaults, including int-coerced timeouts,
-        # apply) instead of a bespoke list.
         for key in [
             "thread_limit",
             "max_temp_directory_size",
@@ -655,7 +552,6 @@ class DuckDBAdapter(PlatformAdapter):
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get DuckDB platform information."""
         platform_info = {
             "platform_type": "duckdb",
             "platform_name": "DuckDB",
@@ -666,11 +562,10 @@ class DuckDBAdapter(PlatformAdapter):
                 "thread_limit": self.thread_limit,
                 "max_temp_directory_size": self.max_temp_directory_size,
                 "enable_progress_bar": self.enable_progress_bar,
-                "result_cache_enabled": False,  # DuckDB has no persistent query result cache
+                "result_cache_enabled": False,
             },
         }
 
-        # Get DuckDB version and client library version from active runtime module.
         module_version = None
         if self._duckdb_module is not None:
             module_version = _normalize_duckdb_version(getattr(self._duckdb_module, "__version__", None))
@@ -704,7 +599,6 @@ class DuckDBAdapter(PlatformAdapter):
     def __init__(self, **config):
         super().__init__(**config)
         self._duckdb_module = self._initialize_duckdb_runtime(config)
-        # DuckDB configuration
         self.database_path = config.get("database_path", ":memory:")
         raw_memory = config.get("memory_limit", "4GB")
         if raw_memory is not None:
@@ -728,7 +622,6 @@ class DuckDBAdapter(PlatformAdapter):
         self.enable_progress_bar = config.get("progress_bar", False)
 
     def _initialize_duckdb_runtime(self, config: dict[str, Any]):
-        """Resolve DuckDB module from the selected runtime contract."""
         global duckdb
 
         requested = config.get("driver_version_requested") or config.get("driver_version")
@@ -743,8 +636,6 @@ class DuckDBAdapter(PlatformAdapter):
             )
         )
 
-        # Backward-compatible fast path: use already-imported module when no
-        # runtime contract was requested.
         if not has_runtime_contract:
             if duckdb is not None:
                 return duckdb
@@ -773,7 +664,6 @@ class DuckDBAdapter(PlatformAdapter):
                 "Install duckdb or provide a valid isolated runtime for the requested version."
             ) from exc
 
-        # Keep legacy module-level alias aligned for compatibility with older paths.
         duckdb = module
 
         module_version = getattr(module, "__version__", None)
@@ -783,7 +673,6 @@ class DuckDBAdapter(PlatformAdapter):
         return module
 
     def _detect_connection_version(self, connection: Any) -> str | None:
-        """Detect runtime version from a live DuckDB connection."""
         if connection is None:
             return None
         try:
@@ -803,38 +692,24 @@ class DuckDBAdapter(PlatformAdapter):
         return _normalize_duckdb_version(candidate)
 
     def get_database_path(self, **connection_config) -> str:
-        """Get the database file path for DuckDB.
-
-        Priority:
-        1. connection_config["database_path"] if provided and not None
-        2. self.database_path (set during from_config)
-        3. ":memory:" as final fallback
-        """
-        # Use connection_config path if explicitly provided and not None
         db_path = connection_config.get("database_path")
         if db_path is not None:
             return db_path
-        # Fall back to instance database_path (set during from_config)
         if self.database_path is not None:
             return self.database_path
-        # Final fallback to in-memory database
         return ":memory:"
 
     def create_connection(self, **connection_config) -> Any:
-        """Create optimized DuckDB connection."""
         self.log_operation_start("DuckDB connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
         db_path = self.get_database_path(**connection_config)
         self.log_very_verbose(f"DuckDB database path: {db_path}")
 
-        # Create connection
         conn = self._duckdb_module.connect(db_path)
         self.log_very_verbose("DuckDB connection established")
 
-        # Validate requested runtime against live execution context.
         live_version = self._detect_connection_version(conn)
         if live_version:
             self.driver_version_actual = live_version
@@ -844,14 +719,10 @@ class DuckDBAdapter(PlatformAdapter):
                 f"DuckDB runtime version mismatch: requested {self.driver_version_requested}, but live connection reports {live_version}."
             )
 
-        # Apply DuckDB settings
         from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
         config_applied = []
         if self.memory_limit:
-            # DuckDB does not support parameters in SET statements. Keep the
-            # value a string literal, with the adapter-level whitelist above
-            # providing the validation boundary and escaping as defense in depth.
             memory_limit = escape_sql_string_literal(str(self.memory_limit))
             conn.execute(f"SET memory_limit = '{memory_limit}'")
             config_applied.append(f"memory_limit={self.memory_limit}")
@@ -873,14 +744,10 @@ class DuckDBAdapter(PlatformAdapter):
             config_applied.append("progress_bar=enabled")
             self.log_very_verbose("DuckDB progress bar enabled")
 
-        # Optimize for OLAP workloads
         conn.execute("SET default_order = 'ASC'")
         config_applied.append("OLAP optimizations")
         self.log_very_verbose("DuckDB OLAP optimizations applied")
-        # Note: enable_optimizer setting not available in current DuckDB versions
 
-        # Enable profiling only when displaying plans; skip when capture_plans is active
-        # (EXPLAIN ANALYZE handles plan capture separately without requiring profiling).
         if self.show_query_plans and not self.capture_plans:
             conn.execute("SET enable_profiling = 'query_tree_optimizer'")
             config_applied.append("query profiling")
@@ -888,42 +755,29 @@ class DuckDBAdapter(PlatformAdapter):
 
         self.log_operation_complete("DuckDB connection", details=f"Applied: {', '.join(config_applied)}")
 
-        # Return wrapped connection for dry-run interception only when enabled
         if self.dry_run_mode:
             return DuckDBConnectionWrapper(conn, self)
         return conn
 
     def _rewrite_schema_statement(self, statement: str) -> str:
-        """Rewrite one schema statement for the execution engine.
-
-        Identity by default. Engines sharing the DuckDB dialect but rejecting
-        parts of its DDL (e.g. DuckLake and PRIMARY KEY constraints) override
-        this hook; PRIMARY KEY handling stays in each adapter.
-        """
         return statement
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
-        # Get constraint settings from tuning configuration
         enable_primary_keys, enable_foreign_keys = self._get_constraint_configuration()
         self._log_constraint_configuration(enable_primary_keys, enable_foreign_keys)
         self.log_verbose(
             f"Schema constraints - Primary keys: {enable_primary_keys}, Foreign keys: {enable_foreign_keys}"
         )
 
-        # Use common schema creation helper (standard ANSI DDL translated to DuckDB)
         schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-        # For TPC-DS, remove foreign key constraints to avoid constraint violations during parallel loading
         benchmark_name = getattr(benchmark, "_name", "") or benchmark.__class__.__name__
         if "TPC-DS" in str(benchmark_name) or "TPCDS" in str(benchmark_name):
             schema_sql = strip_foreign_keys(schema_sql)
 
-        # Split schema into individual CREATE TABLE statements for better compatibility
-        # This handles foreign key constraints and complex multi-table schemas
         statements = []
         current_statement = []
 
@@ -934,19 +788,14 @@ class DuckDBAdapter(PlatformAdapter):
             else:
                 current_statement.append(line)
 
-        # Include the last statement
         if current_statement:
             statements.append("\n".join(current_statement))
 
-        # Execute each CREATE TABLE statement separately
         tables_created = 0
         for statement in statements:
             if statement.strip():
-                # Engine-specific rewrite (identity by default; e.g. DuckLake
-                # strips PRIMARY KEY constraints its engine rejects).
                 statement = self._rewrite_schema_statement(statement)
 
-                # Extract table name
                 import re
 
                 table_name = "unknown"
@@ -972,16 +821,13 @@ class DuckDBAdapter(PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using DuckDB's optimized CSV reading capabilities."""
         from benchbox.platforms.base.data_loading import DataLoader
 
-        # Check if using cloud storage and log
         if is_cloud_path(str(data_dir)):
             path_info = get_cloud_path_info(str(data_dir))
             self.log_verbose(f"Loading data from cloud storage: {path_info['provider']} bucket '{path_info['bucket']}'")
             emit(f"  Loading data from {path_info['provider']} cloud storage")
 
-        # Create DuckDB-specific handler factory
         def duckdb_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
             from benchbox.platforms.base.data_loading import (
                 DuckDBDeltaHandler,
@@ -991,16 +837,13 @@ class DuckDBAdapter(PlatformAdapter):
                 resolve_csv_dialect,
             )
 
-            # Check if this is a Delta Lake table directory
             if file_path.is_dir():
                 delta_log_dir = file_path / "_delta_log"
                 if delta_log_dir.exists() and delta_log_dir.is_dir():
                     return DuckDBDeltaHandler(adapter)
 
-            # Determine the true base extension (handles names like *.tbl.1.zst)
             base_ext = FileFormatRegistry.get_base_data_extension(file_path)
 
-            # Create DuckDB native handler for supported formats
             if base_ext in (".tbl", ".dat", ".csv"):
                 from benchbox.platforms.base.data_loading import DataSource
 
@@ -1016,10 +859,8 @@ class DuckDBAdapter(PlatformAdapter):
                 )
             elif base_ext == ".parquet":
                 return DuckDBParquetHandler(adapter)
-            return None  # Fall back to generic handler
+            return None
 
-        # Use DataLoader with DuckDB-specific handler.
-        # Pass tuning_config so sorted tables are reordered via CTAS after loading.
         loader = DataLoader(
             adapter=self,
             benchmark=benchmark,
@@ -1029,46 +870,23 @@ class DuckDBAdapter(PlatformAdapter):
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
-        # DataLoader doesn't provide per-table timings yet
         return table_stats, loading_time, None
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Create DuckDB external views over Parquet/Delta sources."""
         return _create_duckdb_external_views(self, benchmark, connection, data_dir)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """Build DuckDB CTAS SQL used by PlatformAdapter.apply_ctas_sort."""
         return _build_duckdb_ctas_sort_sql(table_name, sort_columns)
 
     def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
-        """CTAS-sort a table, then re-create its sort index so the footprint survives.
-
-        The normal shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``
-        and can drop the ``idx_<table>_sort`` index ``apply_table_tunings`` built
-        pre-load. When foreign keys are enabled, the shared path instead uses an
-        atomic in-place rewrite that preserves the table and index identity. If
-        populated dependent rows make that rewrite unsafe, the shared helper
-        leaves the table unchanged rather than violating referential integrity.
-        The re-create remains idempotent and covers the normal replacement path
-        so introspection can corroborate the physical sort.
-        """
         applied = super().apply_ctas_sort(table_name, tuning_config, connection)
         if applied and not self.dry_run_mode:
             self._recreate_sort_index_after_ctas(table_name, tuning_config, connection)
         return applied
 
     def _recreate_sort_index_after_ctas(self, table_name: str, tuning_config: Any, connection: Any) -> None:
-        """Re-create the sort index the CTAS re-materialization dropped.
-
-        Records the re-creation as a ``PHASE_POST_LOAD`` layout op (folded into
-        the applied ledger by ``_fold_layout_operations_into_ledger``) so the
-        introspection receipt can corroborate a real, surviving
-        ``duckdb_indexes()`` footprint and upgrade the run to
-        ``applied_verified``. Never breaks a run: a failed re-creation is logged
-        and recorded as a failed op, and the load continues.
-        """
         sort_columns = self._resolve_ctas_sort_columns(table_name, tuning_config)
         if not sort_columns:
             return
@@ -1078,7 +896,7 @@ class DuckDBAdapter(PlatformAdapter):
         try:
             connection.execute(index_sql)
             self.log_verbose(f"Re-created sort index on {table_name_upper} after CTAS sort")
-        except Exception as exc:  # capture never breaks a run
+        except Exception as exc:
             self.logger.warning(f"Failed to re-create sort index on {table_name_upper} after CTAS: {exc}")
             self._record_sort_index_layout_op(index_sql, table_name_upper, status="failed", error=exc)
             return
@@ -1087,7 +905,6 @@ class DuckDBAdapter(PlatformAdapter):
     def _record_sort_index_layout_op(
         self, statement: str, table: str, *, status: str, error: Exception | None = None
     ) -> None:
-        """Append a post-load sort-index op for ``_fold_layout_operations_into_ledger``."""
         from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD
 
         ops = getattr(self, "_applied_layout_operations", None)
@@ -1106,20 +923,11 @@ class DuckDBAdapter(PlatformAdapter):
         )
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply DuckDB-specific optimizations based on benchmark type."""
         benchmark = getattr(self, "benchmark", None)
         transaction_benchmark = getattr(benchmark, "_benchmark_label", "").lower() == "transaction primitives"
         if benchmark_type.lower() == "transaction_primitives" or transaction_benchmark:
-            # DuckDB 1.3.x can produce duplicate rows for a read-after-write
-            # scalar subquery when parallel operators are enabled. The following
-            # INSERT...SELECT can then hit DuckDB's batch-index assertion and
-            # invalidate the database. Transaction Primitives measures transaction
-            # semantics, not intra-query parallelism, so keep its execution path
-            # single-threaded while preserving the caller's setting for all other
-            # benchmarks.
             connection.execute("SET threads TO 1")
 
-        # Enable profiling only when displaying plans; skip when capture_plans is active.
         if self.show_query_plans and not self.capture_plans:
             connection.execute("SET enable_profiling = 'query_tree'")
 
@@ -1133,16 +941,13 @@ class DuckDBAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and profiling."""
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
-        # In dry-run mode, capture SQL instead of executing
         if self.dry_run_mode:
             self.capture_sql(query, "query", None)
             self.log_very_verbose(f"Captured query {query_id} for dry-run")
 
-            # Return a synthetic result payload for dry-run execution.
             return {
                 "query_id": query_id,
                 "status": "DRY_RUN",
@@ -1156,12 +961,10 @@ class DuckDBAdapter(PlatformAdapter):
         start_time = mono_time()
 
         try:
-            # Enable profiling only if display is active (not when capture suppresses display)
             if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA enable_profiling = 'query_tree'")
                 logger.debug("DuckDB query profiling enabled for this query")
 
-            # Execute the query
             result = connection.execute(query)
             rows = result.fetchall()
 
@@ -1169,12 +972,9 @@ class DuckDBAdapter(PlatformAdapter):
             actual_row_count = len(rows)
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {actual_row_count} rows")
 
-            # Display query plan if enabled; skip when capture_plans is also active
-            # to avoid issuing EXPLAIN twice (display + capture would both call get_query_plan).
             if not self.capture_plans:
                 self.display_query_plan_if_enabled(connection, query, query_id)
 
-            # Validate row count if enabled and benchmark type is provided
             validation_result = None
             if validate_row_count and benchmark_type:
                 from benchbox.core.validation.query_validation import QueryValidator
@@ -1188,7 +988,6 @@ class DuckDBAdapter(PlatformAdapter):
                     stream_id=stream_id,
                 )
 
-                # Log validation result
                 if validation_result.warning_message:
                     self.log_verbose(f"Row count validation: {validation_result.warning_message}")
                 elif not validation_result.is_valid:
@@ -1199,15 +998,10 @@ class DuckDBAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
-            # Gate-only value oracle: compute a digest of the FULL result set here,
-            # where the rows are materialized (the power-test seam only sees
-            # first_row + count). Behind BENCHBOX_EMIT_RESULT_DIGEST and stream 0 (the
-            # only stream with a stored reference digest), so a normal run is unchanged.
             from benchbox.core.results.result_digest import compute_result_digest, result_digest_enabled
 
             result_digest = compute_result_digest(rows) if result_digest_enabled() and stream_id in (None, 0) else None
 
-            # Use centralized helper to build result with consistent validation field mapping
             result = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
@@ -1218,7 +1012,6 @@ class DuckDBAdapter(PlatformAdapter):
                 materialized_rows=rows,
             )
 
-            # Capture and merge structured query plan (SUCCESS-guarded in the helper)
             self._merge_plan_capture_into_result(result, connection, query, query_id)
 
             return result
@@ -1241,49 +1034,18 @@ class DuckDBAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            # Disable profiling if it was enabled (mirrors the enable condition)
             if self.show_query_plans and not self.capture_plans:
                 connection.execute("PRAGMA disable_profiling")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get DuckDB query execution plan using EXPLAIN (FORMAT JSON).
-
-        Uses plain EXPLAIN (FORMAT JSON) by default (self.analyze_plans=False) to
-        capture the estimated plan with no re-execution overhead: plan fingerprints
-        are structure-only, so estimated plans lose nothing for structural comparison.
-
-        When self.analyze_plans is True (opt-in), uses EXPLAIN (ANALYZE, FORMAT JSON)
-        (PostgreSQL-style combined syntax) to capture actual per-operator timing and
-        cardinality from real query execution. The ANALYZE format uses different field
-        names than plain EXPLAIN (FORMAT JSON): operator_timing/operator_cardinality/
-        operator_name vs timing/cardinality/name. DuckDBQueryPlanParser handles both
-        schemas transparently. capture_query_plan() prints a one-time run-level notice
-        the first time this opt-in actually captures a plan, since it roughly doubles
-        wall-clock cost for a --capture-plans run and perturbs cache state.
-
-        Note: EXPLAIN (ANALYZE, ...) re-executes the query, adding ~1× query cost to the
-        capture step. Plan fingerprints are unaffected - compute_plan_fingerprint()
-        excludes timing/cardinality by design.
-
-        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
-        to prevent double-execution, even when analyze_plans=True: DuckDB's
-        EXPLAIN ANALYZE physically runs the statement, which would mutate data a
-        second time. The plan structure is still captured (FORMAT JSON only);
-        execution statistics are absent for these statements.
-        """
         from benchbox.platforms.base.result_capture import is_dml_query
 
         analyze = self.analyze_plans
-        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
-        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
         if analyze and is_dml_query(query):
             analyze = False
-        # EXPLAIN (ANALYZE, FORMAT JSON) is the PostgreSQL-style combined syntax supported by DuckDB.
-        # Plain EXPLAIN (FORMAT JSON) produces estimated plans only (no timing/cardinality data).
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
         try:
             rows = connection.execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
-            # DuckDB returns rows of (explain_key, explain_value); the JSON payload is in column 1
             parts = [str(row[1]) for row in rows if len(row) > 1]
             if parts:
                 return "\n".join(parts)
@@ -1292,25 +1054,21 @@ class DuckDBAdapter(PlatformAdapter):
         return None
 
     def get_query_plan_parser(self):
-        """Get DuckDB query plan parser."""
         from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
 
         return DuckDBQueryPlanParser()
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
-        """Get DuckDB-specific metadata and system information."""
         metadata = {
             "platform": self.platform_name,
             "duckdb_version": getattr(self._duckdb_module, "__version__", "unknown"),
-            "result_cache_enabled": False,  # DuckDB has no persistent query result cache
+            "result_cache_enabled": False,
         }
 
         try:
-            # Get DuckDB settings
             settings = connection.execute("PRAGMA show_all_settings").fetchall()
             metadata["settings"] = {setting[0]: setting[1] for setting in settings}
 
-            # Get memory usage
             memory_info = connection.execute("PRAGMA database_size").fetchall()
             metadata["database_size"] = memory_info
 
@@ -1320,9 +1078,7 @@ class DuckDBAdapter(PlatformAdapter):
         return metadata
 
     def analyze_tables(self, connection: Any) -> None:
-        """Run ANALYZE on all tables for better query optimization."""
         try:
-            # Get all table names
             tables = connection.execute("""
                 SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'main' AND table_type = 'BASE TABLE'
@@ -1337,23 +1093,9 @@ class DuckDBAdapter(PlatformAdapter):
             emit(f"⚠️️  Could not analyze tables: {e}")
 
     def get_target_dialect(self) -> str:
-        """Get the target SQL dialect for this platform."""
         return "duckdb"
 
     def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if DuckDB supports a specific tuning type.
-
-        DuckDB supports:
-        - SORTING: Via ORDER BY in table definition (DuckDB 0.10+)
-        - PARTITIONING: Limited support, mainly through file-based partitions
-
-        Args:
-            tuning_type: The type of tuning to check support for
-
-        Returns:
-            True if the tuning type is supported by DuckDB
-        """
-        # Import here to avoid circular imports
         try:
             from benchbox.core.tuning.interface import TuningType
 
@@ -1362,45 +1104,14 @@ class DuckDBAdapter(PlatformAdapter):
             return False
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate DuckDB-specific tuning clauses for CREATE TABLE statements.
-
-        DuckDB supports:
-        - Sorting optimization hints (no explicit syntax in CREATE TABLE)
-        - Partitioning through file organization (handled at data loading level)
-
-        Args:
-            table_tuning: The tuning configuration for the table
-
-        Returns:
-            SQL clause string to be appended to CREATE TABLE statement
-        """
         if not table_tuning:
             return ""
 
         clauses = []
 
-        # DuckDB doesn't have explicit CREATE TABLE tuning clauses
-        # Sorting and partitioning are handled at query/loading time
-        # We'll return empty string and handle optimization in apply_table_tunings
-
         return " ".join(clauses) if clauses else ""
 
     def apply_table_tunings(self, table_name: str, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a DuckDB table.
-
-        DuckDB tuning approach:
-        - SORTING: Create indexes on sort columns for query optimization
-        - PARTITIONING: Log partitioning strategy (handled at data loading level)
-        - CLUSTERING: Treat as secondary sorting for optimization hints
-        - DISTRIBUTION: Not applicable for single-node DuckDB
-
-        Args:
-            table_tuning: The tuning configuration to apply
-            connection: DuckDB connection
-
-        Raises:
-            ValueError: If the tuning configuration is invalid for DuckDB
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -1408,17 +1119,13 @@ class DuckDBAdapter(PlatformAdapter):
         self.logger.info(f"Applying DuckDB tunings for table: {table_name_upper}")
 
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle sorting optimization through indexes
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns:
-                # Sort columns by their order and create index
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
-                # Create index for sort optimization
                 index_sql = _duckdb_sort_index_sql(table_name_upper, column_names)
 
                 try:
@@ -1427,14 +1134,11 @@ class DuckDBAdapter(PlatformAdapter):
                 except Exception as e:
                     self.logger.warning(f"Failed to create sort index on {table_name_upper}: {e}")
 
-            # Handle clustering as additional index optimization
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if cluster_columns:
-                # Sort columns by their order and create secondary index
                 sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
-                # Create index for clustering optimization
                 index_name = f"idx_{table_name_upper.lower()}_cluster"
                 index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
 
@@ -1444,7 +1148,6 @@ class DuckDBAdapter(PlatformAdapter):
                 except Exception as e:
                     self.logger.warning(f"Failed to create cluster index on {table_name_upper}: {e}")
 
-            # Handle partitioning - log strategy but implementation depends on data loading
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -1452,8 +1155,6 @@ class DuckDBAdapter(PlatformAdapter):
                 self.logger.info(
                     f"Partitioning strategy for {table_name_upper}: {', '.join(column_names)} (handled at data loading level)"
                 )
-                # Requested-but-not-rendered as a DDL statement: recorded as a
-                # dropped intent so the ledger surfaces the request honestly.
                 _ledger = getattr(self, "_applied_tuning_ledger", None)
                 if _ledger is not None:
                     _ledger.record_dropped(
@@ -1461,7 +1162,6 @@ class DuckDBAdapter(PlatformAdapter):
                         "DuckDB applies partitioning at data-loading time, not via DDL",
                     )
 
-            # Distribution not applicable for DuckDB
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             if distribution_columns:
                 self.logger.warning(
@@ -1480,29 +1180,16 @@ class DuckDBAdapter(PlatformAdapter):
             raise ValueError(f"Failed to apply tunings to DuckDB table {table_name_upper}: {e}") from e
 
     def apply_unified_tuning(self, tuning_config, connection) -> None:
-        """Apply unified tuning configuration to DuckDB.
-
-        The connection is wrapped so the CREATE INDEX statements emitted by
-        ``apply_table_tunings`` land in the applied-tuning ledger (DDL phase).
-        Wrapping degrades to the raw connection when no ledger is present.
-
-        Args:
-            tuning_config: UnifiedTuningConfiguration instance
-            connection: DuckDB connection
-        """
         from benchbox.core.tuning.applied_ledger import PHASE_DDL, recording_connection
 
         recording = recording_connection(connection, getattr(self, "_applied_tuning_ledger", None), PHASE_DDL)
         try:
-            # Apply table-level tunings for each table configuration
             for table_name, table_tuning in tuning_config.table_tunings.items():
                 self.logger.info(f"Applying unified tuning to table: {table_name}")
                 self.apply_table_tunings(table_name, table_tuning, recording)
 
-            # Apply platform-specific optimizations
             self.apply_platform_optimizations(tuning_config, recording)
 
-            # Apply constraint configurations (already handled in schema creation)
             self.logger.info("Constraint configuration applied during schema creation")
 
         except Exception as e:
@@ -1510,26 +1197,15 @@ class DuckDBAdapter(PlatformAdapter):
             raise
 
     def apply_platform_optimizations(self, tuning_config, connection) -> None:
-        """Apply DuckDB-specific platform optimizations.
-
-        Args:
-            tuning_config: UnifiedTuningConfiguration instance
-            connection: DuckDB connection
-        """
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Check if platform optimizations are configured
             if not tuning_config.platform_optimizations:
                 self.logger.info("No platform optimizations configured")
                 return
 
-            # DuckDB-specific optimizations can be applied through platform_optimizations
-            # For now, just log that platform optimization validation was completed
             self.logger.info("Platform optimization validation completed for DuckDB")
 
-            # Note: DuckDB doesn't support platform-specific tunings like Z_ORDERING, AUTO_OPTIMIZE
-            # These are Databricks/cloud-specific features that don't apply to DuckDB
             unsupported_types = {
                 TuningType.Z_ORDERING,
                 TuningType.AUTO_OPTIMIZE,
@@ -1539,7 +1215,6 @@ class DuckDBAdapter(PlatformAdapter):
             }
 
             for table_name, table_tuning in tuning_config.table_tunings.items():
-                # Check all tuning types for unsupported configurations
                 all_tuning_types = [
                     TuningType.PARTITIONING,
                     TuningType.CLUSTERING,
@@ -1559,30 +1234,16 @@ class DuckDBAdapter(PlatformAdapter):
             raise
 
     def apply_constraint_configuration(self, tuning_config, table_name: str, connection) -> None:
-        """Apply constraint configuration for a specific table.
-
-        Note: Constraints are applied during schema creation in DuckDB,
-        so this method primarily validates the configuration.
-
-        Args:
-            tuning_config: UnifiedTuningConfiguration instance
-            table_name: Name of the table
-            connection: DuckDB connection
-        """
         try:
-            # Primary keys - validate configuration
             if not tuning_config.primary_keys.enabled:
                 self.logger.info(f"Primary keys disabled for table {table_name}")
 
-            # Foreign keys - validate configuration
             if not tuning_config.foreign_keys.enabled:
                 self.logger.info(f"Foreign keys disabled for table {table_name}")
 
-            # Unique constraints
             if not tuning_config.unique_constraints.enabled:
                 self.logger.info(f"Unique constraints disabled for table {table_name}")
 
-            # Check constraints
             if not tuning_config.check_constraints.enabled:
                 self.logger.info(f"Check constraints disabled for table {table_name}")
 
@@ -1591,71 +1252,44 @@ class DuckDBAdapter(PlatformAdapter):
             raise
 
     def _get_existing_tables(self, connection) -> list[str]:
-        """Get list of existing tables in the DuckDB database.
-
-        Override the base class implementation with DuckDB-specific query.
-        DuckDB doesn't support the standard information_schema query used in base class.
-
-        Args:
-            connection: DuckDB connection
-
-        Returns:
-            List of table names (lowercase)
-        """
         try:
-            # Use DuckDB's SHOW TABLES command which is more reliable
             result = connection.execute("SHOW TABLES").fetchall()
-            # Convert to lowercase for consistent comparison
             return [row[0].lower() for row in result]
         except Exception as e:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
 
     def validate_platform_capabilities(self, benchmark_type: str):
-        """Validate DuckDB-specific capabilities for the benchmark.
-
-        Args:
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-
-        Returns:
-            ValidationResult with DuckDB capability validation status
-        """
         errors = []
         warnings = []
 
-        # Check if DuckDB is available
         if self._duckdb_module is None:
             errors.append("DuckDB library not available - install with 'pip install duckdb'")
         else:
-            # Check DuckDB version compatibility
             try:
                 version = self._duckdb_module.__version__
-                # Warn if using very old versions
                 if version.startswith(("0.8", "0.9")):
                     warnings.append(f"DuckDB version {version} is older - consider upgrading for better performance")
             except AttributeError:
                 warnings.append("Could not determine DuckDB version")
 
-        # Check memory configuration
         if hasattr(self, "memory_limit") and self.memory_limit:
             try:
-                # Parse memory limit if it's a string (e.g., "4GB")
                 if isinstance(self.memory_limit, str):
                     if self.memory_limit.lower().endswith("gb"):
                         memory_gb = float(self.memory_limit[:-2])
                     elif self.memory_limit.lower().endswith("mb"):
                         memory_gb = float(self.memory_limit[:-2]) / 1024
                     else:
-                        memory_gb = float(self.memory_limit) / (1024**3)  # Assume bytes
+                        memory_gb = float(self.memory_limit) / (1024**3)
                 else:
-                    memory_gb = float(self.memory_limit) / (1024**3)  # Assume bytes
+                    memory_gb = float(self.memory_limit) / (1024**3)
 
                 if memory_gb < 1.0:
                     warnings.append(f"Memory limit ({self.memory_limit}) may be insufficient for larger scale factors")
             except (ValueError, TypeError):
                 warnings.append(f"Could not parse memory limit: {self.memory_limit}")
 
-        # Platform-specific details
         platform_info = {
             "platform": self.platform_name,
             "benchmark_type": benchmark_type,
@@ -1669,7 +1303,6 @@ class DuckDBAdapter(PlatformAdapter):
         if self._duckdb_module:
             platform_info["duckdb_version"] = getattr(self._duckdb_module, "__version__", "unknown")
 
-        # Import ValidationResult here to avoid circular imports
         try:
             from benchbox.core.validation import ValidationResult
 
@@ -1680,31 +1313,20 @@ class DuckDBAdapter(PlatformAdapter):
                 details=platform_info,
             )
         except ImportError:
-            # Fallback if validation module not available
             return None
 
     def validate_connection_health(self, connection: Any):
-        """Validate DuckDB connection health and capabilities.
-
-        Args:
-            connection: DuckDB connection object
-
-        Returns:
-            ValidationResult with connection health status
-        """
         errors = []
         warnings = []
         connection_info = {}
 
         try:
-            # Test basic query execution
             result = connection.execute("SELECT 1 as test_value").fetchone()
             if result[0] != 1:
                 errors.append("Basic query execution test failed")
             else:
                 connection_info["basic_query_test"] = "passed"
 
-            # Check available memory settings
             try:
                 memory_result = connection.execute("PRAGMA memory_limit").fetchone()
                 if memory_result:
@@ -1712,7 +1334,6 @@ class DuckDBAdapter(PlatformAdapter):
             except Exception:
                 warnings.append("Could not query memory limit setting")
 
-            # Check available threads
             try:
                 threads_result = connection.execute("PRAGMA threads").fetchone()
                 if threads_result:
@@ -1723,7 +1344,6 @@ class DuckDBAdapter(PlatformAdapter):
         except Exception as e:
             errors.append(f"Connection health check failed: {str(e)}")
 
-        # Import ValidationResult here to avoid circular imports
         try:
             from benchbox.core.validation import ValidationResult
 
@@ -1738,5 +1358,4 @@ class DuckDBAdapter(PlatformAdapter):
                 },
             )
         except ImportError:
-            # Fallback if validation module not available
             return None

@@ -1,29 +1,7 @@
 #!/usr/bin/env python
-"""Fold retired tuning companions into their corpus bundles.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The requested tuning and the applied ledger used to ship beside a bundle as
-``{stem}.tuning.json`` and ``{stem}.applied.json``. They now live in the
-bundle's ``platform.tuning`` block, and nothing writes the companions any more.
-Corpus bundles published before that change still carry them, so this moves the
-evidence into the bundle, removes the companion files, and re-points the
-submission manifest that pins their hashes.
-
-The move is value-preserving and never re-anonymizes: the companions in the
-corpus are already public artifacts, and ``inline_tuning_artifacts`` only
-relocates fields. Re-running is safe -- a bundle with no companions left is
-skipped.
-
-Usage::
-
-    uv run -- python _project/scripts/inline_tuning_corpus_migrate.py [--check]
-
-``--check`` reports what would change and exits non-zero if anything would,
-which is what CI needs to prove the corpus is already migrated.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -94,7 +72,6 @@ def _primary_bundles(root: Path) -> list[Path]:
 
 
 def migrate_bundle(bundle_path: Path, *, check: bool) -> list[str]:
-    """Fold one bundle's companions inline. Returns a list of change descriptions."""
     tuning_path = bundle_path.with_name(f"{bundle_path.stem}.tuning.json")
     applied_path = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
     tuning = _load(tuning_path)
@@ -124,9 +101,6 @@ def migrate_bundle(bundle_path: Path, *, check: bool) -> list[str]:
     manifest_path = bundle_path.with_name(f"{bundle_path.stem}.manifest.json")
     manifest = _load(manifest_path)
     if manifest is not None:
-        # The manifest pins a per-file hash and errors on a declared companion
-        # that is not on disk, so the retired entries have to go and the bundle
-        # hash has to follow the rewritten content.
         manifest["bundle_hash"] = _sha256(bundle_path)
         companions = manifest.get("companion_hashes")
         if isinstance(companions, dict):

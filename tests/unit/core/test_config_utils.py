@@ -1,9 +1,6 @@
-"""Tests for core configuration utilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from pathlib import Path
@@ -37,8 +34,6 @@ pytestmark = [
 
 
 class TestDeepMergeDicts:
-    """Test deep dictionary merging utility."""
-
     def test_simple_merge(self):
 
         base = {"a": 1, "b": 2}
@@ -62,7 +57,6 @@ class TestDeepMergeDicts:
         assert result == expected
 
     def test_original_unchanged(self):
-        """Test that original dictionaries remain unchanged."""
         base = {"a": {"nested": 1}}
         override = {"a": {"nested": 2}}
 
@@ -82,8 +76,6 @@ class TestDeepMergeDicts:
 
 
 class TestLoadConfigFile:
-    """Test configuration file loading utility."""
-
     def test_load_yaml_file(self, tmp_path):
 
         config_file = tmp_path / "config.yaml"
@@ -107,7 +99,6 @@ class TestLoadConfigFile:
         assert result == config_data
 
     def test_load_file_no_extension(self, tmp_path):
-        """Test loading file without extension (tries YAML first)."""
         config_file = tmp_path / "config"
         config_data = {"key": "value"}
 
@@ -144,8 +135,6 @@ class TestLoadConfigFile:
 
 
 class TestSaveConfigFile:
-    """Test configuration file saving utility."""
-
     def test_save_yaml_file(self, tmp_path):
 
         config_file = tmp_path / "config.yaml"
@@ -190,8 +179,6 @@ class TestSaveConfigFile:
 
 
 class TestBuildBenchmarkConfig:
-    """Test benchmark configuration building utility."""
-
     def test_build_from_dict(self):
 
         config = {
@@ -255,8 +242,6 @@ class TestBuildBenchmarkConfig:
 
 
 class TestBuildPlatformAdapterConfig:
-    """Test platform adapter configuration building utility."""
-
     def test_build_duckdb_config_from_dict(self):
 
         config = {"benchmark": "tpch", "scale_factor": 1.0, "memory_limit": "8GB", "force": True}
@@ -319,7 +304,6 @@ class TestBuildPlatformAdapterConfig:
         assert result == expected
 
     def test_build_clickhouse_config_normalizes_legacy_mode_alias(self):
-        """Legacy `mode` input should emit matching canonical and compatibility keys."""
         args = SimpleNamespace(
             deployment_mode=None,
             mode="embedded",
@@ -337,7 +321,6 @@ class TestBuildPlatformAdapterConfig:
         assert result["mode"] == "local"
 
     def test_build_clickhouse_config_rejects_cloud_mode(self):
-        """Passing cloud deployment through config helpers must raise."""
         args = SimpleNamespace(
             deployment_mode="cloud",
             mode=None,
@@ -363,8 +346,6 @@ class TestBuildPlatformAdapterConfig:
 
 
 class TestValidateConfigSections:
-    """Test configuration section validation utility."""
-
     def test_validate_all_sections_present(self):
 
         config = {"database": {}, "benchmarks": {}, "output": {}}
@@ -394,8 +375,6 @@ class TestValidateConfigSections:
 
 
 class TestValidateNumericConfig:
-    """Test numeric configuration validation utility."""
-
     def test_validate_valid_values(self):
 
         config = {"timeout": 30, "scale_factor": 1.5, "max_workers": 4}
@@ -418,7 +397,6 @@ class TestValidateNumericConfig:
         assert "max_workers" in errors[2]
 
     def test_validate_missing_required_values(self):
-        """Test validation fails for missing required values."""
         config = {}
         validations = {"timeout": (0, 300, True), "optional_setting": (0, 100, False)}
 
@@ -441,8 +419,6 @@ class TestValidateNumericConfig:
 
 
 class TestDefaultOutputDirHelper:
-    """Test private output-dir helper branches used by config builders."""
-
     def test_missing_platform_or_benchmark_returns_none(self):
         assert _get_default_output_dir(None, "tpch", 0.01) is None
         assert _get_default_output_dir("duckdb", None, 0.01) is None
@@ -464,13 +440,10 @@ class TestDefaultOutputDirHelper:
 
 
 class TestLoadPlatformConfig:
-    """Test platform-config loading and fallback behavior."""
-
     def test_load_platform_config_uses_built_in_defaults_when_default_file_missing(self, tmp_path):
         with patch("benchbox.core.config_utils.emit") as mock_emit:
             original_cwd = Path.cwd()
             try:
-                # Ensure examples/config/<platform>.yaml does not exist.
                 import os
 
                 os.chdir(tmp_path)
@@ -520,8 +493,6 @@ class TestLoadPlatformConfig:
 
 
 class TestLoadTuningConfig:
-    """Test tuning-config selection and parsing."""
-
     def test_load_tuning_config_warns_when_auto_selected_file_is_missing(self, tmp_path):
         with patch("benchbox.core.config_utils.emit") as mock_emit:
             original_cwd = Path.cwd()
@@ -567,8 +538,6 @@ class TestLoadTuningConfig:
 
 
 class TestMergeAllConfigs:
-    """Test precedence and normalization across merged configuration sources."""
-
     def test_merge_all_configs_applies_precedence_and_quiet_overrides(self):
         args = SimpleNamespace(scale=2, verbose=2, quiet=True, duckdb_database_path="/tmp/cli.duckdb")
 
@@ -603,8 +572,6 @@ class TestMergeAllConfigs:
 
 
 class TestBuiltinDefaults:
-    """Test platform-specific built-in defaults."""
-
     @pytest.mark.parametrize(
         ("platform", "expected"),
         [
@@ -626,8 +593,6 @@ class TestBuiltinDefaults:
 
 
 class TestExtractCliConfig:
-    """Test CLI config extraction and alias normalization."""
-
     def test_extract_cli_config_filters_none_and_maps_aliases(self):
         args = SimpleNamespace(
             duckdb_database_path="/tmp/duckdb.db",

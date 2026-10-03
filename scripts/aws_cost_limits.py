@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""
-AWS Service Cost Limits Manager
-
-Sets and modifies usage limits for AWS services to cap daily spending.
-Supports: Redshift Serverless, Athena, EMR Serverless, Lambda, Budget Actions
-
-Usage:
-    # Set default $5/day limits for all supported services
-    python aws_cost_limits.py --all
-
-    # Set specific limit for a service
-    python aws_cost_limits.py --service redshift --daily-spend 10
-
-    # List current limits
-    python aws_cost_limits.py --list
-
-    # Create budget with auto-stop action
-    python aws_cost_limits.py --budget --monthly-limit 50 --action stop-ec2
-
-    # Remove limits (use with caution)
-    python aws_cost_limits.py --service athena --remove
-"""
 
 from __future__ import annotations
 
@@ -33,18 +11,13 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
-# =============================================================================
-# Cost Constants (as of 2024, us-east-2)
-# =============================================================================
+REDSHIFT_SERVERLESS_RPU_HOUR = 0.36
+ATHENA_TB_SCANNED = 5.00
+EMR_SERVERLESS_VCPU_HOUR = 0.052624
+EMR_SERVERLESS_MEMORY_GB_HOUR = 0.0057785
+LAMBDA_GB_SECOND = 0.0000166667
+LAMBDA_REQUEST = 0.0000002
 
-REDSHIFT_SERVERLESS_RPU_HOUR = 0.36  # $/RPU-hour
-ATHENA_TB_SCANNED = 5.00  # $/TB scanned
-EMR_SERVERLESS_VCPU_HOUR = 0.052624  # $/vCPU-hour
-EMR_SERVERLESS_MEMORY_GB_HOUR = 0.0057785  # $/GB-hour
-LAMBDA_GB_SECOND = 0.0000166667  # $/GB-second
-LAMBDA_REQUEST = 0.0000002  # $/request ($0.20 per 1M)
-
-# Common EC2 instance costs (on-demand, us-east-2)
 EC2_INSTANCE_COSTS = {
     "t2.micro": 0.0116,
     "t2.small": 0.023,
@@ -62,14 +35,12 @@ EC2_INSTANCE_COSTS = {
     "c5.xlarge": 0.17,
 }
 
-DEFAULT_DAILY_SPEND = 5.00  # $5/day default
-DEFAULT_MONTHLY_BUDGET = 50.00  # $50/month default
+DEFAULT_DAILY_SPEND = 5.00
+DEFAULT_MONTHLY_BUDGET = 50.00
 
 
 @dataclass
 class ServiceLimit:
-    """Represents a service limit configuration."""
-
     service: str
     resource_name: str
     limit_type: str
@@ -79,34 +50,20 @@ class ServiceLimit:
     status: str = "active"
 
 
-# =============================================================================
-# AWS Client Helpers
-# =============================================================================
-
-
 def get_client(service: str):
-    """Get a boto3 client for the specified service."""
     return boto3.client(service)
 
 
 def get_account_id() -> str:
-    """Get the current AWS account ID."""
     return get_client("sts").get_caller_identity()["Account"]
 
 
 def get_region() -> str:
-    """Get the current AWS region."""
     session = boto3.session.Session()
     return session.region_name or "us-east-1"
 
 
-# =============================================================================
-# Redshift Serverless
-# =============================================================================
-
-
 def get_redshift_workgroups() -> list[dict[str, Any]]:
-    """List all Redshift Serverless workgroups."""
     client = get_client("redshift-serverless")
     try:
         response = client.list_workgroups()
@@ -116,7 +73,6 @@ def get_redshift_workgroups() -> list[dict[str, Any]]:
 
 
 def get_redshift_usage_limits() -> list[dict[str, Any]]:
-    """Get all Redshift Serverless usage limits."""
     client = get_client("redshift-serverless")
     try:
         response = client.list_usage_limits()
@@ -126,7 +82,6 @@ def get_redshift_usage_limits() -> list[dict[str, Any]]:
 
 
 def calculate_redshift_rpu_hours(daily_spend: float) -> int:
-    """Calculate RPU-hours limit for a given daily spend target."""
     rpu_hours = daily_spend / REDSHIFT_SERVERLESS_RPU_HOUR
     return max(1, int(rpu_hours))
 
@@ -137,7 +92,6 @@ def set_redshift_limit(
     daily_spend: float,
     breach_action: str = "deactivate",
 ) -> dict[str, Any]:
-    """Set or update Redshift Serverless usage limit."""
     client = get_client("redshift-serverless")
     rpu_hours = calculate_redshift_rpu_hours(daily_spend)
 
@@ -180,7 +134,6 @@ def set_redshift_limit(
 
 
 def remove_redshift_limit(workgroup_arn: str) -> bool:
-    """Remove Redshift Serverless usage limit for a workgroup."""
     client = get_client("redshift-serverless")
     existing_limits = get_redshift_usage_limits()
 
@@ -194,13 +147,7 @@ def remove_redshift_limit(workgroup_arn: str) -> bool:
     return removed
 
 
-# =============================================================================
-# Athena
-# =============================================================================
-
-
 def get_athena_workgroups() -> list[dict[str, Any]]:
-    """List all Athena workgroups."""
     client = get_client("athena")
     try:
         response = client.list_work_groups()
@@ -210,21 +157,18 @@ def get_athena_workgroups() -> list[dict[str, Any]]:
 
 
 def get_athena_workgroup_config(workgroup_name: str) -> dict[str, Any]:
-    """Get Athena workgroup configuration."""
     client = get_client("athena")
     response = client.get_work_group(WorkGroup=workgroup_name)
     return response.get("WorkGroup", {})
 
 
 def calculate_athena_bytes(daily_spend: float) -> int:
-    """Calculate bytes scanned limit for a given daily spend target."""
     tb_allowed = daily_spend / ATHENA_TB_SCANNED
     bytes_allowed = int(tb_allowed * 1024 * 1024 * 1024 * 1024)
-    return max(10 * 1024 * 1024, bytes_allowed)  # Minimum 10MB
+    return max(10 * 1024 * 1024, bytes_allowed)
 
 
 def format_bytes(bytes_val: int) -> str:
-    """Format bytes as human-readable string."""
     if bytes_val >= 1024**4:
         return f"{bytes_val / 1024**4:.2f} TB"
     elif bytes_val >= 1024**3:
@@ -236,11 +180,9 @@ def format_bytes(bytes_val: int) -> str:
 
 
 def set_athena_limit(workgroup_name: str, daily_spend: float) -> dict[str, Any]:
-    """Set or update Athena workgroup data scan limit."""
     client = get_client("athena")
     bytes_limit = calculate_athena_bytes(daily_spend)
 
-    # Per-query limit: divide by ~20 queries/day for interactive use
     per_query_bytes = max(10 * 1024 * 1024, bytes_limit // 20)
 
     response = client.update_work_group(
@@ -261,7 +203,6 @@ def set_athena_limit(workgroup_name: str, daily_spend: float) -> dict[str, Any]:
 
 
 def remove_athena_limit(workgroup_name: str) -> bool:
-    """Remove Athena workgroup data scan limit."""
     client = get_client("athena")
     try:
         client.update_work_group(
@@ -275,13 +216,7 @@ def remove_athena_limit(workgroup_name: str) -> bool:
         return False
 
 
-# =============================================================================
-# EMR Serverless
-# =============================================================================
-
-
 def get_emr_serverless_applications() -> list[dict[str, Any]]:
-    """List all EMR Serverless applications."""
     client = get_client("emr-serverless")
     try:
         response = client.list_applications()
@@ -291,7 +226,6 @@ def get_emr_serverless_applications() -> list[dict[str, Any]]:
 
 
 def get_emr_serverless_application(app_id: str) -> dict[str, Any] | None:
-    """Get details of an EMR Serverless application."""
     client = get_client("emr-serverless")
     try:
         response = client.get_application(applicationId=app_id)
@@ -301,22 +235,13 @@ def get_emr_serverless_application(app_id: str) -> dict[str, Any] | None:
 
 
 def calculate_emr_max_capacity(daily_spend: float) -> dict[str, str]:
-    """
-    Calculate EMR Serverless max capacity for a given daily spend target.
-
-    Assumes a balanced workload using both vCPU and memory.
-    Cost per hour with 1 vCPU + 4GB memory ≈ $0.076
-    """
-    # Approximate cost per "unit" (1 vCPU + 4GB memory for 1 hour)
     cost_per_unit_hour = EMR_SERVERLESS_VCPU_HOUR + (4 * EMR_SERVERLESS_MEMORY_GB_HOUR)
 
-    # If running 8 hours/day, how many concurrent units?
     hours_per_day = 8
     max_concurrent_units = daily_spend / (cost_per_unit_hour * hours_per_day)
 
-    # Convert to vCPU and memory limits
     max_vcpu = max(1, int(max_concurrent_units))
-    max_memory_gb = max_vcpu * 4  # 4GB per vCPU is typical ratio
+    max_memory_gb = max_vcpu * 4
 
     return {
         "cpu": f"{max_vcpu} vCPU",
@@ -325,7 +250,6 @@ def calculate_emr_max_capacity(daily_spend: float) -> dict[str, str]:
 
 
 def set_emr_serverless_limit(app_id: str, app_name: str, daily_spend: float) -> dict[str, Any] | None:
-    """Set EMR Serverless application max capacity."""
     client = get_client("emr-serverless")
     capacity = calculate_emr_max_capacity(daily_spend)
 
@@ -347,10 +271,8 @@ def set_emr_serverless_limit(app_id: str, app_name: str, daily_spend: float) -> 
 
 
 def remove_emr_serverless_limit(app_id: str, app_name: str) -> bool:
-    """Remove EMR Serverless application max capacity limit."""
     client = get_client("emr-serverless")
     try:
-        # Set very high limits to effectively remove the cap
         client.update_application(
             applicationId=app_id,
             maximumCapacity={
@@ -365,13 +287,7 @@ def remove_emr_serverless_limit(app_id: str, app_name: str) -> bool:
         return False
 
 
-# =============================================================================
-# Lambda
-# =============================================================================
-
-
 def get_lambda_functions() -> list[dict[str, Any]]:
-    """List all Lambda functions."""
     client = get_client("lambda")
     try:
         paginator = client.get_paginator("list_functions")
@@ -384,7 +300,6 @@ def get_lambda_functions() -> list[dict[str, Any]]:
 
 
 def get_lambda_concurrency(function_name: str) -> int | None:
-    """Get reserved concurrency for a Lambda function."""
     client = get_client("lambda")
     try:
         response = client.get_function_concurrency(FunctionName=function_name)
@@ -394,7 +309,6 @@ def get_lambda_concurrency(function_name: str) -> int | None:
 
 
 def get_account_lambda_concurrency_limit() -> dict[str, Any]:
-    """Get account-level Lambda concurrency limits."""
     client = get_client("lambda")
     try:
         response = client.get_account_settings()
@@ -407,17 +321,9 @@ def get_account_lambda_concurrency_limit() -> dict[str, Any]:
 
 
 def calculate_lambda_concurrency(daily_spend: float, avg_duration_ms: int = 1000, memory_mb: int = 128) -> int:
-    """
-    Calculate Lambda concurrency limit for a given daily spend target.
-
-    Assumes continuous invocation at the concurrency limit.
-    """
-    # Cost per invocation (duration-based)
     gb_seconds_per_invocation = (memory_mb / 1024) * (avg_duration_ms / 1000)
     cost_per_invocation = (gb_seconds_per_invocation * LAMBDA_GB_SECOND) + LAMBDA_REQUEST
 
-    # Invocations per day at given concurrency
-    # At concurrency N with 1s duration: N invocations/second = N * 86400/day
     seconds_per_day = 86400
     invocations_per_concurrent_per_day = seconds_per_day / (avg_duration_ms / 1000)
 
@@ -428,7 +334,6 @@ def calculate_lambda_concurrency(daily_spend: float, avg_duration_ms: int = 1000
 
 
 def set_lambda_concurrency(function_name: str, concurrency: int) -> dict[str, Any] | None:
-    """Set reserved concurrency for a Lambda function."""
     client = get_client("lambda")
     try:
         response = client.put_function_concurrency(
@@ -443,7 +348,6 @@ def set_lambda_concurrency(function_name: str, concurrency: int) -> dict[str, An
 
 
 def remove_lambda_concurrency(function_name: str) -> bool:
-    """Remove reserved concurrency from a Lambda function."""
     client = get_client("lambda")
     try:
         client.delete_function_concurrency(FunctionName=function_name)
@@ -454,13 +358,7 @@ def remove_lambda_concurrency(function_name: str) -> bool:
         return False
 
 
-# =============================================================================
-# EC2 (Read-only - no native spending limits)
-# =============================================================================
-
-
 def get_running_ec2_instances() -> list[dict[str, Any]]:
-    """List all running EC2 instances with cost estimates."""
     client = get_client("ec2")
     try:
         response = client.describe_instances(
@@ -471,9 +369,8 @@ def get_running_ec2_instances() -> list[dict[str, Any]]:
         for reservation in response.get("Reservations", []):
             for instance in reservation.get("Instances", []):
                 instance_type = instance.get("InstanceType", "unknown")
-                hourly_cost = EC2_INSTANCE_COSTS.get(instance_type, 0.10)  # Default estimate
+                hourly_cost = EC2_INSTANCE_COSTS.get(instance_type, 0.10)
 
-                # Get name tag
                 name = "unnamed"
                 for tag in instance.get("Tags", []):
                     if tag["Key"] == "Name":
@@ -496,10 +393,6 @@ def get_running_ec2_instances() -> list[dict[str, Any]]:
     except ClientError:
         return []
 
-
-# =============================================================================
-# Budget Actions (Universal Cost Control)
-# =============================================================================
 
 BUDGET_ACTION_POLICY = """{
     "Version": "2012-10-17",
@@ -527,7 +420,6 @@ BUDGET_ACTION_POLICY = """{
 
 
 def get_budgets() -> list[dict[str, Any]]:
-    """List all AWS Budgets."""
     client = get_client("budgets")
     account_id = get_account_id()
     try:
@@ -538,7 +430,6 @@ def get_budgets() -> list[dict[str, Any]]:
 
 
 def get_budget_actions(budget_name: str) -> list[dict[str, Any]]:
-    """Get actions for a specific budget."""
     client = get_client("budgets")
     account_id = get_account_id()
     try:
@@ -557,22 +448,12 @@ def create_cost_control_budget(
     alert_thresholds: list[int] | None = None,
     email: str | None = None,
 ) -> dict[str, Any] | None:
-    """
-    Create a budget with alert notifications.
-
-    Args:
-        monthly_limit: Monthly spending limit in USD
-        budget_name: Name for the budget
-        alert_thresholds: List of percentage thresholds for alerts (default: [50, 80, 100])
-        email: Email address for notifications
-    """
     client = get_client("budgets")
     account_id = get_account_id()
 
     if alert_thresholds is None:
         alert_thresholds = [50, 80, 100]
 
-    # Check if budget already exists
     existing = get_budgets()
     if any(b["BudgetName"] == budget_name for b in existing):
         print(f"  Budget '{budget_name}' already exists - updating...")
@@ -605,7 +486,6 @@ def create_cost_control_budget(
             print(f"  Error updating budget: {e}")
             return None
 
-    # Create new budget with notifications
     notifications = []
     if email:
         for threshold in alert_thresholds:
@@ -668,17 +548,10 @@ def create_budget_action_iam_policy(
     threshold: int = 100,
     action_name: str = "DenyExpensiveServices",
 ) -> dict[str, Any] | None:
-    """
-    Create a budget action that applies an IAM deny policy when threshold is reached.
-
-    This is the most effective way to prevent runaway costs - it blocks expensive
-    operations at the IAM level when the budget threshold is exceeded.
-    """
     client = get_client("budgets")
     iam_client = get_client("iam")
     account_id = get_account_id()
 
-    # First, create or get the IAM policy
     policy_name = f"BudgetAction-{action_name}"
     policy_arn = f"arn:aws:iam::{account_id}:policy/{policy_name}"
 
@@ -697,9 +570,7 @@ def create_budget_action_iam_policy(
             print(f"  Error creating IAM policy: {e}")
             return None
 
-    # Create the budget action
     try:
-        # Check if action already exists
         existing_actions = get_budget_actions(budget_name)
         if any(
             a.get("Definition", {}).get("IamActionDefinition", {}).get("PolicyArn") == policy_arn
@@ -708,11 +579,9 @@ def create_budget_action_iam_policy(
             print(f"  Budget action already exists for '{budget_name}'")
             return {"exists": True}
 
-        # Need an IAM role for the budget to use
         role_name = "AWSBudgetsActionsRole"
         role_arn = f"arn:aws:iam::{account_id}:role/{role_name}"
 
-        # Check/create the role
         try:
             iam_client.get_role(RoleName=role_name)
         except iam_client.exceptions.NoSuchEntityException:
@@ -731,14 +600,12 @@ def create_budget_action_iam_policy(
                 AssumeRolePolicyDocument=json.dumps(trust_policy),
                 Description="Role for AWS Budgets to execute actions",
             )
-            # Attach necessary permissions
             iam_client.attach_role_policy(
                 RoleName=role_name,
                 PolicyArn="arn:aws:iam::aws:policy/AWSBudgetsActionsWithAWSResourceControlAccess",
             )
             print(f"  Created IAM role '{role_name}'")
 
-        # Get all IAM users and groups to apply the policy to
         users = iam_client.list_users().get("Users", [])
         groups = iam_client.list_groups().get("Groups", [])
 
@@ -762,13 +629,13 @@ def create_budget_action_iam_policy(
             Definition={
                 "IamActionDefinition": {
                     "PolicyArn": policy_arn,
-                    "Users": [u["UserName"] for u in users if u["UserName"] != "root"][:10],  # Max 10
-                    "Groups": [g["GroupName"] for g in groups][:10],  # Max 10
+                    "Users": [u["UserName"] for u in users if u["UserName"] != "root"][:10],
+                    "Groups": [g["GroupName"] for g in groups][:10],
                 }
             },
             ExecutionRoleArn=role_arn,
             ApprovalModel="AUTOMATIC",
-            Subscribers=[],  # Required but can be empty
+            Subscribers=[],
         )
 
         print(f"  Created budget action for '{budget_name}':")
@@ -792,22 +659,15 @@ def create_budget_action_stop_ec2(
     budget_name: str,
     threshold: int = 100,
 ) -> dict[str, Any] | None:
-    """
-    Create a budget action that stops EC2 instances when threshold is reached.
-
-    Uses SSM Automation to stop instances.
-    """
     client = get_client("budgets")
     iam_client = get_client("iam")
     account_id = get_account_id()
     region = get_region()
 
     try:
-        # Need an IAM role for the budget to use
         role_name = "AWSBudgetsActionsRole"
         role_arn = f"arn:aws:iam::{account_id}:role/{role_name}"
 
-        # Check/create the role
         try:
             iam_client.get_role(RoleName=role_name)
         except iam_client.exceptions.NoSuchEntityException:
@@ -832,14 +692,12 @@ def create_budget_action_stop_ec2(
             )
             print(f"  Created IAM role '{role_name}'")
 
-        # Check if action already exists
         existing_actions = get_budget_actions(budget_name)
         ssm_actions = [a for a in existing_actions if a.get("ActionType") == "RUN_SSM_DOCUMENTS"]
         if ssm_actions:
             print(f"  SSM budget action already exists for '{budget_name}'")
             return {"exists": True}
 
-        # Get running instances
         instances = get_running_ec2_instances()
         if not instances:
             print("  No running EC2 instances found")
@@ -886,12 +744,10 @@ def create_budget_action_stop_ec2(
 
 
 def delete_budget(budget_name: str) -> bool:
-    """Delete a budget and its actions."""
     client = get_client("budgets")
     account_id = get_account_id()
 
     try:
-        # First delete all actions
         actions = get_budget_actions(budget_name)
         for action in actions:
             try:
@@ -904,7 +760,6 @@ def delete_budget(budget_name: str) -> bool:
             except ClientError as e:
                 print(f"  Error deleting action: {e}")
 
-        # Then delete the budget
         client.delete_budget(AccountId=account_id, BudgetName=budget_name)
         print(f"  Deleted budget '{budget_name}'")
         return True
@@ -912,11 +767,6 @@ def delete_budget(budget_name: str) -> bool:
     except ClientError as e:
         print(f"  Error deleting budget: {e}")
         return False
-
-
-# =============================================================================
-# List All Limits
-# =============================================================================
 
 
 def _collect_redshift_limits(log) -> list[ServiceLimit]:
@@ -1151,7 +1001,6 @@ def _collect_budget_limits(log) -> list[ServiceLimit]:
 
 
 def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
-    """List all current service limits."""
 
     def log(msg: str) -> None:
         if not quiet:
@@ -1167,16 +1016,9 @@ def list_current_limits(quiet: bool = False) -> list[ServiceLimit]:
     return limits
 
 
-# =============================================================================
-# Set All Limits
-# =============================================================================
-
-
 def set_all_limits(daily_spend: float) -> None:
-    """Set limits for all supported services."""
     print(f"\nSetting limits for ${daily_spend:.2f}/day per service...")
 
-    # Redshift Serverless
     print("\n--- Redshift Serverless ---")
     workgroups = get_redshift_workgroups()
     if workgroups:
@@ -1185,7 +1027,6 @@ def set_all_limits(daily_spend: float) -> None:
     else:
         print("  No workgroups found - skipping")
 
-    # Athena
     print("\n--- Athena ---")
     athena_workgroups = get_athena_workgroups()
     if athena_workgroups:
@@ -1198,7 +1039,6 @@ def set_all_limits(daily_spend: float) -> None:
     else:
         print("  No workgroups found - skipping")
 
-    # EMR Serverless
     print("\n--- EMR Serverless ---")
     emr_apps = get_emr_serverless_applications()
     if emr_apps:
@@ -1208,7 +1048,6 @@ def set_all_limits(daily_spend: float) -> None:
     else:
         print("  No applications found - skipping")
 
-    # Lambda - only set if there are functions
     print("\n--- Lambda ---")
     functions = get_lambda_functions()
     if functions:
@@ -1224,13 +1063,7 @@ def set_all_limits(daily_spend: float) -> None:
     print("\nTip: Use --budget to create a budget with automatic actions for additional protection.")
 
 
-# =============================================================================
-# Set Service Limit
-# =============================================================================
-
-
 def set_service_limit(service: str, daily_spend: float, resource_name: str | None = None) -> None:  # noqa: C901
-    """Set limit for a specific service."""
     service = service.lower()
 
     if service in ("redshift", "redshift-serverless"):
@@ -1271,14 +1104,13 @@ def set_service_limit(service: str, daily_spend: float, resource_name: str | Non
         print("\nSetting Lambda concurrency limits...")
         functions = get_lambda_functions()
         if resource_name:
-            # Set for specific function
             concurrency = calculate_lambda_concurrency(daily_spend)
             set_lambda_concurrency(resource_name, concurrency)
         elif functions:
             concurrency = calculate_lambda_concurrency(daily_spend)
             print(f"  Calculated concurrency: {concurrency} for ${daily_spend:.2f}/day")
             print(f"  Found {len(functions)} functions:")
-            for fn in functions[:10]:  # Show first 10
+            for fn in functions[:10]:
                 print(f"    - {fn['FunctionName']}")
             if len(functions) > 10:
                 print(f"    ... and {len(functions) - 10} more")
@@ -1294,7 +1126,6 @@ def set_service_limit(service: str, daily_spend: float, resource_name: str | Non
 
 
 def remove_service_limit(service: str, resource_name: str | None = None) -> None:
-    """Remove limits for a specific service."""
     service = service.lower()
 
     if service in ("redshift", "redshift-serverless"):
@@ -1332,11 +1163,6 @@ def remove_service_limit(service: str, resource_name: str | None = None) -> None
     else:
         print(f"Unknown service: {service}")
         sys.exit(1)
-
-
-# =============================================================================
-# Main
-# =============================================================================
 
 
 def main():
@@ -1415,7 +1241,6 @@ Cost calculations:
         help="Output in JSON format (for --list)",
     )
 
-    # Budget-specific arguments
     parser.add_argument(
         "--budget",
         "-b",
@@ -1455,7 +1280,6 @@ Cost calculations:
 
     args = parser.parse_args()
 
-    # Validate arguments
     if not any([args.list, args.all, args.service, args.budget]):
         parser.print_help()
         sys.exit(1)
@@ -1464,7 +1288,6 @@ Cost calculations:
         print("Error: --remove requires --service or --budget")
         sys.exit(1)
 
-    # Execute
     try:
         if args.list:
             limits = list_current_limits(quiet=args.json)
@@ -1491,7 +1314,6 @@ Cost calculations:
             if args.remove:
                 delete_budget(args.budget_name)
             else:
-                # Create or update budget
                 print(f"\n--- AWS Budget: {args.budget_name} ---")
                 create_cost_control_budget(
                     monthly_limit=args.monthly_limit,
@@ -1499,7 +1321,6 @@ Cost calculations:
                     email=args.email,
                 )
 
-                # Create action if specified
                 if args.action == "deny-policy":
                     print("\n--- Creating IAM Deny Policy Action ---")
                     create_budget_action_iam_policy(

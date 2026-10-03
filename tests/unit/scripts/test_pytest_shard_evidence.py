@@ -1,5 +1,3 @@
-"""Exercise shard evidence against real serial and distributed pytest runs."""
-
 from __future__ import annotations
 
 import json
@@ -224,8 +222,6 @@ def test_real_medium_receipts_reject_missing_or_inconsistent_outcomes(tmp_path: 
         elif defect == "not-list":
             payload["node_outcomes"] = {}
         else:
-            # Keep actual predecessor receipts intact: absence itself is a
-            # regression failure, never replace it with fabricated success.
             outcomes = payload.get("node_outcomes", [])
             if outcomes:
                 reports = outcomes[0]["reports"]

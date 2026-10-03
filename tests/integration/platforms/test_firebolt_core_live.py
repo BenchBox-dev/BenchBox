@@ -1,21 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for Firebolt Core.
-
-Setup:
-    make test-docker-up-firebolt
-    # or: docker compose -f docker/firebolt/docker-compose.yml up -d --wait
-
-These tests require Firebolt Core running and accessible at localhost:3473.
-Set FIREBOLT_CORE_HOST, FIREBOLT_CORE_PORT, FIREBOLT_CORE_DATABASE to
-target a different instance.
-
-System requirements:
-  RAM: 16 GB minimum recommended for Firebolt Core.
-"""
 
 import pytest
 
@@ -28,8 +13,6 @@ pytestmark = [
 
 
 class TestLiveFireboltCoreConnection:
-    """Test basic Firebolt Core connectivity via Docker."""
-
     def test_connection(self, live_firebolt_core_adapter):
 
         connection = live_firebolt_core_adapter.create_connection()
@@ -51,10 +34,7 @@ class TestLiveFireboltCoreConnection:
 
 
 class TestLiveFireboltCoreQueryExecution:
-    """Test query execution against a live Firebolt Core instance."""
-
     def test_execute_query_via_adapter(self, live_firebolt_core_adapter):
-        """Verify execute_query() returns a result for SELECT 1."""
         connection = live_firebolt_core_adapter.create_connection()
         try:
             result = live_firebolt_core_adapter.execute_query(
@@ -68,7 +48,6 @@ class TestLiveFireboltCoreQueryExecution:
             live_firebolt_core_adapter.close_connection(connection)
 
     def test_aggregation_query(self, live_firebolt_core_adapter):
-        """Execute an aggregation to verify analytical capabilities."""
         connection = live_firebolt_core_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -82,7 +61,6 @@ class TestLiveFireboltCoreQueryExecution:
             live_firebolt_core_adapter.close_connection(connection)
 
     def test_create_and_query_table(self, live_firebolt_core_adapter):
-        """Create a table, insert rows, verify count, and clean up."""
         connection = live_firebolt_core_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -103,10 +81,7 @@ class TestLiveFireboltCoreQueryExecution:
 
 
 class TestLiveFireboltCoreSpecificFeatures:
-    """Test Firebolt-specific features available in Core mode."""
-
     def test_result_cache_set(self, live_firebolt_core_adapter):
-        """Verify result cache setting is accepted (Core mode ignores it but must not error)."""
         connection = live_firebolt_core_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -118,7 +93,6 @@ class TestLiveFireboltCoreSpecificFeatures:
             live_firebolt_core_adapter.close_connection(connection)
 
     def test_drop_table_is_synchronous(self, live_firebolt_core_adapter):
-        """Verify DROP TABLE completes synchronously - table is immediately gone after drop."""
         connection = live_firebolt_core_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -128,6 +102,6 @@ class TestLiveFireboltCoreSpecificFeatures:
                 cursor.execute("SELECT COUNT(*) FROM benchbox_cleanup_test")
                 pytest.fail("Table should have been dropped")
             except Exception:
-                pass  # Expected - table does not exist
+                pass
         finally:
             live_firebolt_core_adapter.close_connection(connection)

@@ -1,9 +1,3 @@
-"""
-Tests for CLI parameter consistency and new flag behavior.
-
-Tests the new unified parameter structure that aligns with unified_runner.
-"""
-
 import sys
 import sys as _sys
 from unittest.mock import MagicMock, patch
@@ -11,12 +5,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -26,7 +14,6 @@ pytestmark = [
 ]
 
 
-# Skip all tests if CLI modules are unavailable
 try:
     from benchbox.cli.main import cli
     from benchbox.cli.orchestrator import BenchmarkOrchestrator
@@ -40,21 +27,16 @@ except ImportError as e:
 
 @pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
 class TestCLIParameterConsistency:
-    """Test new CLI parameter behavior."""
-
     @pytest.fixture
     def runner(self):
-        """Create CliRunner for testing."""
         return CliRunner()
 
     @pytest.fixture
     def mock_orchestrator(self):
-        """Mock orchestrator for testing."""
         with patch.object(_run_module, "BenchmarkOrchestrator") as mock_class:
             mock_instance = MagicMock()
             mock_class.return_value = mock_instance
 
-            # Mock execute_benchmark to return a basic result
             mock_result = MagicMock()
             mock_result.validation_status = "SUCCESS"
             mock_result.execution_id = "test-123"
@@ -64,7 +46,6 @@ class TestCLIParameterConsistency:
 
     @pytest.fixture
     def mock_dependencies(self, mock_orchestrator):
-        """Mock all CLI dependencies."""
         with (
             patch.object(_run_module, "DatabaseManager") as mock_db,
             patch.object(_run_module, "BenchmarkManager") as mock_bench,
@@ -72,16 +53,13 @@ class TestCLIParameterConsistency:
             patch.object(_run_module, "get_platform_manager") as mock_platform,
             patch.object(_run_module, "ResultExporter") as mock_exporter,
         ):
-            # Setup database manager
             mock_db_instance = MagicMock()
             mock_db.return_value = mock_db_instance
 
-            # Setup benchmark manager
             mock_bench_instance = MagicMock()
             mock_bench_instance.benchmarks = {"tpch": {"display_name": "TPC-H", "estimated_time_range": "1-5min"}}
             mock_bench.return_value = mock_bench_instance
 
-            # Setup system profiler
             mock_system_instance = MagicMock()
             mock_system_profile = MagicMock()
             mock_system_profile.cpu_cores_logical = 4
@@ -89,7 +67,6 @@ class TestCLIParameterConsistency:
             mock_system_instance.get_system_profile.return_value = mock_system_profile
             mock_system.return_value = mock_system_instance
 
-            # Setup platform manager
             mock_platform_instance = MagicMock()
             mock_platform_instance.is_platform_available.return_value = True
             mock_platform.return_value = mock_platform_instance
@@ -114,11 +91,9 @@ class TestCLIParameterConsistency:
         )
 
         assert result.exit_code == 0
-        # Verify orchestrator was called with correct phases
         mock_dependencies["orchestrator"].execute_benchmark.assert_called_once()
         args, kwargs = mock_dependencies["orchestrator"].execute_benchmark.call_args
-        # Should have phases_to_run parameter
-        assert len(args) == 4  # config, system_profile, database_config, phases_to_run
+        assert len(args) == 4
         phases_to_run = args[3]
         assert phases_to_run == ["power"]
 
@@ -140,7 +115,6 @@ class TestCLIParameterConsistency:
         )
 
         assert result.exit_code == 0
-        # Verify orchestrator was called with correct phases
         args, kwargs = mock_dependencies["orchestrator"].execute_benchmark.call_args
         phases_to_run = args[3]
         assert set(phases_to_run) == {"generate", "load", "power"}
@@ -172,7 +146,7 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
         args, kwargs = mock_dependencies["orchestrator"].execute_benchmark.call_args
         phases_to_run = args[3]
-        assert phases_to_run == ["power", "load", "throughput"]  # No duplicates, order preserved
+        assert phases_to_run == ["power", "load", "throughput"]
 
     def test_tuning_mode_tuned(self, runner, mock_dependencies):
 
@@ -222,7 +196,6 @@ class TestCLIParameterConsistency:
         result = runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
 
         assert result.exit_code == 0
-        # Should handle data-only execution without database
 
     def test_execution_type_mapping_load_only(self, runner, mock_dependencies):
 
@@ -271,7 +244,6 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
         args, kwargs = mock_dependencies["orchestrator"].execute_benchmark.call_args
         phases_to_run = args[3]
-        # Order should be preserved as specified
         assert phases_to_run == ["throughput", "generate", "power"]
 
     def test_orchestrator_phase_integration(self, mock_dependencies):
@@ -281,12 +253,10 @@ class TestCLIParameterConsistency:
 
         orchestrator = BenchmarkOrchestrator()
 
-        # Mock the orchestrator-local lifecycle import used by execute_benchmark().
         with patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_lifecycle:
             mock_result = MagicMock()
             mock_lifecycle.return_value = mock_result
 
-            # Mock benchmark instance creation
             with (
                 patch.object(orchestrator, "_get_benchmark_instance") as mock_get_benchmark,
                 patch.object(orchestrator, "_get_platform_config") as mock_get_platform_config,
@@ -319,21 +289,17 @@ class TestCLIParameterConsistency:
                     print(f"Orchestrator failed with exception: {e}")
                     raise
 
-                # Verify lifecycle was called with correct phases
                 mock_lifecycle.assert_called_once()
                 call_kwargs = mock_lifecycle.call_args[1]
                 assert "phases" in call_kwargs
                 phases = call_kwargs["phases"]
 
-                # Should have generate=True, load=True, execute=True (because power is an execute phase)
                 assert phases.generate is True
                 assert phases.load is True
                 assert phases.execute is True
 
 
 class TestCLIParameterConsistencyUnavailable:
-    """Test graceful handling when CLI modules are unavailable."""
-
     def test_import_unavailable(self):
 
         if IMPORTS_AVAILABLE:
@@ -343,30 +309,23 @@ class TestCLIParameterConsistencyUnavailable:
 
 
 class TestPhaseValidationLogic:
-    """Test phase validation logic in isolation."""
-
     def test_valid_phases_set(self):
-        """The documented phase vocabulary includes the opt-in statistics phase."""
         valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
 
-        # Test all phases are valid
         for phase in valid_phases:
             assert phase in valid_phases
         assert "statistics" in valid_phases
 
     def test_phase_parsing(self):
 
-        # Test comma separation
         phase_string = "generate,load,power"
         phases = [p.strip() for p in phase_string.split(",") if p.strip()]
         assert phases == ["generate", "load", "power"]
 
-        # Test with spaces
         phase_string = "generate, load , power"
         phases = [p.strip() for p in phase_string.split(",") if p.strip()]
         assert phases == ["generate", "load", "power"]
 
-        # Test empty elements
         phase_string = "generate,,load,power,"
         phases = [p.strip() for p in phase_string.split(",") if p.strip()]
         assert phases == ["generate", "load", "power"]
@@ -375,22 +334,18 @@ class TestPhaseValidationLogic:
 
         query_phases = {"power", "throughput", "maintenance"}
 
-        # Test data-only
         phases = ["generate"]
         has_query_phases = bool(set(phases) & query_phases)
         assert not has_query_phases
 
-        # Test load-only
         phases = ["load"]
         has_query_phases = bool(set(phases) & query_phases)
         assert not has_query_phases
 
-        # Test with query phases
         phases = ["generate", "load", "power"]
         has_query_phases = bool(set(phases) & query_phases)
         assert has_query_phases
 
-        # Test combined
         phases = ["power", "throughput", "maintenance"]
         has_all_query = all(p in phases for p in ["power", "throughput", "maintenance"])
         assert has_all_query
@@ -398,15 +353,12 @@ class TestPhaseValidationLogic:
 
 @pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
 class TestGlobalCacheCLIFlag:
-    """Tests for --global-cache flag wiring through the CLI."""
-
     @pytest.fixture
     def runner(self):
         return CliRunner()
 
     @pytest.fixture
     def captured_config(self):
-        """Capture the BenchmarkConfig passed to the orchestrator."""
         from unittest.mock import MagicMock, patch
 
         captured: dict = {}
@@ -440,7 +392,6 @@ class TestGlobalCacheCLIFlag:
             yield captured
 
     def test_global_cache_flag_sets_cache_dir_in_options(self, runner, captured_config):
-        """--global-cache injects cache_dir pointing to ~/.benchbox/datagen/ in options."""
         from pathlib import Path
 
         result = runner.invoke(
@@ -456,7 +407,6 @@ class TestGlobalCacheCLIFlag:
         assert config.options["cache_dir"] == expected
 
     def test_no_global_cache_flag_omits_cache_dir(self, runner, captured_config):
-        """Without --global-cache, cache_dir is not set in options (project-local default applies)."""
         result = runner.invoke(
             cli,
             ["run", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"],
@@ -469,8 +419,6 @@ class TestGlobalCacheCLIFlag:
 
 
 class TestStatisticsPhaseToken:
-    """The statistics phase token parses and maps to LifecyclePhases.statistics."""
-
     def test_parse_phases_list_accepts_statistics(self):
         import types
 
@@ -495,12 +443,6 @@ class TestStatisticsPhaseToken:
 
 @pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
 class TestStreamsConcurrencyAlias:
-    """Canonical `run` accepts --streams with --concurrency as an alias.
-
-    Both spellings must reach BenchmarkConfig.concurrency through the
-    canonical (non-deprecated) `run` command, not just run-official.
-    """
-
     @pytest.mark.parametrize("flag", ["--streams", "--concurrency"])
     def test_both_spellings_parse_to_concurrency(self, flag):
         from benchbox.cli.commands.run import run

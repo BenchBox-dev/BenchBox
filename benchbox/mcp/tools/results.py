@@ -1,11 +1,6 @@
-"""Results tools for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides tools for retrieving, comparing, and exporting benchmark results.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,7 +23,6 @@ from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
-# Tool annotations for read-only results tools
 RESULTS_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read benchmark results",
     read_only_hint=True,
@@ -37,7 +31,6 @@ RESULTS_READONLY_ANNOTATIONS = ToolAnnotations(
     open_world_hint=False,
 )
 
-# Tool annotations for export (creates files)
 EXPORT_ANNOTATIONS = ToolAnnotations(
     title="Export benchmark results",
     read_only_hint=False,
@@ -48,7 +41,6 @@ EXPORT_ANNOTATIONS = ToolAnnotations(
 
 
 def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
-    """Register results tools with the MCP server."""
 
     @mcp.tool(
         description="Get benchmark results or list recent runs.\n\n        Args:\n            result_file: Result filename (omit to list recent runs)\n            format: Output format: 'list', 'details', 'json', 'csv', 'html', 'text', 'markdown'\n            output_path: File path for export (relative to results dir)\n            limit: Max results when listing (default: 10)\n            platform: Filter by platform name (for listing)\n            benchmark: Filter by benchmark name (for listing)\n            include_queries: Include per-query details (default: True)\n\n        Returns:\n            List of runs, full results, or exported content.\n        ",
@@ -63,31 +55,14 @@ def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None
         benchmark: str | None = None,
         include_queries: bool = True,
     ) -> dict[str, Any]:
-        """Get benchmark results or list recent runs.
-
-        Args:
-            result_file: Result filename (omit to list recent runs)
-            format: Output format: 'list', 'details', 'json', 'csv', 'html', 'text', 'markdown'
-            output_path: File path for export (relative to results dir)
-            limit: Max results when listing (default: 10)
-            platform: Filter by platform name (for listing)
-            benchmark: Filter by benchmark name (for listing)
-            include_queries: Include per-query details (default: True)
-
-        Returns:
-            List of runs, full results, or exported content.
-        """
-        # If no result_file, list recent runs
         if result_file is None or format == "list":
             return _list_recent_runs_impl(limit, platform, benchmark, resolve_path_provider(results_dir))
 
-        # Get results for specific file
         configured_results_dir = resolve_path_provider(results_dir)
         results = _get_results_impl(result_file, include_queries, results_dir=configured_results_dir)
         if "error" in results:
             return results
 
-        # Handle different output formats
         format_lower = format.lower()
         if format_lower == "details":
             return results
@@ -109,7 +84,6 @@ def _list_recent_runs_impl(
     benchmark: str | None,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """List recent benchmark runs."""
     if not results_dir.exists():
         return {"runs": [], "count": 0, "message": f"No results directory found at {results_dir}"}
 
@@ -169,7 +143,6 @@ def _list_recent_runs_impl(
 
 
 def _get_results_impl(result_file: str, include_queries: bool = True, *, results_dir: Path) -> dict[str, Any]:
-    """Core implementation for getting benchmark results."""
     if ".." in result_file or result_file.startswith("/") or result_file.startswith("\\"):
         return make_error(
             ErrorCode.VALIDATION_ERROR,
@@ -223,7 +196,6 @@ def _export_results_impl(
     output_path: str | None,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Export results to JSON, CSV, or HTML format."""
     content: str = ""
 
     if format == "json":
@@ -254,7 +226,6 @@ def _export_results_impl(
 
         content = generate_html_report(results)
 
-    # Write to file if output_path provided
     if output_path:
         if ".." in output_path or output_path.startswith("/"):
             return make_error(
@@ -302,7 +273,6 @@ def _export_results_impl(
 
 
 def _export_summary_impl(results: dict[str, Any], format: str) -> dict[str, Any]:
-    """Export formatted summary of benchmark results (transport wrapper)."""
     from benchbox.core.results.html_report import generate_summary_content
 
     return generate_summary_content(results, format)

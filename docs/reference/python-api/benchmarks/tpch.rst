@@ -44,21 +44,68 @@ API Reference
 TPCH Class
 ~~~~~~~~~~
 
-.. autoclass:: benchbox.tpch.TPCH
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:module:: benchbox.tpch
+.. py:class:: TPCH(scale_factor: float = 1.0, output_dir: Optional[Union[str, Path]] = None, **kwargs)
+
+   TPC-H facade over the implementation in ``benchbox.core.tpch``. The
+   constructor rejects non-numeric or non-positive scale factors. Query and
+   data sizes are source-driven; this page does not promise a fixed byte size.
+
+   .. py:method:: generate_data() -> list[Union[str, Path]]
+
+      Generate the configured TPC-H tables and return their file paths.
+
+   .. py:method:: get_queries(dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]
+
+      Return the query mapping, optionally translated from ``base_dialect`` to
+      ``dialect``.
+
+   .. py:method:: get_query(query_id: int, *, params: Optional[dict[str, Any]] = None, seed: Optional[int] = None, scale_factor: Optional[float] = None, dialect: Optional[str] = None, base_dialect: Optional[str] = None, **kwargs) -> str
+
+      Return one query. ``query_id`` must be an integer from 1 through 22;
+      invalid types and ranges raise ``TypeError`` or ``ValueError``.
+
+   .. py:method:: get_schema() -> list[dict]
+
+      Return the facade's schema value. The delegated implementation currently
+      returns a lower-case table-name mapping; consumers should inspect the
+      runtime value rather than rely on the facade annotation.
+
+   .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config=None) -> str
+
+      Return CREATE TABLE SQL for the requested dialect and tuning options.
+
+   .. py:method:: generate_streams(num_streams: int = 1, rng_seed: Optional[int] = None, streams_output_dir: Optional[Union[str, Path]] = None) -> list[Path]
+
+      Generate query-stream files using the supplied stream count, seed, and
+      output directory.
+
+   .. py:method:: get_stream_info(stream_id: int) -> dict[str, Any]
+
+      Return metadata for the requested generated stream.
+
+   .. py:method:: get_all_streams_info() -> list[dict[str, Any]]
+
+      Return metadata for one stream or all generated streams.
+
+   .. py:attribute:: tables
+
+      Mapping of table names to generated data paths.
+
+   .. py:method:: run_official_benchmark(connection_factory, config=None)
+
+      Run the official TPC-H benchmark through the supplied connection factory and configuration, returning the implementation result.
+
+   .. py:method:: run_power_test(connection_factory, config=None)
+
+      Run the TPC-H power test through the supplied connection factory and configuration, returning the implementation result.
+
+   .. py:method:: run_maintenance_test(connection_factory, config=None)
+
+      Run the TPC-H maintenance test through the supplied connection factory and configuration, returning the implementation result.
 
 Constructor
 ~~~~~~~~~~~
-
-.. code-block:: python
-
-    TPCH(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
 
 Parameters:
 

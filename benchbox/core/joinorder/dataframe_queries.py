@@ -482,7 +482,6 @@ def _make_generated_expression_impl(query_id: str) -> QueryImpl:
         return _execute_joinorder_expression_query(ctx, query_id)
 
     _impl.__name__ = f"q{query_id}_expression_impl"
-    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder DataFrame translation."
     return _impl
 
 
@@ -491,7 +490,6 @@ def _make_generated_pandas_impl(query_id: str) -> QueryImpl:
         return _execute_joinorder_pandas_query(ctx, query_id)
 
     _impl.__name__ = f"q{query_id}_pandas_impl"
-    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder pandas translation."
     return _impl
 
 

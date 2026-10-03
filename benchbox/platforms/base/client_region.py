@@ -1,11 +1,5 @@
-"""Client region and cloud discovery for link locality disclosure.
-
-Discovers client runner placement using cloud Instance Metadata Services (IMDS)
-or CLI option overrides.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -26,21 +20,7 @@ _IMDS_BASE_URL = "http://169.254.169.254"
 _MAX_IMDS_BODY_BYTES = 8192
 
 
-# IMDS endpoints are link-local and must never be sent to a proxy: with
-# HTTP(S)_PROXY set (common in corp/CI), the default opener would hand the
-# metadata request to the proxy, leaking the token and publishing whatever
-# the proxy answers as the client region. An empty ProxyHandler registers
-# no *_open methods, so the opener below routes direct by construction and
-# the default env-proxy handler is skipped.
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """Refuse redirects from the metadata address.
-
-    The default redirect handler re-sends request headers (including the
-    IMDSv2 token) to the redirect target, so a 302 from 169.254.169.254
-    would leak the token to an arbitrary host. Metadata endpoints never
-    redirect legitimately.
-    """
-
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN202
         return None
 
@@ -52,28 +32,20 @@ _KNOWN_CLIENT_CLOUDS = frozenset({"aws", "gcp", "azure"})
 
 
 def reset_client_region_cache() -> None:
-    """Reset the process-cached client region discovery result."""
     global _CACHED_CLIENT_REGION
     with _CACHE_LOCK:
         _CACHED_CLIENT_REGION = None
 
 
 def _imds_open(request: urllib.request.Request, timeout: float = _IMDS_TIMEOUT_SECONDS) -> Any:
-    """Open a link-local IMDS request without proxy handling."""
     return _IMDS_OPENER.open(request, timeout=timeout)
 
 
 def _read_body(response: Any) -> str:
-    """Read a bounded, decoded IMDS response body."""
     return response.read(_MAX_IMDS_BODY_BYTES).decode("utf-8", errors="replace").strip()
 
 
 def _valid_region(value: Any) -> str | None:
-    """Return the value when it is a tight region token, else None.
-
-    Rejects HTML error pages, hostnames, and other non-region bodies that a
-    proxy or middlebox might return for the metadata URL.
-    """
     if not isinstance(value, str):
         return None
     token = value.strip().lower()
@@ -83,7 +55,6 @@ def _valid_region(value: Any) -> str | None:
 
 
 def _probe_aws_imds() -> dict[str, Any] | None:
-    """Probe AWS IMDSv2 for EC2 instance region, falling back to IMDSv1."""
     region: str | None = None
     try:
         token_req = urllib.request.Request(
@@ -112,8 +83,6 @@ def _probe_aws_imds() -> dict[str, Any] | None:
             "client_cloud": "aws",
             "source": "observed",
         }
-    # IMDSv1-only hosts (HttpTokens=optional) have no token endpoint; the
-    # document GET still answers without a token.
     try:
         doc_req = urllib.request.Request(
             f"{_IMDS_BASE_URL}/latest/dynamic/instance-identity/document",
@@ -135,7 +104,6 @@ def _probe_aws_imds() -> dict[str, Any] | None:
 
 
 def _probe_gcp_imds() -> dict[str, Any] | None:
-    """Probe GCP metadata server for compute engine zone and derive region."""
     try:
         req = urllib.request.Request(
             f"{_IMDS_BASE_URL}/computeMetadata/v1/instance/zone",
@@ -144,7 +112,6 @@ def _probe_gcp_imds() -> dict[str, Any] | None:
         )
         with _imds_open(req) as resp:
             raw_zone = _read_body(resp)
-            # GCP zone can be 'projects/12345/zones/us-central1-a' or 'us-central1-a'
             zone = raw_zone.split("/")[-1]
             region = zone.rsplit("-", 1)[0] if "-" in zone else zone
             region = _valid_region(region)
@@ -160,7 +127,6 @@ def _probe_gcp_imds() -> dict[str, Any] | None:
 
 
 def _probe_azure_imds() -> dict[str, Any] | None:
-    """Probe Azure Instance Metadata Service (IMDS) for location."""
     try:
         req = urllib.request.Request(
             f"{_IMDS_BASE_URL}/metadata/instance/compute/location?api-version=2021-02-01&format=text",
@@ -181,7 +147,6 @@ def _probe_azure_imds() -> dict[str, Any] | None:
 
 
 def _probe_imds() -> dict[str, Any]:
-    """Try probing known cloud IMDS endpoints in sequence."""
     for probe in (_probe_aws_imds, _probe_gcp_imds, _probe_azure_imds):
         try:
             result = probe()
@@ -197,13 +162,6 @@ def _probe_imds() -> dict[str, Any]:
 
 
 def _get_cached_imds() -> dict[str, Any]:
-    """Return process-cached IMDS discovery or execute probe if uncached.
-
-    The cache is process-lifetime by design: IMDS identity describes the
-    host, which does not change under a running process, while re-probing
-    on every run would add up to three link-local timeouts to each
-    benchmark. Tests reset it via :func:`reset_client_region_cache`.
-    """
     global _CACHED_CLIENT_REGION
     with _CACHE_LOCK:
         if _CACHED_CLIENT_REGION is None:
@@ -232,17 +190,6 @@ def _valid_explicit_cloud(value: Any) -> str | None:
 
 
 def discover_client_region(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Discover or resolve client region and cloud provider.
-
-    Parameters:
-        config: Optional configuration mapping or runner config that may specify
-            explicit `client_region` and/or `client_cloud` overrides.
-
-    Returns:
-        Dictionary containing `client_region`, `client_cloud`, and `source`.
-        Explicit values are validated and never raise; invalid values are
-        ignored with a warning.
-    """
     if config is not None:
         if isinstance(config, Mapping):
             explicit_region = config.get("client_region")
@@ -262,10 +209,6 @@ def discover_client_region(config: Mapping[str, Any] | None = None) -> dict[str,
             }
         if cloud:
             observed = _get_cached_imds()
-            # An explicitly attested cloud must not relabel an observed region
-            # from another cloud: that fabricates a cross-cloud collocation
-            # signal. Keep the observed region only when the clouds agree.
-            # "unknown" carries no cloud signal, so it never drops the region.
             observed_region = observed.get("client_region")
             if cloud in _KNOWN_CLIENT_CLOUDS and observed.get("client_cloud") != cloud:
                 observed_region = None

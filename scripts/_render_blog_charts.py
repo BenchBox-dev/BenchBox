@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Render scale-factor-harmonization blog images via textcharts CLI.
-
-Pipeline: textcharts CLI -> ANSI text -> ansi2html -> headless Chrome -> PNG
-Reuses the capture infrastructure from capture_chart_images.py.
-"""
 
 from __future__ import annotations
 

@@ -1,5 +1,3 @@
-"""Verify source, wheel, and sdist bundled generators against one manifest."""
-
 from __future__ import annotations
 
 import argparse
@@ -41,7 +39,6 @@ def _member_name(raw_name: str, seen: dict[str, bool], binary_prefix: str, direc
 
 
 def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT_ROOT) -> None:
-    """Reject bundled file changes, including lost POSIX execute permissions."""
     verify_binary_tree(source_root)
     trusted_manifest = (source_root / MANIFEST_NAME).read_bytes()
     source_files = {

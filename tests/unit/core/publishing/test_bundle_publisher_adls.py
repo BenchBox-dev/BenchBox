@@ -34,13 +34,13 @@ def test_copy_to_cloud_uploads_adls_files_directly(tmp_path, monkeypatch):
             return FileSystem()
 
     azure = ModuleType("azure")
-    azure.__path__ = []  # type: ignore[attr-defined]
+    azure.__path__ = []
     identity = ModuleType("azure.identity")
-    identity.DefaultAzureCredential = lambda: "credential"  # type: ignore[attr-defined]
+    identity.DefaultAzureCredential = lambda: "credential"
     storage = ModuleType("azure.storage")
-    storage.__path__ = []  # type: ignore[attr-defined]
+    storage.__path__ = []
     filedatalake = ModuleType("azure.storage.filedatalake")
-    filedatalake.DataLakeServiceClient = Service  # type: ignore[attr-defined]
+    filedatalake.DataLakeServiceClient = Service
     monkeypatch.setitem(
         sys.modules,
         "azure",
@@ -84,17 +84,17 @@ def test_copy_to_cloud_uses_documented_account_key_when_available(tmp_path, monk
             return FileSystem()
 
     azure = ModuleType("azure")
-    azure.__path__ = []  # type: ignore[attr-defined]
+    azure.__path__ = []
     identity = ModuleType("azure.identity")
-    identity.DefaultAzureCredential = lambda: pytest.fail("account-key auth should not use a default credential")  # type: ignore[attr-defined]
+    identity.DefaultAzureCredential = lambda: pytest.fail("account-key auth should not use a default credential")
     core = ModuleType("azure.core")
-    core.__path__ = []  # type: ignore[attr-defined]
+    core.__path__ = []
     credentials = ModuleType("azure.core.credentials")
-    credentials.AzureNamedKeyCredential = NamedKeyCredential  # type: ignore[attr-defined]
+    credentials.AzureNamedKeyCredential = NamedKeyCredential
     storage = ModuleType("azure.storage")
-    storage.__path__ = []  # type: ignore[attr-defined]
+    storage.__path__ = []
     filedatalake = ModuleType("azure.storage.filedatalake")
-    filedatalake.DataLakeServiceClient = Service  # type: ignore[attr-defined]
+    filedatalake.DataLakeServiceClient = Service
     monkeypatch.setitem(sys.modules, "azure", azure)
     monkeypatch.setitem(sys.modules, "azure.identity", identity)
     monkeypatch.setitem(sys.modules, "azure.core", core)

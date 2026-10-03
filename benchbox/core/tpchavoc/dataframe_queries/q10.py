@@ -24,9 +24,8 @@ from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build
 # TPC-H spec output order for Q10.
 _RESULT_COLUMNS = ["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]
 
-# ---------------------------------------------------------------------------
+
 # v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q10_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -37,9 +36,7 @@ def q10_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter orders and lineitem before joining
-# ---------------------------------------------------------------------------
 
 
 def q10_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -97,9 +94,7 @@ def q10_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune
-# ---------------------------------------------------------------------------
 
 
 def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -143,9 +138,7 @@ def q10_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars
-# ---------------------------------------------------------------------------
 
 
 def q10_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -198,9 +191,7 @@ def q10_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - add revenue column before groupby
-# ---------------------------------------------------------------------------
 
 
 def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -233,9 +224,7 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
 q10_v5_pandas_impl = make_variant_delegate(q10_v4_pandas_impl, name="q10_v5_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style
-# ---------------------------------------------------------------------------
 
 
 def q10_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -261,9 +250,7 @@ def q10_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - join orders before customer
-# ---------------------------------------------------------------------------
 
 
 def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -322,9 +309,7 @@ def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - combine date and returnflag filters
-# ---------------------------------------------------------------------------
 
 
 def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -386,9 +371,7 @@ def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort
-# ---------------------------------------------------------------------------
 
 
 def q10_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -399,9 +382,7 @@ def q10_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return q10_v5_pandas_impl(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - revenue = price - price*disc
-# ---------------------------------------------------------------------------
 
 
 def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -460,8 +441,7 @@ def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q10_VARIANTS = build_yaml_variants(__file__, globals(), 10, JOIN_AGG_SORT)

@@ -1,5 +1,3 @@
-"""Tests for the BenchBox-local agent write preflight guard."""
-
 from __future__ import annotations
 
 import os
@@ -19,10 +17,6 @@ pytestmark = [
 
 SCRIPT = REPO_ROOT / "scripts" / "agent_write_preflight.sh"
 
-# These exercise the clone-location guard, so pin a human identity: otherwise
-# the preflight's [COMMIT-IDENTITY-001] assertion decides the result instead,
-# and every "allows" case fails wherever the ambient identity is an agent --
-# which is precisely the case in a cloud agent session.
 HUMAN_IDENTITY = {
     "GIT_AUTHOR_NAME": "Joe Harris",
     "GIT_AUTHOR_EMAIL": "joeharris76@gmail.com",
@@ -235,7 +229,6 @@ def test_skill_sync_write_target_runs_preflight() -> None:
 
 
 def _init_clone(path: Path, *, with_hook: bool = True) -> Path:
-    """Create a plain clone fixture, optionally with a healthy shared hook."""
     path.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.name", "BenchBox Test"], cwd=path, check=True)
@@ -255,7 +248,6 @@ def _run_in_clone(
     extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, **HUMAN_IDENTITY}
-    # Let the script derive the primary clone naturally from this repo.
     env.pop("BENCHBOX_AGENT_PRIMARY_CLONE", None)
     env.pop("BENCHBOX_ALLOW_MAIN_CLONE_WRITE", None)
     env.pop("ALLOW_MAIN_CLONE_WRITE", None)
@@ -276,7 +268,6 @@ def _run_in_clone(
 
 
 def test_preflight_still_refuses_an_undeclared_plain_clone(tmp_path: Path) -> None:
-    """The declaration is opt-in: absent it, behavior is exactly as before."""
     result = _run_in_clone(_init_clone(tmp_path / "BenchBox"))
 
     assert result.returncode == 1
@@ -320,7 +311,6 @@ def test_preflight_allows_a_declared_ephemeral_clone(tmp_path: Path) -> None:
 
 
 def test_ephemeral_declaration_is_not_sibling_path_dependent(tmp_path: Path) -> None:
-    """The explicit disposable-clone exception does not inspect sibling paths."""
     repo = _init_clone(tmp_path / "BenchBox")
     (tmp_path / "BenchBox.sibling-worktree").mkdir()
 
@@ -331,24 +321,15 @@ def test_ephemeral_declaration_is_not_sibling_path_dependent(tmp_path: Path) -> 
 
 
 def test_preflight_refuses_an_agent_author_identity(tmp_path: Path) -> None:
-    """[COMMIT-IDENTITY-001] before linked-worktree writes.
-
-    Linked worktrees share the primary clone's config, so one stray [user]
-    block can reauthor every linked worktree at once. Preflight catches this
-    before any commit exists.
-    """
     result = _run_in_clone(_init_clone(tmp_path / "BenchBox"), ephemeral=True, extra_env=AGENT_IDENTITY)
 
     assert result.returncode == 1
     assert "Git author identity resolves to a known" in result.stderr
     assert "agent/service identity" in result.stderr
-    # The refusal has to show WHERE the value came from -- a repository-local
-    # override is invisible otherwise, and that is the case being caught.
     assert "origins:" in result.stderr
 
 
 def test_preflight_agent_identity_refusal_is_declarable(tmp_path: Path) -> None:
-    """A task that explicitly authorized the agent identity can say so."""
     result = _run_in_clone(
         _init_clone(tmp_path / "BenchBox"),
         ephemeral=True,
@@ -360,7 +341,6 @@ def test_preflight_agent_identity_refusal_is_declarable(tmp_path: Path) -> None:
 
 
 def test_preflight_identity_check_is_not_confused_by_a_human_named_like_a_vendor(tmp_path: Path) -> None:
-    """Match on the vendor address, not a substring of the display name."""
     result = _run_in_clone(
         _init_clone(tmp_path / "BenchBox"),
         ephemeral=True,
@@ -372,8 +352,6 @@ def test_preflight_identity_check_is_not_confused_by_a_human_named_like_a_vendor
 
 
 def test_refusal_names_the_ephemeral_escape_not_only_the_broad_override(tmp_path: Path) -> None:
-    """The refusal used to offer BENCHBOX_ALLOW_MAIN_CLONE_WRITE as the only way
-    out, which trained agents to reach for the blanket override routinely."""
     result = _run_in_clone(_init_clone(tmp_path / "BenchBox"))
 
     assert "BENCHBOX_EPHEMERAL_CLONE=1" in result.stderr
@@ -382,7 +360,6 @@ def test_refusal_names_the_ephemeral_escape_not_only_the_broad_override(tmp_path
 
 
 def _fake_uv(bin_dir: Path, record: Path) -> None:
-    """A stand-in for `uv` that records whether preflight tried to install hooks."""
     bin_dir.mkdir(parents=True, exist_ok=True)
     fake = bin_dir / "uv"
     fake.write_text(f'#!/bin/sh\npwd >> "{record}"\nexit 0\n', encoding="utf-8")
@@ -401,7 +378,6 @@ def _linked_worktree(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _write_generated_hook(primary: Path, interpreter: str, hook_name: str = "pre-commit") -> None:
-    """Reproduce the shape `pre-commit install` writes, including the pinned path."""
     hooks = primary / ".git" / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
     hook = hooks / hook_name
@@ -417,7 +393,6 @@ def _write_generated_hook(primary: Path, interpreter: str, hook_name: str = "pre
 
 
 def test_preflight_fails_when_shared_hook_interpreter_no_longer_exists(tmp_path: Path) -> None:
-    """A deleted worktree's venv must block writes until the primary repairs the hook."""
     primary, linked = _linked_worktree(tmp_path)
     dead_interpreter = tmp_path / "BenchBox.wt-deleted" / ".venv" / "bin" / "python"
     _write_generated_hook(primary, str(dead_interpreter))
@@ -471,7 +446,6 @@ def test_preflight_fails_when_shared_hook_is_missing(tmp_path: Path) -> None:
 
 
 def test_preflight_cold_start_does_not_repair_missing_shared_hooks(tmp_path: Path) -> None:
-    """A cold linked worktree must stop before an absent shared hook can be bypassed."""
     primary, linked = _linked_worktree(tmp_path)
     record = tmp_path / "uv-cwd.txt"
     _fake_uv(tmp_path / "fake-bin", record)
@@ -490,7 +464,6 @@ def test_preflight_cold_start_does_not_repair_missing_shared_hooks(tmp_path: Pat
 
 @pytest.mark.parametrize("stale_stage", ["pre-push", "commit-msg"])
 def test_preflight_fails_when_configured_sibling_hook_interpreter_is_stale(tmp_path: Path, stale_stage: str) -> None:
-    """A stale sibling hook must block writes even when pre-commit is healthy."""
     primary, linked = _linked_worktree(tmp_path)
     (linked / ".pre-commit-config.yaml").write_text(
         "default_install_hook_types: [pre-commit, pre-push, commit-msg]\n",
@@ -515,7 +488,6 @@ def test_preflight_fails_when_configured_sibling_hook_interpreter_is_stale(tmp_p
 
 @pytest.mark.parametrize("missing_stage", ["pre-push", "commit-msg"])
 def test_preflight_fails_when_configured_sibling_hook_is_missing(tmp_path: Path, missing_stage: str) -> None:
-    """A configured hook stage cannot silently disappear from the shared hooks directory."""
     primary, linked = _linked_worktree(tmp_path)
     (linked / ".pre-commit-config.yaml").write_text(
         "default_install_hook_types: [pre-commit, pre-push, commit-msg]\n",
@@ -532,7 +504,6 @@ def test_preflight_fails_when_configured_sibling_hook_is_missing(tmp_path: Path,
 
 
 def test_preflight_reads_block_style_configured_hook_types(tmp_path: Path) -> None:
-    """Block-style YAML must enforce every configured shared hook stage."""
     primary, linked = _linked_worktree(tmp_path)
     (linked / ".pre-commit-config.yaml").write_text(
         "default_install_hook_types:\n  - pre-commit\n  - pre-push\n  - commit-msg\n",
@@ -547,14 +518,12 @@ def test_preflight_reads_block_style_configured_hook_types(tmp_path: Path) -> No
 
 
 def test_worktree_removal_hook_isolation(tmp_path: Path) -> None:
-    """Removing one linked worktree leaves hooks functional in other worktrees without manual PATH export."""
     primary = _init_clone(tmp_path / "BenchBox")
     wt1 = tmp_path / "BenchBox.wt-one"
     wt2 = tmp_path / "BenchBox.wt-two"
     subprocess.run(["git", "worktree", "add", "-q", "-b", "fix/one", str(wt1), "HEAD"], cwd=primary, check=True)
     subprocess.run(["git", "worktree", "add", "-q", "-b", "fix/two", str(wt2), "HEAD"], cwd=primary, check=True)
 
-    # Write a hook pointing to sys.executable that records execution on commit
     record = tmp_path / "hook-ran.txt"
     hooks = primary / ".git" / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
@@ -569,15 +538,12 @@ def test_worktree_removal_hook_isolation(tmp_path: Path) -> None:
     )
     hook.chmod(0o755)
 
-    # Remove wt1
     subprocess.run(["git", "worktree", "remove", str(wt1)], cwd=primary, check=True)
 
-    # Run preflight in wt2 - it should recognize the hook is healthy
     result = _run_in_clone(wt2)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Repaired commit-time hooks" not in result.stdout
 
-    # Commit in wt2 without any manual PATH export
     test_file = wt2 / "test.txt"
     test_file.write_text("change\n", encoding="utf-8")
     subprocess.run(["git", "add", "test.txt"], cwd=wt2, check=True)

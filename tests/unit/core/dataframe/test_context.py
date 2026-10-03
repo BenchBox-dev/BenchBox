@@ -1,13 +1,4 @@
-"""Unit tests for DataFrameContext protocol and implementation.
-
-Tests for:
-- DataFrameContext protocol compliance
-- DataFrameContextImpl base functionality
-- Table registration and retrieval
-- Expression helper methods
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -28,37 +19,25 @@ pytestmark = [
 
 
 class ConcreteContext(DataFrameContextImpl[dict]):
-    """Concrete implementation of DataFrameContextImpl for testing.
-
-    Uses plain dictionaries as the DataFrame type for simplicity.
-    """
-
     def col(self, name: str) -> str:
-        """Return column name as string (Pandas-like behavior)."""
         return name
 
     def lit(self, value: Any) -> Any:
-        """Return literal value directly."""
         return value
 
     def date_sub(self, column: Any, days: int) -> dict[str, Any]:
-        """Return a dict representing date subtraction."""
         return {"op": "date_sub", "column": column, "days": days}
 
     def date_add(self, column: Any, days: int) -> dict[str, Any]:
-        """Return a dict representing date addition."""
         return {"op": "date_add", "column": column, "days": days}
 
     def cast_date(self, column: Any) -> dict[str, Any]:
-        """Return a dict representing date cast."""
         return {"op": "cast_date", "column": column}
 
     def cast_string(self, column: Any) -> dict[str, Any]:
-        """Return a dict representing string cast."""
         return {"op": "cast_string", "column": column}
 
     def _window_descriptor(self, op: str, **kwargs: Any) -> dict[str, Any]:
-        """Helper to describe window operations for tests."""
         return {"op": op, **kwargs}
 
     def window_rank(
@@ -66,7 +45,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window RANK operation."""
         return self._window_descriptor(
             "window_rank",
             order_by=order_by,
@@ -78,7 +56,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window ROW_NUMBER operation."""
         return self._window_descriptor(
             "window_row_number",
             order_by=order_by,
@@ -90,7 +67,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         order_by: list[tuple[str, bool]],
         partition_by: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window DENSE_RANK operation."""
         return self._window_descriptor(
             "window_dense_rank",
             order_by=order_by,
@@ -103,7 +79,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         partition_by: list[str] | None = None,
         order_by: list[tuple[str, bool]] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window SUM operation."""
         return self._window_descriptor(
             "window_sum",
             column=column,
@@ -117,7 +92,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         partition_by: list[str] | None = None,
         order_by: list[tuple[str, bool]] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window AVG operation."""
         return self._window_descriptor(
             "window_avg",
             column=column,
@@ -131,7 +105,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         partition_by: list[str] | None = None,
         order_by: list[tuple[str, bool]] | None = None,
     ) -> dict[str, Any]:
-        """Describe a window COUNT operation."""
         return self._window_descriptor(
             "window_count",
             column=column,
@@ -140,7 +113,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         )
 
     def window_min(self, column: str, partition_by: list[str] | None = None) -> dict[str, Any]:
-        """Describe a window MIN operation."""
         return self._window_descriptor(
             "window_min",
             column=column,
@@ -148,7 +120,6 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         )
 
     def window_max(self, column: str, partition_by: list[str] | None = None) -> dict[str, Any]:
-        """Describe a window MAX operation."""
         return self._window_descriptor(
             "window_max",
             column=column,
@@ -156,40 +127,27 @@ class ConcreteContext(DataFrameContextImpl[dict]):
         )
 
     def union_all(self, *dataframes: Any) -> list[Any]:
-        """Return all frames (union descriptor)."""
         return list(dataframes)
 
     def rename_columns(self, df: Any, mapping: dict[str, str]) -> dict[str, Any]:
-        """Return a descriptor describing renamed columns."""
         return {"df": df, "mapping": mapping}
 
     def scalar(self, df: Any, column: str | None = None) -> Any:
-        """Extract a single scalar value from a DataFrame.
-
-        For testing, assumes df is a dict with data, returns first value.
-        """
         if isinstance(df, dict):
             if column is not None and column in df:
                 values = df[column]
                 if isinstance(values, list) and len(values) > 0:
                     return values[0]
-            # Return first value from first column
             for key, values in df.items():
                 if isinstance(values, list) and len(values) > 0:
                     return values[0]
         return None
 
     def scalar_to_df(self, data: dict[str, Any]) -> dict[str, list[Any]]:
-        """Create a single-row DataFrame (dict) from scalar values.
-
-        For testing, returns a dict with lists containing the scalar values.
-        """
         return {k: [v] for k, v in data.items()}
 
 
 class TestDataFrameContextProtocol:
-    """Tests for DataFrameContext protocol."""
-
     def test_protocol_is_runtime_checkable(self):
 
         ctx = ConcreteContext(platform="test", family="pandas")
@@ -199,7 +157,6 @@ class TestDataFrameContextProtocol:
 
         ctx = ConcreteContext(platform="test", family="pandas")
 
-        # Check all required methods exist and are callable
         assert hasattr(ctx, "get_table")
         assert hasattr(ctx, "list_tables")
         assert hasattr(ctx, "table_exists")
@@ -213,8 +170,6 @@ class TestDataFrameContextProtocol:
 
 
 class TestDataFrameContextImpl:
-    """Tests for DataFrameContextImpl base class."""
-
     def test_initialization(self):
 
         ctx = ConcreteContext(platform="pandas", family="pandas")
@@ -431,8 +386,6 @@ class TestDataFrameContextImpl:
 
 
 class TestDataFrameContextMultipleRegistrations:
-    """Tests for complex table registration scenarios."""
-
     def test_overwrite_table(self):
 
         ctx = ConcreteContext(platform="test", family="pandas")
@@ -468,8 +421,6 @@ class TestDataFrameContextMultipleRegistrations:
 
 
 class TestDataFrameContextFamily:
-    """Tests for family-specific behavior."""
-
     def test_pandas_family(self):
 
         ctx = ConcreteContext(platform="pandas", family="pandas")

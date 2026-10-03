@@ -41,28 +41,57 @@ Quick Start
 
     print(f"Completed {results.total_queries} queries in {results.total_execution_time:.2f}s")
 
+Shared query and category contracts are maintained in :doc:`mixins`.
+
 API Reference
 -------------
 
 ReadPrimitives Class
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.read_primitives.ReadPrimitives
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:module:: benchbox.read_primitives
+.. py:class:: ReadPrimitives(scale_factor: float = 1.0, output_dir: Optional[Union[str, Path]] = None, **kwargs)
+
+   Catalog-driven read operations over the TPC-H schema. Query and category
+   methods inherited from ``QueryFacadeMixin`` and ``QueryCategoryFacadeMixin``
+   remain part of the supported surface; their maintained contracts are in
+   :doc:`mixins` and shared lifecycle behavior is in :doc:`../base`.
+
+   .. py:method:: generate_data(tables: Optional[list[str]] = None) -> dict[str, str | list[str]]
+
+      Generate selected or all tables and return the live table-to-file mapping.
+   .. py:method:: get_schema() -> dict[str, dict]
+
+      Return the current TPC-H table schema mapping.
+
+   .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config=None) -> str
+
+      Return CREATE TABLE SQL for the requested dialect and tuning configuration. An invalid tuning object raises ``RuntimeError`` after constraint extraction fails.
+   .. py:method:: load_data_to_database(connection: Any, tables: Optional[list[str]] = None) -> None
+
+      Load the selected generated tables into ``connection`` after creating the schema. If ``tables`` is ``None``, load every generated table.
+   .. py:method:: execute_query(query_id: str, connection: Any, params: Optional[dict[str, Any]] = None) -> Any
+
+      Execute one catalog query on ``connection`` and return fetched rows. The
+      ``params`` argument is accepted for facade compatibility but is currently
+      ignored by the implementation; query parameters are not applied. Invalid
+      query IDs raise ``ValueError``.
+   .. py:method:: run_benchmark(connection: Any, queries: Optional[list[str]] = None, iterations: int = 1, categories: Optional[list[str]] = None) -> dict[str, Any]
+
+      Execute selected queries or categories for the requested iteration count and return benchmark result metadata.
+
+   .. py:method:: run_category_benchmark(connection: Any, category: str, iterations: int = 1) -> dict[str, Any]
+
+      Execute one query category for the requested iteration count and return benchmark result metadata.
+   .. py:method:: get_benchmark_info() -> dict[str, Any]
+
+      Return catalog and benchmark metadata.
 
 Constructor
 ~~~~~~~~~~~
 
-.. code-block:: python
-
-    ReadPrimitives(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        verbose: bool = False,
-        **kwargs
-    )
+The constructor accepts ``verbose`` through ``**kwargs``; it defaults to
+``False`` and controls implementation logging.
 
 Parameters:
 
@@ -121,14 +150,14 @@ Get a specific primitive query.
 Parameters:
 
 - **query_id** (int|str): Query identifier (e.g., "aggregation_simple", "window_rank")
-- **params** (dict, optional): Query parameters
+- **params** (dict, optional): Must be ``None``; this catalog does not support query parameters
 
 Returns:
     str: Query SQL text
 
 Raises:
 
-- **ValueError**: If query_id is invalid
+- **ValueError**: If query_id is invalid or ``params`` is not ``None``
 
 get_queries(dialect=None)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -347,18 +376,11 @@ Execute a primitive query on the database.
     # Execute single query
     result = benchmark.execute_query("aggregation_simple", conn)
 
-    # Execute with custom parameters
-    result = benchmark.execute_query(
-        "aggregation_simple",
-        conn,
-        params={"threshold": 100}
-    )
-
 Parameters:
 
 - **query_id** (str): Query identifier
 - **connection** (Any): Database connection
-- **params** (dict, optional): Query parameters
+- **params** (dict, optional): Accepted for compatibility and ignored; values do not change the executed SQL
 
 Returns:
     Any: Query results from the database

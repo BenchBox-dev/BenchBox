@@ -1,5 +1,3 @@
-"""Deprecated compare-dataframes compatibility command."""
-
 import json
 import sys
 from pathlib import Path
@@ -43,7 +41,6 @@ def compare_dataframes(
     theme,
     list_platforms,
 ):
-    """Compare DataFrame platform performance. Deprecated; use `benchbox compare`."""
     if list_platforms:
         _list_available_platforms()
         return

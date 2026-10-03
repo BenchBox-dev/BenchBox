@@ -1,38 +1,8 @@
-"""Inventory of how the TPC-DS DataFrame implementations consume the parameters dsqgen produces.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The SQL surface takes its values from dsqgen; the DataFrame surface reads a static defaults file
-(``default_parameters.yaml``) through ``get_parameters``. This test classifies each of the 99 queries
-without any data, from three sources: which keys each implementation reads (recorded by running both
-families against a stand-in context), the defaults file, and the names dsqgen reports with ``-LOG``
-together with the template text that says which of them reach the SQL.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-Categories, in priority order:
-
-* ``c`` hard-coded: the implementation cannot take what dsqgen draws. A multi-valued draw that reaches the
-  SQL (Q41 draws sixteen colors) has no matching key, or only a scalar one (Q24 reads a single color), so
-  the code itself has to change.
-* ``b`` binding gap: an implementation reads a key the defaults file does not have (a silent literal
-  fallback), the defaults file has a key no implementation reads (a dead key), or a list-valued default is
-  shorter than the draw (Q8 draws 400 zips and the default has five, but the implementation passes the whole
-  list through, so only the binding data is short).
-* ``a`` no gap detected.
-
-The derived flag marks templates that do arithmetic on a drawn value (Q39 uses ``[MONTH]+1``), which an
-adapter must reproduce because ``-LOG`` records only the base value.
-
-Limits: name matching between dsqgen names and defaults keys is a heuristic (lower case, plurals,
-substrings, a few abbreviations), so ``a`` means "no gap detected", not "verified"; single-valued
-dsqgen names the heuristic cannot pair are listed in ``unmatched_names`` but do not change the category.
-Four pandas implementations (Q5, Q77, Q80, Q88) do not run to completion against the stand-in, so their
-dead-key result is a lower bound. The classification lists below may only shrink: a query that becomes
-``a`` fails as an unexpected pass until it is removed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,20 +20,15 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
     pytest.mark.tpcds,
-    # Each implementation run is bounded with SIGALRM, which Windows does not have.
     pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="needs SIGALRM"),
 ]
 
-# Queries whose implementations read a key missing from the defaults file (literal fallback).
 LITERAL_FALLBACK = frozenset({8, 10, 21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91})
 
-# Implementations that do not run to completion against the stand-in context.
 INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
 
-# Category (c): the implementation cannot take the draw (it reads one value, or none).
 HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 
-# Category (b): everything else the inventory finds a gap in. This may only shrink.
 BINDING_GAP = frozenset(
     {
         1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
@@ -71,8 +36,6 @@ BINDING_GAP = frozenset(
     }
 )  # fmt: skip
 
-# The gate in the inventory's work item: more hard-coded queries than this makes the adapter work a
-# separate program.
 HARD_CODED_BUDGET = 15
 
 _DEFINE = re.compile(r"define\s+(\w+)\s*=\s*(.*?);", re.S)
@@ -81,8 +44,6 @@ _ABBREVIATIONS = {"ES": ["education"], "MS": ["marital"], "GEN": ["gender"], "CC
 
 
 class _Stub:
-    """Stands in for any frame, column or expression: every operation returns another stub."""
-
     def __getattr__(self, name: str) -> Any:
         if name.startswith("__") and name.endswith("__"):
             raise AttributeError(name)
@@ -116,9 +77,6 @@ class _Stub:
         return None
 
     def __array__(self, *args: Any, **kwargs: Any) -> Any:
-        # Without this, NumPy coerces a stub as a sequence of length 2 whose items are stubs, nested to
-        # NumPy's dimension limit: ``ndarray | stub`` then allocates without end. NumPy can also swallow
-        # the timeout raised inside ``__len__`` during that coercion, so the time bound alone does not stop it.
         raise TypeError("the stand-in is not array-like")
 
     __hash__ = object.__hash__
@@ -134,8 +92,6 @@ for _operator in _OPERATORS:
     setattr(_Stub, f"__{_operator}__", lambda self, *args: _Stub())
 
 
-# Each implementation run against the stand-in gets this long, then the timeout is raised again at this
-# interval until it propagates.
 _RUN_SECONDS = 3.0
 _RETRY_SECONDS = 0.5
 
@@ -145,8 +101,6 @@ class _Timeout(Exception):
 
 
 def _raise_timeout(signum: int, frame: Any) -> None:
-    # The timer repeats so a timeout swallowed by native code is raised again. A signal that lands in
-    # _read_keys itself, after the implementation has stopped, is ignored so it cannot escape the cleanup.
     if frame is not None and frame.f_code is _read_keys.__code__:
         return
     raise _Timeout
@@ -157,12 +111,12 @@ class QueryInventory:
     query_id: int
     category: str = "a"
     derived: bool = False
-    incomplete: set[str] = field(default_factory=set)  # family names whose run did not finish
+    incomplete: set[str] = field(default_factory=set)
     consumed: set[str] = field(default_factory=set)
     fallback: set[str] = field(default_factory=set)
     dead: set[str] = field(default_factory=set)
-    shortfall: list[str] = field(default_factory=list)  # the implementation cannot take the draw
-    data_shortfall: list[str] = field(default_factory=list)  # the defaults are shorter than the draw
+    shortfall: list[str] = field(default_factory=list)
+    data_shortfall: list[str] = field(default_factory=list)
     unmatched_names: list[str] = field(default_factory=list)
 
 
@@ -178,7 +132,6 @@ def _plural_forms(name: str) -> set[str]:
 
 
 def _matching_keys(name: str, keys: list[str]) -> list[str]:
-    """Defaults keys a dsqgen name plausibly feeds (heuristic: plural, substring, abbreviation, date)."""
     normalized = _normalize(name)
     base = _normalize(re.sub(r"(number|_?[a-h]|\d)$", "", name.lower()))
     stems = {stem for stem in {normalized, base} | _plural_forms(normalized) | _plural_forms(base) if len(stem) >= 2}
@@ -193,7 +146,6 @@ def _matching_keys(name: str, keys: list[str]) -> list[str]:
 
 
 def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set[str]], set[str]]:
-    """Which dsqgen names reach the SQL: (indices used per name, derived flag, names inside defines, body names)."""
     text = re.sub(r"--[^\n]*", "", text)
     defines = {match.group(1): match.group(2) for match in _DEFINE.finditer(text)}
     body = _DEFINE.sub("", text)
@@ -205,7 +157,7 @@ def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set
 
     note(body)
     changed = True
-    while changed:  # a define used by the SQL makes the names inside it used too
+    while changed:
         changed = False
         for name, expression in defines.items():
             if name in used:
@@ -222,7 +174,6 @@ def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set
 
 
 def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) -> tuple[set[str], bool]:
-    """Run one implementation against the stand-in and return the parameter keys it read."""
     import pandas as pd
 
     import benchbox.core.dataframe.benchmark_suite  # noqa: F401  (import order guard)
@@ -244,7 +195,6 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
     )
     previous_handler = signal.signal(signal.SIGALRM, _raise_timeout)
     started = mono_time()
-    # pytest-timeout's signal method shares this timer; it is re-armed with its remaining time below.
     outer_delay, outer_interval = signal.setitimer(signal.ITIMER_REAL, 0)
     complete = True
     try:
@@ -307,8 +257,6 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
         if len(used[name]) <= capacity:
             continue
         if takes_a_list:
-            # The implementation passes a list through (for example to is_in), so it can take every value the
-            # SQL uses; only the binding data is short, which is adapter work, not a code change.
             result.data_shortfall.append(f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults")
         else:
             result.shortfall.append(f"{name}: {len(used[name])} values reach the SQL, the implementation reads one")
@@ -342,10 +290,6 @@ def test_every_query_is_classified(inventory):
 
 
 def test_incomplete_runs_are_the_known_ones(inventory):
-    """Dead-key results are lower bounds only for implementations that do not run to completion.
-
-    Tracked per (query, family): a new failure in the other family of a known query must not pass.
-    """
     incomplete = {f"{entry.query_id}:{family}" for entry in inventory.values() for family in entry.incomplete}
     assert incomplete <= INCOMPLETE_RUNS
 
@@ -355,7 +299,7 @@ def test_literal_fallback_queries_are_the_known_fifteen(inventory):
 
 
 def test_derived_value_flag_marks_arithmetic_on_a_drawn_value(inventory):
-    assert inventory[39].derived  # [MONTH]+1
+    assert inventory[39].derived
     assert not inventory[93].derived
 
 
@@ -376,7 +320,6 @@ def test_parameters_are_bound_to_dsqgen(inventory, request, query_id):
 
 
 def test_listed_categories_match_the_inventory(inventory):
-    """The xfail lists may only shrink, and a query may not move between lists unnoticed."""
     for query_id, entry in inventory.items():
         assert entry.category == _expected_category(query_id), f"Q{query_id}"
 
@@ -387,11 +330,6 @@ def test_hard_coded_queries_stay_within_the_adapter_budget(inventory):
 
 
 def test_numpy_refuses_the_stand_in_instead_of_expanding_it():
-    """``ndarray | stub`` must fail at once; it once grew a worker past 14 GB in CI.
-
-    Runs in a child process with a short wall-clock limit, so a regression fails this test after
-    about 1.5 GB of growth (the observed rate is about 45 MB/s) instead of exhausting the machine.
-    """
     import subprocess
     import sys
     from pathlib import Path
@@ -416,7 +354,6 @@ def test_numpy_refuses_the_stand_in_instead_of_expanding_it():
 
 
 def test_reading_keys_keeps_the_outer_timer_armed():
-    """pytest-timeout's signal method shares ITIMER_REAL; reading keys must hand it back armed."""
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
 
     previous_handler = signal.signal(signal.SIGALRM, lambda signum, frame: None)

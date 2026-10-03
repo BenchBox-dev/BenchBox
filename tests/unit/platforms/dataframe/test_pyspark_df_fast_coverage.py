@@ -1,10 +1,4 @@
-"""Fast-lane coverage tests for PySparkDataFrameAdapter (mocked PySpark).
-
-All methods are tested by patching PYSPARK_AVAILABLE=True and mocking
-the SparkSessionManager / spark functions - no real Spark process needed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,11 +18,6 @@ from benchbox.core.dataframe.tuning import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_F():
@@ -75,7 +64,7 @@ def _make_Window():
 
 
 def _new_adapter(monkeypatch):
-    """Return (adapter, mock_session, mock_F, mock_Window) with all dependencies mocked."""
+
     mock_F = _make_F()
     mock_Window = _make_Window()
     mock_session = MagicMock()
@@ -95,14 +84,7 @@ def _new_adapter(monkeypatch):
     return adapter, mock_session, mock_F, mock_Window
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 class TestPySparkCoverageMocked:
-    """Coverage for PySparkDataFrameAdapter with mocked PySpark."""
-
     def test_init_and_platform_name(self, monkeypatch):
         adapter, _, _, _ = _new_adapter(monkeypatch)
         assert adapter.platform_name == "PySpark"
@@ -141,7 +123,7 @@ class TestPySparkCoverageMocked:
         adapter._session_claimed = False
         assert adapter._get_or_create_session() is mock_session
         assert adapter._session_claimed is True
-        # Cached on second call
+
         assert adapter._get_or_create_session() is mock_session
 
     def test_close_and_context_manager(self, monkeypatch):
@@ -153,7 +135,7 @@ class TestPySparkCoverageMocked:
         adapter.close()
         assert released
         assert adapter._spark is None
-        adapter.close()  # second close is a no-op
+        adapter.close()
 
     def test_context_manager_protocol(self, monkeypatch):
         adapter, _, _, _ = _new_adapter(monkeypatch)

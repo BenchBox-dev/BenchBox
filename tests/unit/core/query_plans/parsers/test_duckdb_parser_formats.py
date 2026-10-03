@@ -1,10 +1,3 @@
-"""
-Tests for DuckDB parser format detection and fallback.
-
-Tests JSON format parsing, text format parsing, format detection,
-and fallback behavior when JSON parsing fails.
-"""
-
 import pytest
 
 from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
@@ -16,7 +9,6 @@ pytestmark = [
 ]
 
 
-# Sample DuckDB JSON EXPLAIN outputs
 JSON_SIMPLE_SCAN = """{
     "name": "SEQ_SCAN",
     "extra_info": "orders",
@@ -108,7 +100,6 @@ JSON_ARRAY_FORMAT = """[
     }
 ]"""
 
-# Text format samples
 TEXT_SIMPLE_SCAN = """
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -119,8 +110,6 @@ TEXT_SIMPLE_SCAN = """
 
 
 class TestDuckDBParserFormatDetection:
-    """Test format detection in DuckDB parser."""
-
     def test_detect_json_format_object(self) -> None:
 
         parser = DuckDBQueryPlanParser()
@@ -150,8 +139,6 @@ class TestDuckDBParserFormatDetection:
 
 
 class TestDuckDBJSONParser:
-    """Test JSON format parsing."""
-
     def test_parse_simple_scan_json(self) -> None:
 
         parser = DuckDBQueryPlanParser()
@@ -180,7 +167,6 @@ class TestDuckDBJSONParser:
         plan = parser.parse_explain_output("q03", JSON_NESTED_PLAN)
 
         assert plan is not None
-        # Should find the actual operator, not QUERY_PLAN wrapper
         assert plan.logical_root.operator_type == LogicalOperatorType.PROJECT
 
     def test_parse_json_with_timing(self) -> None:
@@ -189,7 +175,6 @@ class TestDuckDBJSONParser:
         plan = parser.parse_explain_output("q04", JSON_WITH_TIMING)
 
         assert plan is not None
-        # Physical operator should have timing info
         assert plan.logical_root.physical_operator is not None
         assert plan.logical_root.physical_operator.properties.get("timing") == 0.015
         assert plan.logical_root.physical_operator.properties.get("cardinality") == 100
@@ -218,7 +203,7 @@ class TestDuckDBJSONParser:
 
         assert plan is not None
         assert plan.plan_fingerprint is not None
-        assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+        assert len(plan.plan_fingerprint) == 64
 
     def test_json_raw_output_preserved(self) -> None:
 
@@ -230,12 +215,9 @@ class TestDuckDBJSONParser:
 
 
 class TestDuckDBParserFallback:
-    """Test fallback from JSON to text parsing."""
-
     def test_fallback_on_invalid_json(self) -> None:
 
         parser = DuckDBQueryPlanParser()
-        # This looks like JSON start but isn't valid JSON, then has text format
         invalid_json_with_text = """{ invalid json here }
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -244,7 +226,6 @@ class TestDuckDBParserFallback:
 └───────────────────────────┘
 """
         plan = parser.parse_explain_output("q09", invalid_json_with_text)
-        # Should fallback to text parser and find the scan
         assert plan is not None
         assert plan.logical_root.operator_type == LogicalOperatorType.SCAN
 
@@ -260,7 +241,6 @@ class TestDuckDBParserFallback:
     def test_empty_json_array_fallback(self) -> None:
 
         parser = DuckDBQueryPlanParser()
-        # Empty array should fail and return None
         plan = parser.parse_explain_output("q11", "[]")
         assert plan is None
 
@@ -268,15 +248,11 @@ class TestDuckDBParserFallback:
 
         parser = DuckDBQueryPlanParser()
         malformed = '{"no_name_field": true}'
-        # Should fail gracefully
         plan = parser.parse_explain_output("q12", malformed)
-        # Returns None since no valid plan found in JSON and no text fallback
         assert plan is None
 
 
 class TestDuckDBParserOperatorIDs:
-    """Test operator ID generation across formats."""
-
     def test_json_operator_ids_unique(self) -> None:
 
         parser = DuckDBQueryPlanParser()
@@ -297,11 +273,9 @@ class TestDuckDBParserOperatorIDs:
         assert plan1 is not None
         assert plan2 is not None
 
-        # Get first operator ID from each plan
         id1 = int(plan1.logical_root.operator_id.split("_")[-1])
         id2 = int(plan2.logical_root.operator_id.split("_")[-1])
 
-        # IDs should start from same base (both should be low numbers)
         assert id1 < 10
         assert id2 < 10
 
@@ -314,12 +288,10 @@ class TestDuckDBParserOperatorIDs:
         assert plan1 is not None
         assert plan2 is not None
 
-        # Both should have valid operator IDs
         assert plan1.logical_root.operator_id is not None
         assert plan2.logical_root.operator_id is not None
 
     def _collect_operators(self, root):
-        """Helper to collect all operators in tree."""
         operators = [root]
         for child in root.children:
             operators.extend(self._collect_operators(child))
@@ -327,8 +299,6 @@ class TestDuckDBParserOperatorIDs:
 
 
 class TestDuckDBParserEdgeCasesJSON:
-    """Edge cases for JSON format parsing."""
-
     def test_empty_children_array(self) -> None:
 
         parser = DuckDBQueryPlanParser()
@@ -375,7 +345,6 @@ class TestDuckDBParserEdgeCasesJSON:
     def test_deeply_nested_json(self) -> None:
 
         parser = DuckDBQueryPlanParser()
-        # Create deeply nested structure
         nested = {"name": "PROJECTION", "children": []}
         current = nested
         for i in range(20):
@@ -390,7 +359,6 @@ class TestDuckDBParserEdgeCasesJSON:
         plan = parser.parse_explain_output("q22", json_str)
 
         assert plan is not None
-        # Should be able to traverse to the bottom
         node = plan.logical_root
         depth = 0
         while node.children:

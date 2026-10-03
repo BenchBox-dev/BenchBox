@@ -1,9 +1,6 @@
-"""Tests for Apache Iceberg maintenance operations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -11,7 +8,6 @@ import sys
 
 import pytest
 
-# Check if pyiceberg is available
 try:
     import pyiceberg  # noqa: F401
 
@@ -19,7 +15,6 @@ try:
 except ImportError:
     ICEBERG_AVAILABLE = False
 
-# Check if pyarrow is available
 try:
     import pyarrow as pa
 
@@ -28,11 +23,9 @@ except ImportError:
     pa = None  # type: ignore[assignment]
     PYARROW_AVAILABLE = False
 
-# Windows has path handling issues with PyIceberg (C:\ treated as URI scheme)
 IS_WINDOWS = sys.platform == "win32"
 
 
-# Skip all tests if Iceberg not available
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -44,8 +37,6 @@ pytestmark = [
 
 
 class TestIcebergMaintenanceAvailability:
-    """Tests for Iceberg maintenance availability."""
-
     def test_get_maintenance_operations_returns_iceberg(self):
 
         from benchbox.core.dataframe.maintenance_interface import (
@@ -94,13 +85,6 @@ class TestIcebergMaintenanceAvailability:
 
 @pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
 class TestIcebergInsert:
-    """Tests for Iceberg insert operations.
-
-    Note: These tests use a local SQLite catalog, which is sufficient for
-    testing the maintenance interface. Production Iceberg usage would
-    typically use Hive Metastore, AWS Glue, or other catalogs.
-    """
-
     def test_insert_new_rows(self, tmp_path):
 
         from benchbox.platforms.dataframe.iceberg_maintenance import (
@@ -110,7 +94,6 @@ class TestIcebergInsert:
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "test_table"
 
-        # Create a PyArrow table
         data = pa.table(
             {
                 "id": pa.array([1, 2, 3], type=pa.int64()),
@@ -134,7 +117,6 @@ class TestIcebergInsert:
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "test_table"
 
-        # Create empty PyArrow table
         empty_data = pa.table({"id": pa.array([], type=pa.int64()), "name": pa.array([], type=pa.string())})
 
         result = ops.insert_rows(table_path=table_path, dataframe=empty_data, mode="append")
@@ -145,10 +127,7 @@ class TestIcebergInsert:
 
 @pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
 class TestIcebergDelete:
-    """Tests for Iceberg delete operations."""
-
     def test_delete_nonexistent_table(self, tmp_path):
-        """Test delete on non-existent table returns 0 rows."""
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -158,15 +137,12 @@ class TestIcebergDelete:
 
         result = ops.delete_rows(table_path=table_path, condition="id > 0")
 
-        # Should succeed with 0 rows (table doesn't exist)
         assert result.success is True
         assert result.rows_affected == 0
 
 
 @pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
 class TestIcebergMaintenanceResult:
-    """Tests for Iceberg maintenance result timing."""
-
     def test_result_timing(self, tmp_path):
 
         from benchbox.platforms.dataframe.iceberg_maintenance import (
@@ -191,8 +167,6 @@ class TestIcebergMaintenanceResult:
 
 @pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
 class TestIcebergDataFrameConversion:
-    """Tests for DataFrame type conversion."""
-
     def test_convert_polars_dataframe(self, tmp_path):
 
         pytest.importorskip("polars")
@@ -205,7 +179,6 @@ class TestIcebergDataFrameConversion:
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "test_table"
 
-        # Create Polars DataFrame with explicit types for Iceberg
         df = pl.DataFrame(
             {
                 "id": pl.Series([1, 2, 3], dtype=pl.Int64),
@@ -230,7 +203,6 @@ class TestIcebergDataFrameConversion:
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "test_table"
 
-        # Create Pandas DataFrame
         df = pd.DataFrame({"id": pd.array([1, 2, 3], dtype="int64"), "name": ["Alice", "Bob", "Charlie"]})
 
         result = ops.insert_rows(table_path=table_path, dataframe=df, mode="append")
@@ -241,8 +213,6 @@ class TestIcebergDataFrameConversion:
 
 @pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
 class TestIcebergDictCondition:
-    """Native dict conditions must translate to Iceberg predicates exactly."""
-
     def test_dict_to_expression_builds_conjunction(self):
         from pyiceberg.expressions import And, EqualTo
 

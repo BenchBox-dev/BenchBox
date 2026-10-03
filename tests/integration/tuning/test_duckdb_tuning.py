@@ -1,11 +1,6 @@
-"""Integration tests for DuckDB physical tuning.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the end-to-end flow from tuning configuration to DDL execution.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,12 +24,8 @@ pytestmark = [
 
 
 class TestDuckDBTuningConfigFlow:
-    """Tests for tuning config flow from YAML to DDL."""
-
     def test_tuning_config_generates_sorted_ddl(self):
 
-        # Create table tuning with sorting
-        # order is position (1-based), sort_order is ASC/DESC
         table_tuning = TableTuning(
             table_name="lineitem",
             sorting=[
@@ -43,11 +34,9 @@ class TestDuckDBTuningConfigFlow:
             ],
         )
 
-        # Generate DDL
         generator = DuckDBDDLGenerator()
         clauses = generator.generate_tuning_clauses(table_tuning)
 
-        # DuckDB uses sort_by field (which becomes ORDER BY in DDL)
         assert clauses.sort_by is not None
         assert "l_shipdate" in clauses.sort_by
         assert "l_orderkey" in clauses.sort_by
@@ -64,7 +53,6 @@ class TestDuckDBTuningConfigFlow:
             ],
         )
 
-        # Generate DDL
         generator = DuckDBDDLGenerator()
         clauses = generator.generate_tuning_clauses(table_tuning)
 
@@ -76,15 +64,13 @@ class TestDuckDBTuningConfigFlow:
 
         ddl = generator.generate_create_table_ddl("test_table", columns, clauses)
 
-        # Execute in DuckDB
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             conn = duckdb.connect(str(db_path))
             try:
                 conn.execute(ddl)
-                # Verify table exists
                 result = conn.execute("SELECT * FROM test_table").fetchall()
-                assert result == []  # Empty table created successfully
+                assert result == []
             finally:
                 conn.close()
 
@@ -92,7 +78,6 @@ class TestDuckDBTuningConfigFlow:
 
         config = UnifiedTuningConfiguration()
 
-        # Add table tuning using the table_tunings dict
         table_tuning = TableTuning(
             table_name="orders",
             sorting=[TuningColumn(name="o_orderdate", type="date", order=1, sort_order="ASC")],
@@ -100,7 +85,6 @@ class TestDuckDBTuningConfigFlow:
         )
         config.table_tunings["orders"] = table_tuning
 
-        # Retrieve and verify
         retrieved = config.table_tunings.get("orders")
         assert retrieved is not None
         assert retrieved.table_name == "orders"
@@ -122,20 +106,14 @@ class TestDuckDBTuningConfigFlow:
 
         clauses = generator.generate_tuning_clauses(table_tuning)
 
-        # Get post-load statements
         post_load = generator.get_post_load_statements("lineitem", clauses)
 
-        # DuckDB uses ORDER BY in table definition, not post-load
-        # So post_load should be empty for sorting
         assert isinstance(post_load, list)
 
 
 class TestDuckDBDDLGeneratorIntegration:
-    """Integration tests for DuckDB DDL generator with actual database."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create an in-memory DuckDB connection."""
         duckdb = pytest.importorskip("duckdb")
         conn = duckdb.connect(":memory:")
         yield conn
@@ -161,7 +139,6 @@ class TestDuckDBDDLGeneratorIntegration:
 
         duckdb_conn.execute(ddl)
 
-        # Verify table exists with correct structure
         result = duckdb_conn.execute(
             "SELECT column_name, data_type FROM information_schema.columns "
             "WHERE table_name = 'test_sorted' ORDER BY ordinal_position"
@@ -199,23 +176,18 @@ class TestDuckDBDDLGeneratorIntegration:
             "(3, '2024-01-01 11:00:00', 'purchase')"
         )
 
-        # Query and verify
         result = duckdb_conn.execute("SELECT id FROM events ORDER BY event_time").fetchall()
         assert [r[0] for r in result] == [2, 1, 3]
 
 
 class TestTuningConfigIntegration:
-    """Tests for tuning configuration integration."""
-
     def test_config_serialization_roundtrip(self):
 
         config = UnifiedTuningConfiguration()
 
-        # Configure constraints
         config.primary_keys.enabled = True
         config.foreign_keys.enabled = False
 
-        # Add table tuning using the table_tunings dict
         config.table_tunings["lineitem"] = TableTuning(
             table_name="lineitem",
             sorting=[
@@ -224,10 +196,8 @@ class TestTuningConfigIntegration:
             ],
         )
 
-        # Serialize
         config_dict = config.to_dict()
 
-        # Deserialize
         restored = UnifiedTuningConfiguration.from_dict(config_dict)
 
         assert restored.primary_keys.enabled is True
@@ -241,7 +211,6 @@ class TestTuningConfigIntegration:
 
         config = UnifiedTuningConfiguration()
 
-        # Add tunings for multiple tables using dict
         for table_name in ["lineitem", "orders", "customer"]:
             config.table_tunings[table_name] = TableTuning(
                 table_name=table_name,

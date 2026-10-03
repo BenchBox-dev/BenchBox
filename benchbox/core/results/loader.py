@@ -1,12 +1,3 @@
-"""Result file loading and discovery utilities for schema v2.x.
-
-This module provides functionality to load and reconstruct BenchmarkResults
-from exported JSON files, enabling result re-export and analysis without
-re-running benchmarks.
-
-IMPORTANT: Only supported schema v2.x files are accepted. Legacy v1.x files are rejected.
-"""
-
 from __future__ import annotations
 
 import json
@@ -44,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 class ResultLoadError(Exception):
-    """Raised when a result file cannot be loaded or parsed."""
+    pass
 
 
 class UnsupportedSchemaError(ResultLoadError):
-    """Raised when the result file has an unsupported schema version."""
+    pass
 
 
 def find_latest_result(
@@ -56,26 +47,11 @@ def find_latest_result(
     benchmark: str | None = None,
     platform: str | None = None,
 ) -> Path | None:
-    """Find the most recent result file in a directory.
-
-    Args:
-        directory: Directory to search for result files.
-        benchmark: Optional benchmark name filter (e.g., "tpch", "tpcds").
-        platform: Optional platform name filter (e.g., "duckdb", "databricks").
-
-    Returns:
-        Path to most recent result file, or None if no results found.
-
-    Note:
-        Only v2.0 schema files are considered. Companion files (.plans.json,
-        .tuning.json) are excluded from the search.
-    """
     directory_path = Path(directory) if isinstance(directory, str) else directory
 
     if not directory_path.exists() or not directory_path.is_dir():
         return None
 
-    # Find all JSON files, excluding companion files
     result_files = [f for f in directory_path.glob("*.json") if not f.name.endswith(COMPANION_SUFFIXES)]
 
     if not result_files:
@@ -87,22 +63,18 @@ def find_latest_result(
             with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Only consider files accepted by the runtime loader policy.
             if not is_loader_supported_result_schema(data):
                 continue
 
-            # Extract metadata for filtering (v2.0 format)
             file_benchmark = data.get("benchmark", {}).get("id", "")
             file_platform = data.get("platform", {}).get("name", "")
             file_timestamp = data.get("run", {}).get("timestamp", "")
 
-            # Apply filters
             if benchmark and benchmark.lower() not in file_benchmark.lower():
                 continue
             if platform and platform.lower() not in file_platform.lower():
                 continue
 
-            # Parse timestamp for sorting
             try:
                 timestamp_dt = datetime.fromisoformat(file_timestamp)
             except (ValueError, TypeError):
@@ -121,23 +93,6 @@ def find_latest_result(
 
 
 def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, Any]]:
-    """Load a result JSON file and reconstruct BenchmarkResults.
-
-    Args:
-        filepath: Path to result JSON file.
-
-    Returns:
-        Tuple of (BenchmarkResults object, raw JSON dict).
-
-    Raises:
-        ResultLoadError: If file cannot be loaded or parsed.
-        UnsupportedSchemaError: If schema version is not v2.0.
-        FileNotFoundError: If file does not exist.
-
-    Note:
-        Only schema v2.0 files are supported. Legacy v1.x files will raise
-        UnsupportedSchemaError.
-    """
     filepath_obj = Path(filepath) if isinstance(filepath, str) else filepath
 
     if not filepath_obj.exists():
@@ -151,54 +106,25 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except OSError as e:
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
-    # Check schema version through the named runtime loader policy.
     version_decision = LOADER_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not version_decision.accepted:
         raise UnsupportedSchemaError(version_decision.error_message())
 
-    # Load companion files if they exist
     plans_data, plans_load_error = _load_companion_file(filepath_obj, ".plans.json")
     tuning_data, _tuning_load_error = _load_companion_file(filepath_obj, ".tuning.json")
     applied_data, _applied_load_error = _load_companion_file(filepath_obj, ".applied.json")
 
-    # Reconstruct BenchmarkResults
     try:
         result = reconstruct_benchmark_results(data, plans_data, tuning_data, applied_data)
     except Exception as e:
         raise ResultLoadError(f"Failed to reconstruct BenchmarkResults: {e}") from e
 
-    # Surface a plans-companion load failure so consumers can distinguish "no
-    # plans were captured" from "a .plans.json exists but could not be read"
-    # (qpc-05 / F4.3). Attached as an attribute rather than swallowed at DEBUG.
     result.plans_load_error = plans_load_error
 
     return result, data
 
 
 def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] | None, str | None]:
-    """Load a companion file if it exists.
-
-    Returns ``(data, error)``:
-      - ``(dict, None)`` when the companion loaded successfully;
-      - ``(None, None)`` when no companion file exists (the common case);
-      - ``(None, "<reason>")`` when the companion EXISTS but could not be read
-        or parsed.
-
-    The exists-but-unreadable case is a user-actionable problem (a corrupt or
-    unreadable ``.plans.json``), so it is logged at WARNING and returned as an
-    error string rather than swallowed at DEBUG and reported downstream as "no
-    plans captured" (qpc-05 / F4.3).
-
-    Path arithmetic: an exact basename suffix swap (``name[:-len(".json")] +
-    suffix``) rather than ``Path.with_suffix()`` chained twice or a path-wide
-    ``str.replace(".json", suffix)`` -- both of those break on a scale-factor
-    filename like ``result_sf0.1.json`` -- ``with_suffix("")`` leaves
-    ``result_sf0.1``, whose OWN suffix is then read as ``.1`` (stripped by
-    the second ``with_suffix()`` call, corrupting the basename to
-    ``result_sf0.plans.json``); ``str.replace`` operates on the full path
-    string and rewrites the FIRST ``.json`` it finds anywhere, including one
-    that happens to appear in a parent directory name.
-    """
     name = main_file.name
     companion_name = name[: -len(".json")] + suffix if name.endswith(".json") else name + suffix
     companion_path = main_file.with_name(companion_name)
@@ -215,7 +141,6 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
 
 
 def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
-    """Reject query extensions that predate their schema contract."""
     version = str(result_schema_version_value(data) or "")
     if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
         return
@@ -234,26 +159,6 @@ def reconstruct_benchmark_results(
     tuning_data: dict[str, Any] | None = None,
     applied_data: dict[str, Any] | None = None,
 ) -> BenchmarkResults:
-    """Reconstruct a BenchmarkResults object from a supported v2.x JSON schema.
-
-    This function reverses the transformation performed by build_result_payload()
-    in the schema module, mapping JSON keys back to BenchmarkResults dataclass
-    attributes.
-
-    Args:
-        data: Result data in v2.0 JSON format.
-        plans_data: Optional plans companion file data.
-        tuning_data: Optional tuning companion file data.
-        applied_data: Optional applied-ledger companion (``.applied.json``) data,
-            the AppliedTuningLedger.to_payload() dict; carried onto the result.
-
-    Returns:
-        Fully reconstructed BenchmarkResults object.
-
-    Raises:
-        KeyError: If required fields are missing.
-        ValueError: If data cannot be parsed correctly.
-    """
     _validate_versioned_query_extensions(data)
     run_section = data.get("run", {})
     benchmark_section = data.get("benchmark", {})
@@ -344,7 +249,6 @@ def reconstruct_benchmark_results(
 
 
 def _coerce_datagen_version(value: object) -> int | None:
-    """Coerce a persisted datagen version to int; unknown shapes stay unset."""
     if value is None:
         return None
     if isinstance(value, bool):
@@ -360,7 +264,6 @@ def _coerce_datagen_version(value: object) -> int | None:
 
 
 def _coerce_datagen_hash(value: object) -> str | None:
-    """Coerce a persisted datagen hash to str; unknown shapes stay unset."""
     if value is None:
         return None
     if isinstance(value, str) and value.strip():
@@ -369,7 +272,6 @@ def _coerce_datagen_hash(value: object) -> str | None:
 
 
 def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
-    """Preserve execution metadata that is not otherwise reconstructed."""
     metadata: dict[str, Any] = {}
     translation = execution_section.get("translation")
     if isinstance(translation, dict):
@@ -381,7 +283,6 @@ def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, 
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:
-    """Parse an ISO-format timestamp string, falling back to now()."""
     try:
         return datetime.fromisoformat(timestamp_str)
     except (ValueError, TypeError):
@@ -389,7 +290,6 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
 
 
 def _extract_timing_metrics(summary_section: dict[str, Any]) -> dict[str, Any]:
-    """Extract timing and data loading metrics from the summary section."""
     timing = summary_section.get("timing", {})
     data_section = summary_section.get("data", {})
     return {
@@ -401,7 +301,6 @@ def _extract_timing_metrics(summary_section: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_tpc_metrics(summary_section: dict[str, Any]) -> dict[str, Any]:
-    """Extract TPC benchmark metrics from the summary section."""
     tpc = summary_section.get("tpc_metrics", {})
     timing = summary_section.get("timing", {})
     geometric_mean_ms = timing.get("geometric_mean_ms")
@@ -414,7 +313,6 @@ def _extract_tpc_metrics(summary_section: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
-    """Extract and reconstruct platform info dictionary."""
     info: dict[str, Any] = {
         "name": platform_section.get("name"),
         "version": platform_section.get("version"),
@@ -426,20 +324,6 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str, Any] | None) -> dict[str, Any]:
-    """Extract tuning configuration from platform section and companion data.
-
-    Reads the inlined ``platform.tuning`` block first: since the requested
-    configuration and the applied ledger are folded into the bundle, a bundle is
-    self-describing and needs no companion to reconstruct its tuning. A
-    ``.tuning.json`` companion still wins where it is present, because it is the
-    only source for bundles exported before the inlining and because a
-    republished corpus bundle may carry the companion alone.
-
-    Prefers the ADR-1 fields (``requested_config_hash``, ``tuning_source``) and
-    falls back to the legacy ``hash``/``source`` bridge keys for older bundles
-    that predate this extraction (see schema.py's
-    ``_legacy_tuning_source_bridge``).
-    """
     tunings_applied = None
     tuning_source_file = None
     tuning_config_hash = None
@@ -451,11 +335,6 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
         tuning_source = tuning_summary.get("tuning_source")
         tuning_validation_status = tuning_summary.get("validation_status")
-        # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
-        # source in the summary block, with no companion .tuning.json carrying
-        # a real source_file. Reconstruct the old "yaml" sentinel here so those
-        # summary-only bundles keep round-tripping a truthy tuning_source_file,
-        # matching this function's pre-existing behavior.
         tuning_source_file = tuning_summary.get("source_file") or (
             "yaml" if tuning_summary.get("source") == "yaml" else None
         )
@@ -464,11 +343,6 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
             tunings_applied = _flatten_requested_tuning(inline_requested)
 
     if tuning_data:
-        # A companion wins field by field, never wholesale. A companion that is
-        # stale, hand-authored, or minimal can carry only `requested`, and
-        # overwriting unconditionally would wipe the inlined `source_file` and
-        # `validation_status` with None -- losing, on a bundle that states them,
-        # the template the run used and whether its tuning was verified.
         requested = tuning_data.get("requested")
         if requested:
             tunings_applied = _flatten_requested_tuning(requested)
@@ -492,14 +366,6 @@ def _extract_applied_ledger(
     platform_section: dict[str, Any],
     applied_data: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Reconstruct the applied-tuning ledger from the bundle or its companion.
-
-    An ``.applied.json`` companion wins when present: it is the only source for
-    bundles exported before the ledger was inlined, and a republished corpus
-    bundle may ship the companion alone. Otherwise the inlined
-    ``platform.tuning.applied`` block is the ledger, with the hash re-attached
-    from the summary that owns it.
-    """
     if applied_data:
         return applied_data
 
@@ -521,7 +387,6 @@ def _extract_applied_ledger_hash(
     platform_section: dict[str, Any],
     applied_data: dict[str, Any] | None,
 ) -> str | None:
-    """Resolve the applied-ledger hash, companion first, then the summary."""
     if applied_data and applied_data.get("applied_ledger_hash"):
         return applied_data["applied_ledger_hash"]
     tuning_summary = platform_section.get("tuning")
@@ -531,15 +396,6 @@ def _extract_applied_ledger_hash(
 
 
 def _flatten_requested_tuning(requested: dict[str, Any]) -> dict[str, Any]:
-    """Restore the flat requested-tuning shape from its exported grouping.
-
-    schema.py's ``_requested_tuning_sections`` groups
-    primary_keys/foreign_keys/unique_constraints/check_constraints under
-    ``requested["constraints"]`` for export. ``tunings_applied`` must carry the
-    flat ``UnifiedTuningConfiguration.to_dict()`` shape (builder.py's documented
-    contract) so a load -> re-export round trip through ``build_tuning_payload``
-    does not drop every constraint and its ``platform.tuning.counts`` entry.
-    """
     flattened = dict(requested.get("constraints") or {})
     for key in ("platform_optimizations", "table_tunings"):
         if key in requested:
@@ -548,7 +404,6 @@ def _flatten_requested_tuning(requested: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_system_profile(environment_section: dict[str, Any]) -> dict[str, Any]:
-    """Reconstruct system profile from environment section."""
     profile: dict[str, Any] = {}
     if not environment_section:
         return profile
@@ -579,7 +434,6 @@ def _extract_system_profile(environment_section: dict[str, Any]) -> dict[str, An
 
 
 def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[str, Any] | None:
-    """Extract normalized execution-environment metadata from the environment section."""
     if not isinstance(environment_section, dict):
         return None
 
@@ -596,13 +450,6 @@ def _extract_cost_summary(
     normalized_cost_section: dict[str, Any] | None = None,
     scan_bytes_section: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """Extract cost summary from cost section.
-
-    Preserves the ``normalized_cost`` block when present so a re-export round-
-    trips ``cost.total_usd`` correctly for bundles that have one. Legacy
-    bundles without a normalized_cost block still round-trip their direct
-    total via the schema-side missing-vs-rejected distinction.
-    """
     if not cost_section and not isinstance(scan_bytes_section, dict):
         return None
     summary: dict[str, Any] = {}
@@ -621,7 +468,6 @@ def _extract_cost_summary(
 
 
 def _extract_plans_info(plans_data: dict[str, Any] | None) -> tuple[int, int]:
-    """Extract query plan capture counts from companion data."""
     if not plans_data:
         return 0, 0
     return plans_data.get("plans_captured", 0), plans_data.get("capture_failures", 0)
@@ -632,52 +478,6 @@ def _reconstruct_query_results(
     errors_list: list[dict[str, Any]],
     plans_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Reconstruct query results from compact v2.0 format.
-
-    Converts from compact format:
-        {"id": "Q1", "ms": 632.9, "rows": 100}
-
-    To internal format:
-        {"query_id": "Q1", "execution_time_ms": 632.9, "rows_returned": 100, "status": "SUCCESS"}
-
-    When ``plans_data`` (the loaded ``.plans.json`` companion) carries an entry for a
-    query ID, rehydrate ``query_plan`` as a real ``QueryPlanDAG`` plus its fingerprint
-    fields, so plans survive a load -> show-plan/compare-plans round-trip.
-
-    ``build_plans_payload`` keys its ``queries`` map by the raw, pre-normalization
-    query ID (e.g. ``"q1"``), while the compact ``queries`` list here carries the
-    already-normalized ID (e.g. ``"1"``) written by ``_build_query_results_section``.
-    Normalize both sides for the lookup so the two companion files agree without
-    changing the on-disk ``.plans.json`` format. A query ID that ran in more than
-    one stream is written under ``"{query_id}#{stream_id}"`` composite keys (see
-    ``build_plans_payload``); ``_index_plan_entries``/``_lookup_plan_entry`` below
-    resolve those back to the exact stream's entry. A combined run (e.g. power
-    then throughput) can have a power row and a throughput row share the same
-    query_id AND stream_id (each phase's stream counter starts at its own 0);
-    those are disambiguated with a further ``"{query_id}#{stream_id}:{test_type}"``
-    key, resolved via the row's own compact ``test_type`` field.
-
-    Current-format bundles write ``status``/``run_type`` on every compact entry
-    (including failures, which are ALSO duplicated into ``errors[]`` for the
-    legacy fallback below) and use ``iter``/``stream`` 0 for warmup rows / the
-    first stream. Legacy bundles predate those per-entry fields entirely: their
-    ``queries[]`` entries carry only successful queries (no ``status`` key at
-    all) and failures live solely in ``errors[]``. Both shapes must round-trip:
-    an entry's own ``status`` (when present) is authoritative; ``errors[]`` is
-    only used to (a) attach ``error_type``/``error_message`` detail onto a
-    compact entry that already reports non-SUCCESS, and (b) synthesize a
-    standalone FAILED row for a query_id that never appears in ``queries[]``
-    at all (the legacy shape).
-
-    ``errors[]`` and ``queries[]`` are written in the same order (see
-    ``schema.py``'s single pass over ``normalized_results``), and a query_id
-    can legitimately fail more than once across iterations/streams. Errors
-    are matched to their queries[] row one-at-a-time, in write order, per
-    query_id (a FIFO queue keyed by normalized query_id) rather than always
-    reusing the first error seen for that ID - the earlier ``dict.setdefault``
-    approach attached the SAME (first) error detail to every repeated failure
-    of a query, discarding the real cause of the later ones.
-    """
     plan_entries = _index_plan_entries(plans_data)
     results: list[dict[str, Any]] = []
 
@@ -690,11 +490,6 @@ def _reconstruct_query_results(
             continue
         query_errors_by_id[normalize_query_id(qid)].append(error)
 
-    # Tracks which error dicts (by identity) were actually attached to a
-    # queries[] row below, so the legacy fallback only synthesizes a
-    # standalone row for errors that a queries[] row never consumed - not
-    # for every error whose query_id merely appears elsewhere in queries[]
-    # (e.g. a different, successful execution of the same query_id).
     consumed_error_ids: set[int] = set()
 
     for q in queries_list:
@@ -702,10 +497,6 @@ def _reconstruct_query_results(
         query_id = execution.query_id
         status = execution.status
         result = query_execution_to_legacy_dict(execution)
-        # Preserve the established loader API shape even when compact v2 omits
-        # optional numeric fields.  Schema re-export still omits these None
-        # values through the legacy adapter, while callers that index the
-        # reconstructed dictionary retain their historical contract.
         result.setdefault("execution_time_ms", None)
         result.setdefault("rows_returned", None)
 
@@ -723,10 +514,6 @@ def _reconstruct_query_results(
         )
         results.append(result)
 
-    # Legacy fallback: synthesize a FAILED row for every error not already
-    # consumed above. Current-format bundles duplicate every failure into
-    # queries[] too, so every error is consumed by the loop above and this
-    # produces nothing extra (no phantom second row for the same failure).
     for error in errors_list:
         if error.get("phase") != "query":
             continue
@@ -745,7 +532,6 @@ def _reconstruct_query_results(
 
 
 def _attach_plan(result: dict[str, Any], plan_entry: dict[str, Any] | None) -> None:
-    """Rehydrate a ``.plans.json`` entry onto a reconstructed query result dict."""
     if not plan_entry:
         return
 
@@ -761,16 +547,6 @@ def _attach_plan(result: dict[str, Any], plan_entry: dict[str, Any] | None) -> N
 
 
 def _index_plan_entries(plans_data: dict[str, Any] | None) -> dict[str, Any]:
-    """Index a ``.plans.json`` ``queries`` map for lookup by normalized query ID.
-
-    A query ID that ran in more than one stream is written under
-    ``"{query_id}#{stream_id}"`` composite keys (see ``build_plans_payload``); this
-    splits those apart so the reader doesn't need to know the writer's key format.
-    Each normalized query ID maps to either a single entry dict (the common
-    bare-key, single-stream case) or a ``{stream_id_str: entry}`` dict (the
-    multi-stream case) - distinguished in ``_lookup_plan_entry`` by the presence
-    of a ``"plan"`` key, which a stream-keyed bucket never has.
-    """
     raw_entries: dict[str, Any] = (plans_data or {}).get("queries") or {}
     indexed: dict[str, Any] = {}
     for key, entry in raw_entries.items():
@@ -786,8 +562,6 @@ def _index_plan_entries(plans_data: dict[str, Any] | None) -> dict[str, Any]:
 def _lookup_plan_entry(
     plan_entries: dict[str, Any], query_id: Any, stream_id: Any, test_type: Any = None
 ) -> dict[str, Any] | None:
-    """Resolve the plan entry for ``query_id``, disambiguating by ``stream_id`` (and,
-    for a cross-phase collision, ``test_type``) when needed."""
     if query_id is None:
         return None
     entry = plan_entries.get(normalize_query_id(query_id))
@@ -801,27 +575,10 @@ def _lookup_plan_entry(
 
 
 def iter_query_results(results: Any) -> list[dict[str, Any]]:
-    """Return the flattened per-query result dicts for a ``BenchmarkResults`` instance.
-
-    ``query_results`` is the canonical per-query source: ``ResultBuilder`` populates it
-    identically for freshly executed results and ``reconstruct_benchmark_results``
-    populates it the same way for bundles reloaded from disk (including rehydrated
-    ``query_plan``/``plan_fingerprint`` values from the ``.plans.json`` companion).
-    ``execution_phases`` is not a reliable per-query source once reconstructed from a
-    bundle - only phase-level summaries survive that round-trip - so consumers that
-    need per-query plan/fingerprint data should use this accessor instead of walking
-    ``execution_phases``.
-    """
     return list(getattr(results, "query_results", None) or [])
 
 
 def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPhases | None:
-    """Reconstruct ExecutionPhases from the phases block.
-
-    Only summary-level fields (status, duration_ms) are available for most phases.
-    MigrationPhase is reconstructed with full summary fields; per_table_stats
-    cannot be recovered (intentionally excluded from serialization).
-    """
     if not phases_section:
         return None
 
@@ -836,7 +593,7 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
             storage_before_bytes=mig.get("storage_before_bytes", 0),
             storage_after_bytes=mig.get("storage_after_bytes", 0),
             storage_delta_bytes=mig.get("storage_delta_bytes", 0),
-            per_table_stats={},  # Not serialized; summary-level only
+            per_table_stats={},
         )
 
     throughput = None
@@ -875,10 +632,6 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
             ),
         )
 
-    # Only return ExecutionPhases if we have at least one reconstructable phase.
-    # Setup sub-phases (data_generation, schema_creation, etc.) are serialized as
-    # flat status/duration_ms pairs - insufficient to reconstruct the full dataclass
-    # tree, so we provide a minimal SetupPhase shell for round-trip fidelity.
     if (
         migration is None
         and throughput is None
@@ -887,14 +640,13 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
         return None
 
     return ExecutionPhases(
-        setup=SetupPhase(),  # Placeholder; sub-phase detail not recoverable
+        setup=SetupPhase(),
         migration=migration,
         throughput_test=throughput,
     )
 
 
 def _reconstruct_native_comparison(comparisons_section: dict[str, Any]) -> NativeComparison | None:
-    """Reconstruct NativeComparison from the comparisons block."""
     if not comparisons_section:
         return None
 

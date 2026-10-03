@@ -58,13 +58,18 @@ Quick Start
 API Reference
 ~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.scale_factor.format_scale_factor
+.. py:function:: benchbox.utils.scale_factor.format_scale_factor(scale_factor: float) -> str
 
-**Signature**:
+   Format a scale label. Integral values >= 1 produce sf plus the integer;
+   nonintegral values >= 1 remove the decimal point from their string form. Values
+   below 1 use ten decimal places, strip trailing zeros and prefix the remaining
+   decimal digits with sf0; zero produces sf0. Examples: 1 -> sf1, 1.5 -> sf15,
+   0.1 -> sf01 and 0.01 -> sf001.
 
-.. code-block:: python
+   This is a naming convention, not a lossless or unique numeric encoding: 1.5 and
+   15 both produce sf15, and sufficiently small values round to sf0. Callers are
+   responsible for valid scale inputs; the function does not validate positivity.
 
-    format_scale_factor(scale_factor: float) -> str
 
 **Parameters**:
 
@@ -90,13 +95,10 @@ API Reference
     format_scale_factor(1.5)    # "sf15"
     format_scale_factor(2.25)   # "sf225"
 
-.. autofunction:: benchbox.utils.scale_factor.format_benchmark_name
+.. py:function:: benchbox.utils.scale_factor.format_benchmark_name(benchmark_name: str, scale_factor: float) -> str
 
-**Signature**:
+   Return benchmark_name followed by an underscore and format_scale_factor(scale_factor). Preserve the supplied benchmark name.
 
-.. code-block:: python
-
-    format_benchmark_name(benchmark_name: str, scale_factor: float) -> str
 
 **Parameters**:
 
@@ -113,13 +115,10 @@ API Reference
     format_benchmark_name("tpcds", 0.1)   # "tpcds_sf01"
     format_benchmark_name("ssb", 10.0)    # "ssb_sf10"
 
-.. autofunction:: benchbox.utils.scale_factor.format_data_directory
+.. py:function:: benchbox.utils.scale_factor.format_data_directory(benchmark_name: str, scale_factor: float) -> str
 
-**Signature**:
+   Return benchmark_name, an underscore, the formatted scale label, and _data. This returns a name, not a created directory.
 
-.. code-block:: python
-
-    format_data_directory(benchmark_name: str, scale_factor: float) -> str
 
 **Parameters**:
 
@@ -136,13 +135,10 @@ API Reference
     format_data_directory("tpcds", 0.1)   # "tpcds_sf01_data"
     format_data_directory("ssb", 10.0)    # "ssb_sf10_data"
 
-.. autofunction:: benchbox.utils.scale_factor.format_schema_name
+.. py:function:: benchbox.utils.scale_factor.format_schema_name(benchmark_name: str, scale_factor: float) -> str
 
-**Signature**:
+   Return benchmark_name followed by an underscore and the formatted scale label. The function does not sanitize database identifiers.
 
-.. code-block:: python
-
-    format_schema_name(benchmark_name: str, scale_factor: float) -> str
 
 **Parameters**:
 
@@ -266,16 +262,18 @@ Quick Start
 API Reference
 ~~~~~~~~~~~~~
 
-.. autofunction:: benchbox.utils.dependency_validation.validate_dependency_versions
+.. py:function:: benchbox.utils.dependency_validation.validate_dependency_versions(pyproject_data: Mapping[str, object], lock_data: Mapping[str, object]) -> list[str]
 
-**Signature**:
+   Check project dependencies and optional extras against parsed lock data.
+   Canonicalize package names and accept any satisfying locked version, including
+   prereleases. Return problem strings; an empty list means every checked
+   requirement has a satisfying version. The check does not evaluate environment
+   markers or prove that every target environment resolves successfully.
 
-.. code-block:: python
+   :raises DependencyValidationError: pyproject_data has no project mapping.
 
-    validate_dependency_versions(
-        pyproject_data: Mapping[str, object],
-        lock_data: Mapping[str, object]
-    ) -> list[str]
+   Invalid requirement/version strings can raise their packaging parser errors.
+
 
 **Parameters**:
 
@@ -305,16 +303,12 @@ API Reference
         for problem in problems:
             print(f"❌ {problem}")
 
-.. autofunction:: benchbox.utils.dependency_validation.build_matrix_summary
+.. py:function:: benchbox.utils.dependency_validation.build_matrix_summary(pyproject_data: Mapping[str, object], lock_data: Mapping[str, object]) -> dict[str, object]
 
-**Signature**:
+   Return python_requires from lock_data requires-python (unspecified when absent),
+   resolution_markers as a list, and optional_dependencies with extras sorted by
+   name. This is a summary of supplied mappings, not dependency resolution.
 
-.. code-block:: python
-
-    build_matrix_summary(
-        pyproject_data: Mapping[str, object],
-        lock_data: Mapping[str, object]
-    ) -> dict[str, object]
 
 **Parameters**:
 
@@ -493,17 +487,85 @@ API Reference
 SystemInfo Class
 """"""""""""""""
 
-.. autoclass:: benchbox.utils.system_info.SystemInfo
+.. py:class:: benchbox.utils.system_info.SystemInfo(os_name: str, os_version: str, architecture: str, cpu_model: str | None, cpu_cores: int, total_memory_gb: float, available_memory_gb: float, python_version: str, hostname: str, cpu_vendor: str | None = None, cpu_identity_provenance: str | None = None)
+
+   Dataclass of host information. The first nine fields are required constructor
+   arguments. cpu_vendor and cpu_identity_provenance are appended optional fields,
+   preserving existing positional construction. Memory values divide bytes by
+   1024**3 (GiB), despite the historical _gb suffix.
+
+.. py:method:: benchbox.utils.system_info.SystemInfo.to_dict() -> dict[str, Any]
+
+   Return a compatibility dictionary. os_name becomes os_type, while os_version
+   also appears as os_release; cpu_cores also appears as cpu_count, and
+   total_memory_gb also appears as memory_gb. Retain original memory names and CPU
+   identity/provenance fields. This differs from the dataclass field-name layout.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.os_name
+   :type: str
+
+   Operating system name. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.os_version
+   :type: str
+
+   Operating system release. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.architecture
+   :type: str
+
+   Machine architecture. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.cpu_model
+   :type: str | None
+
+   Measured or inferred CPU model, or None when unavailable. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.cpu_cores
+   :type: int
+
+   Declared logical core count; get_system_info uses psutil detection, which can be unavailable. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.total_memory_gb
+   :type: float
+
+   Total host memory in GiB. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.available_memory_gb
+   :type: float
+
+   Available host memory in GiB. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.python_version
+   :type: str
+
+   Python runtime version. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.hostname
+   :type: str
+
+   Host name. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.cpu_vendor
+   :type: str | None
+
+   Optional CPU vendor. Default: ``None``.
+
+.. py:attribute:: benchbox.utils.system_info.SystemInfo.cpu_identity_provenance
+   :type: str | None
+
+   Optional identity provenance: measured or inferred. Default: ``None``.
+
 
 **Fields**:
 
 - **os_name** (str): Operating system name
 - **os_version** (str): Operating system version
 - **architecture** (str): System architecture
-- **cpu_model** (str): CPU model name
+- **cpu_model** (str | None): CPU model name, or None when unavailable
 - **cpu_cores** (int): Number of CPU cores
-- **total_memory_gb** (float): Total memory in GB
-- **available_memory_gb** (float): Available memory in GB
+- **total_memory_gb** (float): Total memory in GiB (bytes / 1024**3)
+- **available_memory_gb** (float): Available memory in GiB (bytes / 1024**3)
 - **python_version** (str): Python version
 - **hostname** (str): System hostname
 
@@ -511,13 +573,24 @@ SystemInfo Class
 
    Convert to dictionary for compatibility.
 
-.. autofunction:: benchbox.utils.system_info.get_system_info
+.. py:function:: benchbox.utils.system_info.get_system_info() -> SystemInfo
 
-**Signature**:
+   Return current host information. Detect a measured CPU identity when possible;
+   fall back to inferred real model strings and keep cpu_model=None when identity
+   cannot be established. Bare architecture tokens are not substituted for CPU
+   models. CPU counts follow psutil detection and can be unavailable on some hosts.
+   Memory quantities use bytes / 1024**3.
 
-.. code-block:: python
+   Try the platform-specific CPU detector first. If it supplies no usable model,
+   try ``platform.processor()`` and then ``/proc/cpuinfo`` when that string is
+   empty. Reject architecture-only fallback strings: an unavailable identity
+   remains ``None`` rather than becoming a model-like placeholder. Successful
+   detector models have ``cpu_identity_provenance="measured"``; accepted fallback
+   models have ``"inferred"``. Missing identity leaves provenance unset. This
+   preserves a meaningful hardware axis when an OS processor string is merely
+   ``arm`` or ``x86_64``. CPU detection failures fall back; other host/memory
+   collection errors are not broadly suppressed.
 
-    get_system_info() -> SystemInfo
 
 **Returns**: ``SystemInfo`` dataclass with current system information
 
@@ -533,22 +606,20 @@ SystemInfo Class
     print(f"Cores: {info.cpu_cores}")
     print(f"Memory: {info.total_memory_gb:.1f} GB")
 
-.. autofunction:: benchbox.utils.system_info.get_memory_info
+.. py:function:: benchbox.utils.system_info.get_memory_info() -> dict[str, float]
 
-**Signature**:
+   Return total_gb, available_gb and used_gb as bytes / 1024**3, plus percent_used
+   on a 0 to 100 scale. These historical _gb keys therefore contain GiB quantities.
 
-.. code-block:: python
-
-    get_memory_info() -> dict[str, float]
 
 **Returns**: Dictionary with memory information
 
 **Keys**:
 
-- ``total_gb``: Total memory in GB
-- ``available_gb``: Available memory in GB
-- ``used_gb``: Used memory in GB
-- ``percent_used``: Memory usage percentage
+- ``total_gb``: Total memory in GiB (bytes / 1024**3)
+- ``available_gb``: Available memory in GiB (bytes / 1024**3)
+- ``used_gb``: Used memory in GiB (bytes / 1024**3)
+- ``percent_used``: Memory usage percentage on a 0 to 100 scale
 
 **Example**:
 
@@ -560,13 +631,15 @@ SystemInfo Class
     print(f"Memory: {memory['used_gb']:.1f} GB / {memory['total_gb']:.1f} GB "
           f"({memory['percent_used']:.1f}%)")
 
-.. autofunction:: benchbox.utils.system_info.get_cpu_info
+.. py:function:: benchbox.utils.system_info.get_cpu_info() -> dict[str, Any]
 
-**Signature**:
+   Return logical_cores, physical_cores, current_usage_percent, per_core_usage
+   and model. Core counts may be None when psutil cannot detect them. Usage values
+   are percentages; per_core_usage is a list. Two sequential one-second CPU samples
+   are taken, so this call normally blocks for about two seconds. Model uses the
+   platform processor string or an architecture-based fallback; its identity
+   policy differs from get_system_info.
 
-.. code-block:: python
-
-    get_cpu_info() -> dict[str, Any]
 
 **Returns**: Dictionary with CPU information
 
@@ -588,6 +661,32 @@ SystemInfo Class
     print(f"CPU: {cpu['model']}")
     print(f"Cores: {cpu['physical_cores']} physical, {cpu['logical_cores']} logical")
     print(f"Usage: {cpu['current_usage_percent']:.1f}%")
+
+
+CPU Identity Detection
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. py:function:: benchbox.utils.environment.is_cpu_architecture_token(value: str, machine: str) -> bool
+
+   Strip and lowercase the value. Return true for an empty value, the current
+   machine architecture, that architecture followed by ``CPU``, ``unknown cpu``
+   or a recognized architecture token. Use this to reject architecture labels
+   masquerading as CPU models; it does not identify arbitrary processor brands.
+
+.. py:function:: benchbox.utils.environment.detect_cpu_info() -> tuple[str | None, str | None]
+
+   Return CPU model and vendor, allowing either to be unavailable. Darwin reads
+   the ``sysctl`` CPU brand string; Linux reads ``/proc/cpuinfo`` and uses known
+   ARM part mappings when no model string is present; Windows reads the first
+   ``Win32_Processor`` through PowerShell CIM. Darwin and Windows subprocesses
+   have two-second timeouts. Probe errors return unavailable values; unsupported
+   platforms return ``(None, None)``. A detected architecture label is discarded
+   as a model, without discarding an available vendor.
+
+   These probes request processor identity, not hostnames or machine identifiers.
+   ``get_system_info()`` separately includes a hostname; callers publishing host
+   information still need the :doc:`/development/result-execution-environment`
+   anonymization rules.
 
 Usage Examples
 ~~~~~~~~~~~~~~

@@ -1,24 +1,11 @@
-"""Shared fixtures and utilities for core unit tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
 
 class MockExpr:
-    """Minimal expression mock for DataFrame/expression API testing.
-
-    Supports all operators needed by both Polars-style expression_impl and
-    pandas-style pandas_impl functions: comparisons, booleans, arithmetic,
-    item access, and method chaining - all return self.
-
-    Exists because MagicMock raises TypeError for ``mock >= mock`` comparisons
-    when the comparison result is used inside numpy/polars boolean contexts.
-    """
-
     def __ge__(self, other: object) -> MockExpr:
         return self
 

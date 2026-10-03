@@ -1331,25 +1331,21 @@ def _load_helper_query_specs() -> list[dict[str, Any]]:
 _HELPER_QUERY_SPECS = _load_helper_query_specs()
 
 
-def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helper_args: tuple[Any, ...]) -> QueryImpl:
+def _make_helper_impl(query_id: int, family: str, helper: Any, helper_args: tuple[Any, ...]) -> QueryImpl:
     def impl(ctx: DataFrameContext) -> Any:
         return helper(ctx, query_id, *helper_args)
 
     impl.__name__ = f"q{query_id}_{family}_impl"
     impl.__qualname__ = impl.__name__
-    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
     return impl
 
 
 for _spec in _HELPER_QUERY_SPECS:
     _qid = _spec["query_id"]
-    _title = _spec["title"]
     _register_generated_impl(
-        _make_helper_impl(_qid, _title, "expression", globals()[_spec["expression_helper"]], _spec["args"])
+        _make_helper_impl(_qid, "expression", globals()[_spec["expression_helper"]], _spec["args"])
     )
-    _register_generated_impl(
-        _make_helper_impl(_qid, _title, "pandas", globals()[_spec["pandas_helper"]], _spec["args"])
-    )
+    _register_generated_impl(_make_helper_impl(_qid, "pandas", globals()[_spec["pandas_helper"]], _spec["args"]))
 
 
 _JoinedAggCondition = tuple[Any, ...]
@@ -1541,7 +1537,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     return result if limit is None else result.head(limit)
 
 
-def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
+def _make_joined_agg_impl(query_id: int, family: str, spec: dict[str, Any]) -> QueryImpl:
     engine = _joined_agg_expression_impl if family == "expression" else _joined_agg_pandas_impl
 
     def impl(ctx: DataFrameContext) -> Any:
@@ -1549,7 +1545,6 @@ def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str
 
     impl.__name__ = f"q{query_id}_{family}_impl"
     impl.__qualname__ = impl.__name__
-    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
     return impl
 
 
@@ -1627,7 +1622,7 @@ def _state_average_returns_pandas_impl(ctx: DataFrameContext, spec: dict[str, An
     return result
 
 
-def _make_state_average_returns_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
+def _make_state_average_returns_impl(query_id: int, family: str, spec: dict[str, Any]) -> QueryImpl:
     engine = _state_average_returns_expression_impl if family == "expression" else _state_average_returns_pandas_impl
 
     def impl(ctx: DataFrameContext) -> Any:
@@ -1635,21 +1630,18 @@ def _make_state_average_returns_impl(query_id: int, title: str, family: str, spe
 
     impl.__name__ = f"q{query_id}_{family}_impl"
     impl.__qualname__ = impl.__name__
-    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
     return impl
 
 
 for _spec in _QUERY_SPECS["joined_aggregate"]:
     _query_id = _spec["query_id"]
-    _query_title = _spec["title"]
-    _register_generated_impl(_make_joined_agg_impl(_query_id, _query_title, "expression", _spec))
-    _register_generated_impl(_make_joined_agg_impl(_query_id, _query_title, "pandas", _spec))
+    _register_generated_impl(_make_joined_agg_impl(_query_id, "expression", _spec))
+    _register_generated_impl(_make_joined_agg_impl(_query_id, "pandas", _spec))
 
 for _spec in _QUERY_SPECS["state_average_returns"]:
     _query_id = _spec["query_id"]
-    _query_title = _spec["title"]
-    _register_generated_impl(_make_state_average_returns_impl(_query_id, _query_title, "expression", _spec))
-    _register_generated_impl(_make_state_average_returns_impl(_query_id, _query_title, "pandas", _spec))
+    _register_generated_impl(_make_state_average_returns_impl(_query_id, "expression", _spec))
+    _register_generated_impl(_make_state_average_returns_impl(_query_id, "pandas", _spec))
 
 
 def q96_expression_impl(ctx: DataFrameContext) -> Any:

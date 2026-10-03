@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Verify canonical JoinOrder corpus backfill bundles."""
 
 from __future__ import annotations
 

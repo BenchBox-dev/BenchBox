@@ -1,9 +1,6 @@
-"""Tests for Azure Synapse Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +15,6 @@ pytestmark = [
 
 
 def test_synapse_spark_load_data_propagates_table_creation_failure(tmp_path):
-    """A failed table creation must not be reported as a successful load."""
     with (
         patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
         patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -45,8 +41,6 @@ def test_synapse_spark_load_data_propagates_table_creation_failure(tmp_path):
 
 
 class TestSynapseSparkAdapterInitialization:
-    """Test SynapseSparkAdapter initialization."""
-
     def test_missing_workspace_name_raises_error(self):
 
         with (
@@ -112,7 +106,6 @@ class TestSynapseSparkAdapterInitialization:
                 )
 
     def test_valid_configuration(self):
-        """Test valid configuration with all required parameters."""
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -161,7 +154,6 @@ class TestSynapseSparkAdapterInitialization:
             assert adapter.tenant_id is None
 
     def test_derived_livy_endpoint(self):
-        """Test Livy endpoint is derived from workspace and pool names."""
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -184,7 +176,6 @@ class TestSynapseSparkAdapterInitialization:
             assert "dev.azuresynapse.net" in adapter.livy_endpoint
 
     def test_adls_uri_format(self):
-        """Test ADLS Gen2 URI is correctly formatted."""
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -207,8 +198,6 @@ class TestSynapseSparkAdapterInitialization:
 
 
 class TestSynapseSparkAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
 
         with (
@@ -264,8 +253,6 @@ class TestSynapseSparkAdapterPlatformInfo:
 
 
 class TestSynapseSparkAdapterConnection:
-    """Test connection and authentication."""
-
     def test_create_connection_success(self):
 
         import requests as real_requests
@@ -391,8 +378,6 @@ class TestSynapseSparkAdapterConnection:
 
 
 class TestSynapseSparkAdapterTuning:
-    """Test benchmark tuning configuration."""
-
     def test_configure_for_tpch(self):
 
         with (
@@ -455,8 +440,6 @@ class TestSynapseSparkAdapterTuning:
 
 
 class TestSynapseSparkAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
 
         from argparse import ArgumentParser
@@ -530,7 +513,6 @@ class TestSynapseSparkAdapterCLI:
             assert adapter.timeout_minutes == 90
 
     def test_from_config_reads_nested_options_toggle(self):
-        """CLI --platform-option values nest under options without a builder."""
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -556,8 +538,6 @@ class TestSynapseSparkAdapterCLI:
 
 
 class TestSynapseSparkAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_registered_in_registry(self):
 
         from benchbox.core.platform_registry import PlatformRegistry
@@ -584,8 +564,6 @@ class TestSynapseSparkAdapterRegistry:
 
 
 class TestSynapseLivyStateConstants:
-    """Test Livy session state constants."""
-
     def test_synapse_livy_session_states(self):
 
         from benchbox.platforms.azure.synapse_spark_adapter import SynapseLivySessionState
@@ -756,7 +734,6 @@ class TestSynapseLivyStateConstants:
             assert session_conf["spark.sql.catalog.spark_catalog.type"] == "hive"
 
     def test_session_config_parquet_no_extensions(self):
-        """Test parquet (default) does not add format extensions."""
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -786,7 +763,6 @@ class TestSynapseLivyStateConstants:
             assert "spark.sql.extensions" not in session_conf
 
     def test_synapse_livy_statement_states(self):
-        """Test LivyStatementState constants are defined (shared across Azure Spark adapters)."""
         from benchbox.platforms.azure.spark_execution_utils import LivyStatementState
 
         assert LivyStatementState.WAITING == "waiting"
@@ -796,11 +772,6 @@ class TestSynapseLivyStateConstants:
         assert LivyStatementState.CANCELLED == "cancelled"
 
     def test_user_spark_config_wins_over_benchmark_config(self):
-        """Explicit user spark_config must survive benchmark config merge.
-
-        Benchmark-specific configuration (e.g. the optimizer's AQE enablement)
-        is merged first so an explicit user override is not clobbered.
-        """
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -833,7 +804,6 @@ class TestSynapseLivyStateConstants:
 
 
 def _create_synapse_session_conf(**adapter_kwargs):
-    """Build a Synapse adapter with mocked Livy transport and return the session conf."""
     with (
         patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
         patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -863,8 +833,6 @@ def _create_synapse_session_conf(**adapter_kwargs):
 
 
 class TestSynapseAdaptiveToggle:
-    """Livy session build renders adaptive_enabled explicitly in both directions."""
-
     AQE_KEYS = (
         "spark.sql.adaptive.enabled",
         "spark.sql.adaptive.coalescePartitions.enabled",

@@ -1,5 +1,3 @@
-"""Tests for query plan capture failure handling."""
-
 from __future__ import annotations
 
 import logging
@@ -20,8 +18,6 @@ pytestmark = [
 
 
 class DummyAdapter(PlatformAdapter):
-    """Lightweight adapter for testing plan capture paths."""
-
     def __init__(
         self,
         explain_output: Any = "PLAN",
@@ -89,8 +85,6 @@ class DummyAdapter(PlatformAdapter):
 
 
 class _QuickParser:
-    """Simple parser that returns a minimal plan."""
-
     platform_name = "test"
 
     def parse_explain_output(self, query_id: str, explain_output: str):
@@ -117,7 +111,7 @@ def test_parser_unavailable_records_warning(caplog: pytest.LogCaptureFixture) ->
     plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q1")
 
     assert plan is None
-    assert capture_time_ms >= 0  # Timing is recorded even on failure
+    assert capture_time_ms >= 0
     assert adapter.query_plans_captured == 0
     assert adapter.plan_capture_failures == 1
     assert adapter.plan_capture_errors[0]["reason"] == "parser_unavailable"
@@ -151,18 +145,17 @@ def test_plan_capture_failure_is_graceful_when_not_strict() -> None:
 
 
 def test_plan_capture_timeout_records_failure(caplog: pytest.LogCaptureFixture) -> None:
-    """Test that slow EXPLAIN queries time out and record failure."""
     adapter = DummyAdapter(
         capture_plans=True,
-        explain_delay_seconds=2.0,  # Simulate slow EXPLAIN
-        plan_capture_timeout_seconds=1,  # 1 second timeout
+        explain_delay_seconds=2.0,
+        plan_capture_timeout_seconds=1,
     )
 
     caplog.set_level(logging.WARNING)
     plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q4")
 
     assert plan is None
-    assert capture_time_ms >= 1000  # Should have waited at least timeout duration
+    assert capture_time_ms >= 1000
     assert adapter.query_plans_captured == 0
     assert adapter.plan_capture_failures == 1
     assert adapter.plan_capture_errors[0]["reason"] == "timeout"
@@ -171,15 +164,6 @@ def test_plan_capture_timeout_records_failure(caplog: pytest.LogCaptureFixture) 
 
 
 def test_capture_timeout_returns_promptly() -> None:
-    """A timed-out capture must return control promptly, not block on the EXPLAIN thread.
-
-    The old implementation's `with ThreadPoolExecutor(...)` called
-    shutdown(wait=True) on exit, so even after TimeoutError the caller blocked
-    until the runaway EXPLAIN finished — the timeout was cosmetic. The EXPLAIN
-    here waits on an event that is only set AFTER capture_query_plan returns,
-    so the old code would block for the full 30s wait; the fixed code returns
-    in ~plan_capture_timeout_seconds.
-    """
     release_explain = threading.Event()
     adapter = DummyAdapter(capture_plans=True, plan_capture_timeout_seconds=1)
 
@@ -194,19 +178,16 @@ def test_capture_timeout_returns_promptly() -> None:
         plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q_hang")
         elapsed = time.monotonic() - start
     finally:
-        # Unblock the abandoned EXPLAIN thread so it exits immediately and
-        # does not delay interpreter shutdown.
         release_explain.set()
 
     assert plan is None
     assert elapsed < 5, f"capture_query_plan blocked for {elapsed:.1f}s after timeout - blocking-shutdown regression"
-    assert capture_time_ms >= 1000  # the timeout itself was still honored
+    assert capture_time_ms >= 1000
     assert adapter.plan_capture_failures == 1
     assert adapter.plan_capture_errors[0]["reason"] == "timeout"
 
 
 def test_capture_timeout_strict_mode_raises_promptly() -> None:
-    """In strict mode the timeout's PlanCaptureError must also propagate promptly."""
     release_explain = threading.Event()
     adapter = DummyAdapter(
         capture_plans=True,
@@ -233,26 +214,24 @@ def test_capture_timeout_strict_mode_raises_promptly() -> None:
 
 
 def test_plan_capture_completes_within_timeout() -> None:
-    """Test that fast EXPLAIN queries complete within timeout."""
 
     adapter = DummyAdapter(
         capture_plans=True,
         explain_output="EXPLAIN PLAN",
-        explain_delay_seconds=0.1,  # Fast EXPLAIN
-        plan_capture_timeout_seconds=5,  # 5 second timeout
+        explain_delay_seconds=0.1,
+        plan_capture_timeout_seconds=5,
         parser=_QuickParser(),
     )
 
     plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q5")
 
     assert plan is not None
-    assert capture_time_ms >= 100  # Should have at least the delay time
+    assert capture_time_ms >= 100
     assert adapter.query_plans_captured == 1
     assert adapter.plan_capture_failures == 0
 
 
 def test_plan_capture_returns_zero_time_when_disabled() -> None:
-    """Test that disabled capture returns None and 0.0 time."""
     adapter = DummyAdapter(capture_plans=False)
 
     plan, capture_time_ms = adapter.capture_query_plan(None, "SELECT 1", "q6")
@@ -262,9 +241,6 @@ def test_plan_capture_returns_zero_time_when_disabled() -> None:
 
 
 def test_capture_phase_replaces_owned_connection_after_timeout() -> None:
-    """A timed-out EXPLAIN must not poison later captures when the phase owns the
-    connection: it closes the poisoned one and reopens a fresh connection so the
-    remaining captures still run."""
     release_explain = threading.Event()
     created_connections: list[object] = []
     capture_connections: list[object] = []
@@ -291,8 +267,6 @@ def test_capture_phase_replaces_owned_connection_after_timeout() -> None:
     )
 
     try:
-        # connection=None => the phase opens (and owns) the connection, so it is
-        # safe to close and reopen after a timeout.
         result = run_plan_capture_phase(
             adapter,
             [("slow", "SELECT slow"), ("fast", "SELECT fast")],
@@ -303,16 +277,11 @@ def test_capture_phase_replaces_owned_connection_after_timeout() -> None:
     assert result.failed == 1
     assert result.captured == 1
     assert set(result.plans) == {"fast"}
-    # First (poisoned) and second (fresh) connections both came from create_connection.
     assert len(created_connections) == 2
     assert capture_connections[:2] == [created_connections[0], created_connections[1]]
 
 
 def test_capture_phase_skips_remaining_on_caller_connection_timeout() -> None:
-    """A caller-supplied connection carries in-memory/session-scoped state that a
-    fresh connection cannot see, so after a timeout the phase must NOT reopen it
-    (that would EXPLAIN against an empty/wrong schema). It skips the remaining
-    captures instead, counting them as failed and never calling create_connection."""
     release_explain = threading.Event()
     original_connection = object()
     created_connections: list[object] = []
@@ -345,21 +314,16 @@ def test_capture_phase_skips_remaining_on_caller_connection_timeout() -> None:
     finally:
         release_explain.set()
 
-    # The slow query timed out; the fast query was skipped (not reopened/run).
     assert result.captured == 0
     assert result.failed == 2
     assert result.plans == {}
     assert created_connections == []
-    # Only the slow capture ran, on the caller's connection; the fast one never ran.
     assert capture_connections == [original_connection]
 
 
 def test_plan_query_filter_only_captures_specified_queries() -> None:
-    """Test that plan_queries filter only captures specified queries."""
 
     class SimpleParser:
-        """Simple parser that returns a minimal plan."""
-
         platform_name = "test"
 
         def parse_explain_output(self, query_id: str, explain_output: str):
@@ -385,26 +349,17 @@ def test_plan_query_filter_only_captures_specified_queries() -> None:
         plan_queries="q01,q02",
     )
 
-    # q01 should be captured
     plan1, time1 = adapter.capture_query_plan(None, "SELECT 1", "q01")
     assert plan1 is not None
 
-    # q03 should be skipped (not in filter)
     plan3, time3 = adapter.capture_query_plan(None, "SELECT 1", "q03")
     assert plan3 is None
     assert time3 == 0.0
 
 
 def test_plan_query_filter_only_captures_selected_queries() -> None:
-    """plan_query_filter restricts capture to the selected query ids.
-
-    The per-iteration sampling machinery (plan_first_n / plan_sampling_rate) has
-    been retired; query selection is the only remaining capture filter.
-    """
 
     class SimpleParser:
-        """Simple parser that returns a minimal plan."""
-
         platform_name = "test"
 
         def parse_explain_output(self, query_id: str, explain_output: str):
@@ -430,21 +385,17 @@ def test_plan_query_filter_only_captures_selected_queries() -> None:
         plan_queries="q01",
     )
 
-    # Selected query is captured, every time it is requested (no per-iteration cap).
     plan1, _ = adapter.capture_query_plan(None, "SELECT 1", "q01")
     assert plan1 is not None
     plan2, _ = adapter.capture_query_plan(None, "SELECT 1", "q01")
     assert plan2 is not None
 
-    # Non-selected query is skipped.
     plan3, time3 = adapter.capture_query_plan(None, "SELECT 1", "q02")
     assert plan3 is None
     assert time3 == 0.0
 
 
 class _FakeCursor:
-    """Minimal DBAPI cursor whose EXPLAIN raises, for the shared helper test."""
-
     def __init__(self, error: Exception) -> None:
         self._error = error
         self.closed = False
@@ -470,10 +421,6 @@ class _FakeConnection:
 def test_get_query_plan_from_cursor_returns_none_and_logs_on_failure(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """qpc-05 / F4.2: on EXPLAIN failure the shared helper must return None and
-    log the exception -- NOT return the error text as if it were the plan (which
-    the display path would print as a plan and the capture path would hand to a
-    parser)."""
     from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
     cursor = _FakeCursor(RuntimeError("EXPLAIN blew up"))
@@ -485,12 +432,10 @@ def test_get_query_plan_from_cursor_returns_none_and_logs_on_failure(
     assert result is None
     assert cursor.closed is True
     assert any("EXPLAIN blew up" in rec.getMessage() for rec in caplog.records)
-    # The error text must NOT be smuggled back as plan data.
     assert result is None or "Could not get query plan" not in result
 
 
 def test_get_query_plan_from_cursor_returns_joined_rows_on_success() -> None:
-    """Control: a successful EXPLAIN returns the newline-joined plan rows."""
     from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
     class _OkCursor:

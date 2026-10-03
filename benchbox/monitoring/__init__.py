@@ -1,10 +1,3 @@
-"""Monitoring utilities exposed for public consumption.
-
-This package intentionally lazy-loads reporting helpers so callers that only
-need core monitoring primitives do not import charting dependencies such as
-``textcharts`` during unrelated CLI startup.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -43,7 +36,6 @@ __all__ = list(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily expose monitoring helpers and sibling submodules."""
     module_name = _EXPORTS.get(name)
     if module_name is not None:
         module = importlib.import_module(f"{__name__}.{module_name}")
@@ -61,5 +53,4 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """Return stable introspection output for lazy exports."""
     return sorted(set(globals()) | set(__all__))

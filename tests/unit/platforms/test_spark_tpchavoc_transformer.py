@@ -1,13 +1,5 @@
-"""Tests for the Spark SQL TPC-Havoc query transformer.
-
-Verifies that SparkTPCHavocQueryTransformer rewrites the TPC-Havoc variant
-shapes Spark rejects (correlated scalar subqueries in aggregated SELECT
-lists, empty GROUP BY (), and the bare dual leg) and passes every other
-query through byte-identical.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -48,12 +40,10 @@ def _assert_spark_parseable(sql: str, variant_id: str) -> None:
 
 @pytest.mark.parametrize("variant_id", SCALAR_IDS)
 def test_scalar_group_by_variants_wrapped_in_first(variant_id: str):
-    """Each scalar-grouping variant gains FIRST() and stays spark-parseable."""
     original = _variant_sql(variant_id)
     transformer = SparkTPCHavocQueryTransformer()
     rewritten = transformer.transform(original, query_id=variant_id)
     assert transformer.get_transformations_applied() == ["scalar_group_by_first"]
-    # 1_v1/8_v1/12_v1 carry two correlated scalars each; the rest carry one.
     expected_first_count = 2 if variant_id in {"1_v1", "8_v1", "12_v1"} else 1
     assert rewritten.upper().count("FIRST(") == expected_first_count
     _assert_spark_parseable(rewritten, variant_id)
@@ -61,7 +51,6 @@ def test_scalar_group_by_variants_wrapped_in_first(variant_id: str):
 
 @pytest.mark.parametrize("variant_id", EMPTY_IDS)
 def test_group_by_empty_variants_drop_empty_grouping(variant_id: str):
-    """GROUP BY () is removed while HAVING is retained."""
     original = _variant_sql(variant_id)
     assert "group by" in original.lower()
     transformer = SparkTPCHavocQueryTransformer()
@@ -74,7 +63,6 @@ def test_group_by_empty_variants_drop_empty_grouping(variant_id: str):
 
 @pytest.mark.parametrize("variant_id", DUAL_IDS)
 def test_dual_variants_gain_column_alias(variant_id: str):
-    """The bare (SELECT 1) dual leg gains an explicit column alias."""
     original = _variant_sql(variant_id)
     transformer = SparkTPCHavocQueryTransformer()
     rewritten = transformer.transform(original, query_id=variant_id)
@@ -86,7 +74,6 @@ def test_dual_variants_gain_column_alias(variant_id: str):
 
 @pytest.mark.parametrize("variant_id", ["2_v1", "5_v5", "22_v10", "Q99", "11"])
 def test_unlisted_query_ids_pass_through_unchanged(variant_id: str):
-    """Variants without a Spark rule pass through byte-identical."""
     original = _variant_sql("2_v1")
     transformer = SparkTPCHavocQueryTransformer()
     assert transformer.transform(original, query_id=variant_id) == original
@@ -111,7 +98,6 @@ def test_query_id_normalization_accepts_prefixed_forms():
 
 @pytest.mark.parametrize("variant_id", SCALAR_IDS + EMPTY_IDS + DUAL_IDS)
 def test_rewrites_are_idempotent(variant_id: str):
-    """A second transform is a no-op (no nested FIRST() or drift)."""
     original = _variant_sql(variant_id)
     first_pass = SparkTPCHavocQueryTransformer().transform(original, query_id=variant_id)
     second_pass = SparkTPCHavocQueryTransformer().transform(first_pass, query_id=variant_id)
@@ -120,7 +106,6 @@ def test_rewrites_are_idempotent(variant_id: str):
 
 
 def test_rewrite_rule_ids_cover_transformer_ids():
-    """Registry rule IDs and transformer ID sets stay in sync."""
     assert {
         "1_v1",
         "3_v1",
@@ -136,7 +121,6 @@ def test_rewrite_rule_ids_cover_transformer_ids():
 
 
 def test_spark_tpchavoc_rules_registered():
-    """Exactly 11 query_adapter rules for spark/tpchavoc."""
     import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
@@ -155,7 +139,6 @@ def test_spark_tpchavoc_rules_registered():
 
 @pytest.mark.parametrize("variant_id", SCALAR_IDS + EMPTY_IDS + DUAL_IDS)
 def test_spark_tpchavoc_rule_resolution(variant_id: str):
-    """Each rewritten variant resolves to a REWRITE_QUERY decision."""
     import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
     from benchbox.sql_compat.actions import CompatAction
     from benchbox.sql_compat.context import CompatibilityContext, Phase
@@ -196,7 +179,6 @@ def test_spark_tpchavoc_unlisted_variant_has_no_rule():
 
 
 def _delegated_query(adapter, original, query_id, benchmark_type):
-    """Run execute_query with the executor stubbed; return the sent SQL."""
     from unittest.mock import patch
 
     with patch.object(
@@ -215,7 +197,6 @@ def _delegated_query(adapter, original, query_id, benchmark_type):
 
 
 def test_spark_adapter_applies_transformer_for_tpchavoc():
-    """SparkAdapter.execute_query rewrites tpchavoc queries before delegating."""
     from benchbox.platforms.spark import SparkAdapter
 
     original = _variant_sql("1_v1")
@@ -224,7 +205,6 @@ def test_spark_adapter_applies_transformer_for_tpchavoc():
 
 
 def test_execute_query_applies_transformer_without_benchmark_type():
-    """Variant IDs trigger the rewrite even when benchmark_type is unset."""
     from benchbox.platforms.spark import SparkAdapter
 
     original = _variant_sql("1_v1")
@@ -233,7 +213,6 @@ def test_execute_query_applies_transformer_without_benchmark_type():
 
 
 def test_spark_adapter_skips_transformer_for_other_benchmarks():
-    """Non-tpchavoc queries reach the executor byte-identical."""
     from benchbox.platforms.spark import SparkAdapter
 
     original = _variant_sql("1_v1")
@@ -242,7 +221,6 @@ def test_spark_adapter_skips_transformer_for_other_benchmarks():
 
 
 def test_spark_adapter_skips_transformer_for_unknown_ids_without_benchmark():
-    """Unlisted IDs without a benchmark pass through byte-identical."""
     from benchbox.platforms.spark import SparkAdapter
 
     original = _variant_sql("2_v1")
@@ -254,7 +232,6 @@ def test_spark_adapter_skips_transformer_for_unknown_ids_without_benchmark():
     "adapter_cls_name", ["benchbox.platforms.velox.VeloxAdapter", "benchbox.platforms.lakesail.LakeSailAdapter"]
 )
 def test_spark_family_adapters_share_mixin_execute_query(adapter_cls_name):
-    """Velox/LakeSail must not override the mixin hook (WIRING-001)."""
     import importlib
 
     from benchbox.platforms.base.spark_execution_mixin import SparkQueryExecutionMixin

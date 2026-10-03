@@ -23,6 +23,8 @@ The benchmark is particularly valuable for testing systems used in data science 
 - **Analytics-oriented queries** - Focuses on data exploration patterns
 - **Performance measurement** - Designed for precise timing comparisons
 
+BenchBox generates synthetic taxi trip data that mimics the structure and characteristics of the NYC Taxi & Limousine Commission Trip Record Data used in the H2O DB benchmark.
+
 ## Schema Description
 
 The H2O DB benchmark uses a single table design based on the NYC Taxi & Limousine Commission Trip Record Data structure:
@@ -548,10 +550,10 @@ from pyspark.sql.functions import *
 from benchbox import H2ODB
 
 # Initialize Spark for large-scale analytics
-spark = SparkSession.builder \\
-    .appName("H2ODB-Benchmark") \\
-    .config("spark.sql.adaptive.enabled", "true") \\
-    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \\
+spark = SparkSession.builder \
+    .appName("H2ODB-Benchmark") \
+    .config("spark.sql.adaptive.enabled", "true") \
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
     .getOrCreate()
 
 # Generate large-scale taxi data

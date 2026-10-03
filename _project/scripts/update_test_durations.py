@@ -1,5 +1,3 @@
-"""Regenerate the committed per-test p95 artifact from T3 JUnit reports."""
-
 from __future__ import annotations
 
 import argparse

@@ -1,9 +1,3 @@
-"""Print a file plan and checklist for adding a BenchBox platform.
-
-This helper is intentionally non-mutating. It measures extension cost up front
-without creating another framework around platform authoring.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -52,7 +46,6 @@ def _slugify(value: str) -> str:
 
 
 def build_plan(name: str, kind: PlatformKind) -> ScaffoldPlan:
-    """Build a non-mutating platform extension plan."""
     slug = _slugify(name)
     cli_name = slug.replace("_", "-")
 

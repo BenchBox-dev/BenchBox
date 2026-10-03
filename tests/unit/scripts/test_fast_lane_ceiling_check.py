@@ -1,14 +1,3 @@
-"""Unit tests for _project/scripts/fast_lane_ceiling_check.py: the absolute
-ceiling, merge-queue grace, --emit-fast-count and --delta-check modes.
-
-The pytest-collection subprocess itself is monkeypatched out via
-`_run_pytest_collect` (fast, offline, deterministic) -- these tests pin the
-new modes' own parsing/threshold logic, not pytest's collection output
-format, which is exercised for real by `fast_lane_ceiling_check.py --strict`
-itself (and by the fast-lane collect these very tests are marked medium to
-avoid contending with -- see the pytestmark comment below).
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -18,10 +7,6 @@ from typing import Callable
 
 import pytest
 
-# medium, not fast: these tests cover the fast lane's own contention
-# controls; adding fast tests here would recreate the ceiling contention they
-# guard against (see _project/config/fast_lane_ceiling_log.md's 2026-07-24
-# entry). Medium still runs in the required pre-merge lane (medium-test).
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -47,9 +32,6 @@ def _fake_collect(output: str, rc: int = 0) -> Callable[[Path, str], tuple[int, 
     return _run
 
 
-# ------------------------------------------------------------------ #
-# --emit-fast-count                                                    #
-# ------------------------------------------------------------------ #
 def test_emit_fast_count_prints_bare_integer(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("43/43 tests collected"))
     rc = mod._emit_fast_count(Path("/nonexistent"))
@@ -87,11 +69,8 @@ def test_emit_fast_count_unparseable_output_fails_closed(
     rc = mod._emit_fast_count(Path("/nonexistent"))
     err = capsys.readouterr().err
     assert rc == 1
-    # Reported as an environment failure, not as a parse/policy problem: the
-    # lane was never measured, so nothing is known to be wrong with it.
     assert "FAST_LANE_ENVIRONMENT_ERROR" in err
     assert "could not run pytest --collect-only" in err
-    # The diagnostic must be actionable - it names the interpreter used.
     assert sys.executable in err
 
 
@@ -106,9 +85,6 @@ def test_emit_fast_count_rejects_error_exit_even_with_no_tests_text(
     assert "exit 2" in err
 
 
-# ------------------------------------------------------------------ #
-# --delta-check: baseline-file availability                            #
-# ------------------------------------------------------------------ #
 def test_delta_check_skips_when_baseline_file_missing(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
     missing = tmp_path / "does-not-exist.txt"
     rc = mod._delta_check(Path("/nonexistent"), missing)
@@ -187,9 +163,6 @@ def test_delta_check_does_not_parse_error_exit_as_empty_collection(
     assert "exit 2" in err
 
 
-# ------------------------------------------------------------------ #
-# --delta-check: threshold behavior (fail > 150, warn > 75, else clean) #
-# ------------------------------------------------------------------ #
 def test_delta_check_fails_over_150(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
@@ -249,7 +222,6 @@ def test_delta_check_clean_under_75_no_warning(
 def test_delta_check_boundary_exactly_150_does_not_fail(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """delta > 150 fails; delta == 150 must not (strict inequality per spec)."""
     baseline = tmp_path / "develop-count.txt"
     baseline.write_text("25000", encoding="utf-8")
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25150/40000 tests collected"))
@@ -259,9 +231,6 @@ def test_delta_check_boundary_exactly_150_does_not_fail(
     assert "FAST_LANE_DELTA_VIOLATION" not in out
 
 
-# ------------------------------------------------------------------ #
-# Headroom warning (w2): FAST_LANE_WARNING at headroom < 100            #
-# ------------------------------------------------------------------ #
 def test_check_fast_lane_policy_warns_below_headroom_threshold(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
@@ -286,16 +255,7 @@ def test_check_fast_lane_policy_no_warning_above_threshold(
     assert "FAST_LANE_WARNING" not in out
 
 
-# ------------------------------------------------------------------ #
-# Environment failure vs policy violation                             #
-# ------------------------------------------------------------------ #
 def test_check_fast_lane_policy_raises_when_collect_cannot_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A collect that never ran is not a set of policy violations.
-
-    Running the check with an interpreter that lacks pytest used to yield four
-    FAST_LANE_VIOLATIONs on a perfectly healthy tree, indistinguishable from a
-    genuine cap breach.
-    """
     monkeypatch.setattr(
         mod, "_run_pytest_collect", _fake_collect("ModuleNotFoundError: No module named 'pytest'", rc=1)
     )
@@ -317,7 +277,6 @@ def test_check_fast_lane_policy_rejects_error_exit_with_no_tests_text(monkeypatc
 
 
 def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Must-preserve: a genuine cap breach is still a FAST_LANE_VIOLATION."""
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25810/28000 tests collected"))
     policy = {"enabled": True, "max_fast_tests": 10}
 
@@ -329,7 +288,6 @@ def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.
 def test_check_fast_lane_policy_preserves_breaches_before_intersection_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A later collect failure must not erase violations found by fast collect."""
     outputs = iter(
         [
             (0, "25810/28000 tests collected"),
@@ -348,7 +306,6 @@ def test_check_fast_lane_policy_preserves_breaches_before_intersection_failure(
 def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
-    """The skip reason must not blame a baseline that is present and valid."""
     baseline = tmp_path / "develop-count.txt"
     baseline.write_text("25000", encoding="utf-8")
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("pytest crashed, no collect line", rc=1))
@@ -362,10 +319,6 @@ def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
     assert "no develop baseline available" not in err
 
 
-# ------------------------------------------------------------------ #
-# ------------------------------------------------------------------ #
-# Composition grace (merge_group lane only)                            #
-# ------------------------------------------------------------------ #
 def _policy(**overrides):
     policy = {"enabled": True, "max_fast_tests": 10000}
     policy.update(overrides)
@@ -456,15 +409,11 @@ def test_ceiling_grace_flag_rejected_on_other_events(
     event_file = tmp_path / "event.json"
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
     _write_event(event_file, {"event_name": "pull_request"})
-    # A PR editing its own workflow copy to add the flag still fails closed:
-    # the runner's event file says pull_request, so the flag is rejected.
     with pytest.raises(ValueError, match="only valid for merge_group"):
         mod._ceiling_grace_from_event("150")
     _write_event(event_file, {"event_name": "merge_group"})
     with pytest.raises(ValueError, match="--ceiling-grace"):
         mod._ceiling_grace_from_event("751")
-    # No event file (local ci-lint runs) means no grace can apply: the flag
-    # is rejected rather than silently ignored.
     monkeypatch.delenv("GITHUB_EVENT_PATH")
     with pytest.raises(ValueError, match="only valid for merge_group"):
         mod._ceiling_grace_from_event("150")
@@ -477,8 +426,6 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
     lint_steps = pr["jobs"]["code-lint"]["steps"]
     ceiling = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-ceiling")
-    # No environment variable may smuggle the grace in: the committed command
-    # carries the flag and the script gates it on runner event identity.
     assert "FAST_LANE_CEILING_GRACE" not in (ceiling.get("env") or {})
     assert "--ceiling-grace 750" in ceiling["run"]
     wall_clock = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")

@@ -24,9 +24,8 @@ from typing import Any
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
-# ---------------------------------------------------------------------------
 # Default parameters
-# ---------------------------------------------------------------------------
+
 
 # Single source of truth: the generated data covers up to LAST_AVAILABLE_YEAR
 # (benchbox/core/flightdata/downloader_specs.yaml).  The SQL catalog derives
@@ -135,9 +134,7 @@ def _pandas_airline_names(ctx: DataFrameContext) -> Any:
     )
 
 
-# ===========================================================================
 # Expression Family (Polars, DataFusion, PySpark)
-# ===========================================================================
 
 
 def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1135,9 +1132,7 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ===========================================================================
 # Pandas Family (Pandas, cuDF, Dask)
-# ===========================================================================
 
 
 def _pandas_origin_airport(ctx: DataFrameContext, df: Any) -> Any:
@@ -1398,9 +1393,8 @@ def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ===========================================================================
 # Registry
-# ===========================================================================
+
 
 FLIGHTDATA_DATAFRAME_QUERIES = QueryRegistry("FlightData DataFrame")
 

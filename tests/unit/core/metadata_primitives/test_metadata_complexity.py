@@ -1,15 +1,6 @@
-"""Unit tests for Metadata Primitives complexity testing functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains unit tests for:
-- TestMetadataComplexityConfig: Tests for complexity configuration and presets
-- TestDDLGeneration: Tests for DDL generation utilities
-- TestMetadataGenerator: Tests for metadata structure generation
-- TestComplexityCategories: Tests for complexity-specific query categories
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -50,15 +41,8 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# MetadataComplexityConfig Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestMetadataComplexityConfig:
-    """Test MetadataComplexityConfig dataclass and validation."""
-
     def test_default_config(self):
 
         config = MetadataComplexityConfig()
@@ -166,15 +150,8 @@ class TestMetadataComplexityConfig:
         assert config.view_depth == 1
 
 
-# =============================================================================
-# Complexity Presets Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestComplexityPresets:
-    """Test predefined complexity presets."""
-
     def test_all_presets_exist(self):
 
         expected = [
@@ -217,15 +194,8 @@ class TestComplexityPresets:
         assert config.constraint_density == ConstraintDensity.DENSE
 
 
-# =============================================================================
-# Generated Metadata Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestGeneratedMetadata:
-    """Test GeneratedMetadata tracking class."""
-
     def test_default_values(self):
 
         generated = GeneratedMetadata()
@@ -260,15 +230,8 @@ class TestGeneratedMetadata:
         assert summary["prefix"] == "test_"
 
 
-# =============================================================================
-# Type Complexity Enum Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestTypeComplexity:
-    """Test TypeComplexity enum."""
-
     def test_enum_values(self):
 
         assert TypeComplexity.SCALAR.value == "scalar"
@@ -278,8 +241,6 @@ class TestTypeComplexity:
 
 @pytest.mark.unit
 class TestConstraintDensity:
-    """Test ConstraintDensity enum."""
-
     def test_enum_values(self):
 
         assert ConstraintDensity.NONE.value == "none"
@@ -287,15 +248,8 @@ class TestConstraintDensity:
         assert ConstraintDensity.DENSE.value == "dense"
 
 
-# =============================================================================
-# DDL Generation Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestTypeMappings:
-    """Test type mapping functionality."""
-
     def test_all_dialects_have_mappings(self):
 
         expected_dialects = ["duckdb", "snowflake", "bigquery", "clickhouse", "databricks", "postgres"]
@@ -338,8 +292,6 @@ class TestTypeMappings:
 
 @pytest.mark.unit
 class TestColumnDefinition:
-    """Test ColumnDefinition dataclass."""
-
     def test_default_values(self):
 
         col = ColumnDefinition(name="test", data_type="INTEGER")
@@ -357,8 +309,6 @@ class TestColumnDefinition:
 
 @pytest.mark.unit
 class TestTableDefinition:
-    """Test TableDefinition dataclass."""
-
     def test_basic_table(self):
 
         table = TableDefinition(
@@ -375,8 +325,6 @@ class TestTableDefinition:
 
 @pytest.mark.unit
 class TestGenerateWideTableColumns:
-    """Test wide table column generation."""
-
     def test_generate_columns_count(self):
 
         columns = generate_wide_table_columns(100, "duckdb")
@@ -393,28 +341,23 @@ class TestGenerateWideTableColumns:
 
         columns = generate_wide_table_columns(100, "duckdb")
         types = {c.data_type for c in columns}
-        # Should have at least 3 different types
         assert len(types) >= 3
 
     def test_generate_columns_with_complex_types(self):
 
         columns = generate_wide_table_columns(50, "duckdb", TypeComplexity.BASIC)
         type_names = [c.data_type for c in columns]
-        # Should have array types
         assert any("[]" in t for t in type_names)
 
     def test_generate_columns_with_nested_types(self):
 
         columns = generate_wide_table_columns(50, "duckdb", TypeComplexity.NESTED)
         type_names = [c.data_type for c in columns]
-        # Should have struct types
         assert any("STRUCT" in t for t in type_names)
 
 
 @pytest.mark.unit
 class TestGenerateSimpleTableColumns:
-    """Test simple table column generation."""
-
     def test_generate_minimum_columns(self):
 
         columns = generate_simple_table_columns(5, "duckdb")
@@ -426,15 +369,12 @@ class TestGenerateSimpleTableColumns:
 
         columns = generate_simple_table_columns(10, "duckdb")
         assert len(columns) == 10
-        # Extra columns should be named field_XX
         extra_names = [c.name for c in columns[5:]]
         assert all(name.startswith("field_") for name in extra_names)
 
 
 @pytest.mark.unit
 class TestGenerateCreateTableSQL:
-    """Test CREATE TABLE SQL generation."""
-
     def test_basic_table(self):
 
         columns = [
@@ -480,8 +420,6 @@ class TestGenerateCreateTableSQL:
 
 @pytest.mark.unit
 class TestGenerateCreateViewSQL:
-    """Test CREATE VIEW SQL generation."""
-
     def test_basic_view(self):
 
         view = ViewDefinition(name="test_view", source_sql="SELECT * FROM base_table")
@@ -501,8 +439,6 @@ class TestGenerateCreateViewSQL:
 
 @pytest.mark.unit
 class TestDropSQL:
-    """Test DROP statement generation."""
-
     def test_drop_table(self):
 
         sql = generate_drop_table_sql("test_table", "duckdb")
@@ -526,8 +462,6 @@ class TestDropSQL:
 
 @pytest.mark.unit
 class TestDialectSupport:
-    """Test dialect support checks."""
-
     def test_supports_complex_types(self):
 
         assert supports_complex_types("duckdb") is True
@@ -535,14 +469,12 @@ class TestDialectSupport:
         assert supports_complex_types("bigquery") is True
         assert supports_complex_types("clickhouse") is True
         assert supports_complex_types("databricks") is True
-        # Unknown dialect should not support complex types
         assert supports_complex_types("mysql") is False
 
     def test_supports_views(self):
 
         assert supports_views("duckdb") is True
         assert supports_views("snowflake") is True
-        # ClickHouse has limited view support
         assert supports_views("clickhouse") is False
 
     def test_supports_foreign_keys(self):
@@ -553,15 +485,8 @@ class TestDialectSupport:
         assert supports_foreign_keys("clickhouse") is False
 
 
-# =============================================================================
-# MetadataGenerator Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestMetadataGenerator:
-    """Test MetadataGenerator class (unit tests, no database)."""
-
     def test_generator_instantiation(self):
 
         generator = MetadataGenerator()
@@ -569,15 +494,8 @@ class TestMetadataGenerator:
         assert hasattr(generator, "setup")
 
 
-# =============================================================================
-# Benchmark Complexity Methods Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestBenchmarkComplexityMethods:
-    """Test MetadataPrimitivesBenchmark complexity methods."""
-
     def test_get_complexity_categories(self):
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -608,15 +526,8 @@ class TestBenchmarkComplexityMethods:
         assert "constraint" in categories
 
 
-# =============================================================================
-# ComplexityBenchmarkResult Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestComplexityBenchmarkResult:
-    """Test ComplexityBenchmarkResult dataclass."""
-
     def test_result_creation(self):
 
         config = MetadataComplexityConfig()
@@ -636,15 +547,8 @@ class TestComplexityBenchmarkResult:
         assert result.benchmark_result is None
 
 
-# =============================================================================
-# Query Category Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestComplexityQueryCategories:
-    """Test that complexity query categories are properly defined."""
-
     def test_wide_table_category_exists(self):
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -680,13 +584,11 @@ class TestComplexityQueryCategories:
         benchmark = MetadataPrimitivesBenchmark()
         categories = benchmark.get_query_categories()
 
-        # Original categories
         assert "schema" in categories
         assert "column" in categories
         assert "stats" in categories
         assert "query" in categories
 
-        # New complexity categories
         assert "wide_table" in categories
         assert "view_hierarchy" in categories
         assert "complex_type" in categories
@@ -698,20 +600,12 @@ class TestComplexityQueryCategories:
         benchmark = MetadataPrimitivesBenchmark()
         queries = benchmark.get_queries_by_category("acl")
         assert len(queries) > 0
-        # Verify expected ACL queries exist
         query_ids = list(queries.keys())
         assert any("privilege" in q for q in query_ids)
 
 
-# =============================================================================
-# ACL Complexity Configuration Tests
-# =============================================================================
-
-
 @pytest.mark.unit
 class TestAclComplexityConfig:
-    """Test ACL-specific complexity configuration."""
-
     def test_default_acl_config(self):
 
         config = MetadataComplexityConfig()
@@ -734,11 +628,9 @@ class TestAclComplexityConfig:
 
     def test_acl_config_validation(self):
 
-        # Negative role count should raise
         with pytest.raises(ValueError):
             MetadataComplexityConfig(acl_role_count=-1)
 
-        # Too many roles should raise
         with pytest.raises(ValueError):
             MetadataComplexityConfig(acl_role_count=501)
 
@@ -775,8 +667,6 @@ class TestAclComplexityConfig:
 
 @pytest.mark.unit
 class TestAclPresets:
-    """Test ACL complexity presets."""
-
     def test_acl_sparse_preset(self):
 
         config = get_complexity_preset("acl_sparse")
@@ -814,15 +704,12 @@ class TestAclPresets:
 
 @pytest.mark.unit
 class TestGeneratedMetadataWithAcl:
-    """Test GeneratedMetadata with ACL fields."""
-
     def test_generated_metadata_with_roles(self):
 
         metadata = GeneratedMetadata(
             tables=["t1", "t2"],
             roles=["r1", "r2", "r3"],
         )
-        # total_objects includes tables + roles
         assert metadata.total_objects == 5
 
     def test_generated_metadata_with_grants(self):
@@ -856,4 +743,4 @@ class TestGeneratedMetadataWithAcl:
         assert summary["views"] == 1
         assert summary["roles"] == 1
         assert summary["grants"] == 1
-        assert summary["total"] == 3  # tables + views + roles
+        assert summary["total"] == 3

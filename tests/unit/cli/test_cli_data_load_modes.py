@@ -1,9 +1,6 @@
-"""Tests for CLI data-only and load-only execution modes.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 import sys as _sys
@@ -16,12 +13,6 @@ from click.testing import CliRunner
 from benchbox.cli.benchmarks import BenchmarkConfig
 from benchbox.cli.main import cli
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -33,7 +24,6 @@ pytestmark = [
 
 @contextmanager
 def _mock_run_command_components(*, include_db_manager: bool = False):
-    """Provide shared run-command mocks with default successful execution behavior."""
     with ExitStack() as stack:
         mocks = {
             "bench_mgr": stack.enter_context(patch.object(_run_module, "BenchmarkManager")),
@@ -61,7 +51,6 @@ def _mock_run_command_components(*, include_db_manager: bool = False):
 
 @contextmanager
 def _mock_quick_restart(saved_config):
-    """Provide an accepted quick-restart session with no live execution dependencies."""
     mock_sys = Mock()
     mock_sys.stdin.isatty.return_value = True
     mock_sys.stdout.isatty.return_value = True
@@ -99,29 +88,23 @@ def _mock_quick_restart(saved_config):
 
 
 class TestCLIDataLoadModes:
-    """Test data-only and load-only execution modes."""
-
     def setup_method(self):
-        """Setup test fixtures."""
         self.runner = CliRunner()
 
     def test_data_only_no_database_required(self):
 
         with _mock_run_command_components() as mocks:
-            # Test data-only without database parameter
             result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
             assert result.exit_code == 0
             assert "Data generation completed" in result.output or "Benchmark completed" in result.output
 
-            # Verify orchestrator was called with None database_config
             mocks["orchestrator"].return_value.execute_benchmark.assert_called_once()
             call_args = mocks["orchestrator"].return_value.execute_benchmark.call_args[0]
-            assert call_args[2] is None  # database_config should be None
+            assert call_args[2] is None
 
     def test_data_only_ignores_database_parameter(self):
 
         with _mock_run_command_components():
-            # Test data-only with database parameter (should be ignored)
             result = self.runner.invoke(
                 cli,
                 [
@@ -148,14 +131,12 @@ class TestCLIDataLoadModes:
     def test_load_only_with_database(self):
 
         with _mock_run_command_components(include_db_manager=True) as mocks:
-            # Setup mocks
             mock_db_config = Mock()
             mock_db_config.type = "duckdb"
             mock_db_config.options = {}
             assert mocks["db_mgr"] is not None
             mocks["db_mgr"].return_value.create_config.return_value = mock_db_config
 
-            # Test load-only with database parameter
             result = self.runner.invoke(
                 cli,
                 [
@@ -173,21 +154,17 @@ class TestCLIDataLoadModes:
             assert result.exit_code == 0
             assert "Data loading completed" in result.output or "Benchmark completed" in result.output
 
-            # Verify database config was created
             mocks["db_mgr"].return_value.create_config.assert_called_once()
 
-            # Verify orchestrator was called with proper database_config
             mocks["orchestrator"].return_value.execute_benchmark.assert_called_once()
             call_args = mocks["orchestrator"].return_value.execute_benchmark.call_args[0]
-            assert call_args[2] is not None  # database_config should not be None
+            assert call_args[2] is not None
 
     def test_benchmark_config_test_execution_type(self):
 
         with _mock_run_command_components() as mocks:
-            # Test data-only mode
             result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
             assert result.exit_code == 0
-            # Data generation mode always shows COMPLETED status (not validation_status)
             assert "Data generation completed: COMPLETED" in result.output
 
             mocks["orchestrator"].return_value.execute_benchmark.assert_called_once()
@@ -195,7 +172,6 @@ class TestCLIDataLoadModes:
             assert phases == ["generate"]
 
     def test_force_flag(self):
-        """Ensure CLI forwards force flags into benchmark config options."""
         with _mock_run_command_components(include_db_manager=True) as mocks:
             mock_db_cfg = Mock()
             mock_db_cfg.type = "duckdb"
@@ -225,7 +201,6 @@ class TestCLIDataLoadModes:
             assert config.options.get("force_regenerate") is True
 
     def test_table_mode_option_forwarded(self):
-        """Ensure CLI forwards --table-mode into benchmark config options."""
         with _mock_run_command_components(include_db_manager=True) as mocks:
             mock_db_cfg = Mock()
             mock_db_cfg.type = "duckdb"
@@ -255,7 +230,6 @@ class TestCLIDataLoadModes:
             assert config.options.get("table_mode") == "external"
 
     def test_table_mode_cli_value_saved_for_quick_restart(self):
-        """Explicit CLI --table-mode should be persisted in quick restart config."""
         with (
             _mock_run_command_components(include_db_manager=True) as mocks,
             patch("benchbox.cli.preferences.save_last_run_config") as mock_save_last_run_config,
@@ -288,7 +262,6 @@ class TestCLIDataLoadModes:
             assert kwargs.get("additional_options", {}).get("table_mode") == "external"
 
     def test_table_mode_cli_precedence_over_quick_restart_config(self):
-        """Explicit CLI --table-mode should override saved quick-restart table mode."""
         mock_sys = Mock()
         mock_sys.stdin = Mock()
         mock_sys.stdin.isatty.return_value = True
@@ -354,7 +327,6 @@ class TestCLIDataLoadModes:
             assert config.options.get("table_mode") == "external"
 
     def test_quick_restart_atomically_refreshes_execution_significant_state(self):
-        """Saved selectors are re-resolved; explicit current CLI values win."""
         saved = {
             "database": "duckdb",
             "benchmark": "tpch",
@@ -431,7 +403,6 @@ class TestCLIDataLoadModes:
         saved_compression,
         expected,
     ):
-        """Saved compression is executable state, not display-only restart metadata."""
         saved = {
             "database": "duckdb",
             "benchmark": "tpch",
@@ -462,7 +433,6 @@ class TestCLIDataLoadModes:
         ) == (enabled, compression_type, level)
 
     def test_quick_restart_saved_power_iterations_reach_execution_config(self):
-        """A five-iteration run must not silently restart with the three-iteration default."""
         saved = {
             "database": "duckdb",
             "benchmark": "tpch",
@@ -511,7 +481,6 @@ class TestCLIDataLoadModes:
         assert execution_context.seed is None
 
     def test_quick_restart_invalid_tuning_fails_closed_without_execution(self):
-        """Negative control: swallowing re-resolution failure would execute stale state."""
         saved = {
             "database": "duckdb",
             "benchmark": "tpch",
@@ -529,7 +498,6 @@ class TestCLIDataLoadModes:
         mocks["db_mgr"].return_value.create_config.assert_not_called()
 
     def test_table_mode_external_rejects_tuned_in_quick_restart(self):
-        """Quick-restart should still reject external table mode with tuned mode."""
         mock_sys = Mock()
         mock_sys.stdin = Mock()
         mock_sys.stdin.isatty.return_value = True
@@ -571,7 +539,6 @@ class TestCLIDataLoadModes:
             mocks["orchestrator"].return_value.execute_benchmark.assert_not_called()
 
     def test_table_mode_external_shows_tag_in_output(self):
-        """CLI should print [external] in the run announcement when --table-mode external."""
         with _mock_run_command_components(include_db_manager=True) as mocks:
             mock_db_cfg = Mock()
             mock_db_cfg.type = "duckdb"
@@ -599,7 +566,6 @@ class TestCLIDataLoadModes:
             assert "[external]" in result.output, f"Expected '[external]' tag in CLI output, got:\n{result.output}"
 
     def test_table_mode_native_omits_tag_in_output(self):
-        """CLI should NOT print [external] when using default native mode."""
         with _mock_run_command_components(include_db_manager=True) as mocks:
             mock_db_cfg = Mock()
             mock_db_cfg.type = "duckdb"
@@ -625,7 +591,6 @@ class TestCLIDataLoadModes:
             assert "[external]" not in result.output
 
     def test_table_mode_external_rejects_tuned(self):
-        """external table mode should reject explicit tuned mode."""
         result = self.runner.invoke(
             cli,
             [
@@ -644,9 +609,6 @@ class TestCLIDataLoadModes:
         assert "--table-mode external is incompatible with tuning enabled" in result.output
 
     def test_table_mode_external_rejects_auto(self):
-        """external table mode should reject --tuning auto (TODO w4: the guard covers every
-        tuning-bearing resolution, not just the literal 'tuned' keyword -- auto's
-        TuningSource.SMART_DEFAULTS is always enabled=True)."""
         result = self.runner.invoke(
             cli,
             [
@@ -665,7 +627,6 @@ class TestCLIDataLoadModes:
         assert "--table-mode external is incompatible with tuning enabled" in result.output
 
     def test_table_mode_external_rejects_custom_file(self, tmp_path):
-        """external table mode should reject a custom tuning file path (TODO w4)."""
         tuning_file = tmp_path / "custom.yaml"
         tuning_file.write_text("constraints: {}\n")
         result = self.runner.invoke(
@@ -686,7 +647,6 @@ class TestCLIDataLoadModes:
         assert "--table-mode external is incompatible with tuning enabled" in result.output
 
     def test_table_mode_external_allows_notuning(self):
-        """external table mode should still be allowed with --tuning notuning (the default)."""
         with _mock_run_command_components(include_db_manager=True) as mocks:
             mock_db_cfg = Mock()
             mock_db_cfg.type = "duckdb"
@@ -716,9 +676,7 @@ class TestCLIDataLoadModes:
             assert "incompatible with tuning enabled" not in result.output
 
     def test_enable_postgen_manifest_flag_forwarded(self):
-        """Ensure CLI forwards the manifest validation flag into benchmark options."""
         with _mock_run_command_components() as mocks:
-            # Use new composite --validation flag (postgen enables just manifest validation)
             result = self.runner.invoke(
                 cli,
                 [
@@ -741,10 +699,7 @@ class TestCLIDataLoadModes:
 
 
 class TestCLIDataLoadModesDryRun:
-    """Test data-only and load-only modes with dry-run."""
-
     def setup_method(self):
-        """Setup test fixtures."""
         self.runner = CliRunner()
 
     def test_dry_run_data_only_no_database_required(self):
@@ -754,7 +709,6 @@ class TestCLIDataLoadModesDryRun:
             patch("benchbox.cli.main.BenchmarkManager") as mock_bench_mgr,
             patch("benchbox.cli.main.SystemProfiler") as mock_profiler,
         ):
-            # Setup mocks
             mock_bench_mgr.return_value.benchmarks = {
                 "tpch": {"display_name": "TPC-H", "estimated_time_range": (2, 10)}
             }
@@ -763,7 +717,6 @@ class TestCLIDataLoadModesDryRun:
             mock_executor.return_value.display_dry_run_results.return_value = None
             mock_executor.return_value.save_dry_run_results.return_value = {"json": "/tmp/result.json"}
 
-            # Test data-only dry-run without database parameter
             result = self.runner.invoke(
                 cli,
                 [
@@ -780,10 +733,9 @@ class TestCLIDataLoadModesDryRun:
             )
             assert result.exit_code == 0
 
-            # Verify dry run executor was called with None database_config
             mock_executor.return_value.execute_dry_run.assert_called_once()
             call_args = mock_executor.return_value.execute_dry_run.call_args[0]
-            assert call_args[2] is None  # database_config should be None
+            assert call_args[2] is None
 
     def test_dry_run_data_only_ignores_database(self):
 
@@ -792,7 +744,6 @@ class TestCLIDataLoadModesDryRun:
             patch("benchbox.cli.main.BenchmarkManager") as mock_bench_mgr,
             patch("benchbox.cli.main.SystemProfiler") as mock_profiler,
         ):
-            # Setup mocks
             mock_bench_mgr.return_value.benchmarks = {
                 "tpch": {"display_name": "TPC-H", "estimated_time_range": (2, 10)}
             }
@@ -801,7 +752,6 @@ class TestCLIDataLoadModesDryRun:
             mock_executor.return_value.display_dry_run_results.return_value = None
             mock_executor.return_value.save_dry_run_results.return_value = {"json": "/tmp/result.json"}
 
-            # Test data-only dry-run with database parameter (should be ignored)
             result = self.runner.invoke(
                 cli,
                 [
@@ -848,8 +798,6 @@ class TestCLIDataLoadModesDryRun:
 
 
 class TestOrchestratorDataLoadModes:
-    """Test orchestrator support for data-only and load-only modes."""
-
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch("benchbox.cli.orchestrator.console")
     def test_execute_benchmark_data_only_skips_platform_adapter(self, mock_console, mock_get_adapter):
@@ -873,13 +821,11 @@ class TestOrchestratorDataLoadModes:
         mock_benchmark._name = "test"
         mock_benchmark.scale_factor = 0.01
         mock_benchmark.output_dir = "/tmp/test"
-        mock_benchmark.tables = None  # Force data generation
+        mock_benchmark.tables = None
         mock_benchmark.generate_data.return_value = {"table1": "file1.csv"}
 
-        # Mock parallel attribute to avoid comparison issues
         mock_benchmark.parallel = 1
 
-        # Mock data generator attributes to avoid comparison issues
         if hasattr(mock_benchmark, "data_generator"):
             mock_benchmark.data_generator.parallel = 1
             mock_benchmark.data_generator.validator = Mock()
@@ -888,7 +834,6 @@ class TestOrchestratorDataLoadModes:
                 "No existing data",
             )
 
-        # Mock the centralized result creation method to return BenchmarkResults
         def mock_create_enhanced_result(platform, query_results, **kwargs):
             from datetime import datetime
 
@@ -914,20 +859,15 @@ class TestOrchestratorDataLoadModes:
 
         mock_benchmark.create_enhanced_benchmark_result = mock_create_enhanced_result
 
-        # Patch DirectoryManager.get_datagen_path to avoid file system operations
         with patch.object(orchestrator, "_get_benchmark_instance", return_value=mock_benchmark):
             result = orchestrator.execute_benchmark(config, system_profile, None, ["generate"])
 
-        # Verify platform adapter was not called
         mock_get_adapter.assert_not_called()
 
-        # Generate-only runs without validation records should not claim validation passed.
         assert result.validation_status == "NOT_RUN"
 
 
 class TestDryRunDataLoadModes:
-    """Test dry-run executor support for data-only and load-only modes."""
-
     def test_execute_dry_run_with_none_database_config(self):
 
         from datetime import datetime

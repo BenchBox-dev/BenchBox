@@ -316,7 +316,7 @@ report:
 
 ## Jenkins
 
-Create `Jenkinsfile`:
+Create `Jenkinsfile`. Benchmark parameter values are passed as individual arguments through environment variables; shell expressions in those values are treated as data:
 
 ```groovy
 pipeline {
@@ -345,15 +345,16 @@ pipeline {
 
         stage('Run Benchmark') {
             steps {
-                sh """
-                    benchbox run \
-                        --platform ${params.PLATFORM} \
-                        --benchmark ${params.BENCHMARK} \
-                        --scale ${params.SCALE_FACTOR} \
-                        --output results/
-
-                    benchbox export --last --format html --output-dir results/
-                """
+                withEnv([
+                    "BENCHBOX_PLATFORM=${params.PLATFORM}",
+                    "BENCHBOX_BENCHMARK=${params.BENCHMARK}",
+                    "BENCHBOX_SCALE_FACTOR=${params.SCALE_FACTOR}"
+                ]) {
+                    sh '''
+                        benchbox run --platform "$BENCHBOX_PLATFORM" --benchmark "$BENCHBOX_BENCHMARK" --scale "$BENCHBOX_SCALE_FACTOR" --output results/
+                        benchbox export --last --format html --output-dir results/
+                    '''
+                }
             }
         }
 
@@ -365,10 +366,7 @@ pipeline {
             }
             steps {
                 sh '''
-                    python scripts/compare_benchmarks.py \
-                        --baseline baseline/*.json \
-                        --current results/*.json \
-                        --threshold 10
+                    python scripts/compare_benchmarks.py --baseline baseline/*.json --current results/*.json --threshold 10
                 '''
             }
         }
@@ -553,9 +551,10 @@ stages:
 
 ### 1. Small Scale Factors
 
-Use small scale factors in CI/CD to keep execution times reasonable:
+Use small scale factors in CI/CD to keep execution times reasonable. These
+are command-option fragments:
 
-```yaml
+```text
 # Fast feedback in CI
 --scale 0.01  # ~10 MB data, ~30 seconds
 
@@ -941,9 +940,10 @@ benchbox run \
 
 **Problem**: CI runners run out of memory
 
-**Solution**: Use resource-appropriate configurations:
+**Solution**: Use resource-appropriate configurations. The fragments below
+show a runner setting and a command option, not a complete workflow:
 
-```yaml
+```text
 # GitHub Actions - use larger runners
 runs-on: ubuntu-latest-8-cores
 

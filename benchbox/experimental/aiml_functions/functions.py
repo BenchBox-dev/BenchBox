@@ -1,9 +1,6 @@
-"""AI/ML function definitions and platform support registry.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -13,8 +10,6 @@ from typing import Any
 
 
 class AIMLFunctionCategory(str, Enum):
-    """Categories of AI/ML SQL functions."""
-
     SENTIMENT = "sentiment"
     CLASSIFICATION = "classification"
     SUMMARIZATION = "summarization"
@@ -27,8 +22,6 @@ class AIMLFunctionCategory(str, Enum):
 
 @dataclass
 class PlatformSupport:
-    """Platform-specific support information for an AI/ML function."""
-
     platform: str
     function_name: str
     syntax_template: str
@@ -39,14 +32,11 @@ class PlatformSupport:
     cost_per_1k_tokens: float = 0.0
 
     def format_query(self, input_column: str, **kwargs: Any) -> str:
-        """Format the function call with the given input column."""
         return self.syntax_template.format(input=input_column, **kwargs)
 
 
 @dataclass
 class AIMLFunction:
-    """Definition of an AI/ML SQL function."""
-
     function_id: str
     category: AIMLFunctionCategory
     name: str
@@ -54,18 +44,15 @@ class AIMLFunction:
     platforms: dict[str, PlatformSupport] = field(default_factory=dict)
     sample_input: str = ""
     expected_output_type: str = "string"
-    latency_class: str = "high"  # low (<100ms), medium (100-500ms), high (>500ms)
+    latency_class: str = "high"
 
     def is_supported_on(self, platform: str) -> bool:
-        """Check if this function is supported on the given platform."""
         return platform.lower() in self.platforms
 
     def get_platform_support(self, platform: str) -> PlatformSupport | None:
-        """Get platform-specific support information."""
         return self.platforms.get(platform.lower())
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "function_id": self.function_id,
             "category": self.category.value,
@@ -77,16 +64,11 @@ class AIMLFunction:
 
 
 class AIMLFunctionRegistry:
-    """Registry of AI/ML SQL functions across platforms."""
-
     def __init__(self) -> None:
-        """Initialize the registry with known AI/ML functions."""
         self._functions: dict[str, AIMLFunction] = {}
         self._register_functions()
 
     def _register_functions(self) -> None:
-        """Register all known AI/ML functions."""
-        # Sentiment Analysis
         self._functions["sentiment_analysis"] = AIMLFunction(
             function_id="sentiment_analysis",
             category=AIMLFunctionCategory.SENTIMENT,
@@ -125,7 +107,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Text Classification
         self._functions["text_classification"] = AIMLFunction(
             function_id="text_classification",
             category=AIMLFunctionCategory.CLASSIFICATION,
@@ -164,7 +145,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Text Summarization
         self._functions["summarization"] = AIMLFunction(
             function_id="summarization",
             category=AIMLFunctionCategory.SUMMARIZATION,
@@ -203,7 +183,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # LLM Completion
         self._functions["completion"] = AIMLFunction(
             function_id="completion",
             category=AIMLFunctionCategory.COMPLETION,
@@ -243,7 +222,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Text Embedding
         self._functions["embedding"] = AIMLFunction(
             function_id="embedding",
             category=AIMLFunctionCategory.EMBEDDING,
@@ -283,7 +261,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Translation
         self._functions["translation"] = AIMLFunction(
             function_id="translation",
             category=AIMLFunctionCategory.TRANSLATION,
@@ -312,7 +289,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Entity Extraction
         self._functions["entity_extraction"] = AIMLFunction(
             function_id="entity_extraction",
             category=AIMLFunctionCategory.EXTRACTION,
@@ -351,7 +327,6 @@ class AIMLFunctionRegistry:
             },
         )
 
-        # Anomaly Detection (ML/Prediction)
         self._functions["anomaly_detection"] = AIMLFunction(
             function_id="anomaly_detection",
             category=AIMLFunctionCategory.PREDICTION,
@@ -383,35 +358,28 @@ class AIMLFunctionRegistry:
         )
 
     def get_function(self, function_id: str) -> AIMLFunction | None:
-        """Get a function by ID."""
         return self._functions.get(function_id)
 
     def get_all_functions(self) -> dict[str, AIMLFunction]:
-        """Get all registered functions."""
         return self._functions.copy()
 
     def get_functions_by_category(self, category: AIMLFunctionCategory) -> list[AIMLFunction]:
-        """Get all functions in a category."""
         return [f for f in self._functions.values() if f.category == category]
 
     def get_functions_for_platform(self, platform: str) -> list[AIMLFunction]:
-        """Get all functions supported on a platform."""
         platform_lower = platform.lower()
         return [f for f in self._functions.values() if f.is_supported_on(platform_lower)]
 
     def get_supported_platforms(self) -> set[str]:
-        """Get all platforms with AI/ML function support."""
         platforms: set[str] = set()
         for func in self._functions.values():
             platforms.update(func.platforms.keys())
         return platforms
 
     def get_categories(self) -> list[AIMLFunctionCategory]:
-        """Get all function categories."""
         return list(AIMLFunctionCategory)
 
     def export_registry(self) -> dict[str, Any]:
-        """Export the registry as a dictionary."""
         return {
             "functions": {func_id: func.to_dict() for func_id, func in self._functions.items()},
             "platforms": list(self.get_supported_platforms()),

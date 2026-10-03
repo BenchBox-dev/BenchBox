@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Run the revision-pinned MCP conformance and Inspector acceptance gate."""
 
 from __future__ import annotations
 
@@ -38,14 +37,10 @@ SCENARIOS = (
     "server-sse-multiple-streams",
     "server-stateless",
 )
-# This is an exact, revision-bound fixture baseline. Keep every entry
-# individually named: the conformance runner must fail closed for any result
-# not listed here, and a baseline entry never waives a real BenchBox defect.
 EXPECTED_FAILURE_IDS = (
     "server-stateless:sep-2575-server-rejects-undeclared-capability",
     "server-stateless:sep-2575-missing-capability-http-400",
 )
-# Static registries must not emit list-change warnings; any warning is a gate failure.
 EXPECTED_WARNING_IDS: tuple[str, ...] = ()
 
 
@@ -54,7 +49,6 @@ def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> 
 
 
 def _parse_result_ids(output: str, status: str) -> list[str]:
-    """Extract conformance result IDs for one exact status label."""
     result_ids: list[str] = []
     for line in output.splitlines():
         if status not in line:
@@ -116,19 +110,15 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=600)  # noqa: S603
         output = (result.stdout or "") + (result.stderr or "")
-        # Parse all FAILURE lines regardless of exit code so we can validate
-        # the exact baseline and also detect unparseable nonzero exits.
         qualified_failed = _qualify_result_ids(_parse_result_ids(output, "FAILURE"), scenario)
         qualified_warnings = _qualify_result_ids(_parse_result_ids(output, "WARNING"), scenario)
 
         expected_failures = [fid for fid in EXPECTED_FAILURE_IDS if fid.startswith(f"{scenario}:")]
         expected_warnings = [wid for wid in EXPECTED_WARNING_IDS if wid.startswith(f"{scenario}:")]
-        # P1: nonzero exit with no parseable FAILURE is an unparseable transport/startup error
         if result.returncode != 0 and not qualified_failed:
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
             raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
-        # P2: require exact failure and warning sets, not just a known-failure subset.
         unexpected_failures = [fid for fid in qualified_failed if fid not in expected_failures]
         missing_failures = [fid for fid in expected_failures if fid not in qualified_failed]
         unexpected_warnings = [wid for wid in qualified_warnings if wid not in expected_warnings]
@@ -137,19 +127,13 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
             raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
-        # For the expected non-zero case (server-stateless with fixture failures),
-        # also ensure the exit code is non-zero; a zero exit with the baseline
-        # would indicate the baseline is no longer exercised.
         if expected_failures and result.returncode == 0:
-            # Baseline expected failures but tool exited 0 -> stale baseline
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
             raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
-        # If we reach here, the scenario passed with exact expected failures
         if result.returncode != 0:
             sys.stdout.write(output)
         else:
-            # Success case with no expected failures (most scenarios) - still surface log
             if output.strip():
                 sys.stdout.write(output)
 
@@ -206,8 +190,6 @@ def _write_evidence(path: Path, protocol_version: str) -> None:
         raise RuntimeError("Refusing to write production evidence from a dirty worktree")
     source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()  # noqa: S603
     automated = dict.fromkeys(sorted(AUTOMATED_GATES), True)
-    # Focused in-process tests are useful regressions, but only a deployed
-    # multi-worker acceptance run can certify the shared storage class.
     automated["multiworker"] = False
     payload = {
         "source_revision": source_revision,
@@ -218,7 +200,6 @@ def _write_evidence(path: Path, protocol_version: str) -> None:
         "inspector_revision": INSPECTOR_REVISION,
         "inspector_integrity": INSPECTOR_INTEGRITY,
         "automated": automated,
-        # These require operator evidence; false deliberately keeps publication blocked.
         "external": dict.fromkeys(sorted(EXTERNAL_GATES), False),
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

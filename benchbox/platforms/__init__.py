@@ -1,12 +1,6 @@
-"""Database platform adapters for optimized benchmark execution.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides database-specific optimizations for benchmark execution,
-separating benchmark logic from platform-specific implementation details.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import ast
 import importlib
@@ -20,52 +14,10 @@ from benchbox.utils.runtime_env import DriverResolution, DriverRuntimeStrategy, 
 from .base import BenchmarkResults, ConnectionConfig, DriverIsolationCapability, PlatformAdapter
 from .base.adapter import check_isolation_capability
 
-# ============================================================================
-# Lazy Import System for Cloud Platform Adapters
-# ============================================================================
-# Cloud platform SDKs (databricks, snowflake, google-cloud-bigquery, etc.) have
-# heavy import chains that add 300+ seconds to pytest collection time even when
-# wrapped in try/except blocks. The import statement itself executes even if
-# immediately caught.
-#
-# This lazy loading pattern defers the actual import until the adapter is first
-# accessed, dramatically reducing test suite startup time.
-#
-# Adapters loaded lazily (heavy SDK dependencies):
-#   - DatabricksAdapter (databricks-sql-connector, databricks-sdk)
-#   - BigQueryAdapter (google-cloud-bigquery, google-cloud-storage)
-#   - SnowflakeAdapter (snowflake-connector-python)
-#   - RedshiftAdapter (redshift-connector, boto3)
-#   - ClickHouseAdapter (clickhouse-driver or chdb)
-#   - TrinoAdapter (trino)
-#   - AthenaAdapter (pyathena, boto3)
-#   - SparkAdapter (pyspark)
-#   - PySparkSQLAdapter (pyspark)
-#   - FireboltAdapter (firebolt-sdk)
-#   - InfluxDBAdapter (influxdb3-python)
-#   - PrestoAdapter (presto-python-client)
-#   - AzureSynapseAdapter (pyodbc, azure-identity)
-#   - FabricWarehouseAdapter (pyodbc, azure-identity)
-#   - FabricLakehouseAdapter (pyodbc, azure-identity)
-#   - FabricSparkAdapter (azure identity + storage SDK)
-#
-# Adapters loaded eagerly (light dependencies or core):
-#   - DuckDBAdapter (duckdb - core dependency, always available)
-#   - MotherDuckAdapter (duckdb - shares core dependency)
-#   - DuckLakeAdapter (duckdb - shares core dependency; requires duckdb>=1.3 at runtime)
-#   - SQLiteAdapter (stdlib sqlite3)
-#   - DataFusionAdapter (datafusion - ~68 MB native lib, now lazy)
-#   - PolarsAdapter (polars - ~142 MB native lib, now lazy)
-#   - PostgreSQLAdapter (psycopg (v3) - core dependency)
-#   - TimescaleDBAdapter (psycopg (v3) - shares core dependency)
-# ============================================================================
-
-# Cache for lazily loaded adapters and constants
 _lazy_adapter_cache: dict[str, Optional[Type[PlatformAdapter]]] = {}
 _lazy_constant_cache: dict[str, bool] = {}
 _lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 
-# Mapping of lazy adapter names to their module paths.
 _LAZY_ADAPTER_ROWS = """\
 DuckDBAdapter|.duckdb
 MotherDuckAdapter|.motherduck
@@ -130,26 +82,16 @@ _LAZY_CONSTANTS = {
     name: (module_path, False) for name, module_path in (row.split("|", 1) for row in _LAZY_CONSTANT_ROWS.splitlines())
 }
 
-# Cache for clickhouse module (special case - needs module reference)
 _clickhouse_module_cache = None
 
 
 def _resolve_lazy_module_path(module_path: str) -> str:
-    """Return the absolute module path used for import diagnostics."""
     if module_path.startswith(".") and __package__ is not None:
         return importlib.util.resolve_name(module_path, __package__)
     return module_path
 
 
 def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
-    """Load a lazily-imported adapter class.
-
-    Args:
-        name: Adapter class name (e.g., 'DatabricksAdapter')
-
-    Returns:
-        Adapter class if available, None if import fails
-    """
     if name in _lazy_adapter_cache:
         return _lazy_adapter_cache[name]
 
@@ -186,14 +128,6 @@ def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
 
 
 def _load_lazy_constant(name: str) -> bool:
-    """Load a lazily-imported availability constant.
-
-    Args:
-        name: Constant name (e.g., 'POLARS_AVAILABLE')
-
-    Returns:
-        Constant value (True/False), defaults to False on import failure
-    """
     if name in _lazy_constant_cache:
         return _lazy_constant_cache[name]
 
@@ -221,52 +155,33 @@ def _load_lazy_constant(name: str) -> bool:
 
 
 def __getattr__(name: str):
-    """Lazy load cloud platform adapters and DataFrame components on first access.
-
-    This function is called when an attribute is not found in the module's namespace.
-    It enables deferred loading of heavy cloud SDK dependencies until they're actually
-    needed, dramatically reducing test collection time.
-    """
     global _clickhouse_module_cache
 
-    # Handle adapter classes
     if name in _LAZY_ADAPTERS:
         return _load_lazy_adapter(name)
 
-    # Handle availability constants
     if name in _LAZY_CONSTANTS:
         return _load_lazy_constant(name)
 
-    # Special case: clickhouse module reference (for legacy patches/tests)
     if name == "clickhouse":
         if _clickhouse_module_cache is None:
             try:
                 _clickhouse_module_cache = importlib.import_module(".clickhouse", __package__)
             except (ImportError, OSError):
-                pass  # Keep as None
+                pass
         return _clickhouse_module_cache
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_lazy_adapter_diagnostics() -> dict[str, dict[str, object]]:
-    """Return diagnostics captured by lazy adapter loading."""
     return {name: diagnostic.copy() for name, diagnostic in _lazy_adapter_diagnostics.items()}
 
 
 def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = None) -> dict[str, dict[str, object]]:
-    """Run registry-level optional adapter diagnostics on demand."""
     return PlatformRegistry.diagnose_optional_adapter_imports(platform_names)
 
 
-# ============================================================================
-# Eagerly Loaded Adapters (light dependencies or core)
-# ============================================================================
-# These adapters have lightweight dependencies that don't impact startup time
-# significantly, so they're loaded eagerly for simpler access patterns.
-
-
-# Import local platform adapters (core/light dependencies).
 def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[PlatformAdapter]]:
     try:
         module = importlib.import_module(module_path, __package__)
@@ -292,7 +207,6 @@ is_dataframe_platform diagnose_optional_adapter_imports get_lazy_adapter_diagnos
 __all__ = _EXPORT_NAMES.split()
 
 
-# Import unified adapter factory
 from benchbox.platforms.adapter_factory import (
     get_adapter,
     get_available_deployments,
@@ -303,42 +217,19 @@ from benchbox.platforms.adapter_factory import (
 
 
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
-    """Factory function to create platform adapters.
-
-    This function delegates adapter lookup to PlatformRegistry (the single source
-    of truth for platform definitions) while handling CLI-specific concerns like
-    error messages and driver version resolution.
-
-    Args:
-        platform_name: Name of the platform (aliases like 'sqlite3' are resolved)
-        **config: Platform-specific configuration
-
-    Returns:
-        Configured platform adapter instance
-
-    Raises:
-        ValueError: If platform is not supported
-        ImportError: If platform dependencies are not installed
-    """
-    # Resolve aliases and normalize to canonical name via PlatformRegistry
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
 
-    # Get adapter class from registry (single source of truth)
     try:
         adapter_class = PlatformRegistry.get_adapter_class(canonical_name)
     except ValueError:
-        # Platform not registered - provide helpful error with available platforms
         available = ", ".join(PlatformRegistry.get_available_platforms())
         raise ValueError(f"Unsupported platform: {platform_name}. Available: {available}") from None
 
-    # Check if adapter class is actually available (deps installed)
     if adapter_class is None:
         platform_info = PlatformRegistry.get_platform_info(canonical_name)
         install_cmd = platform_info.installation_command if platform_info else "unknown"
         raise ImportError(f"Platform '{platform_name}' is not available. Install required dependencies: {install_cmd}")
 
-    # Check for pre-resolved driver state from upstream (database.py) before popping keys.
-    # driver_runtime_strategy is NOT popped, so its presence signals upstream already resolved.
     already_resolved = config.get("driver_runtime_strategy") is not None
 
     driver_package = config.pop("driver_package", None)
@@ -349,7 +240,6 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     driver_auto_install = bool(config.pop("driver_auto_install", False))
     driver_auto_install_used = bool(config.pop("driver_auto_install_used", False))
 
-    # Get platform info for driver metadata (already resolved to canonical name)
     platform_info = PlatformRegistry.get_platform_info(canonical_name)
     install_hint = platform_info.installation_command if platform_info else "unknown"
     package_hint = driver_package or (platform_info.driver_package if platform_info else None)
@@ -357,7 +247,6 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     requested_version = explicit_requested_version
 
     if already_resolved:
-        # Upstream (database.py) already resolved the driver - reconstruct without re-resolving.
         resolution = DriverResolution(
             package=driver_package or package_hint or "",
             requested=explicit_requested_version,
@@ -369,7 +258,6 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
             runtime_python_executable=config.get("driver_runtime_python_executable"),
         )
     else:
-        # No upstream resolution (e.g., direct API usage) - resolve now.
         resolution = ensure_driver_version(
             package_name=package_hint,
             requested_version=requested_version,
@@ -382,8 +270,6 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     resolved_version = resolution.resolved or driver_version_resolved
     requested = explicit_requested_version or resolution.requested
 
-    # Propagate driver runtime contract into adapter constructor config so
-    # adapters that need runtime binding during initialization can apply it.
     config.setdefault("driver_package", resolution.package or package_hint)
     config.setdefault("driver_version_requested", requested)
     config.setdefault("driver_version_resolved", resolved_version)
@@ -394,29 +280,15 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
     config.setdefault("driver_auto_install", resolution.auto_install_used or driver_auto_install)
     config.setdefault("driver_auto_install_used", resolution.auto_install_used)
 
-    # Use from_config() if adapter supports config-aware initialization (e.g., Databricks, Snowflake)
-    # This enables proper schema naming based on benchmark/scale/tuning configuration
-    # Inject the canonical registry key so PlatformAdapter.canonical_platform_type
-    # reflects the resolved platform selector rather than falling back to a
-    # normalized display name. Upstream config plumbing (core/platform_config.py)
-    # strips "type" from DatabaseConfig before adapters are constructed, so this
-    # is the authoritative point where the canonical key reaches the adapter.
-    # Overwrite (not setdefault): any inbound "type" is the raw user selector,
-    # possibly an alias (e.g. "sqlite3"); canonical_name is its resolved form.
     config["type"] = canonical_name
     if hasattr(adapter_class, "from_config") and callable(adapter_class.from_config):
         adapter_instance = adapter_class.from_config(config)
     else:
-        # Simple adapters use direct constructor (e.g., DuckDB, SQLite)
         adapter_instance = adapter_class(**config)
 
-    # Some from_config implementations rebuild their constructor config with
-    # selected keys only, dropping the injected "type" -- restore it on the
-    # stored platform_config so canonical_platform_type works uniformly.
     if isinstance(getattr(adapter_instance, "platform_config", None), dict):
         adapter_instance.platform_config.setdefault("type", canonical_name)
 
-    # Attach driver metadata for downstream consumers (CLI summaries, exports).
     adapter_instance.driver_package = resolution.package or package_hint
     adapter_instance.driver_version_requested = requested
     adapter_instance.driver_version_resolved = resolved_version
@@ -430,52 +302,20 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
 
 
 def list_available_platforms() -> dict[str, bool]:
-    """List all platforms and their availability status.
-
-    Delegates to PlatformRegistry.get_platform_availability() which is
-    the single source of truth for platform availability.
-
-    Returns:
-        Dictionary mapping platform names to availability boolean.
-    """
     return PlatformRegistry.get_platform_availability()
 
 
 def get_platform_requirements(platform_name: str) -> str:
-    """Get installation requirements for a platform.
-
-    Delegates to PlatformRegistry.get_platform_requirements() which is
-    the single source of truth for platform metadata.
-
-    Args:
-        platform_name: Name of the platform (aliases are resolved automatically)
-
-    Returns:
-        Installation command string
-    """
     return PlatformRegistry.get_platform_requirements(platform_name)
 
 
 def check_platform_connectivity(platform_name: str, **config) -> bool:
-    """Check connectivity to a platform using its adapter.
-
-    Args:
-        platform_name: Name of the platform to test
-        **config: Platform configuration
-
-    Returns:
-        True if connection successful, False otherwise
-    """
     try:
         adapter = get_platform_adapter(platform_name, **config)
         return adapter.test_connection()
     except Exception:
         return False
 
-
-# ============================================================================
-# DataFrame Platform Support
-# ============================================================================
 
 _DATAFRAME_PLATFORM_ROWS = """\
 polars-df|PolarsDataFrameAdapter|POLARS_AVAILABLE|pip install polars (core dependency - should be installed)
@@ -495,29 +335,12 @@ _DATAFRAME_PLATFORM_INFO = {
 
 
 def get_dataframe_adapter(platform_name: str, **config):
-    """Factory function to create DataFrame platform adapters.
-
-    DataFrame adapters use native DataFrame APIs (e.g., Polars expressions,
-    Pandas operations) instead of SQL for query execution.
-
-    Args:
-        platform_name: Name of the DataFrame platform ('polars-df', 'pandas-df', etc.)
-        **config: Platform-specific configuration options
-
-    Returns:
-        DataFrame adapter instance
-
-    Raises:
-        ValueError: If platform is not a recognized DataFrame platform
-        ImportError: If required dependencies are not installed
-    """
     platform_lower = platform_name.lower()
 
     if platform_lower not in _DATAFRAME_PLATFORM_INFO:
         available = ", ".join(sorted(_DATAFRAME_PLATFORM_INFO))
         raise ValueError(f"Unknown DataFrame platform: {platform_name}. Available: {available}")
 
-    # Trigger lazy load via __getattr__
     adapter_name = _DATAFRAME_PLATFORM_INFO[platform_lower][0]
     adapter_class = _load_lazy_adapter(adapter_name)
 
@@ -531,64 +354,19 @@ def get_dataframe_adapter(platform_name: str, **config):
 
 
 def list_available_dataframe_platforms() -> dict[str, bool]:
-    """List all DataFrame platforms and their availability status.
-
-    Returns:
-        Dictionary mapping platform name to availability boolean
-    """
-    # Trigger lazy load via __getattr__ for each constant
     return {platform: _load_lazy_constant(info[1]) for platform, info in _DATAFRAME_PLATFORM_INFO.items()}
 
 
 def get_dataframe_requirements(platform_name: str) -> str:
-    """Get installation requirements for a DataFrame platform.
-
-    Args:
-        platform_name: Name of the DataFrame platform
-
-    Returns:
-        Installation command string
-    """
     info = _DATAFRAME_PLATFORM_INFO.get(platform_name.lower())
     return info[2] if info is not None else "Unknown DataFrame platform"
 
 
 def is_dataframe_platform(platform_name: str) -> bool:
-    """Check if a platform name refers to a DataFrame platform.
-
-    Args:
-        platform_name: Platform name to check
-
-    Returns:
-        True if the platform is a DataFrame platform
-    """
     return platform_name.lower() in _DATAFRAME_PLATFORM_INFO
 
 
-# ============================================================================
-# Platform Hook Registration (Deferred)
-# ============================================================================
-# Platform hooks are registered lazily to avoid triggering SDK imports during
-# module load. The option specs are registered unconditionally (they're just
-# metadata), but config builders are wrapped in lazy loaders that only import
-# the adapter module when the builder is actually called.
-#
-# This is critical for test performance - importing adapters like Databricks
-# or Snowflake triggers heavy SDK imports (300+ seconds). By deferring these
-# imports, pytest collection time is dramatically reduced.
-# ============================================================================
-
-
 def _make_lazy_config_builder(module_path: str, builder_name: str):
-    """Create a lazy config builder that defers module import until called.
-
-    Args:
-        module_path: Relative module path (e.g., '.databricks')
-        builder_name: Name of the config builder function in the module
-
-    Returns:
-        A wrapper function that lazily imports and calls the real builder
-    """
     from typing import Any
 
     def lazy_builder(
@@ -616,12 +394,6 @@ try:
             *(_spec(spec[0], spec[1], **(spec[2] if len(spec) > 2 else {})) for spec in specs),
         )
 
-    # Rows are "platform|name|help|kwargs". `platform` is the BASE platform key
-    # (e.g. `datafusion`, `polars`) — NOT the `-df` CLI alias. `benchbox run`
-    # normalizes `--platform datafusion-df` to `datafusion` via PLATFORM_ALIASES
-    # before calling PlatformHookRegistry.parse_options(), and the DataFrame
-    # adapters take these as base-name constructor kwargs, so DataFrame options
-    # must be keyed by the base name to be reachable from the CLI.
     _OPTION_SPEC_ROWS = """\
 databricks|uc_catalog|Unity Catalog catalog name for staging data|{}
 databricks|uc_schema|Unity Catalog schema name for staging data|{}
@@ -900,42 +672,26 @@ velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads
 
     _register_spec_rows(_OPTION_SPEC_ROWS)
 
-    # ========================================================================
-    # Cloud Platform Hooks (Lazy Config Builders)
-    # ========================================================================
-    # These platforms use lazy config builders to avoid importing heavy SDKs
-    # at module load time. Option specs are registered unconditionally.
-
-    # MotherDuck — the credential wizard saves a `database` field, but the
-    # default builder did not call CredentialManager, so the configured
-    # database was silently dropped at run time. Routing through a lazy
-    # config builder pulls the wizard-saved database into runtime config.
     PlatformHookRegistry.register_config_builder(
         "motherduck", _make_lazy_config_builder(".motherduck", "_build_motherduck_config")
     )
 
-    # Databricks
     PlatformHookRegistry.register_config_builder(
         "databricks", _make_lazy_config_builder(".databricks", "_build_databricks_config")
     )
 
-    # BigQuery
     PlatformHookRegistry.register_config_builder(
         "bigquery", _make_lazy_config_builder(".bigquery", "_build_bigquery_config")
     )
 
-    # Trino
     PlatformHookRegistry.register_config_builder("trino", _make_lazy_config_builder(".trino", "_build_trino_config"))
 
-    # Firebolt
     PlatformHookRegistry.register_config_builder(
         "firebolt", _make_lazy_config_builder(".firebolt", "_build_firebolt_config")
     )
 
-    # Presto
     PlatformHookRegistry.register_config_builder("presto", _make_lazy_config_builder(".presto", "_build_presto_config"))
 
-    # PostgreSQL-family hooks are lazy too; importing their modules pulls psycopg.
     PlatformHookRegistry.register_config_builder(
         "postgresql", _make_lazy_config_builder(".postgresql", "_build_postgresql_config")
     )
@@ -959,66 +715,32 @@ velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads
         "cedardb", _make_lazy_config_builder(".cedardb", "_build_cedardb_config")
     )
 
-    # ========================================================================
-    # Lazy Cloud Platform Hooks (Azure Synapse, Fabric)
-    # ========================================================================
-
-    # Azure Synapse (lazy - uses pyodbc and azure-identity)
     PlatformHookRegistry.register_config_builder(
         "synapse", _make_lazy_config_builder(".azure_synapse", "_build_synapse_config")
     )
 
-    # Microsoft Fabric Warehouse (lazy - uses pyodbc and azure-identity)
-    # Fabric uses from_config pattern, no separate config builder needed
-
-    # Onehouse Quanton (lazy - uses requests and boto3)
     PlatformHookRegistry.register_config_builder(
         "quanton", _make_lazy_config_builder(".onehouse", "_build_quanton_config")
     )
 
-    # ClickHouse Cloud (lazy - uses clickhouse-connect)
     PlatformHookRegistry.register_config_builder(
         "clickhouse-cloud", _make_lazy_config_builder(".clickhouse_cloud", "_build_clickhouse_cloud_config")
     )
 
-    # StarRocks (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder(
         "starrocks", _make_lazy_config_builder(".starrocks.setup", "_build_starrocks_config")
     )
 
-    # Databend (lazy - uses databend-driver)
     PlatformHookRegistry.register_config_builder(
         "databend", _make_lazy_config_builder(".databend", "_build_databend_config")
     )
 
-    # Doris (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder("doris", _make_lazy_config_builder(".doris", "_build_doris_config"))
 
-    # SingleStore (lazy - uses singlestoredb SDK)
     PlatformHookRegistry.register_config_builder(
         "singlestore", _make_lazy_config_builder(".singlestore", "_build_singlestore_config")
     )
 
-    # ========================================================================
-    # DataFrame Platform Hooks
-    # ========================================================================
-    # DataFrame platform option specs are registered unconditionally since
-    # they're just metadata. The actual adapter availability is checked at
-    # runtime when the adapter is instantiated.
-
-    # Polars DataFrame
-
-    # Pandas DataFrame
-
-    # cuDF DataFrame
-
-    # Dask DataFrame
-
-    # DataFusion DataFrame
-    # SQLite (embedded — stdlib sqlite3, no heavy SDK imports)
-
-    # Apache Gluten + Velox (lazy - uses pyspark + Gluten bundle jar)
 
 except ImportError:
-    # Platform hooks may not be available in all contexts
     pass

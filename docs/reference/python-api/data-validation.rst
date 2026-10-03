@@ -12,11 +12,11 @@ BenchBox provides comprehensive data validation utilities for benchmark data gen
 
 **Key Features**:
 
-- **Automatic Validation**: Validates data files against expected row counts
+- **Automatic Validation**: Checks expected files and available row counts
 - **Manifest Support**: Uses ``_datagen_manifest.json`` for fast validation
 - **Compression Support**: Handles ``.gz`` and ``.zst`` compressed files
 - **Chunked Files**: Supports parallel data generation with chunked files
-- **Row Count Tolerance**: Allows ±5% variance in row counts
+- **Row Count Tolerance**: Uses max(1, int(expected_rows * 0.05)) when row totals are available
 - **Scale Factor Awareness**: Adjusts expectations based on scale factor
 - **Multiple Formats**: Supports ``.tbl``, ``.dat``, ``.csv``, ``.parquet``
 
@@ -43,18 +43,59 @@ API Reference
 BenchmarkDataValidator Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.utils.data_validation.BenchmarkDataValidator
-   :members:
-   :inherited-members:
+.. py:class:: benchbox.utils.data_validation.BenchmarkDataValidator(benchmark_name: str, scale_factor: float=1.0)
+
+   Validate data reuse for a benchmark and scale factor. Benchmark names are
+   lowercased. TPC-H and TPC-DS use table expectations; other names use generic
+   file discovery. TPC-H nation and region row counts stay fixed at every scale.
+   TPC-DS call_center, reason, ship_mode, warehouse, income_band, web_site, store
+   and time_dim keep their baseline counts at scale >= 1; at smaller scales they
+   scale proportionally. Other scaled counts use max(1, int(base_rows * scale)).
+
+   :param benchmark_name: Benchmark name, such as tpch or tpcds.
+   :param scale_factor: Scale used to derive table expectations.
+
+.. py:method:: benchbox.utils.data_validation.BenchmarkDataValidator.validate_data_directory(data_dir: Union[str, Path]) -> DataValidationResult
+
+   Validate a directory against this validator's expectations and return a
+   DataValidationResult. A missing directory produces an invalid result. A matching
+   manifest is rejected when its data-generation stamp is stale; otherwise the
+   manifest path checks entries against their recorded sizes and row counts.
+   Without a matching manifest, scan files and attempt a best-effort manifest write.
+   This method can therefore write _datagen_manifest.json in the input directory.
+
+   :param data_dir: Directory containing benchmark data.
+   :returns: Validation outcomes, file sizes in bytes, issues and the validation time.
+
+   Known TPC-H and TPC-DS expectations use a row-count tolerance of
+   max(1, int(expected_rows * 0.05)). The scan compares positive counted row totals;
+   failed or unavailable row counting does not establish a complete row-count
+   check. Exact .tbl/.dat names and their .gz/.zst variants are recognized, along
+   with numbered table_N_M.dat chunks. Generic benchmarks scan top-level .tbl,
+   .dat, .csv and .parquet files without benchmark-specific row expectations.
+   Review issues and tables_validated as well as the valid flag; this is a data
+   reuse check, not an official TPC correctness certification.
+
+.. py:method:: benchbox.utils.data_validation.BenchmarkDataValidator.should_regenerate_data(data_dir: Union[str, Path], force_regenerate: bool=False) -> tuple[bool, DataValidationResult]
+
+   Return (should_regenerate, validation_result). With force_regenerate=True,
+   return True and an invalid result describing the request without scanning data.
+   Otherwise validate the directory and return the inverse of its valid flag.
+
+   :param data_dir: Directory to validate.
+   :param force_regenerate: Request regeneration regardless of existing data.
+   :returns: Regeneration decision and its validation evidence.
+
+.. py:method:: benchbox.utils.data_validation.BenchmarkDataValidator.print_validation_report(result: DataValidationResult, verbose: bool=True) -> None
+
+   Print validation status, missing tables and row-count mismatches. With
+   verbose=True, include file sizes and issue descriptions.
+
+   :param result: Validation evidence to display.
+   :param verbose: Include detailed sizes and issues.
+
 
 **Constructor**:
-
-.. code-block:: python
-
-    BenchmarkDataValidator(
-        benchmark_name: str,
-        scale_factor: float = 1.0
-    )
 
 **Parameters**:
 
@@ -84,8 +125,8 @@ Validation Methods
 
    - Directory existence
    - Table/file presence
-   - File size (non-zero)
-   - Row counts (±5% tolerance)
+   - File sizes (the scan checks emptiness; manifests check recorded size identity)
+   - Available positive row counts (max(1, int(expected_rows * 0.05)) tolerance)
    - Compression support (gz, zst)
    - Chunked file detection
 
@@ -154,8 +195,45 @@ DataValidationResult Class
 
 Result object returned by validation operations.
 
-.. autoclass:: benchbox.utils.data_validation.DataValidationResult
-   :members:
+.. py:class:: benchbox.utils.data_validation.DataValidationResult(valid: bool, tables_validated: dict[str, bool], missing_tables: list[str], row_count_mismatches: dict[str, tuple[int, int]], file_size_info: dict[str, int], validation_timestamp: datetime, issues: list[str])
+
+   Dataclass of validation outcomes. All seven constructor arguments are required.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.valid
+   :type: bool
+
+   Overall validity reported by the validator; inspect detailed issues and table outcomes for the checks actually performed. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.tables_validated
+   :type: dict[str, bool]
+
+   Per-table validity flags. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.missing_tables
+   :type: list[str]
+
+   Names of tables missing required data files or manifest entries. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.row_count_mismatches
+   :type: dict[str, tuple[int, int]]
+
+   Table names mapped to (expected, actual) row-count pairs. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.file_size_info
+   :type: dict[str, int]
+
+   File names or manifest-relative paths mapped to file sizes in bytes. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.validation_timestamp
+   :type: datetime
+
+   Local datetime when the validation result was created. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.DataValidationResult.issues
+   :type: list[str]
+
+   Human-readable descriptions of validation issues. Required constructor argument.
+
 
 **Fields**:
 
@@ -192,15 +270,47 @@ TableExpectation Class
 
 Expected data characteristics for a table.
 
-.. autoclass:: benchbox.utils.data_validation.TableExpectation
+.. py:class:: benchbox.utils.data_validation.TableExpectation(name: str, expected_rows: int, expected_files: list[str], min_file_size: int = 0, allow_zero_rows: bool = False)
+
+   Dataclass describing a table expectation. name, expected_rows and expected_files
+   are required; min_file_size defaults to zero bytes and allow_zero_rows to False.
+   The validator's built-in expectations start from scale factor 1 and are scaled
+   for its configuration. A custom expectation's expected_rows is the count to
+   compare directly; it is not automatically rescaled when assigned afterward.
+
+.. py:attribute:: benchbox.utils.data_validation.TableExpectation.name
+   :type: str
+
+   Table name. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.TableExpectation.expected_rows
+   :type: int
+
+   Row count expected by this table expectation. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.TableExpectation.expected_files
+   :type: list[str]
+
+   Expected data filenames used by file resolution. Required constructor argument.
+
+.. py:attribute:: benchbox.utils.data_validation.TableExpectation.min_file_size
+   :type: int
+
+   Minimum-size metadata in bytes. Current validation checks emptiness and manifest size identity rather than enforcing this threshold. Default: ``0``.
+
+.. py:attribute:: benchbox.utils.data_validation.TableExpectation.allow_zero_rows
+   :type: bool
+
+   Whether the scan path permits zero-byte files for this expectation; it is not a blanket exemption from other checks. Default: ``False``.
+
 
 **Fields**:
 
 - **name** (str): Table name
-- **expected_rows** (int): Expected row count at scale factor 1.0
+- **expected_rows** (int): Expected row count for this expectation (built-in baselines start at scale factor 1.0)
 - **expected_files** (list[str]): Expected file names
 - **min_file_size** (int): Minimum file size in bytes (default: 0)
-- **allow_zero_rows** (bool): Whether zero-row tables are valid (default: False)
+- **allow_zero_rows** (bool): Whether the scan permits zero-byte files (default: False)
 
 Usage Examples
 --------------

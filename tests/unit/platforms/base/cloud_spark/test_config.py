@@ -1,9 +1,6 @@
-"""Tests for SparkConfigOptimizer benchmark configuration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -24,8 +21,6 @@ pytestmark = [
 
 
 class TestSparkResourceConfig:
-    """Test SparkResourceConfig dataclass."""
-
     def test_default_values(self):
 
         config = SparkResourceConfig()
@@ -53,8 +48,6 @@ class TestSparkResourceConfig:
 
 
 class TestSparkParallelismConfig:
-    """Test SparkParallelismConfig dataclass."""
-
     def test_default_values(self):
 
         config = SparkParallelismConfig()
@@ -76,8 +69,6 @@ class TestSparkParallelismConfig:
 
 
 class TestSparkConfig:
-    """Test SparkConfig dataclass and to_dict() method."""
-
     def test_default_config_to_dict(self):
 
         config = SparkConfig()
@@ -141,8 +132,6 @@ class TestSparkConfig:
 
 
 class TestSparkConfigOptimizerTPCH:
-    """Test SparkConfigOptimizer.for_tpch() method."""
-
     def test_tpch_small_scale(self):
 
         config = SparkConfigOptimizer.for_tpch(scale_factor=0.01)
@@ -188,8 +177,6 @@ class TestSparkConfigOptimizerTPCH:
 
 
 class TestSparkConfigOptimizerTPCDS:
-    """Test SparkConfigOptimizer.for_tpcds() method."""
-
     def test_tpcds_small_scale(self):
 
         config = SparkConfigOptimizer.for_tpcds(scale_factor=1.0)
@@ -201,7 +188,6 @@ class TestSparkConfigOptimizerTPCDS:
 
         config = SparkConfigOptimizer.for_tpcds(scale_factor=100)
 
-        # TPC-DS needs more resources for complex queries
         assert config.resources.driver_memory != "2g"
         assert config.io.broadcast_timeout == 600
 
@@ -210,24 +196,18 @@ class TestSparkConfigOptimizerTPCDS:
         tpch_config = SparkConfigOptimizer.for_tpch(scale_factor=10)
         tpcds_config = SparkConfigOptimizer.for_tpcds(scale_factor=10)
 
-        # TPC-DS complexity factor should result in more partitions
         assert tpcds_config.parallelism.shuffle_partitions >= tpch_config.parallelism.shuffle_partitions
 
 
 class TestSparkConfigOptimizerSSB:
-    """Test SparkConfigOptimizer.for_ssb() method."""
-
     def test_ssb_smaller_than_tpch(self):
 
         ssb_config = SparkConfigOptimizer.for_ssb(scale_factor=10)
 
-        # SSB is simpler, should have fewer partitions
         assert ssb_config.parallelism.shuffle_partitions <= 200
 
 
 class TestSparkConfigOptimizerPlatformOptimizations:
-    """Test platform-specific optimizations."""
-
     def test_databricks_optimizations(self):
 
         config = SparkConfigOptimizer.for_tpch(
@@ -257,27 +237,22 @@ class TestSparkConfigOptimizerPlatformOptimizations:
             platform=CloudPlatform.GLUE,
         )
 
-        # Glue uses different memory model
         assert config.resources.memory_overhead_factor == 0.2
 
 
 class TestSparkConfigOptimizerHelpers:
-    """Test SparkConfigOptimizer helper methods."""
-
     def test_calculate_shuffle_partitions_small(self):
 
         partitions = SparkConfigOptimizer._calculate_shuffle_partitions(0.1)
 
-        # Should be at least minimum (50)
         assert partitions >= 50
 
     def test_calculate_shuffle_partitions_large(self):
 
         partitions = SparkConfigOptimizer._calculate_shuffle_partitions(100)
 
-        # Should scale with data size
         assert partitions > 200
-        assert partitions <= 2000  # Should be capped
+        assert partitions <= 2000
 
     def test_calculate_shuffle_partitions_with_complexity(self):
 
@@ -309,8 +284,6 @@ class TestSparkConfigOptimizerHelpers:
 
 
 class TestCloudPlatformEnum:
-    """Test CloudPlatform enum."""
-
     def test_all_platforms_defined(self):
 
         platforms = [p.value for p in CloudPlatform]
@@ -325,8 +298,6 @@ class TestCloudPlatformEnum:
 
 
 class TestOptimizerAdaptiveToggle:
-    """SparkConfigOptimizer honors adaptive_enabled instead of force-enabling AQE."""
-
     AQE_KEYS = (
         "spark.sql.adaptive.enabled",
         "spark.sql.adaptive.coalescePartitions.enabled",
@@ -356,8 +327,6 @@ class TestOptimizerAdaptiveToggle:
 
 
 class TestBenchmarkTypeEnum:
-    """Test BenchmarkType enum."""
-
     def test_all_benchmarks_defined(self):
 
         benchmarks = [b.value for b in BenchmarkType]

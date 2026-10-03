@@ -8,7 +8,7 @@ from .common import (
     install_dataproc_serverless_stub,
     install_dataproc_stub,
     install_emr_serverless_stub,
-)  # fmt: skip
+)
 
 pytestmark = [
     pytest.mark.integration,

@@ -1,26 +1,6 @@
-"""pg_mooncake platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extends PostgreSQL adapter with pg_mooncake-specific functionality:
-- Mooncake table access method (USING mooncake) with Parquet/Iceberg storage
-- DuckDB-powered vectorized execution on columnar data
-- Object storage backend support (S3/GCS/Azure)
-
-pg_mooncake is a PostgreSQL extension that adds native columnstore tables
-with DuckDB-powered vectorized execution. Data is stored in Parquet format
-with Iceberg metadata, providing 5-20x columnar compression and top-10
-ClickBench performance.
-
-Deployment modes:
-- self-hosted: Self-hosted PostgreSQL with pg_mooncake extension (default)
-
-Storage modes:
-- local: Data stored on local disk (default)
-- s3: Data stored in S3 bucket
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -47,16 +27,6 @@ except ImportError:
 
 
 class PgMooncakeAdapter(PostgreSQLAdapter):
-    """pg_mooncake platform adapter with columnstore tables and DuckDB execution.
-
-    Extends PostgreSQLAdapter with pg_mooncake-specific features:
-    - Mooncake table access method (USING mooncake)
-    - DuckDB-powered vectorized execution on Parquet data
-    - Object storage backend configuration (S3/GCS)
-
-    Requires PostgreSQL 15+ with pg_mooncake extension installed.
-    """
-
     plan_capture_phase_eligible = True
 
     @property
@@ -64,15 +34,12 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return "pg_mooncake"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for pg_mooncake (PostgreSQL-compatible)."""
         return POSTGRES_DIALECT
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> PgMooncakeAdapter:
-        """Create pg_mooncake adapter from unified configuration."""
         adapter_config = {}
 
-        # Connection parameters (inherited from PostgreSQL)
         adapter_config["host"] = config.get("host", "localhost")
         adapter_config["port"] = config.get("port", 5432)
         adapter_config["username"] = config.get("username", "postgres")
@@ -80,7 +47,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         adapter_config["schema"] = config.get("schema", "public")
         adapter_config["sslmode"] = config.get("sslmode", "prefer")
 
-        # Database name - use provided or generate from benchmark config
         if config.get("database"):
             adapter_config["database"] = config["database"]
         elif config.get("benchmark") and config.get("scale_factor") is not None:
@@ -91,27 +57,21 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         else:
             adapter_config["database"] = "benchbox"
 
-        # Admin database for CREATE/DROP DATABASE operations
         adapter_config["admin_database"] = config.get("admin_database", "postgres")
 
-        # Performance settings (inherited from PostgreSQL)
         adapter_config["work_mem"] = config.get("work_mem", "256MB")
         adapter_config["maintenance_work_mem"] = config.get("maintenance_work_mem", "512MB")
         adapter_config["effective_cache_size"] = config.get("effective_cache_size", "1GB")
         adapter_config["max_parallel_workers_per_gather"] = config.get("max_parallel_workers_per_gather", 2)
 
-        # Connection pool settings
         adapter_config["connect_timeout"] = config.get("connect_timeout", 10)
         adapter_config["statement_timeout"] = config.get("statement_timeout", 0)
 
-        # pg_mooncake-specific settings
         adapter_config["storage_mode"] = config.get("storage_mode", "local")
         adapter_config["mooncake_bucket"] = config.get("mooncake_bucket")
 
-        # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -129,10 +89,8 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
     def __init__(self, **config):
         super().__init__(**config)
 
-        # pg_mooncake-specific configuration
         self.storage_mode = config.get("storage_mode", "local")
 
-        # Validate storage mode
         valid_storage_modes = {"local", "s3"}
         if self.storage_mode not in valid_storage_modes:
             raise ValueError(
@@ -140,7 +98,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                 f"Valid modes: {', '.join(sorted(valid_storage_modes))}"
             )
 
-        # Object storage settings
         self.mooncake_bucket = config.get("mooncake_bucket") or os.environ.get("MOONCAKE_S3_BUCKET")
 
         if self.storage_mode == "s3" and not self.mooncake_bucket:
@@ -151,18 +108,15 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             )
 
     def create_connection(self, **connection_config) -> Any:
-        """Create PostgreSQL connection and configure pg_mooncake extension."""
         conn = super().create_connection(**connection_config)
 
         cursor = conn.cursor()
         try:
-            # Verify pg_mooncake extension is installed
             cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake'")
             result = cursor.fetchone()
             if result:
                 self.logger.info(f"pg_mooncake extension version: {result[0]}")
             else:
-                # Try to create the extension
                 self.logger.info("pg_mooncake extension not found, attempting to create...")
                 cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_mooncake CASCADE")
                 conn.commit()
@@ -177,7 +131,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                         "the 'postgresql' or 'duckdb' platform instead."
                     )
 
-            # Configure object storage session GUCs (shared with per-stream sessions).
             self._apply_mooncake_session_gucs(cursor)
 
             conn.commit()
@@ -196,12 +149,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return conn
 
     def _apply_mooncake_session_gucs(self, cursor: Any) -> None:
-        """Apply pg_mooncake's session-local GUCs on an open cursor.
-
-        Shared by ``create_connection`` and ``_apply_stream_session_state`` so a
-        throughput/maintenance stream sees the same object-storage configuration
-        as the setup session.
-        """
         if self.storage_mode == "s3" and self.mooncake_bucket:
             cursor.execute(
                 psycopg_sql.SQL("SET mooncake.default_bucket = {}").format(psycopg_sql.Literal(self.mooncake_bucket))
@@ -209,14 +156,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             self.logger.info(f"Set mooncake.default_bucket = {self.mooncake_bucket}")
 
     def _apply_stream_session_state(self, connection: Any) -> None:
-        """Reapply pg_mooncake session GUCs to a fresh throughput-stream connection.
-
-        Without this, a stream connection built by the base
-        ``new_stream_connection`` would not carry ``mooncake.default_bucket``,
-        so a multi-stream run could resolve object storage differently than the
-        setup session. Extension verification / creation stays a one-time step
-        in ``create_connection``.
-        """
         cursor = connection.cursor()
         try:
             self._apply_mooncake_session_gucs(cursor)
@@ -224,38 +163,15 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def _transform_create_statement(self, stmt: str) -> str:
-        """Leave CREATE TABLE statements as heap tables for bulk loading.
-
-        pg_mooncake 0.2.0 does not support PostgreSQL COPY directly into
-        mooncake access-method tables. BenchBox first loads ordinary heap
-        tables through the PostgreSQL parent path, then promotes each loaded
-        table into a mooncake mirror with the original benchmark table name.
-        """
         return stmt
 
     def _add_columnstore_access_method(self, ddl_statement: str) -> str:
-        """Add USING mooncake to CREATE TABLE statements.
-
-        Transforms:
-            CREATE TABLE foo (col1 INT, col2 TEXT);
-        Into:
-            CREATE TABLE foo (col1 INT, col2 TEXT) USING mooncake;
-
-        Only modifies CREATE TABLE statements. Other DDL (CREATE INDEX,
-        ALTER TABLE, etc.) is passed through unchanged.
-
-        Note: This parser assumes DDL from BenchBox's schema generators, which
-        produce clean single-statement DDL without embedded comments or extra
-        semicolons. It does not handle arbitrary user-authored SQL.
-        """
         stripped = ddl_statement.strip()
         upper = stripped.upper()
 
-        # Only modify CREATE TABLE statements
         if not upper.startswith("CREATE TABLE"):
             return ddl_statement
 
-        # Don't double-add if already has the pg_mooncake access method.
         if "USING MOONCAKE" in upper:
             return ddl_statement
 
@@ -269,7 +185,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         connection: Any,
         data_dir: str | os.PathLike,
     ) -> tuple[dict[str, int], float, None]:
-        """Load through PostgreSQL heap tables, then create mooncake mirrors."""
         table_stats, loading_time, extra = super().load_data(benchmark, connection, data_dir)
         loaded_tables = [table for table, rows in table_stats.items() if rows > 0]
         if loaded_tables:
@@ -282,7 +197,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         table_names: list[str],
         table_stats: dict[str, int],
     ) -> dict[str, int]:
-        """Rename loaded heap tables and expose mooncake mirrors under original names."""
         if not self._validate_identifier(self.schema):
             raise ValueError(f"Invalid pg_mooncake schema identifier: {self.schema}")
 
@@ -314,7 +228,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return updated_stats
 
     def _mooncake_staging_table_name(self, table_name: str) -> str:
-        """Return a PostgreSQL-safe staging table name for a loaded heap table."""
         suffix_budget = 63 - len("__bb_moon_src_")
         return f"__bb_moon_src_{table_name[:suffix_budget]}"
 
@@ -338,14 +251,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute one benchmark query outside lingering pg_mooncake transactions.
-
-        pg_mooncake routes mirror-table scans through DuckDB and can reject a
-        later scan with "DuckDB execution is not supported inside functions"
-        when the previous DB-API SELECT left a transaction open. Close the
-        transaction boundary around each benchmark query and retry that
-        pg_mooncake-specific transient error once after rollback.
-        """
         self._close_mooncake_query_transaction(connection, action="commit", phase="before query")
         result = super().execute_query(
             connection,
@@ -387,13 +292,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return "DuckDB execution is not supported inside functions" in str(result.get("error", ""))
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Return tables and end the catalog transaction before mooncake reads.
-
-        pg_mooncake 0.2.0 routes user-table reads through DuckDB. After a
-        PostgreSQL catalog query, the next mooncake table scan can fail with
-        "DuckDB execution is not supported inside functions" until the current
-        transaction is closed. Keep this workaround local to pg_mooncake.
-        """
         cursor = connection.cursor()
         should_commit = False
         try:
@@ -424,14 +322,11 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                     self.logger.debug(f"Failed to close pg_mooncake catalog transaction: {e}")
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get pg_mooncake platform information."""
         platform_info = super().get_platform_info(connection)
 
-        # Override platform type and name
         platform_info["platform_type"] = "pg_mooncake"
         platform_info["platform_name"] = "pg_mooncake"
 
-        # Add pg_mooncake-specific configuration
         platform_info["configuration"]["storage_mode"] = self.storage_mode
         if self.mooncake_bucket:
             platform_info["configuration"]["mooncake_bucket"] = self.mooncake_bucket
@@ -440,7 +335,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get pg_mooncake version
                 cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake'")
                 result = cursor.fetchone()
                 if result:
@@ -457,28 +351,10 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         connection: Any,
         table_names: list[str] | None = None,
     ) -> Any:
-        """Migrate PostgreSQL heap tables to pg_mooncake columnstore format.
-
-        Executes ALTER TABLE ... SET ACCESS METHOD columnar for each table,
-        recording wall time and storage delta. Returns a MigrationPhase result
-        capturing per-table stats and totals, or None if no tables are given.
-
-        This method is safe to call on tables already in columnstore format;
-        ALTER TABLE is a no-op in that case (measured but harmless).
-
-        Args:
-            connection: Active psycopg connection to the benchmark database.
-            table_names: Tables to migrate. When None, discovers all heap tables
-                in the adapter's schema from pg_catalog automatically.
-
-        Returns:
-            MigrationPhase instance, or None if table_names resolves to empty.
-        """
         from benchbox.core.results.models import MigrationPhase, MigrationTableStats
 
         cursor = connection.cursor()
         try:
-            # Discover heap tables when not provided explicitly
             if table_names is None:
                 cursor.execute(
                     """
@@ -498,8 +374,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                 return None
 
             def _get_storage_bytes(table: str) -> int:
-                # pg_total_relation_size() accepts a regclass text argument;
-                # build the qualified name with Identifier quoting, then cast.
                 qualified = psycopg_sql.SQL("{}.{}").format(
                     psycopg_sql.Identifier(self.schema),
                     psycopg_sql.Identifier(table),
@@ -572,7 +446,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if pg_mooncake supports a specific tuning type."""
         return False
 
 

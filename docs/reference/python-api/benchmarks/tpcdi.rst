@@ -47,27 +47,275 @@ API Reference
 TPCDI Class
 ~~~~~~~~~~~
 
-.. autoclass:: benchbox.tpcdi.TPCDI
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:class:: benchbox.tpcdi.TPCDI(scale_factor: float=1.0, output_dir: Optional[Union[str, Path]]=None, **kwargs)
+
+   Public TPC-DI facade over the data-integration implementation. Inherits the
+   common benchmark lifecycle and adapter integration described in :doc:`../base`.
+   Its own query, schema and ETL methods delegate to the TPC-DI implementation.
+   The result of run_with_platform is a BenchmarkResults object; connection-based
+   run_benchmark and run_full_benchmark return their TPC-DI result dictionaries.
+   These APIs are distinct.
+
+   :param scale_factor: Dataset scale factor; actual file size depends on generated tables and options.
+   :param output_dir: Generated-data location; omitted output uses the configured TPC-DI datagen directory.
+   :param kwargs: Implementation options, including verbose, parallel/configuration and generation options.
+
+   Calculating metrics does not by itself certify an official TPC-DI run.
+
+.. py:method:: benchbox.tpcdi.TPCDI.generate_data() -> list[Union[str, Path]]
+
+   Generate TPC-DI benchmark data.
+
+   :returns: A list of paths to the generated data files
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.get_queries(dialect: Optional[str]=None) -> dict[str, str]
+
+   Get all TPC-DI benchmark queries.
+
+   :param dialect: Target SQL dialect for query translation. If None, returns original queries.
+
+   :returns: A dictionary mapping query IDs to query strings
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.get_query(query_id: Union[int, str], *, params: Optional[dict[str, Any]]=None) -> str
+
+   Get a specific TPC-DI benchmark query.
+
+   :param query_id: The ID of the query to retrieve
+   :param params: Optional parameters to customize the query
+
+   :returns: The query string
+
+   :raises ValueError: If the query_id is invalid
+
+
+   params is keyword-only on this facade. Numeric IDs up to 12 map to VQ IDs;
+   higher numeric IDs map to AQ IDs after subtracting 12. Named IDs also include
+   the legacy V/A queries and extended VQ/AQ/EQ query families.
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.get_schema(dialect: str='standard') -> dict[str, dict[str, Any]]
+
+   Get the TPC-DI schema.
+
+   :param dialect: Target SQL dialect
+
+   :returns: A dictionary mapping table names to table definitions
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.get_create_tables_sql(dialect: str='standard', tuning_config=None) -> str
+
+   Get SQL to create all TPC-DI tables.
+
+   :param dialect: SQL dialect to use
+   :param tuning_config: Unified tuning configuration for constraint settings
+
+   :returns: SQL script for creating all tables
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.generate_source_data(formats: Optional[list[str]]=None, batch_types: Optional[list[str]]=None) -> dict[str, list[str]]
+
+   Generate source data in various formats for ETL processing.
+
+   :param formats: List of data formats to generate (csv, xml, fixed_width, json)
+   :param batch_types: List of batch types to generate (historical, incremental, scd)
+
+   :returns: Dictionary mapping formats to lists of generated file paths
+
+
+   Omitted formats selects csv, xml, fixed_width and json; omitted batch_types
+   selects historical, incremental and scd. Unsupported formats raise ValueError.
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.run_etl_pipeline(connection: Any, batch_type: str='historical', validate_data: bool=True) -> dict[str, Any]
+
+   Run the complete ETL pipeline for TPC-DI.
+
+   :param connection: Database connection for target warehouse
+   :param batch_type: Type of batch to process (historical, incremental, scd)
+   :param validate_data: Whether to run data validation after ETL
+
+   :returns: Dictionary containing ETL execution results and metrics
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.validate_etl_results(connection: Any) -> dict[str, Any]
+
+   Validate ETL results using data quality checks.
+
+   :param connection: Database connection to validate against
+
+   :returns: Dictionary containing validation results and data quality metrics
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.get_etl_status() -> dict[str, Any]
+
+   Get current ETL processing status and metrics.
+
+   :returns: Dictionary containing ETL status, metrics, and batch information
+
+
+   Keys include etl_mode_enabled, source_directory, staging_directory,
+   warehouse_directory, simple_stats, supported_formats and batch_types.
+
+
+.. py:property:: benchbox.tpcdi.TPCDI.etl_mode
+   :type: bool
+
+   Check if ETL mode is enabled.
+
+   :returns: Always True as TPC-DI is now a pure ETL benchmark
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.load_data_to_database(connection: Any, tables: Optional[list[str]]=None) -> None
+
+   Load generated data into a database.
+
+   :param connection: Database connection
+   :param tables: Optional list of tables to load. If None, loads all.
+
+   :raises ValueError: If data hasn't been generated yet
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.run_benchmark(connection: Any, queries: Optional[list[str]]=None, iterations: int=1) -> dict[str, Any]
+
+   Run the complete TPC-DI benchmark.
+
+   :param connection: Database connection to use
+   :param queries: Optional list of query IDs to run. If None, runs all.
+   :param iterations: Number of times to run each query
+
+   :returns: Dictionary containing benchmark results
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.execute_query(query_id: Union[int, str], connection: Any, params: Optional[dict[str, Any]]=None) -> Any
+
+   Execute a TPC-DI query on the given database connection.
+
+   :param query_id: Query identifier (e.g., "V1", "V2", "A1", etc.)
+   :param connection: Database connection to use for execution
+   :param params: Optional parameters to use in the query
+
+   :returns: Query results from the database
+
+   :raises ValueError: If the query_id is not valid
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.create_schema(connection: Any, dialect: str='duckdb') -> None
+
+   Create TPC-DI schema using the schema manager.
+
+   :param connection: Database connection
+   :param dialect: Target SQL dialect
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.run_full_benchmark(connection: Any, dialect: str='duckdb') -> dict[str, Any]
+
+   Run the complete TPC-DI benchmark with all phases. On success, the returned
+   dictionary contains ``success``, ``metrics``, ``etl_result``,
+   ``validation_result``, ``report`` and ``execution_time_seconds``. Failures return
+   ``success=False``, ``error`` and ``execution_time_seconds``. The nested results
+   are serialized dictionaries; execution time is in seconds.
+
+   This is the main entry point for running a complete TPC-DI benchmark
+   including schema creation, data loading, ETL processing, validation,
+   and metrics calculation.
+
+   :param connection: Database connection
+   :param dialect: SQL dialect for the target database
+
+   :returns: Complete benchmark results with all metrics
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.run_etl_benchmark(connection: Any, dialect: str='duckdb') -> Any
+
+   Run the ETL benchmark pipeline.
+
+   :param connection: Database connection
+   :param dialect: SQL dialect
+
+   :returns: ETL execution results
+
+
+   The current implementation returns benchbox.core.tpcdi.etl.ETLResult;
+   the public facade retains its Any return annotation.
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.run_data_validation(connection: Any) -> Any
+
+   Run data quality validation.
+
+   :param connection: Database connection
+
+   :returns: Data quality validation results
+
+
+   The current implementation returns benchbox.core.tpcdi.validation.DataQualityResult.
+
+   :raises ValueError: The validator has not been initialized.
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.calculate_official_metrics(etl_result: Any, validation_result: Any) -> Any
+
+   Calculate official TPC-DI metrics.
+
+   :param etl_result: ETL execution results
+   :param validation_result: Data validation results
+
+   :returns: Official TPC-DI benchmark metrics
+
+
+   The current implementation consumes ETLResult and DataQualityResult and
+   returns benchbox.core.tpcdi.metrics.BenchmarkMetrics.
+
+
+.. py:method:: benchbox.tpcdi.TPCDI.optimize_database(connection: Any) -> dict[str, Any]
+
+   Optimize database performance for TPC-DI queries.
+
+   :param connection: Database connection
+
+   :returns: Optimization results
+
+
+.. py:property:: benchbox.tpcdi.TPCDI.validator
+   :type: Any
+
+   Get the TPC-DI validator instance.
+
+   :returns: TPCDIValidator instance
+
+
+   May be None before the implementation initializes validation for a connection.
+
+
+.. py:property:: benchbox.tpcdi.TPCDI.schema_manager
+   :type: Any
+
+   Get the TPC-DI schema manager instance.
+
+   :returns: TPCDISchemaManager instance
+
+
+.. py:property:: benchbox.tpcdi.TPCDI.metrics_calculator
+   :type: Any
+
+   Get the TPC-DI metrics calculator instance.
+
+   :returns: TPCDIMetrics instance
+
+
 
 Constructor
 ~~~~~~~~~~~
 
-.. code-block:: python
-
-    TPCDI(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        verbose: bool = False,
-        **kwargs
-    )
+The constructor accepts ``verbose`` through ``**kwargs``; it defaults to
+``False`` and controls implementation logging.
 
 Parameters:
 
-- **scale_factor** (float): Data size multiplier. SF=1.0 generates ~100MB of data. Range: 0.1 to 30+
-- **output_dir** (str|Path, optional): Directory for generated data files. Default: temporary directory
+- **scale_factor** (float): Data size multiplier. Actual file size depends on generated tables and options.
+- **output_dir** (str|Path, optional): Directory for generated data files. Default: configured TPC-DI datagen directory
 - **verbose** (bool): Enable verbose logging. Default: False
 - **kwargs**: Additional options (e.g., batch_size, enable_scd, validate_data)
 
@@ -133,7 +381,7 @@ Get a specific TPC-DI query.
     a1 = benchmark.get_query("A1")
 
     # Get data quality query
-    dq1 = benchmark.get_query("DQ1")
+    dq1 = benchmark.get_query("VQ1")
 
 Parameters:
 
@@ -296,10 +544,11 @@ Run the complete TPC-DI benchmark with all phases.
     # Run complete benchmark
     results = benchmark.run_full_benchmark(conn, dialect="duckdb")
 
-    print(f"Total duration: {results['total_duration']:.2f}s")
-    print(f"ETL duration: {results['etl_duration']:.2f}s")
-    print(f"Query duration: {results['query_duration']:.2f}s")
-    print(f"Data quality score: {results['quality_score']:.2f}")
+    print(f"Total duration: {results['execution_time_seconds']:.2f}s")
+    if results["success"]:
+        print(results["metrics"])
+    else:
+        print(results["error"])
 
 Parameters:
 
@@ -370,8 +619,8 @@ Calculate official TPC-DI metrics.
     # Calculate official metrics
     metrics = benchmark.calculate_official_metrics(etl_result, validation_result)
 
-    print(f"TPC-DI Metric: {metrics['tpcdi_metric']}")
-    print(f"Throughput: {metrics['throughput']:.2f} records/sec")
+    print(f"Composite Performance Score: {metrics.overall_performance:.2f}")
+    print(f"Throughput: {metrics.etl_throughput:.2f} records/sec")
 
 Parameters:
 
@@ -684,11 +933,318 @@ Complete Official Benchmark
     print("TPC-DI Benchmark Results")
     print("="*60)
     print(f"Scale Factor: {benchmark.scale_factor}")
-    print(f"ETL Duration: {etl_result['duration']:.2f}s")
-    print(f"Data Quality Score: {validation_result['quality_score']:.2f}%")
-    print(f"TPC-DI Metric: {official_metrics['tpcdi_metric']}")
-    print(f"Throughput: {official_metrics['throughput']:.2f} records/sec")
+    print(f"ETL Duration: {etl_result.total_execution_time:.2f}s")
+    print(f"Data Quality Score: {validation_result.quality_score:.2%}")
+    print(f"Composite Performance Score: {official_metrics.overall_performance:.2f}")
+    print(f"Throughput: {official_metrics.etl_throughput:.2f} records/sec")
     print("="*60)
+
+Returned ETL, validation, and metric records
+--------------------------------------------------
+
+These methods return mutable dataclasses. Use attribute access; they are not
+dictionaries. Required fields have no constructor default. Each list or
+dictionary factory creates a separate container for each instance.
+
+.. py:class:: benchbox.core.tpcdi.etl.ETLBatchResult
+
+   One ETL batch outcome. ``batch_date`` is the assigned business date.
+   ``execution_time`` is in seconds; record fields are counts.
+   ``validation_results`` contains the batch-specific validation payload.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``batch_id``
+        - ``int``
+        - ``Required``
+      * - ``batch_date``
+        - ``date``
+        - ``Required``
+      * - ``start_time``
+        - ``datetime``
+        - ``Required``
+      * - ``end_time``
+        - ``datetime``
+        - ``Required``
+      * - ``execution_time``
+        - ``float``
+        - ``0.0``
+      * - ``records_processed``
+        - ``int``
+        - ``0``
+      * - ``records_inserted``
+        - ``int``
+        - ``0``
+      * - ``records_updated``
+        - ``int``
+        - ``0``
+      * - ``records_deleted``
+        - ``int``
+        - ``0``
+      * - ``success``
+        - ``bool``
+        - ``False``
+      * - ``error_message``
+        - ``str | None``
+        - ``None``
+      * - ``validation_results``
+        - ``dict[str, Any]``
+        - ``Fresh dict``
+
+.. py:class:: benchbox.core.tpcdi.etl.ETLPhaseResult
+
+   An ETL phase and its batches. ``total_execution_time`` is in seconds;
+   ``total_records_processed`` counts records across the phase.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``phase_name``
+        - ``str``
+        - ``Required``
+      * - ``batches``
+        - ``list[ETLBatchResult]``
+        - ``Fresh list``
+      * - ``start_time``
+        - ``datetime | None``
+        - ``None``
+      * - ``end_time``
+        - ``datetime | None``
+        - ``None``
+      * - ``total_execution_time``
+        - ``float``
+        - ``0.0``
+      * - ``total_records_processed``
+        - ``int``
+        - ``0``
+      * - ``success``
+        - ``bool``
+        - ``False``
+
+.. py:method:: benchbox.core.tpcdi.etl.ETLPhaseResult.add_batch_result(batch: ETLBatchResult) -> None
+
+   Append the batch and add its processed-record count. A failed batch sets
+   ``success`` to False; a successful batch does not set it to True.
+   This method does not update timestamps or elapsed time.
+
+.. py:class:: benchbox.core.tpcdi.etl.ETLResult
+
+   Overall result returned by ``run_etl_benchmark``. The historical phase is
+   optional; ``incremental_loads`` contains subsequent phases.
+   ``total_execution_time`` is in seconds.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``historical_load``
+        - ``ETLPhaseResult | None``
+        - ``None``
+      * - ``incremental_loads``
+        - ``list[ETLPhaseResult]``
+        - ``Fresh list``
+      * - ``start_time``
+        - ``datetime | None``
+        - ``None``
+      * - ``end_time``
+        - ``datetime | None``
+        - ``None``
+      * - ``total_execution_time``
+        - ``float``
+        - ``0.0``
+      * - ``total_records_processed``
+        - ``int``
+        - ``0``
+      * - ``success``
+        - ``bool``
+        - ``False``
+
+.. py:class:: benchbox.core.tpcdi.validation.ValidationResult
+
+   One rule outcome. ``sql`` retains the original validation rule query;
+   execution may use its dialect translation. ``violations`` is the first
+   returned scalar, or -1 on an empty result or execution failure.
+   ``expected`` is the comparison value. Execution failures set ``passed``
+   to False and retain exception text in ``error``. ``category`` groups
+   outcomes, and ``severity`` determines error and warning counts.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``name``
+        - ``str``
+        - ``Required``
+      * - ``description``
+        - ``str``
+        - ``Required``
+      * - ``sql``
+        - ``str``
+        - ``Required``
+      * - ``violations``
+        - ``Union[int, float, str]``
+        - ``0``
+      * - ``expected``
+        - ``Union[int, float, str]``
+        - ``0``
+      * - ``passed``
+        - ``bool``
+        - ``False``
+      * - ``status``
+        - ``str``
+        - ``'pending'``
+      * - ``error``
+        - ``Optional[str]``
+        - ``None``
+      * - ``category``
+        - ``str``
+        - ``'integrity'``
+      * - ``severity``
+        - ``str``
+        - ``'error'``
+
+.. py:class:: benchbox.core.tpcdi.validation.DataQualityResult
+
+   Result returned by ``run_data_validation``. ``quality_score`` is the
+   passing-validation fraction, or 0 when no validations ran. It is not a
+   percentage. ``error_count`` and ``warning_count`` count failed validations
+   with the corresponding severity. Each ``categories`` value contains
+   ``total``, ``passed``, and ``failed`` counts.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``validations``
+        - ``list[ValidationResult]``
+        - ``Fresh list``
+      * - ``total_validations``
+        - ``int``
+        - ``0``
+      * - ``passed_validations``
+        - ``int``
+        - ``0``
+      * - ``failed_validations``
+        - ``int``
+        - ``0``
+      * - ``quality_score``
+        - ``float``
+        - ``0.0``
+      * - ``error_count``
+        - ``int``
+        - ``0``
+      * - ``warning_count``
+        - ``int``
+        - ``0``
+      * - ``categories``
+        - ``dict[str, dict[str, int]]``
+        - ``Fresh dict``
+
+.. py:class:: benchbox.core.tpcdi.metrics.BenchmarkMetrics
+
+   Result returned by ``calculate_official_metrics``. Time fields use seconds.
+   ``etl_throughput`` is records per second across successful ETL phases, or
+   0 when their summed time is nonpositive. ``data_quality_score`` is the
+   passing-validation fraction; ``data_integrity_score`` receives the same
+   value. The composite ``overall_performance`` is
+   ``sqrt(min(etl_throughput / 1000, 1) * data_quality_score) * 1000``, or 0
+   when either input is nonpositive.
+
+   The calculator leaves ``total_records_loaded``, ``validation_time``,
+   ``dimension_load_time``, ``fact_load_time``, ``index_creation_time``, and
+   ``scd_processing_time`` at their defaults. ``tpc_di_compliant`` reports
+   internal checks; it does not establish official TPC certification.
+   ``benchmark_date`` is a fresh local datetime at construction.
+
+   .. list-table:: Fields
+      :header-rows: 1
+      :widths: 34 43 23
+
+      * - Field
+        - Type
+        - Default
+      * - ``etl_throughput``
+        - ``float``
+        - ``0.0``
+      * - ``data_quality_score``
+        - ``float``
+        - ``0.0``
+      * - ``overall_performance``
+        - ``float``
+        - ``0.0``
+      * - ``total_execution_time``
+        - ``float``
+        - ``0.0``
+      * - ``total_records_processed``
+        - ``int``
+        - ``0``
+      * - ``total_records_loaded``
+        - ``int``
+        - ``0``
+      * - ``historical_load_time``
+        - ``float``
+        - ``0.0``
+      * - ``historical_load_records``
+        - ``int``
+        - ``0``
+      * - ``incremental_load_time``
+        - ``float``
+        - ``0.0``
+      * - ``incremental_load_records``
+        - ``int``
+        - ``0``
+      * - ``validation_time``
+        - ``float``
+        - ``0.0``
+      * - ``validations_passed``
+        - ``int``
+        - ``0``
+      * - ``validations_total``
+        - ``int``
+        - ``0``
+      * - ``data_integrity_score``
+        - ``float``
+        - ``0.0``
+      * - ``dimension_load_time``
+        - ``float``
+        - ``0.0``
+      * - ``fact_load_time``
+        - ``float``
+        - ``0.0``
+      * - ``index_creation_time``
+        - ``float``
+        - ``0.0``
+      * - ``scd_processing_time``
+        - ``float``
+        - ``0.0``
+      * - ``tpc_di_compliant``
+        - ``bool``
+        - ``False``
+      * - ``scale_factor``
+        - ``float``
+        - ``1.0``
+      * - ``benchmark_date``
+        - ``datetime``
+        - ``datetime.now()``
+
 
 See Also
 --------

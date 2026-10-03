@@ -1,18 +1,6 @@
-"""Integration tests for Metadata Primitives complexity testing with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module tests the full complexity benchmark workflow including:
-- MetadataGenerator creating actual database structures
-- Wide table generation and queries
-- View hierarchy generation and queries
-- Complex type table generation and queries
-- Large catalog generation and queries
-- Constraint generation and queries
-- Full complexity benchmark runs
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import duckdb
 import pytest
@@ -34,21 +22,13 @@ pytestmark = [
 
 @pytest.fixture
 def duckdb_connection():
-    """Create a fresh in-memory DuckDB connection."""
     conn = duckdb.connect(":memory:")
     yield conn
     conn.close()
 
 
-# =============================================================================
-# MetadataGenerator Integration Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestMetadataGeneratorDuckDB:
-    """Integration tests for MetadataGenerator with DuckDB."""
-
     def test_setup_minimal_config(self, duckdb_connection):
 
         config = MetadataComplexityConfig(
@@ -76,7 +56,6 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify wide table exists
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'benchbox_wide_100'"
         ).fetchone()
@@ -95,7 +74,6 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify tables were created
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_catalog_%'"
         ).fetchone()
@@ -114,13 +92,11 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify views were created
         assert len(generated.views) == 3
         assert "benchbox_view_d1" in generated.views
         assert "benchbox_view_d2" in generated.views
         assert "benchbox_view_d3" in generated.views
 
-        # Verify views are queryable
         for view_name in generated.views:
             result = duckdb_connection.execute(f"SELECT * FROM {view_name} LIMIT 1").fetchall()
             assert result is not None
@@ -139,7 +115,6 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify complex type table exists
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'benchbox_complex_basic'"
         ).fetchone()
@@ -159,7 +134,6 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify both complex type tables exist
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_complex_%'"
         ).fetchone()
@@ -179,11 +153,10 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify parent and child tables exist
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_fk_%'"
         ).fetchone()
-        assert result[0] >= 3  # 1 parent + at least 2 children
+        assert result[0] >= 3
 
         generator.teardown(duckdb_connection, "duckdb", generated)
 
@@ -198,7 +171,6 @@ class TestMetadataGeneratorDuckDB:
 
         generated = generator.setup(duckdb_connection, "duckdb", config)
 
-        # Verify objects exist
         result_before = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_%'"
         ).fetchone()
@@ -206,7 +178,6 @@ class TestMetadataGeneratorDuckDB:
 
         generator.teardown(duckdb_connection, "duckdb", generated)
 
-        # Verify objects are gone
         result_after = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_%'"
         ).fetchone()
@@ -216,7 +187,6 @@ class TestMetadataGeneratorDuckDB:
 
         generator = MetadataGenerator()
 
-        # Create some objects manually
         duckdb_connection.execute("CREATE TABLE benchbox_test1 (id INT)")
         duckdb_connection.execute("CREATE TABLE benchbox_test2 (id INT)")
         duckdb_connection.execute("CREATE VIEW benchbox_test_view AS SELECT 1")
@@ -224,22 +194,14 @@ class TestMetadataGeneratorDuckDB:
         dropped = generator.cleanup_all(duckdb_connection, "duckdb", "benchbox_")
         assert dropped >= 3
 
-        # Verify objects are gone
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_%'"
         ).fetchone()
         assert result[0] == 0
 
 
-# =============================================================================
-# Complexity Benchmark Integration Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestComplexityBenchmarkDuckDB:
-    """Integration tests for complexity benchmark with DuckDB."""
-
     def test_run_complexity_benchmark_minimal(self, duckdb_connection):
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -271,7 +233,6 @@ class TestComplexityBenchmarkDuckDB:
 
         assert result.benchmark_result is not None
         assert result.benchmark_result.total_queries > 0
-        # Should have wide_table category in results
         assert "wide_table" in result.benchmark_result.category_summary
 
     def test_run_complexity_benchmark_deep_views(self, duckdb_connection):
@@ -335,7 +296,6 @@ class TestComplexityBenchmarkDuckDB:
 
         assert result.benchmark_result is not None
         assert result.benchmark_result.total_queries > 0
-        # Full preset should test multiple categories
         assert len(result.benchmark_result.category_summary) > 1
 
     def test_setup_teardown_lifecycle(self, duckdb_connection):
@@ -345,13 +305,11 @@ class TestComplexityBenchmarkDuckDB:
         generated = benchmark.setup_complexity(duckdb_connection, "duckdb", "baseline")
         assert generated.total_objects > 0
 
-        # Verify objects exist
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_%'"
         ).fetchone()
         assert result[0] > 0
 
-        # Run queries
         benchmark_result = benchmark.run_benchmark(
             duckdb_connection,
             dialect="duckdb",
@@ -361,25 +319,16 @@ class TestComplexityBenchmarkDuckDB:
 
         benchmark.teardown_complexity(duckdb_connection, "duckdb", generated)
 
-        # Verify cleanup
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_%'"
         ).fetchone()
         assert result[0] == 0
 
 
-# =============================================================================
-# Wide Table Query Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestWideTableQueriesDuckDB:
-    """Integration tests for wide table queries with DuckDB."""
-
     @pytest.fixture
     def setup_wide_tables(self, duckdb_connection):
-        """Set up wide tables for testing."""
         config = MetadataComplexityConfig(
             width_factor=100,
             view_depth=0,
@@ -412,21 +361,13 @@ class TestWideTableQueriesDuckDB:
         result = benchmark.execute_query("wide_table_type_distribution", duckdb_connection, dialect="duckdb")
 
         assert result.success
-        assert result.row_count > 1  # Multiple data types
-
-
-# =============================================================================
-# View Hierarchy Query Tests
-# =============================================================================
+        assert result.row_count > 1
 
 
 @pytest.mark.integration
 class TestViewHierarchyQueriesDuckDB:
-    """Integration tests for view hierarchy queries with DuckDB."""
-
     @pytest.fixture
     def setup_view_hierarchy(self, duckdb_connection):
-        """Set up view hierarchy for testing."""
         config = MetadataComplexityConfig(
             width_factor=20,
             view_depth=3,
@@ -443,7 +384,7 @@ class TestViewHierarchyQueriesDuckDB:
         result = benchmark.execute_query("view_hierarchy_list", duckdb_connection, dialect="duckdb")
 
         assert result.success
-        assert result.row_count == 3  # 3 views in hierarchy
+        assert result.row_count == 3
 
     def test_view_hierarchy_depth_analysis_query(self, duckdb_connection, setup_view_hierarchy):
 
@@ -454,18 +395,10 @@ class TestViewHierarchyQueriesDuckDB:
         assert result.row_count == 3
 
 
-# =============================================================================
-# Large Catalog Query Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestLargeCatalogQueriesDuckDB:
-    """Integration tests for large catalog queries with DuckDB."""
-
     @pytest.fixture
     def setup_large_catalog(self, duckdb_connection):
-        """Set up large catalog for testing."""
         config = MetadataComplexityConfig(
             width_factor=10,
             view_depth=0,
@@ -493,31 +426,18 @@ class TestLargeCatalogQueriesDuckDB:
         assert result.row_count == 1
 
 
-# =============================================================================
-# Error Handling Tests
-# =============================================================================
-
-
 @pytest.mark.integration
 class TestComplexityErrorHandling:
-    """Test error handling in complexity testing."""
-
     def test_cleanup_on_manual_objects(self, duckdb_connection):
-
-        # This test verifies that cleanup_all properly removes
-        # objects that match the prefix pattern
 
         generator = MetadataGenerator()
 
-        # Create some objects manually with the benchbox prefix
         duckdb_connection.execute("CREATE TABLE benchbox_manual_1 (id INT)")
         duckdb_connection.execute("CREATE TABLE benchbox_manual_2 (id INT)")
 
-        # Cleanup should remove these
         dropped = generator.cleanup_all(duckdb_connection, "duckdb", "benchbox_")
         assert dropped >= 2
 
-        # Verify they're gone
         result = duckdb_connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'benchbox_manual_%'"
         ).fetchone()

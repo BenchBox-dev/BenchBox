@@ -1,19 +1,6 @@
-"""``platform.config`` is pruned only where a normalized block carries the data.
-
-The per-adapter ``compute_configuration`` mapping is a duplicate of
-``platform.compute`` for adapters that publish a normalized compute block, and
-the two could contradict each other -- a Databricks bundle asserted
-``cluster_size: "Medium"`` beside an observed ``warehouse_size: "2X-Small"``.
-
-Not every adapter has one. ClickHouse records its ``system_settings`` and
-``build_options`` under ``compute_configuration`` and publishes no
-``platform.compute`` at all, so pruning unconditionally would move engine
-settings that shape the result out of the block consumers read.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for
-details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for
+# details.
 
 from __future__ import annotations
 
@@ -54,8 +41,6 @@ def _platform_config(result: BenchmarkResults) -> dict:
 
 class TestPruneRequiresANormalizedComputeBlock:
     def test_clickhouse_keeps_its_engine_settings_without_a_compute_block(self) -> None:
-        """No normalized compute block: `compute_configuration` has no other
-        structured home and must stay where consumers read it."""
         result = _results(
             platform_info={
                 "platform_name": "ClickHouse Local",
@@ -70,7 +55,6 @@ class TestPruneRequiresANormalizedComputeBlock:
         assert config["compute_configuration"]["system_settings"]["max_threads"] == "10"
 
     def test_an_empty_normalized_block_does_not_authorize_the_prune(self) -> None:
-        """A compute block holding only provenance carries no facts to defer to."""
         result = _results(
             platform_info={"platform_name": "ClickHouse Local", "compute_configuration": _CLICKHOUSE_COMPUTE_CONFIG},
             platform_compute={"source": "unavailable", "collection_status": "unavailable"},
@@ -97,14 +81,11 @@ class TestPruneRequiresANormalizedComputeBlock:
         config = _platform_config(result)
 
         assert "compute_configuration" not in config
-        # Sibling keys are untouched by the prune.
         assert config["catalog"] == "workspace"
 
 
 class TestLayoutLedgersAlwaysPrune:
     def test_layout_operations_leave_platform_config_but_survive_in_raw_config(self) -> None:
-        """The applied-tuning ledger owns what executed; `raw_config` keeps the
-        adapter's own copy, so `platform.config` needs no third one."""
         operations = [{"mechanism": "optimize", "phase": "post_load", "statement": "OPTIMIZE LINEITEM"}]
         result = _results(
             platform="Databricks",

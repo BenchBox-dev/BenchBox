@@ -1,5 +1,3 @@
-"""Hosted submission authentication commands."""
-
 from __future__ import annotations
 
 import click
@@ -18,7 +16,7 @@ from benchbox.cli.submit_auth import (
 
 @click.group("auth", help=("Manage hosted result-submission credentials."))
 def auth() -> None:
-    """Manage hosted result-submission credentials."""
+    pass
 
 
 @auth.command("login", help=("Store a hosted results service token in the OS keyring."))
@@ -49,7 +47,6 @@ def auth() -> None:
 )
 @click.pass_context
 def login(ctx: click.Context, service_url: str, token: str | None, token_stdin: bool) -> None:
-    """Store a hosted results service token in the OS keyring."""
 
     if token is not None and token_stdin:
         console.print("[red]Pass either --token or --token-stdin, not both.[/red]")
@@ -89,7 +86,6 @@ def login(ctx: click.Context, service_url: str, token: str | None, token_stdin: 
 )
 @click.pass_context
 def status(ctx: click.Context, service_url: str) -> None:
-    """Show whether hosted submission credentials are available."""
 
     try:
         auth_status = get_submission_auth_status(service_url)
@@ -117,7 +113,6 @@ def status(ctx: click.Context, service_url: str) -> None:
 )
 @click.pass_context
 def refresh(ctx: click.Context, service_url: str) -> None:
-    """Replace the stored hosted results service token."""
 
     try:
         refresh_submission_token(service_url)
@@ -140,7 +135,6 @@ def refresh(ctx: click.Context, service_url: str) -> None:
 )
 @click.pass_context
 def logout(ctx: click.Context, service_url: str) -> None:
-    """Remove the stored hosted results service token from the OS keyring."""
 
     store = SubmissionAuthStore()
     try:

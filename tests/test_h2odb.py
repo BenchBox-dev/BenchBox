@@ -1,9 +1,6 @@
-"""Tests for H2O Database Benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sqlite3
 import tempfile
@@ -23,40 +20,27 @@ pytestmark = pytest.mark.medium
 
 @pytest.mark.h2odb
 class TestH2ODB:
-    """Test the H2O Database Benchmark implementation."""
-
     @pytest.fixture
     def h2odb(self, small_scale_factor: float, temp_dir: Path) -> H2ODB:
-        """Create an H2ODB  H2ODBBenchmark instance for testing."""
         return H2ODB(scale_factor=small_scale_factor, output_dir=temp_dir)
 
-    # Runs to completion but far exceeds the medium lane's 60s cap: timed out
-    # on a clean GitHub runner (develop-post-merge run 28706929881, medium-test
-    # job) and measured ~257s in a 4-core container (2026-07-05). The marker
-    # overrides the CLI --timeout=60 (pytest-timeout marker precedence) so the
-    # test keeps running in the medium lane instead of being killed mid-work.
     @pytest.mark.timeout(600)
     def test_generate_data(self, h2odb: H2ODB) -> None:
-        """Test that data generation produces expected files."""
         data_paths = h2odb.generate_data()
 
-        # Check that output includes expected files (returns dict)
-        expected_tables = ["trips"]  # H2ODB has one main table
+        expected_tables = ["trips"]
 
         assert isinstance(data_paths, dict), "generate_data should return a dictionary"
 
         for table in expected_tables:
             assert table in data_paths, f"Table {table} not found in generated data"
 
-        # Verify files exist
         for _table_name, path in data_paths.items():
             assert Path(path).exists(), f"Generated file {path} does not exist"
 
     def test_get_queries(self, h2odb: H2ODB) -> None:
-        """Test that all  H2ODBBenchmark queries can be retrieved."""
         queries = h2odb.get_queries()
 
-        # H2ODB has 10 analytical queries
         expected_queries = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9", "Q10"]
 
         assert len(queries) == 10
@@ -65,32 +49,26 @@ class TestH2ODB:
             assert isinstance(queries[query_id], str)
             assert queries[query_id].strip()
 
-            # Check that queries contain expected SQL elements
             query_sql = queries[query_id].upper()
             assert "SELECT" in query_sql
             assert "FROM" in query_sql
-            assert "TRIPS" in query_sql  # All queries should use the trips table
+            assert "TRIPS" in query_sql
 
-            # Check for analytical functions that are common in H2O  H2ODBBenchmarks
             if "GROUP BY" in query_sql or "COUNT" in query_sql or "SUM" in query_sql or "AVG" in query_sql:
-                # This is an analytical query, which is expected for H2O  H2ODBBenchmark
                 pass
 
     def test_get_query(self, h2odb: H2ODB) -> None:
-        """Test retrieving a specific query."""
         query1 = h2odb.get_query("Q1")
         assert isinstance(query1, str)
         assert "SELECT" in query1.upper()
         assert "TRIPS" in query1.upper()
 
-        # Test a different query
         query5 = h2odb.get_query("Q5")
         assert isinstance(query5, str)
         assert "SELECT" in query5.upper()
         assert "TRIPS" in query5.upper()
 
     def test_translate_query(self, h2odb: H2ODB, sql_dialect: str) -> None:
-        """Test translating a query to different SQL dialects."""
         h2odb.get_query("Q1")
         translated_query = h2odb.translate_query("Q1", dialect=sql_dialect)
 
@@ -98,37 +76,29 @@ class TestH2ODB:
         assert "SELECT" in translated_query.upper()
 
     def test_invalid_query_id(self, h2odb: H2ODB) -> None:
-        """Test that requesting an invalid query raises an exception."""
         with pytest.raises(ValueError):
-            h2odb.get_query("Q11")  # Only Q1-Q10 exist
+            h2odb.get_query("Q11")
 
         with pytest.raises(ValueError):
-            h2odb.get_query("Q0")  # Q0 doesn't exist
+            h2odb.get_query("Q0")
 
     def test_get_query_params(self, h2odb: H2ODB) -> None:
-        """Test that H2O queries don't accept parameters."""
-        # Test with default (no parameters)
         param_query = h2odb.get_query("Q1")
         assert isinstance(param_query, str)
         assert "SELECT" in param_query.upper()
 
-        # Test that passing parameters raises an error (H2O queries are static)
         with pytest.raises(ValueError, match="H2O DB queries are static and don't accept parameters"):
             h2odb.get_query("Q1", params={"param1": "value1"})
 
     def test_get_schema(self, h2odb: H2ODB) -> None:
-        """Test retrieving the H2ODB schema."""
         schema = h2odb.get_schema()
 
-        # Check that schema is a dictionary and trips table is present
         assert isinstance(schema, dict), "Schema should be a dictionary"
         assert "trips" in schema, "trips table not found in schema"
 
-        # Check trips table structure
         trips_table = schema["trips"]
         column_names = [col["name"] for col in trips_table["columns"]]
 
-        # Expected columns based on NYC taxi data structure (using actual names from implementation)
         expected_columns = [
             "vendor_id",
             "pickup_datetime",
@@ -152,43 +122,34 @@ class TestH2ODB:
             assert column in column_names, f"Column {column} not found in trips table"
 
     def test_get_create_tables_sql(self, h2odb: H2ODB) -> None:
-        """Test retrieving SQL to create H2ODB tables."""
         sql = h2odb.get_create_tables_sql()
 
         assert isinstance(sql, str)
         assert "CREATE TABLE" in sql
         assert "trips" in sql
 
-        # Check for expected column types (using actual column names)
         assert "vendor_id" in sql
         assert "pickup_datetime" in sql
         assert "fare_amount" in sql
 
     def test_H2ODBBenchmark_properties(self, h2odb: H2ODB) -> None:
-        """Test  H2ODBBenchmark-specific properties."""
-        # Test that H2ODB has exactly one table (the trips table)
         schema = h2odb.get_schema()
         assert len(schema) == 1
 
-        # Test that all queries are analytical in nature
         queries = h2odb.get_queries()
         assert len(queries) == 10
 
-        # Check that queries test different analytical aspects
         all_queries_text = " ".join(queries.values()).upper()
 
-        # Should contain various analytical operations
         analytical_keywords = ["COUNT", "SUM", "AVG", "GROUP BY", "ORDER BY"]
         found_keywords = [kw for kw in analytical_keywords if kw in all_queries_text]
         assert len(found_keywords) >= 3, "H2O queries should contain various analytical operations"
 
     def test_taxi_data_focus(self, h2odb: H2ODB) -> None:
-        """Test that the  H2ODBBenchmark focuses on taxi/trip data analysis."""
         schema = h2odb.get_schema()
         trips_table = schema["trips"]
         column_names = [col["name"] for col in trips_table["columns"]]
 
-        # Should have taxi-specific columns
         taxi_columns = [
             "pickup_datetime",
             "dropoff_datetime",
@@ -201,20 +162,16 @@ class TestH2ODB:
         for col in taxi_columns:
             assert col in column_names, f"Taxi-specific column {col} not found"
 
-        # Queries should reference taxi-related concepts
         queries = h2odb.get_queries()
         all_queries_text = " ".join(queries.values()).upper()
 
-        # Should contain references to taxi operations
         taxi_keywords = ["TRIP", "FARE", "TIP", "PASSENGER", "PICKUP", "DROPOFF"]
         found_keywords = [kw for kw in taxi_keywords if kw in all_queries_text]
         assert len(found_keywords) >= 2, "H2O queries should reference taxi/trip concepts"
 
     def test_analytical_query_patterns(self, h2odb: H2ODB) -> None:
-        """Test that queries follow expected analytical patterns."""
         queries = h2odb.get_queries()
 
-        # Should have queries that test different analytical patterns
         has_aggregation = False
         has_grouping = False
 
@@ -235,13 +192,10 @@ class TestH2ODB:
 
         assert has_aggregation, "H2O  H2ODBBenchmark should include aggregation queries"
         assert has_grouping, "H2O  H2ODBBenchmark should include grouping queries"
-        # Note: not all analytical queries need sorting and filtering, so we don't assert those
 
 
 @pytest.mark.h2odb
 class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
-    """Test H2ODBBenchmark class directly for better coverage."""
-
     benchmark_class = H2ODBBenchmark
     sample_query_id = "Q1"
     sample_table = "trips"
@@ -252,42 +206,31 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
 
     @pytest.fixture
     def h2odb_benchmark(self, small_scale_factor: float, temp_dir: Path) -> H2ODBBenchmark:
-        """Create an H2ODBBenchmark instance for testing."""
         return H2ODBBenchmark(scale_factor=small_scale_factor, output_dir=temp_dir)
 
     @pytest.fixture
     def benchmark_instance(self, h2odb_benchmark: H2ODBBenchmark) -> H2ODBBenchmark:
-        """Alias for the mixin's benchmark_instance fixture."""
         return h2odb_benchmark
 
     def test_init_with_default_output_dir(self) -> None:
-        """Test  H2ODBBenchmark initialization with default output directory."""
         h2odb = H2ODBBenchmark(scale_factor=0.01)
         assert h2odb.scale_factor == 0.01
-        # Default path follows: benchmark_runs/datagen/{benchmark}_sf{formatted_sf}
-        # 0.01 formats as "sf001" per format_scale_factor()
         assert h2odb.output_dir == resolve_benchmark_runs_dir() / "datagen" / "h2odb_sf001"
         assert h2odb._name == "H2O Database Benchmark"
         assert h2odb._version == "1.0"
 
     def test_generate_data_validation(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test data generation input validation."""
-        # Test unsupported output format
         with pytest.raises(ValueError, match="Unsupported output format"):
             h2odb_benchmark.generate_data(output_format="json")
 
-        # Test invalid table names
         with pytest.raises(ValueError, match="Invalid table names"):
             h2odb_benchmark.generate_data(tables=["invalid_table"])
 
     def test_load_data_to_database_batch_processing(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test load_data_to_database with batch processing."""
-        # Set up mock data with many rows to test batching
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "trips.csv"
-            # a large CSV file to test batch processing
             rows = []
-            for i in range(15000):  # More than batch_size (10000)
+            for i in range(15000):
                 rows.append(
                     f"2023-01-01 12:00:00|2023-01-01 12:30:00|{i}.5|15.50|3.00|2|40.7589|-73.9851|40.7614|-73.9776"
                 )
@@ -305,11 +248,9 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
 
                 h2odb_benchmark.load_data_to_database(mock_connection)
 
-                # Should be called multiple times due to batching
                 assert mock_connection.executemany.call_count >= 2
 
     def test_run_H2ODBBenchmark_default_queries(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test run_benchmark with default queries."""
         mock_connection = Mock()
 
         with patch.object(h2odb_benchmark, "execute_query") as mock_execute:
@@ -330,12 +271,11 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
                 assert "Q2" in result["queries"]
 
     def test_run_H2ODBBenchmark_timing_calculation(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test run_ H2ODBBenchmark timing calculations."""
         mock_connection = Mock()
 
         with patch.object(H2ODBBenchmark, "execute_query") as mock_execute:
             mock_execute.return_value = [("result1",), ("result2",)]
-            mock_clock = Mock(side_effect=[0.0, 0.5, 1.0, 1.2])  # Two iterations
+            mock_clock = Mock(side_effect=[0.0, 0.5, 1.0, 1.2])
             with (
                 patch("benchbox.core.h2odb.benchmark.mono_time", mock_clock),
                 patch("benchbox.utils.clock.mono_time", mock_clock),
@@ -343,12 +283,11 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
                 result = h2odb_benchmark.run_benchmark(mock_connection, queries=["Q1"], iterations=2)
 
                 query_result = result["queries"]["Q1"]
-                assert abs(query_result["avg_time"] - 0.35) < 0.01  # (0.5 + 0.2) / 2
+                assert abs(query_result["avg_time"] - 0.35) < 0.01
                 assert abs(query_result["min_time"] - 0.2) < 0.01
                 assert abs(query_result["max_time"] - 0.5) < 0.01
 
     def test_run_H2ODBBenchmark_with_exceptions(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test run_ H2ODBBenchmark handling exceptions during execution."""
         mock_connection = Mock()
 
         with patch.object(H2ODBBenchmark, "execute_query") as mock_execute:
@@ -362,25 +301,19 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
             assert query_result["avg_time"] == 0
 
     def test_sqlite_integration(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test actual SQLite integration for load_data_to_database."""
-        # Generate some test data for trips table - all 22 columns
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "trips.csv"
-            # Data format: vendor_id|pickup_datetime|dropoff_datetime|passenger_count|trip_distance|pickup_longitude|pickup_latitude|rate_code_id|store_and_fwd_flag|dropoff_longitude|dropoff_latitude|payment_type|fare_amount|extra|mta_tax|tip_amount|tolls_amount|improvement_surcharge|total_amount|pickup_location_id|dropoff_location_id|congestion_surcharge
             csv_file.write_text(
                 "1|2023-01-01 12:00:00|2023-01-01 12:30:00|2|5.5|-73.9851|40.7589|1|N|-73.9776|40.7614|1|15.50|0.50|0.50|3.00|0.00|0.30|19.80|161|239|2.50\n2|2023-01-01 13:00:00|2023-01-01 13:15:00|1|2.1|-73.9934|40.7505|1|N|-73.9889|40.7490|2|8.50|0.00|0.50|1.50|0.00|0.30|10.80|230|186|2.50\n"
             )
 
             h2odb_benchmark.tables = {"trips": str(csv_file)}
 
-            # in-memory SQLite database
             conn = sqlite3.connect(":memory:")
 
             try:
-                # This should work without errors
                 h2odb_benchmark.load_data_to_database(conn, tables=["trips"])
 
-                # Verify data was loaded
                 cursor = conn.cursor()
                 cursor.execute("SELECT COUNT(*) FROM trips")
                 count = cursor.fetchone()[0]
@@ -389,26 +322,22 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
                 cursor.execute("SELECT pickup_datetime, trip_distance FROM trips ORDER BY pickup_datetime")
                 rows = cursor.fetchall()
                 assert len(rows) == 2
-                assert rows[0][0] == "2023-01-01 12:00:00"  # pickup_datetime
-                assert float(rows[0][1]) == 5.5  # trip_distance
+                assert rows[0][0] == "2023-01-01 12:00:00"
+                assert float(rows[0][1]) == 5.5
 
             finally:
                 conn.close()
 
     def test_schema_methods_delegation(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test schema-related methods delegate correctly."""
-        # Test get_schema
         schema = h2odb_benchmark.get_schema()
         assert isinstance(schema, dict)
         assert "trips" in schema
 
-        # Test get_create_tables_sql
         sql = h2odb_benchmark.get_create_tables_sql()
         assert isinstance(sql, str)
         assert "CREATE TABLE" in sql
 
     def test_get_all_queries_method(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test get_all_queries method."""
         with patch.object(h2odb_benchmark.query_manager, "get_all_queries") as mock_get_all:
             mock_get_all.return_value = {"Q1": "SELECT ...", "Q2": "SELECT ..."}
 
@@ -418,17 +347,14 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
             assert result == {"Q1": "SELECT ...", "Q2": "SELECT ..."}
 
     def test_csv_parsing_edge_cases(self, h2odb_benchmark: H2ODBBenchmark) -> None:
-        """Test CSV parsing with various edge cases."""
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "trips.csv"
-            # Test with pipe delimiters and typical H2O data format
             csv_file.write_text(
                 "2023-01-01 12:00:00|2023-01-01 12:30:00|5.5|15.50|3.00|2|40.7589|-73.9851|40.7614|-73.9776\n"
             )
 
             h2odb_benchmark.tables = {"trips": str(csv_file)}
 
-            # mock connection that tracks the data being inserted
             mock_connection = Mock()
             mock_connection.executescript = Mock()
             mock_connection.executemany = Mock()
@@ -439,13 +365,11 @@ class TestH2ODBBenchmarkDirectly(BenchmarkTestMixin):
 
                 h2odb_benchmark.load_data_to_database(mock_connection)
 
-                # Verify executemany was called with the right data
                 call_args = mock_connection.executemany.call_args
                 assert call_args is not None
                 sql, data = call_args[0]
                 assert "INSERT INTO trips VALUES" in sql
                 assert len(data) == 1
-                # Check that the datetime and numeric fields are parsed correctly
-                assert data[0][0] == "2023-01-01 12:00:00"  # pickup_datetime
-                assert data[0][1] == "2023-01-01 12:30:00"  # dropoff_datetime
-                assert data[0][2] == "5.5"  # trip_distance
+                assert data[0][0] == "2023-01-01 12:00:00"
+                assert data[0][1] == "2023-01-01 12:30:00"
+                assert data[0][2] == "5.5"

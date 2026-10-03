@@ -1,9 +1,6 @@
-"""Unit tests for DataFrame tuning defaults.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -29,8 +26,6 @@ def test_datafusion_rejects_unsupported_profiles(profile: str) -> None:
 
 
 class TestSystemProfile:
-    """Tests for SystemProfile dataclass."""
-
     def test_default_values(self):
 
         profile = SystemProfile(cpu_cores=4, available_memory_gb=8.0)
@@ -55,8 +50,6 @@ class TestSystemProfile:
 
 
 class TestDetectSystemProfile:
-    """Tests for detect_system_profile() function."""
-
     def test_returns_system_profile(self):
 
         profile = detect_system_profile()
@@ -66,8 +59,6 @@ class TestDetectSystemProfile:
 
 
 class TestGetProfileSummary:
-    """Tests for get_profile_summary() function."""
-
     def test_low_memory_category(self):
 
         profile = SystemProfile(cpu_cores=4, available_memory_gb=2.0)
@@ -101,8 +92,6 @@ class TestGetProfileSummary:
 
 
 class TestGetSmartDefaults:
-    """Tests for get_smart_defaults() function."""
-
     def test_returns_configuration(self):
 
         config = get_smart_defaults("polars")
@@ -121,7 +110,6 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=8, available_memory_gb=16.0)
         config = get_smart_defaults("polars", profile)
 
-        # Should have lazy evaluation enabled
         assert config.execution.lazy_evaluation is True
 
     def test_polars_low_memory_defaults(self):
@@ -129,7 +117,6 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=4, available_memory_gb=2.0)
         config = get_smart_defaults("polars", profile)
 
-        # Should enable streaming mode
         assert config.execution.streaming_mode is True
         assert config.memory.chunk_size is not None
 
@@ -138,7 +125,6 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=32, available_memory_gb=128.0)
         config = get_smart_defaults("polars", profile)
 
-        # Should prefer in-memory processing
         assert config.execution.engine_affinity == "in-memory"
         assert config.execution.streaming_mode is False
 
@@ -147,7 +133,6 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=4, available_memory_gb=16.0)
         config = get_smart_defaults("pandas", profile)
 
-        # Should use pyarrow backend with enough memory
         assert config.data_types.dtype_backend == "pyarrow"
 
     def test_pandas_low_memory_defaults(self):
@@ -155,9 +140,7 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=4, available_memory_gb=4.0)
         config = get_smart_defaults("pandas", profile)
 
-        # Should use numpy_nullable backend
         assert config.data_types.dtype_backend == "numpy_nullable"
-        # Should enable memory map
         assert config.io.memory_map is True
 
     def test_dask_defaults(self):
@@ -165,7 +148,6 @@ class TestGetSmartDefaults:
         profile = SystemProfile(cpu_cores=8, available_memory_gb=32.0)
         config = get_smart_defaults("dask", profile)
 
-        # Should have worker configuration
         assert config.parallelism.worker_count is not None
         assert config.parallelism.threads_per_worker is not None
         assert config.memory.memory_limit is not None
@@ -181,7 +163,6 @@ class TestGetSmartDefaults:
         )
         config = get_smart_defaults("cudf", profile)
 
-        # Should enable GPU
         assert config.gpu.enabled is True
         assert config.gpu.device_id == 0
 
@@ -196,7 +177,6 @@ class TestGetSmartDefaults:
         )
         config = get_smart_defaults("cudf", profile)
 
-        # Should enable spill to host with small GPU
         assert config.gpu.spill_to_host is True
         assert config.gpu.pool_type == "managed"
 
@@ -205,7 +185,6 @@ class TestGetSmartDefaults:
         config1 = get_smart_defaults("POLARS")
         config2 = get_smart_defaults("polars-df")
 
-        # Both should work
         assert isinstance(config1, DataFrameTuningConfiguration)
         assert isinstance(config2, DataFrameTuningConfiguration)
 

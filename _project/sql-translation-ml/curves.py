@@ -1,5 +1,3 @@
-"""Export training measurements as a standalone figure."""
-
 import json
 from pathlib import Path
 

@@ -1,5 +1,3 @@
-"""TPC-Havoc DataFrame variant queries."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.dataframe_queries.registry import (

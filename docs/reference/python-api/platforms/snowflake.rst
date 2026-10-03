@@ -59,71 +59,227 @@ API Reference
 SnowflakeAdapter Class
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.platforms.snowflake.SnowflakeAdapter
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. py:class:: benchbox.platforms.snowflake.SnowflakeAdapter(**config)
 
-Constructor Parameters
-~~~~~~~~~~~~~~~~~~~~~~
+   Snowflake adapter.  ``warehouse`` defaults to ``"COMPUTE_WH"``,
+   ``database`` to ``"BENCHBOX"``, ``schema`` to ``"PUBLIC"``,
+   ``authenticator`` to ``"snowflake"``, ``warehouse_size`` to ``"MEDIUM"``,
+   ``auto_suspend`` to ``300``, ``auto_resume`` to ``True``, and ``query_tag``
+   to ``"BenchBox"``.  ``disable_result_cache`` and ``strict_validation``
+   default to ``True``.  Optional dependencies can raise ``ImportError``;
+   invalid staging or table-mode combinations raise ``ValueError``.
 
-.. code-block:: python
+   Example::
 
-    SnowflakeAdapter(
-        account: str,
-        username: str,
-        password: str,
-        warehouse: str = "COMPUTE_WH",
-        database: str = "BENCHBOX",
-        schema: str = "PUBLIC",
-        role: Optional[str] = None,
-        authenticator: str = "snowflake",
-        private_key_path: Optional[str] = None,
-        private_key_passphrase: Optional[str] = None,
-        warehouse_size: str = "MEDIUM",
-        auto_suspend: int = 300,
-        auto_resume: bool = True,
-        multi_cluster_warehouse: bool = False,
-        query_tag: str = "BenchBox",
-        timezone: str = "UTC",
-        file_format: str = "CSV",
-        compression: str = "AUTO"
-    )
+      adapter = SnowflakeAdapter(account="org-account", username="user", warehouse="COMPUTE_WH")
 
-Parameters:
+   The adapter advertises external-table support.  See :doc:`common` for shared methods.
 
-**Connection (Required)**:
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.create_connection(**connection_config) -> Any
 
-- **account** (str): Snowflake account identifier (e.g., "xy12345.us-east-1")
-- **username** (str): Snowflake username
-- **password** (str): User password
-- **warehouse** (str): Virtual warehouse name. Default: "COMPUTE_WH"
-- **database** (str): Database name. Default: "BENCHBOX"
-- **schema** (str): Schema name. Default: "PUBLIC"
+   Create optimized Snowflake connection.
 
-**Authentication**:
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.create_schema(benchmark, connection: Any) -> float
 
-- **role** (str, optional): Role to assume for the session
-- **authenticator** (str): Authentication method ("snowflake", "oauth", etc.). Default: "snowflake"
-- **private_key_path** (str, optional): Path to private key for key-pair authentication
-- **private_key_passphrase** (str, optional): Passphrase for encrypted private key
+   Create schema using Snowflake table definitions.
 
-**Warehouse Configuration**:
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-- **warehouse_size** (str): Warehouse size (X-SMALL, SMALL, MEDIUM, LARGE, X-LARGE, 2X-LARGE, etc.). Default: "MEDIUM"
-- **auto_suspend** (int): Auto-suspend timeout in seconds. Default: 300 (5 minutes)
-- **auto_resume** (bool): Enable automatic warehouse resume. Default: True
-- **multi_cluster_warehouse** (bool): Enable multi-cluster configuration. Default: False
+   Load data using Snowflake PUT and COPY INTO commands.
 
-**Session Settings**:
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]
 
-- **query_tag** (str): Tag for query tracking and monitoring. Default: "BenchBox"
-- **timezone** (str): Session timezone. Default: "UTC"
+   Register external tables backed by cloud storage via a named external stage.
 
-**Data Loading**:
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]
 
-- **file_format** (str): Default file format. Default: "CSV"
-- **compression** (str): Compression type (AUTO, GZIP, BROTLI, ZSTD, etc.). Default: "AUTO"
+   Execute query with detailed timing and performance tracking.
+
+   Accepts either a connection or an already-open cursor: the TPC power
+   harness passes a per-stream cursor through the facade, which has no
+   ``cursor()`` method of its own.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.validate_session_cache_control(connection: Any) -> dict[str, Any]
+
+   Validate that session-level cache control settings were successfully applied.
+
+   :param connection: Active Snowflake database connection
+
+   :returns:     - validated: bool - Whether validation passed - cache_disabled: bool - Whether cache is actually disabled - settings: dict - Actual session settings - warnings: list[str] - Any validation warnings - errors: list[str] - Any validation errors
+   :rtype: dict with
+
+   :raises ConfigurationError: If cache control validation fails and strict_validation=True
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.analyze_table(connection: Any, table_name: str) -> None
+
+   Trigger table analysis for better query optimization.
+
+   Raises on failure (does not swallow) so the opt-in statistics phase's
+   gather_statistics() -> run_statistics_phase() caller can detect and
+   record a real failure as status=FAILED.
+
+Static member inventory
+-----------------------
+
+.. py:property:: benchbox.platforms.snowflake.SnowflakeAdapter.platform_name
+
+   Returns this adapter's registered platform identifier for selection, metadata, and capability lookup.
+
+.. py:staticmethod:: benchbox.platforms.snowflake.SnowflakeAdapter.add_cli_arguments(parser) -> None
+
+   Add Snowflake-specific CLI arguments.
+
+.. py:classmethod:: benchbox.platforms.snowflake.SnowflakeAdapter.from_config(config: dict[str, Any])
+
+   Create Snowflake adapter from unified configuration.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_platform_info(self, connection: Any=None) -> dict[str, Any]
+
+   Get Snowflake platform information.
+
+   Captures comprehensive Snowflake configuration including:
+   Snowflake version
+   Warehouse size and auto-suspend/resume settings
+   Multi-cluster warehouse configuration
+   Cloud provider and region
+   Account edition (best effort)
+
+   Gracefully degrades if permissions are insufficient for metadata queries.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_normalized_result_metadata(self, *, connection: Any | None=None, platform_info: Mapping[str, Any] | None=None) -> dict[str, Any]
+
+   Return Snowflake-specific normalized cloud/runtime metadata.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_target_dialect(self) -> str
+
+   Return the target SQL dialect for Snowflake.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.check_server_database_exists(self, **connection_config) -> bool
+
+   Check if database exists in Snowflake account.
+
+   Also checks for existing schemas and tables, since they may exist from a
+   previous run even if the database doesn't formally exist at account level.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.drop_database(self, **connection_config) -> None
+
+   Drop database in Snowflake account.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.validate_external_table_requirements(self) -> None
+
+   Validate required cloud staging configuration for external table mode.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None
+
+   Apply Snowflake-specific optimizations based on benchmark type.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_query_plan(self, connection: Any, query: str) -> str | None
+
+   Return the Snowflake plan as JSON via ``EXPLAIN USING JSON``.
+
+   Snowflake has no plain ``EXPLAIN`` that yields a parseable tree; the
+   JSON form returns a single VARIANT cell describing the operator graph.
+   Accepts a connection or an already-open cursor.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_query_plan_parser(self)
+
+   Get Snowflake query plan parser.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.get_tuning_introspector(self)
+
+   Read ``INFORMATION_SCHEMA`` clustering keys to corroborate the ledger.
+
+   Snowflake's tuning footprint is the clustering key, applied after load
+   by ``ALTER TABLE ... CLUSTER BY``. Those statements already reach the
+   applied ledger (``apply_standard_unified_tuning`` wraps the connection
+   in a recording connection), so this supplies the catalog side that lets
+   them be corroborated instead of classified ``unverifiable``.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.close_connection(self, connection: Any) -> None
+
+   Close Snowflake connection.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.generate_tuning_clause(self, table_tuning) -> str
+
+   Generate Snowflake-specific tuning clauses for CREATE TABLE statements.
+
+   Snowflake supports:
+   CLUSTER BY (column1, column2, ...) for clustering keys
+   Micro-partitions are automatic based on ingestion order and clustering
+
+   :param table_tuning: The tuning configuration for the table
+
+   :returns: SQL clause string to be appended to CREATE TABLE statement
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.apply_table_tunings(self, table_tuning, connection: Any) -> None
+
+   Apply tuning configurations to a Snowflake table.
+
+   Snowflake tuning approach:
+   CLUSTERING: Handled via CLUSTER BY in CREATE TABLE or ALTER TABLE
+   PARTITIONING: Automatic micro-partitions with optional clustering keys
+   Automatic clustering can be enabled for maintenance
+
+   :param table_tuning: The tuning configuration to apply
+   :param connection: Snowflake connection
+
+   :raises ValueError: If the tuning configuration is invalid for Snowflake
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None
+
+   Apply unified tuning configuration to Snowflake.
+
+   :param unified_config: Unified tuning configuration to apply
+   :param connection: Snowflake connection
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None
+
+   Apply Snowflake-specific platform optimizations.
+
+   Snowflake optimizations include:
+   Warehouse scaling and multi-cluster configuration
+   Query acceleration service settings
+   Result set caching configuration
+   Session-level optimization parameters
+
+   :param platform_config: Platform optimization configuration
+   :param connection: Snowflake connection
+
+.. py:attribute:: benchbox.platforms.snowflake.SnowflakeAdapter.plan_capture_phase_eligible
+
+   Advertises whether benchmark plan capture is available for this adapter.
+
+.. py:attribute:: benchbox.platforms.snowflake.SnowflakeAdapter.driver_isolation_capability
+
+   Declares whether this adapter can run through an isolated driver runtime; the value controls runtime-resolution support.
+
+.. py:attribute:: benchbox.platforms.snowflake.SnowflakeAdapter.supports_external_tables
+
+   Advertises whether the adapter implements external-table creation.
+
+.. py:method:: benchbox.platforms.snowflake.SnowflakeAdapter.apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None
+
+   Logs informational messages for enabled primary-key and foreign-key settings.
+   This hook executes no SQL and does not use ``connection``. Table-creation
+   hooks handle any platform-supported constraint DDL.
+
+Constructor Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass keyword configuration through ``SnowflakeAdapter(**config)``.
+
+- ``account``, ``username`` and ``password`` supply connection identity;
+  ``role`` is optional. ``authenticator`` defaults to ``"snowflake"``;
+  ``private_key_path`` and ``private_key_passphrase`` support key-pair settings.
+- ``warehouse``, ``database`` and ``schema`` default to ``"COMPUTE_WH"``,
+  ``"BENCHBOX"`` and ``"PUBLIC"`` respectively.
+- ``warehouse_size`` defaults to ``"MEDIUM"``. ``auto_suspend`` defaults to
+  300 seconds, ``auto_resume`` to ``True`` and ``multi_cluster_warehouse`` to
+  ``False``.
+- ``query_tag`` defaults to ``"BenchBox"`` and ``timezone`` to ``"UTC"``.
+- ``file_format`` defaults to ``"CSV"`` and ``compression`` to ``"AUTO"``.
+
+Defaulted string settings above use the default for a falsey supplied value.
 
 Configuration Examples
 ----------------------
@@ -574,17 +730,20 @@ Data Organization
 
 1. **Use clustering keys** for filtered columns:
 
-   .. code-block:: python
+   Illustrative SQL fragments; supply complete table definitions before execution.
+
+   .. code-block:: sql
 
        CREATE TABLE lineitem (...)
        CLUSTER BY (l_shipdate, l_orderkey)
 
 2. **Partition large tables** by date:
 
-   .. code-block:: python
+   Snowflake creates micro-partitions automatically. Date-based clustering
+   uses a clause such as this illustrative fragment:
 
-       # Snowflake automatically creates micro-partitions
-       # Clustering by date provides similar benefits
+   .. code-block:: sql
+
        CLUSTER BY (DATE_TRUNC('month', order_date))
 
 3. **Analyze clustering quality**:

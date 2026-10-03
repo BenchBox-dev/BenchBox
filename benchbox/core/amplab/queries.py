@@ -1,20 +1,6 @@
-"""AMPLab Big Data Benchmark query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the standard AMPLab benchmark queries, which test
-big data processing systems using web analytics workloads.
-
-The queries include:
-1. Scan Query - Filter and aggregate uservisits data
-2. Join Query - Join uservisits with rankings
-3. UDF Query - Complex analytics with user-defined functions
-
-For more information see:
-- https://amplab.cs.berkeley.edu/benchmark/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 

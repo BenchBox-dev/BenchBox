@@ -1,9 +1,3 @@
-"""Tests for Redshift connection isolation during VACUUM/ANALYZE.
-
-Verifies that VACUUM/ANALYZE operations use a separate connection so that
-a socket-level timeout does not poison the main benchmark connection.
-"""
-
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
@@ -17,7 +11,7 @@ pytestmark = [
 
 
 def _make_adapter(**kwargs):
-    """Create a RedshiftAdapter with test defaults, skip if driver missing."""
+
     try:
         from benchbox.platforms.redshift import RedshiftAdapter
     except ImportError:
@@ -35,7 +29,7 @@ def _make_adapter(**kwargs):
 
 
 def _make_smart_cursor(*, tables=None, fail_on=None):
-    """Create a mock cursor. fail_on is a set of SQL prefixes that should raise."""
+
     cursor = Mock()
     cursor.fetchall.return_value = tables or []
     cursor.fetchone.return_value = ("off",)
@@ -53,26 +47,22 @@ def _make_smart_cursor(*, tables=None, fail_on=None):
 
 
 class TestVacuumAnalyzeConnectionIsolation:
-    """Test that VACUUM/ANALYZE use a separate connection."""
-
     @pytest.fixture(autouse=True)
     def _skip_cluster_state_check(self):
-        """Prevent real boto3 API calls in _resolve_connect_timeout."""
+
         from benchbox.platforms.redshift import RedshiftAdapter
 
         with patch.object(RedshiftAdapter, "_resolve_connect_timeout", return_value=10):
             yield
 
     def test_vacuum_timeout_does_not_affect_main_connection(self):
-        """Main connection cursor is never used for VACUUM/ANALYZE."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=False)
 
-        # Main connection - its cursor should only do the table list query
         main_conn = Mock()
         main_cursor = _make_smart_cursor(tables=[("public", "orders")])
         main_conn.cursor.return_value = main_cursor
 
-        # Maintenance connection - will timeout on VACUUM
         maint_conn = Mock()
         maint_conn.autocommit = True
         maint_cursor = _make_smart_cursor(fail_on={"VACUUM"})
@@ -81,15 +71,13 @@ class TestVacuumAnalyzeConnectionIsolation:
         with patch.object(adapter, "_connect_with_driver", return_value=maint_conn):
             adapter.configure_for_benchmark(main_conn, "tpch")
 
-        # Main cursor should NOT have any VACUUM calls
         main_execute_calls = [str(c) for c in main_cursor.execute.call_args_list]
         assert not any("VACUUM" in c for c in main_execute_calls)
 
-        # Maintenance connection was created and closed
         maint_conn.close.assert_called()
 
     def test_successful_vacuum_analyze_uses_separate_connection(self):
-        """Even when VACUUM/ANALYZE succeed, they use the maintenance connection."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
 
         main_conn = Mock()
@@ -98,24 +86,22 @@ class TestVacuumAnalyzeConnectionIsolation:
 
         maint_conn = Mock()
         maint_conn.autocommit = True
-        maint_cursor = _make_smart_cursor()  # All operations succeed
+        maint_cursor = _make_smart_cursor()
         maint_conn.cursor.return_value = maint_cursor
 
         with patch.object(adapter, "_connect_with_driver", return_value=maint_conn):
             adapter.configure_for_benchmark(main_conn, "tpch")
 
-        # Maintenance cursor should have VACUUM and ANALYZE calls
         maint_execute_calls = [str(c) for c in maint_cursor.execute.call_args_list]
         assert any("VACUUM" in c for c in maint_execute_calls)
         assert any("ANALYZE" in c for c in maint_execute_calls)
 
-        # Main cursor should not
         main_execute_calls = [str(c) for c in main_cursor.execute.call_args_list]
         assert not any("VACUUM" in c for c in main_execute_calls)
         assert not any("ANALYZE" in c for c in main_execute_calls)
 
     def test_vacuum_timeout_aborts_remaining_tables(self):
-        """After a socket timeout, remaining VACUUM/ANALYZE are skipped."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
 
         main_conn = Mock()
@@ -130,12 +116,11 @@ class TestVacuumAnalyzeConnectionIsolation:
         with patch.object(adapter, "_connect_with_driver", return_value=maint_conn):
             adapter.configure_for_benchmark(main_conn, "tpch")
 
-        # VACUUM was only attempted for the first table before the connection died
         vacuum_calls = [c for c in maint_cursor.execute.call_args_list if "VACUUM" in str(c)]
-        assert len(vacuum_calls) == 1  # Only first table attempted
+        assert len(vacuum_calls) == 1
 
     def test_maintenance_connection_failure_is_nonfatal(self):
-        """If the maintenance connection can't be created, configure still succeeds."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
 
         main_conn = Mock()
@@ -143,11 +128,10 @@ class TestVacuumAnalyzeConnectionIsolation:
         main_conn.cursor.return_value = main_cursor
 
         with patch.object(adapter, "_connect_with_driver", side_effect=Exception("connection refused")):
-            # Should not raise
             adapter.configure_for_benchmark(main_conn, "tpch")
 
     def test_no_tables_skips_maintenance_connection(self):
-        """If schema has no tables, no maintenance connection is created."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
 
         main_conn = Mock()
@@ -159,7 +143,7 @@ class TestVacuumAnalyzeConnectionIsolation:
             mock_connect.assert_not_called()
 
     def test_maintenance_connection_uses_long_running_timeout(self):
-        """Maintenance connection uses the long-running timeout helper."""
+
         adapter = _make_adapter(auto_vacuum=True, auto_analyze=True)
 
         main_conn = Mock()
@@ -183,7 +167,7 @@ class TestVacuumAnalyzeConnectionIsolation:
         )
 
     def test_vacuum_disabled_only_runs_analyze(self):
-        """With auto_vacuum=False, only ANALYZE runs on maintenance connection."""
+
         adapter = _make_adapter(auto_vacuum=False, auto_analyze=True)
 
         main_conn = Mock()

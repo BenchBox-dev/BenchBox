@@ -1,5 +1,3 @@
-"""Tests for plan history tracking."""
-
 from __future__ import annotations
 
 import json
@@ -33,12 +31,10 @@ pytestmark = [
 
 
 def _qr(query_id: str, execution_time_ms: float = 100.0, query_plan: QueryPlanDAG | None = None) -> dict:
-    """Build a query_results dict matching the real BenchmarkResults.query_results shape."""
     return {"query_id": query_id, "execution_time_ms": execution_time_ms, "query_plan": query_plan}
 
 
 def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanDAG:
-    """Create a plan with a specific fingerprint."""
     root = LogicalOperator(
         operator_id="1",
         operator_type=LogicalOperatorType.SCAN,
@@ -55,12 +51,6 @@ def _create_plan_with_fingerprint(query_id: str, fingerprint: str) -> QueryPlanD
 
 
 class TestParseHistoryTimestamp:
-    """#1025 review: datetime.fromisoformat only accepts a trailing "Z" from
-    Python 3.11 onward; on 3.10 (requires-python floor) it raises ValueError,
-    which the except branch silently downgrades to a datetime.min sort key -
-    misordering history entries with a "Z"-suffixed timestamp instead of
-    raising or logging anything actionable."""
-
     def test_z_suffix_parses_as_utc(self) -> None:
         parsed = _parse_history_timestamp("2024-03-10T02:30:00Z")
 
@@ -80,11 +70,6 @@ class TestParseHistoryTimestamp:
     def test_z_suffix_is_stripped_before_fromisoformat_regardless_of_python_version(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Prove the "Z" -> "+00:00" normalization happens unconditionally,
-        not just on interpreters new enough to accept "Z" natively. The
-        sandbox's own Python (3.11+) already tolerates "Z" in fromisoformat,
-        so a plain before/after diff can't distinguish fixed from buggy here
-        - assert directly on the string handed to fromisoformat instead."""
         import benchbox.core.query_plans.history as history_module
 
         seen: list[str] = []
@@ -96,9 +81,6 @@ class TestParseHistoryTimestamp:
                 seen.append(value)
                 return real_fromisoformat(value)
 
-        # `datetime` is a plain module-level name in history.py (`from datetime
-        # import datetime`); datetime.datetime itself is a C type and cannot
-        # be monkeypatched directly, so replace the module-level binding.
         monkeypatch.setattr(history_module, "datetime", _RecordingDatetime)
 
         history_module._parse_history_timestamp("2024-03-10T02:30:00Z")
@@ -107,8 +89,6 @@ class TestParseHistoryTimestamp:
 
 
 class TestPlanHistoryEntry:
-    """Tests for PlanHistoryEntry dataclass."""
-
     def test_to_dict(self) -> None:
 
         entry = PlanHistoryEntry(
@@ -144,16 +124,6 @@ class TestPlanHistoryEntry:
 
 
 class TestPlanHistory:
-    """Tests for PlanHistory class.
-
-    Constructs real ``BenchmarkResults`` via ``make_benchmark_results`` using
-    its REAL attribute names (``execution_id``/``timestamp``), not the
-    ``run_id``/``start_time`` names ``PlanHistory.add_run`` used to read
-    (qpc-08 / F1.2): those attributes don't exist on ``BenchmarkResults``, so
-    a fixture that bolted them on as loose attributes masked `add_run` being
-    permanently unreachable from any real caller.
-    """
-
     def test_add_run(self) -> None:
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -167,10 +137,8 @@ class TestPlanHistory:
 
             history.add_run(results)
 
-            # Verify file was created
             assert (Path(tmpdir) / "run1.json").exists()
 
-            # Verify content
             with open(Path(tmpdir) / "run1.json", encoding="utf-8") as f:
                 data = json.load(f)
             assert data["run_id"] == "run1"
@@ -178,7 +146,6 @@ class TestPlanHistory:
             assert data["plan_fingerprints"]["q1"]["fingerprint"] == "a" * 64
 
     def test_add_run_without_execution_id_is_a_noop(self) -> None:
-        """A result with no execution_id cannot be filed under any run name."""
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -197,7 +164,6 @@ class TestPlanHistory:
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Add multiple runs
             for i in range(3):
                 plan = _create_plan_with_fingerprint("q1", "a" * 64)
                 results = make_benchmark_results(
@@ -210,30 +176,13 @@ class TestPlanHistory:
             entries = history.query_plan_history("q1")
 
             assert len(entries) == 3
-            assert entries[0].run_id == "run0"  # Sorted by timestamp
+            assert entries[0].run_id == "run0"
             assert entries[2].run_id == "run2"
 
     def test_query_plan_history_sorts_mixed_offset_timestamps_chronologically(self) -> None:
-        """qpc-08 / F7.2: mixed-offset timestamps must be ordered by the instant
-        they denote, not by lexicographic string comparison.
-
-        The earlier instant here is deliberately arranged to sort LATER by both
-        of the axes a naive implementation might rely on -- filename/glob order
-        and raw-string order -- so only a parse-based sort recovers the true
-        chronological order. A regression to ``history.sort(key=lambda x:
-        x.timestamp)`` (lexicographic) turns this test red.
-        """
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # run-a: 2024-03-10 02:30 UTC.
-            # run-b: 2024-03-10 06:30 +08:00 == 2024-03-09 22:30 UTC -- the
-            # EARLIER instant. Yet its filename ("run-b" > "run-a") AND its raw
-            # timestamp string ("06:30" > "02:30") both sort it AFTER run-a, so
-            # a lexicographic (or glob-order) sort yields the wrong [run-a,
-            # run-b]; only parsing yields the correct [run-b, run-a]. Explicit
-            # offsets (not "Z") keep this valid on every supported Python,
-            # including 3.10 where ``fromisoformat`` rejects a trailing "Z".
             stored_timestamps = (
                 ("run-a", "2024-03-10T02:30:00+00:00"),
                 ("run-b", "2024-03-10T06:30:00+08:00"),
@@ -246,9 +195,6 @@ class TestPlanHistory:
                         query_results=[_qr("q1", 100.0, plan)],
                     )
                 )
-                # Overwrite the stored timestamp with the exact mixed-offset
-                # representation under test (add_run would otherwise write the
-                # fixture's naive now()).
                 entry_file = Path(tmpdir) / f"{exec_id}.json"
                 with open(entry_file, encoding="utf-8") as f:
                     data = json.load(f)
@@ -273,7 +219,6 @@ class TestPlanHistory:
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # All runs have same fingerprint - no flapping
             for i in range(5):
                 plan = _create_plan_with_fingerprint("q1", "a" * 64)
                 results = make_benchmark_results(
@@ -290,7 +235,6 @@ class TestPlanHistory:
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Plan changes once - not flapping
             fingerprints = ["a" * 64, "a" * 64, "b" * 64, "b" * 64, "b" * 64]
             for i, fp in enumerate(fingerprints):
                 plan = _create_plan_with_fingerprint("q1", fp)
@@ -301,7 +245,6 @@ class TestPlanHistory:
                 )
                 history.add_run(results)
 
-            # Single transition = 1/4 = 25%, below 30% threshold
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_detected(self) -> None:
@@ -309,7 +252,6 @@ class TestPlanHistory:
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Plan oscillates - flapping
             fingerprints = ["a" * 64, "b" * 64, "a" * 64, "b" * 64, "a" * 64]
             for i, fp in enumerate(fingerprints):
                 plan = _create_plan_with_fingerprint("q1", fp)
@@ -320,22 +262,12 @@ class TestPlanHistory:
                 )
                 history.add_run(results)
 
-            # 4 transitions = 4/4 = 100%, above 30% threshold
             assert history.detect_plan_flapping("q1") is True
 
     def test_detect_plan_flapping_ignores_fingerprint_version_boundary(self) -> None:
-        """A pure fingerprint-encoding-version bump (qpc-03 v1 -> v2) makes
-        the fingerprint string change even for an unchanged plan (#1028
-        review). Every consecutive pair here crosses a fingerprint_version
-        boundary; without the fix that reads as 100% transitions (flapping),
-        but none of it reflects a real plan change, so it must not flap."""
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Alternating fingerprint_version on every run, same logical plan
-            # re-encoded each time - an artificial worst case that isolates
-            # the version-boundary-exclusion mechanism (same technique as
-            # test_detect_plan_flapping_ignores_cross_platform_alternation).
             specs = [("v1-a" * 16, 1), ("v2-a" * 16, 2), ("v1-a" * 16, 1), ("v2-a" * 16, 2), ("v1-a" * 16, 1)]
             for i, (fp, version) in enumerate(specs):
                 plan = _create_plan_with_fingerprint("q1", fp)
@@ -354,7 +286,6 @@ class TestPlanHistory:
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # Only 2 runs - not enough to detect flapping
             for i in range(2):
                 fp = "a" * 64 if i == 0 else "b" * 64
                 plan = _create_plan_with_fingerprint("q1", fp)
@@ -368,17 +299,9 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_ignores_cross_platform_alternation(self) -> None:
-        """qpc-08 / F3.4-partial: two platforms alternating for the same
-        query_id is NOT one flapping sequence -- each platform has its own
-        independent, stable plan lineage. Naive interleaved comparison would
-        report 100% transitions; partitioned by platform, neither platform
-        actually flaps.
-        """
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
-            # duckdb: always "a". postgres: always "b". Interleaved by
-            # timestamp they alternate a/b/a/b/a -- 100% naive transition rate.
             for i in range(5):
                 platform = "duckdb" if i % 2 == 0 else "postgres"
                 fingerprint = "a" * 64 if platform == "duckdb" else "b" * 64
@@ -394,8 +317,6 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_detects_real_flap_within_one_platform(self) -> None:
-        """A genuine flap on ONE platform is still detected even when a
-        second, stable platform's runs are interleaved in the same history."""
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -410,7 +331,6 @@ class TestPlanHistory:
                         query_results=[_qr("q1", 100.0, plan)],
                     )
                 )
-            # A stable postgres lineage interleaved in the same history dir.
             for i in range(5):
                 plan = _create_plan_with_fingerprint("q1", "b" * 64)
                 history.add_run(
@@ -442,26 +362,21 @@ class TestPlanHistory:
             versions = history.get_plan_version_history("q1")
 
             assert len(versions) == 5
-            # Same fingerprint keeps same version
             assert versions[0] == ("a" * 64, 1)
             assert versions[1] == ("a" * 64, 1)
-            # New fingerprint increments version
             assert versions[2] == ("b" * 64, 2)
             assert versions[3] == ("c" * 64, 3)
             assert versions[4] == ("c" * 64, 3)
 
     def test_get_plan_version_history_ignores_fingerprint_version_boundary(self) -> None:
-        """A fingerprint_version change alone (qpc-03 encoding bump) must not
-        bump the reported plan version - only a genuine content change within
-        the same encoding version should (#1028 review)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
             specs = [
-                ("a" * 64, 1),  # v1 baseline
-                ("a2" * 32, 2),  # same logical plan, re-encoded as v2 - NOT a change
-                ("a2" * 32, 2),  # stable under v2
-                ("b" * 64, 2),  # genuine change, same (v2) encoding
+                ("a" * 64, 1),
+                ("a2" * 32, 2),
+                ("a2" * 32, 2),
+                ("b" * 64, 2),
             ]
             for i, (fp, version) in enumerate(specs):
                 plan = _create_plan_with_fingerprint("q1", fp)
@@ -477,9 +392,9 @@ class TestPlanHistory:
 
             assert len(versions) == 4
             assert versions[0] == ("a" * 64, 1)
-            assert versions[1] == ("a2" * 32, 1)  # encoding bump alone: no version bump
+            assert versions[1] == ("a2" * 32, 1)
             assert versions[2] == ("a2" * 32, 1)
-            assert versions[3] == ("b" * 64, 2)  # genuine change: version bumps
+            assert versions[3] == ("b" * 64, 2)
 
     def test_get_all_query_ids(self) -> None:
 
@@ -538,8 +453,6 @@ class TestPlanHistory:
 
 
 class TestCreatePlanHistory:
-    """Tests for create_plan_history factory function."""
-
     def test_creates_history_instance(self) -> None:
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -555,12 +468,6 @@ class TestCreatePlanHistory:
 
 
 class TestAddRunEndToEndViaCLI:
-    """qpc-08 w3: exercise the real (un-mocked) `add_run` -> `PlanHistory` ->
-    `benchbox plan-history` CLI path end to end, proving the wiring actually
-    reaches a real ``BenchmarkResults`` rather than only a fixture that
-    happens to define the attributes `add_run` reads.
-    """
-
     def test_real_benchmark_results_recorded_and_shown_by_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             history_dir = Path(tmpdir)
@@ -596,11 +503,6 @@ def _write_legacy_history_file(
     fingerprint: str,
     platform: str = "duckdb",
 ) -> None:
-    """Write a history file in the pre-fingerprint_version on-disk shape.
-
-    Mirrors what ``PlanHistory.add_run`` wrote before the version field
-    existed: the same keys minus ``fingerprint_version``.
-    """
     payload = {
         "run_id": exec_id,
         "timestamp": timestamp,
@@ -618,11 +520,6 @@ def _write_legacy_history_file(
 
 
 class TestFingerprintVersionLegacy:
-    """A tool upgrade that bumps the fingerprint encoding (v1 -> v2) changes
-    the fingerprint string for an unchanged plan. That boundary must read as
-    neither flapping nor a plan-version bump, and history files written
-    before the version field existed must load as v1 rather than be dropped."""
-
     def test_from_dict_legacy_defaults_to_v1_and_round_trips(self) -> None:
         entry = PlanHistoryEntry.from_dict(
             {
@@ -650,17 +547,6 @@ class TestFingerprintVersionLegacy:
             assert all(e.fingerprint_version == LEGACY_FINGERPRINT_VERSION for e in entries)
 
     def test_legacy_v1_then_v2_boundary_is_neither_flap_nor_bump(self) -> None:
-        """The real upgrade shape: an old on-disk file with no version field
-        followed by runs recorded under the current encoding, then a v1
-        rollback. The strings differ by encoding alone, so no flap and no
-        plan-version bump -- in either direction.
-
-        Three post-boundary runs are deliberate: with only two total runs the
-        flapping check short-circuits (len < 3) and the assertion below would
-        pass even with the version guard removed. Here pairs run0->run1 and
-        run2->run3 cross the encoding boundary; without the guard they read
-        as 2/3 transitions (flapping), with it as 0/3.
-        """
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
             _write_legacy_history_file(tmpdir, "run0", "2024-01-01T00:00:00+00:00", "q1", "a" * 64)
@@ -694,9 +580,6 @@ class TestFingerprintVersionLegacy:
             ]
 
     def test_genuine_flap_within_v2_after_boundary_still_detected(self) -> None:
-        """The boundary exclusion must not blind later detection: a genuine
-        same-encoding oscillation after the upgrade still flaps and still
-        bumps the plan version."""
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
             _write_legacy_history_file(tmpdir, "run0", "2024-01-01T00:00:00+00:00", "q1", "a" * 64)
@@ -718,9 +601,6 @@ class TestFingerprintVersionLegacy:
 
 
 class TestPlatformPartitionAndVersionAwareMetrics:
-    """Version history partitions by platform, and CLI metrics count plan
-    versions rather than raw fingerprint strings."""
-
     def _add(self, history: PlanHistory, exec_id: str, platform: str, fp: str) -> None:
         plan = _create_plan_with_fingerprint("q1", fp)
         history.add_run(

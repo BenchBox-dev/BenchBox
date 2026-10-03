@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""Curation-drift CI guard.
-
-Verifies that every top-level tracked path on develop is accounted for as
-either main-only (will land on the released main tree) or curated (will be
-git-rm'd from the release branch by `make release-cut`).
-
-Sources of truth:
-  - A3 main-only allowlist: _project/decisions/single-repo-migration.md
-    (the bullet under "**main only**" in the A3 row).
-  - Curation list: the `git rm -rf` / `git rm -f` lines inside the
-    `release-cut:` target in Makefile.
-  - Required deferred release paths: explicit release-cut removals for
-    develop-only surfaces that remain on develop but must not ship on release.
-  - Required curated-preview release paths: the Explorer corpus, application,
-    and three build-time helpers that must remain available to docs.yml.
-
-Fails (exit 1) on any top-level path that appears in neither list, naming
-the offending paths and recommending which list to update.
-
-Run locally:
-    uv run -- python scripts/check_release_curation.py
-"""
 
 from __future__ import annotations
 
@@ -55,17 +33,7 @@ REQUIRED_RELEASE_PATHS = frozenset(
 
 
 def parse_main_only_allowlist(doc: Path) -> set[str]:
-    """Extract backtick-quoted top-level paths from every "main only" bullet.
-
-    Picks up both the original A3 bullet and any later amendments that
-    extend the main-only list (matched by the same `**`main` only**:` marker).
-    """
     text = doc.read_text(encoding="utf-8")
-    # Allow optional descriptive text after "main only" before the colon,
-    # e.g. "**`main` only** (extension to A3):" so amendments can extend
-    # the allowlist without changing the original A3 row. A trailing bullet
-    # at end of file has no blank-line terminator (end-of-file-fixer forbids
-    # it), so end of input terminates a bullet too.
     matches = re.findall(
         r"\*\*`main` only\*\*[^:\n]*:(.*?)(?=\n\s*-\s*\*\*|\n\n|\s*\Z)",
         text,
@@ -76,12 +44,10 @@ def parse_main_only_allowlist(doc: Path) -> set[str]:
     paths: set[str] = set()
     for body in matches:
         paths.update(re.findall(r"`([^`]+)`", body))
-    # Strip trailing slashes; we compare against top-level tree entries.
     return {p.rstrip("/") for p in paths}
 
 
 def parse_curation_list(makefile: Path) -> set[str]:
-    """Extract `git rm` paths from the `release-cut:` target body."""
     text = makefile.read_text(encoding="utf-8")
     match = re.search(
         r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)",
@@ -93,19 +59,14 @@ def parse_curation_list(makefile: Path) -> set[str]:
     body = match.group(1)
     paths: set[str] = set()
     for line in body.splitlines():
-        # Match `git rm -rf <paths>` and `git rm -f <paths>`, with or without
-        # `--ignore-unmatch` and with or without a leading `-` (the Make
-        # "ignore exit code" prefix used before --ignore-unmatch was added).
         rm_match = re.search(r"git rm (?:-rf|-f)(?: --ignore-unmatch)? (.+?)$", line.strip())
         if not rm_match:
             continue
-        # Skip option tokens such as --ignore-unmatch; only pathspecs count.
         paths.update(p for p in shlex.split(rm_match.group(1)) if not p.startswith("-"))
     return paths
 
 
 def parse_development_tree_targets(makefile: Path) -> set[str]:
-    """Read the Make targets declared unavailable on a curated release."""
     lines = makefile.read_text(encoding="utf-8").splitlines()
     values: list[str] = []
     collecting = False
@@ -124,7 +85,6 @@ def parse_development_tree_targets(makefile: Path) -> set[str]:
 
 
 def project_dependent_make_targets(root: Path) -> set[str]:
-    """Return targets whose recipes execute or manipulate an `_project/` path."""
     targets: set[str] = set()
     for path in [root / "Makefile", *sorted((root / "make").glob("*.mk"))]:
         target: str | None = None
@@ -152,7 +112,6 @@ def project_dependent_make_targets(root: Path) -> set[str]:
 
 
 def development_tree_target_findings(root: Path) -> list[str]:
-    """Find retained Make recipes that would fail opaquely after curation."""
     declared = parse_development_tree_targets(root / "Makefile")
     required = project_dependent_make_targets(root) - CURATED_RESUMABLE_PROJECT_TARGETS
     return [
@@ -162,7 +121,6 @@ def development_tree_target_findings(root: Path) -> list[str]:
 
 
 def list_tracked_top_level() -> set[str]:
-    """Return the set of top-level tracked paths from `git ls-tree HEAD`."""
     result = subprocess.run(
         ["git", "ls-tree", "HEAD", "--name-only"],
         cwd=REPO_ROOT,

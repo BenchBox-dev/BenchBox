@@ -22,9 +22,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
-# ---------------------------------------------------------------------------
 
 
 def q14_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -35,9 +33,7 @@ def q14_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q14_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
 # v2: pre-filter - filter lineitem before joining part
-# ---------------------------------------------------------------------------
 
 
 def q14_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -89,9 +85,7 @@ def q14_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v3: column prune - select only needed columns before joining
-# ---------------------------------------------------------------------------
 
 
 def q14_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -147,9 +141,7 @@ def q14_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v4: intermediate vars - explicit DataFrames for each step
-# ---------------------------------------------------------------------------
 
 
 def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -181,9 +173,7 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
 q14_v4_pandas_impl = make_variant_delegate(q14_v2_pandas_impl, name="q14_v4_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
 # v5: pre-compute derived - compute revenue column before selecting
-# ---------------------------------------------------------------------------
 
 
 def q14_v5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -236,9 +226,7 @@ def q14_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v6: chained style - maximum method chaining
-# ---------------------------------------------------------------------------
 
 
 def q14_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -285,9 +273,7 @@ def q14_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v7: join reorder - start from part, join lineitem
-# ---------------------------------------------------------------------------
 
 
 def q14_v7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -341,9 +327,7 @@ def q14_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v8: filter combination - filter part for PROMO prefix before joining
-# ---------------------------------------------------------------------------
 
 
 def q14_v8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -406,9 +390,7 @@ def q14_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v9: explicit sort - no sort needed for scalar; use different date check order
-# ---------------------------------------------------------------------------
 
 
 def q14_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -462,9 +444,7 @@ def q14_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # v10: alternative formula - price - price*disc instead of price*(1-disc)
-# ---------------------------------------------------------------------------
 
 
 def q14_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -516,8 +496,7 @@ def q14_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"promo_revenue": [promo_percent]})
 
 
-# ---------------------------------------------------------------------------
 # Registry
-# ---------------------------------------------------------------------------
+
 
 Q14_VARIANTS = build_yaml_variants(__file__, globals(), 14, JOIN_AGG_FILTER)

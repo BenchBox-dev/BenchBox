@@ -1,5 +1,3 @@
-"""Data generation command implementation."""
-
 from __future__ import annotations
 
 import click
@@ -76,50 +74,19 @@ from benchbox.core.run_service import resolve_lifecycle_phases
 )
 @click.pass_context
 def datagen(ctx, benchmark, scale, output_dir, data_format, seed, verbose):
-    """Generate benchmark data without running queries.
-
-    Standalone data generation command that generates benchmark data files
-    without loading or executing queries. Useful for pre-generating data
-    that can be reused across multiple benchmark runs.
-
-    This is a convenience wrapper for: benchbox run --phases generate
-
-    \b
-    Examples:
-        # Generate TPC-H data at scale factor 0.1
-        benchbox datagen --benchmark tpch --scale 0.1 --output ./data/tpch_0.1
-
-    \b
-        # Generate TPC-DS data with specific seed
-        benchbox datagen --benchmark tpcds --scale 1 --seed 42 --output ./data/tpcds_1
-
-    \b
-        # Generate ClickBench data
-        benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench
-
-    \b
-        # Generate with verbose logging
-        benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose
-    """
     console.print("[bold blue]Running data generation...[/bold blue]")
     console.print(f"Benchmark: {benchmark}, Scale: {scale}")
 
     if output_dir:
         console.print(f"Output: {output_dir}")
 
-    # Note: data_format is not directly supported by run command yet
     if data_format and data_format != "parquet":
         console.print(
             f"[yellow]Note: Format '{data_format}' requested but may not be supported. "
             "Default format will be used.[/yellow]"
         )
 
-    # Direct run-service delegation for generate-only: no dummy platform,
-    # no argv round-trip. ``phases="generate"`` is the data-only lifecycle;
-    # the run service resolves it to ``LifecyclePhases(generate=True, ...)``
-    # without requiring a platform adapter.
     _phases = resolve_lifecycle_phases(["generate"])
-    # Validate that generate is a valid phase early, before invoking run.
     assert _phases.generate, "generate phase must be enabled for datagen"
 
     ctx.invoke(
@@ -171,15 +138,6 @@ def datagen(ctx, benchmark, scale, output_dir, data_format, seed, verbose):
 
 
 def _parse_run_args(args: list[str]) -> dict:
-    """Compatibility shim for tests that still import this helper.
-
-    Previously datagen built an argv list with a dummy ``--platform duckdb``
-    and round-tripped it through this parser before ``ctx.invoke(run, ...)``.
-    The helper is retained for backwards compatibility with
-    ``tests/unit/cli/test_new_commands.py`` but is no longer used by the
-    datagen command itself, which now calls ``run`` directly with structured
-    kwargs and no dummy platform.
-    """
     parsed: dict[str, object] = {}
     i = 0
     while i < len(args):

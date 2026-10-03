@@ -1,24 +1,3 @@
-"""The corpus cohort-depth requirement must fail a PR, not just a manual run.
-
-`results-data/SEED_CORPUS_SPEC.md` states it as a hard requirement: every
-committed cohort must have at least 3 comparison identities. `results-data/validate_corpus.py`
-enforces it and exits 1 on violation.
-
-Nothing ran it. Every reference to that script in `.github/workflows` is a path
-list for mirroring, not an execution, and it was absent from pr-preflight, from
-ci-lint and from every pre-commit hook. So PR #1854 added a TPC-DS SF10 cohort
-with DuckDB alone, passed pr-preflight green with 28,043 tests, and merged --
-leaving develop carrying a violated invariant until someone happened to run the
-validator by hand.
-
-This module closes that gap by importing the script rather than restating its
-rule, so the gate and the contributor-facing tool cannot drift apart. It lives
-in the whole-corpus unit lane beside `test_corpus_privacy_invariant.py`, which
-already closed the same class of hole for path leaks and sidecar hashes, and
-therefore runs in pr-preflight and in the required CI lane without a new
-workflow job.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -37,7 +16,6 @@ BUNDLES = REPO_ROOT / "results-data" / "bundles"
 
 
 def _load_validator() -> ModuleType:
-    """Import the vendored script by path; it is not an installed module."""
     spec = importlib.util.spec_from_file_location("validate_corpus", VALIDATOR)
     assert spec and spec.loader, f"cannot load {VALIDATOR}"
     module = importlib.util.module_from_spec(spec)
@@ -71,7 +49,6 @@ def _write_bundle(
 
 
 def test_every_committed_cohort_meets_the_platform_floor() -> None:
-    """The invariant itself, against the real corpus."""
     validator = _load_validator()
     cohorts = validator.cohort_platforms(validator.discover_bundles(BUNDLES))
 
@@ -87,11 +64,6 @@ def test_every_committed_cohort_meets_the_platform_floor() -> None:
 
 
 def test_the_gate_detects_a_one_platform_cohort(tmp_path: Path) -> None:
-    """Negative control, on synthetic bundles.
-
-    Asserting against a real violation would stop being a control the moment
-    the corpus is correct, which is the state this gate exists to keep it in.
-    """
     validator = _load_validator()
     _write_bundle(tmp_path, "a.json", benchmark="tpcds", scale=10.0, platform="DuckDB")
 
@@ -101,7 +73,6 @@ def test_the_gate_detects_a_one_platform_cohort(tmp_path: Path) -> None:
 
 
 def test_the_gate_accepts_a_full_cohort(tmp_path: Path) -> None:
-    """Positive control: three platforms in one cohort must not be flagged."""
     validator = _load_validator()
     for platform in ("DuckDB", "DataFusion", "Spark"):
         _write_bundle(tmp_path, f"{platform}.json", benchmark="tpcds", scale=10.0, platform=platform)
@@ -110,7 +81,6 @@ def test_the_gate_accepts_a_full_cohort(tmp_path: Path) -> None:
 
 
 def test_the_gate_accepts_a_version_matrix_as_distinct_identities(tmp_path: Path) -> None:
-    """A version-over-version cohort may repeat one platform name."""
     validator = _load_validator()
     matrix_dir = tmp_path / "duckdb-version-matrix"
     for index, version in enumerate(("1.0.0", "1.5.5", "1.6.0.dev365")):
@@ -127,7 +97,6 @@ def test_the_gate_accepts_a_version_matrix_as_distinct_identities(tmp_path: Path
 
 
 def test_versions_do_not_pad_an_ordinary_cross_platform_cohort(tmp_path: Path) -> None:
-    """Version identity is reserved for the explicitly segregated matrix corpus."""
     validator = _load_validator()
     for index, version in enumerate(("1.0", "2.0", "3.0")):
         _write_bundle(
@@ -145,7 +114,6 @@ def test_versions_do_not_pad_an_ordinary_cross_platform_cohort(tmp_path: Path) -
 
 
 def test_same_platform_version_does_not_pad_a_cohort(tmp_path: Path) -> None:
-    """Repeated runs at one version remain one comparison identity."""
     validator = _load_validator()
     matrix_dir = tmp_path / "duckdb-version-matrix"
     for index in range(3):
@@ -164,7 +132,6 @@ def test_same_platform_version_does_not_pad_a_cohort(tmp_path: Path) -> None:
 
 
 def test_duckdb_package_version_overrides_internal_engine_version(tmp_path: Path) -> None:
-    """DuckDB development builds compare by package version, not engine string."""
     validator = _load_validator()
     matrix_dir = tmp_path / "duckdb-version-matrix"
     _write_bundle(
@@ -183,11 +150,6 @@ def test_duckdb_package_version_overrides_internal_engine_version(tmp_path: Path
 
 
 def test_companion_files_are_not_counted_as_bundles(tmp_path: Path) -> None:
-    """A sidecar must not pad a cohort's platform count.
-
-    Counting `x.manifest.json` beside `x.json` would let a one-platform cohort
-    look deeper than it is, which is the failure mode this gate exists to stop.
-    """
     validator = _load_validator()
     _write_bundle(tmp_path, "a.json", benchmark="tpch", scale=1.0, platform="DuckDB")
     for companion in ("a.manifest.json", "a.plans.json", "a.tuning.json", "a.applied.json"):
@@ -198,11 +160,6 @@ def test_companion_files_are_not_counted_as_bundles(tmp_path: Path) -> None:
 
 
 def test_an_unreadable_bundle_fails_closed(tmp_path: Path) -> None:
-    """The validator's other invariant: a bundle that cannot be read is fatal.
-
-    Skipping it would let a truncated or unreviewed bundle pass while the gate
-    stayed green.
-    """
     validator = _load_validator()
     (tmp_path / "broken.json").write_text("{not json", encoding="utf-8")
 
@@ -217,11 +174,6 @@ def test_an_unreadable_bundle_fails_closed(tmp_path: Path) -> None:
 def test_the_entry_point_returns_the_right_exit_code(
     tmp_path: Path, platforms: tuple[str, ...], expected_exit: int
 ) -> None:
-    """End-to-end through `main`, so a change that swallows the failure is caught.
-
-    The assertions above use the helpers directly; this one pins the exit code
-    the contributor and any future CI caller actually observe.
-    """
     validator = _load_validator()
     for platform in platforms:
         _write_bundle(tmp_path, f"{platform}.json", benchmark="tpcds", scale=10.0, platform=platform)
@@ -230,7 +182,6 @@ def test_the_entry_point_returns_the_right_exit_code(
 
 
 def test_recency_report_uses_bundle_timestamps(tmp_path: Path) -> None:
-    """Per-cohort and overall ages come from run.timestamp, not file mtime."""
     validator = _load_validator()
     as_of = dt.date(2026, 9, 4)
     _write_bundle(
@@ -283,7 +234,6 @@ def test_recency_report_uses_bundle_timestamps(tmp_path: Path) -> None:
     ],
 )
 def test_run_timestamp_contract_uses_utc_calendar_days(timestamp: str, expected: dt.date) -> None:
-    """Offsets become UTC dates; legacy naive timestamps are explicitly UTC."""
     validator = _load_validator()
     assert validator.parse_run_date({"run": {"timestamp": timestamp}}) == expected
 
@@ -312,7 +262,6 @@ def test_recency_defaults_to_the_utc_current_day(monkeypatch: pytest.MonkeyPatch
 
 
 def test_age_does_not_fail_a_deep_enough_cohort(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Stale timestamps remain visible in the report without flipping exit status."""
     validator = _load_validator()
     as_of = dt.date(2026, 9, 4)
     for platform in ("DuckDB", "DataFusion", "Spark"):
@@ -334,7 +283,6 @@ def test_age_does_not_fail_a_deep_enough_cohort(tmp_path: Path, capsys: pytest.C
 
 
 def test_missing_run_timestamp_is_omitted_from_recency(tmp_path: Path) -> None:
-    """A timestamp-less bundle is warned and omitted; parseable peers remain."""
     validator = _load_validator()
     as_of = dt.date(2026, 9, 4)
     _write_bundle(
@@ -365,7 +313,6 @@ def test_missing_run_timestamp_is_omitted_from_recency(tmp_path: Path) -> None:
 def test_recency_names_missing_parseable_timestamps_when_bundles_exist(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A populated corpus with bad dates is distinct from an empty corpus."""
     validator = _load_validator()
     for platform in ("DuckDB", "DataFusion", "Spark"):
         _write_bundle(
@@ -384,7 +331,6 @@ def test_recency_names_missing_parseable_timestamps_when_bundles_exist(
 
 
 def test_timestamp_less_bundle_does_not_fail_depth_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """main() on a deep-enough cohort with a timestamp-less bundle exits 0."""
     validator = _load_validator()
     as_of = dt.date(2026, 9, 4)
     for platform in ("DuckDB", "DataFusion", "Spark"):

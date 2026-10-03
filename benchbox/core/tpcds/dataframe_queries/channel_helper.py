@@ -24,9 +24,8 @@ import yaml
 if TYPE_CHECKING:
     pass
 
-# =============================================================================
+
 # Column Mappings
-# =============================================================================
 
 
 # Channel mapping data is loaded from package data to keep this module focused on behavior.
@@ -45,9 +44,7 @@ SALES_TABLE_NAMES = _CHANNEL_MAPPINGS["sales_tables"]
 RETURNS_TABLE_NAMES = _CHANNEL_MAPPINGS["returns_tables"]
 
 
-# =============================================================================
 # Union Helper Functions
-# =============================================================================
 
 
 def union_sales_channels_expression(
@@ -260,9 +257,7 @@ def union_returns_channels_pandas(
     return ctx.concat(channel_dfs)
 
 
-# =============================================================================
 # Convenience Functions
-# =============================================================================
 
 
 def get_sales_column(channel: str, standard_name: str) -> str:

@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Run SQLGlot upstream repros when the locked sqlglot version changes.
-
-Workaround retirement needs a trigger: a repro that flips from FAIL to PASS
-on a new sqlglot version means the upstream defect may be fixed and the
-BenchBox workaround it pins may be removable. Without a trigger, upgrades
-land silently and workarounds live forever.
-
-Behavior:
-
-* Resolve the locked sqlglot version from the working-tree ``uv.lock`` and at the
-  merge-base with ``origin/develop`` (or a ``--base-ref`` override).
-* When the versions match, exit 0: no upgrade, nothing to re-run.
-* When they differ, run ``repro_all.py`` on the NEW lockfile version and
-  report per-repro PASS/FAIL. A repro that now PASSes is a retirement
-  candidate: print the linked workaround from the README tier table and fail
-  with guidance to audit and retire it. A repro that still FAILs is
-  informational only.
-* ``--check`` is the CI gate mode (same behavior; explicit for symmetry with
-  sibling lint scripts). Default mode also runs the comparison.
-
-Exit status: 0 no upgrade or no retirement candidates; 1 the upgrade contains
-a newly-passing repro that needs a retirement audit, or the repro harness
-crashed or reported no summary so retirement cannot be assessed; 2 the locked
-version or merge-base could not be resolved.
-
-Usage:
-    uv run -- python scripts/check_sqlglot_repro_retirement.py [--base-ref REF] [--check]
-"""
 
 from __future__ import annotations
 
@@ -74,7 +46,6 @@ _LOCK_VERSION_RE = re.compile(r'name = "sqlglot"\nversion = "([^"]+)"')
 
 
 def locked_sqlglot_version(ref: str | None = None) -> str | None:
-    """Return the locked sqlglot version at ``ref`` (None = working tree)."""
     if ref is None:
         try:
             text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
@@ -117,11 +88,6 @@ def run_repros() -> tuple[int, str]:
 
 
 def newly_passing(output: str) -> list[str] | None:
-    """Extract repro labels that PASS in the summary section.
-
-    Returns None when no summary section exists (harness crashed before
-    reporting), so callers cannot mistake a crash for an all-FAIL run.
-    """
     passing: list[str] = []
     in_summary = False
     for line in output.splitlines():

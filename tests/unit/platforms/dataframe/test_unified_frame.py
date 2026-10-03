@@ -1,13 +1,4 @@
-"""Unit tests for UnifiedExpr and UnifiedLazyFrame.
-
-Tests for:
-- String concatenation handling (PySpark vs Polars)
-- Bitwise AND operations for integers
-- Expression-based joins
-- New methods (round, abs, cum_max, cum_min)
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,32 +15,26 @@ pytestmark = [
 
 
 def _get_unified_expr():
-    """Import and return UnifiedExpr class."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
 
     return UnifiedExpr
 
 
 def _get_unified_lazy_frame():
-    """Import and return UnifiedLazyFrame class."""
     from benchbox.platforms.dataframe.unified_frame import UnifiedLazyFrame
 
     return UnifiedLazyFrame
 
 
 def _create_mock_adapter():
-    """Create a mock adapter for testing UnifiedLazyFrame."""
     mock_adapter = MagicMock()
     mock_adapter.platform_name = "Polars"
     return mock_adapter
 
 
 class TestUnifiedExprStringConcat:
-    """Tests for string concatenation handling in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -67,14 +52,11 @@ class TestUnifiedExprStringConcat:
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # Create a string literal expression
         prefix = unified_expr_cls(pl.lit("Hello, "), _is_string_literal=True)
         name_col = unified_expr_cls(pl.col("name"))
 
-        # Concatenate using +
         result_expr = prefix + name_col
 
-        # Apply to dataframe and collect
         result = df.with_columns(result_expr.alias("greeting")).collect()
         assert result["greeting"].to_list() == ["Hello, Alice", "Hello, Bob"]
 
@@ -86,26 +68,20 @@ class TestUnifiedExprStringConcat:
 
         name_col = unified_expr_cls(pl.col("name"))
 
-        # Use concat_str method
         result_expr = name_col.concat_str(" - ", pl.lit("suffix"))
 
-        # Apply to dataframe and collect
         result = df.with_columns(result_expr.alias("combined")).collect()
         assert result["combined"].to_list() == ["Alice - suffix", "Bob - suffix"]
 
 
 class TestUnifiedExprBitwiseAnd:
-    """Tests for bitwise AND operations in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
         mock_adapter = _create_mock_adapter()
 
-        # Create a DataFrame with grouping_id-like values
         df = polars.DataFrame({"grouping_id": [0, 1, 2, 3, 7]}).lazy()
         return {
             "polars": polars,
@@ -118,12 +94,10 @@ class TestUnifiedExprBitwiseAnd:
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # grouping_id & 1 - check if bit 0 is set
         gid_col = unified_expr_cls(pl.col("grouping_id"))
         bit0_expr = gid_col & 1
 
         result = df.with_columns(bit0_expr.alias("bit0")).collect()
-        # 0 & 1 = 0, 1 & 1 = 1, 2 & 1 = 0, 3 & 1 = 1, 7 & 1 = 1
         assert result["bit0"].to_list() == [0, 1, 0, 1, 1]
 
     def test_polars_bitwise_and_with_mask(self, polars_context):
@@ -132,21 +106,16 @@ class TestUnifiedExprBitwiseAnd:
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # grouping_id & 2 - check if bit 1 is set
         gid_col = unified_expr_cls(pl.col("grouping_id"))
         bit1_expr = gid_col & 2
 
         result = df.with_columns(bit1_expr.alias("bit1")).collect()
-        # 0 & 2 = 0, 1 & 2 = 0, 2 & 2 = 2, 3 & 2 = 2, 7 & 2 = 2
         assert result["bit1"].to_list() == [0, 0, 2, 2, 2]
 
 
 class TestUnifiedExprMathMethods:
-    """Tests for math methods in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -187,11 +156,8 @@ class TestUnifiedExprMathMethods:
 
 
 class TestUnifiedLazyFrameJoins:
-    """Tests for join operations in UnifiedLazyFrame."""
-
     @pytest.fixture
     def polars_dfs(self):
-        """Create Polars DataFrames for join testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -225,7 +191,6 @@ class TestUnifiedLazyFrameJoins:
 
         result = left.join(right, on="id", how="inner").collect()
 
-        # Should have rows where id matches (2, 3)
         assert len(result) == 2
         assert set(result["id"].to_list()) == {2, 3}
 
@@ -237,11 +202,10 @@ class TestUnifiedLazyFrameJoins:
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
 
-        # Create right df with overlapping column name
         right = pl.DataFrame(
             {
                 "id": [2, 3],
-                "name": ["Bob2", "Carol2"],  # Duplicate column name
+                "name": ["Bob2", "Carol2"],
             }
         ).lazy()
 
@@ -249,7 +213,6 @@ class TestUnifiedLazyFrameJoins:
 
         result = left.join(right_ulf, on="id", how="left", suffix="_r").collect()
 
-        # Should have name from left and name_r from right
         assert "name" in result.columns
         assert "name_r" in result.columns
 
@@ -265,16 +228,12 @@ class TestUnifiedLazyFrameJoins:
 
         result = left.join(right, how="cross").collect()
 
-        # 2 * 3 = 6 rows
         assert len(result) == 6
 
 
 class TestUnifiedLazyFrameWithColumns:
-    """Tests for with_columns in UnifiedLazyFrame."""
-
     @pytest.fixture
     def polars_df(self):
-        """Create a Polars DataFrame for testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -292,7 +251,6 @@ class TestUnifiedLazyFrameWithColumns:
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # Add a new column
         z_expr = unified_expr_cls((pl.col("x") + pl.col("y")).alias("z"))
         result = df.with_columns(z_expr).collect()
 
@@ -305,21 +263,16 @@ class TestUnifiedLazyFrameWithColumns:
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # Replace x with x * 2
         x_doubled = unified_expr_cls((pl.col("x") * 2).alias("x"))
         result = df.with_columns(x_doubled).collect()
 
         assert result["x"].to_list() == [2, 4, 6]
-        # Only 2 columns (x, y), not 3
         assert len(result.columns) == 2
 
 
 class TestUnifiedStrExpr:
-    """Tests for UnifiedStrExpr string methods."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing string operations."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -368,7 +321,6 @@ class TestUnifiedStrExpr:
         assert result["has_o"].to_list() == [True, True, False, False]
 
     def test_contains_accepts_unified_literal(self, polars_context):
-        """String methods unwrap UnifiedExpr literals before delegating."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -381,7 +333,6 @@ class TestUnifiedStrExpr:
         assert result["has_world"].to_list() == [True, False, False, False]
 
     def test_string_literal_unwrap_returns_scalar_value(self):
-        """String namespace methods need the original scalar, not a backend literal expression."""
         from benchbox.platforms.dataframe.unified_frame import _unwrap_unified_expr
 
         unified_expr_cls = _get_unified_expr()
@@ -405,16 +356,10 @@ class TestUnifiedStrExpr:
         result = df.with_columns(result_expr.alias("sliced")).collect()
         assert result["sliced"].to_list() == ["Hello", "hello", "WORLD", "  spa"]
 
-    # NOTE: to_uppercase and to_lowercase tests skipped due to implementation bug
-    # in unified_frame.py where Polars str methods don't properly delegate to .str namespace
-
 
 class TestUnifiedDtExpr:
-    """Tests for UnifiedDtExpr datetime methods."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing datetime operations."""
         polars = pytest.importorskip("polars")
         from datetime import date
 
@@ -473,11 +418,8 @@ class TestUnifiedDtExpr:
 
 
 class TestUnifiedExprArithmetic:
-    """Tests for arithmetic operations in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing arithmetic."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -523,7 +465,6 @@ class TestUnifiedExprArithmetic:
         assert result["quot"].to_list() == [5.0, 5.0, 6.0]
 
     def test_reverse_subtraction(self, polars_context):
-        """Test reverse subtraction (scalar - expr)."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -533,7 +474,6 @@ class TestUnifiedExprArithmetic:
         assert result["rsub"].to_list() == [90, 80, 70]
 
     def test_reverse_multiplication(self, polars_context):
-        """Test reverse multiplication (scalar * expr)."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -544,11 +484,8 @@ class TestUnifiedExprArithmetic:
 
 
 class TestUnifiedExprComparison:
-    """Tests for comparison operations in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing comparisons."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -622,11 +559,8 @@ class TestUnifiedExprComparison:
 
 
 class TestUnifiedExprAggregations:
-    """Tests for aggregation methods in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing aggregations."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -659,7 +593,6 @@ class TestUnifiedExprAggregations:
         assert result["avg"].to_list() == [15.0, 35.0]
 
     def test_avg_alias(self, polars_context):
-        """Test avg (alias for mean) aggregation."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -706,7 +639,6 @@ class TestUnifiedExprAggregations:
 
         value = unified_expr_cls(pl.col("value"))
         result = df.group_by("group").agg(value.first().alias("first")).sort("group").collect()
-        # First values in each group
         assert result["first"].to_list() == [10, 30]
 
     def test_last(self, polars_context):
@@ -717,16 +649,12 @@ class TestUnifiedExprAggregations:
 
         value = unified_expr_cls(pl.col("value"))
         result = df.group_by("group").agg(value.last().alias("last")).sort("group").collect()
-        # Last values in each group
         assert result["last"].to_list() == [20, 40]
 
 
 class TestUnifiedExprNullHandling:
-    """Tests for null handling methods in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing null handling."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -770,11 +698,8 @@ class TestUnifiedExprNullHandling:
 
 
 class TestUnifiedExprMembership:
-    """Tests for membership testing methods in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing membership."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -813,11 +738,8 @@ class TestUnifiedExprMembership:
 
 
 class TestUnifiedExprCasting:
-    """Tests for casting methods in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing casting."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -830,7 +752,6 @@ class TestUnifiedExprCasting:
         }
 
     def test_cast_float64(self, polars_context):
-        """Test cast_float64 method."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -840,7 +761,6 @@ class TestUnifiedExprCasting:
         assert result["as_float"].to_list() == [1.0, 2.0, 3.0]
 
     def test_cast_int32(self, polars_context):
-        """Test cast_int32 method."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -850,7 +770,6 @@ class TestUnifiedExprCasting:
         assert result["as_int"].to_list() == [1, 2, 3]
 
     def test_cast_int64(self, polars_context):
-        """Test cast_int64 method."""
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -871,11 +790,8 @@ class TestUnifiedExprCasting:
 
 
 class TestUnifiedLazyFrameOperations:
-    """Tests for UnifiedLazyFrame DataFrame operations."""
-
     @pytest.fixture
     def polars_df(self):
-        """Create a Polars DataFrame for testing."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -932,7 +848,6 @@ class TestUnifiedLazyFrameOperations:
         assert result["id"].to_list() == [1, 2, 3]
 
     def test_head(self, polars_df):
-        """Test head method (alias for limit)."""
         df = polars_df["df"]
 
         result = df.head(2).collect()
@@ -957,8 +872,6 @@ class TestUnifiedLazyFrameOperations:
         native = df.native
         assert isinstance(native, polars.LazyFrame)
 
-    # NOTE: drop_nulls test skipped - method not yet implemented in UnifiedLazyFrame
-
     def test_rename(self, polars_df):
 
         df = polars_df["df"]
@@ -974,15 +887,12 @@ class TestUnifiedLazyFrameOperations:
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
 
-        # Pass a list to agg (should be handled)
         value_col = unified_expr_cls(pl.col("value"))
         result = df.group_by("category").agg([value_col.sum().alias("total")]).sort("category").collect()
         assert result["total"].to_list() == [90, 60]
 
 
 class TestUnifiedExprRepr:
-    """Tests for UnifiedExpr representation."""
-
     def test_repr(self):
 
         polars = pytest.importorskip("polars")
@@ -994,11 +904,8 @@ class TestUnifiedExprRepr:
 
 
 class TestUnifiedExprLogical:
-    """Tests for logical operations in UnifiedExpr."""
-
     @pytest.fixture
     def polars_context(self):
-        """Create a Polars-based context for testing logical ops."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -1033,8 +940,6 @@ class TestUnifiedExprLogical:
 
 
 class TestUnifiedExprNUnique:
-    """Tests for n_unique method in UnifiedExpr."""
-
     def test_n_unique(self):
 
         polars = pytest.importorskip("polars")
@@ -1048,16 +953,12 @@ class TestUnifiedExprNUnique:
 
         val_col = unified_expr_cls(polars.col("val"))
         result = ulf.group_by("group").agg(val_col.n_unique().alias("distinct")).sort("group").collect()
-        # A has 1 unique, B has 1 unique
         assert result["distinct"].to_list() == [1, 1]
 
 
 class TestFrameAggFacade:
-    """Tests for the frame-level UnifiedLazyFrame.agg global-aggregation facade."""
-
     @pytest.fixture
     def frame(self):
-        """Three-row frame wrapped with a mock adapter."""
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -1072,13 +973,11 @@ class TestFrameAggFacade:
         }
 
     def test_global_sum(self, frame):
-        """agg with a single aggregate yields one row."""
         pl = frame["polars"]
         result = frame["df"].agg(frame["expr"](pl.col("x").sum().alias("s"))).collect()
         assert result.to_dicts() == [{"s": 6.0}]
 
     def test_plain_aggregates_with_select_arithmetic(self, frame):
-        """agg takes plain column aggregates; arithmetic goes in a later select."""
         pl = frame["polars"]
         expr_cls = frame["expr"]
         result = (
@@ -1090,14 +989,12 @@ class TestFrameAggFacade:
         assert result.to_dicts() == [{"r": 10.0}]
 
     def test_list_form(self, frame):
-        """agg accepts a single list of expressions like group_by().agg() does."""
         pl = frame["polars"]
         expr_cls = frame["expr"]
         result = frame["df"].agg([expr_cls(pl.col("x").max().alias("m"))]).collect()
         assert result.to_dicts() == [{"m": 3.0}]
 
     def test_empty_frame_yields_single_row(self, frame):
-        """agg over an empty frame still yields one row (SQL global-agg shape)."""
         pl = frame["polars"]
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -1108,13 +1005,6 @@ class TestFrameAggFacade:
 
 
 class TestFrameAggFacadeDataFusion:
-    """The supported agg idioms through the real DataFusion adapter.
-
-    Arithmetic inside an aggregate is not portable (it mis-rewrites on
-    DataFusion), so queries precompute row-level values or post-process plain
-    aggregates. These tests pin exactly those idioms on DataFusion.
-    """
-
     @pytest.fixture
     def dframe(self):
         pytest.importorskip("datafusion")
@@ -1137,7 +1027,6 @@ class TestFrameAggFacadeDataFusion:
         assert as_dict["t"] == pytest.approx([0.8])
 
     def test_precomputed_product_sums_correctly(self, dframe):
-        """The Q19 idiom: with_columns product, then a plain sum."""
         col, lit = dframe.col, dframe.lit
         result = (
             dframe.get_table("t")
@@ -1148,7 +1037,6 @@ class TestFrameAggFacadeDataFusion:
         assert result.to_pydict()["revenue"] == pytest.approx([75.0])
 
     def test_ratio_over_plain_sums(self, dframe):
-        """The Q14 idiom: plain sums, ratio as column arithmetic in select."""
         col, lit = dframe.col, dframe.lit
         result = (
             dframe.get_table("t")
@@ -1159,7 +1047,6 @@ class TestFrameAggFacadeDataFusion:
         assert result.to_pydict()["r"] == pytest.approx([10000.0 / 0.8])
 
     def test_grouped_precomputed_sums(self, dframe):
-        """The Q1/Q3/Q5/Q7/Q10 idiom: precompute, then plain grouped sums."""
         col, lit = dframe.col, dframe.lit
         result = (
             dframe.get_table("t")
@@ -1174,7 +1061,6 @@ class TestFrameAggFacadeDataFusion:
         assert as_dict["revenue"] == pytest.approx([10 * 0.9 + 20 * 0.8, 30 * 1.0 + 40 * 0.5])
 
     def test_empty_set_selects_null_row(self, dframe):
-        """The Q17 idiom: zero-row counts select a single NULL row."""
         col, lit = dframe.col, dframe.lit
         result = (
             dframe.get_table("t")
@@ -1191,8 +1077,6 @@ class TestFrameAggFacadeDataFusion:
 
 @pytest.mark.slow
 class TestFrameAggIdiomsPySpark:
-    """The Q17 NULL-selection idiom through the real PySpark adapter."""
-
     @pytest.fixture(scope="class")
     def sframe(self, pyspark_test_environment):
         require_pyspark()

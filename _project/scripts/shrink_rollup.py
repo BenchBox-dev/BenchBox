@@ -1,5 +1,3 @@
-"""Roll up merged shrink-campaign ledger fragments from a Git ref."""
-
 from __future__ import annotations
 
 import argparse

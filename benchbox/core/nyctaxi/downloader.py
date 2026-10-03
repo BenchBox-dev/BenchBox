@@ -1,14 +1,6 @@
-"""NYC Taxi data downloader.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Downloads NYC TLC trip data with resumable downloads and validation.
-Supports scale factor sampling for reproducible benchmarks.
-
-Data source: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -54,8 +46,6 @@ PINNED_SOURCE_YEAR = int(_PINNED_SOURCE.get("year", 2019))
 PINNED_SOURCE_MONTHS = [int(month) for month in _PINNED_SOURCE.get("months", list(range(1, 13)))]
 PINNED_SOURCE_SHA256 = {str(url): str(digest) for url, digest in (_PINNED_SOURCE.get("sha256") or {}).items()}
 
-# Complete NYC TLC Taxi Zone data (all 265 zones)
-# Source: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
 TAXI_ZONES_DATA = [tuple(row) for row in _DOWNLOADER_SPECS["taxi_zones"]]
 
 
@@ -80,8 +70,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "nyctaxi_data"
-        # An omitted year resolves to the pinned source contract year, never to
-        # "latest available": the default window must not slide with new TLC data.
         self.year = PINNED_SOURCE_YEAR if year is None else year
         self.months = months or self._default_months(self.year)
         self.seed = seed
@@ -101,23 +89,13 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
                 SCALE_FACTOR_SAMPLE_DIVISOR,
             )
         self._table_row_counts: dict[str, int] = {}
-        # Per-month synthetic-fallback provenance (review: a run whose rows
-        # are all synthetic must not be presented as TLC-backed).
         self._synthetic_fallback_months: list[str] = []
-        # Observed SHA-256 of each successfully downloaded remote parquet, so
-        # the persisted contract pins which bytes were ingested.
         self._content_hashes: dict[str, str] = {}
 
     def _default_months(self, year: int) -> list[int]:
         return list(PINNED_SOURCE_MONTHS)
 
     def source_contract(self) -> dict[str, Any]:
-        """Pinned reproducible source contract for the configured window.
-
-        Returns the exact remote file set this downloader will read, so runs
-        record which source snapshot they came from and reviewers can see a
-        source change as a contract change.
-        """
         urls = [f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet" for month in self.months]
         return {
             "source": "nyc-tlc",
@@ -130,12 +108,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         }
 
     def source_contract_id(self) -> str:
-        """Stable identifier for :meth:`source_contract`.
-
-        Persisted alongside generated data so a later pin change (year,
-        months, URLs) rejects the stale cache instead of silently reusing
-        the previous corpus.
-        """
         canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -151,7 +123,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         return contract_id if isinstance(contract_id, str) else None
 
     def _restore_persisted_provenance(self, output_path: Path) -> None:
-        """Restore evidence needed to classify a reused verified corpus."""
         try:
             persisted = json.loads(self._contract_sidecar_path(output_path).read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -167,9 +138,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         sidecar = {
             "source_contract": self.source_contract(),
             "source_contract_id": self.source_contract_id(),
-            # Observed SHA-256 of each ingested remote file: pins which bytes
-            # the corpus came from (a provider-side byte change surfaces as a
-            # new manifest on the next fresh generation).
             "content_hashes": dict(self._content_hashes),
             "synthetic_months": list(self._synthetic_fallback_months),
             "source_provenance": self.source_provenance(),
@@ -177,19 +145,16 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         self._contract_sidecar_path(output_path).write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
     def _record_synthetic_fallback(self, url: str) -> None:
-        """Record that *url*'s month fell back to synthetic rows."""
         match = re.search(r"(\d{4})-(\d{2})", url)
         label = f"{match.group(1)}-{match.group(2)}" if match else url
         if label not in self._synthetic_fallback_months:
             self._synthetic_fallback_months.append(label)
 
     def download(self) -> Path:
-        """Download and process one NYC Taxi trip table."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         return self._download_and_process_trips()
 
     def _download_and_process_trips(self) -> Path:
-        """Download and process trip data with sampling."""
         output_path = self.output_dir / self.get_compressed_filename(self._OUTPUT_FILENAME)
 
         if output_path.exists() and not self.force_redownload:
@@ -248,7 +213,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         return output_path
 
     def _process_parquet_file(self, url: str, writer: csv.writer, start_trip_id: int) -> int:
-        """Download and process a single parquet file."""
         try:
             import pyarrow.parquet as pq
         except ImportError:
@@ -309,18 +273,10 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
     @staticmethod
     def _clean_csv_value(value: Any, default: Any) -> Any:
-        """Normalize a parquet-derived value for CSV output.
-
-        Pandas represents missing numerics as NaN and integer columns with
-        gaps as float (``1.0``); both break strict loaders (BigQuery rejects
-        ``nan`` and ``1.0`` for INT64). Missing values fall back to the
-        column default, integral floats become ints, and datetimes render
-        as ``YYYY-MM-DD HH:MM:SS``.
-        """
         if value is None:
             return default
         if isinstance(value, float):
-            if value != value:  # NaN (covers numpy float64 too)
+            if value != value:
                 return default
             if value.is_integer():
                 return int(value)
@@ -346,15 +302,9 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
     @staticmethod
     def _normalize_sr_flag(value: Any) -> str:
-        """Map TLC's numeric shared-ride flag to the stored Y/N convention.
-
-        Real TLC FHV Parquet encodes SR_Flag as 1 (shared) or null; the
-        synthetic generator emits Y/N directly. Both normalize to Y/N so the
-        fhv-shared-ride-rate query counts remote and synthetic data alike.
-        """
         if value is None:
             return "N"
-        if isinstance(value, float) and value != value:  # NaN
+        if isinstance(value, float) and value != value:
             return "N"
         text = str(value).strip().lower()
         return "Y" if text in ("1", "1.0", "y", "yes", "true") else "N"
@@ -432,8 +382,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         writer.writerow([trip_id, *[values.get(column, "0.00") for column in type(self)._COLUMN_PROVIDER()]])
 
     def get_download_stats(self) -> dict:
-        # Provenance follows the actual rows: any synthetic fallback month is
-        # reported instead of presenting the run as TLC-backed.
         synthetic = list(self._synthetic_fallback_months)
         if synthetic and len(synthetic) >= len(self.months):
             source = "synthetic"
@@ -455,7 +403,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         return {"taxi_type": self._STATS_TAXI_TYPE, **stats} if self._STATS_TAXI_TYPE is not None else stats
 
     def source_provenance(self) -> dict[str, Any]:
-        """Return fail-closed provenance and promotion eligibility for this corpus."""
         urls = set(self.source_contract()["urls"])
         expected = {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256}
         observed = {url: self._content_hashes[url] for url in urls if url in self._content_hashes}
@@ -478,12 +425,6 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
 
 class NYCTaxiDataDownloader(_TripDataDownloader):
-    """Downloads and processes NYC TLC trip data.
-
-    Supports resumable downloads and deterministic sampling for
-    reproducible scale factors.
-    """
-
     _TABLE_NAME = "trips"
     _OUTPUT_FILENAME = "trips.csv"
     _URL_PREFIX = "yellow_tripdata"
@@ -519,19 +460,10 @@ class NYCTaxiDataDownloader(_TripDataDownloader):
     _POPULAR_ZONES = (132, 138, 161, 162, 163, 164, 186, 230, 234, 236, 237, 239)
 
     def download(self) -> dict[str, Path]:
-        """Download and process NYC Taxi data.
-
-        Returns:
-            Dictionary mapping table names to file paths
-
-        Raises:
-            RuntimeError: If download fails
-        """
         self.output_dir.mkdir(parents=True, exist_ok=True)
         return {"taxi_zones": self._generate_taxi_zones(), "trips": self._download_and_process_trips()}
 
     def _generate_taxi_zones(self) -> Path:
-        """Generate taxi zones dimension table."""
         output_path = self.output_dir / self.get_compressed_filename("taxi_zones.csv")
 
         if output_path.exists() and not self.force_redownload:
@@ -551,13 +483,6 @@ class NYCTaxiDataDownloader(_TripDataDownloader):
 
 
 class GreenTaxiDataDownloader(_TripDataDownloader):
-    """Downloads and processes NYC TLC Green Taxi (LPEP) trip data.
-
-    Green Taxi operates in outer boroughs and above 96th St in Manhattan.
-    Source: green_tripdata_YYYY-MM.parquet
-    Coverage: 2014-present, ~500K trips/month
-    """
-
     _TABLE_NAME = "green_trips"
     _OUTPUT_FILENAME = "green_trips.csv"
     _URL_PREFIX = "green_tripdata"
@@ -600,15 +525,6 @@ class GreenTaxiDataDownloader(_TripDataDownloader):
 
 
 class HVFHVDataDownloader(_TripDataDownloader):
-    """Downloads and processes NYC TLC High Volume For-Hire Vehicle (HVFHV) trip data.
-
-    HVFHV covers Uber, Lyft, Via, and Juno - the app-based rideshare companies.
-    This is now the highest-volume TLC dataset (~25M trips/month since 2019).
-    Source: fhvhv_tripdata_YYYY-MM.parquet
-    Coverage: February 2019-present
-    """
-
-    # HVFHV data only available from Feb 2019
     HVFHV_START_YEAR, HVFHV_START_MONTH = 2019, 2
     HVFHV_LICENSE_NUMS = {"HV0002": "Juno", "HV0003": "Uber", "HV0004": "Via", "HV0005": "Lyft"}
 
@@ -644,16 +560,9 @@ class HVFHVDataDownloader(_TripDataDownloader):
         return list(range(self.HVFHV_START_MONTH if year == self.HVFHV_START_YEAR else 1, 13))
 
     def _generate_synthetic_month(self, writer: csv.writer, start_trip_id: int) -> int:
-        """Generate synthetic HVFHV trip data (app-based rideshare patterns).
-
-        HVFHV is citywide with high volume (~25M/month real data).
-        At SF=1.0 we generate ~25K synthetic trips/month.
-        """
         num_trips = max(100, int(25000 * self.sample_rate * 100))
 
-        # All NYC zones - HVFHV is truly citywide
         all_zones = list(range(1, 263))
-        # License distribution: Uber dominant, Lyft second
         license_weights = ["HV0003"] * 55 + ["HV0005"] * 30 + ["HV0002"] * 10 + ["HV0004"] * 5
 
         for i in range(num_trips):
@@ -665,22 +574,21 @@ class HVFHVDataDownloader(_TripDataDownloader):
 
             month = int(self.rng.choice(self.months))
             pickup_time = datetime(self.year, month, day, hour, minute)
-            wait_min = int(2 + self.rng.exponential(5))  # wait time
+            wait_min = int(2 + self.rng.exponential(5))
             duration_min = int(8 + self.rng.exponential(18))
 
             request_time = pickup_time - timedelta(minutes=wait_min)
             on_scene_time = pickup_time
             dropoff_time = pickup_time + timedelta(minutes=duration_min)
 
-            distance = max(0.1, self.rng.exponential(4.5))  # HVFHV trips tend longer
+            distance = max(0.1, self.rng.exponential(4.5))
             base_fare = 2.50 + distance * 1.80 + duration_min * 0.30
-            # Surge pricing simulation (15% of trips have surge)
             if self.rng.random() > 0.85:
                 base_fare *= float(1.5 + self.rng.random())
 
             license_num = str(self.rng.choice(license_weights))
             base_num = f"B{int(self.rng.integers(100000, 999999))}"
-            is_shared = self.rng.random() > 0.75  # ~25% shared requests
+            is_shared = self.rng.random() > 0.75
 
             writer.writerow(
                 [
@@ -692,23 +600,23 @@ class HVFHVDataDownloader(_TripDataDownloader):
                     on_scene_time.strftime("%Y-%m-%d %H:%M:%S"),
                     pickup_time.strftime("%Y-%m-%d %H:%M:%S"),
                     dropoff_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    int(self.rng.choice(all_zones)),  # pickup_location_id
-                    int(self.rng.choice(all_zones)),  # dropoff_location_id
+                    int(self.rng.choice(all_zones)),
+                    int(self.rng.choice(all_zones)),
                     f"{distance:.2f}",
                     int(duration_min * 60),
                     f"{base_fare:.2f}",
-                    f"{self.rng.random() * 4:.2f}" if self.rng.random() > 0.9 else "0.00",  # tolls
+                    f"{self.rng.random() * 4:.2f}" if self.rng.random() > 0.9 else "0.00",
                     f"{base_fare * 0.025:.2f}",
                     f"{base_fare * 0.089:.2f}",
-                    "2.75" if self.rng.random() > 0.5 else "0.00",  # congestion_surcharge
+                    "2.75" if self.rng.random() > 0.5 else "0.00",
                     "0.00",
-                    f"{base_fare * 0.20:.2f}" if self.rng.random() > 0.55 else "0.00",  # tips
+                    f"{base_fare * 0.20:.2f}" if self.rng.random() > 0.55 else "0.00",
                     f"{base_fare * 0.60:.2f}",
                     "Y" if is_shared else "N",
-                    "Y" if (is_shared and self.rng.random() > 0.5) else "N",  # shared_match_flag
+                    "Y" if (is_shared and self.rng.random() > 0.5) else "N",
                     "N",
-                    "Y" if self.rng.random() > 0.95 else "N",  # wav_request_flag
-                    "Y" if self.rng.random() > 0.97 else "N",  # wav_match_flag
+                    "Y" if self.rng.random() > 0.95 else "N",
+                    "Y" if self.rng.random() > 0.97 else "N",
                 ]
             )
 
@@ -716,14 +624,6 @@ class HVFHVDataDownloader(_TripDataDownloader):
 
 
 class FHVDataDownloader(_TripDataDownloader):
-    """Downloads and processes NYC TLC For-Hire Vehicle (FHV) trip data.
-
-    FHV covers non-high-volume for-hire bases (black cars, liveries, limos).
-    The simplest TLC schema (~1M trips/month) and no fare columns.
-    Source: fhv_tripdata_YYYY-MM.parquet
-    Coverage: 2015-present
-    """
-
     _TABLE_NAME = "fhv_trips"
     _OUTPUT_FILENAME = "fhv_trips.csv"
     _URL_PREFIX = "fhv_tripdata"
@@ -757,12 +657,6 @@ class FHVDataDownloader(_TripDataDownloader):
     _SYNTHETIC_DISTANCE_SCALE = 4.0
 
     def _generate_synthetic_month(self, writer: csv.writer, start_trip_id: int) -> int:
-        """Generate synthetic FHV trip data (dispatched-car patterns).
-
-        FHV trips are pre-arranged dispatches: longer waits and durations
-        than street hails, no metered fare columns. Shared rides are rare
-        (pre-2020 SR flag).
-        """
         num_trips = max(self._SYNTHETIC_MIN_TRIPS, int(self._SYNTHETIC_MONTHLY_TRIPS * self.sample_rate * 100))
         all_zones = list(range(1, 263))
         for i in range(num_trips):

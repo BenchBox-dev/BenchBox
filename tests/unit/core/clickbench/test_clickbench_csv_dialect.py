@@ -1,7 +1,4 @@
-"""Unit tests for ClickBench CSV dialect declarations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 

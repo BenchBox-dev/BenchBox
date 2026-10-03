@@ -1,18 +1,4 @@
-"""Execution tests for ClickBench DataFrame query implementations.
-
-Runs every registered ClickBench query (Q1-Q43) on both backends against a
-small deterministic ``hits`` fixture and asserts the backends agree. The
-fixture holds ten rows so no query's LIMIT truncates tied groups: with no
-truncation both backends return the same groups and an order-insensitive
-comparison is exact (the production tie-aware comparator in the
-cross-surface gate covers the truncated case on real data).
-
-Queries in EXPECTED_EMPTY are vacuous by construction at fixture scale
-(HAVING > 100000 thresholds, OFFSETs beyond the row count) and assert empty
-on both backends; every other query must return at least one row.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -45,14 +31,10 @@ pytestmark = [
 ALL_QUERY_IDS = [q.query_id for q in list_clickbench_queries()] if DEPS_AVAILABLE else []
 assert not DEPS_AVAILABLE or len(ALL_QUERY_IDS) == 43
 
-# Vacuous by construction at the ten-row fixture scale: HAVING thresholds and
-# OFFSETs that no fixture row can satisfy. Everything else must be nonempty.
 EXPECTED_EMPTY = frozenset({"Q28", "Q29", "Q39", "Q40", "Q41", "Q42", "Q43"})
 
 
 class _PandasContext:
-    """Minimal pandas-family context used by ClickBench pandas implementations."""
-
     def __init__(self, tables: dict[str, Any]) -> None:
         self._tables = tables
 
@@ -61,13 +43,6 @@ class _PandasContext:
 
 
 def _make_hits() -> Any:
-    """Ten deterministic rows covering every filter/derive column the queries use.
-
-    Row 0 uses a Google title whose URL lacks ".google." so google_title is
-    nonempty; row 9 carries the exact user_lookup UserID. The row count is
-    pinned at ten by test_fixture_row_count_is_pinned: adding rows can push
-    LIMIT queries into truncation, where backend tie-breaking differs.
-    """
     base = datetime(2013, 7, 5, 12, 0, 0)
     rows = range(10)
     urls = [f"http://www.google.com/search?q={i}" if i % 2 == 0 else f"http://example.com/p{i}" for i in rows]
@@ -106,7 +81,6 @@ def _make_hits() -> Any:
 
 
 def _to_pandas_result(result: Any) -> Any:
-    """Normalize an expression/pandas query result to pandas."""
     if hasattr(result, "collect"):
         result = result.collect()
     if isinstance(result, pl.DataFrame):
@@ -117,7 +91,6 @@ def _to_pandas_result(result: Any) -> Any:
 
 
 def _normalized(frame: Any) -> Any:
-    """Order-insensitive frame: datetime-likes as strings, rows fully sorted."""
     frame = frame.copy()
     for column in frame.columns:
         values = frame[column]
@@ -129,8 +102,6 @@ def _normalized(frame: Any) -> Any:
 
 
 class TestClickBenchQueryExecution:
-    """Every ClickBench query executes on both backends with identical results."""
-
     @pytest.fixture(scope="class")
     @classmethod
     def hits(cls):

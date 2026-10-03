@@ -1,9 +1,6 @@
-"""Tests for AWS Glue platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -21,10 +18,7 @@ pytestmark = [
 
 
 class TestAWSGlueAdapterInitialization:
-    """Test AWSGlueAdapter initialization."""
-
     def test_missing_s3_staging_dir_raises_error(self):
-        """Test error when s3_staging_dir is not provided."""
         from benchbox.platforms.aws import AWSGlueAdapter
 
         with pytest.raises(ConfigurationError, match="s3_staging_dir"):
@@ -42,7 +36,6 @@ class TestAWSGlueAdapterInitialization:
             )
 
     def test_invalid_s3_path_raises_error(self):
-        """Test error when s3_staging_dir has invalid format."""
         from benchbox.platforms.aws import AWSGlueAdapter
 
         with pytest.raises(ConfigurationError, match="Invalid S3"):
@@ -96,8 +89,6 @@ class TestAWSGlueAdapterInitialization:
 
 
 class TestAWSGlueAdapterPlatformInfo:
-    """Test platform information methods."""
-
     def test_get_platform_info(self):
 
         with (
@@ -140,8 +131,6 @@ class TestAWSGlueAdapterPlatformInfo:
 
 
 class TestAWSGlueAdapterConnection:
-    """Test connection management."""
-
     def test_create_connection_success(self):
 
         with (
@@ -169,8 +158,6 @@ class TestAWSGlueAdapterConnection:
 
 
 class TestAWSGlueAdapterSchema:
-    """Test schema creation."""
-
     def test_create_schema_new_database(self):
 
         with (
@@ -181,16 +168,13 @@ class TestAWSGlueAdapterSchema:
             mock_session = MagicMock()
             mock_glue_client = MagicMock()
 
-            # Create a mock exception class that matches ClientError behavior
             class MockClientError(Exception):
                 def __init__(self, error_response, operation_name):
                     self.response = error_response
                     self.operation_name = operation_name
                     super().__init__(f"{operation_name}: {error_response}")
 
-            # Patch ClientError with the mock class
             with patch("benchbox.platforms.aws.glue_adapter.ClientError", MockClientError):
-                # Simulate database not found
                 error_response = {"Error": {"Code": "EntityNotFoundException"}}
                 mock_glue_client.get_database.side_effect = MockClientError(error_response, "GetDatabase")
                 mock_session.client.return_value = mock_glue_client
@@ -232,13 +216,10 @@ class TestAWSGlueAdapterSchema:
 
             adapter.create_schema(None, None)
 
-            # Should not try to create database
             mock_glue_client.create_database.assert_not_called()
 
 
 class TestAWSGlueAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self):
 
         with (
@@ -304,8 +285,6 @@ class TestAWSGlueAdapterDataLoading:
 
 
 class TestAWSGlueAdapterJobStatus:
-    """Test Glue job status constants."""
-
     def test_job_status_values(self):
 
         from benchbox.platforms.aws.glue_adapter import GlueJobStatus
@@ -319,13 +298,10 @@ class TestAWSGlueAdapterJobStatus:
 
 
 class TestAWSGlueAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
 
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Check that glue is in the platform metadata
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "glue" in all_metadata
 
@@ -333,7 +309,6 @@ class TestAWSGlueAdapterRegistry:
 
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Access metadata through the public interface
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "glue" in all_metadata
         glue_meta = all_metadata["glue"]
@@ -345,8 +320,6 @@ class TestAWSGlueAdapterRegistry:
 
 
 class TestAWSGlueAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
 
         with (
@@ -366,7 +339,6 @@ class TestAWSGlueAdapterTuning:
             assert result == []
 
     def test_apply_primary_keys(self):
-        """Test apply_primary_keys returns empty list (not supported)."""
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -384,7 +356,6 @@ class TestAWSGlueAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark doesn't raise."""
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -397,13 +368,10 @@ class TestAWSGlueAdapterTuning:
                 job_role="arn:aws:iam::123456789012:role/GlueRole",
             )
 
-            # Should not raise
             adapter.configure_for_benchmark(None, "tpch")
 
 
 class TestAWSGlueAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
 
         from argparse import ArgumentParser
@@ -413,7 +381,6 @@ class TestAWSGlueAdapterCLI:
         parser = ArgumentParser()
         AWSGlueAdapter.add_cli_arguments(parser)
 
-        # Parse with defaults
         args = parser.parse_args([])
 
         assert args.region == "us-east-1"
@@ -424,8 +391,6 @@ class TestAWSGlueAdapterCLI:
 
 
 class TestAWSGlueAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
 
         with (
@@ -466,14 +431,11 @@ class TestAWSGlueAdapterFromConfig:
 
             adapter = AWSGlueAdapter.from_config(config)
 
-            # Should have generated a database name
             assert adapter.database is not None
             assert "tpch" in adapter.database.lower() or adapter.database == "benchbox"
 
 
 class TestAWSGlueAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_dpu_hours(self):
 
         with (

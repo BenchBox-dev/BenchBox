@@ -55,20 +55,32 @@ under that root.
 JoinOrder Class
 ---------------
 
-.. autoclass:: benchbox.joinorder.JoinOrder
-   :members:
-   :inherited-members:
+.. py:module:: benchbox.joinorder
+.. py:class:: JoinOrder(scale_factor: float = 1.0, output_dir: Optional[Union[str, Path]] = None, **kwargs)
+
+   Canonical IMDb Join Order Benchmark facade. ``scale_factor`` is required to
+   be ``1.0``; other values raise ``ValueError``. Inherited lifecycle behavior
+   is documented in :doc:`../base`.
+
+   .. py:method:: generate_data() -> list[Path]
+
+      Ensure the verified canonical package exists and return manifest-ordered paths.
+   .. py:method:: get_queries(dialect: Optional[str] = None) -> dict[str, str]
+
+      Return the canonical query mapping, optionally translated.
+   .. py:method:: get_query(query_id: Union[int, str], *, params: Optional[dict[str, Any]] = None, dialect: Optional[str] = None) -> str
+
+      Return one JOB query. Parameters are not accepted by the fixed corpus and
+      a non-``None`` ``params`` value raises ``ValueError``.
+   .. py:method:: get_schema(dialect: str = "sqlite") -> str
+
+      Return schema DDL in the requested dialect.
+   .. py:method:: get_create_tables_sql(dialect: str = "standard", tuning_config: Any = None) -> str
+
+      Return JOB schema DDL; ``tuning_config`` is accepted for interface compatibility.
 
 Constructor
 ~~~~~~~~~~~
-
-.. code-block:: python
-
-    JoinOrder(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs,
-    )
 
 Parameters:
 

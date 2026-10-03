@@ -1,13 +1,3 @@
-"""CLI and MCP must report identical statistics for the same measurements.
-
-This is the invariant `one-engine-unify-statistics` exists to establish: not
-that the two surfaces expose the same options, but that they compute the same
-numbers. Both surfaces read different JSON shapes -- the CLI aggregate reads
-``results.queries.details`` with ``status == "SUCCESS"``, MCP analytics reads
-``queries`` rows with ``run_type == "measurement"`` -- so the tests below build
-both shapes from one list of timings and require the outputs to match exactly.
-"""
-
 from __future__ import annotations
 
 import json
@@ -49,7 +39,6 @@ SHARED_TIMINGS: list[float] = [
 
 
 def _cli_shaped_bundle(timings: list[float]) -> dict:
-    """A result bundle in the shape `benchbox aggregate` reads."""
     return {
         "execution": {"platform": "duckdb", "timestamp": "2026-08-04T00:00:00Z", "duration_ms": sum(timings)},
         "benchmark": {"name": "tpch"},
@@ -66,7 +55,6 @@ def _cli_shaped_bundle(timings: list[float]) -> dict:
 
 
 def _mcp_shaped_bundle(timings: list[float]) -> dict:
-    """The same measurements in the shape MCP analytics reads."""
     return {
         "run": {"platform": "duckdb", "benchmark": "tpch", "timestamp": "2026-08-04T00:00:00Z"},
         "benchmark": {"scale_factor": 1.0},
@@ -99,7 +87,6 @@ class TestCrossSurfaceStatisticsEquivalence:
         assert cli_times == mcp_times == SHARED_TIMINGS
 
     def test_both_surfaces_drop_the_same_non_measurements(self):
-        """Filter semantics are surface-specific and must stay that way."""
         from benchbox.cli.commands.aggregate import _successful_query_times_ms
         from benchbox.mcp.tools.analytics import _extract_measurement_timings
 
@@ -143,7 +130,6 @@ class TestCrossSurfaceStatisticsEquivalence:
         assert stats["std_ms"] == round(sample_stdev_ms(SHARED_TIMINGS), 2)
 
     def test_aggregate_csv_column_contract_is_unchanged(self):
-        """Migration must not rename or reorder the published CSV columns."""
         from benchbox.cli.commands.aggregate import _extract_result_row
 
         row = _extract_result_row(_cli_shaped_bundle(SHARED_TIMINGS), Path("run.json"))
@@ -163,7 +149,6 @@ class TestCrossSurfaceStatisticsEquivalence:
         ]
 
     def test_no_surface_keeps_a_private_statistics_implementation(self):
-        """A reintroduced local copy is how the surfaces drifted apart before."""
         import benchbox.cli.commands.aggregate as aggregate_module
         import benchbox.mcp.tools.analytics as analytics_module
 

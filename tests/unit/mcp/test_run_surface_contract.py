@@ -1,5 +1,3 @@
-"""Contract tests for the documented MCP benchmark run surface."""
-
 from __future__ import annotations
 
 import ast
@@ -84,8 +82,6 @@ MCP_TO_CLI_OPTIONS = {
     "capture_plans": "--capture-plans",
     "dry_run": "--dry-run",
     "validate_only": None,
-    # Inverted polarity: MCP link_probe=True is the default-on probe, while
-    # the CLI surface is the opt-out --no-link-probe flag.
     "link_probe": "--no-link-probe",
     "platform_options": "--platform-option",
 }
@@ -113,17 +109,12 @@ def _omitted_cli_surfaces() -> set[str]:
     return omitted
 
 
-# Ratified tier reasons from
-# docs/development/adr/adr-one-engine-scoped-surfaces.md. Every ledgered
-# omission carries exactly one.
 RATIFIED_OMISSION_TIERS = {
     "security-scoped",
     "interaction-scoped",
     "not-yet-demanded",
 }
 
-# The ledger covers every omitted `benchbox run` option plus the grouped
-# sorted-ingestion family, which has no single flag spelling.
 LEDGERED_CLI_SURFACES = _omitted_cli_surfaces()
 
 EXPECTED_OMISSION_TIERS = {
@@ -171,7 +162,6 @@ _FENCE_LINE = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 
 
 def _fence_marker(line: str) -> str | None:
-    """Return a Markdown fence marker, if *line* opens or closes one."""
     match = _FENCE_LINE.fullmatch(line)
     if match is None:
         return None
@@ -183,7 +173,6 @@ def _fence_marker(line: str) -> str | None:
 
 
 def _is_fence_closer(line: str, opening_marker: str) -> bool:
-    """Return whether *line* closes a fence opened with *opening_marker*."""
     match = _FENCE_LINE.fullmatch(line)
     if match is None or match.group("info").strip():
         return False
@@ -192,17 +181,14 @@ def _is_fence_closer(line: str, opening_marker: str) -> bool:
 
 
 def _is_indented_code(line: str) -> bool:
-    """Return whether *line* starts a Markdown indented code block."""
     return line.startswith("    ") or line.startswith("\t")
 
 
 def _looks_like_table_separator(line: str) -> bool:
-    """Identify a separator-row candidate without parsing its delimiters."""
     return "|" in line and re.search(r"-{3,}", line) is not None
 
 
 def _split_markdown_table_row(line: str, line_number: int) -> list[str]:
-    """Split one pipe-delimited Markdown row and require both delimiters."""
     stripped = line.rstrip()
     if not stripped.startswith("|") or not stripped.endswith("|"):
         raise AssertionError(f"Markdown table row {line_number} must have leading and trailing pipes")
@@ -225,7 +211,6 @@ def _split_markdown_table_row(line: str, line_number: int) -> list[str]:
 
 
 def _assert_markdown_table_topology(text: str) -> None:
-    """Require every public-contract Markdown table to have a stable topology."""
     lines = text.splitlines()
     opening_fence: str | None = None
     index = 0
@@ -284,14 +269,9 @@ def _assert_markdown_table_topology(text: str) -> None:
 
 
 def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
-    """Parse the scoped-surface omission ledger table from the MCP reference."""
     section = _section(text, "**Scoped-surface omission ledger**", "### Discovery Tools")
-    # The per-tool ledger was inserted before the run-surface ledger.  Isolate
-    # the run-surface ledger by its dedicated heading so the tool-mapping rows
-    # are not mixed in.
     run_heading = "### Scoped-Surface Omission Ledger"
     if run_heading.lower() in section.lower():
-        # Find the heading case-insensitively inside section.
         lower = section.lower()
         idx = lower.index(run_heading.lower())
         section = section[idx:]
@@ -302,10 +282,6 @@ def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
         columns = [column.strip() for column in line.strip("|").split("|")]
         if len(columns) < 4:
             continue
-        # Skip rows from the per-tool tables where the tier column may be
-        # absent or not one of the ratified tiers (e.g. the tool-mapping table
-        # has category/notes columns).  Only collect rows whose tier is a
-        # ratified value and whose first column looks like a CLI flag.
         tier_candidate = columns[2].strip()
         if tier_candidate not in RATIFIED_OMISSION_TIERS:
             continue
@@ -320,13 +296,7 @@ def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
     return ledger
 
 
-# ---------------------------------------------------------------------------
-# Per-tool CLI↔MCP mapping ledger
-# ---------------------------------------------------------------------------
-
 _EXPECTED_TOOL_CLI_MAP: dict[str, str] = {
-    # tool -> representative CLI counterpart substring that must appear in the
-    # table's CLI column.  ``none`` is the literal sentinel for MCP-only tools.
     "list_available": "benchbox platforms list",
     "get_benchmark_info": "benchbox benchmarks list",
     "system_profile": "benchbox profile",
@@ -357,11 +327,6 @@ _EXPECTED_OMITTED_CLI_FAMILIES: dict[str, str] = {
 
 
 def _tool_mapping_ledger(text: str) -> dict[str, dict[str, str]]:
-    """Parse the ``MCP tool -> CLI mapping`` table.
-
-    Returns a mapping from MCP tool name to its row dict with keys
-    ``category``, ``cli_counterparts``, ``notes``.
-    """
     section = _section(
         text,
         "### Per-Tool CLI",
@@ -384,7 +349,6 @@ def _tool_mapping_ledger(text: str) -> dict[str, dict[str, str]]:
 
 
 def _omitted_cli_families(text: str) -> dict[str, dict[str, str]]:
-    """Parse the ``CLI command families with no MCP tool`` table."""
     section = _section(
         text,
         "**CLI command families with no MCP tool**",
@@ -638,12 +602,9 @@ class TestMCPDocsContract:
         assert "An omission that is absent from this ledger is a defect, not a decision." in normalized
 
     def test_security_scoped_omissions_are_never_promotable(self):
-        """Credential/destination controls must stay permanently omitted."""
         ledger = _omission_ledger(_doc_text())
         security_scoped = {surface for surface, entry in ledger.items() if entry["tier"] == "security-scoped"}
 
-        # These are the controls that can name a destination, carry secrets, or
-        # overwrite server-owned data. Parity never applies to them.
         assert {
             "--output",
             "--platform-option",
@@ -664,15 +625,12 @@ class TestMCPDocsContract:
 
         assert not (STALE_TOOL_NAMES & documented_headings)
 
-    # -- Per-tool ledger  ---------------------------------------------------
-
     def test_per_tool_mapping_ledger_covers_all_local_tools(self):
         text = _doc_text()
         ledger = _tool_mapping_ledger(text)
         live = set(_registered_tools())
 
         assert set(ledger) == EXPECTED_TOOLS == live, f"tool-mapping ledger {sorted(ledger)} vs live {sorted(live)}"
-        # No extra rows, no missing rows, and no stale names.
         assert not (STALE_TOOL_NAMES & set(ledger))
 
     def test_per_tool_mapping_cli_counterparts_match_expectations(self):
@@ -718,8 +676,6 @@ class TestMCPDocsContract:
         families = _omitted_cli_families(_doc_text())
         live_tools = set(_registered_tools())
 
-        # CLI families use ``benchbox <name>`` spelling, not MCP tool names,
-        # so they must not collide with any registered tool name.
         for family in families:
             tool_like = family.replace("benchbox ", "").replace("-", "_")
             assert tool_like not in live_tools, family

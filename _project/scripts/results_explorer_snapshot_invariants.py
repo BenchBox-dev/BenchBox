@@ -1,9 +1,3 @@
-"""Validate Results Explorer DuckDB eligibility invariants.
-
-This script is intentionally independent of the build pipeline so release
-gates can run it against any generated ``results.duckdb`` snapshot.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -73,9 +67,6 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
     },
 }
 
-# These are the same required non-empty scans used by the browser during
-# snapshot initialisation. Keeping the list here makes an empty or partially
-# populated candidate fail before it can replace the last known-good output.
 REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
     ("results", "SELECT COUNT(*) FROM results"),
     ("platform_index_rows", "SELECT COUNT(*) FROM platform_index_rows"),

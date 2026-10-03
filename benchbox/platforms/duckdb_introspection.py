@@ -1,19 +1,6 @@
-"""DuckDB post-load schema introspector.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Confirms the ``CREATE INDEX`` statements the applied-tuning ledger recorded
-against the real catalog via the structured ``duckdb_indexes()`` table
-function (TODO ``tuning-introspection-receipts-20260716`` / design note
-``docs/development/tuning-introspection-receipts.md``).
-
-Bounded (one query, capped, filtered to the tables the ledger touched) and
-non-fatal (any failure returns an :class:`IntrospectedState` with ``error``
-set, never raises). Uses the ``expressions`` catalog column -- the structured
-indexed-column list -- rather than screen-scraping the ``sql`` DDL text.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -32,23 +19,13 @@ from benchbox.core.tuning.introspection import (
 
 logger = logging.getLogger(__name__)
 
-#: Hard cap on catalog rows read, so a pathological schema can never turn
-#: introspection into an unbounded scan.
 _MAX_INDEX_ROWS = 1000
 
 
 class DuckDBTuningIntrospector:
-    """Introspect DuckDB indexes to corroborate the applied ledger."""
-
     platform = "duckdb"
 
     def introspect(self, connection: Any, ledger: AppliedTuningLedger) -> IntrospectedState:
-        """Read ``duckdb_indexes()`` for the tables the ledger touched.
-
-        Returns an :class:`IntrospectedState` of ``index`` facts. Never raises:
-        a failed catalog read degrades to a state carrying ``error`` so
-        corroboration refuses the verification upgrade.
-        """
         tables = ledger_tables(ledger)
         try:
             cursor = connection.execute(
@@ -56,7 +33,7 @@ class DuckDBTuningIntrospector:
                 f"FROM duckdb_indexes() LIMIT {_MAX_INDEX_ROWS}"
             )
             rows = cursor.fetchall()
-        except Exception as exc:  # introspection must never break a run
+        except Exception as exc:
             logger.debug("duckdb index introspection degraded: %s", exc)
             return IntrospectedState(platform=self.platform, error=f"duckdb_indexes read failed: {exc}")
 
@@ -73,7 +50,6 @@ class DuckDBTuningIntrospector:
                 )
             except Exception:  # pragma: no cover - defensive on row shape
                 continue
-            # Bound to the ledger's tables (when known) so evidence stays scoped.
             if tables and normalize_identifier(table_name or "") not in tables:
                 continue
             objects.append(

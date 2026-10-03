@@ -1,15 +1,6 @@
-"""Unit tests for the Delta Lake to Parquet export layer.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests use the ``deltalake`` package directly (no JVM or Spark
-session) to build fixture tables, then verify the export produces
-ClickHouse-ingestible Parquet output: ``.parquet`` files readable by
-PyArrow with preserved schema and row counts, including pinned-version
-exports.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -112,7 +103,6 @@ class TestExportErrors:
             export_delta_to_parquet(delta_table, delta_table / "nested-out")
 
     def test_output_containing_table_raises(self, delta_table: Path):
-        """An output_dir above the table must not trigger recursive cleanup of the table."""
         with pytest.raises(DeltaExportError, match="must not overlap"):
             export_delta_to_parquet(delta_table, delta_table.parent)
         assert (delta_table / "_delta_log").is_dir()
@@ -144,7 +134,6 @@ class TestExportShapes:
         assert pq.read_table(out / "data.parquet").num_rows == 2
 
     def test_reexport_with_different_name_cleans_stale_files(self, delta_table: Path, tmp_path: Path):
-        """Reusing output_dir with another file_name must not duplicate rows."""
         out = tmp_path / "parquet"
         export_delta_to_parquet(delta_table, out, version=0, file_name="v0.parquet")
         repeat = export_delta_to_parquet(delta_table, out, version=0, file_name="v0.parquet")

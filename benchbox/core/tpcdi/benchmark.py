@@ -1,14 +1,9 @@
-"""TPC-DI (Data Integration) benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides TPC-DI benchmark implementation that tests data integration and ETL processes for data warehousing.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import csv
 import json
@@ -61,7 +56,6 @@ from benchbox.sql_compat.rules.execution_filter.lakesail_tpcdi import LAKESAIL_T
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import emit
 
-# Pre-compiled for translate_query_text() - avoids recompilation on every call.
 _JULIANDAY_DIFF_RE = re.compile(
     r"JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)\s*-\s*JULIANDAY\s*\(([^)]+(?:\([^)]*\)[^)]*)*)\)",
     re.IGNORECASE,
@@ -90,60 +84,15 @@ _POSTGRES_BOOLEAN_NUMBER_RE = re.compile(
 
 
 class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
-    """TPC-DI (Data Integration) benchmark implementation.
-
-    Tests data integration and ETL processes in data warehousing scenarios.
-
-    The benchmark consists of:
-    - 7 main tables representing a financial services data warehouse
-    - Complete ETL pipeline with historical and incremental loads
-    - Comprehensive data quality validation framework
-    - Official TPC-DI metrics calculation and reporting
-    - Database-agnostic implementation with SQLGlot translation
-
-    ClickHouse dialect notes:
-    - AQ6 uses SUM(SUM(x)) OVER () nested window aggregate - unsupported in ClickHouse.
-      Replaced with a CROSS JOIN pre-computed total.
-
-    Integrated systems:
-    - TPCDISchemaManager: Database-agnostic schema management
-    - TPCDIValidator: Comprehensive data quality validation
-    - TPCDIETLPipeline: Complete ETL pipeline with SCD processing
-    - TPCDIDataLoader: High-performance data loading
-    - TPCDIMetrics: Official metrics calculation and reporting
-
-    Attributes:
-        scale_factor: Scale factor for the benchmark (1.0 = standard size)
-        output_dir: Directory to output generated data and results
-        query_manager: TPC-DI query manager
-        data_generator: TPC-DI data generator
-        schema_manager: Database-agnostic schema manager
-        validator: Data quality validation system
-        etl_pipeline: ETL pipeline manager
-        data_loader: Data loading system
-        metrics_calculator: Metrics calculation system
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
         output_dir: Optional[Union[str, Path]] = None,
-        enable_parallel: bool = False,  # Parallel processing is opt-in
+        enable_parallel: bool = False,
         max_workers: Optional[int] = None,
         config: Optional[TPCDIConfig] = None,
         **kwargs: Any,
     ):
-        """Initialize TPC-DI benchmark.
-
-        Args:
-            scale_factor: Scale factor for data generation (1.0 = standard size)
-            output_dir: Directory for generated data files
-            enable_parallel: Whether to enable basic parallel processing
-            max_workers: Maximum number of workers for parallel processing
-            config: Optional TPCDIConfig instance for unified configuration
-            **kwargs: Additional configuration options passed to integrated components
-        """
-        # Extract quiet from kwargs to prevent duplicate kwarg error
         kwargs = dict(kwargs)
         quiet = kwargs.pop("quiet", False)
 
@@ -153,12 +102,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self._version = "1.0"
         self._description = "TPC-DI (Data Integration) Benchmark - Tests ETL and data integration performance"
 
-        # TPC-DI generates BOOLEAN columns as literal 'True'/'False' strings.
-        # Adapters with strict numeric-boolean parsing (e.g. SingleStore
-        # STRICT_ALL_TABLES) need to rewrite these to '1'/'0' before load.
         self.csv_normalize_booleans: bool = True
 
-        # Use unified configuration if provided, otherwise create from parameters
         if config is None:
             self.config = TPCDIConfig(
                 scale_factor=scale_factor,
@@ -169,40 +114,32 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         else:
             self.config = config
 
-        # Set up directories from config. Assigning output_dir re-derives the
-        # ETL directories via _sync_output_dir_to_generators.
         self.output_dir = self.config.output_dir
         self.config.create_directories()
         assert self.output_dir is not None
 
-        # Simple parallel processing configuration from config
         self.enable_parallel = self.config.enable_parallel
         self.max_workers = self.config.max_workers
-        # Ensure benchmark scale factor reflects unified configuration
         self.scale_factor = self.config.scale_factor
 
-        # Initialize components
         self.query_manager = TPCDIQueryManager()
         generator_kwargs = dict(kwargs)
         generator_kwargs.setdefault("generation_seed", getattr(self.config, "generation_seed", 42))
         self.data_generator = TPCDIDataGenerator(self.config.scale_factor, self.output_dir, **generator_kwargs)
 
-        # Initialize new integrated systems
         self.schema_manager = TPCDISchemaManager()
-        self.validator = None  # Initialized when connection is available
-        self.etl_pipeline = None  # Initialized when connection is available
-        self.data_loader = None  # Initialized when connection is available
+        self.validator = None
+        self.etl_pipeline = None
+        self.data_loader = None
         self.metrics_calculator = TPCDIMetrics(self.config.scale_factor)
 
-        # Phase 3 Enhanced ETL Components
-        self.finwire_processor = None  # Initialized when connection is available
-        self.customer_mgmt_processor = None  # Initialized when connection is available
-        self.scd_processor = None  # Initialized when connection is available
-        self.incremental_loader = None  # Initialized when connection is available
-        self.data_quality_monitor = None  # Initialized when connection is available
-        self.error_recovery_manager = None  # Initialized when connection is available
+        self.finwire_processor = None
+        self.customer_mgmt_processor = None
+        self.scd_processor = None
+        self.incremental_loader = None
+        self.data_quality_monitor = None
+        self.error_recovery_manager = None
 
-        # ETL components - always initialized
         self.etl_engine = None
         self.source_generators: dict[str, Any] = {}
         self.etl_stats: dict[str, Any] = {}
@@ -210,26 +147,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         self._initialize_etl_components()
 
-        # Data files mapping
         self.tables: dict[str, Any] = {}
 
     def _sync_output_dir_to_generators(self, path: Any) -> None:
-        """Keep the TPC-DI config and ETL directories in sync with output_dir.
-
-        TPC-DI derives its ETL layout (source/staging/warehouse) and its
-        data_generator path from the configured output root, so a
-        post-construction output_dir reassignment (e.g. an explicit CLI
-        ``--output`` resolved by the runner) must re-derive all of them.
-        Path math is owned by TPCDIConfig; this hook only re-reads it.
-        """
         super()._sync_output_dir_to_generators(path)
         config = getattr(self, "config", None)
         if config is None:
-            # BaseBenchmark.__init__ assigns output_dir before the config
-            # exists; the constructor re-assigns from config afterwards.
             return
-        # Store the handler as-is so cloud wrappers (e.g. DatabricksPath) keep
-        # their upload target; config path math works on any PathLike.
         config.output_dir = path
         self.source_dir = config.source_dir
         self.staging_dir = config.staging_dir
@@ -241,28 +165,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         output_format: str = "csv",
         seed: Optional[int] = None,
     ) -> list[Union[str, Path]]:
-        """Generate TPC-DI data.
-
-        Args:
-            tables: Optional list of tables to generate. If None, generates all.
-            output_format: Format for output data (only "csv" supported
-                currently)
-            seed: Optional explicit generation seed for this request,
-                overriding the configured generation_seed. Recorded in output
-                metadata with the generation algorithm version.
-
-        Returns:
-            List of paths to generated data files
-
-        Raises:
-            ValueError: If output_format is not supported
-        """
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
-        # Duck-typed generators (including test doubles) may not carry a
-        # generation_seed attribute; only real generators participate in the
-        # request-scoped override contract below.
         original_generation_seed = getattr(self.data_generator, "generation_seed", None)
         if seed is not None:
             self.data_generator.generation_seed = int(seed)
@@ -270,7 +175,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if tables is None:
             tables = list(TABLES.keys())
 
-        # Validate table names
         invalid_tables = set(tables) - set(TABLES.keys())
         if invalid_tables:
             raise ValueError(f"Invalid table names: {invalid_tables}")
@@ -279,8 +183,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             self.tables = self.data_generator.generate_data(tables)
             return list(self.tables.values())
         finally:
-            # A request override must not change the benchmark instance's
-            # configured seed for a later generation request.
             self.data_generator.generation_seed = original_generation_seed
 
     def get_query(
@@ -289,27 +191,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         params: Optional[dict[str, Any]] = None,
         dialect: Optional[str] = None,
     ) -> str:
-        """Get the SQL text for a specific TPC-DI query.
-
-        Args:
-            query_id: Query identifier (e.g., "V1", "V2", "A1", etc. or numeric 1, 2, 3)
-            params: Optional parameter values to use in the query
-            dialect: Optional SQL dialect for query translation
-
-        Returns:
-            The SQL text of the query with parameters substituted
-
-        Raises:
-            ValueError: If the query_id is not valid
-        """
-        # Convert numeric IDs to standard TPC-DI query format
         if isinstance(query_id, int) or (isinstance(query_id, str) and query_id.isdigit()):
             numeric_id = int(query_id)
-            # Map numeric IDs to validation queries (most common for testing)
             if numeric_id <= 12:
                 query_id = f"VQ{numeric_id}"
             else:
-                # For higher numbers, try analytical queries
                 query_id = f"AQ{numeric_id - 12}"
 
         query_id = str(query_id)
@@ -321,26 +207,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return self._apply_query_source_variant(query_id, translated_query, dialect, params=params)
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Get all available TPC-DI queries (30 total).
-
-        Args:
-            dialect: Target SQL dialect for query translation. If None, returns original queries.
-
-        Returns:
-            A dictionary mapping query identifiers to their SQL text (30 queries total)
-        """
-        # Get all query IDs
         all_query_ids = list(self.query_manager._all_queries.keys())
 
-        # Get each query with parameters substituted FIRST
         queries = {}
         for query_id in all_query_ids:
-            # This calls get_query which substitutes parameters before returning
-            # Pass dialect=None here because we'll translate afterward if needed
             queries[query_id] = self.query_manager.get_query(query_id, params=None, dialect=None)
 
         if dialect:
-            # NOW translate each query to the target dialect (after parameter substitution)
             translated_queries = {}
             for query_id, query_sql in queries.items():
                 translated_queries[query_id] = self.translate_query_text(query_sql, dialect)
@@ -369,7 +242,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         *,
         params: Optional[dict[str, Any]] = None,
     ) -> str:
-        """Apply a registry-selected query-source variant after dialect translation."""
         import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import CompatibilityContext, Phase
@@ -471,7 +343,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return query_sql
 
     def _apply_postgres_query_overrides(self, query_id: str, query_sql: str) -> str:
-        """Apply PostgreSQL-specific TPC-DI query rewrites after SQLGlot rendering."""
         if query_id == "A5":
             return query_sql.replace(
                 "HAVING customer_count > 10",
@@ -493,25 +364,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return query_sql
 
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
-        """Return platform-specific TPC-DI queries excluded by compatibility policy."""
         if platform_name.lower() == "lakesail":
             return list(LAKESAIL_TPCDI_SKIPS)
         return []
 
     def translate_query_text(self, query_text: str, target_dialect: str) -> str:
-        """Translate a query from TPC-DI's source dialect to target dialect.
-
-        Args:
-            query_text: SQL query text to translate
-            target_dialect: Target SQL dialect (e.g., 'duckdb', 'bigquery', 'snowflake')
-
-        Returns:
-            Translated SQL query text
-
-        """
         from benchbox.utils.dialect_utils import translate_sql_query
 
-        # Apply platform-specific pre-processing before SQLGlot translation
         if target_dialect in {"duckdb", "postgres", "postgresql"}:
             query_text = _DATE_INTERVAL_RE.sub(
                 lambda m: f"(CURRENT_DATE - INTERVAL '{m.group(1)} days')",
@@ -524,9 +383,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
 
         elif target_dialect.lower() == "datafusion":
-            # DataFusion has a native BOOLEAN type and does not expose SQLite's
-            # JULIANDAY function. Render the shared TPC-DI SQL in DataFusion's
-            # supported forms before SQLGlot performs the remaining translation.
             query_text = _DATE_INTERVAL_RE.sub(
                 lambda m: f"(CURRENT_DATE - INTERVAL '{m.group(1)} days')",
                 query_text,
@@ -538,10 +394,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
 
         elif target_dialect.lower() == "snowflake":
-            # Snowflake has no JULIANDAY function and rejects DATE('now').
-            # Rewrite DATE idioms here; JULIANDAY is rewritten after
-            # translation below (SQLGlot passes it through untouched, while
-            # the shared diff regex cannot handle nested function args).
             query_text = _DATE_INTERVAL_RE.sub(
                 lambda m: f"DATEADD(day, -{m.group(1)}, CURRENT_DATE())",
                 query_text,
@@ -553,12 +405,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             or "starrocks" in target_dialect.lower()
             or "doris" in target_dialect.lower()
         ):
-            # Flatten double-nested scalar COUNT in EQ3 before SQLGlot (all three dialects):
-            #   (SELECT COUNT(*) FROM (SELECT COUNT(*) AS x FROM tbl WHERE ...))
-            # → (SELECT COUNT(*) FROM tbl WHERE ...)
             query_text = _DOUBLE_COUNT_RE.sub(r"(SELECT COUNT(*) \1)", query_text)
 
-        # TPC-DI queries use modern SQL (netezza/postgres) as source dialect
         query_text = translate_sql_query(
             query=query_text,
             target_dialect=target_dialect,
@@ -566,17 +414,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         )
 
         if "clickhouse" in target_dialect.lower():
-            # dateDiff('day', start, end) returns end − start days.
             query_text = _JULIANDAY_DIFF_RE.sub(
                 lambda m: f"dateDiff('day', {m.group(2).strip()}, {m.group(1).strip()})",
                 query_text,
             )
-            # Must come before DATE('now') replacement
             query_text = _DATE_INTERVAL_RE.sub(lambda m: f"(today() - {m.group(1)})", query_text)
             query_text = _DATE_NOW_RE.sub("today()", query_text)
 
-            # FROM VALUES (N) AS alias → FROM (SELECT N) AS alias
-            # ClickHouse does not support VALUES(...) as a table expression in FROM.
             query_text = re.sub(
                 r"\bFROM\s*\(?\s*VALUES\s*\((\d+)\)\s*\)?\s*(?:AS\s+)?(\w+)",
                 r"FROM (SELECT \1) AS \2",
@@ -585,12 +429,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
 
         elif "starrocks" in target_dialect.lower() or "doris" in target_dialect.lower():
-            # Doris is MySQL-compatible; same date-function rewrites as StarRocks.
             query_text = _JULIANDAY_DIFF_RE.sub(
                 lambda m: f"DATEDIFF({m.group(1).strip()}, {m.group(2).strip()})",
                 query_text,
             )
-            # Must come before DATE('now') replacement
             query_text = _DATE_INTERVAL_RE.sub(
                 lambda m: f"DATE_SUB(CURDATE(), INTERVAL {m.group(1)} DAY)",
                 query_text,
@@ -598,9 +440,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             query_text = _DATE_NOW_RE.sub("CURDATE()", query_text)
 
         elif target_dialect.lower() == "datafusion":
-            # SQLGlot preserves the source JULIANDAY subtraction for DataFusion;
-            # rewrite it after transpilation so SQLGlot cannot reinterpret the
-            # DataFusion date expression as its Netezza AGE expression.
             query_text = _JULIANDAY_DIFF_RE.sub(
                 lambda m: f"({m.group(1).strip()} - {m.group(2).strip()})",
                 query_text,
@@ -613,9 +452,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
 
         elif target_dialect.lower() == "snowflake":
-            # SQLGlot passes unknown JULIANDAY calls through for Snowflake.
-            # Rewrite diffs first (nesting-safe), then any surviving bare
-            # call as day-number arithmetic.
             query_text = re.sub(
                 r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)\s*-\s*JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
                 r"DATEDIFF(day, \2, \1)",
@@ -632,11 +468,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return query_text
 
     def get_all_queries(self) -> dict[str, str]:
-        """Get all available TPC-DI queries.
-
-        Returns:
-            A dictionary mapping query identifiers to their SQL text
-        """
         return self.query_manager.get_all_queries()
 
     def execute_query(
@@ -645,28 +476,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         connection: Any,
         params: Optional[dict[str, Any]] = None,
     ) -> Any:
-        """Execute a TPC-DI query on the given database connection.
-
-        Args:
-            query_id: Query identifier (e.g., "V1", "V2", "A1", etc.)
-            connection: Database connection to use for execution
-            params: Optional parameters to use in the query
-
-        Returns:
-            Query results from the database
-
-        Raises:
-            ValueError: If the query_id is not valid
-        """
         sql = self.get_query(query_id, params)
 
-        # Execute query using connection
         if hasattr(connection, "execute"):
-            # Direct database connection
             cursor = connection.execute(sql)
             return cursor.fetchall()
         elif hasattr(connection, "cursor"):
-            # Connection with cursor method
             cursor = connection.cursor()
             cursor.execute(sql)
             return cursor.fetchall()
@@ -674,14 +489,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError("Unsupported connection type")
 
     def get_schema(self, dialect: str = "standard") -> dict[str, dict[str, Any]]:
-        """Get the TPC-DI schema definitions.
-
-        Args:
-            dialect: SQL dialect to use for data types
-
-        Returns:
-            Dictionary mapping table names to their schema definitions
-        """
         return TABLES
 
     def get_create_tables_sql(
@@ -689,52 +496,29 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str = "standard",
         tuning_config: Optional["UnifiedTuningConfiguration"] = None,
     ) -> str:
-        """Get CREATE TABLE SQL for all TPC-DI tables.
-
-        Args:
-            dialect: SQL dialect to use
-            tuning_config: Unified tuning configuration for constraint settings
-
-        Returns:
-            Complete SQL schema creation script
-        """
-        # Extract constraint settings from tuning configuration
         enable_primary_keys = tuning_config.primary_keys.enabled if tuning_config else False
         enable_foreign_keys = tuning_config.foreign_keys.enabled if tuning_config else False
 
         return get_all_create_table_sql(dialect, enable_primary_keys, enable_foreign_keys)
 
     def load_data_to_database(self, connection: Any, tables: Optional[list[str]] = None) -> None:
-        """Load generated data into a database.
-
-        Args:
-            connection: Database connection
-            tables: Optional list of tables to load. If None, loads all.
-
-        Raises:
-            ValueError: If data hasn't been generated yet
-        """
         if not self.tables:
             raise ValueError("No data generated. Call generate_data() first.")
 
         if tables is None:
             tables = list(self.tables.keys())
 
-        # Create tables first
         self._execute_schema_sql(connection)
 
-        # Load data from CSV files
         for table_name in tables:
             if table_name not in self.tables:
                 continue
             self._load_single_table(connection, table_name)
 
-        # Commit transaction
         if hasattr(connection, "commit"):
             connection.commit()
 
     def _execute_schema_sql(self, connection: Any) -> None:
-        """Execute CREATE TABLE statements on the given connection."""
         schema_sql = self.get_create_tables_sql()
         if hasattr(connection, "executescript"):
             connection.executescript(schema_sql)
@@ -745,7 +529,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     cursor.execute(statement)
 
     def _load_single_table(self, connection: Any, table_name: str) -> None:
-        """Load a single table's CSV data into the database."""
         _path = self.tables[table_name]
         table_schema = TABLES[table_name]
 
@@ -787,16 +570,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def run_benchmark(
         self, connection: Any, queries: Optional[list[str]] = None, iterations: int = 1
     ) -> dict[str, Any]:
-        """Run the complete TPC-DI benchmark.
-
-        Args:
-            connection: Database connection to use
-            queries: Optional list of query IDs to run. If None, runs all 30 queries.
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing benchmark results
-        """
 
         if queries is None:
             queries = list(self.query_manager.get_all_queries().keys())
@@ -817,7 +590,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "avg_time": 0,
                 "min_time": float("inf"),
                 "max_time": 0,
-                "sql_text": self.get_query(query_id),  # Add actual SQL text
+                "sql_text": self.get_query(query_id),
             }
 
             for i in range(iterations):
@@ -848,7 +621,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         }
                     )
 
-            # Calculate average time for successful iterations
             successful_iterations = [
                 iter_result
                 for iter_result in cast(list[dict[str, Any]], query_results["iterations"])
@@ -866,20 +638,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return results
 
-    # ========================================================================
-    # DataFrame Mode Support
-    # ========================================================================
-
     def supports_dataframe_mode(self) -> bool:
-        """TPC-DI supports DataFrame mode through benchmark-managed ETL orchestration."""
         return True
 
     def skip_dataframe_data_loading(self) -> bool:
-        """TPC-DI manages its own ETL input/output lifecycle.
-
-        The generic DataFrame loader path is query-centric and table-oriented.
-        TPC-DI runs staged ETL and therefore should bypass that loading path.
-        """
         return True
 
     def get_dataframe_etl_capabilities(
@@ -887,18 +649,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         platform_name: str,
         maintenance_ops: Any | None = None,
     ) -> dict[str, Any]:
-        """Get transactional ETL capabilities for a DataFrame platform.
-
-        This is the capability contract for TPC-DI DataFrame ETL execution.
-        TPC-DI requires transaction-aware write semantics for reliable
-        incremental and SCD2 processing.
-        """
         if maintenance_ops is None:
             maintenance_ops = get_maintenance_operations_for_platform(platform_name)
         return self._build_dataframe_etl_capabilities(platform_name, maintenance_ops)
 
     def _build_dataframe_etl_capabilities(self, platform_name: str, maintenance_ops: Any | None) -> dict[str, Any]:
-        """Build ETL capability payload from a resolved maintenance implementation."""
         if maintenance_ops is None:
             return {
                 "platform": platform_name,
@@ -935,12 +690,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         monitor: Any | None = None,
         run_options: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """Execute TPC-DI ETL stages for DataFrame mode.
-
-        This path runs benchmark-managed ETL stages and returns stage-level
-        results compatible with the DataFrame benchmark runner output schema.
-        """
-        # Reserved for future benchmarking telemetry integration.
         _ = (monitor, run_options)
         options = getattr(benchmark_config, "options", {}) or {}
         require_transactional_capabilities = bool(options.get("tpcdi_require_transactional_capabilities", True))
@@ -1056,7 +805,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         stage_map: dict[str, str],
         selected_stage_ids: set[str],
     ) -> list[dict[str, Any]]:
-        """Execute selected ETL stages and format as query-style benchmark results."""
         stage_results: list[dict[str, Any]] = []
         for query_id in ("TDI_HISTORICAL", "TDI_INCREMENTAL", "TDI_SCD"):
             if query_id not in selected_stage_ids:
@@ -1098,76 +846,28 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 )
         return stage_results
 
-    # Extended query execution methods for comprehensive query suite
-
     def run_validation_queries(self, connection: Any, iterations: int = 1) -> dict[str, Any]:
-        """Run all data quality validation queries (VQ1-VQ12).
-
-        Args:
-            connection: Database connection to use
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing validation query results
-        """
         validation_query_ids = list(self.query_manager.get_validation_queries().keys())
         return self.run_benchmark(connection, validation_query_ids, iterations)
 
     def run_analytical_queries(self, connection: Any, iterations: int = 1) -> dict[str, Any]:
-        """Run all business intelligence analytical queries (AQ1-AQ10).
-
-        Args:
-            connection: Database connection to use
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing analytical query results
-        """
         analytical_query_ids = list(self.query_manager.get_analytical_queries().keys())
         return self.run_benchmark(connection, analytical_query_ids, iterations)
 
     def run_etl_validation_queries(self, connection: Any, iterations: int = 1) -> dict[str, Any]:
-        """Run all ETL validation queries (EQ1-EQ8).
-
-        Args:
-            connection: Database connection to use
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing ETL validation query results
-        """
         etl_query_ids = list(self.query_manager.get_etl_queries().keys())
         return self.run_benchmark(connection, etl_query_ids, iterations)
 
     def run_queries_by_category(self, connection: Any, category: str, iterations: int = 1) -> dict[str, Any]:
-        """Run queries from a specific category.
-
-        Args:
-            connection: Database connection to use
-            category: Query category (e.g. 'referential_integrity', 'customer_profitability')
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing category-specific query results
-        """
         category_query_ids = self.query_manager.get_queries_by_category(category)
         if not category_query_ids:
             raise ValueError(f"No queries found for category: {category}")
         return self.run_benchmark(connection, category_query_ids, iterations)
 
     def get_query_execution_plan(self) -> list[tuple[str, str, list[str]]]:
-        """Get execution plan for all queries ordered by dependencies.
-
-        Returns:
-            List of tuples containing (query_id, query_type, dependencies) in execution order
-        """
         return self.query_manager.get_execution_plan()
 
-    # Simplified Parallel Processing Methods
-
     def _initialize_etl_components(self) -> None:
-        """Initialize ETL-specific components."""
-        # Create ETL directories
         if self.source_dir:
             self.source_dir.mkdir(parents=True, exist_ok=True)
         if self.staging_dir:
@@ -1175,7 +875,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if self.warehouse_dir:
             self.warehouse_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize source data generators
         self.source_generators = {
             "csv": self._generate_csv_sources,
             "xml": self._generate_xml_sources,
@@ -1183,10 +882,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "json": self._generate_json_sources,
         }
 
-        # Initialize simple ETL tracking
         self.etl_stats = {"batches_processed": 0, "errors": [], "processing_time": 0}
 
-        # Initialize simple batch status
         self.batch_status = {
             "historical": {"status": "pending"},
             "incremental": {"status": "pending"},
@@ -1198,15 +895,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         formats: Optional[list[str]] = None,
         batch_types: Optional[list[str]] = None,
     ) -> dict[str, list[str]]:
-        """Generate source data in various formats for ETL processing.
-
-        Args:
-            formats: List of data formats to generate (csv, xml, fixed_width, json)
-            batch_types: List of batch types to generate (historical, incremental, scd)
-
-        Returns:
-            Dictionary mapping formats to lists of generated file paths
-        """
 
         if formats is None:
             formats = ["csv", "xml", "fixed_width", "json"]
@@ -1224,24 +912,20 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return generated_files
 
     def _generate_csv_sources(self, batch_types: list[str]) -> list[str]:
-        """Generate CSV source files for different batch types."""
         csv_files = []
 
         for batch_type in batch_types:
             batch_dir = self.source_dir / "csv" / batch_type
             batch_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate customer data
             customer_file = batch_dir / f"customers_{batch_type}.csv"
 
             num_records = int(1000 * self.scale_factor)
             if batch_type == "incremental":
-                num_records = int(num_records * 0.1)  # 10% for incremental
+                num_records = int(num_records * 0.1)
             elif batch_type == "scd":
-                num_records = int(num_records * 0.05)  # 5% for SCD updates
+                num_records = int(num_records * 0.05)
 
-            # Generate customer data using pandas
-            # Create unique surrogate key ranges for different batch types
             sk_offset = {"historical": 0, "incremental": 1000000, "scd": 2000000}
             batch_offset = sk_offset.get(batch_type, 0)
 
@@ -1249,39 +933,39 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             for i in range(num_records):
                 customer_data.append(
                     [
-                        batch_offset + i + 1,  # SK_CustomerID (surrogate key) - unique across batches
-                        i + 100000000,  # CustomerID - integer (not string)
-                        f"TAX{i:06d}",  # TaxID - string
-                        "Active",  # Status
-                        f"LastName{i}",  # LastName
-                        f"FirstName{i}",  # FirstName
-                        "M",  # MiddleInitial
-                        "M",  # Gender
-                        1,  # Tier
-                        "1980-01-01",  # DOB
-                        f"{i} Main St",  # AddressLine1
-                        "",  # AddressLine2
-                        "12345",  # PostalCode
-                        "City",  # City
-                        "NY",  # StateProv
-                        "USA",  # Country
-                        "555-0123",  # Phone1
-                        "",  # Phone2
-                        "",  # Phone3
-                        f"customer{i}@email.com",  # Email1
-                        "",  # Email2
-                        "Standard Tax Rate",  # NationalTaxRateDesc
-                        0.25000,  # NationalTaxRate
-                        "Local Tax Rate",  # LocalTaxRateDesc
-                        0.05000,  # LocalTaxRate
-                        f"AGENCY{i:03d}",  # AgencyID
-                        750 + i,  # CreditRating
-                        1000000 + i * 10000,  # NetWorth
-                        f"Customer {i} Marketing Profile",  # MarketingNameplate
-                        1,  # IsCurrent
-                        1,  # BatchID
-                        "1999-01-01",  # EffectiveDate
-                        "9999-12-31",  # EndDate
+                        batch_offset + i + 1,
+                        i + 100000000,
+                        f"TAX{i:06d}",
+                        "Active",
+                        f"LastName{i}",
+                        f"FirstName{i}",
+                        "M",
+                        "M",
+                        1,
+                        "1980-01-01",
+                        f"{i} Main St",
+                        "",
+                        "12345",
+                        "City",
+                        "NY",
+                        "USA",
+                        "555-0123",
+                        "",
+                        "",
+                        f"customer{i}@email.com",
+                        "",
+                        "Standard Tax Rate",
+                        0.25000,
+                        "Local Tax Rate",
+                        0.05000,
+                        f"AGENCY{i:03d}",
+                        750 + i,
+                        1000000 + i * 10000,
+                        f"Customer {i} Marketing Profile",
+                        1,
+                        1,
+                        "1999-01-01",
+                        "9999-12-31",
                     ]
                 )
 
@@ -1325,7 +1009,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             df.to_csv(customer_file, index=False)
             csv_files.append(str(customer_file))
 
-            # Generate trade data
             trade_file = batch_dir / f"trades_{batch_type}.csv"
 
             num_trades = int(5000 * self.scale_factor)
@@ -1334,8 +1017,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             elif batch_type == "scd":
                 num_trades = int(num_trades * 0.1)
 
-            # Generate trade data using pandas
-            # Create unique trade ID ranges for different batch types
             trade_offset = {"historical": 0, "incremental": 10000000, "scd": 20000000}
             trade_batch_offset = trade_offset.get(batch_type, 0)
 
@@ -1343,15 +1024,15 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             for i in range(num_trades):
                 trade_data.append(
                     [
-                        trade_batch_offset + i + 1,  # TradeID - unique across batches
-                        i % 100 + 1,  # SK_SecurityID
-                        100,  # Quantity
-                        50.00,  # TradePrice
-                        1,  # SK_CreateDateID
-                        batch_offset + (i % 1000) + 1,  # SK_CustomerID - reference correct customer range
-                        i % 10 + 1,  # SK_BrokerID
-                        "Buy",  # Type
-                        9.99,  # Commission
+                        trade_batch_offset + i + 1,
+                        i % 100 + 1,
+                        100,
+                        50.00,
+                        1,
+                        batch_offset + (i % 1000) + 1,
+                        i % 10 + 1,
+                        "Buy",
+                        9.99,
                     ]
                 )
 
@@ -1374,14 +1055,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return csv_files
 
     def _generate_xml_sources(self, batch_types: list[str]) -> list[str]:
-        """Generate XML source files for different batch types."""
         xml_files = []
 
         for batch_type in batch_types:
             batch_dir = self.source_dir / "xml" / batch_type
             batch_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate company data in XML format
             company_file = batch_dir / f"companies_{batch_type}.xml"
             root = ET.Element("companies")
 
@@ -1411,14 +1090,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return xml_files
 
     def _generate_fixed_width_sources(self, batch_types: list[str]) -> list[str]:
-        """Generate fixed-width source files for different batch types."""
         fixed_width_files = []
 
         for batch_type in batch_types:
             batch_dir = self.source_dir / "fixed_width" / batch_type
             batch_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate security data in fixed-width format
             security_file = batch_dir / f"securities_{batch_type}.txt"
             with open(security_file, "w", encoding="utf-8") as f:
                 num_securities = int(500 * self.scale_factor)
@@ -1428,7 +1105,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     num_securities = int(num_securities * 0.05)
 
                 for i in range(num_securities):
-                    # Fixed-width format: symbol(8), name(30), exchange(10), shares(15)
                     symbol = f"SYM{i:04d}".ljust(8)
                     name = f"Security {i:04d}".ljust(30)
                     exchange = "NYSE".ljust(10)
@@ -1442,14 +1118,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return fixed_width_files
 
     def _generate_json_sources(self, batch_types: list[str]) -> list[str]:
-        """Generate JSON source files for different batch types."""
         json_files = []
 
         for batch_type in batch_types:
             batch_dir = self.source_dir / "json" / batch_type
             batch_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate account data in JSON format
             account_file = batch_dir / f"accounts_{batch_type}.json"
             accounts = []
 
@@ -1459,15 +1133,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             elif batch_type == "scd":
                 num_accounts = int(num_accounts * 0.05)
 
-            # Create unique account ID ranges for different batch types
             account_offset = {"historical": 0, "incremental": 5000000, "scd": 6000000}
             account_batch_offset = account_offset.get(batch_type, 0)
 
             for i in range(num_accounts):
                 account = {
-                    "account_id": account_batch_offset + i + 1,  # Use integer for account_id - unique across batches
-                    "customer_id": (i % 1000) + 100000000,  # Use integer for customer_id (match the CustomerID range)
-                    "broker_id": i % 10 + 1,  # Use integer for broker_id
+                    "account_id": account_batch_offset + i + 1,
+                    "customer_id": (i % 1000) + 100000000,
+                    "broker_id": i % 10 + 1,
                     "status": "Active",
                     "account_desc": f"Account {i:06d}",
                     "tax_status": 0,
@@ -1489,16 +1162,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         batch_type: str = "historical",
         validate_data: bool = True,
     ) -> dict[str, Any]:
-        """Run the complete ETL pipeline for TPC-DI.
-
-        Args:
-            connection: Database connection for target warehouse
-            batch_type: Type of batch to process (historical, incremental, scd)
-            validate_data: Whether to run data validation after ETL
-
-        Returns:
-            Dictionary containing ETL execution results and metrics
-        """
         if backend is None:
             if connection is None:
                 raise ValueError("run_etl_pipeline requires either backend or connection")
@@ -1516,10 +1179,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
         try:
-            # Configure batch status
             self.batch_status[batch_type]["status"] = "running"
 
-            # Phase 1: Extract - Generate source data
             extract_start = mono_time()
             source_files = self.generate_source_data(
                 formats=["csv", "xml", "fixed_width", "json"], batch_types=[batch_type]
@@ -1532,7 +1193,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "source_files": source_files,
             }
 
-            # Phase 2: Transform - Process source data
             transform_start = mono_time()
             if self.enable_parallel:
                 transformation_results = self._transform_source_data_parallel(source_files, batch_type)
@@ -1547,7 +1207,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "parallel_enabled": self.enable_parallel,
             }
 
-            # Phase 3: Load - Load into target warehouse
             load_start = mono_time()
             load_results = self._load_transformed_data(
                 backend=backend,
@@ -1562,7 +1221,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "tables_updated": load_results["tables_updated"],
             }
 
-            # Phase 4: Validate (if requested)
             if validate_data:
                 validation_start = mono_time()
                 validation_results = backend.validate_results()
@@ -1577,11 +1235,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             total_time = elapsed_seconds(start_time)
 
-            # Configure simple stats
             self.etl_stats["batches_processed"] += 1
             self.etl_stats["processing_time"] += total_time
 
-            # Configure batch status
             self.batch_status[batch_type]["status"] = "completed"
 
             pipeline_results["success"] = True
@@ -1590,7 +1246,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             pipeline_results["simple_stats"] = self._get_simple_stats()
 
         except Exception as e:
-            # Configure batch status on error
             self.batch_status[batch_type]["status"] = "failed"
 
             pipeline_results["success"] = False
@@ -1610,7 +1265,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return pipeline_results
 
     def _transform_source_data(self, source_files: dict[str, list[str]], batch_type: str) -> dict[str, Any]:
-        """Transform source data into staging format."""
         transformation_results: dict[str, Any] = {
             "records_processed": 0,
             "transformations_applied": [],
@@ -1637,7 +1291,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return transformation_results
 
     def _transform_source_data_parallel(self, source_files: dict[str, list[str]], batch_type: str) -> dict[str, Any]:
-        """Transform source data into staging format using simple parallel processing."""
         transformation_results: dict[str, Any] = {
             "records_processed": 0,
             "transformations_applied": [],
@@ -1645,7 +1298,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "staged_data_parts": {},
         }
 
-        # Collect all transformation tasks
         transform_tasks = []
         for format_type, files in source_files.items():
             for file_path in files:
@@ -1658,7 +1310,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 elif format_type == "json":
                     transform_tasks.append((self._transform_json_file, file_path, batch_type))
 
-        # Execute transformations in parallel using simple ThreadPoolExecutor
         if transform_tasks:
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(transform_tasks))) as executor:
                 futures = [
@@ -1672,32 +1323,22 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         self._accumulate_transformation_result(transformation_results, result)
                     except Exception as e:
                         emit(f"❌ Error in parallel transformation: {e}")
-                        # Continue processing other files
 
         self._materialize_staged_data(transformation_results)
         return transformation_results
 
     def _transform_csv_file(self, file_path: str, batch_type: str) -> dict[str, Any]:
-        """Transform a CSV file to a table DataFrame."""
         transformations = ["csv_to_staging", "data_type_conversion", "null_handling"]
 
-        # Read CSV file using pandas
         df = pd.read_csv(file_path)
 
-        # Transform based on file type
         file_name = Path(file_path).name.lower()
         if "customer" in file_name:
-            # Map to DimCustomer schema - only essential columns for demo
-            # The SQL backend replaces these source defaults with values
-            # allocated from the warehouse inside its SCD transaction.
             batch_offset = {"historical": 0, "incremental": 1_000_000, "scd": 2_000_000}.get(batch_type, 0)
             df["SK_CustomerID"] = range(batch_offset + 1, batch_offset + len(df) + 1)
             df["IsCurrent"] = True
             df["BatchID"] = batch_offset // 1_000_000 + 1
-            # Preserve the source effective date for the first warehouse
-            # version; subsequent versions are dated by the SQL loader.
 
-            # Reorder columns to match DimCustomer schema
             column_order = [
                 "SK_CustomerID",
                 "CustomerID",
@@ -1723,7 +1364,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             ]
             df = df[column_order]
         else:
-            # Default transformation - add BatchID
             df["BatchID"] = 1
 
         table_name = self._get_target_table_from_source_name(file_path)
@@ -1735,16 +1375,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _transform_xml_file(self, file_path: str, batch_type: str) -> dict[str, Any]:
-        """Transform an XML file to a table DataFrame."""
         transformations = ["xml_parsing", "xml_to_relational", "data_flattening"]
 
-        # Parse XML and convert to pandas DataFrame
         tree = ET.parse(file_path)
         root = tree.getroot()
 
         data = []
         for company in root.findall("company"):
-            # Helper function to safely extract text from XML elements
+
             def get_text(element_name: str) -> str:
                 elem = company.find(element_name)
                 return elem.text if elem is not None and elem.text is not None else ""
@@ -1790,17 +1428,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _transform_fixed_width_file(self, file_path: str, batch_type: str) -> dict[str, Any]:
-        """Transform a fixed-width file to a table DataFrame."""
         transformations = ["fixed_width_parsing", "field_extraction", "data_trimming"]
 
-        # Parse fixed-width file using pandas
-        # Define column specifications for fixed-width format
         colspecs = [(0, 8), (8, 38), (38, 48), (48, 63)]
         names = ["symbol", "name", "exchange", "shares_outstanding"]
 
         df = pd.read_fwf(file_path, colspecs=colspecs, names=names)
 
-        # Add batch metadata
         df["batch_id"] = batch_type
         df["load_timestamp"] = datetime.now().isoformat()
 
@@ -1812,20 +1446,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _transform_json_file(self, file_path: str, batch_type: str) -> dict[str, Any]:
-        """Transform a JSON file to a table DataFrame."""
         transformations = ["json_parsing", "json_normalization", "schema_mapping"]
 
-        # Read JSON file using pandas. convert_dates=False keeps date-like
-        # payloads as text through ingest: pandas infers datetimes by column
-        # name (a column literally named "date" becomes datetime64), and
-        # downstream loads treat these fields as strings.
         df = pd.read_json(file_path, convert_dates=False)
 
-        # Add batch metadata
         df["batch_id"] = batch_type
         df["load_timestamp"] = datetime.now().isoformat()
 
-        # Ensure proper column order
         columns = [
             "account_id",
             "customer_id",
@@ -1839,7 +1466,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "load_timestamp",
         ]
 
-        # Reorder columns if they exist
         existing_columns = [col for col in columns if col in df.columns]
         df = df[existing_columns]
 
@@ -1855,7 +1481,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         aggregate: dict[str, Any],
         result: dict[str, Any],
     ) -> None:
-        """Merge a single transform result into aggregate transformation payload."""
         aggregate["records_processed"] += result["records_processed"]
         aggregate["transformations_applied"].extend(result["transformations"])
 
@@ -1878,7 +1503,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         table_parts.append(dataframe_raw)
 
     def _materialize_staged_data(self, aggregate: dict[str, Any]) -> None:
-        """Materialize per-table staged DataFrames with a single concat per table."""
         parts = aggregate.get("staged_data_parts")
         if not isinstance(parts, dict):
             raise TypeError("Transformation aggregate is missing 'staged_data_parts' dictionary")
@@ -1906,7 +1530,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         staged_data: dict[str, pd.DataFrame],
         batch_type: str,
     ) -> dict[str, Any]:
-        """Load staged data, applying SCD2 expiration before incremental customer inserts."""
         customers = staged_data.get("DimCustomer")
         if customers is None or customers.empty:
             return backend.load_dataframes(staged_data, batch_type=batch_type)
@@ -1929,7 +1552,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return backend.load_dataframes(staged_data, batch_type=batch_type)
 
     def _create_sql_etl_backend(self, *, connection: Any) -> SQLETLBackend:
-        """Create SQL ETL backend from benchmark SQL connection."""
         validation_queries = list(self.query_manager.get_queries_by_type("validation"))
         return SQLETLBackend(
             connection=connection,
@@ -1941,42 +1563,22 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def _load_warehouse_data(
         self, connection: Any, transformation_results: dict[str, Any], batch_type: str
     ) -> dict[str, Any]:
-        """Load transformed data into SQL warehouse."""
         backend = self._create_sql_etl_backend(connection=connection)
         return backend.load_dataframes(transformation_results.get("staged_data", {}), batch_type=batch_type)
 
     def _get_target_table_from_source_name(self, source_name: str) -> Optional[str]:
-        """Determine target table name from source file name."""
         file_name = Path(source_name).name.lower()
 
         if "customer" in file_name:
             return "DimCustomer"
-        # Disable other tables for demo - only customer table is fully implemented
-        # elif 'company' in file_name or 'companies' in file_name:
-        #     return 'DimCompany'
-        # elif 'security' in file_name or 'securities' in file_name:
-        #     return 'DimSecurity'
-        # elif 'account' in file_name:
-        #     return 'DimAccount'
-        # elif 'trade' in file_name:
-        #     return 'FactTrade'
         else:
             return None
 
     def validate_etl_results(self, connection: Any) -> dict[str, Any]:
-        """Validate ETL results using data quality checks.
-
-        Args:
-            connection: Database connection to validate against
-
-        Returns:
-            Dictionary containing validation results and data quality metrics
-        """
 
         return self._create_sql_etl_backend(connection=connection).validate_results()
 
     def _get_simple_stats(self) -> dict[str, Any]:
-        """Get simple ETL processing stats."""
         return {
             "batches_processed": self.etl_stats["batches_processed"],
             "total_processing_time": self.etl_stats["processing_time"],
@@ -1985,11 +1587,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def get_etl_status(self) -> dict[str, Any]:
-        """Get current ETL processing status.
-
-        Returns:
-            Dictionary containing ETL status and batch information
-        """
 
         return {
             "etl_mode_enabled": True,
@@ -2002,7 +1599,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _initialize_connection_dependent_systems(self, connection: Any, dialect: str = "duckdb") -> None:
-        """Initialize systems that require a database connection."""
         if self.validator is None:
             self.validator = TPCDIValidator(connection, dialect)
 
@@ -2012,7 +1608,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if self.data_loader is None:
             self.data_loader = TPCDIDataLoader(connection, dialect)
 
-        # Initialize Phase 3 Enhanced ETL Components
         if self.finwire_processor is None:
             self.finwire_processor = FinWireProcessor(connection, dialect)
 
@@ -2038,60 +1633,34 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             self.error_recovery_manager = ErrorRecoveryManager(connection, dialect)
 
     def create_schema(self, connection: Any, dialect: str = "duckdb") -> None:
-        """Create TPC-DI schema using the schema manager.
-
-        Args:
-            connection: Database connection
-            dialect: Target SQL dialect
-        """
         self.schema_manager.create_schema(connection, dialect)
         emit(f"Created TPC-DI schema for {dialect}")
 
     def run_full_benchmark(self, connection: Any, dialect: str = "duckdb") -> dict[str, Any]:
-        """Run the complete TPC-DI benchmark with all phases.
-
-        This is the main entry point for running a complete TPC-DI benchmark
-        including schema creation, data loading, ETL processing, validation,
-        and metrics calculation.
-
-        Args:
-            connection: Database connection
-            dialect: SQL dialect for the target database
-
-        Returns:
-            Complete benchmark results with all metrics
-        """
         emit(f"Starting complete TPC-DI benchmark (scale factor: {self.config.scale_factor})")
         start_time = datetime.now()
         start_mono = mono_time()
 
         try:
-            # Initialize connection-dependent systems
             self._initialize_connection_dependent_systems(connection, dialect)
 
-            # Phase 1: Create schema
             emit("Phase 1: Creating database schema...")
             self.create_schema(connection, dialect)
 
-            # Phase 2: Run ETL pipeline
             emit("Phase 2: Running ETL pipeline...")
             etl_result = self.run_etl_benchmark(connection, dialect)
 
-            # Phase 3: Run data validation
             emit("Phase 3: Running data quality validation...")
             validation_result = self.run_data_validation(connection)
 
-            # Phase 4: Calculate metrics
             end_time = datetime.now()
             emit("Phase 4: Calculating TPC-DI metrics...")
             metrics = self.metrics_calculator.calculate_detailed_metrics(
                 etl_result, validation_result, start_time, end_time
             )
 
-            # Phase 5: Generate report
             report = self.metrics_calculator.generate_official_report(metrics)
 
-            # Print results
             self.metrics_calculator.print_official_results(metrics)
 
             return {
@@ -2112,15 +1681,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             }
 
     def run_etl_benchmark(self, connection: Any, dialect: str = "duckdb") -> ETLResult:
-        """Run the ETL benchmark pipeline.
-
-        Args:
-            connection: Database connection
-            dialect: SQL dialect
-
-        Returns:
-            ETL execution results
-        """
         self._initialize_connection_dependent_systems(connection, dialect)
         stage_map = {
             "TDI_HISTORICAL": "historical",
@@ -2144,7 +1704,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
     ) -> ETLResult:
-        """Convert shared stage execution results to ETLResult model."""
         etl_result = ETLResult(start_time=start_time or datetime.now())
         stage_lookup = {str(result.get("query_id")): result for result in stage_results}
 
@@ -2191,7 +1750,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @staticmethod
     def _extract_records_processed(stage: dict[str, Any]) -> int:
-        """Extract records_processed from a stage result dict, tolerating zero values."""
         value = stage.get("records_processed")
         if value is not None:
             return int(value)
@@ -2201,14 +1759,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return int(stage.get("rows_returned", 0))
 
     def run_data_validation(self, connection: Any) -> DataQualityResult:
-        """Run data quality validation.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            Data quality validation results
-        """
         if self.validator is None:
             raise ValueError("Validator not initialized. Call run_full_benchmark or initialize manually.")
 
@@ -2218,38 +1768,19 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def calculate_official_metrics(
         self, etl_result: ETLResult, validation_result: DataQualityResult
     ) -> BenchmarkMetrics:
-        """Calculate official TPC-DI metrics.
-
-        Args:
-            etl_result: ETL execution results
-            validation_result: Data validation results
-
-        Returns:
-            Official TPC-DI benchmark metrics
-        """
         start_time = datetime.now()
         end_time = datetime.now()
 
         return self.metrics_calculator.calculate_detailed_metrics(etl_result, validation_result, start_time, end_time)
 
     def optimize_database(self, connection: Any) -> dict[str, Any]:
-        """Optimize database performance for TPC-DI queries.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            Optimization results
-        """
         if self.data_loader is None:
             raise ValueError("Data loader not initialized")
 
         emit("Optimizing database for TPC-DI performance...")
 
-        # Create indexes
         index_results = self.data_loader.create_indexes(connection)
 
-        # Optimize tables
         optimize_results = self.data_loader.optimize_tables(connection)
 
         return {
@@ -2259,7 +1790,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _serialize_etl_result(self, etl_result: ETLResult) -> dict[str, Any]:
-        """Serialize ETL result to JSON-compatible format."""
         return {
             "start_time": etl_result.start_time.isoformat() if etl_result.start_time else None,
             "end_time": etl_result.end_time.isoformat() if etl_result.end_time else None,
@@ -2288,7 +1818,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _serialize_validation_result(self, validation_result: DataQualityResult) -> dict[str, Any]:
-        """Serialize validation result to JSON-compatible format."""
         return {
             "total_validations": validation_result.total_validations,
             "passed_validations": validation_result.passed_validations,
@@ -2311,15 +1840,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _serialize_report(self, report: BenchmarkReport) -> dict[str, Any]:
-        """Serialize benchmark report to JSON-compatible format."""
         return {
             "summary": report.summary,
             "phase_details": report.phase_details,
             "validation_details": report.validation_details,
             "performance_breakdown": report.performance_breakdown,
         }
-
-    # Phase 3 Enhanced ETL Pipeline Methods
 
     def run_enhanced_etl_pipeline(
         self,
@@ -2328,28 +1854,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         enable_data_quality_monitoring: bool = True,
         enable_error_recovery: bool = True,
     ) -> dict[str, Any]:
-        """Run the enhanced TPC-DI ETL pipeline with Phase 3 capabilities.
-
-        Parallel ETL is not a phase of this pipeline: concurrent execution
-        lives on the canonical path via ``TPCDIConfig(enable_parallel=True,
-        max_workers=N)`` (see ``run_etl_pipeline``). The removed
-        ``enable_parallel_processing`` flag gated only synthetic batch tasks
-        that processed no data (adr-tpcdi-enhanced-parallel-support-decision).
-
-        Args:
-            connection: Database connection
-            dialect: SQL dialect
-            enable_data_quality_monitoring: Enable real-time data quality monitoring
-            enable_error_recovery: Enable error recovery and retry mechanisms
-
-        Returns:
-            Enhanced ETL execution results
-        """
         emit("Starting enhanced TPC-DI ETL pipeline (Phase 3)")
         start_time = datetime.now()
         start_mono = mono_time()
 
-        # Initialize connection-dependent systems
         self._initialize_connection_dependent_systems(connection, dialect)
 
         pipeline_results: dict[str, Any] = {
@@ -2365,7 +1873,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
         try:
-            # Phase 1: Enhanced Data Processing with FinWire and Customer Management
             emit("Phase 1: Enhanced data processing...")
             phase1_start = mono_time()
 
@@ -2379,7 +1886,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "success": phase1_results.get("success", False),
             }
 
-            # Phase 2: Enhanced SCD Type 2 Processing
             emit("Phase 2: Enhanced SCD Type 2 processing...")
             phase2_start = mono_time()
 
@@ -2393,7 +1899,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "success": phase2_results.get("success", False),
             }
 
-            # Phase 3: Incremental Data Loading
             emit("Phase 3: Incremental data loading...")
             phase3_start = mono_time()
 
@@ -2407,7 +1912,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "success": phase3_results.get("success", False),
             }
 
-            # Phase 4: Data Quality Monitoring (if enabled)
             if enable_data_quality_monitoring:
                 emit("Phase 4: Data quality monitoring...")
                 phase4_start = mono_time()
@@ -2424,7 +1928,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 }
                 pipeline_results["quality_score"] = phase4_results.get("quality_score", 0.0)
 
-            # Calculate total records processed
             pipeline_results["total_records_processed"] = (
                 phase1_results.get("total_records", 0)
                 + phase2_results.get("records_processed", 0)
@@ -2445,8 +1948,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 if not phase_result.get("success", False)
             ]
 
-            # Quality monitoring is observational and remains optional. Every
-            # requested ETL phase must succeed for the pipeline to succeed.
             optional_phase_successes = []
             if enable_data_quality_monitoring:
                 optional_phase_successes.append(pipeline_results["phases"]["data_quality_monitoring"]["success"])
@@ -2486,22 +1987,19 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             pipeline_results["end_time"] = datetime.now().isoformat()
             pipeline_results["total_duration"] = elapsed_seconds(start_mono)
             emit(f"❌ Enhanced ETL pipeline failed: {e}")
-            # Don't raise - return the error details for debugging
 
         return pipeline_results
 
     def _run_enhanced_data_processing(self) -> dict[str, Any]:
-        """Run enhanced data processing with FinWire and Customer Management processors."""
         results = {
-            "success": True,  # Default to success, only set to False on actual errors
+            "success": True,
             "finwire_records": 0,
             "customer_mgmt_records": 0,
             "total_records": 0,
-            "errors": [],  # Initialize errors list
+            "errors": [],
         }
 
         try:
-            # Process FinWire data files
             if self.finwire_processor:
                 finwire_files = self._generate_finwire_data_files()
                 for finwire_file in finwire_files:
@@ -2512,7 +2010,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         results["errors"].extend(processing_result.get("errors", []))
                         results["success"] = False
 
-            # Process Customer Management data files
             if self.customer_mgmt_processor:
                 customer_files = self._generate_customer_mgmt_data_files()
                 for customer_file in customer_files:
@@ -2532,9 +2029,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         results["success"] = False
 
             results["total_records"] = results["finwire_records"] + results["customer_mgmt_records"]
-            results["records_processed"] = results[
-                "total_records"
-            ]  # Include required key            # Success is already set to True by default, only changed to False on actual errors
+            results["records_processed"] = results["total_records"]
 
         except Exception as e:
             emit(f"❌ Enhanced data processing failed: {e}")
@@ -2544,18 +2039,15 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return results
 
     def _run_enhanced_scd_processing(self, connection: Any) -> dict[str, Any]:
-        """Run enhanced SCD Type 2 processing."""
         results = {"success": False, "records_processed": 0, "changes_detected": 0}
 
         try:
             if self.scd_processor:
-                # Process SCD for customer dimension using actual data
                 dimension_name = "DimCustomer"
                 business_key_column = "CustomerID"
                 scd_columns = ["FirstName", "LastName", "Email", "Address"]
                 batch_id = 1
 
-                # Run actual SCD processing
                 scd_result = self.scd_processor.process_dimension(
                     dimension_name, business_key_column, scd_columns, batch_id
                 )
@@ -2574,13 +2066,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return results
 
     def _run_incremental_data_loading(self, connection: Any) -> dict[str, Any]:
-        """Run incremental data loading."""
         results = {"success": False, "batches_loaded": 0, "records_loaded": 0}
 
         try:
-            # TPC-DI changes come from the incremental source batch. Warehouse
-            # tables have no LastModified CDC column, so scanning them cannot
-            # discover source changes or produce rows for another load.
             pipeline = self.run_etl_pipeline(connection=connection, batch_type="incremental", validate_data=False)
             load = pipeline.get("phases", {}).get("load")
             if pipeline.get("success") and load is not None:
@@ -2597,7 +2085,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return results
 
     def _run_data_quality_monitoring(self, connection: Any) -> dict[str, Any]:
-        """Run data quality monitoring."""
         results = {
             "success": False,
             "rules_executed": 0,
@@ -2607,7 +2094,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         try:
             if self.data_quality_monitor:
-                # Include actual quality rules for TPC-DI tables
                 from benchbox.core.tpcdi.etl.data_quality_monitor import DataQualityRule
 
                 quality_rules = [
@@ -2649,23 +2135,19 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     ),
                 ]
 
-                # Include rules in monitor
                 for rule in quality_rules:
                     self.data_quality_monitor.add_rule(rule)
 
-                # Execute quality checks
                 quality_result = self.data_quality_monitor.execute_quality_checks()
 
                 results["rules_executed"] = quality_result.get("rules_executed", 0)
                 results["quality_score"] = quality_result.get("overall_pass_rate", 0.0)
                 results["issues_detected"] = quality_result.get("rules_failed", 0)
-                # Don't fail ETL just because of quality rule issues - this is expected in test environments
                 results["success"] = True
                 results["note"] = f"Quality monitoring completed with {results['quality_score']:.1f}% pass rate"
 
         except Exception as e:
             emit(f"⚠️ Data quality monitoring encountered issues: {e}")
-            # Still mark as successful but note the issues
             results["success"] = True
             results["rules_executed"] = 0
             results["quality_score"] = 0.0
@@ -2675,11 +2157,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return results
 
     def get_enhanced_etl_status(self) -> dict[str, Any]:
-        """Get the status of enhanced ETL components.
-
-        Returns:
-            Status of all Phase 3 ETL components
-        """
         return {
             "phase_3_components": {
                 "finwire_processor": self.finwire_processor is not None,
@@ -2698,17 +2175,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
     def _generate_finwire_data_files(self) -> list[Path]:
-        """Generate realistic FinWire data files for processing."""
         finwire_files = []
 
-        # Create FinWire directory
         finwire_dir = self.output_dir / "finwire"
         finwire_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate sample FinWire file with realistic TPC-DI format
         finwire_file = finwire_dir / "finwire.txt"
 
-        # Calculate number of records based on scale factor
         num_companies = max(1, int(100 * self.scale_factor))
         num_securities = max(1, int(500 * self.scale_factor))
         num_financials = max(1, int(200 * self.scale_factor))
@@ -2724,7 +2197,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             return "".join(record)
 
         with open(finwire_file, "w", encoding="utf-8") as f:
-            # Generate Company Fundamental records (CMP)
             for i in range(num_companies):
                 cmp_id = f"{i + 1:010d}"
                 record = format_record(
@@ -2743,7 +2215,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 )
                 f.write(record + "\n")
 
-            # Generate Security Master records (SEC)
             for i in range(num_securities):
                 record = format_record(
                     FinWireParser.SEC_LAYOUT,
@@ -2764,7 +2235,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 )
                 f.write(record + "\n")
 
-            # Generate Financial records (FIN)
             for i in range(num_financials):
                 record = format_record(
                     FinWireParser.FIN_LAYOUT,
@@ -2785,14 +2255,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return finwire_files
 
     def _generate_customer_mgmt_data_files(self) -> list[Path]:
-        """Generate realistic Customer Management data files for processing."""
         customer_files = []
 
-        # Create customer management directory
         customer_dir = self.output_dir / "customer_mgmt"
         customer_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate Customer Management XML file
         customer_xml = customer_dir / "CustomerMgmt.xml"
         num_customers = max(1, int(50 * self.scale_factor))
 
@@ -2822,12 +2289,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         customer_files.append(customer_xml)
 
-        # Generate Prospect CSV file
         prospect_csv = customer_dir / "Prospect.csv"
         num_prospects = max(1, int(20 * self.scale_factor))
 
         with open(prospect_csv, "w", encoding="utf-8") as f:
-            # CSV header
             f.write(
                 "LastName,FirstName,MiddleInitial,Gender,AddressLine1,AddressLine2,PostalCode,City,StateProv,Country,Phone,Income,NumberCars,NumberChildren,MaritalStatus,Age,CreditRating,OwnOrRentFlag,Employer,NumberCreditCards,NetWorth\n"
             )
@@ -2840,10 +2305,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         customer_files.append(prospect_csv)
         return customer_files
 
-
-# ---------------------------------------------------------------------------
-# Register benchmark-specific CLI option specs
-# ---------------------------------------------------------------------------
 
 from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,

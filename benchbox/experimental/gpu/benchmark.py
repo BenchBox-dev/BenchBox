@@ -1,9 +1,6 @@
-"""GPU benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,8 +24,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class GPUQueryResult:
-    """Result of executing a GPU-accelerated query."""
-
     query_id: str
     success: bool
     execution_time_ms: float
@@ -40,7 +35,6 @@ class GPUQueryResult:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "query_id": self.query_id,
             "success": self.success,
@@ -56,8 +50,6 @@ class GPUQueryResult:
 
 @dataclass
 class GPUBenchmarkResults:
-    """Results from running the GPU benchmark."""
-
     gpu_info: GPUInfo
     started_at: datetime
     completed_at: datetime | None = None
@@ -71,7 +63,6 @@ class GPUBenchmarkResults:
     gpu_metrics_aggregate: GPUMetricsAggregate | None = None
 
     def add_result(self, result: GPUQueryResult) -> None:
-        """Add a query result."""
         self.query_results.append(result)
         self.total_queries += 1
         if result.success:
@@ -82,7 +73,6 @@ class GPUBenchmarkResults:
         self.peak_memory_mb = max(self.peak_memory_mb, result.peak_memory_mb)
 
     def complete(self, metrics_aggregate: GPUMetricsAggregate | None = None) -> None:
-        """Mark the benchmark as complete."""
         self.completed_at = datetime.now(timezone.utc)
         self.gpu_metrics_aggregate = metrics_aggregate
         if metrics_aggregate:
@@ -90,16 +80,13 @@ class GPUBenchmarkResults:
 
     @property
     def success_rate(self) -> float:
-        """Get success rate as a fraction."""
         return self.successful_queries / self.total_queries if self.total_queries > 0 else 0.0
 
     @property
     def avg_execution_time_ms(self) -> float:
-        """Get average execution time."""
         return self.total_execution_time_ms / self.total_queries if self.total_queries > 0 else 0.0
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "gpu_info": self.gpu_info.to_dict(),
             "started_at": self.started_at.isoformat(),
@@ -117,7 +104,6 @@ class GPUBenchmarkResults:
         }
 
 
-# GPU benchmark query definitions
 GPU_BENCHMARK_QUERIES: dict[str, dict[str, Any]] = {
     "aggregation_simple": {
         "name": "Simple Aggregation",
@@ -262,17 +248,6 @@ GPU_BENCHMARK_QUERIES: dict[str, dict[str, Any]] = {
 
 
 class GPUBenchmark(BaseBenchmark):
-    """GPU Acceleration benchmark for DataFrame operations.
-
-    Benchmarks GPU-accelerated query execution using RAPIDS cuDF and compares
-    performance with CPU-based execution.
-
-    Example:
-        >>> benchmark = GPUBenchmark()
-        >>> if benchmark.is_gpu_available():
-        ...     results = benchmark.run_benchmark(adapter, "cudf")
-    """
-
     SUPPORTED_PLATFORMS = {"cudf", "dask_cudf", "spark_rapids"}
 
     def __init__(
@@ -285,17 +260,6 @@ class GPUBenchmark(BaseBenchmark):
         metrics_interval: float = 0.5,
         **kwargs: Any,
     ) -> None:
-        """Initialize the GPU benchmark.
-
-        Args:
-            scale_factor: Scale factor for data generation
-            output_dir: Output directory for generated data
-            seed: Random seed for reproducibility
-            device_index: GPU device index to use
-            collect_metrics: Whether to collect GPU metrics during execution
-            metrics_interval: Metrics sampling interval in seconds
-            **kwargs: Additional configuration
-        """
         super().__init__(scale_factor, output_dir, **kwargs)
 
         self._name = "GPU Acceleration Benchmark"
@@ -311,59 +275,35 @@ class GPUBenchmark(BaseBenchmark):
         self.collect_metrics = collect_metrics
         self.metrics_interval = metrics_interval
 
-        # GPU detection
         self._gpu_info: GPUInfo | None = None
         self._queries = GPU_BENCHMARK_QUERIES
 
     @property
     def name(self) -> str:
-        """Get benchmark name."""
         return self._name
 
     @property
     def version(self) -> str:
-        """Get benchmark version."""
         return self._version
 
     @property
     def description(self) -> str:
-        """Get benchmark description."""
         return self._description
 
     def is_gpu_available(self) -> bool:
-        """Check if GPU is available for benchmarking."""
         if self._gpu_info is None:
             self._gpu_info = detect_gpu()
         return self._gpu_info.available and self._gpu_info.cudf_available
 
     def get_gpu_info(self) -> GPUInfo:
-        """Get GPU information."""
         if self._gpu_info is None:
             self._gpu_info = detect_gpu()
         return self._gpu_info
 
     def get_queries(self) -> dict[str, str]:
-        """Get all benchmark queries.
-
-        Returns:
-            Dictionary mapping query IDs to query strings.
-        """
-        # Return query templates - actual queries depend on data schema
         return {qid: q["sql_template"] for qid, q in self._queries.items()}
 
     def get_query(self, query_id: int | str, *, params: dict[str, Any] | None = None) -> str:
-        """Get a specific benchmark query.
-
-        Args:
-            query_id: Query identifier
-            params: Optional parameters for template substitution
-
-        Returns:
-            Query SQL string
-
-        Raises:
-            ValueError: If query_id not found
-        """
         query_id_str = str(query_id)
         if query_id_str not in self._queries:
             available = ", ".join(self._queries.keys())
@@ -371,22 +311,18 @@ class GPUBenchmark(BaseBenchmark):
 
         sql_template = self._queries[query_id_str]["sql_template"]
 
-        # Apply parameters if provided
         if params:
             sql_template = sql_template.format(**params)
 
         return sql_template.strip()
 
     def get_supported_platforms(self) -> set[str]:
-        """Get platforms that support GPU acceleration."""
         return self.SUPPORTED_PLATFORMS.copy()
 
     def get_query_categories(self) -> list[str]:
-        """Get available query categories."""
         return list(set(q["category"] for q in self._queries.values()))
 
     def get_queries_by_category(self, category: str) -> list[str]:
-        """Get query IDs for a category."""
         return [qid for qid, q in self._queries.items() if q["category"] == category]
 
     def generate_data(
@@ -394,15 +330,6 @@ class GPUBenchmark(BaseBenchmark):
         tables: list[str] | None = None,
         output_format: str = "parquet",
     ) -> dict[str, str]:
-        """Generate sample data for GPU benchmarking.
-
-        Args:
-            tables: Optional list of tables to generate
-            output_format: Output format (parquet recommended for GPU)
-
-        Returns:
-            Dictionary mapping table names to file paths
-        """
         import random
 
         random.seed(self.seed)
@@ -411,15 +338,12 @@ class GPUBenchmark(BaseBenchmark):
 
         files: dict[str, str] = {}
 
-        # Generate test data using pandas/numpy (can be loaded to GPU later)
         try:
             import numpy as np
             import pandas as pd
 
-            # Scale row count with scale factor
             n_rows = int(100000 * self.scale_factor)
 
-            # Main benchmark table
             df = pd.DataFrame(
                 {
                     "id": range(n_rows),
@@ -440,7 +364,6 @@ class GPUBenchmark(BaseBenchmark):
                 df.to_csv(main_path, index=False)
             files["gpu_benchmark_main"] = str(main_path)
 
-            # Dimension table for joins
             dim_df = pd.DataFrame(
                 {
                     "category": ["A", "B", "C", "D", "E"],
@@ -467,25 +390,11 @@ class GPUBenchmark(BaseBenchmark):
         query_id: str,
         query_sql: str,
     ) -> GPUQueryResult:
-        """Execute a query on GPU using cuDF.
-
-        Args:
-            cudf_df: cuDF DataFrame
-            query_sql: SQL query to execute
-            query_id: Query identifier
-
-        Returns:
-            GPUQueryResult with execution metrics
-        """
         memory_tracker = GPUMemoryTracker(device_index=self.device_index)
         memory_tracker.start()
 
         start_time = time.perf_counter()
         try:
-            # cuDF supports SQL via dask-sql or direct DataFrame operations
-            # Here we use DataFrame API operations that mirror SQL semantics
-
-            # Register the DataFrame for SQL execution if dask-sql is available
             try:
                 from dask_sql import Context  # type: ignore
 
@@ -494,8 +403,6 @@ class GPUBenchmark(BaseBenchmark):
                 result = c.sql(query_sql)
                 row_count = len(result)
             except ImportError:
-                # Fallback: execute as cuDF operations
-                # This is a simplified approach - real implementation would parse SQL
                 result = cudf_df
                 row_count = len(result)
 
@@ -526,16 +433,6 @@ class GPUBenchmark(BaseBenchmark):
         query_ids: list[str] | None = None,
         categories: list[str] | None = None,
     ) -> GPUBenchmarkResults:
-        """Run the GPU benchmark.
-
-        Args:
-            cudf_df: cuDF DataFrame to benchmark against
-            query_ids: Optional list of specific queries to run
-            categories: Optional list of query categories to run
-
-        Returns:
-            GPUBenchmarkResults with execution data
-        """
         gpu_info = self.get_gpu_info()
 
         if not gpu_info.available:
@@ -546,7 +443,6 @@ class GPUBenchmark(BaseBenchmark):
             started_at=datetime.now(timezone.utc),
         )
 
-        # Start metrics collection
         metrics_collector = None
         if self.collect_metrics:
             metrics_collector = GPUMetricsCollector(
@@ -556,7 +452,6 @@ class GPUBenchmark(BaseBenchmark):
             metrics_collector.start()
 
         try:
-            # Determine which queries to run
             if query_ids is not None:
                 queries_to_run = [(qid, self._queries[qid]) for qid in query_ids if qid in self._queries]
             elif categories is not None:
@@ -564,10 +459,8 @@ class GPUBenchmark(BaseBenchmark):
             else:
                 queries_to_run = list(self._queries.items())
 
-            # Run queries
             for query_id, query_def in queries_to_run:
                 logger.info(f"Running GPU query: {query_id}")
-                # Note: In real usage, query_sql would be formatted with actual column names
                 query_sql = query_def["sql_template"]
                 result = self.execute_gpu_query(cudf_df, query_id, query_sql)
                 results.add_result(result)
@@ -578,7 +471,6 @@ class GPUBenchmark(BaseBenchmark):
                     logger.warning(f"  ✗ {query_id}: {result.error_message}")
 
         finally:
-            # Stop metrics collection and get aggregate
             if metrics_collector:
                 metrics_collector.stop()
                 aggregate = metrics_collector.get_aggregate(self.device_index)
@@ -589,7 +481,6 @@ class GPUBenchmark(BaseBenchmark):
         return results
 
     def export_benchmark_spec(self) -> dict[str, Any]:
-        """Export the benchmark specification."""
         return {
             "name": self.name,
             "version": self.version,
@@ -615,17 +506,6 @@ def compare_cpu_vs_gpu(
     benchmark: GPUBenchmark,
     query_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Compare CPU vs GPU execution times.
-
-    Args:
-        pandas_df: pandas DataFrame for CPU execution
-        cudf_df: cuDF DataFrame for GPU execution
-        benchmark: GPUBenchmark instance
-        query_ids: Optional list of queries to compare
-
-    Returns:
-        Comparison results with speedup metrics
-    """
 
     queries = query_ids or list(benchmark._queries.keys())
     comparison: dict[str, Any] = {
@@ -637,17 +517,14 @@ def compare_cpu_vs_gpu(
     gpu_times = []
 
     for query_id in queries:
-        # CPU execution (using pandas operations)
         cpu_start = time.perf_counter()
         try:
-            # Simplified: just measure basic operations
             _ = pandas_df.groupby("category").agg({"value": ["sum", "mean", "count"]})
             cpu_time_ms = (time.perf_counter() - cpu_start) * 1000
         except Exception as e:
             cpu_time_ms = 0.0
             logger.debug(f"CPU execution failed: {e}")
 
-        # GPU execution
         gpu_result = benchmark.execute_gpu_query(
             cudf_df,
             query_id,
@@ -668,7 +545,6 @@ def compare_cpu_vs_gpu(
             cpu_times.append(cpu_time_ms)
             gpu_times.append(gpu_time_ms)
 
-    # Summary statistics
     if cpu_times and gpu_times:
         avg_cpu = sum(cpu_times) / len(cpu_times)
         avg_gpu = sum(gpu_times) / len(gpu_times)

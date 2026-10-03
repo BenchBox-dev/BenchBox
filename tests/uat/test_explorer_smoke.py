@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/phases/explorer_smoke.py."""
-
 from __future__ import annotations
 
 import json
@@ -48,7 +46,6 @@ def test_skipped_when_node_missing(tmp_path: Path):
 
 
 def test_explorer_smoke_skips_with_reason_when_explorer_absent(tmp_path: Path):
-    """Clean main checkout: explorer build inputs absent -> structured skip, not a hard fail."""
     bundles_dir = tmp_path / "b"
     write_bundle(bundles_dir)
     sentinel = Mock(side_effect=AssertionError("heavy path must not run when explorer is absent"))
@@ -67,13 +64,11 @@ def test_explorer_smoke_skips_with_reason_when_explorer_absent(tmp_path: Path):
     assert "explorer assets absent" in result.skip_reason
     assert result.exit_code() == 0
     sentinel.assert_not_called()
-    # The minimal corpus contract still ran even though the heavy path was skipped.
     contract = (tmp_path / "logs" / "explorer_corpus_contract.json").read_text(encoding="utf-8")
     assert '"bundles": 1' in contract
 
 
 def test_explorer_corpus_contract_runs_regardless_of_node(tmp_path: Path):
-    """The always-on minimal corpus contract validates bundles even with no Node and no explorer."""
     bundles_dir = tmp_path / "b"
     write_bundle(bundles_dir)
     with (
@@ -93,12 +88,6 @@ def test_explorer_corpus_contract_runs_regardless_of_node(tmp_path: Path):
 
 
 def test_explorer_corpus_contract_fails_loudly_on_empty_bundles_without_node(tmp_path: Path):
-    """The minimal corpus contract is a real gate: empty corpus fails even with no Node/explorer.
-
-    uat-fail-advance-consistency w2: corpus problems are a structured phase
-    failure (aborted=True), not an uncaught RuntimeError -- so the failure
-    flows through the orchestrator's abort-artifact machinery.
-    """
     with (
         patch.object(explorer_smoke, "explorer_present", return_value=False),
         patch.object(explorer_smoke, "has_node", return_value=False),
@@ -157,9 +146,6 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     assert invocations[0][:6] == list(explorer_smoke.EXPLORER_BUILD_ARGV)
     assert "--data-dir" in invocations[0]
     assert invocations[1] == ["npm", "ci"]
-    # UAT delegates build+playwright to the explorer's single npm script and
-    # forwards browser projects via npm's `--` passthrough; it no longer issues
-    # `npm run build` / `npx playwright` itself.
     assert invocations[2] == [
         "npm",
         "run",
@@ -208,12 +194,6 @@ def test_default_playwright_fixture_dir_is_scoped_to_log_dir(tmp_path: Path):
 
 
 def test_delegated_npm_script_targets_external_corpus_tag():
-    """The explorer's delegated smoke script must grep the tag UAT delegates to.
-
-    UAT no longer issues the Playwright grep itself; it calls
-    EXPLORER_SMOKE_NPM_SCRIPT. Pin the contract so the package.json script and
-    the UAT tag constant cannot drift apart.
-    """
     package_json = json.loads((explorer_smoke.EXPLORER_DIR / "package.json").read_text(encoding="utf-8"))
     script = package_json["scripts"][explorer_smoke.EXPLORER_SMOKE_NPM_SCRIPT]
     assert explorer_smoke.EXTERNAL_CORPUS_SMOKE_TAG in script
@@ -310,12 +290,6 @@ def test_external_corpus_contract_fails_before_playwright_for_empty_bundles(tmp_
 
 
 def test_explorer_smoke_reports_malformed_bundle_as_structured_abort(tmp_path: Path):
-    """A malformed (not just empty) corpus also becomes a structured abort, not a raise.
-
-    uat-fail-advance-consistency w2 covers both raise sites in
-    `_validate_external_corpus`: no bundles at all, and bundles present but
-    failing the contract (missing required fields here).
-    """
     bundles_dir = tmp_path / "b"
     bundles_dir.mkdir(parents=True)
     (bundles_dir / "broken.json").write_text(json.dumps({"queries": []}), encoding="utf-8")
@@ -333,7 +307,6 @@ def test_explorer_smoke_reports_malformed_bundle_as_structured_abort(tmp_path: P
     assert result.exit_code() == 2
     assert "missing benchmark.id" in (result.abort_reason or "")
     sentinel.assert_not_called()
-    # The corpus contract JSON still lands with the errors on the abort path.
     contract = json.loads((tmp_path / "logs" / "explorer_corpus_contract.json").read_text(encoding="utf-8"))
     assert contract["errors"]
 

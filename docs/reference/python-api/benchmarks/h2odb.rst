@@ -56,14 +56,6 @@ H2ODB Class
 
 **Constructor**:
 
-.. code-block:: python
-
-    H2ODB(
-        scale_factor: float = 1.0,
-        output_dir: Optional[Union[str, Path]] = None,
-        **kwargs
-    )
-
 **Parameters**:
 
 - **scale_factor** (float): Data size multiplier (1.0 ≈ 1M rows, ~100MB)
@@ -85,6 +77,8 @@ Get SQL to create the TRIPS table with taxi trip data schema.
 **get_schema() -> dict[str, dict]**
 
 Get the table-definition mapping for the TRIPS table.
+
+The facade annotation says ``list[dict]``, but the delegated implementation returns a table-name mapping.
 
 Query Methods
 ~~~~~~~~~~~~~

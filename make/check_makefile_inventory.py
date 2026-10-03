@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Fail closed when BenchBox's evaluated Make contract or migration baseline drifts."""
 
 from __future__ import annotations
 
@@ -56,7 +55,7 @@ class SourceLine:
 
 
 class InventoryError(RuntimeError):
-    """The Make source cannot be inventoried safely."""
+    pass
 
 
 def _digest(lines: Sequence[str]) -> str:
@@ -81,7 +80,6 @@ def _resolve_include(raw: str, root: Path, source: Path) -> Path:
 
 
 def expand_make_sources(root: Path) -> tuple[list[SourceLine], list[str]]:
-    """Expand mandatory includes in parse order, rejecting cycles and ambiguity."""
 
     root = root.resolve()
     include_order: list[str] = []
@@ -129,7 +127,6 @@ def _contract_digest(inventory: dict[str, Any]) -> str:
 
 
 def build_inventory(root: Path) -> dict[str, Any]:
-    """Build a deterministic contract independent of which file owns a rule."""
 
     root = root.resolve()
     lines, include_order = expand_make_sources(root)
@@ -312,11 +309,6 @@ def _compare_baseline_rules(baseline: dict[str, Any], current: dict[str, Any]) -
 
 
 def compare_migration(root: Path, actual: dict[str, Any] | None = None) -> list[str]:
-    """Compare today's graph to the original reviewed extraction.
-
-    This is an explicit historical verification, not the ongoing inventory
-    policy: intentional future contract changes are allowed to diverge.
-    """
 
     root = root.resolve()
     baseline_path = root / BASELINE_PATH
@@ -369,7 +361,6 @@ def compare_migration(root: Path, actual: dict[str, Any] | None = None) -> list[
 
 
 def build_migration_proof(baseline: dict[str, Any], extracted: dict[str, Any]) -> dict[str, Any]:
-    """Build the compact, immutable record of the reviewed initial extraction."""
 
     return {
         "schema_version": MIGRATION_PROOF_SCHEMA_VERSION,
@@ -407,7 +398,6 @@ def _load_migration_proof(path: Path) -> dict[str, Any]:
 
 
 def validate_migration_proof(root: Path) -> list[str]:
-    """Validate immutable historical metadata without freezing today's contract."""
 
     root = root.resolve()
     baseline_path = root / BASELINE_PATH
@@ -459,7 +449,6 @@ def validate_migration_proof(root: Path) -> list[str]:
 
 
 def verify_current_migration(root: Path) -> list[str]:
-    """Reproduce the historical proof against a checkout of the initial split."""
 
     root = root.resolve()
     problems = validate_migration_proof(root)

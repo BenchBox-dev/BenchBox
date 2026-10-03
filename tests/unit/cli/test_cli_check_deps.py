@@ -1,11 +1,6 @@
-"""Tests for the CLI check-deps command.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the dependency checking CLI command functionality.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -21,8 +16,6 @@ pytestmark = [
 
 
 class TestCheckDepsCommand:
-    """Test the check-deps CLI command."""
-
     def test_check_deps_command_exists(self):
 
         runner = CliRunner()
@@ -45,17 +38,14 @@ class TestCheckDepsCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
     def test_check_deps_overview(self, mock_list_groups, mock_check_deps):
-        """Test check-deps without specific platform (overview mode)."""
-        # Mock dependency groups
         mock_groups = {
             "clickhouse": MagicMock(description="ClickHouse driver", packages=["clickhouse-driver"]),
             "databricks": MagicMock(description="Databricks connector", packages=["databricks-sql-connector"]),
-            "cloud": MagicMock(),  # Should be skipped in overview
-            "all": MagicMock(),  # Should be skipped in overview
+            "cloud": MagicMock(),
+            "all": MagicMock(),
         }
         mock_list_groups.return_value = mock_groups
 
-        # Mock dependency checking - clickhouse available, databricks not
         def mock_check(platform, packages):
             if platform == "clickhouse":
                 return True, []
@@ -70,9 +60,9 @@ class TestCheckDepsCommand:
 
         assert result.exit_code == 0
         assert "BenchBox Dependency Status" in result.output
-        assert "✅" in result.output  # Should show success for clickhouse
-        assert "❌" in result.output  # Should show failure for databricks
-        assert "Installation Guide" in result.output  # Decision tree
+        assert "✅" in result.output
+        assert "❌" in result.output
+        assert "Installation Guide" in result.output
 
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.utils.dependencies.list_available_dependency_groups")
@@ -87,7 +77,7 @@ class TestCheckDepsCommand:
             )
         }
         mock_list_groups.return_value = mock_groups
-        mock_check_deps.return_value = (True, [])  # Dependencies available
+        mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
@@ -106,7 +96,7 @@ class TestCheckDepsCommand:
             )
         }
         mock_list_groups.return_value = mock_groups
-        mock_check_deps.return_value = (False, ["databricks-sql-connector"])  # Missing deps
+        mock_check_deps.return_value = (False, ["databricks-sql-connector"])
 
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
@@ -238,14 +228,11 @@ class TestCheckDepsCommand:
 
 
 class TestCheckDepsIntegration:
-    """Integration tests for check-deps command."""
-
     def test_check_deps_real_execution(self):
 
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps"])
 
-        # Should run without errors
         assert result.exit_code == 0
         assert "BenchBox Dependency Status" in result.output
 
@@ -254,9 +241,7 @@ class TestCheckDepsIntegration:
         runner = CliRunner()
         result = runner.invoke(cli, ["check-deps", "--platform", "databricks"])
 
-        # Should run without errors regardless of whether deps are installed
         assert result.exit_code == 0
-        # Should show either success or failure message
         assert (
             "✅ databricks dependencies are installed" in result.output
             or "❌ databricks missing dependencies" in result.output

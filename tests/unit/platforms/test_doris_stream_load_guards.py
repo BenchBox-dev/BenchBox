@@ -1,14 +1,6 @@
-"""Unit tests for Doris Stream Load header and response guards.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins _stream_load_headers output (Expect/format defaults, delimiter and
-TPC quote-trimming conditionals) and _handle_stream_load_response behavior
-(non-200 rejection, failed-status rejection with message, silent partial
-load refusal at max_filter_ratio=0, and warning-then-accept otherwise).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

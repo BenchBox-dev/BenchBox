@@ -1,5 +1,3 @@
-"""Tests for preflight query generation validation for TPC-DS and TPC-H."""
-
 from unittest.mock import Mock
 
 import pytest
@@ -15,7 +13,6 @@ def _mk_tpcds_power(raise_on_ids=None):
     from benchbox.core.tpcds.power_test import TPCDSPowerTest
 
     bench = TPCDSBenchmark(scale_factor=1.0, verbose=False)
-    # Patch benchmark.get_query to simulate dsqgen failures for certain IDs
     raise_on_ids = set(raise_on_ids or [])
 
     def _get_query(query_id, **kwargs):
@@ -48,7 +45,6 @@ def _mk_tpch_power(raise_on_ids=None):
 def test_tpcds_power_preflight_detects_generation_failures():
     power = _mk_tpcds_power(raise_on_ids={3, 17})
     with pytest.raises(RuntimeError) as ei:
-        # Call run which performs preflight first
         power.run()
     assert "preflight failed" in str(ei.value).lower()
 
@@ -74,7 +70,6 @@ def _mk_tpcds_throughput(num_streams=2):
 
 
 def _fake_dsqgen_streams(num_streams, query_ids=(3, 7, 17)):
-    """Stand in for one `dsqgen -STREAMS` batch pass."""
     from benchbox.core.tpcds.streams import StreamQuery
 
     return {
@@ -87,7 +82,6 @@ def _fake_dsqgen_streams(num_streams, query_ids=(3, 7, 17)):
 
 
 def test_tpcds_throughput_preflight_detects_dsqgen_batch_failure(monkeypatch):
-    """A failed `dsqgen -STREAMS` pass must fail fast, before the timed window."""
     from benchbox.core.tpcds import streams
 
     def _boom(**kwargs):
@@ -101,7 +95,6 @@ def test_tpcds_throughput_preflight_detects_dsqgen_batch_failure(monkeypatch):
 
 
 def test_tpcds_throughput_preflight_detects_generation_failures(monkeypatch):
-    """A per-query translation failure must fail fast, before the timed window."""
     from benchbox.core.tpcds import streams
 
     monkeypatch.setattr(streams, "generate_dsqgen_streams", lambda **kw: _fake_dsqgen_streams(kw["num_streams"]))

@@ -1,13 +1,4 @@
-"""Unit tests for DataFrame Platform Capabilities and Memory Management.
-
-Tests for:
-- PlatformCapabilities dataclass
-- Memory estimation
-- Scale factor validation
-- Memory sufficiency checking
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -33,8 +24,6 @@ pytestmark = [
 
 
 class TestPlatformCapabilities:
-    """Tests for PlatformCapabilities dataclass."""
-
     def test_polars_capabilities(self):
 
         caps = get_platform_capabilities("polars")
@@ -60,7 +49,7 @@ class TestPlatformCapabilities:
 
         assert caps.platform_name == "cuDF"
         assert caps.gpu_required is True
-        assert caps.max_recommended_sf <= 5.0  # Limited by GPU VRAM
+        assert caps.max_recommended_sf <= 5.0
 
     def test_dask_capabilities(self):
 
@@ -104,11 +93,9 @@ class TestPlatformCapabilities:
 
         caps = get_platform_capabilities("pandas")
 
-        # SF 1 with 2.5x overhead = 2.5 GB
         mem = caps.estimate_memory_for_sf(1.0)
         assert mem == pytest.approx(2.5, rel=0.1)
 
-        # SF 10 with 2.5x overhead = 25 GB
         mem = caps.estimate_memory_for_sf(10.0)
         assert mem == pytest.approx(25.0, rel=0.1)
 
@@ -122,8 +109,6 @@ class TestPlatformCapabilities:
 
 
 class TestListPlatformCapabilities:
-    """Tests for list_platform_capabilities function."""
-
     def test_returns_all_platforms(self):
 
         caps = list_platform_capabilities()
@@ -138,14 +123,11 @@ class TestListPlatformCapabilities:
         caps1 = list_platform_capabilities()
         caps2 = list_platform_capabilities()
 
-        # Modifying one shouldn't affect the other
         caps1["polars"] = None
         assert caps2["polars"] is not None
 
 
 class TestEstimateMemoryRequired:
-    """Tests for estimate_memory_required function."""
-
     def test_tpch_estimate(self):
 
         estimate = estimate_memory_required("tpch", 10.0, "polars")
@@ -154,7 +136,6 @@ class TestEstimateMemoryRequired:
         assert estimate.scale_factor == 10.0
         assert estimate.platform == "Polars"
         assert estimate.raw_data_gb == 10.0
-        # Polars has 2.0x overhead
         assert estimate.estimated_memory_gb == pytest.approx(20.0)
 
     def test_tpcds_estimate(self):
@@ -170,13 +151,10 @@ class TestEstimateMemoryRequired:
         polars_est = estimate_memory_required("tpch", 10.0, "polars")
         pandas_est = estimate_memory_required("tpch", 10.0, "pandas")
 
-        # Pandas has higher overhead than Polars
         assert pandas_est.estimated_memory_gb > polars_est.estimated_memory_gb
 
 
 class TestValidateScaleFactor:
-    """Tests for validate_scale_factor function."""
-
     def test_valid_scale_factor(self):
 
         is_valid, warning = validate_scale_factor(1.0, "polars")
@@ -192,7 +170,6 @@ class TestValidateScaleFactor:
         assert warning is None
 
     def test_above_limit_non_strict(self):
-        """Test scale factor above limit (non-strict mode)."""
         is_valid, warning = validate_scale_factor(200.0, "polars", strict=False)
 
         assert is_valid is True
@@ -200,7 +177,6 @@ class TestValidateScaleFactor:
         assert "exceeds" in warning.lower()
 
     def test_above_limit_strict(self):
-        """Test scale factor above limit (strict mode)."""
         is_valid, warning = validate_scale_factor(200.0, "polars", strict=True)
 
         assert is_valid is False
@@ -221,8 +197,6 @@ class TestValidateScaleFactor:
 
 
 class TestCheckSufficientMemory:
-    """Tests for check_sufficient_memory function."""
-
     def test_result_structure(self):
 
         result = check_sufficient_memory("tpch", 1.0, "polars")
@@ -234,33 +208,25 @@ class TestCheckSufficientMemory:
         assert hasattr(result, "suggestions")
 
     def test_bool_conversion(self):
-        """Test boolean conversion of result."""
-        # Small SF should be safe
         result = check_sufficient_memory("tpch", 0.01, "polars")
 
-        # Result can be used as boolean
         if result:
-            pass  # Should work
+            pass
 
     def test_provides_suggestions_on_failure(self):
 
-        # Very large SF likely to fail memory check
         result = check_sufficient_memory("tpch", 10000.0, "pandas")
 
         if not result.is_safe:
             assert len(result.suggestions) > 0
 
     def test_gpu_required_check(self):
-        """Test GPU requirement checking for cuDF."""
         result = check_sufficient_memory("tpch", 1.0, "cudf")
 
-        # Either GPU is available or we get a helpful error
         assert result.message is not None
 
 
 class TestFormatMemoryWarning:
-    """Tests for format_memory_warning function."""
-
     def test_formatting(self):
 
         result = MemoryCheckResult(
@@ -282,8 +248,6 @@ class TestFormatMemoryWarning:
 
 
 class TestRecommendPlatformForSf:
-    """Tests for recommend_platform_for_sf function."""
-
     def test_small_sf(self):
 
         platform = recommend_platform_for_sf(1.0)
@@ -306,8 +270,6 @@ class TestRecommendPlatformForSf:
 
 
 class TestDataFormat:
-    """Tests for DataFormat enum."""
-
     def test_formats(self):
 
         assert DataFormat.CSV.value == "csv"
@@ -316,8 +278,6 @@ class TestDataFormat:
 
 
 class TestExecutionModel:
-    """Tests for ExecutionModel enum."""
-
     def test_models(self):
 
         assert ExecutionModel.EAGER.value == "eager"
@@ -327,8 +287,6 @@ class TestExecutionModel:
 
 
 class TestAllPlatformsHaveCapabilities:
-    """Test that all expected platforms have defined capabilities."""
-
     @pytest.mark.parametrize(
         "platform",
         ["polars", "pandas", "cudf", "dask", "vaex", "pyspark", "datafusion"],

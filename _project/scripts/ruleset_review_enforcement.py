@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""Predicates for live develop-review and v* tag-creation enforcement.
-
-The develop ruleset's ``require_code_owner_review`` parameter is a
-repo-admin control for CODEOWNERS-owned soundness paths. It is deliberately
-checked without asserting ``required_approving_review_count``: that count is
-branch-wide and would gate every develop PR. The same predicate is used by
-the standalone CLI and ``scripts/ruleset_drift_check.py``'s canary wiring.
-
-The v* tag-creation predicate remains in this module as the second live
-ruleset control. Both predicates fail closed on missing or incomplete live
-payloads; the caller decides whether a finding is blocking during an explicit
-migration override.
-"""
 
 from __future__ import annotations
 
@@ -24,8 +11,6 @@ from typing import Any
 
 from auto_merge_soundness_paths import SOUNDNESS_FILES, SOUNDNESS_PREFIXES
 
-# Human-readable globs for the CODEOWNERS-owned soundness surface, derived from
-# the shared predicate so this narration cannot drift from auto-merge gating.
 SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
     tuple(f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES)
     + SOUNDNESS_FILES
@@ -50,7 +35,6 @@ CLI_DESCRIPTION = (
 
 
 def extract_rules(payload: Any) -> list[dict[str, Any]]:
-    """Normalize either a ``rules/branches`` list or a full ruleset object."""
     if isinstance(payload, list):
         return [rule for rule in payload if isinstance(rule, dict)]
     if isinstance(payload, dict):
@@ -67,7 +51,6 @@ def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
-    """Return reasons the develop ruleset lacks required review enforcement."""
     params = _pull_request_parameters(rules)
     if params is None:
         return [
@@ -88,35 +71,15 @@ def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
 
 
 def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
-    """True when the ruleset requires a code-owner review and review thread resolution."""
     return not review_enforcement_findings(rules)
 
 
-# ---------------------------------------------------------------------------
-# v* tag-creation protection (tag-and-pypi-environment-admin-hardening w3)
-# ---------------------------------------------------------------------------
-
-# Enforcement flag (blocking after live application).
-# The v* tag-creation ruleset was applied by admin on 2026-07-10 (ruleset id
-# 18774756 ``v-tag-restricted``; see docs/operations/repo-admin-settings.md,
-# "Tag creation restricted to release flow"), so this is flipped to True:
-# ``tag_protection_findings`` for a missing/incomplete tag ruleset are now a
-# BLOCKING drift finding rather than a non-blocking warning. The bypass list
-# was confirmed to be the release-finalize identity only (User:57046) before
-# flipping, per the runbook's "CONFIRM before enforcing" gate.
 TAG_RULESET_ENFORCED = True
 
-# The ref pattern the release flow tags with (make release-finalize pushes v*).
 TAG_REF_PATTERN = "refs/tags/v*"
 
 
 def _tag_glob_covers(pattern: str) -> bool:
-    """True if a ref-name glob ``pattern`` matches every ``refs/tags/v*`` ref.
-
-    Simulate the glob NFA over the literal ``refs/tags/v`` prefix. Coverage is
-    proven only when a reachable trailing ``*`` can consume every possible
-    suffix. Finite samples cannot establish that language containment.
-    """
     tokens: list[str] = []
     index = 0
     while index < len(pattern):
@@ -166,51 +129,6 @@ def _tag_glob_covers(pattern: str) -> bool:
 def tag_protection_findings(
     rulesets: list[dict[str, Any]], *, require_bypass_actor_visibility: bool = False
 ) -> list[str]:
-    """Reasons the live rulesets fail to restrict ``v*`` tag *creation*.
-
-    Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
-    ref conditions cover ``refs/tags/v*`` (or ``~ALL``) AND that carries a
-    ``creation`` rule. That is the repo-admin layer closing the last
-    zero-human path to publish: ``release.yml``'s ``verify-tag-on-release`` only
-    stops a tag that does not point at a release-ancestor commit; it does nothing
-    to stop a collaborator with push access from creating a ``v*`` tag ON an
-    existing release commit out of band. A tag-creation ruleset restricts who may
-    mint the tag in the first place.
-
-    Accepts FULL ruleset objects (``GET /repos/{o}/{r}/rulesets/{id}``). The
-    list endpoint's summaries omit ``conditions`` / ``rules``, so a
-    summary-only payload correctly reports the detail as missing rather than
-    passing on absent evidence (never green on unverified input). Rulesets
-    that target branches (e.g. ``v-release-branches-minimal`` →
-    ``refs/heads/v*``) are ``target != "tag"`` and never count.
-
-    ``include``/``exclude`` ref-name conditions are GitHub fnmatch-style globs,
-    not exact strings: an ``include`` of ``refs/tags/*`` covers ``refs/tags/v*``
-    just as well as the literal pattern, and an ``exclude`` of ``refs/tags/*``
-    negates that coverage even though it is not byte-identical to
-    ``TAG_REF_PATTERN``. Coverage is proven by glob-language containment, not
-    sampled ref names. ``~ALL`` is GitHub's literal sentinel for "every ref"
-    and is matched by exact string.
-
-    NOTE on ``bypass_actors``: this predicate deliberately does NOT treat a
-    non-empty bypass list as a structural failure. This TODO's must_preserve
-    REQUIRES a bypass path (``make release-finalize`` must still create ``v*``
-    tags), so demanding zero bypass actors would brick the release flow. But an
-    explicitly-empty bypass list (``bypass_actors: []``, as returned by the full
-    ruleset GET when none are configured) is the OTHER failure mode of the same
-    requirement: a structurally-valid ruleset with no exception for the
-    release-finalize identity blocks ``make release-finalize``'s own
-    ``git push origin v$(VERSION)``, bricking releases outright. That case is a
-    finding here, not just an advisory. A MISSING ``bypass_actors`` key (as
-    opposed to a present-but-empty list) is left unasserted — it means the
-    caller didn't populate that field at all (e.g. a partial/synthetic
-    payload), not that GitHub confirmed there are zero bypass actors. A
-    non-empty bypass list is still not a structural failure (must_preserve
-    requires the bypass path to exist) but its actor list is a real hole if
-    too broad, so it is surfaced via :func:`tag_bypass_advisory` (rendered by
-    ``main`` and required in the runbook's live-state note) for human
-    confirmation before a live enforcement decision — never passed silently.
-    """
     tag_rulesets = [rs for rs in rulesets if isinstance(rs, dict) and rs.get("target") == "tag"]
     if not tag_rulesets:
         return [
@@ -249,17 +167,6 @@ def tag_protection_findings(
 
 
 def tag_bypass_advisory(rulesets: list[dict[str, Any]]) -> list[str]:
-    """Bypass actors on the covering ``v*`` tag ruleset that a human must confirm.
-
-    Empty list == no protecting tag ruleset, a protecting one with an
-    explicitly-empty ``bypass_actors: []`` (both already surfaced as findings
-    by :func:`tag_protection_findings`, so not repeated here), or a protecting
-    one where ``bypass_actors`` is simply absent from the payload. A non-empty
-    result is NOT a failure — it is the list the operator must confirm is
-    release-flow-only before flipping ``TAG_RULESET_ENFORCED`` (must_preserve:
-    the release identity legitimately needs bypass; a broad role in this list
-    is the hole).
-    """
     if tag_protection_findings(rulesets):
         return []
     for ruleset in rulesets:
@@ -284,18 +191,15 @@ def tag_bypass_advisory(rulesets: list[dict[str, Any]]) -> list[str]:
 
 
 def is_tag_creation_protected(rulesets: list[dict[str, Any]]) -> bool:
-    """True when a ``v*`` tag-creation ruleset restricts out-of-band tagging."""
     return not tag_protection_findings(rulesets)
 
 
 def _load_rulesets(raw_source: str) -> list[dict[str, Any]]:
-    """Load a JSON array of FULL ruleset objects from a file path or '-' (stdin)."""
     raw = sys.stdin.read() if raw_source == "-" else Path(raw_source).read_text(encoding="utf-8")
     payload = json.loads(raw)
     if isinstance(payload, list):
         return [rs for rs in payload if isinstance(rs, dict)]
     if isinstance(payload, dict):
-        # Tolerate a single ruleset object as well as a bare list.
         return [payload]
     return []
 
@@ -352,8 +256,6 @@ def main(argv: list[str] | None = None) -> int:
             print("# Tag-creation ruleset - OK")
             print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
             for advisory in tag_bypass_advisory(rulesets):
-                # Not a failure (must_preserve requires a bypass path), but
-                # the operator must confirm the actor list remains release-scoped.
                 print(f"- CONFIRM before enforcing: {advisory}")
             return 0
         if TAG_RULESET_ENFORCED:
@@ -361,8 +263,6 @@ def main(argv: list[str] | None = None) -> int:
             for finding in tag_findings:
                 print(f"- {finding}")
             return 1
-        # Retain an explicit warning-only escape hatch for migration callers;
-        # the live default is TAG_RULESET_ENFORCED=True above.
         print("# Tag-creation ruleset - WARNING (non-blocking, enforcement override)")
         for finding in tag_findings:
             print(f"- WARNING (non-blocking): {finding}")

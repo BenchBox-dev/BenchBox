@@ -1,104 +1,3 @@
-"""Shared concurrent-stream executor for TPC throughput tests.
-
-``StreamRunner`` provides two static methods extracted from the near-identical
-``run()`` bodies in TPC-H and TPC-DS throughput_test modules:
-
-* ``execute()`` - ThreadPoolExecutor block, future collection, timeout/error
-  handling; mutates the ``ThroughputResult`` in-place.
-* ``compute_metrics()`` - TTT calculation, Throughput@Size, query throughput;
-  also mutates ``ThroughputResult`` in-place.
-
-Per-stream success is enforced here at the shared metric boundary: every
-requested stream must complete successfully before Throughput@Size is valid.
-Spec-local harnesses may still report their historical configurable success
-rate, but the product/export path cannot turn partial success into a score.
-Verbose summary logging remains spec-local because the two specs format their
-details differently.
-
-Timed-out streams
-------------------
-Python cannot forcibly cancel a running thread. ``execute()`` therefore
-offers two complementary, both-optional mitigations for a stream that
-exceeds ``config.stream_timeout``:
-
-* **Detection/surfacing** (always on): the per-stream timeout is enforced
-  via ``concurrent.futures.as_completed(pending, timeout=...)`` -- NOT via
-  ``future.result(timeout=...)`` on an already-completed future, which can
-  never raise ``TimeoutError`` and would silently make timeout enforcement
-  a no-op. Any stream still not ``done()`` when the deadline elapses is
-  recorded as timed-out/leaked in ``result.errors`` and logged via
-  ``logger.warning`` unconditionally (not gated on ``config.verbose``),
-  because a leaked background stream can keep consuming CPU/DB connections
-  and skew a subsequent phase's timing -- this must not be silent.
-* **Cooperative cancellation** (opt-in via ``config.cancel_on_timeout``,
-  default ``False``): when enabled, every stream gets a ``threading.Event``
-  exposed on ``config._stream_cancel_events`` that each spec's
-  ``_execute_stream`` query loop polls between queries. On timeout, this
-  method sets that stream's event so its loop can notice and return soon
-  after its current query finishes -- the only safe way to make a timeout
-  actually stop work without hard-killing a thread. When disabled,
-  ``execute()`` explicitly resets ``config._stream_cancel_events`` to ``{}``
-  (never leaving a stale dict from a prior call on a reused config object);
-  each spec's cancel-event lookup also independently gates on
-  ``config.cancel_on_timeout`` directly, so a stale/leftover attribute value
-  can never be mistaken for this run's cancellation state.
-
-Non-blocking shutdown (return without joining a leaked thread)
-----------------------------------------------------------------
-``execute()`` manages the ``ThreadPoolExecutor`` manually (no ``with``
-block) so it can call ``executor.shutdown(wait=False, cancel_futures=True)``
-in a ``finally`` instead of relying on the context manager's implicit
-``shutdown(wait=True)``. This means ``execute()`` returns as soon as its
-own timeout/accounting window closes -- bounded by ``config.stream_timeout``
-plus classification overhead -- rather than blocking until every submitted
-thread finishes.
-
-On the healthy path (no timeout fires), every future is already ``done()``
-by the time ``as_completed()`` returns, so this call is a no-op: there is
-nothing left to join or cancel, and default-timeout behavior for healthy
-runs is unchanged. On the hung path, two distinct futures can remain
-outstanding at the deadline:
-
-* **Running** (already dispatched to a worker thread): *abandoned*, not
-  killed -- Python cannot forcibly stop a running thread. ``cancel_futures``
-  never touches these (Python's documented semantics only cancel futures
-  that have not started running); the leaked thread keeps executing in the
-  background until ``stream_fn`` itself returns (naturally, or via
-  cooperative cancellation if enabled) and exits.
-* **Queued** (submitted, but ``max_workers < num_streams`` left it still
-  waiting for a worker): ``cancel_futures=True`` cancels these outright, so
-  they never start at all. Without this, a queued stream would begin
-  executing only *after* ``execute()`` has already returned and counted it
-  as timed-out -- extra DB work that can overlap with whatever phase runs
-  next.
-
-**Zombie connection/accounting semantics** (see also
-``docs/development/throughput-result-alignment.md``): a leaked stream's
-database connection is owned by that stream's own ``stream_fn`` and is
-closed by its own ``finally`` block whenever the thread eventually ends --
-``execute()`` never touches it. Until then, the zombie thread holds an open
-session and may still be issuing queries against the database after
-``execute()`` -- and the whole throughput phase -- has returned; a
-subsequent phase (e.g. data maintenance) that starts immediately after can
-run concurrently with it. This residual hazard is why cooperative
-cancellation (bounding the zombie's remaining lifetime to ~one more query)
-is recommended whenever a hard stream_timeout matters operationally. TTT
-and success-rate accounting are unaffected: a leaked stream was already
-excluded from ``result.stream_results`` (and therefore from TTT and
-``streams_successful``) under the *old* blocking behavior too -- it only
-contributes to ``result.streams_executed`` and ``result.errors``, exactly
-as before. What changes here is only how long ``execute()`` itself blocks
-before returning, not what gets counted.
-
-**Containment** (see ``benchbox/core/throughput/containment.py``): the
-timeout path additionally records *which* streams are still running
-(``result.outstanding_stream_ids``), which queued streams were cancelled
-before dispatch (``result.cancelled_stream_ids``), and the last observable
-cleanup state. Combined runners refuse the next measured phase while work
-is outstanding and release the boundary only after
-``await_quiescence()`` observes termination.
-"""
-
 from __future__ import annotations
 
 import concurrent.futures
@@ -119,17 +18,6 @@ from .result import (
 
 
 class _RunnerConfig(Protocol):
-    """Structural type for config objects accepted by StreamRunner.
-
-    Both ``TPCHThroughputTestConfig`` and ``TPCDSThroughputTestConfig``
-    satisfy this protocol; no explicit ``implements`` declaration is needed.
-
-    ``cancel_on_timeout`` is deliberately NOT declared here: it is an
-    optional, opt-in attribute read defensively via ``getattr(...,
-    False)`` in ``execute()`` so configs (and test doubles) that predate it
-    keep working unchanged.
-    """
-
     num_streams: int
     max_workers: int | None
     base_seed: int
@@ -139,8 +27,6 @@ class _RunnerConfig(Protocol):
 
 
 class StreamRunner:
-    """Concurrent-stream executor shared by TPC-H and TPC-DS throughput tests."""
-
     @staticmethod
     def _finalize_tentatively_cancelled(
         result: ThroughputResult,
@@ -149,11 +35,6 @@ class StreamRunner:
         leaked_error: Callable[[int], str],
         logger: logging.Logger,
     ) -> dict[int, concurrent.futures.Future[ThroughputStreamResult]]:
-        """Verify post-shutdown what happened to queued-at-deadline futures.
-
-        Returns the subset still owned by running workers (race-window
-        dispatches), keyed by stream id for termination observation.
-        """
         still_owned: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
         for queued_future, queued_stream_id in tentatively_cancelled:
             if queued_future.cancelled():
@@ -165,8 +46,6 @@ class StreamRunner:
             elif queued_future.done():
                 record_completed(queued_future, queued_stream_id)
             else:
-                # Dispatched in the race window despite shutdown: still
-                # owned by its worker until it terminates.
                 result.streams_executed += 1
                 result.outstanding_stream_ids.append(queued_stream_id)
                 still_owned[queued_stream_id] = queued_future
@@ -185,33 +64,9 @@ class StreamRunner:
         result: ThroughputResult,
         logger: logging.Logger,
     ) -> None:
-        """Run all streams concurrently and populate *result* in-place.
-
-        Submits ``config.num_streams`` futures via a ``ThreadPoolExecutor``,
-        collects results (or timeout/exception errors), and increments
-        ``result.streams_executed``, ``result.streams_successful``, and
-        ``result.errors``.
-
-        Args:
-            stream_fn: Callable accepting ``(stream_id, seed, config)`` and
-                returning a ``ThroughputStreamResult``.  Typically
-                ``self._execute_stream`` from the spec test class.
-            config: Test configuration satisfying ``_RunnerConfig``.
-            result: Mutable ``ThroughputResult`` to accumulate stream outcomes.
-            logger: Spec-local logger for verbose and error messages.
-        """
         max_workers = config.max_workers or config.num_streams
         timeout: float | None = config.stream_timeout if config.stream_timeout > 0 else None
 
-        # The as_completed(timeout=...) deadline below is a single overall
-        # wait bound, not a per-future one (see the NOTE at that call site).
-        # Treating it as equivalent to each stream's own per-stream timeout
-        # relies on every stream starting to run immediately -- true only
-        # when max_workers >= num_streams (all streams submitted back-to-back
-        # with no queueing). If max_workers < num_streams, later streams sit
-        # queued behind earlier ones and are still charged against the same
-        # t0 deadline, so a queued stream could be flagged as timed-out
-        # before it ever ran a single query.
         if max_workers < config.num_streams and timeout is not None:
             logger.warning(
                 f"max_workers ({max_workers}) < num_streams ({config.num_streams}) with a "
@@ -221,42 +76,17 @@ class StreamRunner:
                 "for the timeout to behave as a true per-stream timeout."
             )
 
-        # Opt-in cooperative cancellation (default OFF, behavior-preserving).
-        # See module docstring "Timed-out streams" for the full design.
         cooperative_cancel = bool(getattr(config, "cancel_on_timeout", False))
         cancel_events: dict[int, threading.Event] = {}
 
-        # Managed manually (no `with` block): the context manager's implicit
-        # `__exit__` calls `shutdown(wait=True)`, which would block this
-        # method's return on every submitted thread -- including a leaked
-        # one that never completes. The `finally` below calls
-        # `shutdown(wait=False)` instead, so a still-running (abandoned, not
-        # killed) thread cannot hold `execute()` hostage. See the module
-        # docstring "Non-blocking shutdown" section for the full rationale
-        # and the zombie connection/accounting semantics this implies.
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         try:
-            # Track future -> stream_id mapping for timeout error reporting
             future_to_stream_id: dict[concurrent.futures.Future[ThroughputStreamResult], int] = {}
 
             if cooperative_cancel:
                 cancel_events = {stream_id: threading.Event() for stream_id in range(config.num_streams)}
-                # Runtime-only attribute (not a declared config field) so each
-                # spec's _execute_stream query loop can poll its own stream's
-                # event between queries; set() below when that stream's own
-                # timeout elapses.
                 config._stream_cancel_events = cancel_events  # type: ignore[attr-defined]
             else:
-                # Explicitly reset (never leave stale) -- if this same config
-                # object was reused from a prior execute() call that had
-                # cancel_on_timeout=True and a stream timed out, that stream's
-                # Event would still be set(). Without this reset, this run's
-                # _resolve_cancel_event would observe the leftover dict purely
-                # by presence and immediately treat an unrelated stream as
-                # cancelled. Each spec's _resolve_cancel_event also gates on
-                # config.cancel_on_timeout directly as a second, independent
-                # guard -- see that method's docstring -- but resetting here
-                # keeps the attribute itself honest for any other reader.
                 config._stream_cancel_events = {}  # type: ignore[attr-defined]
 
             for stream_id in range(config.num_streams):
@@ -271,13 +101,6 @@ class StreamRunner:
             def _record_completed_future(
                 completed_future: concurrent.futures.Future[ThroughputStreamResult], completed_stream_id: int
             ) -> None:
-                """Apply success/failure accounting for one *completed* future.
-
-                Shared by the main as_completed() loop below and the timeout
-                fallback loop so streams_executed/streams_successful/errors
-                accounting is identical regardless of which loop observed
-                the future's completion.
-                """
                 try:
                     stream_result = completed_future.result()
                     result.stream_results.append(stream_result)
@@ -312,10 +135,6 @@ class StreamRunner:
 
             pending = set(future_to_stream_id.keys())
 
-            # Streams still active at the deadline, split by what can still be
-            # proven about them. Running futures are leaked (abandoned, still
-            # owned by their workers); queued futures are cancelled by the
-            # shutdown below, verified after it runs.
             outstanding_futures: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
             tentatively_cancelled: list[tuple[concurrent.futures.Future[ThroughputStreamResult], int]] = []
 
@@ -334,37 +153,16 @@ class StreamRunner:
                 )
 
             try:
-                # NOTE: `timeout` bounds this as_completed() call as a whole,
-                # not any individual future.result() call. Passing it to
-                # future.result(timeout=...) instead (the previous approach)
-                # is a no-op once as_completed() has already yielded that
-                # future as done() -- it can never raise TimeoutError there,
-                # silently making per-stream timeout enforcement dead code.
-                # Since every stream is submitted back-to-back immediately
-                # before this loop (max_workers defaults to num_streams, i.e.
-                # no queueing), a single overall deadline here is equivalent
-                # to each stream's own per-stream timeout starting from when
-                # it began running.
                 for future in concurrent.futures.as_completed(pending, timeout=timeout):
                     stream_id = future_to_stream_id[future]
                     pending.discard(future)
                     _record_completed_future(future, stream_id)
 
             except concurrent.futures.TimeoutError:
-                # One or more streams did not complete within `timeout`
-                # seconds. Python cannot forcibly cancel a running thread, so
-                # each such stream's worker may still be executing queries
-                # and holding its database connection in the background
-                # (leaked) -- unless cooperative cancellation is enabled,
-                # which signals the stream's loop to stop soon. Futures that
-                # never started running are NOT leaked: they are cancelled by
-                # the shutdown below and verified after it runs.
                 for future in list(pending):
                     stream_id = future_to_stream_id[future]
 
                     if future.done():
-                        # Completed in the small window between the deadline
-                        # firing and us reacting to it; process normally.
                         pending.discard(future)
                         _record_completed_future(future, stream_id)
                         continue
@@ -373,10 +171,6 @@ class StreamRunner:
                         cancel_events[stream_id].set()
 
                     if future.running():
-                        # Still executing: abandoned, not killed. Ownership
-                        # stays with the worker until it terminates; the
-                        # result records the outstanding stream so phase
-                        # boundaries can contain it (see containment.py).
                         result.streams_executed += 1
                         result.outstanding_stream_ids.append(stream_id)
                         outstanding_futures[stream_id] = future
@@ -391,16 +185,8 @@ class StreamRunner:
                             )
                             + "."
                         )
-                        # Always surfaced -- NOT gated on config.verbose. A leaked
-                        # background stream can keep consuming CPU/DB connections
-                        # and skew a subsequent phase's timing, so this must not
-                        # be silent even in non-verbose runs.
                         logger.warning(error_msg)
                     else:
-                        # Queued but never dispatched: shutdown below cancels
-                        # it before it can start (verified after shutdown, so
-                        # a future that races into running is reclassified as
-                        # outstanding rather than silently dropped).
                         tentatively_cancelled.append((future, stream_id))
                         queued_msg = (
                             f"Stream {stream_id} timed out after {timeout}s without starting: "
@@ -411,41 +197,14 @@ class StreamRunner:
                         logger.warning(queued_msg)
                     pending.discard(future)
         finally:
-            # wait=False: never block this method's return on a still-running
-            # (abandoned, not killed) thread. On the healthy path every
-            # future is already done() by this point, so this is a no-op --
-            # nothing to join, default timeout behavior for healthy runs is
-            # unchanged. On the hung path, any already-RUNNING leaked thread
-            # keeps running to completion in the background; its connection
-            # is closed by its own stream_fn's finally whenever that
-            # eventually happens.
-            #
-            # cancel_futures=True: when max_workers < num_streams, a future
-            # can still be QUEUED (never dispatched to a worker) at the
-            # deadline -- distinct from a leaked RUNNING future. Without
-            # this, such a future would start executing only AFTER
-            # execute() has already returned and counted it as timed-out,
-            # creating extra DB work that can overlap with whatever phase
-            # runs next. cancel_futures only cancels futures that have not
-            # started running (Python's documented semantics); an
-            # already-running future is never touched by it, so the
-            # can't-forcibly-cancel-a-running-thread invariant above is
-            # unaffected. See the module docstring "Non-blocking shutdown"
-            # section.
             executor.shutdown(wait=False, cancel_futures=True)
 
-            # Finalize the queued-stream classification now that shutdown has
-            # attempted cancellation. Every pending future still contributes
-            # exactly one streams_executed count, as before.
             outstanding_futures.update(
                 StreamRunner._finalize_tentatively_cancelled(
                     result, tentatively_cancelled, _record_completed_future, _leaked_error, logger
                 )
             )
 
-            # Hand termination observation to the result. The futures are
-            # in-process only (never serialized); containment.py reads them
-            # to prove termination before releasing a phase boundary.
             result._outstanding_futures = outstanding_futures  # type: ignore[attr-defined]
             result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
 
@@ -455,39 +214,18 @@ class StreamRunner:
         config: _RunnerConfig,
         start_time: float,
     ) -> bool:
-        """Compute TTT, Throughput@Size, and query throughput; mutates *result*.
-
-        Sets ``result.end_time``, ``result.total_time``,
-        ``result.throughput_at_size``, and ``result.query_throughput``.
-        A metric is emitted only when every requested stream completed and
-        reported success. Returning ``False`` lets both TPC drivers use this
-        product-level validity gate without duplicating it.
-
-        Args:
-            result: Mutable ``ThroughputResult`` populated by ``execute()``.
-            config: Test configuration (needs ``num_streams`` and
-                ``scale_factor``).
-            start_time: ``mono_time()`` captured before the test body began;
-                used as a fallback total-time when no streams recorded timing.
-        """
         result.end_time = datetime.now().isoformat()
 
-        # Per TPC-H/DS specification: Total Test Time (TTT) is measured from
-        # when the first stream begins execution until the last stream completes.
-        # This is the actual concurrent execution time, excluding setup overhead.
         if result.stream_results:
             first_stream_start = min(sr.start_time for sr in result.stream_results)
             last_stream_end = max(sr.end_time for sr in result.stream_results)
             total_time = last_stream_end - first_stream_start
         else:
-            # Fallback if no streams executed (shouldn't happen in normal operation)
             total_time = elapsed_seconds(start_time)
 
         result.total_time = total_time
 
         if not throughput_result_succeeded(result, config.num_streams) or total_time <= 0:
-            # Keep the internal numeric sentinel compatible with spec-local
-            # log formatting. The adapter/export seam omits this invalid metric.
             result.throughput_at_size = 0.0
             result.query_throughput = 0.0
             result.success = False

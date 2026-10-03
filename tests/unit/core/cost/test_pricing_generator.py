@@ -1,11 +1,3 @@
-"""Tests for scripts/generate_pricing_data.py, the pricing drift guard.
-
-The guard regenerates the vendor-derived sections of pricing_data.yaml from
-the checked-in vendor evidence and fails on drift; the network-touching
-refresh runs on a schedule, never in the PR-blocking path, so every test
-here is offline (the fetchers are covered through fixture-shaped payloads).
-"""
-
 from __future__ import annotations
 
 import io
@@ -63,7 +55,6 @@ MANUAL_TABLES = [
 
 @pytest.fixture()
 def scratch_copy(tmp_path):
-    """Private evidence + pricing copies the generator can rewrite freely."""
     evidence = tmp_path / "pricing_vendor_evidence.yaml"
     pricing = tmp_path / "pricing_data.yaml"
     shutil.copy(EVIDENCE_PATH, evidence)
@@ -72,12 +63,10 @@ def scratch_copy(tmp_path):
 
 
 def test_check_passes_on_committed_data():
-    """The guard arrives green: committed tables match the evidence, unstubbed."""
     assert generator.main(["--check"]) == 0
 
 
 def test_regeneration_is_byte_stable(scratch_copy):
-    """Regenerating onto a scratch copy produces no diff when upstream is unchanged."""
     evidence, pricing = scratch_copy
     before = pricing.read_bytes()
     assert generator.run_regenerate(evidence, pricing) == 0
@@ -85,7 +74,6 @@ def test_regeneration_is_byte_stable(scratch_copy):
 
 
 def test_check_fails_on_edited_value(scratch_copy, capsys):
-    """A deliberately edited generated value makes --check fail."""
     evidence, pricing = scratch_copy
     text = pricing.read_text(encoding="utf-8")
     assert "  dw100c:\n    us: 1.51" in text
@@ -95,7 +83,6 @@ def test_check_fails_on_edited_value(scratch_copy, capsys):
 
 
 def test_check_fails_when_manual_review_due_missing(scratch_copy):
-    """A hand-maintained table without a review date fails the guard."""
     evidence, pricing = scratch_copy
     text = pricing.read_text(encoding="utf-8")
     due_line = "    manual_review_due: '2026-12-17'\n"
@@ -106,7 +93,6 @@ def test_check_fails_when_manual_review_due_missing(scratch_copy):
 
 
 def test_manual_tables_carry_review_due_dates():
-    """Every hand-maintained table pins its next manual review as an ISO date."""
     payload = yaml.safe_load(PRICING_PATH.read_text(encoding="utf-8"))
     for table in MANUAL_TABLES:
         due = payload["provenance"][table]["manual_review_due"]
@@ -114,13 +100,6 @@ def test_manual_tables_carry_review_due_dates():
 
 
 def test_evidence_regions_match_runtime_tables():
-    """The evidence region maps must equal the tables pricing.py resolves.
-
-    Region-parameter pricing resolves each run by region key, so an evidence
-    region missing from (or extra to) the runtime table would silently move
-    published totals; the generator pins the two to each other, keys and
-    values.
-    """
     from benchbox.core.cost import pricing
 
     evidence = generator.load_evidence()
@@ -135,7 +114,6 @@ def test_evidence_regions_match_runtime_tables():
 
 
 def test_region_tables_render_every_observed_region():
-    """Athena/Synapse serverless render one cell per observed region, never a scalar."""
     evidence = generator.load_evidence()
     rendered = generator.render_all_sections(evidence)
     athena = "\n".join(rendered["athena_price_per_tb"])
@@ -149,7 +127,6 @@ def test_region_tables_render_every_observed_region():
 
 
 def test_committed_file_marks_every_generated_section():
-    """Each generated section has exactly one BEGIN/END marker pair."""
     text = PRICING_PATH.read_text(encoding="utf-8")
     for section in GENERATED_SECTIONS:
         assert text.count(f"# BEGIN GENERATED {section} ") == 1, section
@@ -157,7 +134,6 @@ def test_committed_file_marks_every_generated_section():
 
 
 def test_dwu_levels_scale_linearly_from_base_rates():
-    """Every DWU level is its base rate times its multiplier; spot-check literals."""
     evidence = generator.load_evidence()
     rendered = generator.render_all_sections(evidence)
     block = "\n".join(rendered["synapse_dedicated_dwu_prices"])
@@ -174,7 +150,6 @@ def test_dwu_levels_scale_linearly_from_base_rates():
 
 
 def test_other_bucket_carries_the_sa_east_1_observation():
-    """The `other` bucket fails high: it always renders the sa-east-1 value."""
     evidence = generator.load_evidence()
     block = "\n".join(generator.render_all_sections(evidence)["redshift_node_prices"])
     nodes = evidence["redshift_node_prices"]["nodes"]
@@ -184,7 +159,6 @@ def test_other_bucket_carries_the_sa_east_1_observation():
 
 
 def test_evidence_strings_are_canonical():
-    """Every recorded price is already in canonical form, so refresh diffs are real moves."""
     evidence = generator.load_evidence()
     section = evidence["redshift_node_prices"]
     for node, regions in section["nodes"].items():
@@ -198,7 +172,6 @@ def test_evidence_strings_are_canonical():
 
 
 def test_canonical_decimal_refuses_precision_loss():
-    """A value needing more places raises instead of rounding silently."""
     with pytest.raises(generator.PricingGeneratorError):
         generator.canonical_decimal("0.30005", min_places=2, max_places=4)
     with pytest.raises(generator.PricingGeneratorError):
@@ -206,7 +179,6 @@ def test_canonical_decimal_refuses_precision_loss():
 
 
 def test_canonical_decimal_refuses_non_positive_rates():
-    """Zero and negative rates fail closed instead of rendering into tables."""
     with pytest.raises(generator.PricingGeneratorError):
         generator.canonical_decimal("0.00", min_places=2, max_places=4)
     with pytest.raises(generator.PricingGeneratorError):
@@ -214,14 +186,12 @@ def test_canonical_decimal_refuses_non_positive_rates():
 
 
 def test_plan_price_update_keeps_date_on_match():
-    """Numerically equal fetches keep the recorded string (no false drift)."""
     assert generator.plan_price_update("0.30", "0.3000000000", min_places=2, max_places=4) is None
     assert generator.plan_price_update("0.40", "0.4", min_places=2, max_places=2) is None
     assert generator.plan_price_update("0.30", "0.31", min_places=2, max_places=4) == "0.31"
 
 
 def test_refresh_compares_at_emitted_precision():
-    """Feed digits past the table standard narrow half-up instead of flagging drift."""
     assert generator.plan_price_update("3.0427", "3.0426700000", min_places=2, max_places=4) is None
     assert generator.plan_price_update("3.5401", "3.5401300000", min_places=2, max_places=4) is None
     assert generator.plan_price_update("2.42", "2.4194", min_places=2, max_places=2) is None
@@ -233,7 +203,6 @@ def test_refresh_compares_at_emitted_precision():
 
 
 def test_apply_evidence_updates_is_line_local(scratch_copy):
-    """Evidence edits replace one guarded line and preserve comments."""
     evidence, _ = scratch_copy
     text = evidence.read_text(encoding="utf-8")
     update = generator.EvidenceUpdate(("redshift_node_prices", "nodes", "dc2.large"), "us-east-1", "0.25", "0.26")
@@ -247,7 +216,6 @@ def test_apply_evidence_updates_is_line_local(scratch_copy):
 
 
 def test_splice_rejects_unknown_and_duplicate_markers():
-    """Stray or doubled markers fail closed instead of generating around them."""
     evidence = generator.load_evidence()
     rendered = generator.render_all_sections(evidence)
     original = PRICING_PATH.read_text(encoding="utf-8")
@@ -263,7 +231,6 @@ def test_splice_rejects_unknown_and_duplicate_markers():
 
 
 def test_extract_aws_prices_indexes_by_attribute():
-    """The AWS bulk parser finds the OnDemand USD dimension per product key."""
     products = {
         "sku-a": {
             "productFamily": "Compute Instance",
@@ -290,7 +257,6 @@ def test_extract_aws_prices_indexes_by_attribute():
 
 
 def test_select_azure_meter_requires_exact_match():
-    """The Azure selector takes one exact meter and rejects unit or currency drift."""
     rows = [
         {
             "serviceName": "Azure Synapse Analytics",
@@ -324,7 +290,6 @@ def test_select_azure_meter_requires_exact_match():
 
 
 def test_select_fabric_cu_price_requires_agreement():
-    """Fabric CU meters must speak with one price, or refresh fails loudly."""
     rows = [
         {
             "productName": "Fabric Capacity",
@@ -355,7 +320,6 @@ def test_select_fabric_cu_price_requires_agreement():
 
 
 def test_refresh_with_unchanged_upstream_writes_nothing(scratch_copy, monkeypatch):
-    """A refresh that finds no moves leaves evidence and tables byte-identical."""
     evidence, pricing = scratch_copy
     before_evidence = evidence.read_bytes()
     before_pricing = pricing.read_bytes()
@@ -367,7 +331,6 @@ def test_refresh_with_unchanged_upstream_writes_nothing(scratch_copy, monkeypatc
 
 
 def test_refresh_fails_closed_when_node_missing_from_offer(scratch_copy, monkeypatch):
-    """A node the upstream offer no longer lists aborts the refresh loudly."""
     evidence, pricing = scratch_copy
 
     def _missing_node_offer(url_template, region):
@@ -385,7 +348,6 @@ def test_refresh_fails_closed_when_node_missing_from_offer(scratch_copy, monkeyp
 
 
 def test_refresh_records_moved_price_with_new_date(scratch_copy, monkeypatch):
-    """A moved upstream price updates the cell and stamps the refresh date."""
     evidence, pricing = scratch_copy
     monkeypatch.setattr(generator, "fetch_aws_region_offer", _recorded_aws_offer)
     monkeypatch.setattr(generator, "fetch_azure_region_items", _moved_fabric_rows)
@@ -601,7 +563,6 @@ def test_exhausted_refresh_leaves_files_unchanged(scratch_copy, monkeypatch, htt
 
 
 def _recorded_aws_offer(url_template, region):
-    """Replay the recorded evidence as fetch results (offer keyed by template)."""
     evidence = generator.load_evidence()
     if "AmazonRedshift" in url_template:
         section = evidence["redshift_node_prices"]
@@ -640,7 +601,6 @@ def _recorded_aws_offer(url_template, region):
 
 
 def _recorded_azure_rows(service, region):
-    """Replay the recorded evidence as Azure Retail Prices rows."""
     evidence = generator.load_evidence()
     rows = []
     dedicated = evidence["synapse_dedicated_dwu_prices"]
@@ -683,7 +643,6 @@ def _azure_row(service, product, meter, price, unit="1 Hour"):
 
 
 def _moved_fabric_rows(service, region):
-    """Recorded rows except the eastus Fabric CU meter, which moved to 0.19."""
     rows = _recorded_azure_rows(service, region)
     for row in rows:
         if service == "Microsoft Fabric" and region == "eastus":

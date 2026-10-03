@@ -1,16 +1,6 @@
-"""Deterministic TPC-DI FactTrade generation across worker counts.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers tpcdi-deterministic-generation-contract: per-record randomness
-derived from the explicit seed and stable trade identities (never worker
-count, chunk boundaries, completion order, or scheduling); serial and
-parallel paths share one row algorithm and produce byte-identical output;
-the seed and algorithm version are recorded in output metadata; the
-process-global random generator is never seeded or mutated.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,7 +21,7 @@ pytestmark = [
 
 SEED = 7
 NUM_TRADES = 2000
-CHUNK_SIZE = 500  # 4 fixed logical partitions for NUM_TRADES
+CHUNK_SIZE = 500
 DIMS = {
     "num_accounts": 50,
     "num_securities": 20,
@@ -54,13 +44,11 @@ def _make_generator(tmp_path: Path, subdir: str, max_workers: int, seed: int = S
         generation_seed=seed,
         compression="none",
     )
-    # Keep datasets small so tests stay fast; dimension sizes match DIMS.
     gen.base_customers = DIMS["num_customers"]
     gen.base_companies = DIMS["num_companies"]
     gen.base_securities = DIMS["num_securities"]
     gen.base_accounts = DIMS["num_accounts"]
     gen.base_trades = NUM_TRADES
-    # Compare raw table bytes without compression side effects.
     gen.compress_existing_file = lambda path, remove_original=True: path  # type: ignore[method-assign]
     return gen
 
@@ -85,17 +73,14 @@ def _parallel_bytes(tmp_path: Path, workers: int, seed: int = SEED, tag: str = "
 class TestWorkerCountInvariance:
     @pytest.mark.parametrize("workers", [1, 2, 3, 5])
     def test_parallel_worker_counts_match_serial(self, tmp_path: Path, workers: int) -> None:
-        """Worker counts 1, 2, several, and more than the 4 logical partitions."""
         assert _parallel_bytes(tmp_path, workers) == _serial_bytes(tmp_path)
 
     def test_repeated_parallel_runs_are_identical(self, tmp_path: Path) -> None:
-        """Completion-order and scheduling nondeterminism cannot leak into content."""
         first = _parallel_bytes(tmp_path, 3)
         assert _parallel_bytes(tmp_path, 3, tag="-b") == first
         assert _parallel_bytes(tmp_path, 3, tag="-c") == first
 
     def test_rows_follow_trade_identity_order(self, tmp_path: Path) -> None:
-        """Rows are written in stable trade-id order with 1-based identities."""
         content = _serial_bytes(tmp_path).decode("utf-8").splitlines()
         assert len(content) == NUM_TRADES
         assert [int(line.split("|")[0]) for line in content] == list(range(1, NUM_TRADES + 1))
@@ -164,7 +149,5 @@ class TestPublicRequestPlumbing:
 
         monkeypatch.setattr(benchmark.data_generator, "generate_data", _generate_stub)
         benchmark.generate_data(tables=["DimDate"], seed=11)
-        # An explicit seed is request-scoped; a reused benchmark keeps its
-        # configured seed for the next request.
         assert benchmark.data_generator.generation_seed == 9
         assert calls["tables"] == ["DimDate"]

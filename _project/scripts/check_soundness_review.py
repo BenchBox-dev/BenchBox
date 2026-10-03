@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Require an external adversarial review section for soundness-path PRs."""
 
 from __future__ import annotations
 
@@ -28,7 +27,6 @@ CLI_DESCRIPTION = "Require an external adversarial review section for soundness-
 
 
 def _plain_markdown(body: str) -> str:
-    """Return non-quoted, non-fenced markdown lines for field matching."""
     lines: list[str] = []
     fence: str | None = None
     for line in body.splitlines():
@@ -59,7 +57,6 @@ def _review_section(body: str) -> str | None:
 
 
 def soundness_review_errors(body: str) -> list[str]:
-    """Return missing or malformed fields from the required review section."""
     section = _review_section(body)
     if section is None:
         return ["PR body must contain a 'Soundness review:' section"]
@@ -75,7 +72,6 @@ def soundness_review_errors(body: str) -> list[str]:
 
 
 def check_soundness_review(paths: list[str], body: str) -> list[str]:
-    """Return CI findings for the changed paths and pull request body."""
     if not any_soundness_path(paths):
         return []
     return soundness_review_errors(body)

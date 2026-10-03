@@ -1,9 +1,6 @@
-"""Tests for TPC-H Skew benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -18,8 +15,6 @@ pytestmark = [
 
 
 class TestTPCHSkewBenchmark:
-    """Tests for TPCHSkewBenchmark class."""
-
     def test_initialization_default(self):
 
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
@@ -46,7 +41,6 @@ class TestTPCHSkewBenchmark:
             TPCHSkewBenchmark(scale_factor=0.01, skew_preset="invalid")
 
     def test_scale_factor_validation(self):
-        """Test scale factor must be positive."""
         with pytest.raises(ValueError):
             TPCHSkewBenchmark(scale_factor=0)
         with pytest.raises(ValueError):
@@ -98,7 +92,6 @@ class TestTPCHSkewBenchmark:
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
         queries = benchmark.get_queries()
         assert len(queries) == 22
-        # Check query 1 exists
         assert "1" in queries
 
     def test_get_single_query(self):
@@ -118,8 +111,6 @@ class TestTPCHSkewBenchmark:
 
 
 class TestTPCHSkewTopLevel:
-    """Tests for TPCHSkew top-level class."""
-
     def test_initialization(self):
 
         benchmark = TPCHSkew(scale_factor=0.01)
@@ -145,17 +136,14 @@ class TestTPCHSkewTopLevel:
 
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Valid query
         query = benchmark.get_query(1)
         assert isinstance(query, str)
 
-        # Invalid query ID
         with pytest.raises(ValueError, match="1-22"):
             benchmark.get_query(0)
         with pytest.raises(ValueError, match="1-22"):
             benchmark.get_query(23)
 
-        # Invalid type
         with pytest.raises(TypeError, match="integer"):
             benchmark.get_query("1")  # type: ignore
 
@@ -176,14 +164,11 @@ class TestTPCHSkewTopLevel:
 
 
 class TestTPCHSkewPresetConfigurations:
-    """Tests for preset configuration correctness."""
-
     @pytest.mark.parametrize("preset", ["none", "light", "moderate", "heavy", "extreme", "realistic"])
     def test_preset_creates_valid_benchmark(self, preset):
 
         benchmark = TPCHSkew(scale_factor=0.01, skew_preset=preset)
         assert benchmark.skew_preset == preset
-        # Should be able to get queries
         queries = benchmark.get_queries()
         assert len(queries) == 22
 
@@ -213,17 +198,13 @@ class TestTPCHSkewPresetConfigurations:
 
 
 class TestTPCHSkewDialectSupport:
-    """Tests for SQL dialect support."""
-
     def test_query_dialect_translation(self):
 
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Get query in default dialect
         query_default = benchmark.get_query(1)
         assert isinstance(query_default, str)
 
-        # Get query in specific dialect
         query_duckdb = benchmark.get_query(1, dialect="duckdb")
         assert isinstance(query_duckdb, str)
 
@@ -232,14 +213,11 @@ class TestTPCHSkewDialectSupport:
         benchmark = TPCHSkew(scale_factor=0.01)
         queries = benchmark.get_queries(dialect="duckdb")
         assert len(queries) == 22
-        # All queries should be strings
         for _query_id, query in queries.items():
             assert isinstance(query, str)
 
 
 class TestTPCHSkewScaleFactor:
-    """Tests for scale factor handling."""
-
     def test_fractional_scale_factor(self):
 
         benchmark = TPCHSkew(scale_factor=0.01)
@@ -258,8 +236,6 @@ class TestTPCHSkewScaleFactor:
 
 
 class TestCompareWithUniform:
-    """Tests for compare_with_uniform() method on TPCHSkewBenchmark."""
-
     def test_compare_with_uniform_validation_none_adapter(self):
 
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
@@ -270,21 +246,17 @@ class TestCompareWithUniform:
 
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
 
-        # Create a mock adapter (won't be used due to validation failure)
         class MockAdapter:
             pass
 
         mock_adapter = MockAdapter()
 
-        # Invalid query ID (0)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[0, 1, 2])
 
-        # Invalid query ID (23)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[1, 23])
 
-        # Invalid query ID (string)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=["1", 2])  # type: ignore
 
@@ -305,39 +277,27 @@ class TestCompareWithUniform:
 
     def test_geometric_mean_helper(self):
 
-        # Simple case
         result = TPCHSkewBenchmark._geometric_mean([1.0, 1.0, 1.0])
         assert result == pytest.approx(1.0)
 
-        # Known geometric mean: sqrt(2*8) = 4
         result = TPCHSkewBenchmark._geometric_mean([2.0, 8.0])
         assert result == pytest.approx(4.0)
 
-        # Cube root of 8 = 2
         result = TPCHSkewBenchmark._geometric_mean([8.0])
         assert result == pytest.approx(8.0)
 
-        # Empty list
         result = TPCHSkewBenchmark._geometric_mean([])
         assert result == 0.0
 
     def test_compare_default_queries(self):
-        """Test default queries list is all 22."""
         benchmark = TPCHSkewBenchmark(scale_factor=0.01)
 
-        # We can't run the full comparison without a real adapter,
-        # but we can verify the default would be all 22 queries
-        # by checking the docstring or creating a minimal mock
-
-        # Verify the benchmark is properly configured
         assert benchmark.scale_factor == 0.01
         queries = benchmark.get_queries()
         assert len(queries) == 22
 
 
 class TestTPCHSkewCompareWithUniformWrapper:
-    """Tests for compare_with_uniform() method on public TPCHSkew class."""
-
     def test_compare_with_uniform_exists_on_tpch_skew(self):
 
         benchmark = TPCHSkew(scale_factor=0.01)
@@ -348,7 +308,6 @@ class TestTPCHSkewCompareWithUniformWrapper:
 
         benchmark = TPCHSkew(scale_factor=0.01)
 
-        # Should raise same validation error as implementation
         with pytest.raises(ValueError, match="adapter cannot be None"):
             benchmark.compare_with_uniform(None)
 
@@ -361,11 +320,9 @@ class TestTPCHSkewCompareWithUniformWrapper:
 
         mock_adapter = MockAdapter()
 
-        # Invalid query ID (0)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[0, 1, 2])
 
-        # Invalid query ID (23)
         with pytest.raises(ValueError, match="Invalid query IDs"):
             benchmark.compare_with_uniform(mock_adapter, queries=[1, 23])
 
@@ -385,11 +342,9 @@ class TestTPCHSkewCompareWithUniformWrapper:
 
         import inspect
 
-        # Get signatures
         wrapper_sig = inspect.signature(TPCHSkew.compare_with_uniform)
         impl_sig = inspect.signature(TPCHSkewBenchmark.compare_with_uniform)
 
-        # Check parameter names match (excluding 'self')
         wrapper_params = [p for p in wrapper_sig.parameters if p != "self"]
         impl_params = [p for p in impl_sig.parameters if p != "self"]
         assert wrapper_params == impl_params

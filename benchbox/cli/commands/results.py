@@ -1,5 +1,3 @@
-"""Results command implementation."""
-
 import json
 from pathlib import Path
 from typing import Any
@@ -16,18 +14,10 @@ from benchbox.core.schemas import ExecutionContext
 
 
 def _extract_result_fields(data: dict[str, Any]) -> tuple[str | None, str | None, Any, dict[str, Any] | None]:
-    """Extract platform, benchmark, scale_factor, and execution_context from result data.
-
-    Handles both v2.x schema format and legacy format.
-
-    Returns:
-        Tuple of (platform, benchmark_name, scale_factor, execution_context).
-    """
     platform = None
     benchmark_name = None
     scale_factor = None
 
-    # Try schema v2.x format first
     if "benchmark" in data and isinstance(data["benchmark"], dict):
         benchmark_name = data["benchmark"].get("name") or data["benchmark"].get("id")
         scale_factor = data["benchmark"].get("scale_factor")
@@ -35,7 +25,6 @@ def _extract_result_fields(data: dict[str, Any]) -> tuple[str | None, str | None
     if "platform" in data and isinstance(data["platform"], dict):
         platform = data["platform"].get("name")
 
-    # Try legacy format
     if not platform:
         platform = data.get("platform")
     if not benchmark_name:
@@ -43,7 +32,6 @@ def _extract_result_fields(data: dict[str, Any]) -> tuple[str | None, str | None
     if not scale_factor:
         scale_factor = data.get("scale_factor")
 
-    # Get execution context
     execution_context = data.get("execution") or data.get("execution_context")
 
     return platform, benchmark_name, scale_factor, execution_context
@@ -56,11 +44,6 @@ def _reconstruct_cli_command(
     scale_factor: Any,
     execution_context: dict[str, Any] | None,
 ) -> str:
-    """Reconstruct the full CLI command from result data fields.
-
-    Returns:
-        The reconstructed CLI command string.
-    """
     base_cmd = f"benchbox run --platform {platform} --benchmark {benchmark_name} --scale {scale_factor}"
 
     if execution_context:
@@ -70,10 +53,8 @@ def _reconstruct_cli_command(
             return f"{base_cmd} {' '.join(cli_args)}"
         return base_cmd
 
-    # Try to reconstruct from other fields
     extra_args = []
 
-    # Query subset from run block
     if "run" in data and data["run"].get("query_subset"):
         extra_args.extend(["--queries", ",".join(data["run"]["query_subset"])])
 
@@ -109,18 +90,6 @@ def _reconstruct_cli_command(
 )
 @click.pass_context
 def results(ctx, limit, submitted, paths):
-    """Show exported benchmark results and execution history.
-
-    Displays a summary of recent benchmark executions including performance
-    metrics, execution times, and result file locations.
-
-    \b
-    Examples:
-        benchbox results              # Show last 10 results
-        benchbox results --limit 25   # Show last 25 results
-        benchbox results --paths      # Print exact result paths for benchbox submit
-        benchbox results show-cli <file>  # Show CLI command to reproduce a run
-    """
     if ctx.invoked_subcommand is not None:
         return
     if submitted and paths:
@@ -204,16 +173,6 @@ def _show_submitted_results(exporter: ResultExporter, *, limit: int) -> None:
 @click.argument("result_file", type=click.Path(exists=True))
 @click.option("--full", is_flag=True, help="Show full command with all options")
 def show_cli(result_file: str, full: bool) -> None:
-    """Reconstruct the CLI command from a benchmark result file.
-
-    Reads a benchmark result JSON file and reconstructs the CLI command
-    that can be used to reproduce the benchmark run.
-
-    \b
-    Examples:
-        benchbox results show-cli benchmark_runs/results/tpch_sf001_duckdb_20240101_120000.json
-        benchbox results show-cli ./result.json --full
-    """
     try:
         result_path = Path(result_file)
         with result_path.open("r", encoding="utf-8") as f:
@@ -229,7 +188,6 @@ def show_cli(result_file: str, full: bool) -> None:
 
         full_cmd = _reconstruct_cli_command(data, platform, benchmark_name, scale_factor, execution_context)
 
-        # Display the command
         console.print("\n[bold]Reconstructed CLI Command:[/bold]")
         console.print(Panel(full_cmd, style="green"))
 
@@ -249,7 +207,6 @@ def show_cli(result_file: str, full: bool) -> None:
 
 
 def _display_provenance_info(execution_context: dict[str, Any] | None) -> None:
-    """Display execution provenance information (entry point, timestamp)."""
     if not execution_context:
         return
     entry_point = execution_context.get("entry_point", "unknown")
@@ -259,7 +216,6 @@ def _display_provenance_info(execution_context: dict[str, Any] | None) -> None:
         console.print(f"[dim]Executed: {timestamp}[/dim]")
 
 
-# Keys and their default values that should be skipped in full context display
 _CONTEXT_DEFAULT_VALUES: dict[str, Any] = {
     "phases": ["power"],
     "mode": "sql",
@@ -271,7 +227,6 @@ _CONTEXT_SKIP_KEYS = {"invocation_timestamp", "entry_point"}
 
 
 def _display_execution_context_details(execution_context: dict[str, Any]) -> None:
-    """Display non-default execution context details."""
     console.print("\n[bold]Execution Context Details:[/bold]")
     for key, value in execution_context.items():
         if key in _CONTEXT_SKIP_KEYS or value is None:

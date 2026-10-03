@@ -188,7 +188,6 @@ def _make_expression_impl(query_id: str, query_manager: JoinOrderQueryManager | 
         return _execute_joinorder_expression_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_expression_impl"
-    _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder DataFrame translation."
     return _impl
 
 
@@ -197,7 +196,6 @@ def _make_pandas_impl(query_id: str, query_manager: JoinOrderQueryManager | None
         return _execute_joinorder_pandas_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_pandas_impl"
-    _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder pandas translation."
     return _impl
 
 

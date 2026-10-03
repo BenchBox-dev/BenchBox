@@ -1,13 +1,4 @@
-"""Unit tests for DataFrame Platform Checker.
-
-Tests for:
-- Platform availability detection
-- Version checking
-- Installation suggestions
-- Error message generation
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -32,8 +23,6 @@ pytestmark = [
 
 
 class TestDataFrameFamily:
-    """Tests for DataFrameFamily enum."""
-
     def test_pandas_family_value(self):
 
         assert DataFrameFamily.PANDAS.value == "pandas"
@@ -44,8 +33,6 @@ class TestDataFrameFamily:
 
 
 class TestPlatformInfo:
-    """Tests for PlatformInfo dataclass."""
-
     def test_platform_info_creation(self):
 
         info = PlatformInfo(
@@ -80,8 +67,6 @@ class TestPlatformInfo:
 
 
 class TestDataFramePlatforms:
-    """Tests for DATAFRAME_PLATFORMS registry."""
-
     def test_pandas_registered(self):
 
         assert "pandas" in DATAFRAME_PLATFORMS
@@ -113,7 +98,6 @@ class TestDataFramePlatforms:
         assert info.family == DataFrameFamily.EXPRESSION
 
     def test_all_platforms_have_required_fields(self):
-        """Test all platforms have required fields."""
         for name, info in DATAFRAME_PLATFORMS.items():
             assert info.name, f"{name} missing name"
             assert info.family, f"{name} missing family"
@@ -123,15 +107,10 @@ class TestDataFramePlatforms:
 
 
 class TestDataFramePlatformChecker:
-    """Tests for DataFramePlatformChecker class."""
-
     def test_polars_is_available(self):
-        """Test that Polars (core dep) is available."""
         assert DataFramePlatformChecker.is_available("polars")
 
     def test_pandas_is_available(self):
-        """Test that Pandas is available (installed in dev)."""
-        # Pandas is installed in dev dependencies
         assert DataFramePlatformChecker.is_available("pandas")
 
     def test_unknown_platform_not_available(self):
@@ -142,7 +121,7 @@ class TestDataFramePlatformChecker:
 
         version = DataFramePlatformChecker.get_version("polars")
         assert version is not None
-        assert "." in version  # Version has dots
+        assert "." in version
 
     def test_get_version_unknown_platform(self):
 
@@ -171,14 +150,14 @@ class TestDataFramePlatformChecker:
         available = DataFramePlatformChecker.get_available_platforms()
 
         assert isinstance(available, list)
-        assert "polars" in available  # Core dependency
+        assert "polars" in available
 
     def test_get_available_by_family_expression(self):
 
         available = DataFramePlatformChecker.get_available_by_family(DataFrameFamily.EXPRESSION)
 
         assert isinstance(available, list)
-        assert "polars" in available  # Core dependency
+        assert "polars" in available
 
     def test_get_all_platforms(self):
 
@@ -195,13 +174,10 @@ class TestDataFramePlatformChecker:
 
         assert isinstance(statuses, dict)
         assert all(isinstance(v, PlatformStatus) for v in statuses.values())
-        # Polars should be available (core dep)
         assert statuses["polars"].available is True
 
 
 class TestInstallationSuggestion:
-    """Tests for installation suggestion generation."""
-
     def test_suggestion_for_pandas(self):
 
         suggestion = get_installation_suggestion("pandas")
@@ -210,7 +186,6 @@ class TestInstallationSuggestion:
         assert "uv add" in suggestion
 
     def test_suggestion_for_polars_core(self):
-        """Test suggestion for Polars (core dependency)."""
         suggestion = get_installation_suggestion("polars")
 
         assert "core dependency" in suggestion
@@ -223,8 +198,6 @@ class TestInstallationSuggestion:
 
 
 class TestPlatformErrorMessage:
-    """Tests for platform error message generation."""
-
     def test_error_for_available_platform(self):
 
         message = get_platform_error_message("polars")
@@ -239,10 +212,7 @@ class TestPlatformErrorMessage:
 
 
 class TestRequirePlatform:
-    """Tests for require_platform function."""
-
     def test_require_polars_succeeds(self):
-        """Test requiring Polars (core dep) succeeds."""
         module = require_platform("polars")
 
         assert module is not None
@@ -255,8 +225,6 @@ class TestRequirePlatform:
 
 
 class TestFormatPlatformStatusTable:
-    """Tests for status table formatting."""
-
     def test_table_format(self):
 
         table = format_platform_status_table()
@@ -283,10 +251,7 @@ class TestFormatPlatformStatusTable:
 
 
 class TestMinimumVersionEnforcement:
-    """Below-minimum installs must report unavailable, not warn-and-pass."""
-
     def test_below_minimum_reports_unavailable(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Simulate DataFusion 53 against the 54 floor."""
         monkeypatch.setattr(
             DataFramePlatformChecker,
             "get_version",
@@ -299,7 +264,6 @@ class TestMinimumVersionEnforcement:
         assert "54.0.0" in status.error
 
     def test_at_minimum_reports_available(self) -> None:
-        """The locked DataFusion 54 install stays available."""
         status = DataFramePlatformChecker.check_platform("datafusion")
 
         assert status.available is True

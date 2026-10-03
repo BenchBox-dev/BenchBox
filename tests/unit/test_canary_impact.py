@@ -1,5 +1,3 @@
-"""Tests for the canary-impact selector (scripts/canary_impact.py)."""
-
 from __future__ import annotations
 
 import json
@@ -28,9 +26,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-# -- fixture-tree helpers -----------------------------------------------------
-
-
 def _write_tree(root: Path, files: dict[str, str]) -> None:
     for rel, content in files.items():
         path = root / rel
@@ -39,7 +34,6 @@ def _write_tree(root: Path, files: dict[str, str]) -> None:
 
 
 def _fixture_root(tmp_path: Path, files: dict[str, str]) -> Path:
-    """Create a minimal repo tree with an empty tests/conftest.py."""
     merged = {"tests/conftest.py": "", **files}
     _write_tree(tmp_path, merged)
     return tmp_path
@@ -53,9 +47,6 @@ def _select(root: Path, test_files: list[str], node_ids: list[str], changed: lis
 
 def _nodes(test_file: str, names: list[str]) -> list[str]:
     return [f"{test_file}::{name}" for name in names]
-
-
-# -- dependency rules ----------------------------------------------------------
 
 
 class TestDependencyRules:
@@ -73,7 +64,6 @@ class TestDependencyRules:
         assert fallback is None
         deps = dep_map["tests/test_x.py"].deps
         assert "mypkg/sub.py" in deps
-        # Python executes every parent package __init__ on import.
         assert "mypkg/__init__.py" in deps
 
         selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/__init__.py"])
@@ -286,8 +276,6 @@ class TestDependencyRules:
         dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         deps = dep_map["tests/test_x.py"].deps
-        # The plugin module itself, its package initializer, and the
-        # plugin's transitive dependencies must all be shared edges.
         assert "pkg/plug.py" in deps
         assert "pkg/__init__.py" in deps
         assert "mypkg/leaf.py" in deps
@@ -296,8 +284,6 @@ class TestDependencyRules:
         root = _fixture_root(
             tmp_path,
             {
-                # The initializer deliberately does not import sub: the
-                # submodule edge must come from probing, not the closure.
                 "mypkg/__init__.py": "MARKER = 1\n",
                 "mypkg/sub.py": "VALUE = 1\n",
                 "tests/test_x.py": "from mypkg import sub\n",
@@ -331,9 +317,6 @@ class TestDependencyRules:
         assert selection["whole_suite"] is False
         assert selection["selected"] == []
         assert selection["selected_count"] == 0
-
-
-# -- fail-safe rules ------------------------------------------------------------
 
 
 class TestFailSafeRules:
@@ -382,8 +365,6 @@ class TestFailSafeRules:
         )
         dep_map, fallback, sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
-        # Test-specific unresolved imports select this test for changed paths
-        # that another test may map through a static edge.
         assert dep_map["tests/test_x.py"].dynamic
         assert any(site.startswith("mypkg/helper.py:") for site in sites)
         selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/__init__.py"])
@@ -449,9 +430,6 @@ class TestFailSafeRules:
         root = _fixture_root(
             tmp_path,
             {
-                # Resolvable only through a sys.path manipulation the
-                # static search roots do not cover: the same-named repo
-                # file keeps it fail-safe.
                 "tests/helper_repo_named.py": "VALUE = 1\n",
                 "tests/test_x.py": "import helper_repo_named\n",
             },
@@ -550,7 +528,6 @@ class TestFailSafeRules:
 
 
 def test_marker_expression_matches_release_canary_workflow() -> None:
-    """The selector must use the canary's marker expression, not a copy."""
     workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "release-canary.yml").read_text(encoding="utf-8"))
     shards = workflow["jobs"]["credential-free-non-fast"]
     run_text = "\n".join(str(step.get("run", "")) for step in shards["steps"])

@@ -1,9 +1,3 @@
-"""
-Test SSB ClickHouse integration functionality.
-
-Tests CSV loading configuration, schema creation, and complete benchmark execution.
-"""
-
 import shutil
 import tempfile
 from pathlib import Path
@@ -20,26 +14,20 @@ pytestmark = [
 ]
 
 
-# Skip all tests if chdb is not available.
 chdb = require_chdb()
 
 
 class TestSSBClickHouseIntegration:
-    """Test SSB ClickHouse integration functionality."""
-
     def test_ssb_csv_loading_configuration(self):
 
-        # Use compression_type="none" to avoid zstd dependency
         benchmark = SSBBenchmark(scale_factor=0.01, compress_data=False, compression_type="none")
 
-        # Test CSV config retrieval
         csv_config = benchmark.get_csv_loading_config("date")
 
         assert csv_config is not None
         assert isinstance(csv_config, list)
         assert len(csv_config) > 0
 
-        # Should contain delimiter configuration for SSB (pipe delimiter)
         delimiter_configs = [item for item in csv_config if "delim=" in item]
         assert len(delimiter_configs) > 0
         assert any("|" in item for item in delimiter_configs)
@@ -48,50 +36,40 @@ class TestSSBClickHouseIntegration:
 
         adapter = ClickHouseAdapter(deployment_mode="local")
 
-        # Should create effective tuning config even when none provided
         config = adapter.get_effective_tuning_configuration()
         assert config is not None
 
-        # Primary keys should always be enabled for ClickHouse
         assert config.primary_keys.enabled is True
 
-        # Foreign keys should follow tuning settings (disabled in no-tuning mode)
         assert config.foreign_keys.enabled is False
 
     def test_clickhouse_constraint_configuration(self):
 
         adapter = ClickHouseAdapter(deployment_mode="local")
 
-        # ClickHouse should always enable primary keys
         enable_primary_keys, enable_foreign_keys = adapter._get_constraint_configuration()
 
-        assert enable_primary_keys is True  # Always enabled for ClickHouse
-        assert enable_foreign_keys is False  # Should follow tuning config
+        assert enable_primary_keys is True
+        assert enable_foreign_keys is False
 
     def test_ssb_schema_creation_without_engine(self):
 
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
-        # chDB pins one EmbeddedServer path per worker process. Use the default
-        # in-memory path so this file composes with other chDB tests under xdist.
         client = ClickHouseLocalClient()
 
         try:
             adapter = ClickHouseAdapter(deployment_mode="local")
-            # Use compression_type="none" to avoid zstd dependency
             benchmark = SSBBenchmark(scale_factor=0.01, compress_data=False, compression_type="none")
 
-            # Test schema creation
             duration = adapter.create_schema(benchmark, client)
             assert duration > 0
 
-            # Check that all tables were created (SSB uses lowercase table names)
             tables = client.execute("SHOW TABLES")
             table_names = {t[0] for t in tables}
             expected_tables = {"date", "customer", "supplier", "part", "lineorder"}
             assert table_names == expected_tables
 
-            # Verify all tables use MergeTree engine (ClickHouse default)
             engine_query = "SELECT name, engine FROM system.tables WHERE database = 'default' ORDER BY name"
             engine_result = client.execute(engine_query)
 
@@ -122,10 +100,8 @@ class TestSSBClickHouseIntegration:
 
             adapter.create_schema(benchmark, client)
 
-            # Load data (test a subset of tables to keep test fast)
             test_tables = ["date", "customer"]
             for table_name in test_tables:
-                # Verify data file exists
                 data_file = Path(benchmark.tables[table_name])
                 assert data_file.exists(), f"Data file for {table_name} should exist"
 
@@ -133,7 +109,6 @@ class TestSSBClickHouseIntegration:
                 assert table_name in table_stats
                 assert table_stats[table_name] > 0, f"Should have loaded rows into {table_name}"
 
-            # Verify data was loaded (use lowercase table names)
             for table_name in test_tables:
                 count_result = client.execute(f"SELECT COUNT(*) FROM {table_name}")
                 row_count = count_result[0][0]
@@ -144,7 +119,6 @@ class TestSSBClickHouseIntegration:
                 shutil.rmtree(data_dir)
 
     def test_ssb_query_execution_clickhouse(self):
-        """Test that SSB queries can execute on ClickHouse (basic smoke test)."""
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
         data_dir = Path(tempfile.mkdtemp(prefix="ssb-data-"))
@@ -159,15 +133,12 @@ class TestSSBClickHouseIntegration:
                 compression_type="none",
             )
 
-            # Generate data and set up database
             benchmark.generate_data()
             adapter.create_schema(benchmark, client)
 
-            # Load minimal data (just date table for query testing)
             data_file = Path(benchmark.tables["date"])
             adapter.load_data(benchmark, client, data_file.parent)
 
-            # Test a simple SSB query (Q1.1 modified to just use date table, lowercase table name)
             simple_query = """
                 SELECT d_year, COUNT(*)
                 FROM date
@@ -177,7 +148,6 @@ class TestSSBClickHouseIntegration:
             """
 
             result = client.execute(simple_query)
-            # Should have some results for the date range
             assert len(result) > 0
         finally:
             client.close()

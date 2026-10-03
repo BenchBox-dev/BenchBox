@@ -1,22 +1,3 @@
-"""Firebolt query plan parser.
-
-Parses Firebolt's ``EXPLAIN`` plan, which is returned as an indented operator
-tree (one operator per line). Nesting is encoded by leading whitespace and/or
-tree connectors (``\\_``, ``|-``, ``+-``); each operator line optionally carries
-a ``[n]`` index prefix and a trailing ``[detail]`` / ``(detail)`` description::
-
-    [0] Projection [revenue]
-     \\_[1] Sort [revenue DESC]
-        \\_[2] Aggregate [groupBy: l_orderkey] [aggs: sum(revenue)]
-           \\_[3] Join [type=inner] [condition: o_orderkey = l_orderkey]
-              \\_[4] TableScan [table: orders]
-              \\_[5] TableScan [table: lineitem]
-
-Depth is the column at which the operator token starts (after stripping leading
-whitespace, connector characters, and the optional index prefix); a stack keyed
-by that column reconstructs the parent/child tree.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -33,24 +14,13 @@ from benchbox.core.results.query_plan_models import (
 
 logger = logging.getLogger(__name__)
 
-# Leading whitespace + tree-connector characters that encode nesting depth.
 _CONNECTOR_CHARS = " \t\\_|+-"
-# Optional "[12] " operator index prefix.
 _INDEX_PREFIX_RE = re.compile(r"^\[\d+\]\s*")
-# Bracketed or parenthesized detail group, e.g. "[table: orders]" or "(inner)".
-# Square brackets and parens are matched as separate alternatives (never crossed)
-# so a detail whose value contains nested parens — "[aggs: sum(x)]" — is captured
-# whole rather than truncated at the first inner ")".
 _DETAIL_RE = re.compile(r"\[([^\]]*)\]|\(([^)]*)\)")
-# A "key: value" / "key = value" detail; compiled once and reused per call.
 _KEYED_DETAIL_RE = re.compile(r"\s*(\w+)\s*[:=]\s*(.+)", re.IGNORECASE)
 
 
 class FireboltQueryPlanParser(QueryPlanParser):
-    """Parser for Firebolt ``EXPLAIN`` indented operator-tree text."""
-
-    # Ordered (substring, type) pairs; first match in the lower-cased operator
-    # name wins, so specific names precede the generic ones they contain.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("storedtable", LogicalOperatorType.SCAN),
         ("tablescan", LogicalOperatorType.SCAN),

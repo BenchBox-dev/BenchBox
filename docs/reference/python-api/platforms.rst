@@ -1,13 +1,14 @@
-Platform API Reference
+Platform API reference
 ======================
 
 .. tags:: reference, python-api, sql-platform
 
-This section provides detailed API documentation for all supported database platforms.
+This section documents the supported database adapters and their shared lifecycle.
 
 .. toctree::
    :maxdepth: 1
 
+   platforms/common
    platforms/duckdb
    platforms/datafusion
    platforms/clickhouse

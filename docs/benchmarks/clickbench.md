@@ -23,6 +23,8 @@ The benchmark uses a single flat table with web analytics data containing approx
 - **Cross-system compatibility** - Standard benchmark across different databases
 - **Scalable testing** - Configurable dataset sizes for different scenarios
 
+BenchBox generates synthetic ClickBench data for testing and development.
+
 ## Schema Description
 
 ClickBench uses a single table called **HITS** that represents web analytics data with systematic coverage of user interactions, browser information, geographic data, and various event attributes.
@@ -501,11 +503,11 @@ class ClickBenchPerformanceTester:
         """Analyze performance across different column types and operations."""
         column_tests = [
             ('integer_scan', 'SELECT COUNT(*) FROM hits WHERE RegionID > 1000'),
-            ('string_scan', 'SELECT COUNT(*) FROM hits WHERE SearchPhrase LIKE \\'%google%\\''),
-            ('timestamp_scan', 'SELECT COUNT(*) FROM hits WHERE EventTime > \\'2013-07-01\\''),
+            ('string_scan', "SELECT COUNT(*) FROM hits WHERE SearchPhrase LIKE '%google%'"),
+            ('timestamp_scan', "SELECT COUNT(*) FROM hits WHERE EventTime > '2013-07-01'"),
             ('integer_agg', 'SELECT RegionID, COUNT(*) FROM hits GROUP BY RegionID LIMIT 10'),
-            ('string_agg', 'SELECT SearchPhrase, COUNT(*) FROM hits WHERE SearchPhrase <> \\'\\'GROUP BY SearchPhrase LIMIT 10'),
-            ('mixed_agg', 'SELECT RegionID, SearchPhrase, COUNT(*) FROM hits WHERE SearchPhrase <> \\'\\'GROUP BY RegionID, SearchPhrase LIMIT 10')
+            ('string_agg', "SELECT SearchPhrase, COUNT(*) FROM hits WHERE SearchPhrase <> ''GROUP BY SearchPhrase LIMIT 10"),
+            ('mixed_agg', "SELECT RegionID, SearchPhrase, COUNT(*) FROM hits WHERE SearchPhrase <> ''GROUP BY RegionID, SearchPhrase LIMIT 10")
         ]
 
         results = {}

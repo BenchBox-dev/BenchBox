@@ -1,11 +1,6 @@
-"""Coverage-boosting unit tests for benchbox.platforms.spark.SparkAdapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Target: reach ≥80% coverage on benchbox/platforms/spark.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -16,17 +11,8 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.fast, pytest.mark.usefixtures("spark_runtime_environment")]
 
 
-# ---------------------------------------------------------------------------
-# Shared fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture()
 def mock_pyspark():
-    """Provide a fully-mocked PySpark environment.
-
-    Returns (MockSparkSessionClass, mock_spark_session_instance).
-    """
     mock_session = MagicMock()
     mock_builder = MagicMock()
     mock_builder.master.return_value = mock_builder
@@ -61,14 +47,7 @@ def mock_pyspark():
         yield mock_class, mock_session
 
 
-# ---------------------------------------------------------------------------
-# __init__ config variants
-# ---------------------------------------------------------------------------
-
-
 class TestSparkAdapterInit:
-    """Branch coverage for __init__ parameter handling."""
-
     def test_yarn_master(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
 
@@ -94,7 +73,6 @@ class TestSparkAdapterInit:
         assert a.warehouse_dir == "/tmp/warehouse"
 
     def test_executor_cores_explicit_zero(self, mock_pyspark):
-        """executor_cores=0 is not None so should be kept (edge case)."""
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(executor_cores=0)
@@ -144,21 +122,12 @@ class TestSparkAdapterInit:
         assert a.staging_root == "/tmp/staging"
 
 
-# ---------------------------------------------------------------------------
-# _get_spark_conf branches
-# ---------------------------------------------------------------------------
-
-
 class TestGetSparkConf:
-    """Branch coverage for _get_spark_conf()."""
-
     def test_aqe_disabled(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(adaptive_enabled=False)
         conf = a._get_spark_conf()
-        # Spark enables AQE by default since 3.2.0, so disabling must set the
-        # keys to "false" explicitly rather than omitting them.
         assert conf["spark.sql.adaptive.enabled"] == "false"
         assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
         assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
@@ -269,8 +238,6 @@ class TestGetSparkConf:
 
 
 class TestExecuteQuery:
-    """Branch coverage for shared Spark query execution behavior."""
-
     def test_disable_cache_true_clears_catalog_before_query(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
 
@@ -287,22 +254,12 @@ class TestExecuteQuery:
         mock_session.catalog.clearCache.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# create_connection branches
-# ---------------------------------------------------------------------------
-
-
 class TestCreateConnection:
-    """Branch coverage for create_connection()."""
-
     def test_create_connection_basic(self, mock_pyspark):
-        """create_connection creates a session and USEs the database."""
         mock_class, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(database="bench_db")
-        # Patch handle_existing_database and also the module-level SparkSession reference,
-        # since when the spark module is first imported without pyspark the variable is None.
         with (
             patch.object(a, "handle_existing_database"),
             patch("benchbox.platforms.spark.SparkSession", mock_class),
@@ -315,7 +272,6 @@ class TestCreateConnection:
         assert a._spark_session is mock_session
 
     def test_create_connection_with_hive_support(self, mock_pyspark):
-        """enable_hive=True calls enableHiveSupport() on the builder."""
         mock_class, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -331,7 +287,6 @@ class TestCreateConnection:
         mock_class.builder.enableHiveSupport.assert_called()
 
     def test_create_connection_database_reused(self, mock_pyspark):
-        """When database_was_reused=True, CREATE DATABASE is skipped."""
         mock_class, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -343,17 +298,14 @@ class TestCreateConnection:
             a.database_was_reused = True
             a.create_connection()
 
-        # Verify CREATE DATABASE was not called
         sql_calls = [str(c) for c in mock_session.sql.call_args_list]
         assert not any("CREATE DATABASE" in c.upper() for c in sql_calls)
 
     def test_create_connection_database_already_exists(self, mock_pyspark):
-        """When database exists, skip CREATE DATABASE but still USE it."""
         mock_class, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(database="existing_db")
-        # Pretend the db exists
         db_mock = MagicMock()
         db_mock.name = "existing_db"
         mock_session.catalog.listDatabases.return_value = [db_mock]
@@ -369,7 +321,6 @@ class TestCreateConnection:
         assert any("USE" in c.upper() for c in sql_calls)
 
     def test_create_connection_failure_propagates(self, mock_pyspark):
-        """Session creation failure is re-raised."""
         mock_class, mock_session = mock_pyspark
         mock_class.builder.getOrCreate.side_effect = RuntimeError("spark down")
         from benchbox.platforms.spark import SparkAdapter
@@ -384,14 +335,7 @@ class TestCreateConnection:
                 a.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
-    """Branch coverage for check_server_database_exists()."""
-
     def test_no_session_returns_false(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
 
@@ -442,14 +386,7 @@ class TestCheckServerDatabaseExists:
         assert a.check_server_database_exists(database="custom") is True
 
 
-# ---------------------------------------------------------------------------
-# drop_database
-# ---------------------------------------------------------------------------
-
-
 class TestDropDatabase:
-    """Branch coverage for drop_database()."""
-
     def test_drop_existing_database(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -457,7 +394,6 @@ class TestDropDatabase:
         a = SparkAdapter(database="mydb")
         a._spark_session = mock_session
 
-        # Pretend database exists
         db = MagicMock()
         db.name = "mydb"
         mock_session.catalog.listDatabases.return_value = [db]
@@ -472,9 +408,8 @@ class TestDropDatabase:
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(database="gone")
-        a._spark_session = None  # no session → check returns False
+        a._spark_session = None
 
-        # Should not raise
         a.drop_database()
         mock_session.sql.assert_not_called()
 
@@ -500,14 +435,7 @@ class TestDropDatabase:
             a.drop_database()
 
 
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchema:
-    """Branch coverage for create_schema()."""
-
     def _make_benchmark(self):
         bench = MagicMock()
         bench.get_schema_sql.return_value = (
@@ -528,15 +456,12 @@ class TestCreateSchema:
         assert mock_session.sql.call_count >= 2
 
     def test_create_schema_table_already_exists(self, mock_pyspark):
-        """When sql() raises 'already exists', table is dropped and recreated."""
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(table_format="parquet")
         bench = self._make_benchmark()
 
-        # Raise "already exists" only for the very first CREATE TABLE call;
-        # all subsequent calls (DROP TABLE, re-CREATE, second table) succeed.
         already_raised = {"done": False}
 
         def side_effect(stmt):
@@ -550,12 +475,10 @@ class TestCreateSchema:
         with patch.object(a, "_create_schema_with_tuning", return_value=bench.get_schema_sql()):
             a.create_schema(bench, mock_session)
 
-        # DROP TABLE IF EXISTS should have been called at least once
         drop_calls = [c for c in mock_session.sql.call_args_list if "DROP TABLE" in str(c).upper()]
         assert len(drop_calls) >= 1
 
     def test_create_schema_non_exists_error_propagates(self, mock_pyspark):
-        """Non-'already exists' exceptions propagate."""
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -568,7 +491,6 @@ class TestCreateSchema:
                 a.create_schema(bench, mock_session)
 
     def test_create_schema_delta_format(self, mock_pyspark):
-        """Delta format adds USING DELTA to CREATE TABLE."""
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -582,7 +504,6 @@ class TestCreateSchema:
         assert any("USING DELTA" in s.upper() for s in all_sqls)
 
     def test_create_schema_iceberg_format(self, mock_pyspark):
-        """Iceberg format adds USING ICEBERG to CREATE TABLE."""
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -596,19 +517,7 @@ class TestCreateSchema:
         assert any("USING ICEBERG" in s.upper() for s in all_sqls)
 
 
-# ---------------------------------------------------------------------------
-# _optimize_table_definition
-# ---------------------------------------------------------------------------
-
-
 class TestOptimizeTableDefinition:
-    """Branch coverage for the shared optimize_spark_table_definition helper.
-
-    The Spark adapter's previous _optimize_table_definition wrapper has been
-    inlined into create_schema as part of the C2 cleanup; the V1/V2 conditional
-    flag selection is now done at the call site.
-    """
-
     def test_non_create_returns_unchanged(self, mock_pyspark):
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
@@ -620,7 +529,6 @@ class TestOptimizeTableDefinition:
 
         stmt = "CREATE TABLE t (id INT) USING ORC"
         result = optimize_spark_table_definition(stmt, table_format="parquet")
-        # Should replace with PARQUET
         assert "USING PARQUET" in result.upper()
 
     def test_orc_format(self, mock_pyspark):
@@ -631,7 +539,6 @@ class TestOptimizeTableDefinition:
         assert "USING ORC" in result.upper()
 
     def test_no_closing_paren_no_using(self, mock_pyspark):
-        """Statements without ')' should not get USING appended."""
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         stmt = "CREATE TABLE t AS SELECT 1"
@@ -639,14 +546,7 @@ class TestOptimizeTableDefinition:
         assert "USING" not in result.upper()
 
 
-# ---------------------------------------------------------------------------
-# get_query_plan
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryPlan:
-    """Branch coverage for get_query_plan()."""
-
     def test_plan_returned(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -673,14 +573,7 @@ class TestGetQueryPlan:
         assert plan is None
 
 
-# ---------------------------------------------------------------------------
-# test_connection
-# ---------------------------------------------------------------------------
-
-
 class TestTestConnection:
-    """Branch coverage for test_connection()."""
-
     def test_connection_success(self, mock_pyspark):
         mock_class, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -709,19 +602,11 @@ class TestTestConnection:
         assert result is False
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfo:
-    """Branch coverage for get_platform_info()."""
-
     def test_platform_info_with_connection(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
-        # Simulate a SparkContext with getConf
         mock_conf = MagicMock()
         mock_conf.get.side_effect = lambda k: f"val:{k}"
         mock_sc = MagicMock()
@@ -739,16 +624,13 @@ class TestGetPlatformInfo:
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
-        # Make spark.version attribute access raise to exercise the error path
         type(mock_session).version = PropertyMock(side_effect=AttributeError("no version"))
 
         a = SparkAdapter()
         info = a.get_platform_info(connection=mock_session)
-        # Error is swallowed; platform_version key must still be present
         assert "platform_version" in info
 
     def test_platform_info_no_connection_returns_none_version(self, mock_pyspark):
-        """When connection=None, platform_version is None."""
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter(master="local[2]")
@@ -757,14 +639,7 @@ class TestGetPlatformInfo:
         assert info["connection_mode"] == "local"
 
 
-# ---------------------------------------------------------------------------
-# configure_for_benchmark
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureForBenchmark:
-    """Branch coverage for configure_for_benchmark()."""
-
     def test_olap_sets_aqe(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -793,9 +668,7 @@ class TestConfigureForBenchmark:
         a = SparkAdapter(spark_config={"spark.sql.adaptive.enabled": "false"})
         a.configure_for_benchmark(mock_session, "olap")
 
-        # The explicit spark_config entry must not be clobbered at run time.
         mock_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
-        # Keys without an override still follow adaptive_enabled (default True).
         mock_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "true")
 
     def test_tpcds_sets_cbo(self, mock_pyspark):
@@ -814,7 +687,6 @@ class TestConfigureForBenchmark:
 
         a = SparkAdapter()
         a.configure_for_benchmark(mock_session, "unknown")
-        # No conf.set calls for non-OLAP type
         mock_session.conf.set.assert_not_called()
 
     def test_conf_set_exception_warning(self, mock_pyspark):
@@ -823,19 +695,11 @@ class TestConfigureForBenchmark:
 
         a = SparkAdapter()
         mock_session.conf.set.side_effect = Exception("read-only conf")
-        # Should not propagate
         a.configure_for_benchmark(mock_session, "olap")
         mock_session.conf.set.assert_called()
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause - delta sorting branch
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClause:
-    """Additional branches for generate_tuning_clause()."""
-
     def test_sorting_with_delta_generates_cluster_by(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter
 
@@ -892,14 +756,7 @@ class TestGenerateTuningClause:
         assert a.generate_tuning_clause(None) == ""
 
 
-# ---------------------------------------------------------------------------
-# apply_table_tunings
-# ---------------------------------------------------------------------------
-
-
 class TestApplyTableTunings:
-    """Branch coverage for apply_table_tunings()."""
-
     def test_no_tuning_noop(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -931,7 +788,6 @@ class TestApplyTableTunings:
         assert any("OPTIMIZE" in c.upper() and "ZORDER" in c.upper() for c in sql_calls)
 
     def test_delta_zorder_error_continues(self, mock_pyspark):
-        """Z-ORDER failure should log a warning, not raise."""
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -949,7 +805,6 @@ class TestApplyTableTunings:
         mock_tuning.table_name = "t"
         mock_tuning.get_columns_by_type.side_effect = lambda t: [mock_col] if t == TuningType.SORTING else []
 
-        # Should not raise
         a.apply_table_tunings(mock_tuning, mock_session)
         mock_session.sql.assert_called()
 
@@ -970,19 +825,11 @@ class TestApplyTableTunings:
         mock_tuning.table_name = "nation"
         mock_tuning.get_columns_by_type.side_effect = lambda t: [mock_col] if t == TuningType.PARTITIONING else []
 
-        # Should not raise; logging only for parquet partitioning
         a.apply_table_tunings(mock_tuning, mock_session)
         mock_session.sql.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# apply_unified_tuning
-# ---------------------------------------------------------------------------
-
-
 class TestApplyUnifiedTuning:
-    """Branch coverage for apply_unified_tuning()."""
-
     def test_none_config_noop(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -1038,14 +885,7 @@ class TestApplyUnifiedTuning:
         mock_table_tuning.has_any_tuning.assert_called()
 
 
-# ---------------------------------------------------------------------------
-# apply_platform_optimizations
-# ---------------------------------------------------------------------------
-
-
 class TestApplyPlatformOptimizations:
-    """Branch coverage for apply_platform_optimizations()."""
-
     def test_none_config_noop(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -1073,7 +913,7 @@ class TestApplyPlatformOptimizations:
 
         a = SparkAdapter()
 
-        mock_platform_cfg = MagicMock(spec=[])  # no spark attribute
+        mock_platform_cfg = MagicMock(spec=[])
         a.apply_platform_optimizations(mock_platform_cfg, mock_session)
         mock_session.conf.set.assert_not_called()
 
@@ -1087,19 +927,11 @@ class TestApplyPlatformOptimizations:
         mock_platform_cfg.spark = {"bad.key": "value"}
         mock_session.conf.set.side_effect = Exception("read-only")
 
-        # Should not raise
         a.apply_platform_optimizations(mock_platform_cfg, mock_session)
         mock_session.conf.set.assert_called_with("spark.bad.key", "value")
 
 
-# ---------------------------------------------------------------------------
-# apply_constraint_configuration
-# ---------------------------------------------------------------------------
-
-
 class TestApplyConstraintConfiguration:
-    """Branch coverage for apply_constraint_configuration()."""
-
     def test_pk_enabled_logs(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -1142,14 +974,7 @@ class TestApplyConstraintConfiguration:
             mock_info.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
-    """Branch coverage for close_connection()."""
-
     def test_stop_called_and_session_cleared(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
@@ -1179,11 +1004,6 @@ class TestCloseConnection:
         assert a._spark_session is None
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
     def test_returns_table_names(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -1211,11 +1031,6 @@ class TestGetExistingTables:
         assert tables == []
 
 
-# ---------------------------------------------------------------------------
-# analyze_table
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeTable:
     def test_analyze_table_executes_sql(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -1233,14 +1048,8 @@ class TestAnalyzeTable:
 
         a = SparkAdapter()
         mock_session.sql.side_effect = Exception("permission denied")
-        # Should not raise
         a.analyze_table(mock_session, "orders")
         mock_session.sql.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# from_config
-# ---------------------------------------------------------------------------
 
 
 class TestFromConfig:
@@ -1263,7 +1072,7 @@ class TestFromConfig:
             "scale_factor": 1.0,
         }
         a = SparkAdapter.from_config(config)
-        assert a.database  # non-empty
+        assert a.database
 
     def test_all_core_keys_passed(self, mock_pyspark):
         from benchbox.platforms.spark import SparkAdapter

@@ -1,18 +1,3 @@
-"""The slim-branch privacy detector must match the canonical one.
-
-`scripts/validate_submission.py` carries an inline `find_public_path_leaks`
-behind an `except ImportError`. That fallback is not dead code — it is the
-implementation that actually runs on `published-results`, because the
-slim-branch allowlist in `.github/workflows/sync-results-data-to-published.yml`
-mirrors this script and `benchbox/validation/bundle.py` but *not*
-`benchbox/core/results/anonymization.py`.
-
-So the public-corpus privacy gate is only as strong as this copy. A detector
-improvement made upstream and not mirrored here leaves the real gate blind,
-which is exactly what happened with object-key scanning. These tests exercise
-the fallback directly, with the canonical import forced to fail.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -29,11 +14,6 @@ CANONICAL = "benchbox.core.results.anonymization"
 
 @pytest.fixture(scope="module")
 def slim_leak_detector():
-    """Load the script with the canonical module unimportable.
-
-    Binding `sys.modules[name] = None` makes `from name import ...` raise
-    ImportError, which is the condition the slim branch is really in.
-    """
     saved = sys.modules.get(CANONICAL, ...)
     sys.modules[CANONICAL] = None  # type: ignore[assignment]
     try:
@@ -50,8 +30,6 @@ def slim_leak_detector():
             sys.modules[CANONICAL] = saved  # type: ignore[assignment]
 
     detector = module.find_public_path_leaks
-    # Guard the guard: if the module ever imports the canonical function
-    # despite the block, these tests would silently stop covering the fallback.
     assert detector.__module__ == "_validate_submission_slim", "fixture did not exercise the slim fallback"
     return detector
 
@@ -74,21 +52,14 @@ PAYLOADS = [
 
 @pytest.mark.parametrize("payload", PAYLOADS)
 def test_slim_fallback_matches_canonical_detector(slim_leak_detector, payload) -> None:
-    """Parity is the contract - the two copies must not drift."""
     assert sorted(slim_leak_detector(payload)) == sorted(_canonical()(payload))
 
 
 def test_slim_fallback_flags_a_key_encoded_private_path(slim_leak_detector) -> None:
-    """The gap this test file exists for: keys were not scanned at all."""
     assert slim_leak_detector({"per_path_timings": {"/Users/alice/db": 1.2}}) == ["per_path_timings.<key>"]
 
 
 def test_slim_fallback_does_not_echo_a_leaking_key(slim_leak_detector) -> None:
-    """Diagnostics reach PR comments, so a leaking key must never be named.
-
-    The nested case is the trap: reporting the *child* leak used to splice the
-    raw parent key into the field path.
-    """
     leaks = slim_leak_detector({"/Users/alice/secret": {"working_dir": "/home/bob/private"}})
     joined = " ".join(leaks)
     assert leaks
@@ -98,7 +69,6 @@ def test_slim_fallback_does_not_echo_a_leaking_key(slim_leak_detector) -> None:
 
 
 def test_slim_fallback_still_reports_ordinary_value_leaks(slim_leak_detector) -> None:
-    """Key scanning must not regress the original value behaviour."""
     assert slim_leak_detector({"nested": [{"working_dir": "/Users/alice/private"}]}) == ["nested.0.working_dir"]
 
 
@@ -120,12 +90,6 @@ VERSION_MATRIX = [
 
 @pytest.fixture(scope="module")
 def slim_version_helper():
-    """Load bundle.py with the canonical policy module unimportable.
-
-    Binding `sys.modules[name] = None` makes `from name import ...` raise
-    ImportError, which is the condition the slim branch is really in. The
-    loader must then resolve the helper from the mirrored file.
-    """
     saved = sys.modules.get(BUNDLE_POLICY_CANONICAL, ...)
     sys.modules[BUNDLE_POLICY_CANONICAL] = None  # type: ignore[assignment]
     try:
@@ -140,9 +104,6 @@ def slim_version_helper():
             sys.modules[BUNDLE_POLICY_CANONICAL] = saved  # type: ignore[assignment]
 
     helper = module.result_schema_version_value
-    # Guard the guard: if the module ever imports the canonical function
-    # despite the block, these tests would silently stop covering the file path.
-    # (The helper's home module is the file-loaded policy, not the bundle shim.)
     assert helper.__module__ == "_benchbox_schema_policy", "fixture did not exercise the slim file-load path"
     return helper
 
@@ -155,5 +116,4 @@ def _canonical_version_helper():
 
 @pytest.mark.parametrize("bundle,expected", VERSION_MATRIX)
 def test_slim_version_helper_matches_canonical(slim_version_helper, bundle, expected) -> None:
-    """Single implementation: the mirrored file load must match the helper."""
     assert slim_version_helper(bundle) == _canonical_version_helper()(bundle) == expected

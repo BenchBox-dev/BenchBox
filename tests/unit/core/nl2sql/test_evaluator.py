@@ -1,7 +1,4 @@
-"""Tests for NL2SQL evaluator.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 import pytest
 
@@ -22,8 +19,6 @@ pytestmark = [
 
 
 class TestSQLMatchType:
-    """Tests for SQLMatchType enum."""
-
     def test_match_types_exist(self):
 
         expected = {"exact", "semantic", "partial", "mismatch", "error"}
@@ -32,8 +27,6 @@ class TestSQLMatchType:
 
 
 class TestSQLComparisonResult:
-    """Tests for SQLComparisonResult dataclass."""
-
     def test_comparison_result_creation(self):
 
         result = SQLComparisonResult(
@@ -67,8 +60,6 @@ class TestSQLComparisonResult:
 
 
 class TestAccuracyMetrics:
-    """Tests for AccuracyMetrics dataclass."""
-
     def test_empty_metrics(self):
 
         metrics = AccuracyMetrics()
@@ -106,7 +97,6 @@ class TestAccuracyMetrics:
     def test_accuracy_calculations(self):
 
         metrics = AccuracyMetrics()
-        # 2 exact, 2 semantic, 1 partial, 3 mismatch, 2 error = 10 total
         for _ in range(2):
             metrics.add_result(SQLMatchType.EXACT)
         for _ in range(2):
@@ -118,10 +108,10 @@ class TestAccuracyMetrics:
             metrics.add_result(SQLMatchType.ERROR)
 
         assert metrics.total_queries == 10
-        assert metrics.exact_accuracy == 0.2  # 2/10
-        assert metrics.execution_accuracy == 0.4  # (2+2)/10
-        assert metrics.lenient_accuracy == 0.5  # (2+2+1)/10
-        assert metrics.error_rate == 0.2  # 2/10
+        assert metrics.exact_accuracy == 0.2
+        assert metrics.execution_accuracy == 0.4
+        assert metrics.lenient_accuracy == 0.5
+        assert metrics.error_rate == 0.2
 
     def test_metrics_to_dict(self):
 
@@ -139,11 +129,8 @@ class TestAccuracyMetrics:
 
 
 class TestNL2SQLEvaluator:
-    """Tests for NL2SQLEvaluator class."""
-
     @pytest.fixture
     def evaluator(self):
-        """Create an evaluator without connection."""
         return NL2SQLEvaluator(
             connection=None,
             case_sensitive=False,
@@ -158,7 +145,7 @@ class TestNL2SQLEvaluator:
 
         normalized = evaluator.normalize_sql(sql)
 
-        assert "  " not in normalized  # No double spaces
+        assert "  " not in normalized
         assert "\n" not in normalized
 
     def test_normalize_sql_case(self, evaluator):
@@ -213,7 +200,6 @@ class TestNL2SQLEvaluator:
         assert match is False
 
     def test_compare_without_execution(self, evaluator):
-        """Test comparison without execution (string match only)."""
         generated = "SELECT COUNT(*) FROM orders"
         expected = "SELECT COUNT(*) FROM orders"
 
@@ -245,8 +231,6 @@ class TestNL2SQLEvaluator:
 
 
 class TestSQLSimilarity:
-    """Tests for SQL similarity functions."""
-
     def test_calculate_sql_similarity_identical(self):
 
         sql1 = "SELECT COUNT(*) FROM orders WHERE status = 'active'"
@@ -281,8 +265,6 @@ class TestSQLSimilarity:
 
 
 class TestSQLComponentExtraction:
-    """Tests for SQL component extraction."""
-
     def test_extract_tables(self):
 
         sql = "SELECT * FROM orders o JOIN customers c ON o.cust_id = c.id"
@@ -313,8 +295,6 @@ class TestSQLComponentExtraction:
 
 
 class TestStructuralSimilarity:
-    """Tests for structural similarity calculation."""
-
     def test_structural_similarity_identical(self):
 
         sql1 = "SELECT COUNT(*) FROM orders WHERE status = 'active'"
@@ -335,7 +315,7 @@ class TestStructuralSimilarity:
         similarity = structural_similarity(sql1, sql2)
 
         assert similarity["tables"] == 0.0
-        assert similarity["functions"] == 1.0  # Same function
+        assert similarity["functions"] == 1.0
 
     def test_structural_similarity_partial(self):
 
@@ -344,20 +324,14 @@ class TestStructuralSimilarity:
 
         similarity = structural_similarity(sql1, sql2)
 
-        # Some tables match, some don't
         assert 0 < similarity["tables"] < 1
-        # COUNT is common
         assert 0 < similarity["functions"] < 1
-        # Overall should be partial
         assert 0 < similarity["overall"] < 1
 
 
 class TestCaseSensitiveEvaluator:
-    """Tests for case-sensitive evaluator."""
-
     @pytest.fixture
     def evaluator(self):
-        """Create a case-sensitive evaluator."""
         return NL2SQLEvaluator(
             connection=None,
             case_sensitive=True,
@@ -375,11 +349,8 @@ class TestCaseSensitiveEvaluator:
 
 
 class TestWhitespacePreservingEvaluator:
-    """Tests for whitespace-preserving evaluator."""
-
     @pytest.fixture
     def evaluator(self):
-        """Create a whitespace-preserving evaluator."""
         return NL2SQLEvaluator(
             connection=None,
             case_sensitive=False,
@@ -388,8 +359,6 @@ class TestWhitespacePreservingEvaluator:
 
     def test_whitespace_sensitive_mismatch(self, evaluator):
 
-        # Note: Even with ignore_whitespace=False, basic normalization still happens
-        # This test checks that different SQL structures are not matched
         sql1 = "SELECT COUNT(*) FROM orders WHERE status = 'active'"
         sql2 = "SELECT COUNT(*) FROM orders WHERE status = 'pending'"
 

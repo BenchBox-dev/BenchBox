@@ -1,5 +1,3 @@
-"""Pytest fixtures for E2E CLI tests."""
-
 from __future__ import annotations
 
 import os
@@ -12,16 +10,13 @@ import pytest
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping, Sequence
 
-# Re-export CLI utilities from integration tests
 from tests.integration._cli_e2e_utils import run_cli_command
 
-# Longer timeout for full benchmark runs
-E2E_BENCHMARK_TIMEOUT = 600.0  # 10 minutes for full benchmark execution
+E2E_BENCHMARK_TIMEOUT = 600.0
 
 
 @pytest.fixture
 def results_dir(tmp_path: Path) -> Path:
-    """Provide a temporary directory for benchmark results."""
     results = tmp_path / "benchmark_results"
     results.mkdir()
     return results
@@ -29,7 +24,6 @@ def results_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def data_dir(tmp_path: Path) -> Path:
-    """Provide a temporary directory for generated data."""
     data = tmp_path / "benchmark_data"
     data.mkdir()
     return data
@@ -37,7 +31,6 @@ def data_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def output_dir(tmp_path: Path) -> Path:
-    """Provide a temporary directory for CLI output."""
     output = tmp_path / "cli_output"
     output.mkdir()
     return output
@@ -45,7 +38,6 @@ def output_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def dry_run_dir(tmp_path: Path) -> Path:
-    """Provide a temporary directory for dry-run output."""
     dry_run = tmp_path / "dry_run"
     dry_run.mkdir()
     return dry_run
@@ -53,51 +45,38 @@ def dry_run_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def cleanup_results(results_dir: Path) -> Generator[Path, None, None]:
-    """Fixture that cleans up results directory after test."""
     yield results_dir
     if results_dir.exists():
         shutil.rmtree(results_dir)
 
 
-# ============================================================================
-# Platform-specific fixtures
-# ============================================================================
-
-
 def _platform_config(platform: str) -> dict[str, Any]:
-    """Factory for standard platform test configurations."""
     return {"platform": platform, "benchmark": "tpch", "scale": "0.01"}
 
 
 def _dry_run_config(platform: str, dry_run_dir: Path) -> dict[str, Any]:
-    """Factory for cloud platform dry-run test configurations."""
     return {**_platform_config(platform), "dry_run": str(dry_run_dir)}
 
 
 @pytest.fixture
 def duckdb_config() -> dict[str, Any]:
-    """Default configuration for DuckDB platform tests."""
     return _platform_config("duckdb")
 
 
 @pytest.fixture
 def sqlite_config() -> dict[str, Any]:
-    """Default configuration for SQLite platform tests."""
     return _platform_config("sqlite")
 
 
 @pytest.fixture
 def datafusion_config() -> dict[str, Any]:
-    """Default configuration for DataFusion platform tests."""
     return _platform_config("datafusion")
 
 
 @pytest.fixture
 def clickhouse_stub_dir(tmp_path: Path) -> Path:
-    """Create minimal chDB and clickhouse_driver stubs for subprocess imports."""
     stub_root = tmp_path / "clickhouse_stubs"
 
-    # Create chDB stub
     chdb_package_dir = stub_root / "chdb"
     session_dir = chdb_package_dir / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -152,72 +131,48 @@ def clickhouse_stub_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def clickhouse_env(clickhouse_stub_dir: Path) -> dict[str, str]:
-    """Environment variables for ClickHouse stub imports."""
     existing = os.environ.get("PYTHONPATH", "")
     return {"PYTHONPATH": f"{clickhouse_stub_dir}{os.pathsep}{existing}" if existing else str(clickhouse_stub_dir)}
 
 
-# ============================================================================
-# DataFrame platform fixtures
-# ============================================================================
-
-
 @pytest.fixture
 def pandas_df_config() -> dict[str, Any]:
-    """Default configuration for Pandas DataFrame platform tests."""
     return _platform_config("pandas-df")
 
 
 @pytest.fixture
 def polars_df_config() -> dict[str, Any]:
-    """Default configuration for Polars DataFrame platform tests."""
     return _platform_config("polars-df")
 
 
 @pytest.fixture
 def dask_df_config() -> dict[str, Any]:
-    """Default configuration for Dask DataFrame platform tests."""
     return _platform_config("dask-df")
-
-
-# ============================================================================
-# Cloud platform fixtures (for dry-run testing)
-# ============================================================================
 
 
 @pytest.fixture
 def snowflake_dry_run_config(dry_run_dir: Path) -> dict[str, Any]:
-    """Configuration for Snowflake dry-run tests."""
     return _dry_run_config("snowflake", dry_run_dir)
 
 
 @pytest.fixture
 def bigquery_dry_run_config(dry_run_dir: Path) -> dict[str, Any]:
-    """Configuration for BigQuery dry-run tests."""
     return _dry_run_config("bigquery", dry_run_dir)
 
 
 @pytest.fixture
 def redshift_dry_run_config(dry_run_dir: Path) -> dict[str, Any]:
-    """Configuration for Redshift dry-run tests."""
     return _dry_run_config("redshift", dry_run_dir)
 
 
 @pytest.fixture
 def athena_dry_run_config(dry_run_dir: Path) -> dict[str, Any]:
-    """Configuration for Athena dry-run tests."""
     return _dry_run_config("athena", dry_run_dir)
 
 
 @pytest.fixture
 def databricks_dry_run_config(dry_run_dir: Path) -> dict[str, Any]:
-    """Configuration for Databricks dry-run tests."""
     return _dry_run_config("databricks", dry_run_dir)
-
-
-# ============================================================================
-# CLI runner helpers
-# ============================================================================
 
 
 def build_cli_args(
@@ -225,15 +180,6 @@ def build_cli_args(
     *,
     extra_args: Sequence[str] | None = None,
 ) -> list[str]:
-    """Build CLI arguments from a config dictionary.
-
-    Args:
-        config: Configuration dictionary with platform, benchmark, scale, etc.
-        extra_args: Additional CLI arguments to append
-
-    Returns:
-        List of CLI arguments
-    """
     args = ["run"]
 
     if "platform" in config:
@@ -261,7 +207,6 @@ def build_cli_args(
     if config.get("capture_plans"):
         args.append("--capture-plans")
 
-    # Add platform options
     for key, value in config.get("platform_options", {}).items():
         args.extend(["--platform-option", f"{key}={value}"])
 
@@ -278,25 +223,9 @@ def run_benchmark(
     env: Mapping[str, str] | None = None,
     timeout: float = E2E_BENCHMARK_TIMEOUT,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a benchmark with the given configuration.
-
-    Args:
-        config: Configuration dictionary
-        extra_args: Additional CLI arguments
-        env: Environment variables
-        timeout: Command timeout in seconds
-
-    Returns:
-        CompletedProcess with stdout, stderr, returncode
-    """
 
     args = build_cli_args(config, extra_args=extra_args)
     return run_cli_command(args, env=env, timeout=timeout)
-
-
-# ============================================================================
-# Result file helpers
-# ============================================================================
 
 
 def find_result_files(
@@ -304,15 +233,6 @@ def find_result_files(
     *,
     pattern: str = "*.json",
 ) -> list[Path]:
-    """Find result files in a directory.
-
-    Args:
-        directory: Directory to search
-        pattern: Glob pattern for files
-
-    Returns:
-        List of matching file paths sorted by modification time (newest first)
-    """
     files = list(directory.glob(pattern))
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files
@@ -323,18 +243,8 @@ def find_latest_result(
     *,
     pattern: str = "*.json",
 ) -> Path | None:
-    """Find the most recent result file in a directory.
-
-    Args:
-        directory: Directory to search
-        pattern: Glob pattern for files
-
-    Returns:
-        Path to newest file, or None if no files found
-    """
     files = find_result_files(directory, pattern=pattern)
     return files[0] if files else None
 
 
-# Make imports available at module level
 import subprocess  # noqa: E402

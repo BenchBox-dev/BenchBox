@@ -1,10 +1,5 @@
-"""Post-benchmark client-to-platform link overhead probe.
-
-Measures empirical statement round-trip overhead on an active connection.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -19,12 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 def _allowlisted_error(exc: BaseException) -> dict[str, Any]:
-    """Build the published failure block for a probe error.
-
-    Only the exception class name is published. Raw exception text can
-    carry hostnames, IPs, credentials, or connection strings, so it is
-    kept to the local debug log and never enters the result bundle.
-    """
     logger.debug("Statement overhead probe failed: %r", exc)
     return {
         "collection_status": "partial",
@@ -35,7 +24,6 @@ def _allowlisted_error(exc: BaseException) -> dict[str, Any]:
 
 
 def _run_samples(execute_one: Any, sample_count: int) -> list[float]:
-    """Run 1 warmup plus ``sample_count`` timed statements."""
     execute_one()
     samples: list[float] = []
     for _ in range(sample_count):
@@ -46,7 +34,6 @@ def _run_samples(execute_one: Any, sample_count: int) -> list[float]:
 
 
 def _sample_via_cursor(connection: Any, sample_count: int) -> list[float]:
-    """Sample round trips through a DB-API cursor."""
     cursor = connection.cursor()
     try:
 
@@ -67,11 +54,6 @@ def _sample_via_cursor(connection: Any, sample_count: int) -> list[float]:
 
 
 def _sample_via_query_api(connection: Any, timeout_seconds: float, sample_count: int) -> list[float]:
-    """Sample round trips through a ``query()`` job API (e.g. BigQuery client).
-
-    The job handle's ``result(timeout=...)`` enforces a per-statement bound,
-    which DB-API cursors cannot provide portably.
-    """
     per_statement_timeout = max(0.5, timeout_seconds / (sample_count + 1))
 
     def execute_one() -> None:
@@ -90,23 +72,6 @@ def probe_statement_overhead(
     timeout_seconds: float = 5.0,
     sample_count: int = 5,
 ) -> dict[str, Any]:
-    """Probe baseline statement round-trip overhead on the given connection.
-
-    Discards 1 warmup query (`SELECT 1`), then executes `sample_count` measurement
-    queries timing each in milliseconds.
-
-    The whole probe is bounded by `timeout_seconds`: sampling runs on a daemon
-    thread and the caller stops waiting after the deadline, so a hung
-    `execute()` cannot hang a benchmark run that already succeeded.
-
-    On timeout the worker may still hold the connection when this returns:
-    callers must treat the connection as tainted (no further use except
-    close) when `collection_error_class` is `"TimeoutError"`.
-
-    Never raises exceptions: missing connections, non-standard clients, and
-    execution failures return a partial/unavailable status with an allowlisted
-    diagnostic (no raw error text enters the bundle).
-    """
     if connection is None:
         return {
             "collection_status": "partial",
@@ -126,11 +91,6 @@ def probe_statement_overhead(
 
     def _sample() -> None:
         try:
-            # A connection left inside a failed transaction would fail every
-            # probe statement with the backend's own error, masking the real
-            # state in the published diagnostic. Reset defensively inside the
-            # worker so the rollback itself is covered by the deadline; the
-            # benchmark workload that used this connection has completed.
             rollback = getattr(connection, "rollback", None)
             if callable(rollback):
                 try:

@@ -224,11 +224,9 @@ Each operation category has dedicated staging tables:
 
 The benchmark uses explicit cleanup operations instead of transaction rollback for maximum platform compatibility:
 
-```python
-# Execute write operation
+```sql
 INSERT INTO insert_ops_orders ...;
 
-# Explicit cleanup
 DELETE FROM insert_ops_orders WHERE o_orderkey = ...;
 ```
 
@@ -242,8 +240,7 @@ DELETE FROM insert_ops_orders WHERE o_orderkey = ...;
 
 The benchmark uses percentage-based queries instead of hard-coded key ranges for maximum flexibility:
 
-```python
-# Dynamic approach (works with any data size)
+```sql
 INSERT INTO merge_ops_target
 SELECT * FROM orders
 WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
@@ -323,7 +320,7 @@ benchbox run --benchmark write_primitives --platform duckdb \
 
 #### Constructor
 
-```python
+```text
 WritePrimitives(
     scale_factor: float = 1.0,
     output_dir: str = "_project/data",

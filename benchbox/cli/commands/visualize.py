@@ -1,5 +1,3 @@
-"""Generate charts from BenchBox benchmark results."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -27,16 +25,13 @@ def _render_ascii_charts(
     use_unicode: bool = True,
     template_name: str | None = None,
 ) -> None:
-    """Render ASCII charts to console using ResultPlotter for normalization."""
     from rich.text import Text
 
     from benchbox.core.visualization.ascii_api import ChartOptions
 
     def print_ansi(content: str) -> None:
-        """Print string with ANSI codes through Rich console."""
         console.print(Text.from_ansi(content))
 
-    # Resolve explicit chart types here; template expansion is shared in core orchestration.
     if template_name:
         types_to_render = []
         strict_pairwise_validation = True
@@ -46,10 +41,8 @@ def _render_ascii_charts(
     if not types_to_render and template_name is None:
         types_to_render = ["performance_bar"]
 
-    # Resolve source paths
     source_paths = _resolve_source_paths(ctx, sources)
 
-    # Use ResultPlotter for consistent normalization
     try:
         plotter = ResultPlotter.from_sources(source_paths, theme=theme)
         results = plotter.results
@@ -95,7 +88,6 @@ def _resolve_chart_types(
     ctx: click.Context,
     chart_types: Sequence[str],
 ) -> tuple[list[str], bool]:
-    """Resolve chart types from template or explicit list. Returns (types, strict_pairwise)."""
     strict_pairwise_validation = True
 
     lowered = [c.lower() for c in chart_types]
@@ -112,7 +104,6 @@ def _resolve_chart_types(
 
 
 def _resolve_source_paths(ctx: click.Context, sources: Sequence[str]) -> list[str]:
-    """Resolve source paths from arguments or find recent results."""
     source_paths = list(sources) if sources else []
 
     if not source_paths:
@@ -172,7 +163,6 @@ def visualize(
     no_color: bool,
     no_unicode: bool,
 ):
-    """Generate ASCII charts from BenchBox results."""
     _render_ascii_charts(
         ctx,
         sources,

@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""Action stale bot/agent review comments left on merged PRs.
-
-The script is intentionally an orchestrator, not a static fixer. It gathers
-candidate inline review comments from configured authors, skips comments that
-already carry the BenchBox action marker reply, asks the local executor (the
-`codex` CLI) to assess and fix each remaining finding against the current
-tree, replies to the source comment, and then optionally submits one batched
-PR through the existing Make workflow. The reviewer set is configurable via
-`--author`; the executor is currently codex but is isolated behind the
-`--executor-*` flags so it can be swapped without touching the orchestration.
-"""
 
 from __future__ import annotations
 
@@ -40,10 +29,6 @@ PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "pr_review_
 MIN_EXECUTOR_VERSION = (0, 20, 0)
 PER_COMMENT_COMMIT_SUBJECT_REGEX = re.compile(rf"^{re.escape(PER_COMMENT_COMMIT_PREFIX)}: PR #(\d+) comment (\d+) ")
 GH_API_RETRY_ATTEMPTS = 3
-# Sleep schedule (seconds) consumed in order between retries. Three values are
-# defined so the schedule remains stable if the attempt cap is later raised; at
-# GH_API_RETRY_ATTEMPTS == 3 only the first two are used (1s before retry 2,
-# 4s before retry 3).
 GH_API_RETRY_BACKOFFS: tuple[int, ...] = (1, 4, 9)
 HOOK_AUTOFIX_STDERR_MARKER = "files were modified by this hook"
 
@@ -140,8 +125,6 @@ class ActionResult:
 
 
 class CommandError(RuntimeError):
-    """Raised when an external command fails."""
-
     def __init__(self, args: Sequence[str], result: subprocess.CompletedProcess[str]) -> None:
         output = (result.stderr or result.stdout or "").strip()
         command = " ".join(args)
@@ -151,8 +134,6 @@ class CommandError(RuntimeError):
 
 
 class CommandRunner:
-    """Thin subprocess wrapper for production and tests."""
-
     def __init__(self, cwd: Path) -> None:
         self.cwd = cwd
 
@@ -326,12 +307,6 @@ def pull_request_review_from_api(item: dict[str, Any]) -> PullRequestReview:
 
 
 def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
-    """REST fallback: fetch review comments for a single PR.
-
-    Used when the GraphQL batch path is not viable (e.g. tests injecting a
-    minimal recording runner). Production runs go through
-    `fetch_review_comments_batched`.
-    """
     rows = gh_json_lines(
         runner,
         [
@@ -347,7 +322,6 @@ def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int
 
 
 def fetch_pr_issue_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[IssueComment]:
-    """Fetch top-level PR timeline comments for review-trigger bookkeeping."""
     rows = gh_json_lines(
         runner,
         [
@@ -363,7 +337,6 @@ def fetch_pr_issue_comments(runner: CommandRunner, *, repo: str, pr_number: int)
 
 
 def fetch_pr_reviews(runner: CommandRunner, *, repo: str, pr_number: int) -> list[PullRequestReview]:
-    """Fetch submitted PR reviews, including reviews whose body is not in the timeline."""
     rows = gh_json_lines(
         runner,
         [
@@ -504,13 +477,6 @@ def _fetch_additional_thread_comment_nodes(
 def fetch_review_comments_via_graphql(
     runner: CommandRunner, *, repo: str, pr_number: int
 ) -> list[ReviewComment] | None:
-    """Fetch one PR's review comments via a single GraphQL request (paginated).
-
-    Returns None if the GraphQL endpoint is unavailable in this environment
-    (the caller falls back to the REST path). Each merged PR still costs one
-    GraphQL roundtrip, but each roundtrip pulls every thread + comment for
-    that PR — replacing the prior per-page REST chain.
-    """
     owner, _, name = repo.partition("/")
     if not owner or not name:
         return None
@@ -576,7 +542,6 @@ def load_pr_review_comments(
     pr_number: int,
     require_thread_state: bool = False,
 ) -> list[ReviewComment]:
-    """Prefer GraphQL; fall back to REST on any failure for resilience."""
     via_graphql = fetch_review_comments_via_graphql(runner, repo=repo, pr_number=pr_number)
     if via_graphql is not None:
         return via_graphql
@@ -589,11 +554,6 @@ def load_pr_review_comments(
 
 
 def has_action_marker(replies: Sequence[ReviewComment]) -> bool:
-    """Match the marker only inside an HTML comment at start-of-line.
-
-    Substring matching let any reply that quoted the marker string (e.g. in a
-    meta-discussion) silently kill future sweeps for the thread.
-    """
     return any(ACTION_MARKER_REGEX.search(reply.body) for reply in replies)
 
 
@@ -648,7 +608,6 @@ def pending_comments_for_pr(
     *,
     author_logins: set[str],
 ) -> list[PendingComment]:
-    """Compatibility wrapper returning only the executor-actionable queue."""
     return list(review_inventory_for_pr(pr, comments, author_logins=author_logins).actionable)
 
 
@@ -688,16 +647,6 @@ def usage_limit_review_retry_for_pr(
     author_logins: set[str],
     reviews: Sequence[PullRequestReview] = (),
 ) -> UsageLimitReviewRetry | None:
-    """Return follow-up state when Codex hit review quota without a later result.
-
-    Codex review quota failures are top-level PR comments, not inline review
-    findings, so the normal review-thread scanner cannot action them. A PR
-    needs a fresh review trigger when its latest quota-limit comment has no
-    later `@codex review` trigger and no later actual Codex review result. If
-    a later trigger exists but no review result exists yet, the PR remains in
-    the follow-up queue as awaiting-review-result so operators can see it is
-    not actually reviewed yet without spamming duplicate triggers.
-    """
     usage_comments = [
         comment for comment in comments if is_usage_limit_review_comment(comment, author_logins=author_logins)
     ]
@@ -804,7 +753,6 @@ def discover_pending_comments(
     author_logins: set[str],
     include_post_merge: bool = False,
 ) -> list[PendingComment]:
-    """Compatibility wrapper for callers that only need actionable comments."""
     return list(
         discover_review_inventory(
             runner,
@@ -888,13 +836,6 @@ def select_usage_limit_retry_triggers(
 
 
 def git_state_snapshot(runner: CommandRunner) -> str:
-    """Snapshot of local Git state used as a disposition baseline.
-
-    `git diff` only sees unstaged tracked-file changes. The executor may stage
-    edits (`git add`), create new untracked files, or leave a clean local commit;
-    all of those must count as "fixed". `git status --porcelain` covers modified,
-    staged, and untracked files. `git rev-parse HEAD` covers clean commits.
-    """
     head = checked(runner, ["git", "rev-parse", "HEAD"]).stdout.strip()
     status = checked(runner, ["git", "status", "--porcelain"]).stdout
     return f"HEAD {head}\n{status}"
@@ -918,13 +859,6 @@ def local_commit_count(runner: CommandRunner, base_ref: str) -> int:
 
 
 def discover_locally_committed_pairs(runner: CommandRunner, base_ref: str) -> set[tuple[int, int]]:
-    """Return (pr_number, comment_id) pairs for per-comment commits already on HEAD.
-
-    Used by `--resume` to skip pending comments whose fix already landed
-    locally during a prior crashed sweep. Only the per-comment subject format
-    produced by `commit_message_for_result` matches; the fallback batch commit
-    in `finalize_changes` does not.
-    """
     result = checked(runner, ["git", "log", "--format=%s", f"{base_ref}..HEAD"])
     pairs: set[tuple[int, int]] = set()
     for line in result.stdout.splitlines():
@@ -979,7 +913,6 @@ def build_executor_prompt(
 
 
 def _executor_command() -> str:
-    """Return an executable command, including the Windows launcher suffix."""
     if os.name != "nt":
         return "codex"
     resolved = shutil.which("codex")
@@ -991,13 +924,6 @@ def _executor_command() -> str:
 def check_executor_version(
     runner: CommandRunner, *, minimum: tuple[int, int, int] = MIN_EXECUTOR_VERSION
 ) -> tuple[int, int, int]:
-    """Probe the executor's `--version` and assert it parses to >= minimum.
-
-    The executor is currently the codex CLI; the function name stays generic so
-    a future executor swap doesn't require a rename. Surfaces a clear
-    remediation when the binary is missing or too old, so the routine fails
-    fast instead of mid-loop with an opaque flag-not-recognized error.
-    """
     try:
         command = _executor_command()
         result = runner.run([command, "--version"])
@@ -1033,9 +959,6 @@ def run_executor_for_comment(
 ) -> ActionResult:
     before = git_state_snapshot(runner)
     prompt = build_executor_prompt(item, repo=repo, base=base)
-    # codex-cli >= 0.20 dropped `--ask-for-approval`. The config-override
-    # syntax (`-c approval_policy=<mode>`) works across the supported version
-    # range and is forward-stable.
     cmd = [
         _executor_command(),
         "exec",
@@ -1066,14 +989,10 @@ def run_executor_for_comment(
 
 
 def commit_message_for_result(result: ActionResult) -> str:
-    """One commit per actioned comment, with PR# + comment id for traceability."""
     pr = result.pending.pr
     comment = result.pending.comment
     headline = first_body_line(comment.body)
     subject = f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — {headline}"
-    # Keep commit subjects under the conventional ~100-char soft cap; truncate
-    # the comment headline before composing rather than after, so the trailer
-    # stays intact.
     if len(subject) > 100:
         keep = 100 - (len(subject) - len(headline)) - 1
         subject = f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — {headline[: max(keep, 1)]}…"
@@ -1082,12 +1001,6 @@ def commit_message_for_result(result: ActionResult) -> str:
 
 
 def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
-    """Return paths from `git status --porcelain` whose work-tree column is non-space.
-
-    The work-tree column (Y in `XY <path>`) is non-space whenever the file has
-    uncommitted changes relative to the index. After a pre-commit auto-fix this
-    is exactly how a previously-staged path surfaces.
-    """
     paths: set[str] = set()
     for line in porcelain.splitlines():
         if len(line) < 4 or line[2] != " ":
@@ -1096,7 +1009,6 @@ def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
         if worktree_status == " ":
             continue
         path = line[3:]
-        # Renames: `R  <old> -> <new>`. Take the destination path.
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
         paths.add(path)
@@ -1104,20 +1016,6 @@ def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
 
 
 def commit_changes_for_result(runner: CommandRunner, result: ActionResult) -> bool:
-    """Stage + commit executor-produced changes for one comment.
-
-    Returns True when a commit was created. Called *before* the GitHub reply
-    is posted so a crash between the executor run and the reply leaves no
-    phantom-actioned state on GitHub: either the commit landed (next run sees
-    no change), or nothing happened (next run reprocesses the comment cleanly).
-
-    A pre-commit hook that auto-formats the staged paths (e.g. `ruff-format`)
-    aborts the first commit with the marker `files were modified by this hook`
-    and leaves the formatted change in the work tree. We re-stage the same
-    paths and retry once. We deliberately do NOT generalise this to all commit
-    failures: a hook that detects a real bug (a test runner, a banned-pattern
-    grep) must still surface as a hard failure.
-    """
     if result.disposition != "fixed":
         return False
     paths = git_changed_paths(runner)
@@ -1140,8 +1038,6 @@ def commit_changes_for_result(runner: CommandRunner, result: ActionResult) -> bo
     porcelain = checked(runner, ["git", "status", "--porcelain"]).stdout
     auto_fixed = _porcelain_paths_with_worktree_mods(porcelain)
     if not auto_fixed.intersection(staged_paths):
-        # The hook ran, but the working-tree mods (if any) don't overlap the
-        # paths we just staged — treat as a genuine pre-commit failure.
         raise CommandError(commit_args, commit_result)
     print("==> pre-commit hook auto-fixed staged paths; re-staging and retrying once")
     stage_paths(runner, staged_paths)
@@ -1176,11 +1072,6 @@ _TRANSIENT_GH_STDERR_REGEX = re.compile(
 
 
 def _is_transient_gh_failure(stderr: str) -> bool:
-    """True for connection failures, HTTP 5xx, or HTTP 429.
-
-    Permanent 4xx (e.g. 404 — comment deleted upstream) returns False so the
-    caller fails loud instead of looping on a request that will never succeed.
-    """
     if not stderr:
         return False
     return bool(_TRANSIENT_GH_STDERR_REGEX.search(stderr))
@@ -1194,12 +1085,6 @@ def _gh_command_with_retry(
     backoffs: Sequence[int] = GH_API_RETRY_BACKOFFS,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a GitHub CLI mutation, retrying only on transient failures.
-
-    Targeted at mutation paths: flaky network errors or transient GitHub 5xx
-    responses aborted multiple sweeps in 2026-05. Permanent failures (e.g. 404)
-    still raise immediately; see `_is_transient_gh_failure`.
-    """
     for attempt in range(1, attempts + 1):
         result = runner.run(args)
         if result.returncode == 0:
@@ -1214,7 +1099,6 @@ def _gh_command_with_retry(
             flush=True,
         )
         sleeper(backoff)
-    # Defensive: the loop always returns or raises above.
     raise RuntimeError("_gh_command_with_retry exited without returning or raising")
 
 
@@ -1303,14 +1187,6 @@ def finalize_changes(
     commit_message: str,
     no_submit: bool,
 ) -> None:
-    """Run preflight + open the PR over the per-comment commits already on HEAD.
-
-    Per-comment commits are produced inside `run_action_loop` *before* the
-    GitHub reply is posted. This finalizer's job is just to (a) sweep up any
-    leftover unstaged paths into a fallback batch commit (executor output that
-    was somehow missed by `commit_changes_for_result`), (b) run preflight,
-    (c) open the PR.
-    """
     paths = git_changed_paths(runner)
     commits = local_commit_count(runner, base_ref)
     if not paths and commits == 0:
@@ -1427,11 +1303,6 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
             executor_sandbox=args.executor_sandbox,
             executor_approval=args.executor_approval,
         )
-        # Order matters: commit BEFORE replying. A crash between the executor
-        # and the reply leaves nothing on GitHub; a crash between commit and
-        # reply leaves a benign uncommented commit. Reply-before-commit
-        # would create phantom-actioned threads that future sweeps would
-        # silently skip even though no fix landed.
         commit_changes_for_result(runner, result)
         results.append(result)
         if not args.no_reply:

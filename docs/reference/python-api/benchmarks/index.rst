@@ -17,6 +17,8 @@ BenchBox provides Python APIs for all supported benchmarks, allowing you to:
 - Customize execution parameters
 
 All benchmark classes extend :doc:`../base` and share a common interface.
+Shared generation and query methods are documented in :doc:`mixins`;
+TPC-H query variants are documented in :doc:`tpchavoc`.
 
 Available Benchmarks
 --------------------

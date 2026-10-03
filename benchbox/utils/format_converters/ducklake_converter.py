@@ -1,14 +1,3 @@
-"""DuckLake format converter for BenchBox.
-
-Converts TPC benchmark data from TBL (pipe-delimited) format to DuckLake format.
-
-DuckLake is DuckDB's native open table format that provides:
-- ACID transactions
-- Time travel and snapshot isolation
-- Schema evolution
-- Native DuckDB integration with optimal performance
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -25,25 +14,10 @@ from benchbox.utils.format_converters.base import (
 
 
 class DuckLakeConverter(BaseFormatConverter):
-    """Converter for TBL → DuckLake format.
-
-    DuckLake is DuckDB's native open table format that provides ACID transactions
-    on top of Parquet files with metadata stored in a DuckDB database. This converter:
-    1. Reads TBL files using PyArrow CSV reader
-    2. Converts to Arrow tables
-    3. Writes to DuckLake using DuckDB with the ducklake extension
-
-    DuckLake structure:
-    - Metadata catalog: A DuckDB database file storing table metadata
-    - Data directory: Parquet files containing the actual data
-    """
-
     def get_file_extension(self) -> str:
-        """Get file extension for DuckLake format (directory-based)."""
-        return ""  # DuckLake uses directories, not file extensions
+        return ""
 
     def get_format_name(self) -> str:
-        """Get human-readable format name."""
         return "DuckLake"
 
     def convert(
@@ -54,22 +28,6 @@ class DuckLakeConverter(BaseFormatConverter):
         options: ConversionOptions | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> ConversionResult:
-        """Convert TBL files to DuckLake format.
-
-        Args:
-            source_files: List of source TBL file paths (may be sharded)
-            table_name: Name of the table being converted
-            schema: Table schema definition
-            options: Conversion options (uses defaults if None)
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            ConversionResult with details about the conversion
-
-        Raises:
-            ConversionError: If conversion fails
-            SchemaError: If schema is invalid
-        """
         try:
             import duckdb
         except ImportError as e:
@@ -77,14 +35,12 @@ class DuckLakeConverter(BaseFormatConverter):
 
         opts = options or ConversionOptions()
 
-        # Validate inputs
         self.validate_source_files(source_files)
         self.validate_schema(schema)
 
         if progress_callback:
             progress_callback(f"Starting DuckLake conversion for {table_name}", 0.0)
 
-        # Build PyArrow schema (validates schema can be converted)
         try:
             self._build_arrow_schema(schema)
         except SchemaError:
@@ -92,20 +48,16 @@ class DuckLakeConverter(BaseFormatConverter):
         except Exception as e:
             raise SchemaError(f"Failed to build Arrow schema: {e}") from e
 
-        # Read TBL files using shared method
         combined_table = self.read_tbl_files(
             source_files, schema, progress_callback, progress_start=0.0, progress_end=0.6
         )
 
-        # Get column names for metadata
         column_names = [col["name"] for col in schema["columns"]]
 
-        # Determine output path - DuckLake uses a directory
         source_dir = source_files[0].parent
         output_dir = opts.output_dir if opts.output_dir else source_dir
         ducklake_table_path = output_dir / table_name
 
-        # Clean up existing table directory if it exists
         if ducklake_table_path.exists():
             shutil.rmtree(ducklake_table_path, ignore_errors=True)
 
@@ -115,7 +67,6 @@ class DuckLakeConverter(BaseFormatConverter):
             duckdb, ducklake_table_path, table_name, combined_table, progress_callback
         )
 
-        # Calculate metrics and build result
         row_count = combined_table.num_rows
 
         if opts.validate_row_count:
@@ -145,11 +96,6 @@ class DuckLakeConverter(BaseFormatConverter):
         combined_table,
         progress_callback: Callable[[str, float], None] | None,
     ) -> tuple[Path, Path]:
-        """Create DuckLake catalog and write data via DuckDB extension.
-
-        Returns:
-            Tuple of (metadata_path, data_path).
-        """
         conn = None
         try:
             if progress_callback:
@@ -213,7 +159,6 @@ class DuckLakeConverter(BaseFormatConverter):
         opts: ConversionOptions,
         progress_callback: Callable[[str, float], None] | None,
     ) -> ConversionResult:
-        """Assemble the final ConversionResult with metrics and metadata."""
         source_size = self.calculate_file_size(source_files)
         output_size = sum(f.stat().st_size for f in ducklake_table_path.rglob("*") if f.is_file())
 

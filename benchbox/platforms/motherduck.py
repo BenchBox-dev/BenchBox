@@ -1,22 +1,6 @@
-"""MotherDuck platform adapter for serverless DuckDB cloud.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-MotherDuck is the managed cloud version of DuckDB, providing serverless
-analytics with cloud storage integration. This adapter inherits DuckDB's
-SQL dialect and benchmark compatibility while implementing MotherDuck-specific
-authentication and connection handling.
-
-Authentication:
-- Uses MOTHERDUCK_TOKEN environment variable or config file
-- Token can also be passed via --motherduck-token <token>
-
-Connection:
-- Uses DuckDB's native MotherDuck integration: md:database_name
-- Supports hybrid queries accessing both local and cloud data
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -51,13 +35,10 @@ _MOTHERDUCK_TOKEN_RE = re.compile(r"(motherduck_token=)[^&\s,;)]*", flags=re.IGN
 
 
 def _redact_motherduck_token(message: str, token: str | None = None) -> str:
-    """Remove MotherDuck token material from adapter errors."""
     redacted = message.replace(token, "****") if token else message
     return _MOTHERDUCK_TOKEN_RE.sub(r"\1****", redacted)
 
 
-# MotherDuck credentials include ``database``; route through the shared
-# credential-aware builder so saved setup values reach adapter config.
 _build_motherduck_config = make_platform_config_builder(
     "motherduck",
     __name__,
@@ -72,33 +53,11 @@ _build_motherduck_config = make_platform_config_builder(
 
 
 class MotherDuckAdapter(PlatformAdapter):
-    """MotherDuck platform adapter - serverless DuckDB in the cloud.
-
-    This adapter enables running benchmarks against MotherDuck, allowing
-    direct comparison with local DuckDB performance.
-
-    Authentication:
-        Set MOTHERDUCK_TOKEN environment variable, or provide via CLI flag:
-        --motherduck-token <your-motherduck-token>
-
-    Example usage:
-        benchbox run --platform motherduck --benchmark tpch --scale 0.01 \\
-            --platform-option database=my_benchmark_db
-    """
-
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     plan_capture_phase_eligible = True
 
     def __init__(self, **config):
-        """Initialize MotherDuck adapter.
-
-        Args:
-            **config: Configuration options:
-                - token: MotherDuck authentication token (or use MOTHERDUCK_TOKEN env)
-                - database: MotherDuck database name (default: benchbox)
-                - memory_limit: Local memory limit for hybrid queries
-        """
         super().__init__(**config)
 
         if duckdb is None:
@@ -108,10 +67,8 @@ class MotherDuckAdapter(PlatformAdapter):
                 + "\n\nNote: MotherDuck support requires DuckDB >= 0.9.0"
             )
 
-        # Use inherited dialect from DuckDB
         self._dialect = "duckdb"
 
-        # Authentication
         self.token = config.get("token") or os.environ.get("MOTHERDUCK_TOKEN")
         if not self.token:
             raise ValueError(
@@ -121,23 +78,19 @@ class MotherDuckAdapter(PlatformAdapter):
                 "\nGet your token at: https://app.motherduck.com/token-request"
             )
 
-        # Database configuration
         self.database = config.get("database", "benchbox")
         self.memory_limit = config.get("memory_limit", "4GB")
 
-        # Connection state
         self.connection = None
 
         logger.info(f"MotherDuck adapter initialized for database: {self.database}")
 
     @property
     def platform_name(self) -> str:
-        """Return platform display name."""
         return "MotherDuck"
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add MotherDuck-specific CLI arguments."""
         md_group = parser.add_argument_group("MotherDuck Arguments")
         md_group.add_argument(
             "--motherduck-database",
@@ -153,12 +106,10 @@ class MotherDuckAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create MotherDuck adapter from unified configuration."""
         adapter_config = {
             "benchmark": config.get("benchmark"),
         }
 
-        # Map the legacy argparse-style key and normalized DatabaseConfig key.
         database = config.get("motherduck_database") or config.get("database")
         if database:
             adapter_config["database"] = database
@@ -167,10 +118,6 @@ class MotherDuckAdapter(PlatformAdapter):
         if config.get("memory_limit"):
             adapter_config["memory_limit"] = config["memory_limit"]
 
-        # Pass through tuning provenance/config plus the shared plan
-        # display/capture keys (skipping None so adapter defaults apply):
-        # __init__ only ever sees this rebuilt config, so dropping them
-        # silently disables console plan display and capture/filtering.
         from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
 
         for key in PLAN_FORWARD_KEYS:
@@ -191,35 +138,20 @@ class MotherDuckAdapter(PlatformAdapter):
         return cls(**adapter_config)
 
     def get_target_dialect(self) -> str:
-        """Get the SQL dialect for query translation.
-
-        MotherDuck uses DuckDB's SQL dialect, inherited via config_inheritance.
-        """
         return resolve_dialect_for_query_translation("motherduck")
 
     def create_connection(self, connection_config: Optional[dict[str, Any]] = None):
-        """Create connection to MotherDuck.
-
-        Uses DuckDB's native MotherDuck integration with connection string:
-        md:database_name?motherduck_token=TOKEN
-
-        Returns:
-            DuckDB connection connected to MotherDuck
-        """
         if self.connection is not None:
             return self.connection
 
-        # Build MotherDuck connection string
         connection_string = f"md:{self.database}?motherduck_token={self.token}"
 
         try:
             logger.info(f"Connecting to MotherDuck database: {self.database}")
             self.connection = duckdb.connect(connection_string)
 
-            # Set memory limit for local operations
             self.connection.execute(f"SET memory_limit = '{self.memory_limit}'")
 
-            # Test connection
             result = self.connection.execute("SELECT 1 AS test").fetchone()
             if result and result[0] == 1:
                 logger.info("MotherDuck connection successful")
@@ -231,19 +163,11 @@ class MotherDuckAdapter(PlatformAdapter):
         except Exception as e:
             safe_error = _redact_motherduck_token(str(e), self.token)
             logger.error(f"Failed to connect to MotherDuck: {safe_error}")
-            # `from None`, not `from e`: the cause would carry the unredacted
-            # connection string (token included) into any printed traceback,
-            # undoing the redaction above. Unconditional because __init__
-            # rejects a missing token, so there is no credential-free run whose
-            # chain is worth keeping - unlike ducklake.py, which gates the same
-            # suppression on actually holding a secret. safe_error preserves the
-            # driver's diagnosis, so only the raw duplicate is dropped.
             raise ConnectionError(
                 f"Failed to connect to MotherDuck: {safe_error}\nCheck your MOTHERDUCK_TOKEN and network connection."
             ) from None
 
     def close_connection(self, connection=None):
-        """Close MotherDuck connection."""
         conn = connection or self.connection
         if conn:
             try:
@@ -254,28 +178,14 @@ class MotherDuckAdapter(PlatformAdapter):
             self.connection = None
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get MotherDuck query execution plan using EXPLAIN (ANALYZE, FORMAT JSON).
-
-        MotherDuck uses DuckDB's SQL dialect; EXPLAIN format is identical.
-        DuckDB EXPLAIN rows are (explain_key, explain_value) tuples; column 1 is the JSON payload.
-
-        DML queries (INSERT/UPDATE/DELETE/MERGE/COPY) are explained without ANALYZE
-        to prevent double-execution, even when analyze_plans=True: EXPLAIN ANALYZE
-        physically runs the statement, which would mutate data a second time. The
-        plan structure is still captured (FORMAT JSON only); execution statistics
-        are absent for these statements.
-        """
         from benchbox.platforms.base.result_capture import is_dml_query
 
         analyze = self.analyze_plans
-        # EXPLAIN ANALYZE re-executes the statement; for DML that would double-mutate
-        # data, so downgrade to FORMAT JSON (estimated plan, no execution stats).
         if analyze and is_dml_query(query):
             analyze = False
         explain_options = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
         try:
             rows = (connection or self.connection).execute(f"EXPLAIN ({explain_options}) {query}").fetchall()
-            # column 0 is the key (e.g. "analyzed_plan"), column 1 is the JSON value
             parts = [str(row[1]) for row in rows]
             return "\n".join(parts) if parts else None
         except Exception as e:
@@ -283,7 +193,6 @@ class MotherDuckAdapter(PlatformAdapter):
             return None
 
     def get_query_plan_parser(self):
-        """Get MotherDuck query plan parser (reuses DuckDB parser)."""
         from benchbox.core.query_plans.parsers.duckdb import DuckDBQueryPlanParser
 
         return DuckDBQueryPlanParser()
@@ -298,20 +207,6 @@ class MotherDuckAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query against MotherDuck.
-
-        Args:
-            connection: Active database connection (falls back to self.connection or creates one).
-            query: SQL query to execute.
-            query_id: Query identifier for result tracking.
-            benchmark_type: Benchmark type for optional row-count validation.
-            scale_factor: Scale factor for optional row-count validation.
-            validate_row_count: Whether to validate row count.
-            stream_id: Stream identifier for multi-stream benchmarks.
-
-        Returns:
-            Dict with query_id, status, execution_time_seconds, rows_returned, etc.
-        """
         conn = connection or self.connection
         if conn is None:
             conn = self.create_connection()
@@ -344,23 +239,14 @@ class MotherDuckAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-        # Display plan in console when --show-query-plans is active.
-        # Skip here when --capture-plans is also active: capture_query_plan below
-        # already calls get_query_plan (running EXPLAIN ANALYZE); calling
-        # display_query_plan_if_enabled separately would issue EXPLAIN a second time.
         if not self.capture_plans:
             self.display_query_plan_if_enabled(conn, query, query_id)
 
-        # Capture and merge structured query plan (SUCCESS-guarded in the helper).
-        # Deliberately outside the try: with strict_plan_capture=True a capture
-        # failure raises PlanCaptureError, which must propagate instead of being
-        # swallowed by the broad except and mislabeling the successful query FAILED.
         self._merge_plan_capture_into_result(result_dict, conn, query, query_id)
 
         return result_dict
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get MotherDuck platform information for results traceability."""
         info: dict[str, Any] = {
             "platform_type": "motherduck",
             "platform_name": self.platform_name,
@@ -372,7 +258,6 @@ class MotherDuckAdapter(PlatformAdapter):
             "client_library_version": getattr(duckdb, "__version__", None) if duckdb else None,
         }
 
-        # Probe engine version from active connection
         conn = connection or self.connection
         if conn:
             try:
@@ -387,7 +272,6 @@ class MotherDuckAdapter(PlatformAdapter):
         return info
 
     def get_platform_metadata(self) -> dict[str, Any]:
-        """Get platform metadata including MotherDuck-specific info."""
         metadata = {
             "platform_type": "motherduck",
             "platform_name": self.platform_name,
@@ -396,7 +280,6 @@ class MotherDuckAdapter(PlatformAdapter):
             "inherits_from": "duckdb",
         }
 
-        # Add DuckDB version info if connected
         if self.connection:
             try:
                 result = self.connection.execute("SELECT version()").fetchone()
@@ -408,7 +291,6 @@ class MotherDuckAdapter(PlatformAdapter):
         return metadata
 
     def test_connection(self) -> bool:
-        """Test MotherDuck connection."""
         try:
             conn = self.create_connection()
             result = conn.execute("SELECT 1").fetchone()
@@ -418,24 +300,10 @@ class MotherDuckAdapter(PlatformAdapter):
             return False
 
     def create_schema(self, benchmark, connection) -> float:
-        """Create database schema for the benchmark.
-
-        MotherDuck uses DuckDB's SQL dialect, so schema creation follows
-        the same pattern as local DuckDB.
-
-        Args:
-            benchmark: Benchmark instance with schema definitions
-            connection: DuckDB connection to MotherDuck
-
-        Returns:
-            Time taken to create schema in seconds
-        """
         start_time = time.perf_counter()
 
-        # Get CREATE TABLE statements from benchmark
         schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
 
-        # Execute each statement
         for statement in schema_sql.split(";"):
             statement = statement.strip()
             if statement:
@@ -444,35 +312,19 @@ class MotherDuckAdapter(PlatformAdapter):
         return time.perf_counter() - start_time
 
     def load_data(self, benchmark, connection, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into MotherDuck.
-
-        Data can be loaded directly from local files into MotherDuck using
-        DuckDB's file reading capabilities with MotherDuck's cloud backend.
-
-        Args:
-            benchmark: Benchmark instance
-            connection: DuckDB connection to MotherDuck
-            data_dir: Path to benchmark data directory
-
-        Returns:
-            Tuple of (row_counts, load_time, manifest)
-        """
         start_time = time.perf_counter()
         row_counts: dict[str, int] = {}
         effective_tuning = self.unified_tuning_configuration if self.tuning_enabled else None
 
-        # Get table files from data directory
         for table_file in data_dir.glob("*.parquet"):
             table_name = table_file.stem
 
-            # Load parquet file directly into MotherDuck
             logger.info(f"Loading {table_name} from {table_file}")
             connection.execute(f"""
                 INSERT INTO {table_name}
                 SELECT * FROM read_parquet('{table_file}')
             """)
 
-            # Get row count
             result = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
             row_counts[table_name] = result[0] if result else 0
 
@@ -485,38 +337,18 @@ class MotherDuckAdapter(PlatformAdapter):
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Create MotherDuck external views over Parquet/Delta sources."""
         return _create_duckdb_external_views(self, benchmark, connection, data_dir)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """Build MotherDuck CTAS SQL using DuckDB-compatible syntax."""
         return _build_duckdb_ctas_sort_sql(table_name, sort_columns)
 
     def apply_platform_optimizations(self, platform_config, connection) -> None:
-        """Apply platform-specific optimizations.
-
-        MotherDuck handles optimization automatically - this is a no-op.
-        """
+        pass
 
     def apply_constraint_configuration(self, primary_key_config, foreign_key_config, connection) -> None:
-        """Apply constraint configuration.
-
-        MotherDuck/DuckDB doesn't enforce constraints by default,
-        so this is typically a no-op unless explicitly configured.
-        """
+        pass
 
     def configure_for_benchmark(self, connection, benchmark_type: str) -> None:
-        """Configure MotherDuck for benchmark execution.
-
-        MotherDuck automatically handles most optimizations. We can set
-        some DuckDB-level configurations for local processing if needed.
-
-        Args:
-            connection: DuckDB connection to MotherDuck
-            benchmark_type: Type of benchmark (e.g., "olap")
-        """
-        # MotherDuck handles optimization automatically
-        # Set reasonable defaults for analytical workloads
         try:
             connection.execute(f"SET memory_limit = '{self.memory_limit}'")
         except Exception as e:

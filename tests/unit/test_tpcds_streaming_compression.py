@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Tests for TPC-DS streaming compression functionality.
-"""
 
 import tempfile
 from pathlib import Path
@@ -19,27 +16,19 @@ pytestmark = [
 
 
 class TestTPCDSStreamingCompression:
-    """Test suite for TPC-DS streaming compression feature.
-
-    These tests specifically test zstd compression and require the zstandard library.
-    """
-
     @pytest.fixture
     def temp_dir(self):
-        """Create a temporary directory for testing."""
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
     @pytest.fixture
     def mock_dsdgen_path(self, temp_dir):
-        """Mock dsdgen executable path."""
         dsdgen_exe = temp_dir / "dsdgen"
         dsdgen_exe.write_text("#!/bin/bash\necho 'mock dsdgen'")
         dsdgen_exe.chmod(0o755)
         return dsdgen_exe
 
     def test_streaming_compression_enabled(self, temp_dir, mock_dsdgen_path):
-        """Test that streaming compression is used when compression is enabled."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -51,14 +40,12 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Test that streaming methods are called when compression is enabled
             with patch.object(generator, "_run_streaming_dsdgen") as mock_streaming:
                 with patch.object(generator, "_copy_distribution_files"):
                     generator._run_single_threaded_dsdgen(temp_dir)
                     mock_streaming.assert_called_once_with(temp_dir)
 
     def test_file_based_fallback_when_no_compression(self, temp_dir, mock_dsdgen_path):
-        """Test that file-based generation is used when compression is disabled."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -70,14 +57,12 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Test that file-based method is called when compression is disabled
             with patch.object(generator, "_run_file_based_dsdgen") as mock_file_based:
                 with patch.object(generator, "_copy_distribution_files"):
                     generator._run_single_threaded_dsdgen(temp_dir)
                     mock_file_based.assert_called_once_with(temp_dir)
 
     def test_parent_child_table_handling(self, temp_dir, mock_dsdgen_path):
-        """Test that parent-child table relationships are handled correctly."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -89,20 +74,17 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Test parent table with children (catalog_sales -> catalog_returns)
             with patch.object(generator, "_generate_parent_table_with_children") as mock_parent:
                 with patch.object(generator, "_copy_distribution_files"):
                     generator._generate_table_with_streaming(temp_dir, "catalog_sales")
                     mock_parent.assert_called_once_with(temp_dir, "catalog_sales", ["catalog_returns"])
 
-            # Test single table (no children)
             with patch.object(generator, "_generate_single_table_streaming") as mock_single:
                 with patch.object(generator, "_copy_distribution_files"):
                     generator._generate_table_with_streaming(temp_dir, "customer")
                     mock_single.assert_called_once_with(temp_dir, "customer")
 
     def test_parallel_streaming_compression(self, temp_dir, mock_dsdgen_path):
-        """Test that parallel streaming compression works correctly."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -115,14 +97,12 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Test that parallel streaming method is called
             with patch.object(generator, "_run_parallel_streaming_dsdgen") as mock_parallel:
                 with patch.object(generator, "_copy_distribution_files"):
                     generator._run_parallel_dsdgen(temp_dir)
                     mock_parallel.assert_called_once_with(temp_dir)
 
     def test_compression_filename_generation(self, temp_dir, mock_dsdgen_path):
-        """Test that compressed filenames are generated correctly."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -134,15 +114,12 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Test compressed filename generation
             filename = generator.get_compressed_filename("customer.dat")
             assert filename == "customer.dat.zst"
 
-            # Test that compression is detected correctly
             assert generator.should_use_compression()
 
     def test_generated_files_mapping(self, temp_dir, mock_dsdgen_path):
-        """Test that file mapping works with compressed files."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -154,7 +131,6 @@ class TestTPCDSStreamingCompression:
                 force_regenerate=True,
             )
 
-            # Create mock compressed files
             compressed_files = {}
             table_names = ["customer", "item", "store_sales", "catalog_sales"]
             for table in table_names:
@@ -162,27 +138,20 @@ class TestTPCDSStreamingCompression:
                 compressed_file.write_text(f"compressed {table} data")
                 compressed_files[table] = compressed_file
 
-            # Mock the data generation process
             with patch.object(generator, "_run_dsdgen_native", return_value=None):
                 with patch.object(generator, "should_use_compression", return_value=True):
                     with patch.object(generator, "get_compressor") as mock_compressor:
                         mock_compressor.return_value.get_file_extension.return_value = ".zst"
 
-                        # Test the file mapping logic in _generate_local
                         result = generator._generate_local(temp_dir)
 
-                        # When internal methods are mocked, _generate_local returns empty dict
-                        # because the mocked methods don't actually populate the result
                         assert isinstance(result, dict)
-                        # If any files were found, they should have .zst extension
-                        # Result values are lists of Path objects
                         for table_paths in result.values():
                             assert isinstance(table_paths, list), "Expected list of paths"
                             for file_path in table_paths:
                                 assert str(file_path).endswith(".zst"), f"Expected .zst file, got {file_path}"
 
     def test_generate_local_prunes_stale_artifacts_when_regenerating(self, temp_dir, mock_dsdgen_path):
-        """_generate_local should prune stale table artifacts before regeneration."""
         with patch.object(TPCDSDataGenerator, "_find_or_build_dsdgen") as mock_find:
             mock_find.return_value = mock_dsdgen_path
 
@@ -206,13 +175,11 @@ class TestTPCDSStreamingCompression:
 
 
 def test_streaming_compression_integration():
-    """Integration test for streaming compression functionality."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        # Test with compression enabled (TPC-DS requires scale_factor >= 1.0)
         generator = TPCDSDataGenerator(
-            scale_factor=1.0,  # TPC-DS requires scale_factor >= 1.0
+            scale_factor=1.0,
             output_dir=temp_path,
             verbose=False,
             parallel=1,
@@ -221,9 +188,7 @@ def test_streaming_compression_integration():
             compress_data=True,
         )
 
-        # Test basic functionality (this will use actual dsdgen if available)
         try:
-            # Just test that the generator can be initialized and methods exist
             assert hasattr(generator, "_run_streaming_dsdgen")
             assert hasattr(generator, "_generate_table_with_streaming")
             assert hasattr(generator, "_generate_single_table_streaming")
@@ -231,7 +196,6 @@ def test_streaming_compression_integration():
             assert generator.should_use_compression()
             assert generator.get_compressed_filename("test.dat") == "test.dat.zst"
         except Exception as e:
-            # If dsdgen is not available, that's okay for this test
             if "dsdgen" not in str(e):
                 raise e
 

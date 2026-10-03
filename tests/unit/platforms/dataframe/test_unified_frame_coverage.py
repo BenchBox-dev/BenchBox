@@ -1,5 +1,3 @@
-"""Coverage-focused tests for unified_frame helper utilities."""
-
 from __future__ import annotations
 
 import sys
@@ -89,13 +87,6 @@ class _DFExpr:
         return str(self.value)
 
     def rex_call_operator(self):
-        # Mirror real DataFusion Expr behavior: rex_call_operator() always
-        # raises, wrapping a debug-style dump of the expression's own AST in
-        # the same "Catch all triggered in get_operator_name: ..." text real
-        # DataFusion uses (confirmed against DataFusion 43.0.0 and 53.0.0).
-        # None of these fakes represent an Alias(BinaryExpr(...)) shape, so
-        # _get_datafusion_ast_string() should treat this as "not our
-        # pattern" (return None) rather than raising DataFusionASTFormatError.
         raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: {self.value!r}")
 
 
@@ -506,22 +497,12 @@ def test_datafusion_ast_extractors_basic_cases():
 
 
 def test_get_datafusion_ast_string_success_and_unexpected_error():
-    # Both fakes use the real "Catch all triggered in get_operator_name: ..."
-    # wrapper DataFusion actually raises (confirmed against DataFusion 43.0.0
-    # and 53.0.0) so this test exercises the sanity-check branch, not the
-    # format-drift branch covered separately by
-    # test_unified_frame_datafusion_ast.py.
     class ExprWithAst:
         def rex_call_operator(self):
             raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Alias(BinaryExpr(AggregateFunction(...)))")
 
     class ExprWithoutAst:
         def rex_call_operator(self):
-            # A genuinely different expression shape (e.g. a plain Column) -
-            # still matches the wrapper format but not the Alias/BinaryExpr/
-            # AggregateFunction sanity-check keywords, so this must return
-            # None (fall back to unchanged-expression behavior) rather than
-            # raising DataFusionASTFormatError.
             raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Column {{ relation: None, name: \\'x\\' }}")
 
     assert "Alias" in uf._get_datafusion_ast_string(ExprWithAst())
@@ -589,7 +570,6 @@ def test_unified_expr_default_branches_cover_core_methods():
     expr = uf.UnifiedExpr(_DefaultNativeExpr("base"))
     other = uf.UnifiedExpr(_DefaultNativeExpr("other"))
 
-    # Arithmetic/comparison/boolean
     assert isinstance(expr + other, uf.UnifiedExpr)
     assert isinstance(expr - 1, uf.UnifiedExpr)
     assert isinstance(expr * 2, uf.UnifiedExpr)
@@ -605,7 +585,6 @@ def test_unified_expr_default_branches_cover_core_methods():
     assert isinstance(expr | other, uf.UnifiedExpr)
     assert isinstance(~expr, uf.UnifiedExpr)
 
-    # Aggregates/aliases/casts
     assert isinstance(expr.sum(), uf.UnifiedExpr)
     assert isinstance(expr.mean(), uf.UnifiedExpr)
     assert isinstance(expr.avg(), uf.UnifiedExpr)
@@ -634,7 +613,6 @@ def test_unified_expr_default_branches_cover_core_methods():
     assert isinstance(expr.cum_max(), uf.UnifiedExpr)
     assert isinstance(expr.cum_min(), uf.UnifiedExpr)
 
-    # Namespace accessors
     assert isinstance(expr.str.starts_with("a"), uf.UnifiedExpr)
     assert isinstance(expr.str.ends_with("z"), uf.UnifiedExpr)
     assert isinstance(expr.str.contains("x"), uf.UnifiedExpr)

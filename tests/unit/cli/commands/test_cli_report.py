@@ -111,8 +111,8 @@ class TestReportList:
 
         assert result.exit_code == 0
         assert "DuckDB" in result.output
-        # Snowflake should not appear in filtered results
-        # (can't easily check for absence without parsing table)
+        assert "snowflake" not in result.output.casefold()
+        assert "f2" not in result.output
 
 
 class TestReportRankings:

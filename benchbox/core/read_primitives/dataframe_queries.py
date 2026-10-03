@@ -785,7 +785,6 @@ def _extreme_source(ctx: DataFrameContext, base: str, joins: tuple[tuple[str, st
 
 def _make_extreme_row_impls(
     name: str,
-    doc: str,
     base: str,
     joins: tuple[tuple[str, str, str], ...],
     groups: tuple[str, ...],
@@ -824,15 +823,14 @@ def _make_extreme_row_impls(
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
         impl.__name__ = f"{name}_{family}_impl"
         impl.__qualname__ = impl.__name__
-        impl.__doc__ = doc
         _register_generated_impl(impl)
 
 
 # fmt: off
 for _spec in (
-    ("max_by_simple", "Find the customer with the highest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "max", "max_balance", ("n_name", "c_name", "max_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "max_balance"}, True, None),
-    ("min_by_simple", "Find the customer with the lowest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "min", "min_balance", ("n_name", "c_name", "min_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "min_balance"}, False, None),
-    ("max_by_complex", "Find the most expensive order for each customer segment.", "orders", (("customer", "o_custkey", "c_custkey"),), ("c_mktsegment",), ("c_mktsegment",), "o_totalprice", "max", "max_order_value", ("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value"), ("c_mktsegment",), ("c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"), {"o_totalprice": "max_order_value"}, True, None),
+    ("max_by_simple", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "max", "max_balance", ("n_name", "c_name", "max_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "max_balance"}, True, None),
+    ("min_by_simple", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "min", "min_balance", ("n_name", "c_name", "min_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "min_balance"}, False, None),
+    ("max_by_complex", "orders", (("customer", "o_custkey", "c_custkey"),), ("c_mktsegment",), ("c_mktsegment",), "o_totalprice", "max", "max_order_value", ("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value"), ("c_mktsegment",), ("c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"), {"o_totalprice": "max_order_value"}, True, None),
     # min_by_complex, min_by_with_ties, max_by_with_ties are dedicated impls below:
     # they need a deterministic ARG_MIN/MAX tie-break and the SQL's secondary
     # ORDER BY keys, which this factory (sort-by-alias + arbitrary unique) cannot

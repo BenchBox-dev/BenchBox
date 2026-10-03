@@ -1,19 +1,9 @@
-"""Integration tests for TPC-DS Official Benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests verify the complete TPC-DS benchmark workflow including:
-- Official benchmark execution
-- QphDS@Size metric calculation
-- All three test phases (Power, Throughput, Maintenance)
-- Report generation and validation
-- Compliance checking
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -35,17 +25,13 @@ pytestmark = [
 
 
 class TestTPCDSOfficialBenchmark:
-    """Test suite for TPC-DS Official Benchmark implementation."""
-
     @pytest.fixture
     def temp_dir(self):
-        """Create temporary directory for test outputs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             yield Path(tmp_dir)
 
     @pytest.fixture
     def benchmark_instance(self, temp_dir):
-        """Create TPCDSOfficialBenchmark instance for testing."""
         return TPCDSOfficialBenchmark(
             scale_factor=1.0,
             output_dir=temp_dir,
@@ -54,7 +40,6 @@ class TestTPCDSOfficialBenchmark:
 
     @pytest.fixture
     def mock_connection_factory(self):
-        """Mock database connection factory."""
 
         def factory():
             return Mock()
@@ -133,13 +118,11 @@ class TestTPCDSOfficialBenchmark:
 
     def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory):
 
-        # Mock the internal components that would be used
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power_test,
             patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput_test,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance_test,
         ):
-            # Setup mocks
             mock_power_instance = Mock()
             mock_power_instance.run.return_value = {"power_at_size": 100.0}
             mock_power_test.return_value = mock_power_instance
@@ -166,7 +149,7 @@ class TestTPCDSOfficialBenchmark:
             scale_factor=1.0,
             num_streams=2,
             power_test_enabled=True,
-            throughput_test_enabled=False,  # Only power test
+            throughput_test_enabled=False,
             maintenance_test_enabled=False,
             verbose=True,
         )
@@ -180,12 +163,11 @@ class TestTPCDSOfficialBenchmark:
 
             assert result.success is True
             assert result.power_at_size == 150.0
-            assert result.throughput_at_size == 0.0  # Not run
-            assert result.qphds_at_size == 0.0  # Cannot calculate without both
+            assert result.throughput_at_size == 0.0
+            assert result.qphds_at_size == 0.0
 
     def test_validate_compliance(self, benchmark_instance):
 
-        # Valid result
         valid_result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(),
             start_time="2023-01-01T00:00:00",
@@ -196,14 +178,13 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=100.0,
             throughput_at_size=200.0,
-            qphds_at_size=141.42,  # sqrt(100 * 200)
+            qphds_at_size=141.42,
             success=True,
             errors=[],
         )
 
         assert benchmark_instance.validate_compliance(valid_result) is True
 
-        # Invalid result (failed)
         invalid_result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(),
             start_time="2023-01-01T00:00:00",
@@ -238,7 +219,6 @@ class TestTPCDSOfficialBenchmark:
             errors=[],
         )
 
-        # Use system temp directory for test files to ensure OS cleanup
         import os
         import tempfile
 
@@ -252,7 +232,7 @@ class TestTPCDSOfficialBenchmark:
 
             assert audit_path.exists()
             assert audit_path.is_file()
-            assert audit_path == audit_file  # Ensure it used our specified path
+            assert audit_path == audit_file
 
             content = audit_path.read_text()
             assert "TPC-DS Official Benchmark Audit Trail" in content
@@ -260,7 +240,6 @@ class TestTPCDSOfficialBenchmark:
             assert "Number of Streams: 4" in content
             assert "QphDS@Size: 632.46" in content
         finally:
-            # Clean up the temp file
             if audit_file.exists():
                 os.unlink(audit_file)
 
@@ -268,25 +247,18 @@ class TestTPCDSOfficialBenchmark:
 
         base_benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=False)
 
-        # Test that run_official_benchmark method exists
         assert hasattr(base_benchmark, "run_official_benchmark")
         assert callable(base_benchmark.run_official_benchmark)
 
     def test_error_handling_during_execution(self):
 
-        # Create a minimal mock-based test that directly tests the error handling logic
-        # without expensive TPC binary initialization
-
-        # Mock connection factory
         Mock()
 
-        # Create config object directly
         config = TPCDSOfficialBenchmarkConfig(
             scale_factor=1.0,
             verbose=False,
         )
 
-        # Create result object to test error handling
         result = TPCDSOfficialBenchmarkResult(
             config=config,
             start_time="2023-01-01T00:00:00",
@@ -302,15 +274,12 @@ class TestTPCDSOfficialBenchmark:
             errors=[],
         )
 
-        # Test that error handling works by simulating the power test failure logic
-        # This directly tests the error handling without expensive initialization
         try:
             raise Exception("Database connection failed")
         except Exception as e:
             result.errors.append(f"Power Test failed: {e}")
             result.success = False
 
-        # Verify error handling worked correctly
         assert isinstance(result, TPCDSOfficialBenchmarkResult)
         assert result.success is False
         assert len(result.errors) > 0
@@ -332,17 +301,12 @@ class TestTPCDSOfficialBenchmark:
         assert BenchmarkPhase.MAINTENANCE == "maintenance"
 
 
-# Integration test with actual components
 @pytest.mark.integration
 class TestTPCDSIntegration:
-    """Integration tests with real TPC-DS components."""
-
     def test_integration_with_query_manager(self):
 
         from benchbox.core.tpcds.queries import TPCDSQueryManager
 
-        # This would require dsqgen binary to be available
-        # For now, just test the interface
         query_manager = TPCDSQueryManager()
         assert isinstance(query_manager, TPCDSQueryManager)
         assert hasattr(query_manager, "available")
@@ -364,6 +328,5 @@ class TestTPCDSIntegration:
 
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
-        # Test that run_official_benchmark method exists
         assert hasattr(benchmark, "run_official_benchmark")
         assert callable(benchmark.run_official_benchmark)

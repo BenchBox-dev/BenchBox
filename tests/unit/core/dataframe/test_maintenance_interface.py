@@ -1,7 +1,4 @@
-"""Tests for DataFrame maintenance interface.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 import time
 from pathlib import Path
@@ -30,8 +27,6 @@ pytestmark = [
 
 
 class TestDataFrameMaintenanceCapabilities:
-    """Tests for DataFrameMaintenanceCapabilities."""
-
     def test_default_capabilities(self):
 
         caps = DataFrameMaintenanceCapabilities(platform_name="test")
@@ -70,7 +65,6 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps.supports_transactions is True
 
     def test_parquet_capabilities_limited(self):
-        """Test Parquet has limited capabilities (no row-level operations)."""
         caps = PARQUET_CAPABILITIES
 
         assert caps.platform_name == "parquet"
@@ -87,12 +81,10 @@ class TestDataFrameMaintenanceCapabilities:
         caps = POLARS_CAPABILITIES
 
         assert caps.platform_name == "polars"
-        # Polars supports all operations via read-modify-write pattern
         assert caps.supports_insert is True
         assert caps.supports_delete is True
         assert caps.supports_update is True
         assert caps.supports_merge is True
-        # No transaction log or time travel
         assert caps.supports_transactions is False
         assert caps.supports_time_travel is False
 
@@ -104,11 +96,9 @@ class TestDataFrameMaintenanceCapabilities:
 
     def test_supports_operation_delete(self):
 
-        # Row-level delete
         caps = DataFrameMaintenanceCapabilities(platform_name="test", supports_delete=True)
         assert caps.supports_operation(MaintenanceOperationType.DELETE) is True
 
-        # Partition-level delete also counts
         caps2 = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_delete=False,
@@ -148,8 +138,6 @@ class TestDataFrameMaintenanceCapabilities:
 
         assert is_compliant is False
         assert len(issues) > 0
-        # Parquet supports partitioned delete but not UPDATE
-        # Should mention UPDATE requirement for TPC-DS DM3
         assert any("UPDATE" in issue for issue in issues)
 
     def test_validate_tpc_compliance_insert_only(self):
@@ -163,13 +151,11 @@ class TestDataFrameMaintenanceCapabilities:
         is_compliant, issues = caps.validate_tpc_compliance()
 
         assert is_compliant is False
-        assert any("RF2" in issue for issue in issues)  # DELETE for RF2
-        assert any("DM3" in issue for issue in issues)  # UPDATE for DM3
+        assert any("RF2" in issue for issue in issues)
+        assert any("DM3" in issue for issue in issues)
 
 
 class TestMaintenanceResult:
-    """Tests for MaintenanceResult."""
-
     def test_successful_result(self):
 
         now = time.time()
@@ -201,7 +187,7 @@ class TestMaintenanceResult:
 
     def test_failure_with_start_time(self):
 
-        start = time.time() - 2.0  # 2 seconds ago
+        start = time.time() - 2.0
         result = MaintenanceResult.failure(
             MaintenanceOperationType.UPDATE,
             "Constraint violation",
@@ -210,15 +196,11 @@ class TestMaintenanceResult:
 
         assert result.success is False
         assert result.start_time == start
-        assert result.duration >= 2.0  # Should be at least 2 seconds
+        assert result.duration >= 2.0
 
 
 class TestBaseDataFrameMaintenanceOperations:
-    """Tests for BaseDataFrameMaintenanceOperations."""
-
     class MockMaintenanceOps(BaseDataFrameMaintenanceOperations):
-        """Mock implementation for testing."""
-
         def __init__(self, caps: DataFrameMaintenanceCapabilities):
             super().__init__()
             self._caps = caps
@@ -251,9 +233,7 @@ class TestBaseDataFrameMaintenanceOperations:
         caps = DataFrameMaintenanceCapabilities(platform_name="test")
         ops = self.MockMaintenanceOps(caps)
 
-        # First call
         result1 = ops.get_capabilities()
-        # Second call should return cached
         result2 = ops.get_capabilities()
 
         assert result1 is result2
@@ -304,7 +284,7 @@ class TestBaseDataFrameMaintenanceOperations:
 
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
-            supports_update=True,  # Capability declared but not implemented
+            supports_update=True,
         )
         ops = self.MockMaintenanceOps(caps)
 
@@ -315,7 +295,7 @@ class TestBaseDataFrameMaintenanceOperations:
 
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
-            supports_merge=True,  # Capability declared but not implemented
+            supports_merge=True,
         )
         ops = self.MockMaintenanceOps(caps)
 
@@ -339,8 +319,6 @@ class TestBaseDataFrameMaintenanceOperations:
 
 
 class TestMaintenanceOperationType:
-    """Tests for MaintenanceOperationType enum."""
-
     def test_basic_operations(self):
 
         assert MaintenanceOperationType.INSERT.value == "insert"
@@ -355,8 +333,6 @@ class TestMaintenanceOperationType:
 
 
 class TestTransactionIsolation:
-    """Tests for TransactionIsolation enum."""
-
     def test_isolation_levels(self):
 
         assert TransactionIsolation.NONE.value == "none"
@@ -366,42 +342,32 @@ class TestTransactionIsolation:
 
 
 class TestGetMaintenanceOperationsForPlatform:
-    """Tests for get_maintenance_operations_for_platform."""
-
     def test_unknown_platform_returns_none(self):
 
         result = get_maintenance_operations_for_platform("unknown-platform")
         assert result is None
 
     def test_polars_df_returns_implementation(self):
-        """Test that polars-df returns Polars implementation (if available)."""
         result = get_maintenance_operations_for_platform("polars-df")
-        # Will be None if Polars not installed, otherwise implementation
         if result is not None:
             caps = result.get_capabilities()
             assert caps.platform_name == "polars"
 
     def test_delta_lake_returns_implementation(self):
-        """Test that delta-lake returns Delta Lake implementation (if available)."""
         result = get_maintenance_operations_for_platform("delta-lake")
-        # Will be None if deltalake not installed, otherwise implementation
         if result is not None:
             caps = result.get_capabilities()
             assert caps.platform_name == "delta-lake"
-            # Delta Lake supports full ACID
             assert caps.supports_insert is True
             assert caps.supports_delete is True
             assert caps.supports_update is True
             assert caps.supports_merge is True
 
     def test_iceberg_returns_implementation(self):
-        """Test that iceberg returns Iceberg implementation (if available)."""
         result = get_maintenance_operations_for_platform("iceberg")
-        # Will be None if pyiceberg not installed, otherwise implementation
         if result is not None:
             caps = result.get_capabilities()
             assert caps.platform_name == "iceberg"
-            # Iceberg supports full ACID
             assert caps.supports_insert is True
             assert caps.supports_delete is True
             assert caps.supports_update is True
@@ -409,8 +375,6 @@ class TestGetMaintenanceOperationsForPlatform:
 
     def test_case_insensitive(self):
 
-        # Both should return the same result type (may be None if deps not installed)
         result1 = get_maintenance_operations_for_platform("Polars-DF")
         result2 = get_maintenance_operations_for_platform("POLARS-DF")
-        # Both should be the same type (both None or both PolarsMaintenanceOperations)
         assert type(result1) == type(result2)

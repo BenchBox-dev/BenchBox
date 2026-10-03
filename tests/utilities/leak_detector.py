@@ -1,10 +1,3 @@
-"""Detect unit-test process-state leaks after fixture teardown, then restore them.
-
-Only pytest's owned phase transition in PYTEST_CURRENT_TEST is normalized.
-Environment values and provider representations are never included in failures.
-Registered globals are read without importing modules or allocating defaults.
-"""
-
 from __future__ import annotations
 
 import os
@@ -14,7 +7,6 @@ from typing import Any
 
 import pytest
 
-# The defaults also cover modules first imported during a test.
 REGISTERED_GLOBALS: tuple[tuple[str, str, Any], ...] = (
     ("benchbox.utils.printing", "_QUIET", False),
     ("benchbox.utils.config_interface", "_config_provider", None),
@@ -29,7 +21,6 @@ def _read_global(module: str, attr: str, default: Any) -> Any:
 
 
 def snapshot() -> dict[str, Any]:
-    """Read raw state without constructing a configuration provider."""
     return {
         "cwd": os.getcwd(),
         "env": dict(os.environ),
@@ -38,13 +29,6 @@ def snapshot() -> dict[str, Any]:
 
 
 def restore_global(item: pytest.Item, module: str, attr: str, default: Any) -> None:
-    """Keep reset safety nets without erasing evidence before final teardown.
-
-    For checked tests the outer teardown hook owns the reset. Autouse fixtures
-    can pull monkeypatch earlier in setup, so resetting in a fixture finalizer
-    would inspect temporary patches before their legitimate cleanup runs.
-    Unchecked tests retain the original immediate safety-net behavior.
-    """
     if item.stash.get(_BASELINE_KEY, None) is not None:
         return
     mod = sys.modules.get(module)
@@ -53,7 +37,6 @@ def restore_global(item: pytest.Item, module: str, attr: str, default: Any) -> N
 
 
 def detect_and_restore(baseline: dict[str, Any]) -> list[str]:
-    """Restore changed state and return names of the affected state surfaces."""
     problems: list[str] = []
     try:
         cwd = os.getcwd()
@@ -85,12 +68,9 @@ def detect_and_restore(baseline: dict[str, Any]) -> list[str]:
 
 
 def _check_item(item: pytest.Item) -> None:
-    """Fail the teardown of ``item`` if its function-level teardown left process state changed."""
     baseline = item.stash.get(_BASELINE_KEY, None)
     if baseline is None:
         return
-    # pytest changes this value at each phase, outside fixture ownership.
-    # Accept only its exact expected transition, not arbitrary test writes.
     expected = f"{item.nodeid} (teardown)"
     if os.environ.get("PYTEST_CURRENT_TEST") == expected:
         baseline["env"]["PYTEST_CURRENT_TEST"] = expected
@@ -104,14 +84,6 @@ def _check_item(item: pytest.Item) -> None:
 
 @pytest.fixture(autouse=True)
 def _hermetic_state(request: pytest.FixtureRequest) -> Iterator[None]:
-    """Capture function-fixture state after broader-scoped fixtures are ready.
-
-    The check is a finalizer on the test item, registered here, before any other function-scoped
-    fixture is set up. Finalizers run last-in first-out, so it runs after every function-level
-    finalizer (including ones that fail) and before broader-scoped fixtures are torn down. A
-    module- or session-scoped fixture that legitimately restores state when the last test of its
-    scope finishes is therefore never blamed on that test.
-    """
     item = request.node
     unit_dir = request.config.rootpath / "tests" / "unit"
     if item.path.is_relative_to(unit_dir) or item.get_closest_marker("unit") is not None:
@@ -124,7 +96,6 @@ def _hermetic_state(request: pytest.FixtureRequest) -> Iterator[None]:
 def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> Generator[None, Any, Any]:
     report = yield
     if report.when == "teardown" and item.stash.get(_LEAK_KEY, None):
-        # A required isolation error is not an optional/expected failure.
         report.outcome = "failed"
         if hasattr(report, "wasxfail"):
             del report.wasxfail

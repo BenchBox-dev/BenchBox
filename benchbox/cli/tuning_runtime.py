@@ -1,5 +1,3 @@
-"""Runtime tuning helpers shared by interactive and non-interactive CLI flows."""
-
 from __future__ import annotations
 
 import logging
@@ -10,12 +8,8 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
 def build_baseline_unified_config() -> UnifiedTuningConfiguration:
-    """Build the canonical baseline config for `--tuning notuning` semantics."""
     baseline_config = UnifiedTuningConfiguration()
     baseline_config.disable_all_constraints()
-    # No clustering is requested for untuned runs: plain Delta OPTIMIZE
-    # (file compaction) stays independent of the clustering strategy, so the
-    # strategy must report "none" rather than inherit a tuned default.
     baseline_config.platform_optimizations.databricks_clustering_strategy = "none"
     return baseline_config
 
@@ -23,16 +17,6 @@ def build_baseline_unified_config() -> UnifiedTuningConfiguration:
 def infer_runtime_tuning_mode(
     unified_config: UnifiedTuningConfiguration | None,
 ) -> tuple[bool, Literal["tuned", "notuning"]]:
-    """Collapse an in-memory unified config to the coarse runtime tuning mode.
-
-    Interactive flows may produce an in-memory ``UnifiedTuningConfiguration``
-    instead of a ``--tuning`` string. Downstream preview, persistence, external
-    mode validation, and DataFrame runtime defaults only distinguish between the
-    effective baseline/no-tuning state and a tuned/customized state.
-
-    Callers that need to preserve the original ``--tuning`` source or file path
-    should keep that metadata separately and opt into this collapse explicitly.
-    """
     if unified_config is None or not unified_config.get_enabled_tuning_types():
         return False, "notuning"
     return True, "tuned"
@@ -49,7 +33,6 @@ def resolve_dataframe_tuning_config(
     logger: logging.Logger | None,
     quiet: bool,
 ) -> DataFrameTuningConfiguration | None:
-    """Resolve DataFrame runtime tuning after the effective platform/mode/tuning are known."""
     if mode_name != "dataframe" or not tuning_enabled_flag or not platform_name:
         return None
 

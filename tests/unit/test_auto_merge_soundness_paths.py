@@ -1,5 +1,3 @@
-"""Auto-merge must stop for soundness-critical comparator and parser paths."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -30,7 +28,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/core/equivalence/nested/module.py",
         "benchbox/core/query_plans/parsers/spark.py",
         r"benchbox\core\query_plans\parsers\spark.py",
-        # Oracle-adjacent widening (soundness-surface-widening).
         "benchbox/core/expected_results/loader.py",
         "benchbox/core/expected_results/registry.py",
         "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json",
@@ -38,11 +35,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
-        # Publication privacy: the anonymizer decides every published byte and
-        # the public pseudonym identity. Both failure modes are silent, and
-        # PR #1512 auto-merged a change to all of them before this widening.
-        # The specs YAML is included because it defines which keys are hashed:
-        # dropping an entry there is a silent leak with no code diff to review.
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
         "benchbox/core/results/provenance.py",
@@ -64,7 +56,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
         ".github/CODEOWNERS",
-        # Committed plausibility override artifacts waive validator findings.
         "results-data/bundles/tpch/duckdb/sf1.override.json",
         "results-data/bundles/sf1.override.json",
         ".github/workflows/validate-submission.yml",
@@ -76,9 +67,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         ".github/workflows/publication-lane-docs.yml",
         ".github/workflows/publication-lane-explorer.yml",
         ".github/workflows/publication-corpus-cutover.yml",
-        # Self-protection: the review-gate machinery and the PyPI-publishing
-        # workflow. In-workflow checks are attacker-controlled for same-repo
-        # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
         "_project/scripts/auto_merge_soundness_paths.py",
         ".github/workflows/release.yml",
         "scripts/check_decision_records.py",
@@ -105,33 +93,20 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "docs/reference/hosted-results-contract.md",
         "docs/reference/threat-model.md",
         "tests/unit/test_auto_merge_soundness_paths.py",
-        # pr.yml stays outside the soundness surface by decision (high churn;
-        # its ci-required-result contract is pinned by the develop ruleset +
-        # ruleset-drift canary, not by owner review).
         ".github/workflows/pr.yml",
-        # Not a prefix-collision false positive for .github/workflows/release.yml.
         ".github/workflows/release-canary.yml",
         "",
-        # sql_compat/ is deliberately narrow: only the rule-dispatch core is
-        # a soundness path, not the whole (high-churn) tree.
         "benchbox/sql_compat/rules/clickhouse_rewrites.py",
         "benchbox/sql_compat/registry.py",
         "benchbox/sql_compat/actions.py",
-        # A sibling file that merely starts with the same basename must not
-        # false-positive against the exact-file entries above.
         "benchbox/platforms/base/result_capture_helpers.py",
-        # The anonymizer entries are exact files, not the results package:
-        # exporter.py and schema.py stay auto-mergeable.
         "benchbox/core/results/exporter.py",
         "benchbox/core/results/schema.py",
         "benchbox/core/results/anonymization.py.bak",
         "benchbox/core/results/anonymization_specs.yaml.example",
-        # Plain bundles and near-miss suffixes are not override artifacts.
         "results-data/bundles/tpch/duckdb/sf1.json",
         "results-data/bundles/tpch/duckdb/sf1.plans.json",
         "results-data/corpus-inventory.json",
-        # A sibling directory that merely starts with a gated prefix is not
-        # gated: prefixes are directory prefixes ending in "/".
         "publicationx",
         "publicationx/notes.md",
         "scripts/publicationx/check.py",
@@ -146,21 +121,10 @@ def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
 
 
 def test_soundness_prefixes_are_directory_prefixes() -> None:
-    """SOUNDNESS_PREFIXES must hold directory prefixes only.
-
-    An exact-file entry here would over-match siblings that merely start
-    with it, while CODEOWNERS matches the exact path: the mirror claim
-    would silently break. Exact files belong in SOUNDNESS_FILES.
-    """
     assert soundness.surface_invariant_violations() == []
 
 
 def test_soundness_files_glob_duality_stays_pinned() -> None:
-    """The override glob is a CODEOWNERS mirror spelling, not a matcher.
-
-    Exact membership can never match it; the override regex is the operative
-    gate. Both spellings must cover the same artifact shape.
-    """
     assert soundness.OVERRIDE_FILES_GLOB in soundness.SOUNDNESS_FILES
     assert soundness.is_soundness_path("results-data/bundles/tpch/duckdb/sf1.override.json") is True
     assert soundness.is_soundness_path("results-data/bundles/x.override.json.bak") is False
@@ -169,8 +133,6 @@ def test_soundness_files_glob_duality_stays_pinned() -> None:
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
-    # All arming entry points delegate to the readiness helper, which owns the
-    # shared predicate check instead of duplicating a shell invocation here.
     assert "scripts/pr_landing.py" in makefile
     assert "pr-landing-ready" in makefile
     assert "delivery_mode as 'serial' or 'batch'" in (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
@@ -196,7 +158,6 @@ def _assert_git_index_executable(path: Path, *, env: dict[str, str] | None = Non
 
 
 def test_shared_predicate_script_is_executable_for_workflow() -> None:
-    """The Linux workflow executes the script, so Git must record mode 100755."""
     _assert_git_index_executable(SCRIPT_PATH)
 
 
@@ -274,10 +235,6 @@ def test_codeowners_covers_soundness_paths() -> None:
 
 
 def test_codeowners_matches_soundness_prefixes_1to1() -> None:
-    """CODEOWNERS must list exactly the same widened path set as
-    SOUNDNESS_PREFIXES -- a mismatch means the documented soundness surface
-    (and its review-request routing) silently diverges from what the
-    auto-merge withholding actually gates."""
     codeowners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
     owned_paths = {
         line.rsplit(" ", 1)[0].strip()

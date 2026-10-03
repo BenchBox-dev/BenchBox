@@ -1,5 +1,3 @@
-"""YAML config schema for the UAT framework."""
-
 from __future__ import annotations
 
 import math
@@ -28,7 +26,7 @@ VALID_DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override
 
 
 class ConfigError(ValueError):
-    """Raised when a UAT YAML config fails schema validation."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -40,30 +38,11 @@ class ExecuteConfig:
     compression: str | None = None
     extra_args: tuple[str, ...] = ()
     skip_unreachable: bool = True
-    parallel_platforms: bool = False  # reserved; must remain False
-    # Per-cell liveness probe: TCP timeout, in seconds, for the fresh
-    # reachability probe run before each cell of a platform that WAS
-    # reachable when the platform started. 0 disables the probe entirely --
-    # the same 0-disables convention as free_space_min_gib /
-    # free_memory_min_gib, so every gate this change adds is switched off
-    # the same way.
-    #
-    # This is the mechanism that catches a stack dying at arbitrary latency
-    # mid-platform; the post-start readiness check
-    # (cleanup.docker_settle_s) covers only immediate crashes. Cost is one
-    # loopback TCP connect per cell against multi-minute cells, and zero
-    # syscalls for platforms with no reachability endpoint.
+    parallel_platforms: bool = False
     liveness_probe_timeout_s: float = 2.0
-    # official/streams/seed drive a real multi-stream throughput cell via
-    # `benchbox run-official --streams N` instead of the default `benchbox
-    # run` -- see tests.uat.throughput for why `run-official` is the only
-    # CLI surface that can request N>1 streams today.
     official: bool = False
     streams: int | None = None
     seed: int | None = None
-    # One-platform-at-a-time execute mode. Sequential walking already exists;
-    # this flag makes that contract explicit so later chunk pruning can hang
-    # off a real config field instead of an out-of-tree shell driver.
     platform_chunking: bool = False
 
 
@@ -72,12 +51,6 @@ class OutputConfig:
     benchmark_runs_dir_template: str = "~/Developer/benchmark_runs"
     logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
     submissions_dir_template: str = "~/Developer/benchmark_runs/submissions/{name}"
-    # Keys that were actually present in the raw YAML `output:` mapping --
-    # NOT a value-equality check. A config that explicitly sets a template to
-    # a string that happens to equal the schema default must still be
-    # treated as explicit (must_preserve "Explicit YAML output templates
-    # ALWAYS win"; see tests.uat.phases.execute._resolve_output_base and the
-    # uat-operator-provisioning review response, 2026-07-19).
     explicitly_set: frozenset[str] = field(default_factory=frozenset)
 
 
@@ -88,45 +61,9 @@ class PreflightConfig:
     docker_required: bool = False
     noisy_neighbor_warn_load: float = 8.0
     local_platforms_check: bool = False
-    # Mirrors free_space_min_gib's shape and 0-disables convention (see
-    # UATConfig.memory_gate_enabled). Under mocker each Docker-managed
-    # platform is its own VM with independent memory sizing; `up --wait`
-    # exiting 0 says nothing about host headroom for that VM. Default 2.0
-    # GiB is a deliberately modest floor -- roughly one container VM's
-    # worth of breathing room -- not a tuned production threshold; the
-    # 2026-08-04 postmortem host had 72 MB free of 16 GB when a 1024 MB
-    # cgroup-limited container failed to start. See
-    # uat-container-readiness-and-memory-headroom-gate w2.
-    #
-    # CALIBRATION PROVENANCE -- read before retuning this number. The floor
-    # is compared against `psutil.virtual_memory().available`
-    # (preflight_budget.read_memory_snapshot), but the motivating "72 MB
-    # free of 16 GB" observation is a macOS *free*-style figure, and those
-    # are NOT the same metric: measured on the 2026-08-05 dev host,
-    # `.available` read 6.888 GiB against `.free` 1.076 GiB -- a ~6.4:1
-    # spread. So 2.0 GiB-of-`.available` is NOT "the incident value plus
-    # margin"; the incident number cannot be converted into an `.available`
-    # threshold after the fact, and this floor has deliberately NOT been
-    # silently re-derived from it. `.available` is still the correct metric
-    # to gate on (a `.free` gate would refuse to start on a perfectly
-    # healthy machine -- 1.076 GiB < 2.0 GiB on the host above); what is
-    # unproven is the exact value. Treat 2.0 as a placeholder pending a
-    # `.available` reading captured during a real memory-starved incident,
-    # and record any change against a measured `.available` figure.
     free_memory_min_gib: float = 2.0
-    # Calibrated ClickHouse server compose request. This is resolved into
-    # CLICKHOUSE_MEMORY_LIMIT for managed starts; it is not a 1 GiB fallback.
-    # Operators may override it explicitly for a separately measured rung.
-    # SF1 passed at the exploratory 5.25 GiB rung for both TPC-H and the
-    # TPC-DS load path without cgroup/OOM evidence.
     clickhouse_memory_limit: str = "5.25g"
-    # StarRocks all-in-one FE+BE managed-UAT envelope. StarRocks documents
-    # 4 GB as the Docker quickstart minimum; the 1 GB Mocker default was
-    # observed to exceed its limit and stop answering during SF0.01 power.
     starrocks_memory_limit: str = "4g"
-    # No unvalidated host reserve is added to the measured ClickHouse request.
-    # Operators may set an explicit reserve when a separate host-headroom
-    # measurement justifies it and the run records that policy.
     docker_memory_reserve_gib: float = 0.0
 
 
@@ -139,13 +76,6 @@ class CleanupConfig:
     docker_project_prefix: str = "benchbox-uat"
     docker_start_timeout_s: int = 300
     docker_fixed_container_name_policy: str = "fail"
-    # Settle window after `up --wait` reports success and before the
-    # post-start readiness re-check (compose ps state + TCP probe) runs --
-    # see uat-container-readiness-and-memory-headroom-gate w0. NOT a
-    # replacement for docker_start_timeout_s: `up --wait` already reported
-    # Started/healthy by the time this fires, so raising
-    # docker_start_timeout_s would only wait longer on something the engine
-    # already declared done. This waits to see whether it STAYS up.
     docker_settle_s: int = 10
 
 
@@ -158,7 +88,6 @@ class MatrixFilterConfig:
 
     @property
     def uses_implicit_group_default(self) -> bool:
-        """Whether callers should apply their phase-specific default group."""
         return self.groups is None and not self.include_was_specified and not self.include
 
 
@@ -169,7 +98,6 @@ class ScalesConfig:
 
     @property
     def requested_rungs(self) -> tuple[float, ...]:
-        """Return the effective ladder after any one-scale override."""
         return (self.override,) if self.override is not None else self.rungs
 
 
@@ -202,8 +130,6 @@ class CompatibilityConfig:
 
 @dataclass(frozen=True)
 class UATConfig:
-    """Root config object. Defaults match the spec."""
-
     name: str
     description: str = ""
     phases: tuple[str, ...] = ("preflight", "execute", "report")
@@ -223,33 +149,10 @@ class UATConfig:
 
     @property
     def disk_gate_enabled(self) -> bool:
-        """Whether the free-space floor and per-cell disk watch are active.
-
-        Always-on for every execute-bearing run, decoupled from the
-        `phases:` list -- omitting `"preflight"` skips the pre-sweep
-        budget report/abort only, not this safety interlock (see
-        uat-disk-gate-always-on). Reads the raw configured floor
-        (`preflight.free_space_min_gib`), not a budget-resolved value;
-        the pre-sweep gate separately resolves max(flat floor, budget
-        est_peak) in preflight_budget.check_disk_headroom. The sole
-        opt-out is an explicit `preflight.free_space_min_gib: 0`, which
-        callers must pair with a loud warning
-        (`disk_gate_disabled_warning`) since it turns the gate off
-        entirely.
-        """
         return self.preflight.free_space_min_gib > 0
 
     @property
     def memory_gate_enabled(self) -> bool:
-        """Whether the free-memory floor is active before starting a Docker-managed platform.
-
-        Mirrors `disk_gate_enabled`'s shape and 0-disables convention:
-        gated purely on the configured floor (`preflight.free_memory_min_gib
-        > 0`), read directly by `execute.py` at the platform boundary --
-        there is no separate orchestrator-level toggle to keep in sync (see
-        uat-container-readiness-and-memory-headroom-gate w2). The sole
-        opt-out is an explicit `preflight.free_memory_min_gib: 0`.
-        """
         return self.preflight.free_memory_min_gib > 0
 
 
@@ -258,7 +161,6 @@ MEMORY_GATE_DISABLED_WARNING_PREFIX = "[memory-gate] DISABLED by config"
 
 
 def disk_gate_disabled_warning(config: UATConfig) -> str | None:
-    """Return the loud opt-out warning when `disk_gate_enabled` is False."""
     if config.disk_gate_enabled:
         return None
     return (
@@ -268,7 +170,6 @@ def disk_gate_disabled_warning(config: UATConfig) -> str | None:
 
 
 def memory_gate_disabled_warning(config: UATConfig) -> str | None:
-    """Return the loud opt-out warning when `memory_gate_enabled` is False."""
     if config.memory_gate_enabled:
         return None
     return (
@@ -324,12 +225,6 @@ def _validate_phases(phases: list[str]) -> tuple[str, ...]:
             seen.add(entry)
     if duplicates:
         raise ConfigError(f"`phases:` contains duplicate entries: {sorted(set(duplicates))}")
-    # The orchestrator (tests/uat/orchestrator.py) walks `phases:` literally
-    # in the order given -- it does not reorder to the canonical pipeline
-    # order. A config like `phases: [report, execute]` used to load
-    # successfully and silently produce an empty report (report ran before
-    # any cell existed). Reject any ordering that is not a subsequence of
-    # VALID_PHASES's canonical order.
     canonical_index = {phase: idx for idx, phase in enumerate(VALID_PHASES)}
     indices = [canonical_index[phase] for phase in out]
     if indices != sorted(indices):
@@ -342,7 +237,6 @@ def _validate_phases(phases: list[str]) -> tuple[str, ...]:
 
 
 def _require_positive_int(payload: dict[str, Any], key: str, *, default: int, section: str) -> int:
-    """Coerce payload[key] to int. Reject floats and non-numeric strings."""
     value = payload.get(key, default)
     if isinstance(value, bool):
         raise ConfigError(f"`{section}.{key}` must be an int, got bool")
@@ -423,16 +317,10 @@ def _validate_scales(payload: dict[str, Any] | None) -> ScalesConfig:
     except (TypeError, ValueError) as exc:
         raise ConfigError("`scales.override` must be a number") from exc
 
-    # Keep the report-facing rung list aligned with the single-scale override.
-    # Enumeration already prefers `override`, but report/aggregation consumers
-    # read `rungs`; leaving the schema default here makes an override run report
-    # against the wrong scale ladder.
     rungs_raw = payload.get("rungs", [override_value] if override_value is not None else [0.01])
     if isinstance(rungs_raw, (str, bytes)) or not isinstance(rungs_raw, (list, tuple)):
         raise ConfigError("`scales.rungs` must be a list of numbers")
     if any(isinstance(value, bool) for value in rungs_raw):
-        # bool is an int subclass, so `float(True) == 1.0` would otherwise
-        # silently accept `rungs: [true]` as a 1.0 scale rung.
         raise ConfigError("`scales.rungs` entries must be numbers, got bool")
     try:
         rungs = tuple(float(value) for value in rungs_raw)
@@ -530,7 +418,6 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
 
 
 def _optional_positive_int(payload: dict[str, Any], key: str, *, section: str) -> int | None:
-    """Coerce payload[key] to a positive int, or None if absent/null."""
     if key not in payload or payload[key] is None:
         return None
     value = payload[key]
@@ -548,7 +435,6 @@ def _optional_positive_int(payload: dict[str, Any], key: str, *, section: str) -
 
 
 def _optional_int(payload: dict[str, Any], key: str, *, section: str) -> int | None:
-    """Coerce payload[key] to an int (any sign), or None if absent/null."""
     if key not in payload or payload[key] is None:
         return None
     value = payload[key]
@@ -570,9 +456,6 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
     _reject_unknown_fields(payload, frozenset(template_keys), "output")
     for key in template_keys:
         if key in payload and not isinstance(payload[key], str):
-            # Without this, a non-string value (e.g. a YAML mapping) would
-            # silently str()-coerce into a nonsense path fragment instead of
-            # failing at load time.
             raise ConfigError(f"`output.{key}` must be a string, got {type(payload[key]).__name__}={payload[key]!r}")
     explicitly_set = frozenset(key for key in template_keys if key in payload)
     return OutputConfig(
@@ -812,8 +695,7 @@ def _validate_compatibility(payload: dict[str, Any] | None) -> CompatibilityConf
 
 
 def load_config(path: str | Path) -> UATConfig:
-    """Load and validate a UAT YAML config."""
-    import yaml  # late import — keeps W2 import-free of yaml.
+    import yaml
 
     p = Path(path)
     if not p.exists():
@@ -826,7 +708,6 @@ def load_config(path: str | Path) -> UATConfig:
 
 
 def validate_config(payload: dict[str, Any]) -> UATConfig:
-    """Validate an already-parsed YAML mapping. Public for tests."""
     _reject_unknown_fields(payload, ROOT_FIELDS, "root")
     name = payload.get("name")
     if not name or not isinstance(name, str):
@@ -851,15 +732,6 @@ def validate_config(payload: dict[str, Any]) -> UATConfig:
     validate = _validate_validate(payload.get("validate"))
     package = _validate_package(payload.get("package"))
     if "package" in phases:
-        # These three checks mirror tests/uat/phases/package.py's
-        # `_resolve_state`/`_resolve_service` runtime guard (package.py:55-68)
-        # -- moved here so a bad `package:` section is a load-time
-        # ConfigError instead of an execute-time PackagePhaseError, but only
-        # once the `package` phase is actually enabled. A `package:` section
-        # left stale while the phase is not in `phases:` is inert (matches
-        # the framework's existing "unused-field is a warning, not an
-        # error" leniency for e.g. `preflight.free_space_min_gib` when
-        # `preflight` is absent from `phases:`).
         if package.submit_terminal_state is None:
             raise ConfigError("`package.submit_terminal_state` is required when the `package` phase is enabled")
         if package.submit_terminal_state not in VALID_TERMINAL_STATES:

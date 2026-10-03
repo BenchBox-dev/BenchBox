@@ -1,5 +1,3 @@
-"""Shared status policy for result publication and ranking."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -11,22 +9,11 @@ NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
     {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
 )
 NON_CLEAN_TRANSLATION_STATUSES: frozenset[str] = frozenset({"fallback", "failed"})
-# Statuses that make a run a *CLI-level* failure (non-zero exit). Narrower than
-# NON_CLEAN_VALIDATION_STATUSES: publication must flag unvalidated results
-# (not_run, not_validated, ...), but a completed run whose validation never
-# executed — DataFrame mode, --validation disabled — is not a failed run.
-# Matches the v0.3.0 exit semantics.
 CLI_FAILURE_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
-# Derived partition of NON_CLEAN that is not a CLI-level failure: statuses that
-# keep the bundle non-clean for publication without making the run a CLI
-# failure. Includes never-executed validation (not_run, not_validated, unknown)
-# and claim-weakened validation (uncertain). Keep derived — do not hand-maintain
-# a third literal set.
 UNVALIDATED_VALIDATION_STATUSES: frozenset[str] = NON_CLEAN_VALIDATION_STATUSES - CLI_FAILURE_VALIDATION_STATUSES
 
 
 def normalize_validation_status(value: Any) -> str | None:
-    """Normalize schema and model validation status values for policy checks."""
     if isinstance(value, dict):
         value = value.get("status")
     if value is None:
@@ -36,13 +23,11 @@ def normalize_validation_status(value: Any) -> str | None:
 
 
 def validation_status_is_non_clean(value: Any) -> bool:
-    """Return True when a validation status must not be treated as a clean pass."""
     status = normalize_validation_status(value)
     return status in NON_CLEAN_VALIDATION_STATUSES
 
 
 def normalize_translation_status(value: Any) -> str | None:
-    """Normalize schema and model SQL translation statuses for policy checks."""
     if isinstance(value, Mapping):
         value = value.get("status")
     if value is None:
@@ -52,13 +37,11 @@ def normalize_translation_status(value: Any) -> str | None:
 
 
 def translation_status_is_non_clean(value: Any) -> bool:
-    """Return True when a translation status must not be treated as a clean pass."""
     status = normalize_translation_status(value)
     return status in NON_CLEAN_TRANSLATION_STATUSES
 
 
 def result_failed_query_count(result: Any) -> int:
-    """Return a conservative failed-query count from a BenchmarkResults-like object."""
     failed = int_or_none(getattr(result, "failed_queries", None))
     if failed is not None:
         return max(failed, 0)
@@ -71,7 +54,6 @@ def result_failed_query_count(result: Any) -> int:
 
 
 def result_non_clean_reason(result: Any) -> str | None:
-    """Return a user-facing reason when a result is not a clean pass."""
     failed = result_failed_query_count(result)
     if failed:
         noun = "query" if failed == 1 else "queries"
@@ -88,17 +70,10 @@ def result_non_clean_reason(result: Any) -> str | None:
 
 
 def result_is_clean_pass(result: Any) -> bool:
-    """Return True when a result has no query failures, non-clean validation, or translation fallback."""
     return result_non_clean_reason(result) is None
 
 
 def result_cli_failure_reason(result: Any) -> str | None:
-    """Return a reason when a completed run should exit non-zero at the CLI.
-
-    Narrower than :func:`result_non_clean_reason`: validation that never
-    executed (``not_run``/``not_validated``/...) keeps the bundle non-clean for
-    publication, but does not fail the run itself.
-    """
     failed = result_failed_query_count(result)
     if failed:
         noun = "query" if failed == 1 else "queries"
@@ -115,16 +90,6 @@ def result_cli_failure_reason(result: Any) -> str | None:
 
 
 def result_unvalidated_reason(result: Any) -> str | None:
-    """Return a reason when validation is non-clean but not a CLI-level failure.
-
-    Distinct from CLI failures and schema/integrity violations: statuses in
-    :data:`UNVALIDATED_VALIDATION_STATUSES` keep the result non-clean for
-    publication but are not schema-violation terminal states. The partition
-    includes both never-executed validation (``not_run``/``not_validated``/
-    ``unknown``) and claim-weakened validation (``uncertain``). Returns
-    ``None`` when there are failed queries (those take precedence) or when the
-    validation status is not in the unvalidated partition.
-    """
     if result_failed_query_count(result):
         return None
 
@@ -135,7 +100,6 @@ def result_unvalidated_reason(result: Any) -> str | None:
 
 
 def bundle_non_clean_reason(data: dict[str, Any]) -> str | None:
-    """Return a user-facing reason when a schema-v2 bundle is not a clean pass."""
     failed = bundle_failed_query_count(data)
     if failed:
         noun = "query" if failed == 1 else "queries"
@@ -152,7 +116,6 @@ def bundle_non_clean_reason(data: dict[str, Any]) -> str | None:
 
 
 def bundle_is_clean_pass(data: dict[str, Any]) -> bool:
-    """Return True when a schema-v2 bundle has no query failures, non-clean validation, or translation fallback."""
     return bundle_non_clean_reason(data) is None
 
 

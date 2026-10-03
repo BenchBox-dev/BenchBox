@@ -1,9 +1,6 @@
-"""Tests for BenchBox MCP benchmark execution tools.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
@@ -13,7 +10,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-# Skip all tests if Python < 3.10
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -21,43 +17,34 @@ pytestmark = [
 
 
 class TestValidateConfigTool:
-    """Tests for validate_config tool functionality."""
-
     def test_valid_duckdb_tpch_config(self):
-        """Test validating a valid DuckDB TPC-H configuration."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # Check platform is available
         info = PlatformRegistry.get_platform_info("duckdb")
         assert info is not None
         assert info.available
 
-        # Check benchmark exists using public API
         benchmarks = get_all_benchmarks()
         assert "tpch" in benchmarks
 
     def test_unknown_platform_error(self):
-        """Test that unknown platform is detected."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         info = PlatformRegistry.get_platform_info("nonexistent_platform")
         assert info is None
 
     def test_unknown_benchmark_error(self):
-        """Test that unknown benchmark is detected."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         benchmarks = get_all_benchmarks()
         assert "nonexistent_benchmark" not in benchmarks
 
     def test_invalid_scale_factor(self):
-        """Test that invalid scale factor is detected."""
         scale_factor = -1.0
-        assert scale_factor <= 0  # Should be caught as invalid
+        assert scale_factor <= 0
 
     def test_dataframe_platform_validation(self):
-        """Test validation for DataFrame platforms."""
         from benchbox.platforms import is_dataframe_platform
 
         assert is_dataframe_platform("polars-df")
@@ -66,17 +53,12 @@ class TestValidateConfigTool:
 
 
 class TestDryRunTool:
-    """Tests for dry_run tool functionality."""
-
     def test_dry_run_returns_execution_plan(self):
-        """Test that dry_run returns an execution plan."""
         from benchbox.core.benchmark_registry import get_all_benchmarks, get_benchmark_class
 
-        # Check benchmark exists using public API
         benchmarks = get_all_benchmarks()
         assert "tpch" in benchmarks
 
-        # Get query IDs via public API
         benchmark_class = get_benchmark_class("tpch")
         assert benchmark_class is not None
         bm = benchmark_class(scale_factor=0.01)
@@ -86,7 +68,6 @@ class TestDryRunTool:
         assert len(query_ids) == 22
 
     def test_dry_run_resource_estimates(self):
-        """Test that dry_run provides resource estimates."""
         scale_factor = 1.0
         estimated_data_gb = scale_factor * 1.0
         memory_recommended = max(2, estimated_data_gb * 2)
@@ -98,7 +79,6 @@ class TestDryRunTool:
 def _assert_effective_consumer_value(
     platform: str, option_name: str, adapter: object, attribute: str, expected: object
 ) -> None:
-    """Require an adapter to expose the option value at its declared consumer."""
     observed = getattr(adapter, attribute, None)
     assert observed is not None, (
         f"{platform}.{option_name} consumer attribute {attribute!r} was not observed on {type(adapter).__name__}"
@@ -107,10 +87,7 @@ def _assert_effective_consumer_value(
 
 
 class TestRunBenchmarkTool:
-    """Tests for run_benchmark tool functionality."""
-
     def test_benchmark_config_creation(self):
-        """Test that BenchmarkConfig can be created correctly."""
         from benchbox.core.schemas import BenchmarkConfig
 
         config = BenchmarkConfig(
@@ -124,7 +101,6 @@ class TestRunBenchmarkTool:
         assert config.scale_factor == 0.01
 
     def test_database_config_creation(self):
-        """Test that DatabaseConfig can be created correctly."""
         from benchbox.core.schemas import DatabaseConfig
 
         db_config = DatabaseConfig(
@@ -136,7 +112,6 @@ class TestRunBenchmarkTool:
         assert db_config.name == "test_db"
 
     def test_phase_parsing(self):
-        """Test phase parsing logic."""
         phases_str = "load,power"
         phase_list = phases_str.lower().split(",")
 
@@ -177,7 +152,6 @@ class TestRunBenchmarkTool:
         assert run_core.call_args.kwargs["normalized_platform_options"] == {"threads": 4}
 
     def test_oversized_dask_request_never_builds_a_cluster(self, tmp_path: Path):
-        """Proving rejection by starting a 65,536-thread cluster would be the attack."""
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
         with patch.object(benchmark_tools, "_get_platform_adapter") as get_adapter:
@@ -194,17 +168,9 @@ class TestRunBenchmarkTool:
             )
 
         assert response["status"] == "failed"
-        # The adapter builds its LocalCluster in __init__, so never reaching the
-        # factory is the only evidence that no cluster was created.
         get_adapter.assert_not_called()
 
     def test_dask_local_cluster_is_never_constructed_for_a_rejected_request(self, tmp_path: Path):
-        """Spy one level deeper: LocalCluster itself must not be touched.
-
-        Every downstream collaborator is stubbed so that on an unfixed tree this
-        fails on the assertion rather than by starting a real cluster or a real
-        benchmark.
-        """
         pytest.importorskip("dask.distributed")
         from benchbox.mcp.tools import benchmark as benchmark_tools
         from benchbox.platforms.dataframe import dask_df
@@ -237,7 +203,6 @@ class TestRunBenchmarkTool:
         local_cluster.assert_not_called()
 
     def test_dask_request_inside_the_envelope_still_reaches_the_adapter(self, tmp_path: Path):
-        """The envelope is a ceiling, not a ban on tuning."""
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
         with (
@@ -269,7 +234,6 @@ class TestRunBenchmarkTool:
 
     @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
     def test_clickhouse_port_override_is_refused_before_any_adapter_is_built(self, platform, tmp_path: Path):
-        """A request must not be able to point ClickHouse at another listener."""
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
         with patch.object(benchmark_tools, "_get_platform_adapter") as get_adapter:
@@ -289,7 +253,6 @@ class TestRunBenchmarkTool:
         get_adapter.assert_not_called()
 
     def test_clickhouse_profile_resolves_to_the_server_owned_connection_tuple(self, monkeypatch, tmp_path: Path):
-        """The adapter sees the operator's port/TLS, never the caller's."""
         import json
 
         from benchbox.mcp.schemas import MCP_CLICKHOUSE_PROFILE_ENV
@@ -321,7 +284,6 @@ class TestRunBenchmarkTool:
         assert run_core.call_args.kwargs["normalized_platform_options"] == {"connection_profile": "reviewed"}
 
     def test_clickhouse_profile_withdrawn_by_the_operator_fails_closed(self, monkeypatch, tmp_path: Path):
-        """A replayed request cannot outlive the profile that authorized it."""
         from benchbox.mcp.schemas import MCP_CLICKHOUSE_PROFILE_ENV
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
@@ -373,7 +335,6 @@ class TestRunBenchmarkTool:
         assert tuning.platform_optimizations.liquid_clustering_columns == ["customer_id", "order_id"]
 
     def test_every_matrix_option_reaches_effective_preparation(self, monkeypatch, tmp_path):  # noqa: C901
-        """Each reviewed option reaches its declared consumer (MCP_PLATFORM_OPTION_CONTRACT)."""
         import json
         from unittest.mock import MagicMock, patch
 
@@ -390,16 +351,10 @@ class TestRunBenchmarkTool:
 
         monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
 
-        # Honest counting: track consumers actually observed, not allowlist entries
         observed = 0
         skipped: list[str] = []
         failures: list[str] = []
 
-        # Explicit mapping from (platform, option) to the attribute that the consumer
-        # is expected to set on the constructed adapter. This is derived from
-        # MCP_PLATFORM_OPTION_CONTRACT's consumer field and the adapter's __init__.
-        # For translated options (threads->thread_limit, databricks->tuning_config,
-        # connection_profile->port/secure) the mapping points to the final consumer.
         consumer_attr = {
             ("duckdb", "threads"): "thread_limit",
             ("duckdb", "memory_limit"): "memory_limit",
@@ -408,7 +363,7 @@ class TestRunBenchmarkTool:
             ("dask", "memory_limit"): "_memory_limit",
             ("dask", "use_distributed"): "use_distributed",
             ("clickhouse", "deployment_mode"): "deployment_mode",
-            ("clickhouse", "connection_profile"): "port",  # special: becomes port/secure
+            ("clickhouse", "connection_profile"): "port",
             ("clickhouse-server", "connection_profile"): "port",
             ("datafusion", "batch_size"): "batch_size",
             ("datafusion", "memory_limit"): "memory_limit",
@@ -465,7 +420,6 @@ class TestRunBenchmarkTool:
                     failures.append(f"{platform}.{option_name} prepare failed: {e}")
                     continue
 
-                # First, verify prepared still carries the value (or its translation)
                 try:
                     if platform == "duckdb" and option_name == "threads":
                         assert prepared == {"thread_limit": value}, f"duckdb threads prepared {prepared!r}"
@@ -497,8 +451,6 @@ class TestRunBenchmarkTool:
                     failures.append(str(e))
                     continue
 
-                # Now verify the value reaches the declared consumer on a real adapter,
-                # without starting real Dask schedulers/workers.
                 contract = MCP_PLATFORM_OPTION_CONTRACT.get(platform, {}).get(option_name)
                 if contract is None:
                     failures.append(f"{platform}.{option_name} missing contract")
@@ -553,22 +505,18 @@ class TestRunBenchmarkTool:
                             failures.append(f"{platform}.{option_name} consumer construction failed: {e}")
                             continue
                     elif platform == "dask":
-                        # Isolate Dask lifecycle: mock LocalCluster and Client so no scheduler/worker/nanny/process starts
                         try:
                             from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
                         except ImportError as ie:
                             skipped.append(f"{platform}.{option_name} Dask not installed: {ie}")
                             continue
-                        # Dask's memory_limit is stored as _memory_limit
                         check_attr = "_memory_limit" if option_name == "memory_limit" else attr
-                        # Mock the distributed cluster/client
                         with (
                             patch("benchbox.platforms.dataframe.dask_df.LocalCluster") as mock_cluster,
                             patch("benchbox.platforms.dataframe.dask_df.Client") as mock_client,
                         ):
                             mock_cluster.return_value = MagicMock()
                             mock_client.return_value = MagicMock()
-                            # Also mock dask.distributed variants if imported directly
                             with (
                                 patch("dask.distributed.LocalCluster", create=True) as mock_cluster2,
                                 patch("dask.distributed.Client", create=True) as mock_client2,
@@ -578,34 +526,26 @@ class TestRunBenchmarkTool:
                                 try:
                                     built = DaskDataFrameAdapter(**prepared)
                                 except Exception as e:
-                                    # If construction still tries to start cluster, treat as skip with reason
                                     skipped.append(f"{platform}.{option_name} Dask construct failed (mocked): {e}")
                                     continue
-                                # Verify the attribute reached the consumer without starting a real cluster
-                                # For n_workers/threads_per_worker, check the adapter's stored values
                                 observed_val = getattr(built, check_attr, None) if check_attr else None
-                                # For use_distributed, the consumer is the flag itself
                                 if option_name == "use_distributed":
                                     _assert_effective_consumer_value(
                                         platform, option_name, built, "use_distributed", False
                                     )
                                 else:
-                                    # _memory_limit stores the raw string; compare it directly.
                                     _assert_effective_consumer_value(platform, option_name, built, check_attr, value)
-                                # Ensure no real cluster was started
                                 assert (
                                     mock_cluster.call_count == 0
                                     or built._cluster is None
                                     or isinstance(built._cluster, MagicMock)
                                 ), "Dask cluster was started"
                                 observed += 1
-                                # Clean up adapter to avoid stray threads
                                 try:
                                     built.close()
                                 except Exception:
                                     pass
                     elif platform in ("polars", "pandas"):
-                        # Dataframe adapters - try to construct, but handle missing optional deps per case
                         try:
                             if platform == "polars":
                                 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
@@ -626,10 +566,6 @@ class TestRunBenchmarkTool:
                             skipped.append(f"{platform}.{option_name} not constructible: {e}")
                             continue
                     else:
-                        # For remaining platforms (datafusion, cudf, firebolt, spark, sqlite, velox, databricks already handled)
-                        # Try generic construction if adapter exists, otherwise count prepared verification
-                        # For velox, adaptive_enabled etc. are simple bools stored as attributes
-                        # We attempt to import the adapter and check, but if missing, skip per case
                         adapter_map = {
                             "datafusion": "benchbox.platforms.datafusion.DataFusionAdapter",
                             "cudf": "benchbox.platforms.dataframe.cudf.CUDFAdapter",
@@ -644,18 +580,14 @@ class TestRunBenchmarkTool:
                                 mod_name, cls_name = mod_path.rsplit(".", 1)
                                 mod = __import__(mod_name, fromlist=[cls_name])
                                 Adapter = getattr(mod, cls_name)
-                                # Use prepared to construct with the minimal config required by the factory.
                                 cfg = (
                                     {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
                                     if platform in ("velox", "spark", "datafusion", "firebolt")
                                     else {}
                                 )
                                 cfg.update(prepared)
-                                # For sqlite, need database_path
                                 if platform == "sqlite":
                                     cfg["database_path"] = ":memory:"
-                                # Use the same config-aware factory that production adapter construction uses;
-                                # a constructor fallback would hide dropped configuration keys.
                                 if not hasattr(Adapter, "from_config"):
                                     built = Adapter(**prepared)
                                 else:
@@ -676,19 +608,14 @@ class TestRunBenchmarkTool:
                     failures.append(f"{platform}.{option_name} unexpected: {e}")
                     continue
 
-        # Honest counting: report how many consumers were actually observed, not how many were configured
         total_options = sum(len(v) for v in MCP_PLATFORM_OPTION_ALLOWLIST.values())
         assert not failures, f"consumer failures: {failures[:10]}"
         assert observed + len(skipped) == total_options, (
             f"observed {observed} + skipped {len(skipped)} != total {total_options}; skipped: {skipped[:5]}"
         )
-        # Require that a meaningful number of consumers were observed (not just prepared)
-        # At least 15 options should have been constructed and verified, and skips should be explicit
         assert observed >= 15, f"only {observed} consumers observed, expected at least 15; skipped: {skipped}"
-        # The dedicated negative control below ensures the consumer observation fails if an adapter drops the key.
 
     def test_effective_consumer_oracle_rejects_dropped_option(self):
-        """A prepared value alone cannot satisfy the effective-consumer oracle."""
 
         class DroppedAdapter:
             thread_limit = None
@@ -698,27 +625,21 @@ class TestRunBenchmarkTool:
 
 
 class TestGetQueryDetailsTool:
-    """Tests for get_query_details tool functionality."""
-
     def test_tpch_query_complexity_hints(self):
-        """Test that TPC-H query complexity hints are available (now core-owned)."""
         from benchbox.core.query_hints import get_query_complexity_hints
 
-        # Test Q6 - known simple query
         hints = get_query_complexity_hints("tpch", "6")
         assert hints["type"] == "scan_filter"
         assert hints["complexity"] == "simple"
         assert hints["joins"] == 0
         assert "lineitem" in hints["tables"]
 
-        # Test Q2 - known complex query
         hints = get_query_complexity_hints("tpch", "2")
         assert hints["type"] == "correlated_subquery"
         assert hints["complexity"] == "complex"
         assert hints["joins"] >= 4
 
     def test_unknown_query_returns_default(self):
-        """Test that unknown queries return default hints (now core-owned)."""
         from benchbox.core.query_hints import get_query_complexity_hints
 
         hints = get_query_complexity_hints("unknown_benchmark", "99")
@@ -727,111 +648,90 @@ class TestGetQueryDetailsTool:
         assert "note" in hints
 
     def test_query_id_normalization(self):
-        """Test query ID normalization logic."""
-        # Test the normalization logic used in get_query_details
         test_cases = [
             ("1", "1"),
             ("Q1", "1"),
             ("q1", "1"),
             ("Q01", "01"),
-            ("abc", "abc"),  # Non-numeric kept as-is
+            ("abc", "abc"),
         ]
 
         for input_id, expected in test_cases:
             normalized = input_id.upper().lstrip("Q")
             if not normalized.isdigit():
                 normalized = input_id
-            # For this test we just verify the logic runs
             assert normalized is not None
 
 
 class TestResolveQueryDetailsMode:
-    """Tests for _resolve_query_details_mode helper."""
-
     def test_explicit_sql_mode(self):
-        """Test explicit SQL mode is returned as-is."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode(None, "sql") == "sql"
         assert _resolve_query_details_mode("duckdb", "sql") == "sql"
 
     def test_explicit_dataframe_mode(self):
-        """Test explicit dataframe mode is returned as-is."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode(None, "dataframe") == "dataframe"
         assert _resolve_query_details_mode("duckdb", "dataframe") == "dataframe"
 
     def test_mode_case_insensitive(self):
-        """Test mode parameter is case-insensitive."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode(None, "SQL") == "sql"
         assert _resolve_query_details_mode(None, "DataFrame") == "dataframe"
 
     def test_dataframe_platform_auto_detects(self):
-        """Test that DataFrame platforms auto-detect to dataframe mode."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode("polars-df", None) == "dataframe"
         assert _resolve_query_details_mode("pandas-df", None) == "dataframe"
 
     def test_sql_platform_defaults_to_sql(self):
-        """Test that SQL platforms default to sql mode."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode("duckdb", None) == "sql"
         assert _resolve_query_details_mode("snowflake", None) == "sql"
 
     def test_no_params_defaults_to_sql(self):
-        """Test that no parameters defaults to sql mode."""
         from benchbox.mcp.tools.benchmark import _resolve_query_details_mode
 
         assert _resolve_query_details_mode(None, None) == "sql"
 
 
 class TestGetDataframeFamilyForPlatform:
-    """Tests for _get_dataframe_family_for_platform helper."""
-
     def test_polars_is_expression(self):
-        """Test that Polars maps to expression family."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform("polars-df") == "expression"
         assert _get_dataframe_family_for_platform("polars") == "expression"
 
     def test_pandas_is_pandas(self):
-        """Test that Pandas maps to pandas family."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform("pandas-df") == "pandas"
         assert _get_dataframe_family_for_platform("pandas") == "pandas"
 
     def test_datafusion_is_expression(self):
-        """Test that DataFusion maps to expression family."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform("datafusion-df") == "expression"
         assert _get_dataframe_family_for_platform("datafusion") == "expression"
 
     def test_none_returns_none(self):
-        """Test that None platform returns None."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform(None) is None
 
     def test_unknown_platform_returns_none(self):
-        """Test that unknown platform returns None."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform("nonexistent") is None
 
 
 class TestPopulateDataframeQueryDetails:
-    """Tests for _populate_dataframe_query_details helper."""
-
     def test_tpch_q6_returns_source_code(self):
-        """Test that TPC-H Q6 returns DataFrame source code."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
@@ -846,7 +746,6 @@ class TestPopulateDataframeQueryDetails:
         assert response["dataframe_family"] == "expression"
 
     def test_tpch_q6_pandas_family(self):
-        """Test that pandas-df platform returns pandas family source."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
@@ -857,13 +756,11 @@ class TestPopulateDataframeQueryDetails:
         assert response["source_code"] is not None
 
     def test_no_platform_dataframe_family_is_none(self):
-        """Test that no platform resolves to no explicit DataFrame family."""
         from benchbox.mcp.tools.benchmark import _get_dataframe_family_for_platform
 
         assert _get_dataframe_family_for_platform(None) is None
 
     def test_unknown_query_returns_error(self):
-        """Test that unknown query ID returns error in response."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
@@ -872,7 +769,6 @@ class TestPopulateDataframeQueryDetails:
         assert "error" in response
 
     def test_benchmark_with_dataframe_registry_returns_source(self):
-        """Any benchmark with a DataFrame registry resolves, not just tpch/tpcds."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
@@ -883,7 +779,6 @@ class TestPopulateDataframeQueryDetails:
         assert response["has_expression_impl"] is True
 
     def test_benchmark_without_dataframe_registry_returns_error(self):
-        """A benchmark with no DataFrame implementations still reports the gap."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
@@ -892,10 +787,7 @@ class TestPopulateDataframeQueryDetails:
 
 
 class TestBenchmarkResultExportPath:
-    """Tests for MCP benchmark export path configuration."""
-
     def test_export_and_build_payload_uses_injected_results_dir(self, tmp_path: Path):
-        """Result exporter should write using injected MCP results_dir."""
         from benchbox.mcp.tools.benchmark import _export_and_build_payload
 
         result = SimpleNamespace(execution_id=None)
@@ -921,7 +813,6 @@ class TestBenchmarkResultExportPath:
 
     @pytest.mark.parametrize("anonymize", [False, True])
     def test_export_honours_the_requested_anonymization(self, tmp_path: Path, anonymize: bool):
-        """The exporter is constructed with the caller's trust-boundary decision."""
         from benchbox.mcp.tools.benchmark import _export_and_build_payload
 
         result = SimpleNamespace(execution_id=None)
@@ -940,10 +831,7 @@ class TestBenchmarkResultExportPath:
 
 
 class TestPopulateSqlQueryDetails:
-    """Tests for _populate_sql_query_details helper."""
-
     def test_tpch_q6_returns_sql(self):
-        """Test that TPC-H Q6 returns SQL text."""
         from benchbox.mcp.tools.benchmark import _populate_sql_query_details
 
         response: dict = {}
@@ -953,7 +841,6 @@ class TestPopulateSqlQueryDetails:
         assert "SELECT" in response["sql"].upper()
 
     def test_tpch_q6_with_platform_dialect(self):
-        """Test that TPC-H Q6 with platform returns dialect-translated SQL."""
         from benchbox.mcp.tools.benchmark import _populate_sql_query_details
 
         response: dict = {}
@@ -963,20 +850,16 @@ class TestPopulateSqlQueryDetails:
         assert "SELECT" in response["sql"].upper()
 
     def test_sql_truncation(self):
-        """Test that SQL truncated flag is set correctly."""
         from benchbox.mcp.tools.benchmark import _populate_sql_query_details
 
         response: dict = {}
         _populate_sql_query_details(response, "tpch", "6", None)
 
-        # Q6 is short, should not be truncated
         if "sql" in response:
             assert response.get("sql_truncated") is False
 
 
 class TestMcpCoreRunOutputRoots:
-    """MCP data generation and result publication use separate roots."""
-
     def test_core_run_preserves_constructed_datagen_root(self, tmp_path: Path):
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
@@ -1015,10 +898,7 @@ class TestMcpCoreRunOutputRoots:
 
 
 class TestBenchmarkTiming:
-    """Tests for monotonic execution timing in benchmark MCP helpers."""
-
     def test_data_only_response_uses_monotonic_elapsed_and_tenant_path(self, tmp_path):
-        """The MCP data-only envelope preserves monotonic timing and tenant paths."""
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
         mock_clock = Mock(return_value=103.21)

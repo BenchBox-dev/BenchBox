@@ -1,37 +1,6 @@
-"""DataFrame Platform Capabilities and Memory Management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Defines per-platform capabilities including memory requirements, scale factor
-limits, and partitioning needs. Provides pre-execution checks to prevent
-OOM crashes and guide users to appropriate platforms for their workloads.
-
-Key Features:
-- Platform capability definitions for 8 DataFrame platforms
-- Memory estimation for TPC-H and TPC-DS benchmarks
-- Pre-execution memory validation with helpful error messages
-- Scale factor recommendations per platform
-
-Usage:
-    from benchbox.core.dataframe.capabilities import (
-        PlatformCapabilities,
-        get_platform_capabilities,
-        estimate_memory_required,
-        check_sufficient_memory,
-    )
-
-    # Check if platform can handle scale factor
-    caps = get_platform_capabilities("pandas")
-    if scale_factor > caps.max_recommended_sf:
-        emit(f"Warning: SF {scale_factor} exceeds recommended limit {caps.max_recommended_sf}")
-
-    # Check memory before execution
-    result = check_sufficient_memory("tpch", scale_factor=10, platform="polars")
-    if not result.is_safe:
-        emit(result.message)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -47,39 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 class DataFormat(Enum):
-    """Supported data formats for DataFrame loading."""
-
     CSV = "csv"
     PARQUET = "parquet"
     ARROW = "arrow"
 
 
 class ExecutionModel(Enum):
-    """Platform execution model."""
-
-    EAGER = "eager"  # Loads all data into memory immediately
-    LAZY = "lazy"  # Deferred execution, optimized query plans
-    DISTRIBUTED = "distributed"  # Distributed across workers
-    OUT_OF_CORE = "out_of_core"  # Processes data larger than memory
+    EAGER = "eager"
+    LAZY = "lazy"
+    DISTRIBUTED = "distributed"
+    OUT_OF_CORE = "out_of_core"
 
 
 @dataclass
 class PlatformCapabilities:
-    """Capabilities and limits for a DataFrame platform.
-
-    Attributes:
-        platform_name: Human-readable platform name
-        max_recommended_sf: Maximum recommended scale factor (TPC-H)
-        memory_overhead_factor: Multiplier for data size to estimate memory
-        execution_model: How the platform executes queries
-        requires_partitioning: Whether large data needs partitioning
-        supports_streaming: Whether streaming mode is available
-        gpu_required: Whether GPU is required
-        recommended_data_format: Preferred data format for loading
-        min_memory_gb: Minimum memory recommended for any usage
-        description: Brief description of the platform
-    """
-
     platform_name: str
     max_recommended_sf: float
     memory_overhead_factor: float
@@ -93,32 +43,13 @@ class PlatformCapabilities:
     notes: list[str] = field(default_factory=list)
 
     def estimate_memory_for_sf(self, scale_factor: float) -> float:
-        """Estimate memory required for a scale factor in GB.
-
-        TPC-H SF 1 is approximately 1 GB of raw data.
-
-        Args:
-            scale_factor: TPC-H scale factor
-
-        Returns:
-            Estimated memory in GB
-        """
-        raw_data_gb = scale_factor  # TPC-H SF 1 ≈ 1 GB
+        raw_data_gb = scale_factor
         return raw_data_gb * self.memory_overhead_factor
 
     def can_handle_sf(self, scale_factor: float) -> bool:
-        """Check if platform can safely handle scale factor.
-
-        Args:
-            scale_factor: TPC-H scale factor
-
-        Returns:
-            True if scale factor is within recommended limits
-        """
         return scale_factor <= self.max_recommended_sf
 
 
-# Platform capability definitions
 PLATFORM_CAPABILITIES: dict[str, PlatformCapabilities] = {
     "polars": PlatformCapabilities(
         platform_name="Polars",
@@ -150,12 +81,12 @@ PLATFORM_CAPABILITIES: dict[str, PlatformCapabilities] = {
     ),
     "cudf": PlatformCapabilities(
         platform_name="cuDF",
-        max_recommended_sf=1.0,  # Limited by GPU VRAM
+        max_recommended_sf=1.0,
         memory_overhead_factor=1.8,
         execution_model=ExecutionModel.EAGER,
         gpu_required=True,
         recommended_data_format=DataFormat.PARQUET,
-        min_memory_gb=8.0,  # GPU VRAM
+        min_memory_gb=8.0,
         description="NVIDIA RAPIDS GPU DataFrame library",
         notes=[
             "Limited by GPU VRAM (typically 8-24GB)",
@@ -223,20 +154,8 @@ PLATFORM_CAPABILITIES: dict[str, PlatformCapabilities] = {
 
 
 def get_platform_capabilities(platform: str) -> PlatformCapabilities:
-    """Get capabilities for a DataFrame platform.
-
-    Args:
-        platform: Platform name (case-insensitive)
-
-    Returns:
-        PlatformCapabilities for the platform
-
-    Raises:
-        ValueError: If platform is unknown
-    """
     platform_lower = platform.lower()
 
-    # Handle -df suffix
     if platform_lower.endswith("-df"):
         platform_lower = platform_lower[:-3]
 
@@ -248,18 +167,11 @@ def get_platform_capabilities(platform: str) -> PlatformCapabilities:
 
 
 def list_platform_capabilities() -> dict[str, PlatformCapabilities]:
-    """Get capabilities for all DataFrame platforms.
-
-    Returns:
-        Dictionary mapping platform name to capabilities
-    """
     return PLATFORM_CAPABILITIES.copy()
 
 
 @dataclass
 class MemoryEstimate:
-    """Memory estimation result."""
-
     raw_data_gb: float
     estimated_memory_gb: float
     platform: str
@@ -272,25 +184,12 @@ def estimate_memory_required(
     scale_factor: float,
     platform: str,
 ) -> MemoryEstimate:
-    """Estimate memory required for a benchmark run.
-
-    Args:
-        benchmark: Benchmark name ("tpch" or "tpcds")
-        scale_factor: Scale factor
-        platform: DataFrame platform name
-
-    Returns:
-        MemoryEstimate with memory requirements
-    """
     caps = get_platform_capabilities(platform)
 
-    # Base data sizes (approximate)
-    if benchmark.lower() == "tpch":
-        raw_data_gb = scale_factor  # TPC-H SF 1 ≈ 1 GB
-    elif benchmark.lower() == "tpcds":
-        raw_data_gb = scale_factor  # TPC-DS SF 1 ≈ 1 GB (similar to TPC-H)
+    if benchmark.lower() == "tpch" or benchmark.lower() == "tpcds":
+        raw_data_gb = scale_factor
     else:
-        raw_data_gb = scale_factor  # Default assumption
+        raw_data_gb = scale_factor
 
     estimated_gb = raw_data_gb * caps.memory_overhead_factor
 
@@ -304,11 +203,6 @@ def estimate_memory_required(
 
 
 def get_available_memory_gb() -> float:
-    """Get available system memory in GB.
-
-    Returns:
-        Available memory in GB, or 0 if cannot be determined
-    """
     try:
         import psutil
 
@@ -319,11 +213,6 @@ def get_available_memory_gb() -> float:
 
 
 def get_total_memory_gb() -> float:
-    """Get total system memory in GB.
-
-    Returns:
-        Total memory in GB, or 0 if cannot be determined
-    """
     try:
         import psutil
 
@@ -334,11 +223,6 @@ def get_total_memory_gb() -> float:
 
 
 def get_gpu_memory_gb() -> float | None:
-    """Get available GPU memory in GB (for cuDF).
-
-    Returns:
-        Available GPU memory in GB, or None if not available
-    """
     try:
         import pynvml
 
@@ -353,8 +237,6 @@ def get_gpu_memory_gb() -> float | None:
 
 @dataclass
 class MemoryCheckResult:
-    """Result of a memory sufficiency check."""
-
     is_safe: bool
     message: str
     estimated_memory_gb: float
@@ -364,7 +246,6 @@ class MemoryCheckResult:
     suggestions: list[str] = field(default_factory=list)
 
     def __bool__(self) -> bool:
-        """Allow using result as boolean."""
         return self.is_safe
 
 
@@ -375,21 +256,9 @@ def check_sufficient_memory(
     *,
     safety_margin: float = 0.2,
 ) -> MemoryCheckResult:
-    """Check if sufficient memory is available for a benchmark run.
-
-    Args:
-        benchmark: Benchmark name ("tpch" or "tpcds")
-        scale_factor: Scale factor
-        platform: DataFrame platform name
-        safety_margin: Additional safety margin (0.2 = 20%)
-
-    Returns:
-        MemoryCheckResult with safety check and suggestions
-    """
     caps = get_platform_capabilities(platform)
     estimate = estimate_memory_required(benchmark, scale_factor, platform)
 
-    # Check GPU memory for cuDF
     if caps.gpu_required:
         gpu_mem = get_gpu_memory_gb()
         if gpu_mem is None:
@@ -412,7 +281,6 @@ def check_sufficient_memory(
         memory_type = "system"
 
     if available == 0:
-        # Cannot determine memory, proceed with warning
         return MemoryCheckResult(
             is_safe=True,
             message=f"Could not determine available {memory_type} memory. Proceeding with caution.",
@@ -438,23 +306,19 @@ def check_sufficient_memory(
             platform=platform,
         )
 
-    # Build suggestions
     suggestions = []
 
-    # Check scale factor limit
     if scale_factor > caps.max_recommended_sf:
         suggestions.append(
             f"Scale factor {scale_factor} exceeds recommended limit for {caps.platform_name} "
             f"(max: {caps.max_recommended_sf})"
         )
 
-    # Suggest smaller scale factor
     if scale_factor > 1:
         safe_sf = available / caps.memory_overhead_factor * (1 - safety_margin)
         if safe_sf >= 0.01:
             suggestions.append(f"Try a smaller scale factor (suggested: SF {safe_sf:.2f} or less)")
 
-    # Suggest alternative platforms
     alternatives = []
     for name, alt_caps in PLATFORM_CAPABILITIES.items():
         if name != platform.lower() and alt_caps.can_handle_sf(scale_factor):
@@ -464,7 +328,6 @@ def check_sufficient_memory(
     if alternatives:
         suggestions.append(f"Consider platforms that handle larger data: {', '.join(alternatives[:3])}")
 
-    # Suggest streaming if available
     if caps.supports_streaming:
         suggestions.append(f"Enable streaming mode for {caps.platform_name}")
 
@@ -489,16 +352,6 @@ def validate_scale_factor(
     *,
     strict: bool = False,
 ) -> tuple[bool, str | None]:
-    """Validate scale factor for a platform.
-
-    Args:
-        scale_factor: TPC-H scale factor
-        platform: DataFrame platform name
-        strict: If True, reject scale factors above limit; if False, just warn
-
-    Returns:
-        Tuple of (is_valid, warning_message)
-    """
     caps = get_platform_capabilities(platform)
 
     if scale_factor <= 0:
@@ -522,14 +375,6 @@ def validate_scale_factor(
 
 
 def format_memory_warning(check_result: MemoryCheckResult) -> str:
-    """Format a memory check result as a warning message.
-
-    Args:
-        check_result: MemoryCheckResult from check_sufficient_memory
-
-    Returns:
-        Formatted warning message
-    """
     lines = [check_result.message, ""]
 
     if check_result.suggestions:
@@ -545,25 +390,13 @@ def format_memory_warning(check_result: MemoryCheckResult) -> str:
 
 
 def recommend_platform_for_sf(scale_factor: float) -> str:
-    """Recommend the best platform for a scale factor.
-
-    Args:
-        scale_factor: TPC-H scale factor
-
-    Returns:
-        Recommended platform name
-    """
-    # For small scale factors, Polars is generally best
     if scale_factor <= 10:
         return "polars"
 
-    # For medium scale factors
     if scale_factor <= 100:
-        return "polars"  # With streaming
+        return "polars"
 
-    # For large scale factors
     if scale_factor <= 1000:
         return "dask"
 
-    # For very large scale factors
     return "pyspark"

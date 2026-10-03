@@ -1,5 +1,3 @@
-"""Unit tests for centralized result builder."""
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -23,40 +21,32 @@ pytestmark = [
 
 
 class TestNormalizeBenchmarkId:
-    """Tests for normalize_benchmark_id function."""
-
     @pytest.mark.parametrize(
         ("input_name", "expected_id"),
         [
-            # TPC-H variants
             ("TPC-H", "tpch"),
             ("TPC-H Benchmark", "tpch"),
             ("tpch", "tpch"),
             ("tpc-h", "tpch"),
             ("tpc_h", "tpch"),
             ("TPCH", "tpch"),
-            # TPC-DS variants
             ("TPC-DS", "tpcds"),
             ("TPC-DS Benchmark", "tpcds"),
             ("tpcds", "tpcds"),
             ("tpc-ds", "tpcds"),
             ("tpc_ds", "tpcds"),
             ("TPCDS", "tpcds"),
-            # SSB variants
             ("SSB", "ssb"),
             ("ssb", "ssb"),
             ("SSB Benchmark", "ssb"),
-            # ClickBench variants
             ("ClickBench", "clickbench"),
             ("clickbench", "clickbench"),
             ("ClickBench Benchmark", "clickbench"),
-            # Derived benchmarks (must NOT false-match parent patterns)
             ("tpcds_obt", "tpcds_obt"),
             ("tpcds-obt", "tpcds_obt"),
             ("TPC-DS One Big Table Benchmark", "tpcds_obt"),
             ("tpch_skew", "tpch_skew"),
             ("tpch-skew", "tpch_skew"),
-            # Custom benchmarks (generic normalization)
             ("Custom Benchmark", "custom"),
             ("My-Custom-Test", "my_custom_test"),
             ("Some Other Benchmark", "some_other"),
@@ -72,18 +62,13 @@ class TestNormalizeBenchmarkId:
         assert normalize_benchmark_id("my - - test") == "my_test"
 
     def test_derived_benchmarks_not_confused_with_parents(self) -> None:
-        """Derived benchmarks must resolve to their own ID, not the parent's."""
-        # tpcds_obt contains "tpcds" as substring - must NOT resolve to "tpcds"
         assert normalize_benchmark_id("tpcds_obt") != "tpcds"
         assert normalize_benchmark_id("tpcds_obt") == "tpcds_obt"
-        # tpch_skew contains "tpch" as substring - must NOT resolve to "tpch"
         assert normalize_benchmark_id("tpch_skew") != "tpch"
         assert normalize_benchmark_id("tpch_skew") == "tpch_skew"
 
 
 class TestBenchmarkInfoInput:
-    """Tests for BenchmarkInfoInput dataclass."""
-
     def test_create_basic(self) -> None:
 
         info = BenchmarkInfoInput(name="TPC-H", scale_factor=1.0)
@@ -109,8 +94,6 @@ class TestBenchmarkInfoInput:
 
 
 class TestResultBuilder:
-    """Tests for ResultBuilder class."""
-
     def create_builder(
         self,
         benchmark_name: str = "TPC-H",
@@ -118,7 +101,6 @@ class TestResultBuilder:
         platform_name: str = "DuckDB",
         execution_mode: str = "sql",
     ) -> ResultBuilder:
-        """Create a ResultBuilder for testing."""
         return ResultBuilder(
             benchmark=BenchmarkInfoInput(name=benchmark_name, scale_factor=scale_factor),
             platform=PlatformInfoInput(name=platform_name, execution_mode=execution_mode),
@@ -131,7 +113,6 @@ class TestResultBuilder:
         rows: int = 100,
         status: str = "SUCCESS",
     ) -> QueryResultInput:
-        """Create a QueryResultInput for testing."""
         return QueryResultInput(
             query_id=query_id,
             execution_time_seconds=execution_time,
@@ -179,11 +160,6 @@ class TestResultBuilder:
         assert result.validation_status == "PARTIAL"
 
     def test_build_with_validation_failed_query_counts_as_failed(self) -> None:
-        """#1150 review: a write/op that ran but failed a post-condition check
-        (write_primitives/transaction_primitives status="VALIDATION_FAILED")
-        must count as a failure in aggregate accounting, not vanish from both
-        successful_queries and failed_queries.
-        """
         builder = self.create_builder()
         builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
         builder.add_query_result(self.create_query_result("2", 1.0, 100, "VALIDATION_FAILED"))
@@ -207,7 +183,6 @@ class TestResultBuilder:
     def test_build_counts_failure_statuses_without_counting_skipped(
         self, status: str, expected_failed: int, expected_validation: str
     ) -> None:
-        """Failure statuses affect gates, while intentional skips remain non-failures."""
         builder = self.create_builder()
         builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
         builder.add_query_result(self.create_query_result("2", 0.0, 0, status))
@@ -224,16 +199,13 @@ class TestResultBuilder:
 
         builder = self.create_builder(scale_factor=1.0)
 
-        # Add 4 queries with 1 second each (geom mean = 1)
         for i in range(1, 5):
             builder.add_query_result(self.create_query_result(str(i), 1.0, 100))
 
         result = builder.build()
 
-        # Power@Size = (SF * 3600) / geom_mean = (1 * 3600) / 1 = 3600
         assert result.power_at_size is not None
         assert result.power_at_size == 3600.0
-        # Use approximate comparison for floating point
         assert result.geometric_mean_execution_time is not None
         assert abs(result.geometric_mean_execution_time - 1.0) < 0.0001
 
@@ -247,7 +219,7 @@ class TestResultBuilder:
         result = builder.build()
 
         assert result.total_rows_loaded == 6001215 + 1500000
-        assert result.data_loading_time == 1.5  # 1500ms -> 1.5s
+        assert result.data_loading_time == 1.5
         assert "lineitem" in result.table_statistics
         assert result.table_statistics["lineitem"] == {"rows": 6001215, "load_time_ms": 1000}
 
@@ -292,7 +264,6 @@ class TestResultBuilder:
 
         builder = self.create_builder()
         builder.mark_started()
-        # Simulate some time passing
         builder.mark_completed()
 
         result = builder.build()
@@ -348,9 +319,6 @@ class TestResultBuilder:
         assert result.tuning_source_file == "tuning.yaml"
 
     def test_build_threads_applied_ledger_fields(self) -> None:
-        """Applied-tuning ledger payload/hash + honest status survive onto the
-        built result (ADR-1 additive companion; distinct from the requested
-        config hash)."""
         builder = self.create_builder()
         ledger_payload = {
             "status": "applied_unverified",
@@ -373,13 +341,10 @@ class TestResultBuilder:
         assert result.applied_ledger_hash == ledger_payload["applied_ledger_hash"]
         assert result.tuning_validation_status == "applied_unverified"
         assert result.tuning_metadata_saved is True
-        # The requested-config hash stays distinct from the applied hash.
         assert result.tuning_config_hash == "requested-hash"
         assert result.applied_ledger_hash != result.tuning_config_hash
 
     def test_build_defaults_applied_ledger_fields_to_none(self) -> None:
-        """A build with no tuning info leaves the applied-ledger fields unset and
-        the status at the lowercase default."""
         builder = self.create_builder()
 
         result = builder.build()
@@ -398,7 +363,6 @@ class TestResultBuilder:
         assert result.cost_summary == {"total_cost": 1.50, "currency": "USD"}
 
     def test_build_with_plan_capture_stats(self) -> None:
-        """Test building results with query plan capture statistics."""
         builder = self.create_builder()
         builder.add_plan_capture_stats(
             plans_captured=20,
@@ -442,7 +406,7 @@ class TestResultBuilder:
         result = builder.build()
         qr = result.query_results[0]
 
-        assert qr["query_id"] == "Q1"  # Should have Q prefix
+        assert qr["query_id"] == "Q1"
         assert qr["execution_time"] == 1.5
         assert qr["execution_time_ms"] == 1500
         assert qr["status"] == "SUCCESS"
@@ -451,8 +415,6 @@ class TestResultBuilder:
         assert qr["stream_id"] == 1
 
     def test_query_results_format_includes_plan_capture_error(self) -> None:
-        """A DataFrame plan-capture failure's real cause (qpc-05 / F4.4) must
-        reach the persisted query row, not just the companion errors list."""
         builder = self.create_builder()
         builder.add_query_result(
             QueryResultInput(
@@ -502,14 +464,6 @@ class TestResultBuilder:
         assert result.platform_info["configuration"] == {"threads": 4}
 
     def test_build_preserves_test_type_through_real_pipeline(self) -> None:
-        """test_type must survive the REAL production pipeline: raw platform-adapter
-        dict -> normalize_query_result -> ResultBuilder.add_query_result -> build()
-        -> BenchmarkResults.query_results. This is the phase discriminator
-        build_plans_payload uses to disambiguate a power row and a throughput row
-        sharing the same query_id/stream_id in a combined run; a synthetic
-        QueryResultInput built directly (bypassing normalize_query_result) would
-        hide a regression where the raw dict's "test_type" key gets silently
-        dropped at the normalization boundary."""
         power_raw = {
             "query_id": "Q6",
             "execution_time_seconds": 1.0,
@@ -540,8 +494,6 @@ class TestResultBuilder:
 
 
 class TestBuildBenchmarkResults:
-    """Tests for build_benchmark_results convenience function."""
-
     def test_basic_usage(self) -> None:
 
         query_results = [
@@ -622,8 +574,6 @@ class TestBuildBenchmarkResults:
 
 
 class TestRunConfigInputTableMode:
-    """Verify table_mode is correctly serialized in RunConfigInput."""
-
     def test_external_mode_included_in_dict(self):
         rc = RunConfigInput(table_mode="external", phases=["power"])
         d = rc.to_dict()
@@ -640,7 +590,6 @@ class TestRunConfigInputTableMode:
         assert "table_mode" not in d
 
     def test_round_trip_through_builder(self):
-        """table_mode should survive set_run_config -> build -> config."""
         builder = ResultBuilder(
             benchmark=BenchmarkInfoInput(name="tpch", scale_factor=0.01),
             platform=PlatformInfoInput(name="DuckDB", execution_mode="sql"),
@@ -654,8 +603,6 @@ class TestRunConfigInputTableMode:
 
 
 class TestRunConfigInputExternalFormat:
-    """Verify external_format is correctly serialized in RunConfigInput."""
-
     def test_external_format_included_in_dict(self):
         rc = RunConfigInput(table_mode="external", external_format="parquet", phases=["power"])
         d = rc.to_dict()
@@ -677,7 +624,6 @@ class TestRunConfigInputExternalFormat:
         assert "external_format" not in d
 
     def test_round_trip_through_builder(self):
-        """external_format should survive set_run_config -> build -> execution_metadata."""
         builder = ResultBuilder(
             benchmark=BenchmarkInfoInput(name="tpch", scale_factor=0.01),
             platform=PlatformInfoInput(name="DuckDB", execution_mode="sql"),
@@ -691,7 +637,6 @@ class TestRunConfigInputExternalFormat:
         assert config.get("external_format") == "parquet"
 
     def test_round_trip_tbl_format(self):
-        """TBL format should survive the full round-trip through builder."""
         builder = ResultBuilder(
             benchmark=BenchmarkInfoInput(name="tpch", scale_factor=1.0),
             platform=PlatformInfoInput(name="DuckDB", execution_mode="sql"),
@@ -705,8 +650,6 @@ class TestRunConfigInputExternalFormat:
 
 
 class TestRunConfigInputTableFormat:
-    """Verify table format settings are serialized in RunConfigInput."""
-
     def test_table_format_fields_included_in_dict(self):
         rc = RunConfigInput(
             table_format="parquet",
@@ -754,8 +697,6 @@ class TestRunConfigInputTableFormat:
 
 
 class TestResultFactoryExternalFormat:
-    """Verify external_format propagates through build_enhanced_benchmark_result."""
-
     def _make_benchmark(self, name="TPC-H Benchmark", scale=0.01):
         from unittest.mock import Mock
 
@@ -765,7 +706,6 @@ class TestResultFactoryExternalFormat:
         return bm
 
     def test_external_format_reaches_result_config(self):
-        """external_format in run_config should survive the result factory pipeline."""
         from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 
         result = build_enhanced_benchmark_result(
@@ -785,7 +725,6 @@ class TestResultFactoryExternalFormat:
         assert config.get("external_format") == "parquet"
 
     def test_tbl_format_reaches_result_config(self):
-        """TBL format should propagate through result factory."""
         from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 
         result = build_enhanced_benchmark_result(
@@ -803,7 +742,6 @@ class TestResultFactoryExternalFormat:
         assert config.get("external_format") == "tbl"
 
     def test_missing_external_format_omitted(self):
-        """When external_format is absent, it should not appear in config."""
         from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 
         result = build_enhanced_benchmark_result(
@@ -821,7 +759,6 @@ class TestResultFactoryExternalFormat:
         assert "external_format" not in config
 
     def test_table_format_reaches_result_config(self):
-        """table_format in run_config should survive the result factory pipeline."""
         from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 
         result = build_enhanced_benchmark_result(

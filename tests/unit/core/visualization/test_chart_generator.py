@@ -22,10 +22,6 @@ pytestmark = [
 
 
 def test_all_chart_types_match_generated_explorer_fixture() -> None:
-    """Guard against forward drift between Python registry and generated Explorer fixture.
-
-    When this fails, run make parity-fixtures and update chartRegistry.ts.
-    """
     fixture_path = Path("tests/parity/fixtures/chart_ids.json")
     fixture_ids = json.loads(fixture_path.read_text(encoding="utf-8"))["chart_ids"]
 
@@ -67,7 +63,6 @@ def test_generate_comparison_charts_exports_supported_chart_types(monkeypatch, t
 
     exported = generate_comparison_charts(results, tmp_path)
 
-    # All three comparison chart types should render (performance_bar, distribution_box, query_heatmap)
     assert set(exported.keys()) == {"performance_bar", "distribution_box", "query_heatmap"}
     for path in exported.values():
         assert path.exists()

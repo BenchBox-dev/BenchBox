@@ -1,12 +1,6 @@
-"""Tests for TPCHSkew facade validation and property delegation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets the validation branches in benchbox/tpch_skew.py that are not
-exercised by the implementation-level tests.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 

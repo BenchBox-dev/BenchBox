@@ -1,12 +1,6 @@
-"""Databricks platform adapter with Unity Catalog and Delta Lake optimization.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Databricks-specific optimizations for large-scale analytics,
-including Delta Lake table creation and cluster management.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -47,14 +41,9 @@ except ImportError:
 
 
 def _select_databricks_warehouse(warehouses: list, very_verbose: bool, logger: logging.Logger):
-    """Select the best warehouse from a list of Databricks SQL warehouses.
-
-    Priority: 1) running warehouse, 2) non-terminal warehouse (for auto-start).
-    """
     if not warehouses:
         return None
 
-    # 1. Prefer a running warehouse
     running_wh = next((wh for wh in warehouses if str(wh.state) == "RUNNING"), None)
     if running_wh:
         if very_verbose:
@@ -63,7 +52,6 @@ def _select_databricks_warehouse(warehouses: list, very_verbose: bool, logger: l
 
     if very_verbose:
         logger.info("No running warehouses found. Looking for an available one to auto-start.")
-    # 2. Otherwise, take the first available one that is not in a terminal state
     available_wh = next(
         (wh for wh in warehouses if str(wh.state) not in ["DELETING", "DELETED"]),
         None,
@@ -86,13 +74,6 @@ _ENGINE_VERSION_SOURCE_SQL_QUERY = "sql_query"
 
 
 def _sanitize_spark_engine_version(value: Any) -> str | None:
-    """Strip the commit-hash suffix from ``SELECT version()`` output.
-
-    Serverless warehouses return values like ``"4.2.0 0000...0"`` where the
-    second token is a 40-character placeholder hash. Naive ``split()[0]``
-    truncates legitimate multi-token versions such as ``"Runtime 14.3 LTS"``,
-    so only strip the suffix when it looks like a commit hash.
-    """
     if value is None:
         return None
     text = str(value).strip()
@@ -107,7 +88,6 @@ def _sanitize_spark_engine_version(value: Any) -> str | None:
 
 
 def _first_column(row: Any) -> Any:
-    """Extract the first column from a DB-API fetchone() result."""
     if row is None:
         return None
     if isinstance(row, Mapping):
@@ -142,7 +122,6 @@ def _first_column(row: Any) -> Any:
 
 
 def _unwrap_current_version_struct(row: Any) -> Any:
-    """Unwrap ``SELECT current_version()`` fetchone() result to its struct payload."""
     if row is None:
         return None
     if isinstance(row, Mapping):
@@ -157,8 +136,6 @@ def _unwrap_current_version_struct(row: Any) -> Any:
     if isinstance(row, (tuple, list)):
         if len(row) == 0:
             return None
-        # databricks.sql.types.Row is a tuple that matches field names with `in`;
-        # a plain tuple never does, so it falls through to row[0] below.
         try:
             if "dbsql_version" in row or "dbr_version" in row:  # type: ignore[operator]
                 return row
@@ -180,7 +157,6 @@ def _unwrap_current_version_struct(row: Any) -> Any:
 
 
 def _clean_version_token(value: Any) -> str | None:
-    """Accept only real string versions; reject placeholders and mock objects."""
     if value is None:
         return None
     if not isinstance(value, str):
@@ -190,7 +166,6 @@ def _clean_version_token(value: Any) -> str | None:
 
 
 def _struct_fields_from_object(payload: Any) -> dict[str, Any] | None:
-    """Read version/hash fields from a Row-like object via mapping or attributes."""
     values: dict[str, Any] = {}
     for key in _CURRENT_VERSION_KEYS:
         try:
@@ -207,22 +182,17 @@ def _struct_fields_from_object(payload: Any) -> dict[str, Any] | None:
                 values[key] = getattr(payload, key, None)
         except Exception:
             values[key] = None
-    # Reject objects with no string content (e.g. unconfigured mocks)
     if not any(isinstance(values.get(key), str) for key in _CURRENT_VERSION_KEYS):
         return None
     return values
 
 
 def _parse_current_version_payload(payload: Any) -> dict[str, str | None] | None:
-    """Normalize a ``current_version()`` struct to known version/hash keys."""
     if payload is None or isinstance(payload, str):
         return None
     if isinstance(payload, (tuple, list)):
         if len(payload) == 0:
             return None
-        # Double-wrapped struct (e.g. Row inside Row): unwrap one more level
-        # only when the outer row does not itself carry version keys. As above,
-        # `in` matches field names only on Row, never on a plain tuple.
         try:
             if "dbsql_version" in payload or "dbr_version" in payload:  # type: ignore[operator]
                 pass
@@ -252,15 +222,12 @@ def _parse_current_version_payload(payload: Any) -> dict[str, str | None] | None
 
 
 def _select_databricks_platform_version(parsed: Mapping[str, Any] | None) -> str | None:
-    """Prefer DBSQL version on warehouses, DBR version on clusters."""
     if not isinstance(parsed, Mapping):
         return None
     return _clean_version_token(parsed.get("dbsql_version")) or _clean_version_token(parsed.get("dbr_version"))
 
 
 class DatabricksAdapter(PlatformAdapter):
-    """Databricks platform adapter with Delta Lake and Unity Catalog support."""
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -269,7 +236,6 @@ class DatabricksAdapter(PlatformAdapter):
     def __init__(self, **config):
         super().__init__(**config)
 
-        # Check dependencies with improved error message
         available, missing = check_platform_dependencies("databricks")
         if not available:
             error_msg = get_dependency_error_message("databricks", missing)
@@ -277,21 +243,17 @@ class DatabricksAdapter(PlatformAdapter):
 
         self._dialect = "databricks"
 
-        # Databricks configuration
         self.server_hostname = config.get("server_hostname") or config.get("host")
         self.http_path = config.get("http_path")
         self.access_token = config.get("access_token") or config.get("token")
         self.catalog = config.get("catalog") or "main"
         self.schema = config.get("schema") or "benchbox"
-        # Unity Catalog Volume and staging support
         self.uc_catalog = config.get("uc_catalog")
         self.uc_schema = config.get("uc_schema")
         self.uc_volume = config.get("uc_volume")
-        # Explicit staging root (e.g., dbfs:/Volumes/<cat>/<schema>/<volume>/... or s3://...)
         self.staging_root = config.get("staging_root")
         self.region = config.get("region") or config.get("cloud_region") or config.get("workspace_region")
 
-        # Delta Lake settings
         self.enable_delta_optimization = (
             config.get("enable_delta_optimization") if config.get("enable_delta_optimization") is not None else True
         )
@@ -302,11 +264,6 @@ class DatabricksAdapter(PlatformAdapter):
             config.get("delta_auto_compact") if config.get("delta_auto_compact") is not None else True
         )
 
-        # Table format selection: "delta" (default) or "hudi". Hudi tables are
-        # created with USING HUDI plus record-key TBLPROPERTIES; Delta-only
-        # layout operations (OPTIMIZE, ZORDER, Liquid) are recorded as skipped
-        # for Hudi tables instead of emitting invalid SQL. Managed data loads
-        # (COPY INTO) remain Delta-only: load_data raises for Hudi tables.
         table_format = str(config.get("table_format") or "delta").strip().lower()
         if table_format not in ("delta", "hudi"):
             raise ValueError(f"Unsupported Databricks table_format '{table_format}'. Use 'delta' or 'hudi'.")
@@ -326,29 +283,16 @@ class DatabricksAdapter(PlatformAdapter):
             raise ValueError(f"Unsupported hudi_table_type '{hudi_table_type}'. Use 'cow' or 'mor'.")
         self.hudi_table_type = hudi_table_type
 
-        # Cluster settings. No default: BenchBox connects to an existing SQL
-        # warehouse over `http_path` and never sizes one, so a value here is
-        # requested intent and nothing else. The former "Medium" fallback was
-        # published as the run's compute size and contradicted the warehouse the
-        # run actually used -- a 2X-Small serverless warehouse reported as
-        # Medium, and billed at 8 DBU/hour instead of 1. The observed size comes
-        # from the warehouses API into `platform.compute`.
         self.cluster_size = config.get("cluster_size")
         self.auto_terminate_minutes = (
             config.get("auto_terminate_minutes") if config.get("auto_terminate_minutes") is not None else 30
         )
 
-        # Schema creation settings
         self.create_catalog = config.get("create_catalog") if config.get("create_catalog") is not None else False
 
-        # Upload/validation controls
         force_upload_val = config.get("force_upload")
         self.force_upload = bool(force_upload_val if force_upload_val is not None else False)
 
-        # Result cache control - disable by default for accurate benchmarking.
-        # None-safe: the config builder inserts every platform field with None
-        # when no source provides it, so config.get(key, True) returns None
-        # (key present) and a bare truthiness gate would skip the disable.
         disable_result_cache = config.get("disable_result_cache", True)
         self.disable_result_cache = True if disable_result_cache is None else bool(disable_result_cache)
         self._liquid_clustering_operations: list[dict[str, Any]] = []
@@ -392,13 +336,6 @@ class DatabricksAdapter(PlatformAdapter):
         self._skipped_layout_operations = []
 
     def _resolve_databricks_clustering_strategy(self) -> str:
-        """Resolve clustering strategy and reject misleading mixed layout fields.
-
-        A missing strategy means no clustering was requested ("none"): plain
-        Delta OPTIMIZE file compaction is independent of clustering and never
-        implies ZORDER BY. An explicit "z_order" request is still honored so
-        tuned templates keep working.
-        """
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
         if platform_opts is None:
@@ -470,9 +407,7 @@ class DatabricksAdapter(PlatformAdapter):
             self._skipped_layout_operations.append(operation)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """Build opt-in sorted-ingestion SQL for Databricks."""
         if getattr(self, "table_format", "delta") == "hudi":
-            # CTAS ORDER BY rewrites and ZORDER/Liquid clustering are Delta-only.
             self.logger.info(f"Skipped sorted ingestion for Hudi table {table_name}")
             return None
         mode, method = self.resolve_sorted_ingestion_strategy()
@@ -491,7 +426,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Databricks-specific CLI arguments."""
         db_group = parser.add_argument_group("Databricks Arguments")
         db_group.add_argument("--server-hostname", type=str, help="Databricks server hostname")
         db_group.add_argument("--http-path", type=str, help="Databricks SQL Warehouse HTTP path")
@@ -503,23 +437,19 @@ class DatabricksAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Databricks adapter from unified configuration."""
         from benchbox.utils.database_naming import generate_database_name
 
-        # Try auto-detection if credentials not provided
         adapter_config = {}
         very_verbose = config.get("very_verbose", False)
 
-        # Check if we have valid (non-placeholder) credentials
         def is_placeholder(value):
             if not value:
                 return True
             str_val = str(value)
-            # Common placeholder patterns
             return (
                 "your-workspace" in str_val
                 or "your-warehouse-id" in str_val
-                or "${" in str_val  # Environment variable placeholder
+                or "${" in str_val
                 or "example" in str_val.lower()
             )
 
@@ -534,27 +464,19 @@ class DatabricksAdapter(PlatformAdapter):
             if auto_config:
                 adapter_config.update(auto_config)
 
-        # Override with explicit config values (but skip placeholders)
         for key in ["server_hostname", "http_path", "access_token"]:
             if config.get(key) and not is_placeholder(config.get(key)):
                 adapter_config[key] = config[key]
 
-        # Handle catalog
         adapter_config["catalog"] = config.get("catalog", "workspace")
 
-        # Handle schema - prioritize auto-generation when benchmark context is available
-        # This ensures schema names reflect benchmark/scale/tuning configuration,
-        # rather than using static values from credentials files
         provided_schema = config.get("schema")
         has_benchmark_context = "benchmark" in config and "scale_factor" in config
 
         if has_benchmark_context:
-            # When running a benchmark, always auto-generate schema name unless
-            # user provided an explicit non-default override
             is_default_schema = provided_schema in (None, "", "benchbox")
 
             if is_default_schema:
-                # Generate proper schema name using benchmark configuration
                 schema_name = generate_database_name(
                     benchmark_name=config["benchmark"],
                     scale_factor=config["scale_factor"],
@@ -563,13 +485,10 @@ class DatabricksAdapter(PlatformAdapter):
                 )
                 adapter_config["schema"] = schema_name
             else:
-                # User provided explicit non-default schema - honor it
                 adapter_config["schema"] = provided_schema
         else:
-            # No benchmark context - fall back to provided schema or default
             adapter_config["schema"] = provided_schema or "benchbox"
 
-        # Pass through other relevant config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -604,7 +523,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _auto_detect_databricks_config(very_verbose: bool = False):
-        """Auto-detect Databricks configuration from SDK."""
         logger = logging.getLogger("DatabricksAdapter")
         try:
             from databricks.sdk import WorkspaceClient
@@ -647,14 +565,6 @@ class DatabricksAdapter(PlatformAdapter):
             return None
 
     def _resolve_databricks_engine_version(self, connection: Any) -> dict[str, Any]:
-        """Resolve the Databricks engine version from a live connection.
-
-        Probes ``SELECT current_version()`` first so SQL warehouses record the
-        DBSQL version (``dbsql_version``) and clusters record the runtime
-        version (``dbr_version``), with build hashes preserved. Falls back to
-        sanitized ``SELECT version()`` and then ``SELECT spark_version()`` for
-        older clusters, connectors, and fixtures without ``current_version()``.
-        """
         fallback_hashes: dict[str, str] = {}
         try:
             cursor = connection.cursor()
@@ -722,17 +632,6 @@ class DatabricksAdapter(PlatformAdapter):
         return degraded
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Databricks platform information.
-
-        Captures comprehensive Databricks configuration including:
-        - Runtime/Spark version
-        - Warehouse/cluster size and configuration
-        - Compute tier and pricing information (best effort)
-        - Photon acceleration status
-        - Auto-scaling configuration
-
-        Gracefully degrades if SDK is unavailable or permissions are insufficient.
-        """
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
@@ -778,7 +677,6 @@ class DatabricksAdapter(PlatformAdapter):
             },
         }
 
-        # Get client library version
         try:
             import databricks.sql
 
@@ -786,8 +684,6 @@ class DatabricksAdapter(PlatformAdapter):
         except (ImportError, AttributeError):
             platform_info["client_library_version"] = None
 
-        # Resolve the engine version: current_version() first for the true DBSQL/DBR
-        # version plus build hashes, with sanitized version() fallback.
         if connection is not None:
             resolved_version = self._resolve_databricks_engine_version(connection)
             platform_info["platform_version"] = resolved_version.get("platform_version")
@@ -801,20 +697,15 @@ class DatabricksAdapter(PlatformAdapter):
             platform_info["engine_version"] = None
             platform_info["engine_version_source"] = None
 
-        # Try to get warehouse metadata using Databricks SDK (best effort)
         warehouse_id = self._warehouse_id_from_http_path(self.http_path)
         try:
             from databricks.sdk import WorkspaceClient
 
             if warehouse_id:
-                # Create workspace client
                 workspace = WorkspaceClient(host=f"https://{self.server_hostname}", token=self.access_token)
 
-                # Get warehouse configuration
                 warehouse = workspace.warehouses.get(warehouse_id)
 
-                # Detect if this is a serverless warehouse
-                # Serverless warehouses have warehouse_type=PRO + enable_serverless_compute=True
                 is_serverless = (
                     hasattr(warehouse, "warehouse_type")
                     and hasattr(warehouse, "enable_serverless_compute")
@@ -823,7 +714,6 @@ class DatabricksAdapter(PlatformAdapter):
                     and warehouse.enable_serverless_compute is True
                 )
 
-                # Get raw warehouse type and override to SERVERLESS if detected
                 raw_warehouse_type = (
                     warehouse.warehouse_type.value
                     if hasattr(warehouse, "warehouse_type") and warehouse.warehouse_type
@@ -831,7 +721,6 @@ class DatabricksAdapter(PlatformAdapter):
                 )
                 warehouse_type_display = "SERVERLESS" if is_serverless else raw_warehouse_type
 
-                # Extract channel name and version from channel object
                 channel_name = None
                 warehouse_version = None
                 if hasattr(warehouse, "channel") and warehouse.channel:
@@ -840,7 +729,6 @@ class DatabricksAdapter(PlatformAdapter):
                     if hasattr(warehouse.channel, "dbsql_version"):
                         warehouse_version = warehouse.channel.dbsql_version
 
-                    # Log if extraction fails to help debugging
                     if channel_name is None:
                         self.logger.debug(f"Channel name extraction failed for warehouse {warehouse_id}")
                     if warehouse_version is None:
@@ -878,9 +766,6 @@ class DatabricksAdapter(PlatformAdapter):
             )
             platform_info["compute_configuration"] = self._unavailable_warehouse_metadata(warehouse_id, e)
 
-        # Detect the workspace region when it was not configured. The
-        # detected value flows into configuration["region"], which the
-        # normalized cloud metadata reads.
         if not self.region:
             detected_region = self._detect_databricks_region()
             if detected_region:
@@ -897,7 +782,6 @@ class DatabricksAdapter(PlatformAdapter):
         connection: Any | None = None,
         platform_info: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return Databricks-specific normalized workspace and warehouse metadata."""
         info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
         metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
@@ -924,13 +808,6 @@ class DatabricksAdapter(PlatformAdapter):
         return http_path.split("/warehouses/")[-1].strip("/") or None
 
     def _detect_databricks_region(self) -> str | None:
-        """Detect the workspace region via the Unity Catalog metastore summary.
-
-        The workspace hostname does not embed the region, so the region is
-        read from the metastore summary when it was not configured. Best
-        effort: returns None when the SDK is unavailable, credentials are
-        missing, or the API call fails. Never raises.
-        """
         try:
             from databricks.sdk import WorkspaceClient
 
@@ -1083,22 +960,9 @@ class DatabricksAdapter(PlatformAdapter):
         )
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Databricks."""
         return "databricks"
 
     def preprocess_operation_sql(self, query_id: str, operation: Any) -> str | None:
-        """Rewrite operation write SQL for Databricks-only dialect gaps.
-
-        Respects catalog ``databricks`` overrides (including skip ``None``):
-        rewrites the override when present, otherwise the default write SQL.
-
-        - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
-          VARCHAR requires a length parameter; verified live with
-          DATATYPE_MISSING_SIZE on batch inserts)
-        - ``unnest(generate_series(a, b))`` -> ``explode(sequence(a, b))``
-          (Databricks has neither function; verified live with
-          UNRESOLVED_ROUTINE ``unnest``)
-        """
         import re
 
         overrides = getattr(operation, "platform_overrides", None) or {}
@@ -1122,7 +986,6 @@ class DatabricksAdapter(PlatformAdapter):
         )
 
     def _get_connection_params(self, **connection_config) -> dict[str, Any]:
-        """Get standardized connection parameters."""
         return {
             "server_hostname": connection_config.get("server_hostname", self.server_hostname),
             "http_path": connection_config.get("http_path", self.http_path),
@@ -1130,14 +993,11 @@ class DatabricksAdapter(PlatformAdapter):
         }
 
     def _create_admin_connection(self, **connection_config) -> Any:
-        """Create Databricks connection for admin operations."""
         params = self._get_connection_params(**connection_config)
 
-        # Basic connection without session configuration to work with all warehouse types
         return databricks_sql.connect(**params, user_agent_entry="BenchBox/1.0")
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if schema exists in Databricks catalog."""
         try:
             connection = self._create_admin_connection(**connection_config)
             cursor = connection.cursor()
@@ -1145,38 +1005,24 @@ class DatabricksAdapter(PlatformAdapter):
             catalog = connection_config.get("catalog", self.catalog)
             schema = connection_config.get("schema", self.schema)
 
-            # Check if catalog exists
             cursor.execute("SHOW CATALOGS")
             catalogs = [row[0] for row in cursor.fetchall()]
 
             if catalog not in catalogs:
                 return False
 
-            # Check if schema exists in catalog
             cursor.execute(f"SHOW SCHEMAS IN {catalog}")
             schemas = [row[0] for row in cursor.fetchall()]
 
             return schema in schemas
 
         except Exception:
-            # If we can't connect or check, assume schema doesn't exist
             return False
         finally:
             if "connection" in locals():
                 connection.close()
 
     def reset_database_in_place(self, **connection_config) -> bool:
-        """Truncate the schema's tables instead of dropping the schema.
-
-        Unity Catalog keeps dropped tables recoverable for about seven days,
-        and they count against the metastore table quota until then, so a
-        drop-and-recreate on every reload exhausts small quotas. Schema
-        creation replaces tables with ``CREATE OR REPLACE``, which does not add
-        to the quota. Tables created with ``IF NOT EXISTS`` keep their
-        structure and start empty. Returns False, and the caller drops the
-        schema as before, when the schema is absent or any table cannot be
-        truncated.
-        """
         catalog = connection_config.get("catalog", self.catalog)
         schema = connection_config.get("schema", self.schema)
         connection = None
@@ -1198,7 +1044,6 @@ class DatabricksAdapter(PlatformAdapter):
                 connection.close()
 
     def drop_database(self, **connection_config) -> None:
-        """Drop schema in Databricks catalog."""
         try:
             connection = self._create_admin_connection(**connection_config)
             cursor = connection.cursor()
@@ -1206,7 +1051,6 @@ class DatabricksAdapter(PlatformAdapter):
             catalog = connection_config.get("catalog", self.catalog)
             schema = connection_config.get("schema", self.schema)
 
-            # Drop schema and all its tables
             cursor.execute(f"DROP SCHEMA IF EXISTS {catalog}.{schema} CASCADE")
 
         except Exception as e:
@@ -1216,10 +1060,8 @@ class DatabricksAdapter(PlatformAdapter):
                 connection.close()
 
     def create_connection(self, **connection_config) -> Any:
-        """Create optimized Databricks SQL connection."""
         self.log_operation_start("Databricks connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
         try:
@@ -1230,25 +1072,11 @@ class DatabricksAdapter(PlatformAdapter):
 
             connection = self._create_admin_connection(**connection_config)
 
-            # Test connection and set catalog
             cursor = connection.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchall()
             self.log_very_verbose("Databricks connection test successful")
 
-            # Set catalog and schema context on every connection. Pooled
-            # connections never pass through create_schema(), so deferring
-            # USE SCHEMA there leaves them on the default schema and every
-            # unqualified probe fails (verified live: staging COUNT(*) probes
-            # failed while DDL landed in the default schema). CREATE SCHEMA
-            # is still authorized even when the schema exists, so only
-            # ensure it for fresh databases: on a reused catalog/schema the
-            # principal may hold USE SCHEMA without catalog-level
-            # CREATE SCHEMA, and requiring it here would block reconnects.
-            # USE CATALOG is likewise deferred when this connection is meant
-            # to create the catalog: create_schema() owns catalog creation,
-            # and selecting a not-yet-created catalog fails before it runs.
-            # create_schema() keeps owning table creation.
             if not (getattr(self, "create_catalog", False) and not getattr(self, "database_was_reused", False)):
                 cursor.execute(f"USE CATALOG {self.catalog}")
                 if not getattr(self, "database_was_reused", False):
@@ -1276,11 +1104,9 @@ class DatabricksAdapter(PlatformAdapter):
             raise
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Databricks Delta Lake tables."""
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
-        # Get constraint settings from tuning configuration
         enable_primary_keys, enable_foreign_keys = self._get_constraint_configuration()
         self._log_constraint_configuration(enable_primary_keys, enable_foreign_keys)
         self.log_verbose(
@@ -1290,29 +1116,21 @@ class DatabricksAdapter(PlatformAdapter):
         try:
             cursor = connection.cursor()
 
-            # Step 1: Ensure catalog exists (if create_catalog is enabled)
-            # Step 2: Create schema BEFORE attempting to USE it (correct order)
             if self.create_catalog:
                 cursor.execute(f"CREATE CATALOG IF NOT EXISTS {self.catalog}")
                 cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 self.log_verbose(f"Created catalog and schema: {self.catalog}.{self.schema}")
-                # The catalog now exists: later connections take the normal
-                # context-selection path instead of deferring again.
                 self.create_catalog = False
             else:
-                # Just create schema if catalog already exists
                 cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 self.log_verbose(f"Created schema: {self.catalog}.{self.schema}")
 
-            # Step 3: Set catalog and schema context (now that schema exists)
             cursor.execute(f"USE CATALOG {self.catalog}")
             cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to: {self.catalog}.{self.schema}")
 
-            # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Debug: Log schema SQL generation results
             self.log_verbose(f"Received schema SQL from _create_schema_with_tuning: {len(schema_sql)} characters")
             self.log_very_verbose(f"Schema SQL (first 300 chars): {schema_sql[:300]}")
 
@@ -1321,7 +1139,6 @@ class DatabricksAdapter(PlatformAdapter):
                 self.logger.error(f"Benchmark has get_schema_sql: {hasattr(benchmark, 'get_schema_sql')}")
                 raise RuntimeError(f"No schema SQL generated for {benchmark.__class__.__name__}")
 
-            # Transform SQL syntax for Databricks compatibility
             original_len = len(schema_sql)
             schema_sql = self._fix_databricks_sql_syntax(schema_sql)
             self.log_very_verbose(
@@ -1330,28 +1147,22 @@ class DatabricksAdapter(PlatformAdapter):
             if len(schema_sql) != original_len:
                 self.log_verbose(f"SQL length changed after Databricks syntax fix: {original_len} -> {len(schema_sql)}")
 
-            # Split schema into individual statements and execute
             from benchbox.platforms.cloud_shared import split_leading_sql_comments
 
-            # Skip chunks holding only decorative "--" comments (a ";" inside
-            # a comment splits one off): they carry no DDL.
             statements = [
                 stmt.strip()
                 for stmt in schema_sql.split(";")
                 if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
             ]
 
-            # Debug: Log statement count
             self.log_verbose(f"Parsed {len(statements)} CREATE TABLE statements from schema SQL")
             if not statements:
                 self.logger.error("No CREATE TABLE statements found after parsing schema SQL")
                 self.logger.error(f"Raw schema SQL (first 500 chars): {schema_sql[:500]}")
                 raise RuntimeError("Schema SQL produced no executable statements")
 
-            # Apply Databricks DDL optimization (DDL_OPTIMIZE rule: convert_to_delta_table)
             statements = [self._convert_to_delta_table(s) for s in statements]
 
-            # Execute statements with error handling from base adapter
             tables_created, failed_tables = self._execute_schema_statements(statements, cursor)
 
             duration = elapsed_seconds(start_time)
@@ -1367,27 +1178,12 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.close()
 
     def _ensure_uc_volume_exists(self, uc_volume_path: str, connection: Any) -> None:
-        """Ensure UC Volume exists, creating it if necessary.
-
-        This method also creates the schema if it doesn't exist, providing
-        a complete zero-setup experience for UC Volume workflows.
-
-        Args:
-            uc_volume_path: UC Volume path (e.g., dbfs:/Volumes/catalog/schema/volume)
-            connection: Databricks SQL connection
-
-        Raises:
-            ValueError: If volume path is invalid or creation fails
-        """
-        # Parse volume path: dbfs:/Volumes/catalog/schema/volume
         volume_path = uc_volume_path.replace("dbfs:", "").rstrip("/")
 
-        # Extract catalog, schema, volume from /Volumes/catalog/schema/volume
         if not volume_path.startswith("/Volumes/"):
             raise ValueError(f"Invalid UC Volume path: {uc_volume_path}. Must start with dbfs:/Volumes/")
 
         path_parts = volume_path.split("/")
-        # path_parts = ['', 'Volumes', 'catalog', 'schema', 'volume', ...]
 
         if len(path_parts) < 5:
             raise ValueError(
@@ -1404,13 +1200,11 @@ class DatabricksAdapter(PlatformAdapter):
         try:
             cursor = connection.cursor()
 
-            # First, ensure the schema exists (required for volume creation)
             try:
                 create_schema_sql = f"CREATE SCHEMA IF NOT EXISTS {catalog}.{schema}"
                 cursor.execute(create_schema_sql)
                 self.log_very_verbose(f"Schema ready: {catalog}.{schema}")
             except Exception as schema_error:
-                # If schema creation fails due to permissions, provide clear guidance
                 error_msg = str(schema_error).lower()
                 if "permission" in error_msg or "access denied" in error_msg or "unauthorized" in error_msg:
                     raise ValueError(
@@ -1420,7 +1214,6 @@ class DatabricksAdapter(PlatformAdapter):
                     ) from None
                 raise
 
-            # Now create the volume (IF NOT EXISTS is safe)
             create_volume_sql = f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.{volume}"
             cursor.execute(create_volume_sql)
 
@@ -1428,12 +1221,10 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
         except ValueError:
-            # Re-raise ValueError exceptions (our custom error messages)
             raise
         except Exception as e:
             error_msg = str(e).lower()
 
-            # Check for permission errors
             if "permission" in error_msg or "access denied" in error_msg or "unauthorized" in error_msg:
                 raise ValueError(
                     f"Permission denied creating UC Volume: {catalog}.{schema}.{volume}. "
@@ -1441,7 +1232,6 @@ class DatabricksAdapter(PlatformAdapter):
                     f"Or create it manually: CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.{volume}"
                 ) from e
 
-            # Generic error
             raise ValueError(
                 f"Failed to create UC Volume {catalog}.{schema}.{volume}: {e}. "
                 f"Try creating manually: CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.{volume}"
@@ -1454,25 +1244,6 @@ class DatabricksAdapter(PlatformAdapter):
         data_dir: Path,
         force_upload: bool = False,
     ) -> dict[str, str]:
-        """Upload local data files to Unity Catalog Volume using Databricks Files API.
-
-        For sharded files (e.g., customer.tbl.1.zst, customer.tbl.2.zst, ...),
-        this method will find and upload ALL chunk files, returning exact
-        per-file URIs (COPY INTO rejects mid-path globs, so the loader issues
-        one COPY INTO per shard file).
-
-        Args:
-            data_files: Dictionary of table_name -> local file path (may be first chunk only)
-            uc_volume_path: UC Volume path (e.g., dbfs:/Volumes/catalog/schema/volume)
-            data_dir: Base data directory (for resolving relative paths)
-
-        Returns:
-            Dictionary mapping table names to UC Volume file URIs (lists of exact URIs for sharded tables)
-
-        Raises:
-            ImportError: If databricks-sdk not available
-            Exception: If upload fails
-        """
         try:
             from databricks.sdk import WorkspaceClient
         except ImportError:
@@ -1494,12 +1265,10 @@ class DatabricksAdapter(PlatformAdapter):
 
         manifest_path = self._resolve_uc_manifest_path(data_dir)
 
-        # Check if we can reuse existing data
         reuse_result = self._try_reuse_uc_volume_data(uc_volume_path, manifest_path, force_upload)
         if reuse_result is not None:
             return reuse_result
 
-        # Upload manifest FIRST for atomic consistency
         if manifest_path.exists():
             try:
                 self._upload_manifest_to_uc_volume(manifest_path, uc_volume_path, workspace)
@@ -1519,7 +1288,6 @@ class DatabricksAdapter(PlatformAdapter):
             if result is not None:
                 uploaded_files[table_name] = result
 
-        # Upload manifest last if present
         if manifest_path.exists():
             try:
                 self._upload_manifest_to_uc_volume(manifest_path, uc_volume_path, workspace)
@@ -1529,7 +1297,6 @@ class DatabricksAdapter(PlatformAdapter):
         return uploaded_files
 
     def _collect_local_paths_for_table(self, table_name: str, file_path: Any) -> list[Path]:
-        """Resolve and validate candidate local paths for a single table's data file(s)."""
         local_paths: list[Path] = []
         for candidate in self._normalize_table_file_inputs(file_path):
             local_path = Path(candidate) if not isinstance(candidate, Path) else candidate
@@ -1554,7 +1321,6 @@ class DatabricksAdapter(PlatformAdapter):
         workspace: Any,
         upload_root: Path,
     ) -> Any:
-        """Upload one table's file(s) to UC Volume; returns the URI, list of URIs, or None."""
         if len(local_paths) == 1:
             return self._upload_single_table_path(
                 table_name, local_paths[0], upload_entries[0][1], volume_path, uc_volume_path, workspace, upload_root
@@ -1571,12 +1337,6 @@ class DatabricksAdapter(PlatformAdapter):
         workspace: Any,
         upload_root: Path,
     ) -> Any:
-        """Upload exactly one file for a table, auto-expanding to sharded chunks if detected.
-
-        Always returns exact file URIs: COPY INTO does not accept mid-path
-        globs, so a wildcard pattern is only used for logging and the loader
-        issues one COPY INTO per shard file.
-        """
         is_sharded, _pattern, chunk_files = self._detect_sharded_files(local_path, table_name)
         if is_sharded and chunk_files:
             sharded_entries = self._build_uc_upload_entries(chunk_files, upload_root)
@@ -1600,12 +1360,6 @@ class DatabricksAdapter(PlatformAdapter):
         uc_volume_path: str,
         workspace: Any,
     ) -> Any:
-        """Upload multiple files for a table; returns the list of exact file URIs.
-
-        A wildcard pattern is only used for logging: COPY INTO does not accept
-        mid-path globs, so callers always receive exact URIs and the loader
-        issues one COPY INTO per shard file.
-        """
         wildcard = self._detect_manifest_wildcard([rp for _lp, rp in upload_entries])
         uploaded_uris: list[str] = []
         for local_path, remote_path in upload_entries:
@@ -1619,7 +1373,6 @@ class DatabricksAdapter(PlatformAdapter):
         return uploaded_uris or None
 
     def _resolve_uc_manifest_path(self, data_dir: Path) -> Path:
-        """Determine local manifest path for UC Volume upload validation."""
         try:
             from benchbox.utils.cloud_storage import DatabricksPath
         except Exception:
@@ -1631,7 +1384,6 @@ class DatabricksAdapter(PlatformAdapter):
             return Path(data_dir) / MANIFEST_FILENAME
 
     def _resolve_local_upload_root(self, data_dir: Path) -> Path:
-        """Resolve the local root whose relative paths should be preserved in UC Volumes."""
         try:
             from benchbox.utils.cloud_storage import DatabricksPath
         except Exception:
@@ -1643,12 +1395,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _build_uc_upload_entries(local_paths: list[Path], upload_root: Path) -> list[tuple[Path, str]]:
-        """Build manifest-stable relative targets for UC Volume uploads.
-
-        Uses a single root for all paths: upload_root if every path is under it,
-        otherwise the common parent of all paths. This avoids mixed-strategy
-        collisions when only some paths fall outside upload_root.
-        """
         all_under_root = all(path.is_relative_to(upload_root) for path in local_paths)
 
         if all_under_root:
@@ -1668,7 +1414,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _join_uri_path(root: str, relative_path: str) -> str:
-        """Join a URI/path root with a relative POSIX path."""
         cleaned = relative_path.lstrip("/")
         if not cleaned:
             return root.rstrip("/")
@@ -1676,7 +1421,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _split_remote_path(path_like: Any) -> tuple[str, PurePosixPath] | None:
-        """Split a remote URI into its anchor and POSIX path."""
         raw = str(path_like).rstrip("/")
         if raw.startswith("dbfs:/"):
             suffix = raw[len("dbfs:/") :].lstrip("/")
@@ -1689,7 +1433,6 @@ class DatabricksAdapter(PlatformAdapter):
         return None
 
     def _common_remote_directory(self, file_paths: list[Any]) -> str | None:
-        """Return a shared remote directory for a list of cloud/DBFS file URIs."""
         raw_split_paths = [self._split_remote_path(path_like) for path_like in file_paths]
         if not raw_split_paths or any(item is None for item in raw_split_paths):
             return None
@@ -1720,7 +1463,6 @@ class DatabricksAdapter(PlatformAdapter):
     def _try_reuse_uc_volume_data(
         self, uc_volume_path: str, manifest_path: Path, force_upload: bool
     ) -> dict[str, Any] | None:
-        """Check if existing UC Volume data can be reused. Returns mapping or None."""
         if force_upload or not manifest_path.exists():
             return None
 
@@ -1745,7 +1487,6 @@ class DatabricksAdapter(PlatformAdapter):
         return None
 
     def _detect_sharded_files(self, local_path: Path, table_name: str) -> tuple[bool, str, list[Path]]:
-        """Detect if a file is part of a sharded set. Returns (is_sharded, pattern, chunk_files)."""
         filename = local_path.name
         parts = filename.split(".")
 
@@ -1777,7 +1518,6 @@ class DatabricksAdapter(PlatformAdapter):
     def _upload_file_content_to_uc(
         self, file_path: Path, target_path: str, uc_volume_path: str, workspace: Any
     ) -> None:
-        """Read and upload a single file to UC Volume with validation."""
         from io import BytesIO
 
         expected_size = file_path.stat().st_size
@@ -1802,7 +1542,6 @@ class DatabricksAdapter(PlatformAdapter):
         workspace: Any,
         remote_paths: list[str] | None = None,
     ) -> None:
-        """Upload all chunk files for a sharded table."""
         if remote_paths is not None and len(remote_paths) != len(chunk_files):
             raise ValueError("remote_paths length must match chunk_files length")
 
@@ -1834,7 +1573,6 @@ class DatabricksAdapter(PlatformAdapter):
         workspace: Any,
         remote_path: str | None = None,
     ) -> str | None:
-        """Upload a single (non-sharded) file to UC Volume. Returns dbfs URI or None."""
         single_file_size = local_path.stat().st_size
         if single_file_size == 0:
             self.logger.warning(f"Skipping empty file: {local_path.name}")
@@ -1852,7 +1590,6 @@ class DatabricksAdapter(PlatformAdapter):
             raise RuntimeError(f"Failed to upload {local_path.name} to {uc_volume_path}: {e}") from e
 
     def _upload_manifest_to_uc_volume(self, manifest_path: Path, uc_volume_path: str, workspace: Any) -> None:
-        """Upload the manifest JSON to the UC Volume root."""
         try:
             target_path = uc_volume_path.replace("dbfs:", "")
             if not target_path.endswith("/" + MANIFEST_FILENAME):
@@ -1863,7 +1600,6 @@ class DatabricksAdapter(PlatformAdapter):
             from io import BytesIO
 
             workspace.files.upload(target_path, BytesIO(content), overwrite=True)
-            # Small log for visibility
             try:
                 manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
                 tables = manifest.get("tables") or {}
@@ -1874,12 +1610,6 @@ class DatabricksAdapter(PlatformAdapter):
             raise RuntimeError(f"Manifest upload failed: {e}") from e
 
     def _get_remote_file_uris_from_manifest(self, uc_volume_path: str, remote_manifest: dict) -> dict[str, Any]:
-        """Build UC Volume file URI map per table from manifest entries.
-
-        Multi-file tables map to a list of exact file URIs. COPY INTO does
-        not accept mid-path globs, so no wildcard URIs are produced; the
-        loader issues one COPY INTO per shard file.
-        """
         mapping: dict[str, Any] = {}
         tables = remote_manifest.get("tables") or {}
         for table, entries in tables.items():
@@ -1898,15 +1628,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _is_manifest_shard_name(name: str) -> bool:
-        """Check if a filename looks like a TPC shard (e.g. customer.tbl.1, lineitem.tbl.3.zst).
-
-        Also recognizes the dsdgen underscore-chunk style
-        (e.g. customer_demographics_5_10.dat.gz, store_sales_1_4.tbl).
-
-        Note: names with purely numeric stems (e.g. "123.parquet") will match
-        the trailing-digit heuristic. This is acceptable because such names do
-        not appear in TPC benchmark manifests.
-        """
         parts = Path(name).name.split(".")
         compression_exts_nodot = {ext.lstrip(".") for ext in COMPRESSION_EXTENSIONS}
         if len(parts) >= 4 and parts[-1] in compression_exts_nodot and parts[-2].isdigit():
@@ -1917,13 +1638,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _underscore_chunk_base(filename: str) -> tuple[str, str] | None:
-        """Split a dsdgen underscore-chunk name into (base, dotted extension).
-
-        Matches ``<base>_<index>_<total>.<ext>[.<compression>]``, e.g.
-        ``customer_demographics_5_10.dat.gz`` -> ``("customer_demographics",
-        ".dat.gz")``. Returns None when the stem has no numeric index/total
-        suffix.
-        """
         import re
 
         stem = Path(filename).name
@@ -1959,19 +1673,15 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _normalize_table_file_inputs(file_paths: Any) -> list[Any]:
-        """Normalize single-path or multi-path table inputs to a list."""
         if isinstance(file_paths, (str, Path)):
             return [file_paths]
         return list(file_paths)
 
     @staticmethod
     def _path_name(path_like: Any) -> str:
-        """Return the basename for a local path or cloud URI."""
         import os
 
         path_str = str(path_like).rstrip("/")
-        # Cloud URIs (dbfs:/, s3://, etc.) always use forward-slash separators.
-        # For local paths, os.path.basename handles both / and \ on Windows.
         if "://" in path_str or path_str.startswith("dbfs:/"):
             return path_str.split("/")[-1]
         return os.path.basename(path_str)
@@ -1979,10 +1689,6 @@ class DatabricksAdapter(PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using Databricks COPY INTO from UC Volumes or cloud storage.
-
-        This implementation avoids temporary views and uses COPY INTO for robust ingestion.
-        """
         if self.table_format == "hudi":
             raise ValueError(
                 "Managed data loads are not supported for Databricks Hudi tables: "
@@ -1994,7 +1700,7 @@ class DatabricksAdapter(PlatformAdapter):
         self.log_very_verbose(f"Data directory: {data_dir}")
 
         table_stats = {}
-        per_table_timings = {}  # Track detailed timings per table
+        per_table_timings = {}
         cursor = connection.cursor()
 
         try:
@@ -2006,17 +1712,14 @@ class DatabricksAdapter(PlatformAdapter):
             stage_root = self._resolve_stage_root(data_dir)
             data_source.tables = self._maybe_upload_to_uc_volume(data_source.tables, stage_root, data_dir, connection)
 
-            # Ensure we're in the correct schema context for table operations
             cursor.execute(f"USE CATALOG {self.catalog}")
             cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_verbose(f"Set schema context for data loading: {self.catalog}.{self.schema}")
 
-            # Verify tables exist before attempting to load data
             cursor.execute(f"SHOW TABLES IN {self.catalog}.{self.schema}")
             existing_tables = {row[1].lower() for row in cursor.fetchall()}
             self.log_very_verbose(f"Found {len(existing_tables)} existing tables in {self.catalog}.{self.schema}")
 
-            # Load data for each table using COPY INTO
             for table_name, file_path in data_source.tables.items():
                 try:
                     load_start = mono_time()
@@ -2064,7 +1767,6 @@ class DatabricksAdapter(PlatformAdapter):
         return table_stats, total_time, per_table_timings
 
     def _resolve_databricks_data_files(self, benchmark, data_dir: Path):
-        """Resolve data files via DataSourceResolver."""
         from benchbox.platforms.base.data_loading import DataSource, DataSourceResolver
 
         resolver = DataSourceResolver(
@@ -2081,9 +1783,6 @@ class DatabricksAdapter(PlatformAdapter):
         for table_name, table_files in data_source.tables.items():
             candidates = self._normalize_table_file_inputs(table_files)
             normalized[table_name] = candidates[0] if len(candidates) == 1 else candidates
-        # Return a fresh DataSource so we don't mutate the resolver-owned object;
-        # table_metadata is forwarded so the COPY INTO delimiter resolver still
-        # sees manifest annotations.
         return DataSource(
             source_type=data_source.source_type,
             tables=normalized,
@@ -2093,11 +1792,9 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _is_cloud_uri(s: str) -> bool:
-        """Check if a string is a cloud storage URI."""
         return s.startswith(("s3://", "gs://", "abfss://", "dbfs:/"))
 
     def _resolve_stage_root(self, data_dir: Path) -> str:
-        """Determine the staging root for COPY INTO operations."""
         from benchbox.utils.cloud_storage import DatabricksPath
 
         stage_root = None
@@ -2123,7 +1820,6 @@ class DatabricksAdapter(PlatformAdapter):
         return stage_root
 
     def _maybe_upload_to_uc_volume(self, data_files: dict, stage_root: str, data_dir: Path, connection: Any) -> dict:
-        """Upload local data to UC Volume if needed. Returns updated data_files mapping."""
         from benchbox.utils.cloud_storage import DatabricksPath
 
         data_is_local = isinstance(data_dir, DatabricksPath) or not self._is_cloud_uri(str(data_dir))
@@ -2160,19 +1856,12 @@ class DatabricksAdapter(PlatformAdapter):
         data_source: Any | None = None,
         benchmark: Any | None = None,
     ) -> tuple[str, str, str]:
-        """Resolve file URI, filename, and delimiter for a table's data file.
-
-        Returns:
-            Tuple of (file_uri, filename, delimiter)
-        """
         if isinstance(file_path, list):
             if not file_path:
                 raise ValueError("No data files were provided for Databricks COPY INTO")
             if len(file_path) == 1:
                 file_path = file_path[0]
             else:
-                # Pre-initialize so the wildcard branch can fall through to
-                # filename_for_format with a known value (None → use wildcard name).
                 common_dir = None
                 wildcard = self._detect_manifest_wildcard([self._path_name(path_like) for path_like in file_path])
                 if wildcard:
@@ -2208,20 +1897,12 @@ class DatabricksAdapter(PlatformAdapter):
             filename = self._path_name(file_path)
             file_uri = f"{stage_root}/{filename}"
 
-        # Strip wildcard component for format detection
         filename_for_format = filename.replace(".*", "")
         dialect_path = Path(filename_for_format)
         delimiter = self._resolve_csv_delimiter(data_source, table_name or dialect_path.stem, dialect_path, benchmark)
         return file_uri, filename, delimiter
 
     def _expand_copy_sources(self, file_path: Any, stage_root: str, file_uri: str) -> list[str]:
-        """Expand a COPY INTO source into exact per-file URIs.
-
-        COPY INTO does not accept mid-path glob patterns, so a wildcard URI
-        produced for a shard-compatible file set is expanded back into one
-        exact URI per shard (COPY INTO appends, so one statement per file
-        loads the full table). Non-wildcard sources pass through unchanged.
-        """
         entries = self._normalize_table_file_inputs(file_path)
         if len(entries) > 1 and "*" not in file_uri:
             sources = []
@@ -2232,12 +1913,6 @@ class DatabricksAdapter(PlatformAdapter):
                 else:
                     sources.append(f"{stage_root}/{self._path_name(entry)}")
 
-            # A flat list of files must stay exact. Collapsing it to the shared
-            # staging directory makes COPY INTO scan unrelated benchmark data
-            # that happens to live beside the requested files. Keep a common
-            # ancestor only for partitioned datasets whose files live in
-            # different subdirectories, where the directory carries partition
-            # discovery semantics.
             source_parents = {source.rsplit("/", 1)[0] for source in sources}
             is_partition_directory = any("=" in segment for segment in file_uri.rstrip("/").split("/"))
             if source_parents == {file_uri.rstrip("/")} and not is_partition_directory:
@@ -2263,7 +1938,6 @@ class DatabricksAdapter(PlatformAdapter):
         return sources
 
     def _resolve_csv_delimiter(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None) -> str:
-        """Resolve Databricks COPY INTO delimiter through the shared CSV dialect pipeline."""
         from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 
         dialect_source = data_source or DataSource(source_type="databricks_copy_into", tables={})
@@ -2272,7 +1946,6 @@ class DatabricksAdapter(PlatformAdapter):
         ).delimiter
 
     def _resolve_copy_dialect(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None):
-        """Resolve Databricks COPY INTO CSV dialect through the shared pipeline."""
         from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 
         dialect_source = data_source or DataSource(source_type="databricks_copy_into", tables={})
@@ -2283,25 +1956,9 @@ class DatabricksAdapter(PlatformAdapter):
     def _resolve_csv_null_marker(
         self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None
     ) -> str | None:
-        """Resolve Databricks COPY INTO null marker through the shared CSV dialect pipeline.
-
-        Returns None when the dialect carries no marker, in which case COPY INTO
-        keeps its default empty-field handling.
-        """
         return self._resolve_copy_dialect(data_source, table_name, file_path, benchmark).null_marker
 
     def _get_column_list_for_table(self, benchmark, table_name: str, cursor: Any | None = None) -> str:
-        """Get the explicit column list for a headerless COPY INTO.
-
-        Without a column list COPY INTO maps CSV fields by position against
-        the Delta schema and rejects the load with
-        COPY_INTO_SCHEMA_MISMATCH_WITH_TARGET_TABLE. Columns come from the
-        benchmark schema when it describes the table (dict entries or schema
-        objects with a ``columns`` attribute). Benchmarks also load tables
-        their ``get_schema()`` omits, such as the TPC-H base tables behind
-        Transaction Primitives or the TPC-DS sources behind TPC-DS OBT, so
-        the target table's own DESCRIBE output is the fallback.
-        """
         table_name_upper = table_name.upper()
         columns = self._schema_columns_for_table(benchmark, table_name)
         if not columns and cursor is not None:
@@ -2315,7 +1972,6 @@ class DatabricksAdapter(PlatformAdapter):
         return f" ({', '.join(columns)})"
 
     def _schema_columns_for_table(self, benchmark, table_name: str) -> list[str]:
-        """Return column names for a table from ``benchmark.get_schema()``, or []."""
         if not hasattr(benchmark, "get_schema"):
             return []
         try:
@@ -2339,7 +1995,6 @@ class DatabricksAdapter(PlatformAdapter):
         return names
 
     def _describe_table_columns(self, cursor: Any, table_name_upper: str) -> list[str]:
-        """Return the target table's column names in declaration order, or []."""
         try:
             cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
             rows = list(cursor.fetchall() or [])
@@ -2349,22 +2004,12 @@ class DatabricksAdapter(PlatformAdapter):
         names = []
         for row in rows:
             col = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
-            # DESCRIBE appends partition/metadata sections after a blank or '#' row.
             if not col or col.startswith("#"):
                 break
             names.append(col)
         return names
 
     def _target_cast_select(self, cursor: Any, table_name_upper: str) -> str:
-        """Build a SELECT list casting source fields to the Delta column types.
-
-        Reads the target types from DESCRIBE TABLE so source/Delta type
-        mismatches (e.g. int64 Parquet fields into INT columns, or all-string
-        CSV fields with a header row into typed columns) load without a
-        DELTA_FAILED_TO_MERGE_FIELDS error. Partition-metadata rows emitted
-        by DESCRIBE are skipped. Requires named source fields: Parquet field
-        names or CSV header names.
-        """
         cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
         items = []
         for row in cursor.fetchall():
@@ -2378,7 +2023,6 @@ class DatabricksAdapter(PlatformAdapter):
         return ", ".join(items)
 
     def _parquet_cast_select(self, cursor: Any, table_name_upper: str) -> str:
-        """Build a SELECT list casting Parquet fields to the Delta column types."""
         return self._target_cast_select(cursor, table_name_upper)
 
     def _load_single_table(
@@ -2392,7 +2036,6 @@ class DatabricksAdapter(PlatformAdapter):
         existing_tables: set[str],
         data_source: Any | None = None,
     ) -> tuple[int, float, float]:
-        """Load a single table via COPY INTO. Returns (row_count, copy_time, optimize_time)."""
         table_name_upper = table_name.upper()
 
         if table_name.lower() not in existing_tables:
@@ -2410,8 +2053,6 @@ class DatabricksAdapter(PlatformAdapter):
             data_source=data_source,
             benchmark=benchmark,
         )
-        # Mirror the dialect-path derivation in _resolve_file_uri_and_delimiter so
-        # the null marker resolves for the same file the delimiter came from.
         if isinstance(file_path, list) and file_path:
             null_dialect_path = Path(self._path_name(file_path[0]))
         else:
@@ -2425,8 +2066,6 @@ class DatabricksAdapter(PlatformAdapter):
         header_opt = "true" if copy_dialect.has_header else "false"
         format_options = f"'delimiter'='{delimiter}', 'header'='{header_opt}'"
         if null_marker:
-            # A truthy marker means only that literal is NULL, so empty fields
-            # stay empty strings. Falsy markers keep COPY INTO defaults.
             sentinel = null_marker.replace("'", "''")
             format_options += f", 'nullValue'='{sentinel}'"
 
@@ -2434,14 +2073,6 @@ class DatabricksAdapter(PlatformAdapter):
         if len(copy_sources) > 1:
             self.log_verbose(f"Loading {table_name_upper} from {len(copy_sources)} shard files")
 
-        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the CSV
-        # COPY path. Parquet field types need not match the Delta DDL (IMDb
-        # integers are int64 while the schema says INTEGER/INT), so load
-        # through a SELECT that casts every field to the target column type
-        # read from DESCRIBE TABLE. The same SELECT-cast form loads CSVs with
-        # a header row: named header fields merge by name as all-STRING, so
-        # they need casts just like Parquet fields. Headerless CSVs keep the
-        # positional path with its explicit column list.
         is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
         use_cast_select = is_parquet or copy_dialect.has_header
         cast_select = ""
@@ -2452,10 +2083,6 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             column_list = self._get_column_list_for_table(benchmark, table_name, cursor)
 
-        # COPY INTO skips files it has already loaded into the target table.
-        # Staging file URIs are reused across runs, and a reload can target a
-        # table that was truncated rather than dropped, so force every load;
-        # the row count check below still catches a double load.
         copy_options = " COPY_OPTIONS('force' = 'true')"
         copy_time = 0.0
         for source_uri in copy_sources:
@@ -2521,7 +2148,6 @@ class DatabricksAdapter(PlatformAdapter):
         return row_count, copy_time, optimize_time
 
     def validate_external_table_requirements(self) -> None:
-        """Validate required staging configuration for external table mode."""
         has_explicit_staging = isinstance(self.staging_root, str) and self._is_cloud_uri(self.staging_root)
         has_uc_volume = bool(self.uc_catalog and self.uc_schema and self.uc_volume)
         if not has_explicit_staging and not has_uc_volume:
@@ -2533,12 +2159,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _external_location_from_file_uri(file_uri: str) -> str:
-        """Resolve LOCATION path for CREATE TABLE ... USING PARQUET.
-
-        For .parquet files or wildcard patterns, returns the parent directory.
-        For suffix-less URIs (directories of Parquet files), returns the URI as-is.
-        Raises ValueError for non-Parquet file extensions.
-        """
         normalized_uri = file_uri.strip().rstrip("/")
         if "*" in normalized_uri:
             return normalized_uri.rsplit("/", 1)[0]
@@ -2558,7 +2178,6 @@ class DatabricksAdapter(PlatformAdapter):
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Register Databricks external tables via USING PARQUET LOCATION."""
         start_time = mono_time()
         table_stats: dict[str, int] = {}
         cursor = connection.cursor()
@@ -2602,10 +2221,6 @@ class DatabricksAdapter(PlatformAdapter):
         return table_stats, total_time, None
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Databricks-specific configurations including cache control.
-
-        Applies result cache control first, then any user-provided custom Spark configurations.
-        """
         from benchbox.core.exceptions import ConfigurationError
         from benchbox.platforms.cloud_shared import empty_cache_control_receipt
 
@@ -2625,11 +2240,10 @@ class DatabricksAdapter(PlatformAdapter):
         try:
             self._ensure_session_cache_disabled(cursor, session=connection)
 
-            # Apply user-provided configurations if specified
             if hasattr(self, "spark_configs") and self.spark_configs:
                 for config_key, config_value in self.spark_configs.items():
                     if self.disable_result_cache and str(config_key).strip().lower() == "use_cached_result":
-                        continue  # The validated session helper owns this setting.
+                        continue
                     try:
                         cursor.execute(f"SET {config_key} = {config_value}")
                         self.logger.debug(f"Set {config_key} = {config_value}")
@@ -2642,7 +2256,6 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def _ensure_session_cache_disabled(self, cursor: Any, *, session: Any | None = None) -> None:
-        """Disable and read back cache state once per connection, or refuse execution."""
         import inspect
         import weakref
 
@@ -2659,8 +2272,6 @@ class DatabricksAdapter(PlatformAdapter):
             self._cache_control_receipt = explicit_cache_enabled_receipt("use_cached_result", "true")
             return
 
-        # Real attributes avoid connections invented by dynamic proxies.
-        # Unwrap known recording proxies to keep one capture owner per SET.
         while isinstance(cursor, _RecordingCursor):
             cursor = cursor._cur
         while isinstance(session, RecordingConnection):
@@ -2705,13 +2316,11 @@ class DatabricksAdapter(PlatformAdapter):
             self._cache_control_receipt = receipt
             raise ConfigurationError("Databricks session cache control failed", details=receipt) from exc
 
-        # A later successful session cannot erase an earlier failed receipt.
         if not self._cache_disable_failed:
             self._cache_control_receipt = receipt
         self._cache_disabled_sessions.add(key)
 
     def _initialize_query_session(self, connection: Any) -> None:
-        """Prepare a session before a power or throughput harness starts timing."""
         if hasattr(connection, "cursor"):
             cursor = connection.cursor()
             try:
@@ -2730,8 +2339,6 @@ class DatabricksAdapter(PlatformAdapter):
         return super()._make_power_connection_adapter(connection, benchmark_id, scale_factor)
 
     def _execute_tpch_throughput_test(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        # Databricks currently uses shared cursors. Initialize the actual
-        # connection before the parent harness starts its throughput window.
         self._initialize_query_session(connection)
         return super()._execute_tpch_throughput_test(benchmark, connection, run_config)
 
@@ -2750,12 +2357,6 @@ class DatabricksAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and profiling.
-
-        Accepts either a DB-API connection or an already-open cursor: the TPC
-        power harness passes a per-stream cursor through the facade, which has
-        no ``cursor()`` method of its own.
-        """
         own_cursor = False
         if hasattr(connection, "cursor"):
             cursor = connection.cursor()
@@ -2763,8 +2364,6 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             cursor = connection
 
-        # Fallback for direct callers. Harness factories prepare this session
-        # before their outer timer, even when no warmup is requested.
         try:
             self._ensure_session_cache_disabled(cursor, session=connection if own_cursor else None)
         except Exception as exc:
@@ -2784,24 +2383,9 @@ class DatabricksAdapter(PlatformAdapter):
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
         try:
-            # Schema context is already set in create_connection() and persists for the session
-            # No need to set USE <catalog>.<schema> before every query - it adds unnecessary overhead
-            # (Each USE statement = 1 extra round-trip to Databricks)
-
-            # Execute the query
-            # Note: Query dialect translation is now handled automatically by the base adapter.
-            # Execution normalizations (duplicate output names, zero-divisor
-            # semantics) are no-ops unless their trigger is present.
-            # TPC-DI uses SQL Server/SQLite idioms (BIT flag literals,
-            # JULIANDAY, DATE('now')) that Databricks rejects; rewrite first.
             if re.sub(r"[^a-z0-9]", "", (benchmark_type or "").lower()).startswith("tpcdi"):
                 query = self._apply_tpcdi_databricks_rewrites(query)
             query = self._normalize_databricks_query(query)
-            # The SQL execution API accepts one statement per execute: run
-            # operation batches (DELETE+INSERT pairs, the 3-statement SCD2
-            # stage batch, DDL sequences) statement-by-statement in session
-            # order and report the last statement's rows. A single statement
-            # keeps the identical single-execute path as before.
             from benchbox.platforms.base.mysql_wire import split_sql_statements
 
             statements = split_sql_statements(query)
@@ -2813,7 +2397,6 @@ class DatabricksAdapter(PlatformAdapter):
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
 
-            # Validate row count if enabled and benchmark type is provided
             validation_result = None
             if validate_row_count and benchmark_type:
                 from benchbox.core.validation.query_validation import QueryValidator
@@ -2827,7 +2410,6 @@ class DatabricksAdapter(PlatformAdapter):
                     stream_id=stream_id,
                 )
 
-                # Log validation result
                 if validation_result.warning_message:
                     self.log_verbose(f"Row count validation: {validation_result.warning_message}")
                 elif not validation_result.is_valid:
@@ -2838,7 +2420,6 @@ class DatabricksAdapter(PlatformAdapter):
                         f"(expected: {validation_result.expected_row_count})"
                     )
 
-            # Use base helper to build result with consistent validation field mapping
             result_dict = self._build_query_result_with_validation(
                 query_id=query_id,
                 execution_time=execution_time,
@@ -2848,10 +2429,8 @@ class DatabricksAdapter(PlatformAdapter):
                 materialized_rows=result,
             )
 
-            # Include Databricks-specific fields
-            result_dict["translated_query"] = None  # Translation handled by base adapter
+            result_dict["translated_query"] = None
 
-            # Add resource usage for cost calculation (execution time for DBU estimation)
             result_dict["resource_usage"] = {
                 "execution_time_seconds": execution_time,
             }
@@ -2871,22 +2450,11 @@ class DatabricksAdapter(PlatformAdapter):
             if own_cursor:
                 cursor.close()
 
-        # Plan capture routes through the shared chokepoint, outside the try so a
-        # strict-mode PlanCaptureError propagates rather than being swallowed. For
-        # phase-eligible engines (the default) the chokepoint records the executed
-        # query for the isolated post-measurement phase instead of running EXPLAIN
-        # inline; otherwise it captures inline (capture_query_plan opens its own cursor).
         self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
         return result_dict
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get the Spark physical plan via ``EXPLAIN EXTENDED`` over the SQL cursor.
-
-        Databricks runs Spark SQL, so the plan text is parsed by
-        SparkQueryPlanParser. Returns ``None`` on any failure so capture degrades
-        gracefully.
-        """
         from benchbox.platforms.base.sql_execution import join_explain_rows
 
         cursor = connection.cursor()
@@ -2901,36 +2469,21 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def get_query_plan_parser(self):
-        """Return the Spark plan parser (Databricks runs Spark SQL)."""
         from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
 
         return SparkQueryPlanParser()
 
     def _apply_tpcdi_databricks_rewrites(self, query: str) -> str:
-        """Databricks TPC-DI idioms via the shared cloud rewrite core."""
         from benchbox.platforms.cloud_shared import rewrite_tpcdi_for_databricks
 
         return rewrite_tpcdi_for_databricks(query)
 
     def _normalize_databricks_query(self, query: str) -> str:
-        """Apply Databricks execution normalizations (idempotent, no-op safe).
-
-        - Duplicate top-level output names (e.g. TPC-DS Q39/Q64 selecting
-          ``syear``/``cnt`` from both sides of a self-join) are rejected by
-          Spark with "Can't unify schema with duplicate field names"; later
-          duplicates gain a numeric suffix. Skipped when the rewrite would be
-          unsafe (top-level star, bare ORDER BY/GROUP BY reference to a
-          duplicate name).
-        - ``/`` divisions route through ``try_divide``, which returns NULL on
-          a zero divisor where Databricks would otherwise raise
-          DIVIDE_BY_ZERO (e.g. TPC-DS Q90 at subscale).
-        """
         query = self._deduplicate_output_aliases(query)
         return self._safeguard_databricks_division(query)
 
     @staticmethod
     def _order_group_bare_refs(scope, column_cls) -> set:
-        """Bare column names referenced by ORDER BY / GROUP BY."""
         order_group = []
         if scope.args.get("order"):
             order_group.extend(scope.args["order"].expressions)
@@ -2944,7 +2497,6 @@ class DatabricksAdapter(PlatformAdapter):
         return bare_refs
 
     def _deduplicate_output_aliases(self, query: str) -> str:
-        """Suffix duplicate top-level output names (``name_2``, ``name_3`` ...)."""
         try:
             import sqlglot
             from sqlglot import exp
@@ -2974,7 +2526,6 @@ class DatabricksAdapter(PlatformAdapter):
         if not renames:
             return query
 
-        # Bail out when ORDER BY / GROUP BY references a duplicate bare name.
         if self._order_group_bare_refs(scope, exp.Column) & renames:
             return query
 
@@ -2998,7 +2549,6 @@ class DatabricksAdapter(PlatformAdapter):
         return tree.sql(dialect="databricks")
 
     def _safeguard_databricks_division(self, query: str) -> str:
-        """Route ``/`` divisions through ``try_divide`` (NULL on zero divisor)."""
         try:
             import sqlglot
             from sqlglot import exp
@@ -3024,39 +2574,20 @@ class DatabricksAdapter(PlatformAdapter):
         return tree.transform(to_try_divide).sql(dialect="databricks")
 
     def _fix_databricks_sql_syntax(self, sql: str) -> str:
-        """Transform SQL syntax for Databricks compatibility.
-
-        This method removes SQL syntax that is not supported by Databricks/Spark SQL,
-        particularly NULLS FIRST/LAST clauses in PRIMARY KEY constraints.
-
-        Args:
-            sql: SQL statement(s) to fix
-
-        Returns:
-            Fixed SQL with Databricks-compatible syntax
-        """
         import re
 
         original_sql = sql
 
-        # Pattern 1: Remove NULLS LAST/FIRST from PRIMARY KEY constraints
-        # Databricks doesn't support NULLS ordering in PRIMARY KEY definitions
-        # Match: PRIMARY KEY (col1, col2 NULLS LAST)
-        # Also match: PRIMARY KEY (col1 NULLS FIRST, col2)
         nulls_in_pk_pattern = r"\b(PRIMARY\s+KEY\s*\([^)]*?)\s+NULLS\s+(LAST|FIRST)\s*([^)]*?\))"
 
         def remove_nulls_from_pk(match):
-            # Reconstruct without the NULLS clause
-            before = match.group(1)  # PRIMARY KEY (col1, col2
-            after = match.group(3)  # remaining part + closing paren
+            before = match.group(1)
+            after = match.group(3)
             return f"{before} {after}".strip()
 
         fixed_sql = re.sub(nulls_in_pk_pattern, remove_nulls_from_pk, sql, flags=re.IGNORECASE)
 
-        # Pattern 2: Remove standalone NULLS clauses in column definitions within PRIMARY KEY
-        # This catches cases like: PRIMARY KEY (col1 NULLS LAST, col2 NULLS FIRST)
-        # Apply multiple times to catch all occurrences
-        max_iterations = 10  # Safety limit
+        max_iterations = 10
         for _ in range(max_iterations):
             prev = fixed_sql
             fixed_sql = re.sub(
@@ -3066,9 +2597,8 @@ class DatabricksAdapter(PlatformAdapter):
                 flags=re.IGNORECASE,
             )
             if fixed_sql == prev:
-                break  # No more replacements
+                break
 
-        # Log if any changes were made
         if fixed_sql != original_sql:
             changes_made = original_sql != fixed_sql
             if changes_made:
@@ -3079,30 +2609,16 @@ class DatabricksAdapter(PlatformAdapter):
         return fixed_sql
 
     def _convert_to_delta_table(self, statement: str) -> str:
-        """Convert CREATE TABLE statement to the configured table format.
-
-        Kept under its historical name: "delta" renders USING DELTA as
-        before, while table_format="hudi" renders USING HUDI with record-key
-        TBLPROPERTIES instead.
-        """
         from benchbox.platforms.cloud_shared import split_leading_sql_comments
 
-        # Schema chunks can carry decorative "--" header lines before the real
-        # CREATE (naive ";" splitting preserves them). Gate and rewrite on the
-        # remainder so those chunks still get the idempotent OR REPLACE form.
         prefix, body = split_leading_sql_comments(statement)
         if not body.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE, unless the statement already has
-        # IF NOT EXISTS (CREATE OR REPLACE ... IF NOT EXISTS is a syntax error).
-        # Rewrite the body only, so a comment mentioning CREATE TABLE is safe.
         if "CREATE TABLE" in body.upper() and "OR REPLACE" not in body.upper():
             if "IF NOT EXISTS" not in body.upper():
                 body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
             elif getattr(self, "_schema_reset_in_place", False):
-                # After an in-place reset the table still exists with its old
-                # definition; replace it so the current DDL applies.
                 body = re.sub(
                     r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS", "CREATE OR REPLACE TABLE", body, count=1, flags=re.IGNORECASE
                 )
@@ -3111,13 +2627,6 @@ class DatabricksAdapter(PlatformAdapter):
         if self.table_format == "hudi":
             return self._convert_to_hudi_table(prefix + body)
 
-        # Default to DELTA format when unspecified. Scan the body only: parens
-        # in the comment prefix must not displace the USING DELTA insertion.
-        # On CTAS every table clause (USING, TBLPROPERTIES) precedes
-        # AS SELECT: there is no column list to attach to, and anything
-        # appended after the query is a syntax error. Only scan for the
-        # column-list close paren when the statement actually defines
-        # columns.
         as_select = re.search(r"\bAS\s+(?:SELECT\b|WITH\b)", body, flags=re.IGNORECASE)
         has_using_clause = re.search(
             r"\bUSING\s+(?:DELTA|HUDI|PARQUET|CSV|JSON|TEXT|ORC|AVRO)\b", body, flags=re.IGNORECASE
@@ -3126,7 +2635,6 @@ class DatabricksAdapter(PlatformAdapter):
             if as_select is not None:
                 body = body[: as_select.start()] + "USING DELTA " + body[as_select.start() :]
             else:
-                # Find the closing parenthesis of column definitions
                 paren_count = 0
                 using_pos = len(body)
 
@@ -3139,10 +2647,8 @@ class DatabricksAdapter(PlatformAdapter):
                             using_pos = i + 1
                             break
 
-                # Insert USING DELTA clause
                 body = body[:using_pos] + " USING DELTA" + body[using_pos:]
 
-        # Include Delta Lake optimization properties
         if "TBLPROPERTIES" not in body.upper():
             properties = []
 
@@ -3152,7 +2658,6 @@ class DatabricksAdapter(PlatformAdapter):
 
             clause = "TBLPROPERTIES (" + ", ".join(properties) + ")"
             if as_select is not None:
-                # Re-find AS SELECT: the USING insertion above shifted it.
                 anchor_match = re.search(r"\bAS\s+(?:SELECT\b|WITH\b)", body, flags=re.IGNORECASE)
                 anchor = anchor_match.start() if anchor_match else len(body)
                 body = body[:anchor].rstrip() + " " + clause + " " + body[anchor:]
@@ -3162,19 +2667,6 @@ class DatabricksAdapter(PlatformAdapter):
         return prefix + body
 
     def _convert_to_hudi_table(self, statement: str) -> str:
-        """Convert CREATE TABLE statement to Apache Hudi format.
-
-        Emits USING HUDI with TBLPROPERTIES carrying the table type and,
-        when configured, the record key and precombine field. Each key is
-        emitted only for statements that define the column, so one global
-        key never leaks into other tables of a multi-table benchmark.
-        Delta-only auto-optimize properties are never emitted for Hudi
-        tables. A
-        pre-existing USING clause is replaced (never left as USING DELTA),
-        and Hudi keys missing from pre-existing TBLPROPERTIES are merged in.
-        Record-key values are validated as SQL identifiers at init, so the
-        f-string interpolation below cannot break quoting.
-        """
         import re
 
         has_using_clause = re.search(
@@ -3209,13 +2701,6 @@ class DatabricksAdapter(PlatformAdapter):
         return statement
 
     def _hudi_table_properties(self, statement: str) -> list[str]:
-        """Build the Hudi TBLPROPERTIES entries for one CREATE TABLE statement.
-
-        The table type always applies. The configured record key and
-        precombine field apply only when the statement defines that column:
-        multi-table benchmarks use different keys per table, so a global key
-        must not leak into tables that lack the column.
-        """
         properties = [f"'type' = '{self.hudi_table_type}'"]
         key_options = (
             ("'primaryKey'", self.hudi_primary_key),
@@ -3227,7 +2712,6 @@ class DatabricksAdapter(PlatformAdapter):
         return properties
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:  # noqa: C901
-        """Get Databricks-specific metadata and system information."""
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
@@ -3257,8 +2741,6 @@ class DatabricksAdapter(PlatformAdapter):
         for key in ("platform_version", "engine_version", "engine_version_source", *_CURRENT_VERSION_KEYS):
             if resolved_version.get(key) is not None:
                 metadata[key] = resolved_version[key]
-        # Preserve the Spark engine string for diagnostics; sanitized so the
-        # 40-zero placeholder hash never leaks into stored metadata.
         if resolved_version.get("engine_version_source") == _ENGINE_VERSION_SOURCE_CURRENT_VERSION:
             try:
                 version_cursor = connection.cursor()
@@ -3281,19 +2763,16 @@ class DatabricksAdapter(PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            # Get current catalog and schema
             cursor.execute("SELECT current_catalog(), current_schema()")
             result = cursor.fetchone()
             if result:
                 metadata["current_catalog"] = result[0]
                 metadata["current_schema"] = result[1]
 
-            # Get cluster information
             cursor.execute("SHOW FUNCTIONS LIKE 'current_*'")
             functions = cursor.fetchall()
             metadata["available_functions"] = [f[0] for f in functions]
 
-            # Get Spark configurations
             cursor.execute("SET")
             configs = cursor.fetchall()
             spark_configs = {k: v for k, v in configs if k.startswith("spark.")}
@@ -3310,7 +2789,6 @@ class DatabricksAdapter(PlatformAdapter):
         return metadata
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE TABLE for better query optimization."""
         cursor = connection.cursor()
         try:
             cursor.execute(f"ANALYZE TABLE {table_name.upper()} COMPUTE STATISTICS")
@@ -3321,12 +2799,6 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def optimize_table(self, connection: Any, table_name: str) -> None:
-        """Optimize Delta Lake table.
-
-        Hudi tables skip Delta OPTIMIZE (recorded as a skipped layout
-        operation): Hudi file management runs through its own
-        cleaner/clustering table configurations.
-        """
         table_name_upper = table_name.upper()
         if self.table_format == "hudi":
             self._record_layout_operation(
@@ -3368,12 +2840,6 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def vacuum_table(self, connection: Any, table_name: str, hours: int = 168) -> None:
-        """Vacuum Delta Lake table to remove old files.
-
-        Hudi tables skip Delta VACUUM (recorded as a skipped layout
-        operation): retention runs through Hudi cleaner table
-        configurations, and Delta RETAIN syntax is not valid for them.
-        """
         if self.table_format == "hudi":
             self._record_layout_operation(
                 mechanism="vacuum",
@@ -3398,22 +2864,18 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the Databricks schema."""
         try:
             cursor = connection.cursor()
-            # Use Databricks-specific query to get tables in current schema
             cursor.execute(f"SHOW TABLES IN {self.catalog}.{self.schema}")
             result = cursor.fetchall()
             cursor.close()
 
-            # Result format is (database, tableName, isTemporary)
-            return [row[1] for row in result if not row[2]]  # Exclude temporary tables
+            return [row[1] for row in result if not row[2]]
         except Exception as e:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
 
     def close_connection(self, connection: Any) -> None:
-        """Close Databricks connection."""
         try:
             if connection and hasattr(connection, "close"):
                 connection.close()
@@ -3423,42 +2885,21 @@ class DatabricksAdapter(PlatformAdapter):
     _supported_tuning_type_names = ("PARTITIONING", "CLUSTERING", "DISTRIBUTION")
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Databricks-specific tuning clauses for CREATE TABLE statements.
-
-        Databricks supports:
-        - USING DELTA (Delta Lake format) or USING HUDI (Apache Hudi)
-        - PARTITIONED BY (column1, column2, ...)
-        - CLUSTER BY (column1, column2, ...) for Delta Lake 2.0+
-        - Z-ORDER optimization
-
-        CLUSTER BY / Z-ORDER are Delta-only: Hudi tables get USING HUDI,
-        record-key TBLPROPERTIES, and PARTITIONED BY, with clustering omitted
-        (Hudi manages file layout via its own cleaner/clustering configs).
-
-        Args:
-            table_tuning: The tuning configuration for the table
-
-        Returns:
-            SQL clause string to be appended to CREATE TABLE statement
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
         clauses = []
 
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
             if self.table_format == "hudi":
                 return self._generate_hudi_tuning_clause(table_tuning, TuningType)
 
-            # Always use Delta Lake format for better performance
             clauses.append("USING DELTA")
             clustering_strategy = self._resolve_databricks_clustering_strategy()
             use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"}
 
-            # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 if use_liquid:
@@ -3466,35 +2907,28 @@ class DatabricksAdapter(PlatformAdapter):
                         "Databricks Liquid Clustering is incompatible with PARTITIONED BY; "
                         "move partition columns to Liquid clustering intent or use databricks_z_order."
                     )
-                # Sort by order and create partition clause
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
                 partition_clause = f"PARTITIONED BY ({', '.join(column_names)})"
                 clauses.append(partition_clause)
 
-            # Handle clustering (Delta Lake 2.0+)
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if clustering_strategy == "liquid_clustering_auto":
                 clauses.append("CLUSTER BY AUTO")
             elif cluster_columns:
-                # Sort by order and create cluster clause
                 sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
                 cluster_clause = f"CLUSTER BY ({', '.join(column_names)})"
                 clauses.append(cluster_clause)
 
-            # Distribution handled through Z-ORDER optimization (applied post-creation)
-
         except ImportError:
-            # If tuning interface not available, at least use Delta format
             clauses.append("USING DELTA")
 
         return " ".join(clauses)
 
     def _generate_hudi_tuning_clause(self, table_tuning, TuningType) -> str:
-        """Generate USING HUDI tuning clauses for CREATE TABLE statements."""
         clauses = ["USING HUDI"]
         properties = [f"'type' = '{self.hudi_table_type}'"]
         if self.hudi_primary_key:
@@ -3512,21 +2946,6 @@ class DatabricksAdapter(PlatformAdapter):
         return " ".join(clauses)
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Databricks Delta Lake table.
-
-        Databricks tuning approach:
-        - PARTITIONING: Handled via PARTITIONED BY in CREATE TABLE
-        - CLUSTERING: Handled via CLUSTER BY in CREATE TABLE or ALTER TABLE
-        - DISTRIBUTION: Achieved through Z-ORDER clustering and OPTIMIZE
-        - Delta Lake optimization and maintenance
-
-        Args:
-            table_tuning: The tuning configuration to apply
-            connection: Databricks connection
-
-        Raises:
-            ValueError: If the tuning configuration is invalid for Databricks
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -3535,10 +2954,8 @@ class DatabricksAdapter(PlatformAdapter):
 
         cursor = connection.cursor()
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # Check if table exists and is Delta format
             cursor.execute(f"DESCRIBE EXTENDED {table_name}")
             table_info = cursor.fetchall()
 
@@ -3562,9 +2979,6 @@ class DatabricksAdapter(PlatformAdapter):
             zorder_columns = self._build_zorder_columns(cluster_columns, distribution_columns)
             use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"} or liquid_enabled
             if self.table_format == "hudi":
-                # Delta-only clustering/optimize intents are recorded as skipped
-                # here: the is_delta_table gates below would otherwise drop them
-                # silently for Hudi tables.
                 self._record_hudi_tuning_skips(
                     table_name,
                     zorder_columns,
@@ -3617,7 +3031,6 @@ class DatabricksAdapter(PlatformAdapter):
 
     @staticmethod
     def _build_zorder_columns(cluster_columns, distribution_columns) -> list[str]:
-        """Merge clustering + distribution columns (in order) for Z-ORDER / Liquid Clustering."""
         cols: list[str] = []
         if cluster_columns:
             cols.extend(col.name for col in sorted(cluster_columns, key=lambda c: c.order))
@@ -3635,7 +3048,6 @@ class DatabricksAdapter(PlatformAdapter):
         liquid_columns: list[str],
         sort_columns,
     ) -> None:
-        """Record skipped Delta-only tuning intents for a Hudi table."""
         if zorder_columns and not use_liquid:
             self._record_layout_operation(
                 mechanism="z_order",
@@ -3682,7 +3094,6 @@ class DatabricksAdapter(PlatformAdapter):
         zorder_columns: list[str],
         sort_columns,
     ) -> None:
-        """Apply either Liquid Clustering or Z-ORDER to the table."""
         if clustering_strategy == "liquid_clustering_auto":
             self._apply_liquid_auto_clustering(cursor, table_name, is_delta_table)
         elif use_liquid:
@@ -3892,29 +3303,14 @@ class DatabricksAdapter(PlatformAdapter):
             self.logger.warning(f"Failed to analyze Delta table {table_name}: {e}")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Databricks."""
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Databricks-specific platform optimizations.
-
-        Databricks optimizations include:
-        - Spark configuration tuning (adaptive query execution, join strategies)
-        - Delta Lake optimization settings (auto-optimize, auto-compact)
-        - Cluster autoscaling and resource allocation
-        - Unity Catalog performance settings
-
-        Args:
-            platform_config: Platform optimization configuration
-            connection: Databricks connection
-        """
         if not platform_config:
             return
 
-        # Databricks optimizations are typically applied at Spark session level
-        # Store optimizations for use during query execution and Delta Lake operations
         self.logger.info("Databricks platform optimizations stored for Spark session and Delta Lake management")
 
     apply_constraint_configuration = make_informational_constraint_applier(

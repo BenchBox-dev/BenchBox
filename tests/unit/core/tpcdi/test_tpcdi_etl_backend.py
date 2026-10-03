@@ -1,5 +1,3 @@
-"""Unit tests for TPC-DI SQL/DataFrame ETL backend implementations."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
