@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Owner signs off on this item before any TPC-H code changes (owner decision D5/D9)",
+    "No-seed (qgen -d) is treated as the only answer-file parameter set; TPCH_SF1_REFERENCE_SEED and the wrong comments are corrected; a seeded SQL run at SF 1 no longer reports answer-file row-count failures that come only from the parameter set",
+    "Seeded DataFrame power runs bind the parameters qgen draws for the same seed (from raw qgen text), and a test shows equal bindings between duckdb and polars-df for 22 of 22 queries at two seeds",
+    "DataFrame throughput streams bind per-stream, per-position parameters with the same seed formula as SQL, or the DataFrame path rejects --phases throughput clearly; an equal-bindings test covers at least two streams",
+    "Unseeded SQL throughput and power use a consistent parameter policy, documented",
+    "Result bundles record which parameter set was bound; a run whose validation failed is not reported as PASSED"
+  ],
+  "description": "Found by dfparity-t21 (evidence: /Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md, develop 964bea289). Independently spot-checked on the SF=1 DuckDB database for Q3, Q11, Q18 and Q20: the official answer files (_sources/tpc-h/dbgen/answers/) match `qgen -d` exactly (Q11 1048 rows, Q18 57, Q20 186). `qgen -r 17039360` gives 1469, 9 and 188 rows and different Q3 values. Findings: (1) TPCH_SF1_REFERENCE_SEED (benchmark.py ~31-47) is not the answer-file parameter set, so seeded SQL power runs at SF 1 report false row-count failures on Q11, Q16, Q18 and Q20, and the comments in benchmark.py, tpch_results.py and power_test.py ~317 are wrong. (2) Seeded DataFrame runs ignore the seed: set_parameter_overrides is never called, and they bind the -d defaults. _tpch_reference_context then labels them answer-file-valid. SQL and DataFrame parameters differ on 22 of 22 queries at seed 17039360. (3) In throughput runs, SQL derives a seed per stream and position, and unseeded throughput uses base seed 42 while the power test uses -d. DataFrame streams only reorder the -d queries, so bindings differ at 65 of 66 positions. The DataFrame path also ignores --streams. (4) The SQL bundle reports PASSED although its warm-up stream validation failed 4 checks. (5) The parameter extractor silently returns defaults on dialect-translated SQL, so extract from raw qgen text only.",
+  "links": [
+    "/Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T14:05:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d2e84c3259c84eb58317b2b8f67560b9",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}

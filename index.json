@@ -20233,6 +20233,13 @@
       "status": "done",
       "title": "Unseeded TPC-H DataFrame runs use the SF=1 Q11 fraction at every scale"
     },
+    "tpch-df-seed-parity": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "TPC-H DataFrame runs must bind the SQL run's seed-derived parameters, and the reference-seed assumption must be corrected (needs owner sign-off)"
+    },
     "tpch-skew-dataframe-sql-id-mapping": {
       "claim": null,
       "needs": [],
