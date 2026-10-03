@@ -39,6 +39,7 @@ pytestmark = [
 ]
 
 
+@pytest.mark.timeout(300)
 def test_clickbench_dataframe_surface_equivalent_to_sql(tmp_path):
     """Every ClickBench DataFrame query (both backends) must match its own SQL surface."""
     gate = GATES["clickbench"]
