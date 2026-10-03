@@ -119,6 +119,7 @@ class TestAdapters:
         assert ADAPTERS[14]({"YEAR.01": "1999", "DAY.01": "16"}) == {"year": 1999}
         # Q17's quarters are fixed in the template; the first is bound so the implementation never falls back.
         assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001, "quarter": 1}
+        assert {39, 44, 49, 93} <= set(adapter_query_ids())
 
 
 class TestBinding:

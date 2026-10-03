@@ -126,6 +126,62 @@ def _q14(values: Mapping[str, str]) -> dict[str, Any]:
 def _q17(values: Mapping[str, str]) -> dict[str, Any]:
     # The quarters are fixed in the template (Q1 to Q3); only the year is drawn.
     return {"year": int(values["YEAR.01"]), "quarter": 1}
+def _q18(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "cd_gender": values["GEN.01"],
+        "cd_education_status": values["ES.01"],
+        "birth_months": [int(month) for month in _listed(values, "MONTH")],
+        "states": _listed(values, "STATE"),
+    }
+
+
+def _q20(values: Mapping[str, str]) -> dict[str, Any]:
+    # SDATE is already the first day of the 30-day window; the implementation adds the 30 days.
+    return {"item_categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
+
+
+def _q21(values: Mapping[str, str]) -> dict[str, Any]:
+    # SALES_DATE is the pivot; the implementation reads the 30 days on either side from it.
+    return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q22(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL covers month sequences DMS through DMS+11; the implementation adds the 11.
+    return {"dms": int(values["DMS.01"])}
+
+
+def _q23(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL looks at years YEAR through YEAR+3 for frequent items and YEAR itself for the sales.
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "top_percent": int(values["TOPPERCENT.01"])}
+
+
+def _q25(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "agg": values["AGG.01"]}
+
+
+def _demographics(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "gender": values["GEN.01"],
+        "marital_status": values["MS.01"],
+        "education": values["ES.01"],
+    }
+
+
+def _q26(values: Mapping[str, str]) -> dict[str, Any]:
+    return _demographics(values)
+
+
+def _q27(values: Mapping[str, str]) -> dict[str, Any]:
+    # The six states are logged under their own names (STATE_A to STATE_F), one value each.
+    states = [values[f"STATE_{letter}.01"] for letter in "ABCDEF"]
+    return {**_demographics(values), "states": states}
+
+
+def _q31(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "order_by": values["AGG.01"]}
 
 
 def _q39(values: Mapping[str, str]) -> dict[str, Any]:
@@ -157,6 +213,15 @@ ADAPTERS: dict[int, Adapter] = {
     13: _q13,
     14: _q14,
     17: _q17,
+    18: _q18,
+    20: _q20,
+    21: _q21,
+    22: _q22,
+    23: _q23,
+    25: _q25,
+    26: _q26,
+    27: _q27,
+    31: _q31,
     39: _q39,
     44: _q44,
     49: _q49,

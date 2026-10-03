@@ -125,7 +125,6 @@
   - 10
   cd_education_status: College
   cd_gender: M
-  cd_marital_status: S
   states:
   - ND
   - WI
@@ -144,42 +143,36 @@
   - Jewelry
   - Sports
   - Books
-  month: 2
   sales_date: '2001-01-12'
-  year: 1999
 21:
-  month: 1
   sales_date: '1998-04-08'
-  warehouse_id: 2
-  year: 2000
 22:
   dms: 1212
-  year: 2001
 23:
   month: 1
+  top_percent: 95
   year: 1999
 24:
   color: chiffon
   market_id: 8
 25:
-  month: 4
-  quarters:
-  - 1
-  - 2
-  - 3
+  agg: sum
   year: 2000
 26:
   education: Primary
   gender: F
   marital_status: W
-  promo_channel: channel_demo
   year: 1998
 27:
   education: Primary
   gender: F
   marital_status: W
-  state: TN
   states:
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
   - TN
   year: 1998
 28:
@@ -227,7 +220,7 @@
   state: IL
   year: 2002
 31:
-  gmt_offset: -5.0
+  order_by: ss1.ca_county
   year: 2000
 32:
   days: 90
