@@ -1,9 +1,6 @@
 #!/bin/sh
 set -eu
 
-# BenchBox-local guard for agent write sessions. It intentionally does not
-# encode a global preference: it only protects this repository's primary clone.
-
 top=$(git rev-parse --show-toplevel)
 common_dir=$(git rev-parse --git-common-dir)
 git_dir_abs=$(git rev-parse --absolute-git-dir)
@@ -19,11 +16,6 @@ primary_abs=$(realpath "$primary_clone")
 
 allow_main=${BENCHBOX_ALLOW_MAIN_CLONE_WRITE:-${ALLOW_MAIN_CLONE_WRITE:-}}
 
-# A disposable clone -- a remote agent session, a CI runner -- is structurally
-# identical to the maintainer's primary clone: both are plain clones, neither is
-# a linked worktree. Nothing in the filesystem distinguishes them, so the
-# session has to say so. Keep that declaration explicit and reserve it for
-# disposable remote/CI clones; normal local agents use linked worktrees.
 registered_worktrees=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
 
 ephemeral=no
@@ -64,14 +56,6 @@ EOF
   exit 1
 fi
 
-# [COMMIT-IDENTITY-001] Claim-time identity assertion.
-#
-# Linked worktrees share the primary clone's config, so a single stray [user]
-# block there silently reauthors every linked worktree at once. Catching it at
-# preflight time -- before a session acquires write rights -- is the only point
-# where one check covers every worktree before any commit exists. Keep the agent
-# name/address lists in sync with AGENT_NAMES / AGENT_EMAILS and
-# SIGNING_SERVICE_EMAILS in _project/scripts/agent_instruction_audit.py.
 if [ "${BENCHBOX_ALLOW_AGENT_GIT_IDENTITY:-}" != "1" ]; then
   author_ident=$(git -C "$top_abs" var GIT_AUTHOR_IDENT 2>/dev/null || true)
   author_email=$(printf '%s' "$author_ident" | sed -n 's/^.*<\([^>]*\)>.*$/\1/p' | tr 'A-Z' 'a-z')
@@ -107,14 +91,6 @@ EOF
   fi
 fi
 
-# Commit-time hooks live in the common Git directory, so every linked worktree
-# shares one set. `pre-commit install` records the absolute path of whichever
-# interpreter ran it, so installing from a worktree pins the shared hooks to a
-# directory that is later deleted -- and commits then fail in every worktree at
-# once. Presence is therefore not health: check every hook type configured for
-# installation and fail closed when a hook is absent or its recorded
-# interpreter no longer resolves. The primary clone owns installation;
-# linked-worktree preflight never repairs shared hooks.
 hook_config="$top_abs/.pre-commit-config.yaml"
 hook_types=pre-commit
 if [ -f "$hook_config" ]; then

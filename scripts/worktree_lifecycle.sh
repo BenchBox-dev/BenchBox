@@ -284,7 +284,6 @@ finish_worktree() {
     apply_args="--apply"
   fi
 
-  # shellcheck disable=SC2086
   $py_runner "$script_dir/worktree_finish.py" \
     --repo-root "$primary_clone" \
     --worktree-path "$target" \

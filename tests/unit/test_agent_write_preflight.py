@@ -558,3 +558,28 @@ def test_worktree_removal_hook_isolation(tmp_path: Path) -> None:
     assert commit_res.returncode == 0, commit_res.stdout + commit_res.stderr
     assert record.exists()
     assert str(wt2.resolve()) in record.read_text(encoding="utf-8")
+
+
+def test_agent_identity_lists_match_the_instruction_audit() -> None:
+    import importlib.util
+    import re
+
+    spec = importlib.util.spec_from_file_location(
+        "agent_instruction_audit", REPO_ROOT / "_project" / "scripts" / "agent_instruction_audit.py"
+    )
+    audit = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = audit
+    try:
+        spec.loader.exec_module(audit)
+    finally:
+        sys.modules.pop(spec.name, None)
+    script = SCRIPT.read_text(encoding="utf-8")
+
+    def case_values(variable: str) -> set[str]:
+        match = re.search(rf'case "\${variable}" in\n\s*([^)]+)\) agent_identity=yes', script)
+        assert match, variable
+        return {value.strip() for value in match.group(1).split("|")}
+
+    assert case_values("author_email") == audit.AGENT_EMAILS
+    assert case_values("author_name") == audit.AGENT_NAMES
+    assert audit.SIGNING_SERVICE_EMAILS <= audit.AGENT_EMAILS

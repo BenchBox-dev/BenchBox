@@ -380,13 +380,11 @@ fi
 Generate benchmark documentation from dry run output:
 
 ```bash
-# Generate query documentation
 benchbox run --dry-run ./docs/tpcds_queries \
   --platform duckdb \
   --benchmark tpcds \
   --scale 0.01
 
-# Create markdown documentation
 cat > ./docs/tpcds_benchmark.md << EOF
 # TPC-DS Benchmark
 
@@ -395,7 +393,6 @@ Generated from dry run analysis on $(date).
 ## Queries
 EOF
 
-# Add query documentation
 for query in ./docs/tpcds_queries/queries/*.sql; do
   echo "### $(basename $query .sql)" >> ./docs/tpcds_benchmark.md
   echo '```sql' >> ./docs/tpcds_benchmark.md
@@ -410,8 +407,6 @@ done
 Test configurations across environments:
 
 ```bash
-#!/bin/bash
-# test_configurations.sh
 
 configurations=(
   "duckdb:tpch:0.01"

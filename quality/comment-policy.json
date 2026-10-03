@@ -35667,18 +35667,6 @@
       "expires": "2027-01-04"
     },
     {
-      "path": "scripts/worktree_lifecycle.sh",
-      "symbol": "",
-      "text": "# shellcheck disable=SC2086",
-      "kind": "directive",
-      "consumer": ".pre-commit-config.yaml",
-      "necessity": "ShellCheck reports this construct; the script relies on the reported behavior intentionally.",
-      "alternative": "Rewrite the construct so ShellCheck accepts it.",
-      "owner": "comment-cleanup-lifecycle-tooling",
-      "removal": "Remove when ShellCheck no longer reports the construct.",
-      "expires": "2027-01-04"
-    },
-    {
       "path": "tests/conftest.py",
       "symbol": "pytest_terminal_summary",
       "text": "# pragma: no cover",
@@ -37953,6 +37941,18 @@
       "alternative": "Rewrite the subprocess input as a static literal the checker can parse; that changes the test and was not taken in the cleanup.",
       "owner": "comment-cleanup-test-support",
       "removal": "Remove when the test's subprocess input becomes a static literal or the executable-payload adapter can reconstruct it."
+    },
+    {
+      "path": "_sources/compilation/scripts/compile-all-platforms.sh",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License.",
+      "kind": "notice",
+      "consumer": "COPYRIGHT.md",
+      "necessity": "The repository contribution rule in COPYRIGHT.md requires appropriate copyright headers. Retain this existing authored notice payload unchanged in a source header.",
+      "alternative": "Removing or replacing this payload would lose existing notice wording. A runtime docstring is unnecessary; an exact source comment retains the notice without carrying explanatory prose.",
+      "owner": "comment-cleanup-compilation",
+      "removal": "Remove or change only after the owner records the governing notice requirement and confirms that the exact existing notice may be changed.",
+      "count": 1
     }
   ]
 }

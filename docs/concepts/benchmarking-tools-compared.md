@@ -162,11 +162,12 @@ The best evaluation strategy often uses multiple tools.
 
 ### Example Workflow
 
-```bash
-# OLTP baseline with HammerDB
-hammerdbcli <<< "dbset db pg; buildschema; vuset vu 16; vucreate; vustatus; vurun"
+The HammerDB script `pg_oltp.tcl` runs `dbset db pg`, `buildschema`, `vuset vu 16`, `vucreate`, `vustatus` and
+`vurun` for the OLTP baseline; BenchBox then runs the OLAP comparison:
 
-# OLAP comparison with BenchBox
+```bash
+hammerdbcli auto pg_oltp.tcl
+
 benchbox run --platform postgresql --benchmark tpch --scale 10
 benchbox compare -p duckdb -p postgresql --scale 10
 ```

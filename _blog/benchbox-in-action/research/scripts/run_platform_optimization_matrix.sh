@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BenchBox CLI matrix for post #6:
-# "BenchBox in action: when the same query needs different code"
-#
-# Default behavior is dry-run so the matrix can be reviewed before execution.
-# Execute with: ./run_platform_optimization_matrix.sh --execute
-
 BENCHBOX_CLI="${BENCHBOX_CLI:-./.venv/bin/benchbox}"
 BENCHMARK="${BENCHMARK:-tpcds}"
 QUERIES="${QUERIES:-Q16,Q95}"
@@ -157,7 +151,6 @@ run_one() {
     --quiet
   )
 
-  # PySpark can fail preflight memory checks at SF1 in constrained environments.
   if [[ "$platform" == "pyspark-df" ]]; then
     cmd+=(--ignore-memory-warnings)
   fi

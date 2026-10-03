@@ -521,9 +521,11 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
             if redirect_type == "<<-":
                 text = "".join(line.lstrip("\t") for line in lines[start:index])
             unescaped = re.sub(r"\\.", "", text)
-            if not any(char in raw_marker for char in "'\"\\") and ("$(" in unescaped or "`" in unescaped):
-                raise ValueError("executable substitution in a shell heredoc requires an adapter")
             nested_lang = stdin_language(consumer) if effective else None
+            if not any(char in raw_marker for char in "'\"\\") and ("$(" in unescaped or "`" in unescaped):
+                simple = re.sub(r"\$\([^()#`\n]*\)", "", unescaped)
+                if nested_lang is not None or "$(" in simple or "`" in simple:
+                    raise ValueError("executable substitution in a shell heredoc requires an adapter")
             if nested_lang or include_data:
                 nested_lang = nested_lang or "data"
                 result.append((start + 1, path + "." + nested_lang, text, nested_lang, f"heredoc:{marker}"))
@@ -667,7 +669,8 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                 command = words[0].word.rsplit("/", 1)[-1]
                 words = unwrap_static_command(words)
                 command = words[0].word.rsplit("/", 1)[-1]
-                if command in {"env", "uv"}:
+                inert = command == "uv" and len(words) > 1 and words[1].word not in {"run", "tool", "--"}
+                if command in {"env", "uv"} and not inert:
                     if any(word.parts for word in words):
                         raise ValueError("dynamic inline wrapper arguments require an adapter")
                     normalized = command_words([word.word for word in words])
@@ -676,7 +679,9 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                     words = words[-len(normalized) :]
                     command = words[0].word.rsplit("/", 1)[-1]
                 language = (
-                    "python"
+                    None
+                    if inert
+                    else "python"
                     if re.fullmatch(r"python[0-9.]*", command)
                     else {"node": "javascript", "sh": "bash", "bash": "bash", "zsh": "bash", "eval": "bash"}.get(
                         command

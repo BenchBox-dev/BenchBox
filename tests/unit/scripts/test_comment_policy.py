@@ -2650,3 +2650,16 @@ def test_unquoted_heredoc_ignores_escaped_substitutions(body: str, kinds: list) 
 def test_uv_run_interpreter_with_dynamic_script_arguments() -> None:
     source = 'uv run python -c "import sys  # note" "$RUN_ID"\n'
     assert [(f.kind, f.text) for f in scan("a.sh", source, "bash")] == [("comment", "# note")]
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('uv pip install --python "$venv/bin/python" "$wheel" && python3 -c "import sys  # note"\n', ["comment"]),
+        ("cat > out.md << EOF\n# Title\nGenerated on $(date).\nEOF\n", []),
+        ("cat > out.md << EOF\nRun $(echo a # hidden)\nEOF\n", ["coverage-error"]),
+        ('python3 - << EOF\nprint("$(date)")\nEOF\n', ["coverage-error"]),
+    ],
+)
+def test_inert_uv_subcommands_and_simple_data_heredoc_substitutions(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
