@@ -19,13 +19,15 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import collections
+import re
 import signal
 from collections.abc import Iterator, Mapping
 
 import pytest
 
 from benchbox.core.tpcds.dataframe_queries.parameter_adapters import ADAPTERS, adapter_query_ids
-from tests.unit.core.tpcds.test_parameter_consumption_inventory import _read_keys, _template_usage
+from tests.unit.core.tpcds.test_parameter_consumption_inventory import _DEFINE, _TOKEN, _read_keys
 
 pytestmark = [
     pytest.mark.unit,
@@ -77,17 +79,38 @@ def _flatten(values) -> Iterator[object]:
 
 
 def _values_in_sql(dsqgen, query_id: int, logged: Mapping[str, str]) -> set[str]:
-    """The logged names (``NAME.NN``) whose value reaches the SQL text of the template."""
+    """The logged names (``NAME.NN``) whose own value reaches the SQL that BenchBox runs.
+
+    BenchBox runs only a template's first statement (Q14 and Q23 have two), so only that statement counts.
+    A name used inside another define reaches the SQL through that define's value; when dsqgen logs the
+    outer define itself (Q1's STATE is drawn from COUNTY), the adapter binds the outer value and the inner
+    one is not needed.
+    """
     template = (dsqgen.templates_dir / f"query{query_id}.tpl").read_text(encoding="utf-8", errors="replace")
-    used, _, _, _ = _template_usage(template)
+    text = re.sub(r"--[^\n]*", "", template)
+    defines = {match.group(1): match.group(2) for match in _DEFINE.finditer(text)}
+    first_statement = _DEFINE.sub("", text).split(";")[0]
+    logged_names = {key.rpartition(".")[0] for key in logged}
+
+    used: dict[str, set[int]] = collections.defaultdict(set)
+    pending = [first_statement]
+    expanded: set[str] = set()
+    while pending:
+        for match in _TOKEN.finditer(pending.pop()):
+            name = match.group(1)
+            used[name].add(int(match.group(2) or 0))
+            # An unlogged define passes its inputs through to the SQL.
+            if name in defines and name not in logged_names and name not in expanded:
+                expanded.add(name)
+                pending.append(defines[name])
+
     reaching = set()
     for key in logged:
         name, _, index = key.rpartition(".")
         if name.startswith("_") or name not in used:
             continue
         # ``[NAME]`` in the template is index 0 and logs as ``NAME.01``.
-        indices = {max(i, 1) for i in used[name]}
-        if int(index) in indices:
+        if int(index) in {max(i, 1) for i in used[name]}:
             reaching.add(key)
     return reaching
 
