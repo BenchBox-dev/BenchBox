@@ -4,7 +4,7 @@
     "Value-level answer parsing has unit tests for normal, NULLS_FIRST and NULLS_LAST answer files",
     "The 8 SF=1-empty queries are confirmed to have non-empty answer sets in a test"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T17). Two bindings, two gates: this item supports the qualification binding, separate from the gate binding built from dsqgen -LOG. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T17). Two bindings, two gates: this item supports the qualification binding, separate from the gate binding built from dsqgen -LOG. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 state: parts 1 and 3 are in #2552 (feat/tpcds-qualification-values, BenchBox.wt-tpcds-t17): qualification_values.json with 829 values, 28 tests; CI was green, NOT armed, merges cleanly. Gap: the values came from a one-off pypdf extraction that was not committed, so they cannot be reproduced; commit the extraction script, or have t18's SF=1 run check the values against the official answer sets. Part 2 (value-level .ans parsing in benchbox/core/expected_results/loader.py) is local only: BenchBox.wt-tpcds-t17b, branch feat/tpcds-answer-set-values (079c34427), preflight not run, no PR; soundness path, needs the owner's go-ahead and a maintainer merge, TPC-H expected-result behaviour must stay identical. It merges cleanly into develop 922eaba6e (which removed registry.py's unused wrapper in #2563).",
   "description": "Commit the specification's qualification parameter values as a data file with a test against the spec text (_sources/tpc-ds/specification/specification_4.0.0.pdf). Extend benchbox/core/expected_results/loader.py, which parses only row counts for TPC-DS (parse_tpcds_answer_file, ~line 66), to parse answer-set values (_sources/tpc-ds/answer_sets/<n>.ans), including the _NULLS_FIRST and _NULLS_LAST variants, following the TPC-H load_tpch_value_digests pattern (~line 224). The 8 queries empty at SF=1 in the gate (8, 24, 25, 29, 37, 41, 54, 58) have non-empty official answer sets (verified), so they are parameter problems, not legitimately empty.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "bd6d2dbad65c476b939bad3ddf780964",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:57:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "781326b1a2134aafbd14b7308ddd14e6",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
