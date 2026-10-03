@@ -41,7 +41,6 @@ import shutil
 import time
 import uuid
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -952,32 +951,10 @@ class DataCache:
         return removed
 
 
-_HASH_CHUNK_BYTES = 8 * 1024 * 1024
-
-
-def _file_content_digest(file_path: Path) -> str:
-    """Return the SHA-256 digest of a file's bytes (compressed files are hashed as stored)."""
-    digest = hashlib.sha256()
-    buffer = bytearray(_HASH_CHUNK_BYTES)
-    view = memoryview(buffer)
-    with open(file_path, "rb", buffering=0) as handle:
-        while True:
-            read = handle.readinto(buffer)
-            if not read:
-                break
-            digest.update(view[:read])
-    return digest.hexdigest()
-
-
 def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]]) -> str:
     """Compute hash of source files for cache validation.
 
-    The hash covers each file's table, name, size and a digest of its bytes.
-    It deliberately ignores modification times: a run that regenerates
-    identical data in a fresh temporary directory gets new mtimes, and keying
-    on them forced every such run to rewrite the shared cache. Hashing the
-    content means a cache hit can only serve Parquet converted from the same
-    bytes, whatever the file times say.
+    Uses file modification times for fast validation.
 
     Args:
         source_dir: Source data directory
@@ -986,22 +963,14 @@ def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]])
     Returns:
         Hash string
     """
-    entries: list[tuple[str, Path]] = []
+    hash_data = []
     for table_name in sorted(tables.keys()):
         file_paths = tables[table_name]
         file_list = file_paths if isinstance(file_paths, list) else [file_paths]
-        entries.extend((table_name, file_path) for file_path in file_list if file_path.exists())
-
-    def describe(entry: tuple[str, Path]) -> str:
-        table_name, file_path = entry
-        return f"{table_name}:{file_path.name}:{file_path.stat().st_size}:{_file_content_digest(file_path)}"
-
-    # hashlib releases the GIL on large buffers, so threads hash files in parallel.
-    if len(entries) > 1:
-        with ThreadPoolExecutor(max_workers=min(8, len(entries))) as pool:
-            hash_data = list(pool.map(describe, entries))
-    else:
-        hash_data = [describe(entry) for entry in entries]
+        for file_path in file_list:
+            if file_path.exists():
+                stat = file_path.stat()
+                hash_data.append(f"{table_name}:{file_path.name}:{stat.st_mtime}:{stat.st_size}")
 
     combined = "|".join(hash_data)
     return hashlib.md5(combined.encode()).hexdigest()[:12]

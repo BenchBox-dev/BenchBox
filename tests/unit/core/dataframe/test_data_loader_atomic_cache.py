@@ -25,7 +25,6 @@ from benchbox.core.dataframe.data_loader import (
     DataFrameDataLoader,
     FormatConverter,
     _atomic_cache_write,
-    _compute_source_hash,
 )
 
 pytestmark = [
@@ -221,63 +220,3 @@ class TestPruneStaleTempFiles:
         assert (cache_path / "_manifest.json").exists()
         assert not untracked.exists()
         assert not lookalike.exists()
-
-
-class TestContentBasedSourceHash:
-    def test_identical_content_with_different_mtimes_hashes_equal(self, tmp_path: Path) -> None:
-        first = tmp_path / "run1"
-        second = tmp_path / "run2"
-        first.mkdir()
-        second.mkdir()
-        for directory, stamp in ((first, 1_000_000_000), (second, 1_700_000_000)):
-            (directory / "a.tbl").write_text("1|x|\n2|y|\n")
-            (directory / "b.tbl").write_text("3|z|\n")
-            for file in directory.iterdir():
-                os.utime(file, (stamp, stamp))
-
-        hash_first = _compute_source_hash(first, {"a": [first / "a.tbl"], "b": first / "b.tbl"})
-        hash_second = _compute_source_hash(second, {"a": [second / "a.tbl"], "b": second / "b.tbl"})
-
-        assert hash_first == hash_second
-
-    def test_different_content_of_same_size_and_mtime_hashes_differently(self, tmp_path: Path) -> None:
-        file = tmp_path / "a.tbl"
-        file.write_text("1|aaa|\n")
-        os.utime(file, (1_000_000_000, 1_000_000_000))
-        before = _compute_source_hash(tmp_path, {"a": file})
-
-        file.write_text("1|bbb|\n")
-        os.utime(file, (1_000_000_000, 1_000_000_000))
-        after = _compute_source_hash(tmp_path, {"a": file})
-
-        assert before != after
-
-    def test_different_size_hashes_differently(self, tmp_path: Path) -> None:
-        file = tmp_path / "a.tbl"
-        file.write_text("1|a|\n")
-        before = _compute_source_hash(tmp_path, {"a": file})
-        file.write_text("1|a|\n2|b|\n")
-        assert _compute_source_hash(tmp_path, {"a": file}) != before
-
-    def test_file_larger_than_the_read_chunk_is_fully_hashed(self, tmp_path: Path) -> None:
-        file = tmp_path / "big.tbl"
-        with patch("benchbox.core.dataframe.data_loader._HASH_CHUNK_BYTES", 16):
-            file.write_bytes(b"A" * 100)
-            before = _compute_source_hash(tmp_path, {"big": file})
-            file.write_bytes(b"A" * 99 + b"B")  # change only the last byte
-            assert _compute_source_hash(tmp_path, {"big": file}) != before
-
-    def test_regenerated_identical_data_is_a_cache_hit(self, tmp_path: Path) -> None:
-        loader = DataFrameDataLoader(cache_dir=tmp_path / "cache")
-        hashes = []
-        for run, stamp in (("run1", 1_000_000_000), ("run2", 1_700_000_000)):
-            directory = tmp_path / run
-            directory.mkdir()
-            file = directory / "t.tbl"
-            file.write_text("1|a|\n")
-            os.utime(file, (stamp, stamp))
-            hashes.append(_compute_source_hash(directory, {"t": file}))
-        loader.cache.save_manifest("tpch", 0.01, DataFormat.PARQUET, hashes[0], {"t": {"file": "t.parquet"}})
-        (loader.cache.get_cache_path("tpch", 0.01, DataFormat.PARQUET) / "t.parquet").write_bytes(b"x")
-
-        assert loader.cache.has_cached_data("tpch", 0.01, DataFormat.PARQUET, hashes[1])
