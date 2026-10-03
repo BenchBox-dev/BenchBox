@@ -86,6 +86,16 @@ def test_rollback_may_move_backwards_and_diverge_but_identical_state_is_noop() -
     assert gate(SHA_A, "v0.3.0", deployed(), "rollback").action == DEPLOY
     assert gate(SIDE, "v0.4.1", deployed(), "rollback").action == DEPLOY
     assert gate(SHA_B, "v0.4.1", deployed(), "rollback").action == NOOP
+    same_source_other_tree = generation.generation_gate(
+        candidate_trunk=SHA_B,
+        candidate_tag="v0.4.1",
+        candidate_corpus="1" * 40,
+        candidate_artifact="0" * 64,
+        deployed=deployed(),
+        mode="rollback",
+        is_ancestor=ancestry,
+    )
+    assert same_source_other_tree.action == DEPLOY
 
 
 def test_rollback_to_same_trunk_with_different_corpus_still_deploys() -> None:

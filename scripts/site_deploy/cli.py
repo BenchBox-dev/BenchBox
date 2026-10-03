@@ -166,6 +166,7 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
         "release_sha": target["release_sha"],
         "certifying_run_id": target.get("certifying_run_id"),
         "candidate_corpus": target["corpus_sha"],
+        "candidate_artifact": target["artifact"]["sha256"],
         "rollback": rollback,
         "current_unknown": bool(args.current_unknown),
         "newest_deployment_id": None,
@@ -192,6 +193,7 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
         candidate_trunk=target["trunk_sha"],
         candidate_tag=target["release_tag"],
         candidate_corpus=target["corpus_sha"],
+        candidate_artifact=target["artifact"]["sha256"],
         deployed=deployed,
         mode="rollback",
         is_ancestor=_ancestry(args.repo_dir),
@@ -252,6 +254,7 @@ def command_resolve(args: argparse.Namespace) -> int:
         "release_sha": outcome["release_sha"],
         "certifying_run_id": outcome["certifying_run_id"],
         "candidate_corpus": outcome["candidate_corpus"],
+        "candidate_artifact": outcome.get("candidate_artifact"),
         "bootstrap": bool(args.bootstrap),
         "deployed": outcome.get("deployed_record") or (asdict(deployed) if deployed else None),
         "parent": outcome.get("parent_record") or _parent(deployed),
@@ -298,6 +301,7 @@ def command_recheck(args: argparse.Namespace) -> int:
         candidate_corpus=resolved.get("candidate_corpus"),
         mode=resolved["mode"],
         is_ancestor=_ancestry(args.repo_dir),
+        candidate_artifact=resolved.get("candidate_artifact"),
     )
     print(f"{decision.action}: {decision.reason}")
     return 0 if decision.action == generation.DEPLOY else 1

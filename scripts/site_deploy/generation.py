@@ -78,6 +78,7 @@ def generation_gate(
     mode: str,
     is_ancestor: AncestryCheck,
     candidate_corpus: str | None = None,
+    candidate_artifact: str | None = None,
 ) -> Decision:
     if mode not in MODES:
         return Decision(REFUSE, f"unknown mode {mode!r}")
@@ -88,9 +89,10 @@ def generation_gate(
     same_trunk = candidate_trunk == deployed.trunk_sha
     same_tag = candidate_tag == deployed.release_tag
     same_corpus = mode != "rollback" or candidate_corpus is None or candidate_corpus == deployed.corpus_sha
-    if same_trunk and same_tag and same_corpus and not deployed.newer_unreceipted:
+    same_artifact = mode != "rollback" or candidate_artifact is None or candidate_artifact == deployed.artifact_sha256
+    if same_trunk and same_tag and same_corpus and same_artifact and not deployed.newer_unreceipted:
         return Decision(NOOP, f"generation {deployed.generation} already deployed")
-    if same_trunk and same_tag and same_corpus:
+    if same_trunk and same_tag and same_corpus and same_artifact:
         return Decision(DEPLOY, "a newer deployment carries no receipt; redeploying restores receipt authority")
     if mode == "rollback":
         return Decision(DEPLOY, "rollback to a previously deployed generation")
@@ -119,6 +121,7 @@ def recheck_decision(
     candidate_corpus: str | None,
     mode: str,
     is_ancestor: AncestryCheck,
+    candidate_artifact: str | None = None,
 ) -> Decision:
     current = deployed.receipt_sha256 if deployed else None
     if resolved_receipt_sha256 != current:
@@ -129,6 +132,7 @@ def recheck_decision(
         candidate_trunk=candidate_trunk,
         candidate_tag=candidate_tag,
         candidate_corpus=candidate_corpus,
+        candidate_artifact=candidate_artifact,
         deployed=deployed,
         mode=mode,
         is_ancestor=is_ancestor,
