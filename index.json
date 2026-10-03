@@ -902,6 +902,15 @@
       "status": "open",
       "title": "Build the URL and content inventory that serves as the parity oracle for the Astro migration"
     },
+    "astro-site-02-api-reference-decision": {
+      "claim": null,
+      "needs": [
+        "astro-site-00-decisions-adr"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Decision gate: choose what replaces the 27 autodoc API reference pages now that docstrings are deprecated"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
