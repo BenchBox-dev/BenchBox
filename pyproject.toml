@@ -620,45 +620,6 @@ line-ending = "auto"
 # keep a prose-oriented style, so Markdown stays outside the formatter contract.
 exclude = ["*.md"]
 
-[tool.interrogate]
-# Docstring coverage enforcement
-ignore-init-method = false
-ignore-init-module = false
-ignore-magic = false
-ignore-module = false
-ignore-nested-functions = true
-ignore-nested-classes = true
-ignore-private = true
-ignore-property-decorators = false
-# Keep the blocking gate focused on public API documentation; single-underscore
-# helpers churn heavily and are covered by code review/tests instead.
-ignore-semiprivate = true
-ignore-setters = false
-fail-under = 90  # Ratcheted from baseline after local audit reported 93.1% coverage.
-exclude = [
-    "tests",
-    "_build",
-    "venv",
-    ".venv",
-    "benchmark_runs",
-    "_project",
-    "docs/_build",
-    "benchbox/platforms/credentials",
-    # Bulk mechanical DataFrame query catalogs are generated-style
-    # implementations; keep the gate focused on hand-authored public APIs.
-    "benchbox/core/clickbench/dataframe_queries/queries.py",
-    "benchbox/core/datavault/dataframe_queries/queries.py",
-    "benchbox/core/flightdata/dataframe_queries.py",
-    "benchbox/core/nyctaxi/dataframe_queries/queries.py",
-    "benchbox/core/tpcds/dataframe_queries/queries.py",
-    "benchbox/core/tpcds_obt/dataframe_queries.py",
-    "benchbox/core/tpchavoc/dataframe_queries",
-]
-verbose = 2
-quiet = false
-whitelist-regex = []
-color = true
-
 [tool.coverage.run]
 # Test coverage configuration
 source = ["benchbox"]

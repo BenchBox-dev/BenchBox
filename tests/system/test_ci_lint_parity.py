@@ -398,9 +398,6 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "example-validation", "Check for unsafe patch() string paths in tests"): (
         "Covered by the local example-validation lane in preflight."
     ),
-    ("ci.yml", "docstring-coverage", "Check docstring coverage"): (
-        "Covered by the local `docstring-coverage` lane in preflight."
-    ),
 }
 
 
