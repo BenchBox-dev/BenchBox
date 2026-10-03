@@ -20017,7 +20017,7 @@
         "tpcds-parity-b1-helpers"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "TPC-DS parity B2: align DF parameter defaults with SQL template literals"
     },
     "tpcds-parity-b3-channels-rollup": {
