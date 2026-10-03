@@ -64,6 +64,19 @@ prompt-quickstarts-check:
 query-docs:
 	uv run -- python scripts/generate_query_docs.py
 
+SITE_DIR ?= site
+SITE_INVENTORY ?= $(SITE_DIR)-inventory
+site-inventory:
+	@uv run -- python scripts/site_inventory.py build --site-dir "$(SITE_DIR)" --output-dir "$(SITE_INVENTORY)" --source-sha "$$(git rev-parse HEAD)"
+
+SITE_INVENTORY_BASELINE ?= _project/design/site-inventory/baseline-develop
+site-inventory-diff: site-inventory
+	@uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_INVENTORY)"
+
+SITE_INVENTORY_KNOWN_BROKEN ?= _project/design/site-inventory/known-broken-links.json
+site-inventory-check: site-inventory
+	@uv run -- python scripts/site_inventory.py check --inventory "$(SITE_INVENTORY)" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)"
+
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build
 	@echo ""
