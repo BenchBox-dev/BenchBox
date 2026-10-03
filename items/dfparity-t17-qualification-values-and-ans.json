@@ -1,7 +1,7 @@
 {
   "acceptance": [
-    "A data file holds qualification values for all 99 queries with a test comparing a sample against the spec text",
-    "Value-level answer parsing has unit tests for normal, NULLS_FIRST and NULLS_LAST answer files",
+    "A data file holds qualification values for all 99 queries, produced by a committed, pinned extraction from the spec source, and every value (not a sample) is verified against that source",
+    "Value-level answer parsing has unit tests for normal, NULLS_FIRST and NULLS_LAST answer files, and a parse error fails loudly instead of returning a partial mapping (the t17b branch currently warns and returns partial results, loader.py ~507-543)",
     "The 8 SF=1-empty queries are confirmed to have non-empty answer sets in a test"
   ],
   "context": "Source: DataFrame query parity proposal v3 (item T17). Two bindings, two gates: this item supports the qualification binding, separate from the gate binding built from dsqgen -LOG. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 state: parts 1 and 3 are in #2552 (feat/tpcds-qualification-values, BenchBox.wt-tpcds-t17): qualification_values.json with 829 values, 28 tests; CI was green, NOT armed, merges cleanly. Gap: the values came from a one-off pypdf extraction that was not committed, so they cannot be reproduced; commit the extraction script, or have t18's SF=1 run check the values against the official answer sets. Part 2 (value-level .ans parsing in benchbox/core/expected_results/loader.py) is local only: BenchBox.wt-tpcds-t17b, branch feat/tpcds-answer-set-values (079c34427), preflight not run, no PR; soundness path, needs the owner's go-ahead and a maintainer merge, TPC-H expected-result behaviour must stay identical. It merges cleanly into develop 922eaba6e (which removed registry.py's unused wrapper in #2563).",
@@ -21,6 +21,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "781326b1a2134aafbd14b7308ddd14e6",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:10:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "e2d3743d1d62488d89d0e76df021b2dd",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
