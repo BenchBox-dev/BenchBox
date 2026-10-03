@@ -354,6 +354,7 @@ def _excess_discount_expression(
     sales_date_default: str = "1998-03-18",
 ) -> Any:
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
     col = ctx.col
@@ -402,6 +403,7 @@ def _excess_discount_pandas(
     import pandas as pd
 
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim").copy()
     if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
@@ -3528,6 +3530,11 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+# The template fixes these lists; only the year, quarter and group-by column are drawn.
+_Q45_ZIP_CODES = ["85669", "86197", "88274", "83405", "86475", "85392", "85460", "80348", "81792"]
+_Q45_ITEM_SKS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+
+
 def q45_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q45: Web Sales Customer Zip Analysis (Expression Family).
 
@@ -3540,8 +3547,9 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(45)
     year = params.get("year", 2000)
     qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["85669", "86197", "88274", "83405", "86475"])
-    item_sks = params.get("item_sks", [2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+    group_column = params.get("gbobc", "ca_county")
+    zip_codes = _Q45_ZIP_CODES
+    item_sks = _Q45_ITEM_SKS
 
     web_sales, customer, customer_address, date_dim, item = _tables(
         ctx, "web_sales", "customer", "customer_address", "date_dim", "item"
@@ -3555,7 +3563,7 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Join tables and filter
-    return (
+    grouped = (
         web_sales.join(customer, left_on="ws_bill_customer_sk", right_on="c_customer_sk")
         .join(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
         .join(item, left_on="ws_item_sk", right_on="i_item_sk")
@@ -3565,11 +3573,11 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
             & (col("d_year") == lit(year))
             & (col("ca_zip").cast_string().str.slice(0, 5).is_in(zip_codes) | col("i_item_id").is_in(item_ids_list))
         )
-        .group_by(col("ca_zip"), col("ca_county"))
+        .group_by(col("ca_zip"), col(group_column))
         .agg(col("ws_sales_price").sum().alias("sum_ws_sales_price"))
-        .sort("ca_zip", "ca_county")
-        .limit(100)
     )
+    # The grouping columns can be NULL (ca_city, ca_state, ca_zip); NULL sorts last in the SQL.
+    return _sort_null_largest_expression(ctx, grouped, ["ca_zip", group_column], [False, False]).limit(100)
 
 
 def q45_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3577,8 +3585,9 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(45)
     year = params.get("year", 2000)
     qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["85669", "86197", "88274", "83405", "86475"])
-    item_sks = params.get("item_sks", [2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+    group_column = params.get("gbobc", "ca_county")
+    zip_codes = _Q45_ZIP_CODES
+    item_sks = _Q45_ITEM_SKS
 
     web_sales, customer, customer_address, date_dim, item = _tables(
         ctx, "web_sales", "customer", "customer_address", "date_dim", "item"
@@ -3600,13 +3609,12 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["ca_zip"].str[:5].isin(zip_codes) | merged["i_item_id"].isin(item_ids))
     ]
 
-    # Group and aggregate
-    return (
-        filtered.groupby(["ca_zip", "ca_county"], as_index=False)
-        .agg(sum_ws_sales_price=("ws_sales_price", "sum"))
-        .sort_values(["ca_zip", "ca_county"])
-        .head(100)
+    # Group and aggregate. SQL GROUP BY keeps a NULL key as its own group, which pandas drops by default.
+    grouped = filtered.groupby(["ca_zip", group_column], as_index=False, dropna=False).agg(
+        sum_ws_sales_price=("ws_sales_price", "sum")
     )
+    ordered = _sort_null_largest_pandas(grouped, ["ca_zip", group_column], [False, False]).head(100)
+    return _none_for_null(ordered, ["ca_zip", group_column])
 
 
 def _q90_params() -> tuple[int, int, int, int, int]:
@@ -7030,9 +7038,19 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+# The aggregate functions Q35's template can draw, as the expression method and pandas aggregation for each.
+_Q35_EXPRESSION_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+_Q35_PANDAS_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+
+
+def _q35_aggregates(params: Any) -> tuple[str, str, str]:
+    return params.get("aggone", "avg"), params.get("aggtwo", "max"), params.get("aggthree", "sum")
+
+
 def q35_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(35)
     year = params.get("year", 2002)
+    aggone, aggtwo, aggthree = (_Q35_EXPRESSION_AGGREGATES[name] for name in _q35_aggregates(params))
     col = ctx.col
     lit = ctx.lit
     date_filtered = ctx.get_table("date_dim").filter((col("d_year") == lit(year)) & (col("d_qoy") < lit(4)))
@@ -7056,15 +7074,15 @@ def q35_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(
             [
                 ctx.count().alias("cnt1"),
-                col("cd_dep_count").mean().alias("aggone1"),
-                col("cd_dep_count").max().alias("aggtwo1"),
-                col("cd_dep_count").sum().alias("aggthree1"),
-                col("cd_dep_employed_count").mean().alias("aggone2"),
-                col("cd_dep_employed_count").max().alias("aggtwo2"),
-                col("cd_dep_employed_count").sum().alias("aggthree2"),
-                col("cd_dep_college_count").mean().alias("aggone3"),
-                col("cd_dep_college_count").max().alias("aggtwo3"),
-                col("cd_dep_college_count").sum().alias("aggthree3"),
+                getattr(col("cd_dep_count"), aggone)().alias("aggone1"),
+                getattr(col("cd_dep_count"), aggtwo)().alias("aggtwo1"),
+                getattr(col("cd_dep_count"), aggthree)().alias("aggthree1"),
+                getattr(col("cd_dep_employed_count"), aggone)().alias("aggone2"),
+                getattr(col("cd_dep_employed_count"), aggtwo)().alias("aggtwo2"),
+                getattr(col("cd_dep_employed_count"), aggthree)().alias("aggthree2"),
+                getattr(col("cd_dep_college_count"), aggone)().alias("aggone3"),
+                getattr(col("cd_dep_college_count"), aggtwo)().alias("aggtwo3"),
+                getattr(col("cd_dep_college_count"), aggthree)().alias("aggthree3"),
             ]
         )
         .with_columns([col("cnt1").alias("cnt2"), col("cnt1").alias("cnt3")])
@@ -7098,6 +7116,7 @@ def q35_expression_impl(ctx: DataFrameContext) -> Any:
 def q35_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(35)
     year = params.get("year", 2002)
+    aggone, aggtwo, aggthree = (_Q35_PANDAS_AGGREGATES[name] for name in _q35_aggregates(params))
     date_filtered = ctx.get_table("date_dim")
     date_filtered = date_filtered[(date_filtered["d_year"] == year) & (date_filtered["d_qoy"] < 4)][["d_date_sk"]]
     customers = _store_and_other_channel_customers_pandas(ctx, date_filtered)
@@ -7116,20 +7135,24 @@ def q35_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     agg_spec = {
         "cnt1": ("c_customer_sk", "count"),
-        "aggone1": ("cd_dep_count", "mean"),
-        "aggtwo1": ("cd_dep_count", "max"),
-        "aggthree1": ("cd_dep_count", "sum"),
-        "aggone2": ("cd_dep_employed_count", "mean"),
-        "aggtwo2": ("cd_dep_employed_count", "max"),
-        "aggthree2": ("cd_dep_employed_count", "sum"),
-        "aggone3": ("cd_dep_college_count", "mean"),
-        "aggtwo3": ("cd_dep_college_count", "max"),
-        "aggthree3": ("cd_dep_college_count", "sum"),
+        "aggone1": ("cd_dep_count", aggone),
+        "aggtwo1": ("cd_dep_count", aggtwo),
+        "aggthree1": ("cd_dep_count", aggthree),
+        "aggone2": ("cd_dep_employed_count", aggone),
+        "aggtwo2": ("cd_dep_employed_count", aggtwo),
+        "aggthree2": ("cd_dep_employed_count", aggthree),
+        "aggone3": ("cd_dep_college_count", aggone),
+        "aggtwo3": ("cd_dep_college_count", aggtwo),
+        "aggthree3": ("cd_dep_college_count", aggthree),
     }
     result = base.groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
     result["ca_state"] = result["ca_state"].astype(object).where(result["ca_state"].notna(), None)
     result["cnt2"] = result["cnt1"]
     result["cnt3"] = result["cnt1"]
+    # stddev_samp of a one-row group is NULL in SQL and NaN in pandas.
+    result = _none_for_null(
+        result, [f"agg{position}{number}" for position in ("one", "two", "three") for number in "123"]
+    )
     return (
         result[
             [
@@ -7368,14 +7391,11 @@ def q40_pandas_impl(ctx: DataFrameContext) -> Any:
     result["cr_refunded_cash"] = result["cr_refunded_cash"].fillna(0)
 
     # Compute sales_before and sales_after
-    result["sales_before_val"] = result.apply(
-        lambda row: row["cs_sales_price"] - row["cr_refunded_cash"] if row["d_date"] < sales_date else 0,
-        axis=1,
-    )
-    result["sales_after_val"] = result.apply(
-        lambda row: row["cs_sales_price"] - row["cr_refunded_cash"] if row["d_date"] >= sales_date else 0,
-        axis=1,
-    )
+    # Column-wise rather than row-wise: a row-wise apply on an empty frame returns a frame, not a column.
+    net_sales = result["cs_sales_price"] - result["cr_refunded_cash"]
+    before = result["d_date"] < sales_date
+    result["sales_before_val"] = net_sales.where(before, 0)
+    result["sales_after_val"] = net_sales.where(~before, 0)
 
     # Aggregate by warehouse state and item
     result = result.groupby(["w_state", "i_item_id"], as_index=False).agg(
