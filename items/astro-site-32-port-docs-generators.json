@@ -1,7 +1,7 @@
 {
   "acceptance": [
-    "make site-build runs every generator before astro build; no generator depends on Sphinx import or hooks",
-    "Query docs pages present at their current URLs in the Astro output",
+    "make site-build runs every generator before astro build; no generator depends on Sphinx import or hooks (generate_query_docs currently invoked from docs/conf.py:394)",
+    "Generated query pages present at their current URLs with SQL and DataFrame examples and catalog navigation intact (inventory diff for /docs/benchmarks/queries/** clean)",
     "example-validation and spellcheck run against the canonical docs/ sources and stay green",
     "Drift checks (prompt-quickstarts-check, query-docs, image validation) fail on a seeded drift in tests"
   ],
@@ -20,6 +20,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "a74d64317b3a4c32822d7a0c2ded5438",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:09:10Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c03035f60b8140b68df6a3dcc2437fbf",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
