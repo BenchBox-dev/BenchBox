@@ -127,6 +127,31 @@ packaging:
   - "benchbox/__init__.py"
   - "uv.lock"
 
+# Test-infrastructure inputs to the Windows and macOS binary framing job in
+# ci.yml. Subprocess, file-lock, file-handle, HOME and plugin changes pass on
+# Linux and fail only where a held lock file is unreadable and open files block
+# directory cleanup. The job also runs for the bundled dbgen binaries and the
+# framing test itself.
+framing:
+  - "tests/utilities/**"
+  - "conftest.py"
+  - "**/conftest.py"
+  - "tests/plugins/**"
+  - "tests/**/plugins/*"
+  - "tests/fixtures/database_fixtures.py"
+  - "tests/fixtures/test_data_fixtures.py"
+  - "tests/fixtures/result_dict_fixtures.py"
+  - "tests/fixtures/platform_fixtures.py"
+  - "tests/fixtures/utility_fixtures.py"
+  - "_benchbox_pytest_xdist_safety.py"
+  - "scripts/local_validation.py"
+  - "tests/duration_policy.py"
+  - "pytest.ini"
+  - "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py"
+  - "benchbox/__init__.py"
+  - "benchbox/_binaries/tpc-h/**"
+  - "_binaries/tpc-h/**"
+
 # Results-explorer visualization / CLI<->explorer parity source changes:
 # gates the parity-check job in ci.yml. See
 # tracker item `parity-check-develop-ring`.
