@@ -4,7 +4,7 @@
     "The completeness test covers all 99 templates and runs in about 4 s without data",
     "Declared-structural entries each carry a reason"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T6). Add every batch item created by dfparity-t05 to this item's needs when they exist. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "2026-10-03: done locally on feat/tpcds-literal-fallback-lint (worktree BenchBox.wt-tpcds-t06, commit e82f89910, based on t05g). test_literal_fallback_lint.py: a static AST lint over queries.py and the spec YAMLs; reads are attributed to queries through entry points and spec arguments, and the static view equals the runtime stand-in for all 66 adapted queries. test_parameter_name_completeness.py covers all 99 templates in ~5 s. No real findings on the current tree; STRUCTURAL lists are empty. Both bite: verified with 5 seeded counter-examples (evidence/rev3/t06_bite.txt). KEY FINDING: 33 queries draw values that reach the SQL but have no adapter; the inventory heuristic had missed them. They are pinned in PENDING_ADAPTER, which may only shrink. 6 have adapters on fix branches; the other 27 are tracked in dfparity-t05i-adapters-remaining.",
   "description": "After the adapters exist, prevent silent literal fallbacks from returning: an AST-based test (fast lane, no data) that fails when a TPC-DS DataFrame implementation calls params.get(\"key\", literal) for a key that is not mapped from dsqgen -LOG or declared structural with a reason. Motivating example: Q41 reads manufact_start with a literal fallback of 738 while the YAML holds a dead manufact_ids key. Also add a completeness test: every -LOG parameter name is mapped or declared structural with a reason.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "op": "update",
       "op_id": "84611f7ab43c4ea2953b4568b99f4eb1",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:14:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "de952594bd8a4ad382e8e74cb81602ef",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
