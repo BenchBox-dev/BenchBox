@@ -1,7 +1,9 @@
 """Pin how the post-merge workflow is triggered and queued.
 
-``trunk.yml`` is the only test of ``develop`` in its merged state, so a run for a
-merged commit must not be dropped, and a run on another ref must not replace it.
+``trunk.yml`` is the only test of ``develop`` in its merged state. Runs on one ref
+queue and GitHub keeps a single pending run, so a burst of merges is batched: a
+replaced run is covered by the next one, which tests the newer tree. A run on
+another ref must not replace the pending run for develop.
 """
 
 from __future__ import annotations
