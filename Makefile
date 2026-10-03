@@ -39,12 +39,12 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	quality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
-	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
+	agent-commit-range-check skill-integrity-check ci-lint pr-preflight pr-arm-auto-merge shrink-rollup \
 	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
 	soundness-drain-report soundness-drain-self-test worktree-audit worktree-finish
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix test-required-local-cases joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix test-required-local-cases joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -1347,76 +1347,35 @@ release-check:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-arm pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test trunk-revert
+.PHONY: pr-arm pr-preflight pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test trunk-revert
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
-# Local gate before pushing. One classifier artifact selects the same product
-# and skill-integrity lanes as CI. Content-only, product, unknown, empty, and
-# structurally unsafe skill diffs retain the full historical ci-lint + content
-# guard + fast-test contract; only an approved pure skill-integrity diff uses
-# the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
-# The uncached implementation is called by the receipt-bound wrapper below.
-pr-preflight-uncached:
-	@set -eu; \
-	DECISION=$$(mktemp); \
-	LISTS=$$(mktemp -d); \
-	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
-	git fetch origin develop --quiet; \
-	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
-	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS" SKIP_FAST_TESTS="$(SKIP_FAST_TESTS)"; \
-	$(MAKE) -s pr-preflight-medium-tests PATH_DECISION="$$DECISION"; \
-	$(MAKE) -s uat-artifact-hygiene
-
-# Canonical local preflight: the focused lane runs once, then the remaining
-# required lanes each classify the revalidated transaction input. The ordered
-# wrapper rejects drift between stages, and each stage gets its own
-# content-bound receipt; hosted required checks remain separate.
 pr-preflight:
-	@git fetch origin develop --quiet
-	uv run -- python scripts/local_validation.py ordered \
-		--focused-gate "local-focused-check" --focused-cmd 'make pr-preflight-focused-tests' \
-		--preflight-gate "required-pr-preflight" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \
-		$(BATCH_ARGS)
-
-# Consume the classifier decision only; never reimplement path globs here.
-# Mixed skill/product diffs run both lanes. Skill plus safe content stays on
-# the two narrow lanes. Content-only remains on the full product preflight
-# until a separately authorized optimization exists.
-.pr-preflight-route:
 	@set -eu; \
-	[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
-	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
-	ROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); keys=("skill_integrity_needed", "content_guard_needed", "skill_integrity_only", "needs_code_ci"); assert all(type(d.get(k)) is bool for k in keys), "invalid preflight decision"; assert not d["skill_integrity_only"] or (d["skill_integrity_needed"] and not d["needs_code_ci"]), "contradictory preflight decision"; print(*(str(d[k]).lower() for k in keys))' "$(PATH_DECISION)"); \
-	set -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \
-	if [ "$$SKILL_ONLY" = true ] && [ "$$CONTENT" != true ]; then \
-		echo "Selected preflight lanes: skill-integrity"; \
-		$(MAKE) -s skill-integrity-check; \
-	elif [ "$$SKILL_ONLY" = true ]; then \
-		echo "Selected preflight lanes: skill-integrity content"; \
-		$(MAKE) -s skill-integrity-check; \
-		$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
+	git fetch origin develop --quiet; \
+	PY_LIST=$$(mktemp); \
+	TEST_LIST=$$(mktemp); \
+	trap 'rm -f "$$PY_LIST" "$$TEST_LIST"' EXIT; \
+	uv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > "$$PY_LIST"; \
+	uv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > "$$TEST_LIST"; \
+	if [ -s "$$PY_LIST" ]; then \
+		echo "==> ruff (changed Python files)"; \
+		uv run -- ruff check --force-exclude $$(cat "$$PY_LIST"); \
+		uv run -- ruff format --check --force-exclude $$(cat "$$PY_LIST"); \
 	else \
-		LANES=product; [ "$$CONTENT" = true ] && LANES="$$LANES content"; [ "$$SKILL" = true ] && LANES="$$LANES skill-integrity"; \
-		echo "Selected preflight lanes: $$LANES"; \
-		$(MAKE) ci-lint; \
-		if [ "$$SKILL" = true ]; then $(MAKE) -s skill-integrity-check; fi; \
-		if [ "$(SKIP_FAST_TESTS)" = "1" ]; then \
-			echo "Focused local gate already completed; skipping duplicate fast tests."; \
-			$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
-		else \
-			$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
-		fi; \
-	fi
-
-# The historical full-preflight target runs pr-content-guard unless the
-# receipt-bound focused wrapper explicitly defers it to the required stage.
-# The needs-code-ci decision gates only the fast-test run below. Direct
-# invocation creates classifier artifacts when the parent preflight did not
-# already supply them.
-pr-preflight-focused-tests:
-	@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1
+		echo "No Python files changed; skipping ruff."; \
+	fi; \
+	if [ ! -s "$$TEST_LIST" ]; then \
+		echo "No test files map to the changed paths; CI runs the fast lane."; \
+		exit 0; \
+	fi; \
+	echo "==> tests for changed files"; \
+	STATUS=0; \
+	env $$(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/-u \1/p') uv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat "$$TEST_LIST") || STATUS=$$?; \
+	if [ "$$STATUS" -eq 5 ]; then echo "Mapped tests are all deselected by the default markers."; STATUS=0; fi; \
+	exit "$$STATUS"
 
 pr-preflight-fast-tests:
 	@set -eu; \
@@ -1432,78 +1391,13 @@ pr-preflight-fast-tests:
 		git fetch origin develop --quiet; \
 		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	fi; \
-	if [ "$(SKIP_CONTENT_GUARD)" = "1" ]; then \
-		echo "Focused checks defer content guard to required preflight."; \
-	else \
-		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
-	fi; \
+	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -q; \
 	else \
 		echo "No code changes detected; skipping fast tests."; \
 	fi
-
-# Medium tier as its own receipt-bound preflight stage. Selects tests affected
-# by product paths while merge_group retains the full `make test-medium` tier.
-# Content-only and skill-integrity-only diffs skip it.
-# Identical trees reuse the receipt across worktrees without colliding on
-# the shared test lock. The stage fails pr-preflight on failure; there is
-# no skip flag. The gate invocation scrubs the preflight control variables
-# (PATH_DECISION, PATH_LISTS, SKIP_FAST_TESTS) from the environment and
-# blanks MAKEFLAGS: make exports command-line variables and smuggles their
-# assignments inside MAKEFLAGS, so a leak would make test-spawned makes take
-# the caller-supplied branch with no lists dir ("PATH_LISTS is required") or
-# flip the route into its skip branch (stale "already completed" line inside
-# the suite). BATCH_ARGS is deliberately not scrubbed so batch mode still
-# binds receipts.
-pr-preflight-medium-tests:
-	@set -eu; \
-	if [ -n "$(PATH_DECISION)" ]; then \
-		[ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
-		DECISION="$(PATH_DECISION)"; \
-	else \
-		DECISION=$$(mktemp); \
-		trap 'rm -f "$$DECISION"' EXIT; \
-		git fetch origin develop --quiet; \
-		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" >/dev/null; \
-	fi; \
-	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
-		CHANGED_JSON=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); paths=d["changed_paths"]; assert isinstance(paths, list) and all(isinstance(path, str) for path in paths); print(json.dumps(paths, separators=(",", ":")))' "$$DECISION"); \
-		echo "==> medium tier (impact-selected local tests)"; \
-		env -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS BENCHBOX_MEDIUM_CHANGED_PATHS_JSON="$$CHANGED_JSON" MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD="make test-medium-selected"; \
-	else \
-		echo "No code changes detected; skipping medium tier."; \
-	fi
-
-# Publication lane isolation is a diff-vs-base guard. The path classifier has
-# already produced the changed-path list for the PR, so this target consumes
-# that exact artifact instead of reimplementing path classification or asking
-# the working tree to infer a base. Keep it in the content guard, where
-# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
-# Local validation singleflight. Runs CMD once per identical validated input
-# across worktrees; identical repeats reuse the recorded receipt instead of
-# re-executing and colliding on the shared test lock. Receipts never certify
-# hosted checks and never cross changed trees. Usage:
-#   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
-local-validation:
-	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
-	[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
-	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
-
-local-validation-show:
-	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
-	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
-
-# Ordered local delivery path. The focused check and required preflight have
-# distinct receipt namespaces and the focused gate must finish first. A hook
-# that is not active prints SKIPPED at its boundary instead of looking like a
-# successful test invocation.
-FOCUSED_CMD ?= uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q
-PREFLIGHT_CMD ?= make pr-preflight
-local-validation-path:
-	@echo "Running receipt-bound canonical preflight path (focused then required lanes)."
-	$(MAKE) -s pr-preflight $(BATCH_ARGS)
 
 # Revision/readiness transactions behind one helper (scripts/pr_landing.py).
 # The live PR targets below use the same exact-checkout arming path: start
@@ -1543,6 +1437,11 @@ pr-followup-resume:
 	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
 	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
 
+# Publication lane isolation is a diff-vs-base guard. The path classifier has
+# already produced the changed-path list for the PR, so this target consumes
+# that exact artifact instead of reimplementing path classification or asking
+# the working tree to infer a base. Keep it in the content guard, where
+# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
 pr-content-guard:
 	@set -eu; \
 	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
