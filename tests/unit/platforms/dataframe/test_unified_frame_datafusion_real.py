@@ -514,3 +514,101 @@ def test_datafusion_string_add_concat(datafusion_frame):
 
     d = result.to_pydict()
     assert d["name_excl"] == ["Alice!", "Bob!"]
+
+
+# ---------------------------------------------------------------------------
+# Expressions over aggregates inside group_by().agg() and global select()
+# ---------------------------------------------------------------------------
+# DataFusion plans these natively. The expected values come from SQL
+# semantics: a CASE whose condition and branches are aggregates must evaluate
+# each aggregate once and pick a branch, not combine the aggregates.
+
+
+@pytest.fixture()
+def agg_frame():
+    ctx = datafusion.SessionContext()
+    table = pa.table(
+        {
+            "g": [1, 1, 2, 2, 3],
+            "day": ["Sun", "Mon", "Sun", "Sun", "Mon"],
+            "x": [1, 2, 3, None, None],
+            "y": [1.0, 2.0, 4.0, 4.0, 5.0],
+        }
+    )
+    ctx.register_record_batches("agg_t", [table.to_batches()])
+    return UnifiedLazyFrame(ctx.sql("SELECT * FROM agg_t"), adapter=SimpleNamespace(platform_name="DataFusion"))
+
+
+def _col(name):
+    return UnifiedExpr(datafusion.col(name))
+
+
+def _when(condition):
+    from benchbox.platforms.dataframe.unified_frame import UnifiedWhen
+
+    return UnifiedWhen(condition.native, platform="DataFusion")
+
+
+def _grouped(frame, *exprs):
+    result = frame.group_by("g").agg(*exprs).sort("g").collect().to_pydict()
+    assert result["g"] == [1, 2, 3]
+    return result
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_groupby_case_over_aggregates(agg_frame):
+    """CASE WHEN count(x) > 0 THEN sum(x) END returns sum(x), not count(x) * sum(x)."""
+    x = _col("x")
+    result = _grouped(agg_frame, _when(x.count() > 0).then(x.sum()).otherwise(None).alias("s"))
+    assert result["s"] == [3, 3, None]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_groupby_case_over_aggregates_of_case(agg_frame):
+    """Aggregates of a CASE, wrapped in a CASE over those aggregates."""
+    sun_x = _when(_col("day") == "Sun").then(_col("x")).otherwise(None)
+    result = _grouped(
+        agg_frame,
+        _when(sun_x.count() > 0).then(sun_x.sum()).otherwise(None).alias("sun_sales"),
+    )
+    assert result["sun_sales"] == [1, 3, None]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_groupby_sum_of_case_times_columns(agg_frame):
+    """sum(CASE WHEN ... THEN x * y ELSE 0 END) keeps the CASE inside the sum."""
+    result = _grouped(
+        agg_frame,
+        _when(_col("day") == "Sun").then(_col("x") * _col("y")).otherwise(0).sum().alias("sun_xy"),
+    )
+    assert result["sun_xy"] == [1.0, 12.0, 0.0]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_groupby_count_times_sum_and_mixed_arithmetic(agg_frame):
+    """count * sum, and an expression mixing * and + over three aggregates."""
+    x, y = _col("x"), _col("y")
+    result = _grouped(
+        agg_frame,
+        (x.count() * x.sum()).alias("cnt_x_sum"),
+        (x.count() * x.sum() + y.sum()).alias("mixed"),
+        (x.sum() / y.sum()).alias("ratio"),
+    )
+    assert result["cnt_x_sum"] == [6, 3, None]
+    assert result["mixed"] == [9.0, 11.0, None]
+    assert result["ratio"] == [1.0, 0.375, None]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_global_select_case_over_aggregates(agg_frame):
+    """select() without group_by uses the same native aggregate planning."""
+    x, y = _col("x"), _col("y")
+    result = (
+        agg_frame.select(
+            _when(x.count() > 0).then(x.sum()).otherwise(None).alias("s"),
+            (y.sum() * 0.5).alias("half_y"),
+        )
+        .collect()
+        .to_pydict()
+    )
+    assert result == {"s": [6], "half_y": [8.0]}

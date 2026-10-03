@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renamed into place. Routine pruning preserves writer files regardless of age;
   an explicit cache clear removes files abandoned by a crashed run.
 
+- **Dask TPC-DS queries order NULLs like the reference.** Q19, Q34, Q71 and Q73
+  sort one key ascending and another descending. On `dask-df` every key put
+  NULLs last, so rows with a NULL in a descending key were out of order. They
+  now match the other DataFrame platforms.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade

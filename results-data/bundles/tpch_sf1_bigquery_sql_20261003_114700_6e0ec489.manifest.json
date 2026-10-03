@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf1_bigquery_sql_20261003_114700_6e0ec489.json",
+  "bundle_hash": "9571f6cb15f8eb0e6fa51bb8239d0515c40fbe50d9cd1a25e51b9b6ab243d23d",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
