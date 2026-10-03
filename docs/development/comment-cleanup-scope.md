@@ -175,121 +175,89 @@ algorithms, or payload identity under this policy. Do not rewrite historical
 results. Preserve useful nonempty query references, and record unsupported
 assurance as a blocker rather than adding inert replacement prose.
 
-## Delivery by integration branch
+## Delivery on one integration branch
 
-Module cleanup lands through a small number of integration branches, not one
-pull request per task. An integration branch is cut from `develop`, has one
-integrator, carries a fixed set of module tasks (its members), and lands as one
-pull request into `develop`. Members own disjoint paths because the scope policy
-gives each path exactly one owner. A branch lives about two working days, because
-`develop` merges about eighteen pull requests a day and a long-lived branch would
-always conflict with someone's open work. Foundation work, soundness-path files,
-payload changes, the exception register and the switch to blocking enforcement
-land as their own pull requests.
+All remaining cleanup stays on one isolated integration branch until the whole
+scope is complete and validated. One final pull request targets `develop`.
+Foundation corrections, soundness paths, payload changes, the exception register
+and blocking enforcement belong to that same pull request. Local chunks make
+integration and review manageable; they do not create separate delivery units.
 
-### An exception to the delivery-mode rule
+### Tracker lifecycle
 
-This is a deliberate exception, approved by the repository owner on 2026-10-02,
-to the delivery-mode rule in `AGENTS.md`. That rule reserves a shared
-integration branch with one final pull request for the tracker's
-registered-batch capability, and says to stay in serial mode, with one pull
-request per task, while the capability is absent. The program cannot use the
-capability today: its first use is a one-way schema migration that every client
-of the tracker must be stopped or upgraded for, the final pull request head can
-be bound only once so a single review fix would abort a branch, and a batch
-cannot be refreshed from `develop`. Serial mode with a pull request per task
-would mean over a hundred queue entries and as many reviews, which is the cost
-this contract avoids.
+The repository owner's exception to registered-batch delivery keeps the ordinary
+serial tracker lifecycle. No schema migration or registered-batch cutover is
+required. Record an immutable starting commit, an ordered task set and frozen
+ownership before work. One integrator writes tracked files on the shared branch.
+A task's validated local work may order dependent implementation, but the task
+finishes only after the final pull request merges. Preserve claim ownership;
+release an owned claim with notes identifying the work and evidence.
 
-The exception keeps what the rule is for. The cut commit, an explicit ordered
-member list and frozen member scopes are recorded before work starts. One
-integrator alone writes the branch. Each member's check evidence is listed in
-the pull request. One final pull request goes through full CI, review and the
-merge queue; there is never a feature-base pull request, a skipped check, or a
-bypass of review, merge or authority controls. The tracker lifecycle stays
-serial: a member task is taken, worked on the integration branch, released with a
-note naming the commit that carries its work, and finished only after the
-integration pull request has merged. If the registered-batch capability is
-installed later, the program can move to it; nothing here depends on that.
+### Ownership and parallel work
 
-### Cutting a branch
+Refresh live source, tracker requirements and open pull requests. Record conflicts
+and their owners; reconcile them before final delivery rather than excluding
+required files from the effort. Run the scope validator against a recorded
+commit and task set, and keep its resolved manifest ignored under `.todo-batch/`.
+Unknown paths, ambiguous ownership and unmigrated consumers block deletion.
 
-1. Read live `develop`. List the files that every open pull request changes and
-   leave out of the branch any file another open pull request touches; those
-   files wait for the final sweep.
-2. Run the scope validator at the cut commit. It must report no findings; fix
-   ownership first, through the one writer of the scope policy.
-3. Create a linked worktree with `make worktree-create` and run
-   `make agent-write-preflight`. Record the member list, the cut commit and the
-   excluded files in the ignored ledger under `.todo-batch/`.
+Use a linked worktree and `make agent-write-preflight`. The integrator alone
+edits tracked files. Parallel workers inspect bounded paths and write only
+ignored proposals or review reports. They do not change Git configuration,
+tracker state or the shared test lock. The integrator applies proposals in
+consumer-before-producer order and serializes shared tests.
 
-### Members
+### Checks for each local chunk
 
-Each member is taken by one worker in its own worktree, branched from the
-integration head. A member makes only deletions and the reader migrations that
-its task requires, with the reader migrations committed first. Before handing the
-commits to the integrator, run, without the shared test lock:
+Migrate readers before removing their source prose. Record separate evidence for
+intentional behavior changes and pure deletion. Each chunk requires:
 
-- the parity comparator over the changed files, which allows only removed
-  comments, removed leading docstrings and `pass` for a body left empty;
-- `scripts/check_comment_policy.py --mode strict --path <prefix>` for each owned
-  prefix, where only registered directives and notices may remain;
-- a check that the changed files are a subset of the member's owned paths;
-- a check that no deleted docstring has a reader that is not migrated in the same
-  member or an earlier one;
-- `ruff check`, `ruff format --check` and `compileall` on the changed files;
-- the member's own tests and the consumer tests its edges name, once, under the
-  shared lock and bounded to those tests.
+- deletion parity against an exact recorded base and path set;
+- strict comment-policy checks for its owned paths, with retained text registered;
+- ownership checks and evidence that every affected reader is migrated;
+- applicable Ruff, formatting and compilation checks;
+- bounded module and consumer tests under the shared test lock.
 
-### Integrating and landing
+A mixed branch cannot pass as a deletion-only change. Review its reader, checker,
+policy and payload changes separately. Preserve raw SQL/output identity unless
+an intentional change has the required hash, token, order, parameter, hint and
+applicable correctness, plan and timing evidence.
 
-Only the integrator writes the integration branch, by cherry-picking member
-commits in dependency order. It reruns the parity and ownership checks over the
-whole branch and one full local preflight on the head; when the preflight cannot
-finish in the available time, hosted CI is the gate, and the pull request says so.
-The pull request is opened as a draft. Its body lists the areas cleaned, the
-parity totals, every change that is not a pure deletion with file and line, the
-contracts moved and where, the files left out because of open pull requests, and
-the checker's summary line.
+### Whole-scope acceptance and publication
 
-Before the pull request is marked ready, run one external read-only review over
-the non-deletion diff, a sample of the deleted hunks and every public API file,
-and fix what it finds. Then mark it ready and arm it. If the merge queue rejects
-the head for a reason that is not a defect, arm it again. If a review finding
-arrives after it was queued, dequeue it, fix it, push with an exact lease, wait
-for green and arm it again.
+Finish and measure the pilot before broad deletion. Use its authoring and review
+cost to choose local chunk sizes and review budgets. A failing chunk is repaired;
+required scope is not dropped to obtain a passing result.
 
-The branch stays current by rebasing onto `develop`, never merging `develop` in,
-when the pull request conflicts and once more before it is marked ready. A branch
-never edits a file that an open pull request touches at cut time, and it does not
-push to or comment on other people's pull requests.
+Before publication, require zero unapproved prose and zero unresolved executable
+coverage gaps across the complete scope. Reconcile retained notices/directives,
+generators, contracts and decision records. Validate report, strict, staged,
+transition and workflow behavior. Complete final-enforcement and register evidence
+before setting the candidate policy to blocking; include strict CI wiring in the
+same pull request. Advisory-base acceptance and post-merge blocking are separate
+checks.
 
-### What stays out of an integration branch
+Assess open pull requests for enforcement impact. Give the repository owner the
+impact list and any notification text; an authorized operator sends notifications
+before activation. Tracker text alone does not authorize messages. Prove rejection
+of an injected prohibited comment and acceptance of an unchanged clean candidate
+with isolated tests of the actual workflow path. After merge, verify the fresh
+trusted base and collect hosted enforcement evidence from the next legitimate
+pull request. Do not create an extra probe pull request.
 
-- **Soundness-manifest paths.** Files that the repository's soundness predicate
-  flags are carved out into their own pull requests. Each needs an external review
-  (codex, muse or agy) with a `Soundness review:` section and the owner's manual
-  merge, so keeping them out of the large branches keeps those branches
-  mergeable by the queue.
-- **Payload changes.** A change to SQL text, generated output or an identity needs
-  its own disclosed pull request with raw-hash, token, order, parameter and hint
-  evidence and the correctness, plan and timing evidence the task requires.
-- **The exception register and the switch to blocking.** The checker starts in
-  advisory mode and reports without failing pull requests. The register of
-  retained directives, notices and fixtures lands after the module work, and the
-  setting moves to blocking only after a final whole-scope scan is clean.
+Reconcile current `develop` before final readiness and rebase when needed. Refresh
+affected evidence after base or head changes. Enumerate every changed path with
+Git; capped hosted file lists cannot establish complete review coverage.
 
-### Sizing and failure handling
+Review the exact final head, resolve required findings and all Critical/High
+findings, obtain the required independent Soundness review, and run canonical
+preflight after content settles. Open one final pull request. Its durable
+explanation describes the resulting behavior, preserved contracts, intentional
+changes and validation. Detailed task and comparison receipts stay in local
+evidence or the tracker.
 
-The first branch is a pilot that measures authoring time, parity failures, missed
-readers, review findings and CI attempts, and sets the size limit for the rest.
-Until it does, plan for about four hundred files and twenty thousand deleted lines
-per branch, and at most about one thousand changed lines that are not deletions.
-
-| Event | Action |
-|---|---|
-| A member fails parity or its tests | Fix it on the member branch, or drop it and rebuild the integration branch from the cut commit with the other members. |
-| Branch CI fails because of one member | Fix or drop that member; do not hold the others. |
-| The pull request conflicts with `develop` | Rebase, rerun parity, push with an exact lease. |
-| A regression is found after merge | Revert the squash commit, or fix forward if one file is the cause. |
-| The branch is abandoned | Close the pull request. Members keep their notes and are taken again later; nothing in the tracker needs undoing, because tasks finish only after merge. |
+Follow the active landing policy and exact-head hosted checks. Soundness changes
+currently require the repository owner's manual merge; do not bypass that action.
+After actual merge, verify the merged tree and trusted blocking enforcement,
+then finish tasks in dependency order. Local checks and pilot results do not
+certify UAT, deployment or production use.
