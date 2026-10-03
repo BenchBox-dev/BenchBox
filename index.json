@@ -998,6 +998,16 @@
       "status": "open",
       "title": "Write the authored API contract pages and retire the autodoc reference"
     },
+    "astro-site-35-landing-and-prompts-port": {
+      "claim": null,
+      "needs": [
+        "astro-site-22-shared-layout-shell",
+        "astro-site-32-port-docs-generators"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Port the landing page and the /prompts composer to Astro with behaviour parity"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

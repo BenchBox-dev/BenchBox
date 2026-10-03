@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "/ and /prompts/ served at current URLs; inventory diff clean for them",
+    "test_landing_quickstarts.py and the prompt composer behaviour (filter, copy) covered by tests against the Astro build",
+    "No cdnjs or other third-party script requests on / (network assertion in e2e)",
+    "landing/prompts/a11y-checklist.md items pass"
+  ],
+  "description": "Port landing/index.html, style.css and script.js to an Astro page using the shared shell and tokens. Keep the section structure and copy unless the owner approves changes. Replace Prism (cdnjs) with build-time Shiki, so there are no CDN scripts (G-g).\n\nPort landing/prompts/ (index.html, prompts.js, prompts.css, catalog.generated.js from catalog.yaml) as a page with a Preact island for the interactive composer, at its current URL. Keep the generated quickstarts from generate_landing_quickstarts.py.\n\nDo not add the analytics placeholder in landing/script.js:188.",
+  "links": [
+    "landing/index.html",
+    "landing/prompts",
+    "scripts/generate_landing_quickstarts.py",
+    "tests/unit/landing/test_landing_quickstarts.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:10:41Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "dc949592dac141f6a52ba925204e2595",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
