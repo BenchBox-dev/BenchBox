@@ -6541,7 +6541,7 @@
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
-      "priority": "medium",
+      "priority": "medium-high",
       "status": "open",
       "title": "Investigate the TPC-H seeded-run reference-seed path (owner-contested; verify before any change)"
     },

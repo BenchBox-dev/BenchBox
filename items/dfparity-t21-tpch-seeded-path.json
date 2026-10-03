@@ -1,10 +1,12 @@
 {
   "acceptance": [
+    "A direct reconciliation for TPC-H at SF=1: qgen -d values, qgen -r 17039360 values, and the official answer-file row counts for all 22 queries, showing which parameter set the answer files correspond to",
     "One seeded SF=1 DataFrame-vs-SQL comparison with seed 17039360 is run (with approval for SF=1) and its parameter bindings and validation labels are reported",
-    "Findings are presented to the owner with a recommendation; no TPC-H code is changed without the owner's decision (D5)",
+    "Throughput streams: at least two streams compared for SQL vs DataFrame bindings per query position (SQL derives a seed per stream and position, throughput_test.py ~62-74 and ~262-323; DataFrame stream resolution only permutes static queries, query_resolution.py get_tpch_dataframe_queries)",
+    "Findings are presented to the owner with a recommendation and a named remediation item; no TPC-H code is changed without the owner's decision (D5)",
     "The stale set_parameter_overrides docstring and the 'stream 0' comment are corrected only if the owner agrees"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T21). Owner stance: does NOT accept earlier reviewers' TPC-H claims. Treat this strictly as verification.",
+  "context": "Source: DataFrame query parity proposal v3 (item T21). Owner stance: does NOT accept earlier reviewers' TPC-H claims. Treat this strictly as verification.\n\n2026-10-03, verified by the author and Codex independently on develop 922eaba6e: seeded SQL runs pass the seed to qgen (tpch/queries.py ~71-78); DataFrame TPC-H runs set scale but have no seed binding (no production caller of tpch set_parameter_overrides; benchmark_mixin.py ~959-989). _tpch_reference_context (dataframe/query_validation.py:209-215) treats seed 17039360 as reference-aligned and then applies exact answer-file row counts without checking the executed parameters. So a seeded DataFrame run executes -d parameters while the seeded SQL run executes seed parameters, and the validation label can imply alignment that was not checked. Unseeded runs remain aligned (qgen -d equals get_tpch_parameters for all 22 queries, TESTED earlier). This is evidence of a seeded-path and throughput-stream parity gap, not proof that any row-count check fails. Priority raised to medium-high.",
   "description": "The project owner does not accept earlier reviewers' TPC-H claims, so this item starts from facts I tested or verified and changes nothing without an owner decision. Tested with the bundled qgen on Q3: -d gives BUILDING / 1995-03-15; -r 17039360 (TPCH_SF1_REFERENCE_SEED, benchbox/core/tpch/benchmark.py:31-47, commented as the seed the official answer files used) gives HOUSEHOLD / 1995-03-24; -r 101000000 gives BUILDING / 1995-03-31. Verified: _tpch_reference_context (benchbox/core/dataframe/query_validation.py:209-215) returns true at SF=1 when the seed is None or equals the reference seed, and DataFrame runs bind the -d defaults. Also verified: the unseeded path is aligned by design (code comments; extracted qgen -d parameters equal get_tpch_parameters for all 22 queries at SF=1 and SF=0.01) and no production caller injects seed-derived TPC-H overrides (set_parameter_overrides docstring is stale). Not verified: a seeded end-to-end run, throughput-test seed handling, the 'stream 0' comment at cross_surface.py:1684.",
   "sessions": [
     {
@@ -14,6 +16,14 @@
       "op": "create",
       "op_id": "ce3471d221cf49fc92245c55919bbaa1",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:10:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "25101f84bb1b4c9380b041e5bbcd19b8",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
