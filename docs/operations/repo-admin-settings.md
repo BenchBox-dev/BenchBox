@@ -57,6 +57,7 @@ Required status checks:
 - docs
 - landing
 - tooling
+- oracle-review
 ```
 
 Each required context is one always-reporting result job in
@@ -65,40 +66,36 @@ Each required context is one always-reporting result job in
 a touched unit succeeds only when every job it requires succeeded. A required
 job that was skipped fails the unit, so a path filter or a broken `if:` can
 never read as a pass (`scripts/ci_unit_result.py` holds the rule). Because all
-six contexts report on every `pull_request` and `merge_group` event, no
+six contexts report on every `pull_request` event, no
 required check can stay pending forever on a change that does not touch it.
 
 | Context | Runs for | Jobs it requires |
 | --- | --- | --- |
-| `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and in the merge queue the heavy tier: medium tests, correctness gate, plan-capture gate, DataFusion integration; package smoke and dependency audit on packaging changes |
-| `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite, public-site visual comparison |
+| `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and when heavy inputs change the medium tests, correctness gate, plan-capture gate and DataFusion integration; package smoke and dependency audit on packaging changes |
+| `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite |
 | `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
-| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, visual comparison |
-| `landing` | `landing/`, quickstart inputs | site theme token scan, visual comparison |
-| `tooling` | every event | soundness review flag; content guard, skill integrity, and audit checks by path; ruleset drift in the merge queue |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check |
+| `landing` | `landing/`, quickstart inputs | site theme token scan |
+| `tooling` | every event | content guard, skill integrity, and audit checks by path |
 
-The visual comparison runs only when a rendered public-site input changed
+The public-site visual comparison is advisory and feeds no required context until the site is in production. It runs only when a rendered public-site input changed
 (`render_changed` in the `visual-inputs` job). The site build keeps the broader
 input list so Sphinx warnings still fail before merge.
 
-`ruleset-drift` runs inside the `tooling` unit on `merge_group` events only. It
-checks out the trusted base revision, so the script and this runbook are read
-from the base, never from the change under test, and pull-request events never
-receive the token it uses.
+`scripts/ruleset_drift_check.py` compares the live rulesets with this runbook.
+With no merge queue it no longer runs inside `ci.yml`; run it by hand after a
+settings change, and the nightly workflow runs it as an advisory check.
 
-Required-check changes are ordered because the drift check reads this runbook
-from the trusted base revision. Change this list and
-`APPROVED_MERGE_QUEUE_CONTEXTS` in `scripts/ruleset_drift_check.py` in the same
-PR that changes the workflow, then update the hosted ruleset in one API call
-immediately after that PR merges; the interval is fail closed. Read the live
-ruleset back and run `scripts/ruleset_drift_check.py` before claiming
-activation, and record a merge-group run for the exact head SHA. A green
-pull-request run alone does not prove queue coverage.
+Change this list and `APPROVED_MERGE_QUEUE_CONTEXTS` in
+`scripts/ruleset_drift_check.py` in the same PR that changes the workflow, then
+update the hosted ruleset immediately after that PR merges. Read the live
+ruleset back and run `scripts/ruleset_drift_check.py` before claiming the
+change.
 
 Other ruleset properties to preserve:
 
 ```text
-strict_required_status_checks_policy: true
+strict_required_status_checks_policy: false
 required_linear_history: true
 non_fast_forward: true
 required_pull_request_reviews:    squash-only PRs
@@ -106,11 +103,13 @@ deletion: blocked
 bypass_actors: (none)
 ```
 
-Current-base checks are required because instruction budgets and other
-repository-wide invariants are not additive per PR. Without the strict policy,
-two PRs can each pass against the same older base and exceed an invariant when
-merged in sequence. The tradeoff is deliberate: when `develop` advances, an
-otherwise-green PR must refresh its required checks before it can merge.
+Current-base checks are not required. With no merge queue and about thirty
+merges a day, the strict policy would invalidate every open PR on every merge.
+Instead `trunk.yml` tests `develop` after each merge, including the ungraced
+fast-lane ceiling, and a red run is reverted with `make trunk-revert`. The
+rare case where two PRs each pass on an older base and break an invariant
+together is caught there, not before merge. If that happens more than about
+once a week, turn the strict policy back on.
 
 The latest bounded, read-only wall and runner-minute remeasure is recorded in
 [`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
@@ -150,30 +149,17 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
   }'
 ```
 
-### Native Merge Queue Configuration (Post-v0.4.0)
+### No merge queue
 
-When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611785`), the following rule parameters govern queue operations:
+`develop-squash-only` (ruleset id `15611785`) has no `merge_queue` rule since
+2026-10-03; see `_project/decisions/merge-queue-retirement-2026-10-03.md`.
+Agents arm a PR with `make pr-arm`, which enables auto-merge; it squash-merges
+when the required checks pass and every review thread is resolved. The drift
+check reports a `merge_queue` rule that reappears.
 
-```json
-{
-  "type": "merge_queue",
-  "parameters": {
-    "check_response_timeout_minutes": 90,
-    "grouping_strategy": "ALLGREEN",
-    "max_entries_to_build": 2,
-    "max_entries_to_merge": 3,
-    "merge_method": "SQUASH",
-    "min_entries_to_merge": 1,
-    "min_entries_to_merge_wait_minutes": 0
-  }
-}
-```
-
-- **Queue Timeout:** `check_response_timeout_minutes: 90` allows sufficient time for merge-group checks across parallel shards to complete without premature ejection during runner contention.
-- **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
-- **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
-- **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
+`oracle-review` (from `.github/workflows/oracle-review.yml`) is required: it
+passes when the change touches no soundness path, or when the Codex connector
+has reviewed the current head and none of its review threads is unresolved.
 
 ### Soundness-path review enforcement (enforced; operational caution)
 
