@@ -1,5 +1,7 @@
 # Auto-merge policy: adversarial evaluation and consolidation
 
+> Partly superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md): D7 (no merge-blocking review gate); the required `oracle-review` check now blocks the merge of result-affecting changes, and the PR-body attestation is gone.
+
 **Date**: 2026-08-06
 **Status**: historical evaluation; D1–D4 and D6 were later implemented.
 D5 and D7 remain recommendations pending explicit authorization. At the time

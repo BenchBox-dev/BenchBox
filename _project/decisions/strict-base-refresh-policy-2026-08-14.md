@@ -1,5 +1,7 @@
 # Decision: strict-base refresh safety contract
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-08-14
 Status: Accepted for planning. This record is the current merge-policy
 authority for the refresh program. It does not activate skip behavior.

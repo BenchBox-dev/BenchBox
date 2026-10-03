@@ -106,8 +106,8 @@ a PR's mergeability — both only alert.
   armed by `opened`, `reopened`, or `synchronize` (a re-push will not flip it
   on). The intentional arm paths are:
 
-  - `make pr-arm` on a finished branch (enqueues the exact local head after a
-    live check of the PR)
+  - `make pr-arm` on a finished branch (arms auto-merge on the exact local head
+    after a live check of the PR)
   - `make pr-open READY=1` to open or reuse the PR and arm it in one step
   - `make pr-ready PR=<n> HEAD=<sha>`, which arms through `make pr-arm`; with
     `EVIDENCE=<path>` or `BATCH=1` it runs the evidence transaction instead,
@@ -169,8 +169,11 @@ once when it drains — never a per-run flood of new issues.
 
 ## Red develop tip
 
-There is no post-merge workflow: the merge queue runs the six required units
-on the exact tree that lands, so a red develop tip means something reached
-develop outside the queue or a queue certification was wrong. Treat it as
-**same-day fix-forward priority**, because every PR opened after a red tip
-inherits the breakage. The green-unmerged sweep no longer reports it.
+`.github/workflows/trunk.yml` tests `develop` after every merge (fast lane,
+four-shard medium tier and correctness gate), so a red develop tip is a trunk
+failure that the PR's own checks did not catch. Revert first: run
+`make trunk-revert PR=<n>` for the culprit and fix it afterwards. While trunk has
+been red for more than 30 minutes, `make pr-open` refuses any PR that is not a
+revert, because every PR opened on a red tip inherits the breakage. The
+green-unmerged sweep does not report it.
+See [Merge and trunk governance](merge-queue-governance.md).

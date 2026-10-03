@@ -28,6 +28,15 @@ This design accumulated significant operational drag:
 This ADR establishes the architectural decisions, operational contracts, and migration
 guardrails for a consolidated trunk-based development loop behind the GitHub merge queue.
 
+Amended 2026-10-03: the merge queue and the strict up-to-date rule on `develop` are
+retired, and a pull request merges by auto-merge once its required checks pass on its
+own head. The queue's failures were mostly its own machinery: 38 of the 40 most recent
+failed merge-group runs, with no confirmed cross-PR integration failure. A post-merge
+workflow, `.github/workflows/trunk.yml`, tests `develop` after each merge, and a red
+trunk is reverted first. Where this ADR names the merge queue, read the history of the
+design, not the current gate. See
+`_project/decisions/merge-queue-retirement-2026-10-03.md`.
+
 ## Decisions
 
 ### D1: Trunk branch remains `develop`
@@ -83,11 +92,11 @@ by three controls:
    (`required_review_thread_resolution`). GitHub lets an author with write access resolve
    a thread, so resolution shows that someone dispositioned the finding, not that it was
    fixed. The digest below is the check on that.
-2. Review signal at arming. For changes on the narrowed soundness path list, `make
-   pr-arm` refuses until a completed review is visible on the current head: the Codex
-   connector's submitted review or thumbs-up reaction, or an external review posted as a
-   PR comment. An "eyes" reaction alone means the review has started, not finished. A
-   posted comment shows that a review was recorded, not what it examined.
+2. Review signal as a required check. For changes on the narrowed soundness path list,
+   the required `oracle-review` status check passes only when the Codex connector app has
+   reviewed the current head: its submitted review or thumbs-up reaction. An "eyes"
+   reaction alone means the review has started, not finished. A review that exists shows
+   that a reviewer looked, not what it examined.
 3. Post-merge digest. A scheduled report lists the commits that reached `develop` on the
    narrowed paths and records which review signal each had at merge. It also flags each
    review thread that was resolved with no later commit. It opens a tracker item for
@@ -100,23 +109,21 @@ slower to skip; the digest detects a bypass after the merge and is the backstop.
 squash commit is one revert unit, but a revert on a busy trunk is not always clean, so
 the backstop does not replace the review before the merge.
 
-The arming refusal is a merge-blocking automated review signal. It supersedes item 3 of
+The `oracle-review` check is a merge-blocking automated review signal. It supersedes item 3 of
 `_project/decisions/codeowner-approving-count-zero-constraint-2026-09-15.md` for paths on
 the soundness list only, and only that item. That decision kept such signals advisory
 because a batch of failing Codex reviews exhausted the usage limit and deadlocked the
-queue. To keep one provider's limit from blocking arming, any of the Codex connector,
-the `codex` CLI, `muse` and `agy` satisfies the signal, and each has its own quota.
+queue. The `codex` CLI, `muse` and `agy` remain available as optional extra depth, each
+with its own quota, but only the Codex connector's review satisfies the check.
 
-When none of them can complete a review, the owner's own review of the PR satisfies the
-signal: a review comment from the repository owner, left on the current head, counts as
-the completed review and `make pr-arm` accepts it. The owner is the one party whose
-review does not share the author's context, so this keeps the review independent instead
-of lowering it to a same-model reader. Two conditions apply. The PR body names each
-reviewer that was tried and quotes the quota error each returned, so the fallback leaves
-a record; and the fallback holds only while no listed reviewer can run, so an agent that
-can obtain an external review must do so rather than wait for the owner. All four
-reviewers were exhausted at once on 2026-10-02, which blocked every workflow change for
-three days under the fail-closed rule alone.
+When the connector has not reviewed the head within four hours, the owner, not an agent,
+reviews the change in their own session. If the owner approves, they either re-request the
+connector review, or merge the pull request themselves through the GitHub UI after
+temporarily removing `oracle-review` from the required checks, and restore it afterwards.
+Every human and agent posts as the owner account, so an owner comment cannot be told apart
+from an agent's; for that reason `oracle-review` does not accept one, and agents never post
+a review on the owner's behalf. All four reviewers were exhausted at once on 2026-10-02,
+which blocked every workflow change for three days under the fail-closed rule alone.
 
 The soundness path list is narrowed to code that produces, normalizes, compares or
 validates results, every workflow, the release and binary paths, and `AGENTS.md`.
@@ -126,7 +133,7 @@ unchanged, and the external review requirement is unchanged except for the quota
 fallback above. `AGENTS.md` still states the requirement without the fallback; the change
 that removes the attestation check from `ci.yml` rewrites that sentence, because
 `AGENTS.md` is itself a soundness path and must carry the attestation until then. The
-arming refusal, the digest and the narrowed list land in separate changes; until the
+`oracle-review` check, the digest and the narrowed list land in separate changes; until the
 attestation check is removed from `ci.yml`, a PR on a soundness path must still carry a
 valid `Soundness review:` section.
 

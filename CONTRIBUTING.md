@@ -44,11 +44,11 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
+Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`, plus `oracle-review`, which passes on a result-affecting PR only when the Codex connector app has reviewed its current head. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it with `make pr-arm`, which checks the live PR for a hold and enqueues the exact head; the merge queue lands it when its checks are green. You are done when the PR is merged, not when it is open or green: re-enqueue (`make pr-arm` again) after a spurious ejection and fix and push after a real failure. Stop and hand back only for the exceptions listed in `AGENTS.md` `[WRITE-CLOSEOUT-001]`.
+The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it with `make pr-arm`, which checks the live PR for a hold and arms auto-merge on the exact head; GitHub merges it when its required checks are green. After the merge, `trunk.yml` tests `develop`; if it fails because of your change, revert first with `make trunk-revert PR=<n>`. You are done when the PR is merged, not when it is open or green: re-arm (`make pr-arm` again) after a spurious failure and fix and push after a real failure. Stop and hand back only for the exceptions listed in `AGENTS.md` `[WRITE-CLOSEOUT-001]`.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -94,7 +94,7 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
    ```
 
    `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
-   being mistaken for a queue failure; remove a hold deliberately to release it. Before editing an armed PR,
+   being mistaken for a failing check; remove a hold deliberately to release it. Before editing an armed PR,
    withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
    push the correction, and arm the new head: a later `--match-head-commit` cannot undo a merge of the old head.
    `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
@@ -142,7 +142,7 @@ This runs the broader CI mirror:
 
 Or run any of those individually. Additional one-offs: `make security-audit` and `make spellcheck`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge queue, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
 
 ## Testing
 
