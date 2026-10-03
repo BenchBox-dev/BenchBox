@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-03T15:17:09.818321+00:00",
+  "generated_at": "2026-10-03T16:07:42.757849+00:00",
   "bundles": [
     {
       "file": "amplab_sf01_bigquery_sql_20260920_000055_35490af7.json",
@@ -3058,6 +3058,32 @@
       "bundle_sha256": "1fd9a95b990a5f2369317bfb2704aeb6ef7055d00d8acc68d9c3554a9d7361c5"
     },
     {
+      "file": "tpch_sf1_bigquery_sql_20261003_114700_6e0ec489.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-03T11:47:00.505806",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9571f6cb15f8eb0e6fa51bb8239d0515c40fbe50d9cd1a25e51b9b6ab243d23d"
+    },
+    {
+      "file": "tpch_sf10_bigquery_sql_20261003_120614_73b816d9.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-03T12:06:14.641557",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d3495b289b5d51d1968917880fcf02751657e7376f850ca4e065590804a3f158"
+    },
+    {
       "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -3186,6 +3212,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "de976801b3107015b1c58062c8d71945d97aedbb1aadb278e479e7b6bb264feb"
+    },
+    {
+      "file": "tpch_sf1_databricks_sql_20261003_114841_ab447f73.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-03T11:48:41.560602",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2dab70bc39202aaedd9264bb6173319e12ccccc3d01efe1fe8d69e98c2bba48f"
     },
     {
       "file": "tpch_sf001_duckdb_sql_20260826_105325_8a57a5a8.json",
@@ -3576,6 +3615,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "57eefabaf08d5fa44a7d9315e94377f2e616a65de0200c4abadc82c2244d8546"
+    },
+    {
+      "file": "tpch_sf1_snowflake_sql_20261003_113923_e545c1c5.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-03T11:39:23.834339",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "c30a01782e7bd5329a14c4fff54cb2de443026a2f89435486c40c4f66bec2eb2"
     },
     {
       "file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
@@ -4845,16 +4897,20 @@
       "Spark v4.1.1"
     ],
     "tpch@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2",
       "DuckLake v1.3.2",
       "Polars v1.40.0",
       "PySpark v4.1.1",
       "SQLite v3.53.1",
+      "Snowflake v10.35.101",
       "Spark v4.1.1"
     ],
     "tpch@sf10.0": [
+      "BigQuery",
       "DuckDB v1.0.0",
       "DuckDB v1.1.3",
       "DuckDB v1.2.2",
@@ -4968,7 +5024,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 348,
+    "total_bundles": 352,
     "by_benchmark": {
       "amplab": 23,
       "clickbench": 16,
@@ -4984,7 +5040,7 @@
       "tpcdi": 9,
       "tpcds": 22,
       "tpcds_obt": 6,
-      "tpch": 44,
+      "tpch": 48,
       "tpch_skew": 24,
       "tpchavoc": 18,
       "transaction_primitives": 9,
@@ -4992,12 +5048,12 @@
       "write_primitives": 9
     },
     "by_platform": {
-      "BigQuery": 37,
+      "BigQuery": 39,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
       "DataFusion": 45,
-      "Databricks": 28,
+      "Databricks": 29,
       "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
@@ -5005,15 +5061,15 @@
       "Polars": 28,
       "PySpark": 2,
       "SQLite": 23,
-      "Snowflake": 39,
+      "Snowflake": 40,
       "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 348
+      "maintainer-run": 352
     },
     "by_funding": {
-      "unspecified": 348
+      "unspecified": 352
     }
   }
 }

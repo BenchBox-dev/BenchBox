@@ -225,7 +225,33 @@ What these results are and are not:
   overhead dominates. Only the SF 1 cells are included.
 - Not included: Databricks cells (the runs enabled the result cache and have
   no receipt), BigQuery SSB (needs validator overrides), ClickBench SF 0.1 and
-  SF 10 (scale-invariant), TPC-DS, TPC-DI and TPC-H.
+  SF 10 (scale-invariant), TPC-DS and TPC-DI. TPC-H is covered in the next
+  section.
+
+## Live cloud TPC-H, fresh runs (2026-10-03)
+
+Four maintainer-run TPC-H bundles from live runs on 2026-10-03 were added with
+`result_source: internal` submission manifests: SF 1 on BigQuery, Snowflake and
+Databricks, and SF 10 on BigQuery. They replace part of the coverage withdrawn
+on 2026-09-25 and were run on code that includes the cloud fixes made since:
+Snowflake and Databricks session cache receipts, load hardening, region
+capture and the Snowflake query-history fix.
+
+What these results are and are not:
+
+- All four were run in `--official` mode with `--seed 42`, so each is stamped
+  `compliance_class: official`. Each passes `scripts/validate_submission.py
+  --require-manifest` with no error, warning or override.
+- Snowflake and Databricks runs disabled the result cache per session and
+  record a validated cache receipt with the cache disabled. BigQuery jobs ran
+  with the query cache disabled in configuration.
+- Row counts match the TPC-H scale factor (LINEITEM 6,001,215 at SF 1 and
+  59,986,052 at SF 10) and all 22 queries ran in every bundle.
+- Not included: the SF 0.1 runs on all three platforms (unofficial subscale
+  runs), and SF 10 on Snowflake and Databricks. Those runs completed but their
+  timings move little across scale (geometric mean about 1.35x from SF 0.1 to
+  SF 10 on both platforms), which the validator flags as scale-invariant and
+  which needs a maintainer-written override before publication.
 
 ## Public-path single-pass status (2026-08-05)
 
