@@ -977,6 +977,16 @@
       "status": "open",
       "title": "Repoint the docs content generators and validators at the Astro build"
     },
+    "astro-site-33-blog-collection-and-feed": {
+      "claim": null,
+      "needs": [
+        "astro-site-31-myst-to-mdx-converter",
+        "astro-site-22-shared-layout-shell"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Port the blog to an Astro collection with identical post URLs and an unchanged Atom feed"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
