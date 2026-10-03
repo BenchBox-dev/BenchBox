@@ -967,7 +967,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Write a build-time MyST-to-Astro converter that fails closed on unknown constructs"
+      "title": "Write a build-time MyST-to-Markdown converter for Astro that fails closed on unknown constructs"
     },
     "astro-site-32-port-docs-generators": {
       "claim": null,

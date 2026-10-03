@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "Converter unit tests per construct, plus a golden-file test on 5 real pages",
-    "Full docs/ converts with zero unknown-construct errors; the list of constructs handled is printed by site-build",
-    "All internal links in the converted output resolve (site_inventory diff: zero broken internal links)",
+    "Converter unit tests per construct, plus golden-file tests on 5 real pages including a former-RST hub page",
+    "Full docs/ converts with zero unknown-construct errors",
+    "All internal links and anchors resolve (site_inventory diff: zero broken internal links, zero lost fragment ids)",
+    "MDX used only where a component is present (counted in build output)",
     "No committed generated content; docs/ unchanged by the build"
   ],
-  "description": "Write a converter that runs inside site-build and reads docs/**/*.md as the canonical source (guardrail G-b). It writes Astro content-collection entries to a gitignored build directory.\n\nConstructs to handle, with counts measured on 2026-10-03:\n- {tags}: 219 → frontmatter tags\n- {toctree}: 16 → sidebar config and section order\n- note/tip/warning/important/deprecated admonitions: 26 → Callout component\n- {ref}/{doc} roles: 18 → resolved relative links\n- {mermaid}: 6 → build-time SVG\n- MyST anchors and labels, image paths, code fences with Cobalt2-equivalent Shiki theme\n\nAny directive, role or syntax it does not know is a hard build error naming file and line. Nothing is silently passed through.\n\nOutput is idempotent: a byte-identical rebuild from the same input.",
+  "description": "Write a converter that runs inside site-build and reads docs/**/*.md as the canonical source (guardrail G-b). It writes Astro content-collection entries to a gitignored build directory.\n\nOutput format: plain Markdown by default. MDX is emitted only for a page that needs a component (callout, mermaid, embed), so authoring and parsing constraints stay minimal.\n\nConstructs to handle, with counts re-measured after astro-site-30:\n- {tags} (219) → frontmatter tags and tag pages\n- toctrees (16 MyST + those converted from 39 RST) → sidebar config and section order\n- admonitions (26) → Callout\n- {doc}/{ref} and converted :doc: roles (236 before astro-site-30) → resolved relative links\n- {mermaid} (6) → build-time SVG\n- labels and explicit anchors kept as the same fragment ids; tables, images, Cobalt2-equivalent code highlighting\n\nAny directive, role or syntax it does not know is a hard build error naming file and line. Output is idempotent: a byte-identical rebuild from the same input.",
   "links": [
     "docs/conf.py",
     "docs/_extensions/sphinx_tags_fix.py",
@@ -18,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "da498452d2b246c28973287cba2bdfe1",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:08:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "aff8fb41bf7840018dc085181daa76ad",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
