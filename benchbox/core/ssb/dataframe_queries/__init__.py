@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-# Import queries module to trigger registration
 from benchbox.core.ssb.dataframe_queries import queries as _queries  # noqa: F401
 from benchbox.core.ssb.dataframe_queries.registry import (
     SSB_DATAFRAME_QUERIES,

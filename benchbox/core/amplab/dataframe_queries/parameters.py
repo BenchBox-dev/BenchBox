@@ -13,11 +13,6 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-# Date parameters are typed ``datetime.date`` objects (not ISO strings) so they
-# compare correctly against the production loader's date32-typed ``visitDate``
-# column - mirroring the TPC-H DataFrame queries, whose date params are also
-# ``date`` objects. Comparing a date column to a string literal raises under both
-# the Polars expression backend and the Pandas (pyarrow date32) backend.
 AMPLAB_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
     "Q1": {"pagerank_threshold": 1000},
     "Q1a": {"pagerank_threshold": 1000},
@@ -38,17 +33,15 @@ AMPLAB_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
 
 @dataclass
 class AMPLabParameters:
-    """Parameter container for an AMPLab query."""
-
     query_id: str
     params: dict[str, Any]
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value with optional default."""
+
         return self.params.get(key, default)
 
 
 def get_parameters(query_id: str) -> AMPLabParameters:
-    """Get parameters for an AMPLab query."""
+
     params = AMPLAB_DEFAULT_PARAMS.get(query_id, {}).copy()
     return AMPLabParameters(query_id=query_id, params=params)

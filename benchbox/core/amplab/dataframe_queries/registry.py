@@ -13,7 +13,7 @@ AMPLAB_DATAFRAME_QUERIES = QueryRegistry("amplab")
 
 
 def get_amplab_query(query_id: str) -> DataFrameQuery | None:
-    """Get an AMPLab DataFrame query by ID."""
+
     return AMPLAB_DATAFRAME_QUERIES.get(query_id)
 
 
@@ -21,10 +21,10 @@ def list_amplab_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List AMPLab DataFrame queries with optional filtering."""
+
     return AMPLAB_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 
 def register_query(query: DataFrameQuery) -> None:
-    """Register an AMPLab DataFrame query."""
+
     AMPLAB_DATAFRAME_QUERIES.register(query)

@@ -19,19 +19,6 @@ pytestmark = [
 
 
 class TestGetTableLoadingOrder:
-    """Regression coverage for tuning-fk-load-ordering-fix-20260716.
-
-    SSB's fact table (lineorder) has foreign keys into customer, part,
-    supplier, and date (benchbox/core/ssb/schema_specs.yaml). Before this
-    fix, SSBBenchmark had no get_table_loading_order, so
-    benchbox/platforms/base/data_loading.py::DataLoader fell back to
-    *alphabetical* order (customer, date, lineorder, part, supplier) --
-    which loads lineorder before part/supplier and would violate FK
-    references once examples/tunings/duckdb/ssb_tuned.yaml's
-    foreign_keys.enabled/enforce_referential_integrity actually reaches the
-    engine.
-    """
-
     def test_includes_every_table_exactly_once(self):
         order = get_table_loading_order()
         assert sorted(order) == sorted(TABLES.keys())
@@ -46,14 +33,12 @@ class TestGetTableLoadingOrder:
         assert position["date"] < position["lineorder"]
 
     def test_lineorder_sorts_last(self):
-        # lineorder is the only table with FK dependencies, so it must be
-        # the final entry regardless of tie-breaking among the other four.
+
         order = get_table_loading_order()
         assert order[-1] == "lineorder"
 
     def test_alphabetical_order_would_not_be_fk_safe(self):
-        # Confirms this is a real fix, not a no-op re-derivation of the
-        # previous (alphabetical) fallback behavior.
+
         order = get_table_loading_order()
         assert order != sorted(order)
 

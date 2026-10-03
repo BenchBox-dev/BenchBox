@@ -13,7 +13,7 @@ COFFEESHOP_DATAFRAME_QUERIES = QueryRegistry("coffeeshop")
 
 
 def get_coffeeshop_query(query_id: str) -> DataFrameQuery | None:
-    """Get a CoffeeShop DataFrame query by ID."""
+
     return COFFEESHOP_DATAFRAME_QUERIES.get(query_id)
 
 
@@ -21,10 +21,10 @@ def list_coffeeshop_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List CoffeeShop DataFrame queries with optional filtering."""
+
     return COFFEESHOP_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 
 def register_query(query: DataFrameQuery) -> None:
-    """Register a CoffeeShop DataFrame query."""
+
     COFFEESHOP_DATAFRAME_QUERIES.register(query)

@@ -1,5 +1,3 @@
-"""Fast coverage tests for CoffeeShopBenchmark branches."""
-
 from __future__ import annotations
 
 from pathlib import Path

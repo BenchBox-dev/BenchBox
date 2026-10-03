@@ -16,7 +16,7 @@ from typing import Any
 
 
 def _value(value: str) -> Any:
-    """Coerce plain decimal strings to integers for compact parameters."""
+
     return int(value) if value.isdecimal() else value
 
 
@@ -44,24 +44,15 @@ SSB_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
 
 @dataclass
 class SSBParameters:
-    """Parameter container for an SSB query."""
-
     query_id: str
     params: dict[str, Any]
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value with optional default."""
+
         return self.params.get(key, default)
 
 
 def get_parameters(query_id: str) -> SSBParameters:
-    """Get parameters for an SSB query.
 
-    Args:
-        query_id: Query identifier (e.g., "Q1.1", "Q3.2")
-
-    Returns:
-        SSBParameters with default values for the query.
-    """
     params = SSB_DEFAULT_PARAMS.get(query_id, {}).copy()
     return SSBParameters(query_id=query_id, params=params)

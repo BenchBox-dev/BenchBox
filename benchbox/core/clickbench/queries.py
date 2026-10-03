@@ -23,18 +23,12 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 
 class ClickBenchQueryManager:
-    """Manager for ClickBench queries."""
-
     def __init__(self) -> None:
-        """Initialize ClickBench query manager."""
+
         self._queries = self._load_queries()
 
     def _load_queries(self) -> dict[str, str]:
-        """Load all ClickBench queries.
 
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
         queries = {
             "Q1": "SELECT COUNT(*) FROM hits;",
             "Q2": "SELECT COUNT(*) FROM hits WHERE AdvEngineID <> 0;",
@@ -84,25 +78,11 @@ class ClickBenchQueryManager:
         return queries
 
     def get_all_queries(self) -> dict[str, str]:
-        """Get all ClickBench queries.
 
-        Returns:
-            Dictionary mapping query IDs to SQL strings
-        """
         return self._queries.copy()
 
     def get_query(self, query_id: str) -> str:
-        """Get a specific ClickBench query by ID.
 
-        Args:
-            query_id: Query identifier (Q1, Q2, ..., Q43)
-
-        Returns:
-            SQL query string
-
-        Raises:
-            ValueError: If query_id is not valid
-        """
         if query_id not in self._queries:
             available = sorted(self._queries.keys())
             raise ValueError(f"Invalid query ID '{query_id}'. Available queries: {available}")
@@ -110,11 +90,7 @@ class ClickBenchQueryManager:
         return self._queries[query_id]
 
     def get_query_categories(self) -> dict[str, list[str]]:
-        """Get queries organized by category/type.
 
-        Returns:
-            Dictionary mapping category names to lists of query IDs
-        """
         return {
             "basic_aggregation": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"],
             "grouping_and_ordering": [

@@ -21,14 +21,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 class _Expr:
-    """Minimal expression stub that supports comparison and chaining operators."""
-
     def __gt__(self, other):
         return _Expr()
 
@@ -76,8 +69,6 @@ class _Expr:
 
 
 class _DataFrame:
-    """Minimal DataFrame stub that supports fluent method chaining and comparison."""
-
     def __gt__(self, other):
         return _DataFrame()
 
@@ -131,7 +122,7 @@ class _DataFrame:
 
 
 def _mock_ctx():
-    """Return a mock DataFrameContext with expression and DataFrame stubs."""
+
     ctx = MagicMock()
     ctx.col.side_effect = lambda *a, **kw: _Expr()
     ctx.lit.side_effect = lambda *a, **kw: _Expr()
@@ -141,7 +132,7 @@ def _mock_ctx():
 
 
 def _pandas_ctx():
-    """Return a mock DataFrameContext backed by minimal pandas DataFrames."""
+
     from datetime import datetime
 
     order_lines = pd.DataFrame(
@@ -153,8 +144,6 @@ def _pandas_ctx():
             "total_price": [5.0, 3.0, 8.0, 4.0],
             "quantity": [1, 2, 1, 1],
             "unit_price": [5.0, 3.0, 8.0, 4.0],
-            # Production loads TIME columns as "HH:MM:SS" strings (TIME has no
-            # reliable DataFrame dtype), so the fixture mirrors that contract.
             "order_time": ["08:00:00", "12:00:00", "16:00:00", "20:00:00"],
         }
     )
@@ -189,11 +178,6 @@ def _pandas_ctx():
     return ctx
 
 
-# ---------------------------------------------------------------------------
-# _parse_date
-# ---------------------------------------------------------------------------
-
-
 def test_parse_date_from_string():
     from benchbox.core.coffeeshop.dataframe_queries.queries import _parse_date
 
@@ -206,11 +190,6 @@ def test_parse_date_from_date_object():
 
     d = date(2023, 6, 1)
     assert _parse_date(d) is d
-
-
-# ---------------------------------------------------------------------------
-# SA1
-# ---------------------------------------------------------------------------
 
 
 def test_sa1_expression_impl():
@@ -229,11 +208,6 @@ def test_sa1_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# SA2
-# ---------------------------------------------------------------------------
-
-
 def test_sa2_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import sa2_expression_impl
 
@@ -248,11 +222,6 @@ def test_sa2_pandas_impl():
     ctx = _mock_ctx()
     result = sa2_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# SA3
-# ---------------------------------------------------------------------------
 
 
 def test_sa3_expression_impl():
@@ -271,11 +240,6 @@ def test_sa3_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# SA4 - uses .scalar()
-# ---------------------------------------------------------------------------
-
-
 def test_sa4_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import sa4_expression_impl
 
@@ -290,11 +254,6 @@ def test_sa4_pandas_impl():
     ctx = _pandas_ctx()
     result = sa4_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# SA5
-# ---------------------------------------------------------------------------
 
 
 def test_sa5_expression_impl():
@@ -313,11 +272,6 @@ def test_sa5_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# PR1
-# ---------------------------------------------------------------------------
-
-
 def test_pr1_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import pr1_expression_impl
 
@@ -332,11 +286,6 @@ def test_pr1_pandas_impl():
     ctx = _pandas_ctx()
     result = pr1_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# PR2
-# ---------------------------------------------------------------------------
 
 
 def test_pr2_expression_impl():
@@ -355,11 +304,6 @@ def test_pr2_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# TR1
-# ---------------------------------------------------------------------------
-
-
 def test_tr1_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import tr1_expression_impl
 
@@ -374,11 +318,6 @@ def test_tr1_pandas_impl():
     ctx = _pandas_ctx()
     result = tr1_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# TM1
-# ---------------------------------------------------------------------------
 
 
 def test_tm1_expression_impl():
@@ -397,11 +336,6 @@ def test_tm1_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# QC1
-# ---------------------------------------------------------------------------
-
-
 def test_qc1_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import qc1_expression_impl
 
@@ -418,11 +352,6 @@ def test_qc1_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# QC2
-# ---------------------------------------------------------------------------
-
-
 def test_qc2_expression_impl():
     from benchbox.core.coffeeshop.dataframe_queries.queries import qc2_expression_impl
 
@@ -437,11 +366,6 @@ def test_qc2_pandas_impl():
     ctx = _pandas_ctx()
     result = qc2_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Registration completeness
-# ---------------------------------------------------------------------------
 
 
 def test_all_11_queries_registered_with_callable_impls():

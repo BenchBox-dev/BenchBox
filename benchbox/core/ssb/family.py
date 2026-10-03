@@ -15,8 +15,6 @@ from typing import Any
 
 @dataclass(frozen=True)
 class SSBFamily:
-    """Registry-backed SSB plugin. Not a BaseBenchmark subclass."""
-
     benchmark_id: str = "ssb"
 
     @property

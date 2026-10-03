@@ -32,8 +32,6 @@ from benchbox.utils.file_format import detect_compression, validate_tbl_compress
 
 
 class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
-    """Generator for Star Schema Benchmark data."""
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -43,19 +41,12 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         quiet: bool = False,
         **kwargs,
     ) -> None:
-        """Initialize SSB data generator.
 
-        Args:
-            scale_factor: Scale factor for data generation (1.0 = standard size)
-            output_dir: Directory to write generated data files
-            **kwargs: Additional arguments including compression options
-        """
-        # Initialize compression mixin first
         super().__init__(**kwargs)
 
         self.scale_factor = scale_factor
         self.output_dir = create_path_handler(output_dir) if output_dir else Path.cwd()
-        # Verbosity flags (stored for potential progress logging)
+
         if isinstance(verbose, bool):
             self.verbose_level = 1 if verbose else 0
         else:
@@ -64,17 +55,14 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self.very_verbose = self.verbose_level >= 2 and not quiet
         self.quiet = bool(quiet)
 
-        # Data size constants (base sizes for scale_factor = 1.0)
         self.base_customers = 30000
         self.base_suppliers = 2000
         self.base_parts = 200000
         self.base_lineorders = 6000000
-        self.date_rows = 2556  # Fixed: 7 years of dates
+        self.date_rows = 2556
 
-        # Initialize random seed for reproducible data
         random.seed(42)
 
-        # Data generation dictionaries
         self._nations = [
             "ALGERIA",
             "ARGENTINA",
@@ -124,36 +112,25 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self._ship_modes = ["REG AIR", "AIR", "RAIL", "SHIP", "TRUCK", "MAIL", "FOB"]
 
     def generate_data(self, tables: list[str] | None = None) -> dict[str, str]:
-        """Generate SSB data files.
 
-        Args:
-            tables: Optional list of table names to generate. If None, generates all.
-
-        Returns:
-            Dictionary mapping table names to file paths
-        """
-
-        # Use centralized cloud/local generation handler
         def local_generate_func(output_dir: Path) -> dict[str, Path]:
             return self._generate_data_local(output_dir, tables)
 
         result = self._handle_cloud_or_local_generation(
             self.output_dir,
             local_generate_func,
-            verbose=True,  # SSB doesn't have self.verbose, so use True
+            verbose=True,
         )
 
-        # Convert Path objects to strings for compatibility
         return {k: str(v) for k, v in result.items()}
 
     def _generate_data_local(self, output_dir: Path, tables: list[str] | None = None) -> dict[str, Path]:
-        """Generate SSB data files locally (original implementation)."""
+
         if tables is None:
             tables = ["date", "customer", "supplier", "part", "lineorder"]
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Temporarily update the output directory for internal methods
         original_output_dir = self.output_dir
         self.output_dir = output_dir
 
@@ -170,27 +147,18 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 file_paths["part"] = Path(self._generate_part_data())
             if "lineorder" in tables:
                 file_paths["lineorder"] = Path(self._generate_lineorder_data())
-            # Validate file format consistency: when compression enabled, no raw base files should remain
+
             self._validate_file_format_consistency(output_dir)
 
-            # Write manifest with sizes and row counts
             self._write_manifest(output_dir, file_paths)
 
             return file_paths
         finally:
-            # Restore original output directory
             self.output_dir = original_output_dir
 
-    # DATE dimension spans 7 years; kept as a shared constant so the LINEORDER
-    # generator can sample valid order dates from the same range.
     _DATE_START = datetime(1992, 1, 1)
     _DATE_END = datetime(1998, 12, 31)
 
-    # Canonical SSB date strings are English month/day names. strftime("%A"/"%B"/"%b")
-    # is LOCALE-dependent (e.g. 'Dec1997' becomes 'déc1997' under a French locale),
-    # which would silently desync the canonical query literals (notably Q3.4's
-    # d_yearmonth='Dec1997') from the generated data. Format these from fixed tables
-    # so the output is identical on every machine/locale.
     _MONTH_NAMES = (
         "January",
         "February",
@@ -206,15 +174,11 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         "December",
     )
     _MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    # Indexed by datetime.weekday() (Monday == 0).
+
     _DAY_NAMES = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
     def _date_objects(self) -> list[datetime]:
-        """Return every DATE dimension day as a datetime, in chronological order.
 
-        Single source of truth for the date range so the DATE dimension and the
-        LINEORDER order/commit dates cannot drift apart.
-        """
         days: list[datetime] = []
         current = self._DATE_START
         while current <= self._DATE_END:
@@ -223,7 +187,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return days
 
     def _generate_date_data(self) -> str:
-        """Generate the DATE dimension data."""
+
         filename = self.get_compressed_filename("date.tbl")
         file_path = self.output_dir / filename
 
@@ -244,7 +208,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 d_monthnuminyear = current_date.month
                 d_weeknuminyear = current_date.isocalendar()[1]
 
-                # Determine selling season
                 month = current_date.month
                 if month in [12, 1, 2]:
                     d_sellingseason = "Winter"
@@ -255,10 +218,8 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 else:
                     d_sellingseason = "Fall"
 
-                # Flags
-                d_lastdayinweekfl = 1 if current_date.weekday() == 6 else 0  # Sunday
+                d_lastdayinweekfl = 1 if current_date.weekday() == 6 else 0
 
-                # Calculate last day of month properly handling December
                 if current_date.month == 12:
                     next_month_first = current_date.replace(year=current_date.year + 1, month=1, day=1)
                 else:
@@ -298,7 +259,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return str(file_path)
 
     def _validate_file_format_consistency(self, target_dir: Path) -> None:
-        """Ensure no raw .tbl files exist when compression is enabled; ensure no empty compressed files."""
+
         if not self.should_use_compression():
             return
         validate_tbl_compression_consistency(target_dir, self.get_compressor().get_file_extension())
@@ -329,7 +290,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         for table, path in table_paths.items():
             p = Path(path)
             size = p.stat().st_size if p.exists() else 0
-            # Count rows efficiently
+
             rows = 0
             try:
                 compression = detect_compression(p)
@@ -376,7 +337,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             json.dump(manifest, f, indent=2)
 
     def _generate_customer_data(self) -> str:
-        """Generate the CUSTOMER dimension data."""
+
         filename = self.get_compressed_filename("customer.tbl")
         file_path = self.output_dir / filename
         num_customers = int(self.base_customers * self.scale_factor)
@@ -389,7 +350,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 c_name = f"Customer#{i:09d}"
                 c_address = f"Address {random.randint(1, 999)} Street"
 
-                # Assign nation and region
                 nation = random.choice(self._nations)
                 if nation in [
                     "ALGERIA",
@@ -421,8 +381,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 else:
                     region = "MIDDLE EAST"
 
-                # Canonical SSB c_city is the first 9 chars of the nation name plus a
-                # city digit, e.g. 'UNITED KI1' (10 chars), not an 8-char truncation.
                 c_city = f"{nation[:9]}{random.randint(0, 9)}"
                 c_nation = nation
                 c_region = region
@@ -444,7 +402,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return str(file_path)
 
     def _generate_supplier_data(self) -> str:
-        """Generate the SUPPLIER dimension data."""
+
         filename = self.get_compressed_filename("supplier.tbl")
         file_path = self.output_dir / filename
         num_suppliers = int(self.base_suppliers * self.scale_factor)
@@ -457,7 +415,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 s_name = f"Supplier#{i:09d}"
                 s_address = f"Address {random.randint(1, 999)} Avenue"
 
-                # Assign nation and region (same logic as customer)
                 nation = random.choice(self._nations)
                 if nation in [
                     "ALGERIA",
@@ -489,8 +446,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 else:
                     region = "MIDDLE EAST"
 
-                # Canonical SSB s_city: first 9 chars of the nation name + a city digit,
-                # e.g. 'UNITED KI1' (10 chars). Mirrors c_city in the customer table.
                 s_city = f"{nation[:9]}{random.randint(0, 9)}"
                 s_nation = nation
                 s_region = region
@@ -510,7 +465,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return str(file_path)
 
     def _generate_part_data(self) -> str:
-        """Generate the PART dimension data."""
+
         filename = self.get_compressed_filename("part.tbl")
         file_path = self.output_dir / filename
         num_parts = int(self.base_parts * self.scale_factor)
@@ -554,18 +509,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 p_partkey = i
                 p_name = f"Part {i}"
 
-                # Manufacturer hierarchy (canonical SSB formats):
-                #   p_mfgr     = 'MFGR#' + M                  -> 'MFGR#1'..'MFGR#5'
-                #   p_category = 'MFGR#' + M + C              -> 'MFGR#11'..'MFGR#55'
-                #   p_brand1   = 'MFGR#' + M + C + BB(01-40)  -> 'MFGR#1101'..'MFGR#5540'
-                # where mfgr M and category C are single digits 1..5 and brand BB is
-                # 01..40. The three dimensions are varied at different rates over the
-                # full 1000-value brand space (5 mfgr * 5 categories * 40 brands):
-                # mfgr fastest, then category, then brand. This is deterministic and
-                # covers every (mfgr, category) pair within the first 25 parts -- so
-                # all of p_mfgr/p_category appear even at tiny scales -- while every
-                # canonical value (e.g. p_category 'MFGR#12', p_brand1 'MFGR#2221')
-                # still appears once num_parts >= 1000.
                 mfgr_num = (i - 1) % 5 + 1
                 category_num = ((i - 1) // 5) % 5 + 1
                 brand_num = ((i - 1) // 25) % 40 + 1
@@ -595,7 +538,7 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return str(file_path)
 
     def _generate_lineorder_data(self) -> str:
-        """Generate the LINEORDER fact table data."""
+
         filename = self.get_compressed_filename("lineorder.tbl")
         file_path = self.output_dir / filename
         num_lineorders = int(self.base_lineorders * self.scale_factor)
@@ -604,21 +547,15 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         num_suppliers = int(self.base_suppliers * self.scale_factor)
         num_parts = int(self.base_parts * self.scale_factor)
 
-        # lo_orderdate is a foreign key into the DATE dimension, so it must be one of
-        # the dimension's actual days. Drawing a raw random integer in
-        # [19920101, 19981231] would mostly land on non-dates (e.g. 19920230), which
-        # never join to DATE and silently orphan ~95% of the fact table. Sample from
-        # the exact set of DATE dimension days instead (shared single source).
         valid_dates = self._date_objects()
 
         with self.open_output_file(file_path, "wt") as f:
             writer = csv.writer(f, delimiter="|")
 
             order_key = 1
-            line_number = 0  # Initialize before loop to avoid undefined variable
+            line_number = 0
             for i in range(1, num_lineorders + 1):
-                # Generate new order key occasionally (simulate multi-line orders)
-                if i == 1 or random.random() < 0.7:  # 70% chance of new order
+                if i == 1 or random.random() < 0.7:
                     order_key += 1
                     line_number = 1
                 else:
@@ -630,7 +567,6 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 lo_partkey = random.randint(1, num_parts)
                 lo_suppkey = random.randint(1, num_suppliers)
 
-                # Pick a real date so the row joins to the DATE dimension.
                 order_date = random.choice(valid_dates)
                 lo_orderdate = int(order_date.strftime("%Y%m%d"))
 
@@ -638,20 +574,16 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                 lo_shippriority = random.randint(0, 1)
                 lo_quantity = random.randint(1, 50)
 
-                # Price calculations (in cents to avoid decimals)
-                unit_price = random.randint(90000, 200000)  # $900 to $2000
+                unit_price = random.randint(90000, 200000)
                 lo_extendedprice = unit_price * lo_quantity
-                lo_ordtotalprice = lo_extendedprice  # Simplified
+                lo_ordtotalprice = lo_extendedprice
 
-                lo_discount = random.randint(0, 10)  # 0-10% discount
+                lo_discount = random.randint(0, 10)
                 lo_revenue = lo_extendedprice * (100 - lo_discount) // 100
 
-                lo_supplycost = unit_price * random.randint(50, 80) // 100  # 50-80% of unit price
-                lo_tax = random.randint(0, 8)  # 0-8% tax
+                lo_supplycost = unit_price * random.randint(50, 80) // 100
+                lo_tax = random.randint(0, 8)
 
-                # Commit date is 1-121 days after the order date. Compute it as a real
-                # calendar date so it stays a valid YYYYMMDD value -- plain integer
-                # addition on the datekey would yield non-dates (e.g. 19971235).
                 commit_date = order_date + timedelta(days=random.randint(1, 121))
                 lo_commitdate = int(commit_date.strftime("%Y%m%d"))
                 lo_shipmode = random.choice(self._ship_modes)

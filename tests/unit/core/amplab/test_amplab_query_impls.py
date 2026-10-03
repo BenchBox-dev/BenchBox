@@ -19,14 +19,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 class _Expr:
-    """Minimal expression stub that supports comparison and chaining operators."""
-
     def __gt__(self, other):
         return _Expr()
 
@@ -74,8 +67,6 @@ class _Expr:
 
 
 class _DataFrame:
-    """Minimal DataFrame stub that supports fluent method chaining and comparison."""
-
     def __gt__(self, other):
         return _DataFrame()
 
@@ -129,7 +120,7 @@ class _DataFrame:
 
 
 def _mock_ctx():
-    """Return a mock DataFrameContext with expression and DataFrame stubs."""
+
     ctx = MagicMock()
     ctx.col.side_effect = lambda *a, **kw: _Expr()
     ctx.lit.side_effect = lambda *a, **kw: _Expr()
@@ -139,7 +130,7 @@ def _mock_ctx():
 
 
 def _pandas_ctx_with_documents():
-    """Return a pandas-backed ctx that includes a documents table for q3a."""
+
     documents = pd.DataFrame(
         {
             "url": ["http://example.com/1", "http://example.com/2"],
@@ -152,11 +143,6 @@ def _pandas_ctx_with_documents():
     ctx = MagicMock()
     ctx.get_table.side_effect = lambda name: documents
     return ctx
-
-
-# ---------------------------------------------------------------------------
-# Q1
-# ---------------------------------------------------------------------------
 
 
 def test_q1_expression_impl():
@@ -175,11 +161,6 @@ def test_q1_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# Q1a
-# ---------------------------------------------------------------------------
-
-
 def test_q1a_expression_impl():
     from benchbox.core.amplab.dataframe_queries.queries import q1a_expression_impl
 
@@ -194,11 +175,6 @@ def test_q1a_pandas_impl():
     ctx = _mock_ctx()
     result = q1a_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Q2
-# ---------------------------------------------------------------------------
 
 
 def test_q2_expression_impl():
@@ -217,11 +193,6 @@ def test_q2_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# Q2a
-# ---------------------------------------------------------------------------
-
-
 def test_q2a_expression_impl():
     from benchbox.core.amplab.dataframe_queries.queries import q2a_expression_impl
 
@@ -236,11 +207,6 @@ def test_q2a_pandas_impl():
     ctx = _mock_ctx()
     result = q2a_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Q3
-# ---------------------------------------------------------------------------
 
 
 def test_q3_expression_impl():
@@ -259,11 +225,6 @@ def test_q3_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# Q3a
-# ---------------------------------------------------------------------------
-
-
 def test_q3a_expression_impl():
     from benchbox.core.amplab.dataframe_queries.queries import q3a_expression_impl
 
@@ -278,11 +239,6 @@ def test_q3a_pandas_impl():
     ctx = _pandas_ctx_with_documents()
     result = q3a_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Q4
-# ---------------------------------------------------------------------------
 
 
 def test_q4_expression_impl():
@@ -301,11 +257,6 @@ def test_q4_pandas_impl():
     assert result is not None
 
 
-# ---------------------------------------------------------------------------
-# Q5
-# ---------------------------------------------------------------------------
-
-
 def test_q5_expression_impl():
     from benchbox.core.amplab.dataframe_queries.queries import q5_expression_impl
 
@@ -320,11 +271,6 @@ def test_q5_pandas_impl():
     ctx = _mock_ctx()
     result = q5_pandas_impl(ctx)
     assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# Registration completeness
-# ---------------------------------------------------------------------------
 
 
 def test_all_8_queries_registered_with_callable_impls():

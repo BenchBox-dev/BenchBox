@@ -1,11 +1,3 @@
-"""ClickBench schema definitions.
-
-The ClickBench ``hits`` table is a single flat web analytics table. The column
-specification lives in ``schema_specs.yaml``; the generator intentionally keeps
-most unsigned ClickHouse source columns within signed SMALLINT ranges. Columns
-that can exceed SMALLINT_MAX in BenchBox data remain widened to INTEGER/BIGINT.
-"""
-
 from pathlib import Path
 from typing import cast
 
@@ -27,7 +19,7 @@ def get_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for the ClickBench hits table."""
+
     table = HITS_TABLE
     target = dialect.lower()
     enforce_not_null = target not in {"spark", "lakesail", "pyspark"}
@@ -53,7 +45,7 @@ TABLES = {"hits": HITS_TABLE}
 
 
 def get_tunings() -> BenchmarkTunings:
-    """Get the default tuning configurations for ClickBench tables."""
+
     tunings = BenchmarkTunings("clickbench")
     tunings.add_table_tuning(
         TableTuning(
