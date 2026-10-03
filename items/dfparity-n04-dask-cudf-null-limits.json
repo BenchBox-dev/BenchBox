@@ -3,6 +3,7 @@
     "Each limit is either fixed with a test or documented where users read about backend differences",
     "No change to the Polars or pandas families"
   ],
+  "context": "2026-10-03: local branch docs/dataframe-null-limits (worktree BenchBox.wt-dask-cudf-docs, commit 30e28fa15, based on develop). Dask mixed-direction NULL sort fixed: _sort_null_largest_pandas now drops its flag columns inside map_partitions, which the optimizer leaves alone, so a following head() no longer fails with KeyError '_n0'. Affects Q19, Q34, Q71 and Q73. 5 new tests fail before the fix and pass after; pandas and Dask with 1, 4 and 9 partitions give identical rows. cuDF numeric NULL handling is documented in docs/platforms/cudf.md and marked UNVERIFIED on GPU. The Dask Q98 NaN finding did not reproduce. Preflight was stopped to free the lock; it needs a fresh preflight and PR (not a soundness path). NEW finding for t24: other mixed-direction pandas sort_values calls with na_position='last' (queries.py around 168, 2827, 4017, 6474 on develop) put NULLs last on descending keys on every pandas-family backend, while the SQL puts them first.",
   "description": "Known Dask and cuDF NULL limits from the NULL-semantics work. (1) On Dask a mixed ascending and descending sort keeps NULLs last for every key (its optimizer drops helper flag columns), so Q34 and Q71 order NULLs differently from the reference there. (2) On Dask, results kept lazy (for example Q98, which has no LIMIT) report a NULL key as NaN, because _none_for_null returns a lazy frame unchanged; per-partition conversion would give mixed dtypes (raised in review of #2541). (3) The cuDF family may need dtype care for numeric NULL handling. For each: support it with a test, or document it where users read about backend differences.",
   "sessions": [
     {
@@ -38,6 +39,14 @@
       "op": "release",
       "op_id": "49bdf526d5f041ad91981184b38a01a9",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T15:51:06Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "06c682d0c14940ab94ae04e0cb7ab44c",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
