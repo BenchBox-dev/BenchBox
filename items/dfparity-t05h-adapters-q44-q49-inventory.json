@@ -5,7 +5,7 @@
     "A binding-coverage test asserts, per query and family, that every substitution the SQL template uses is mapped by the adapter and every key the implementation reads is supplied by the binding, for at least two seeds and two streams; the inventory categories remain diagnostics, not the proof",
     "Q44 and Q49 match the DuckDB reference on both families at SF 0.1 with adapter binding, or the reason is documented"
   ],
-  "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Cause not yet determined. queries.py edits serialize with the other t05 batches.",
+  "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Cause not yet determined. queries.py edits serialize with the other t05 batches.\n\n2026-10-03 independent closeout: #2588 is MERGED at 2026-10-03T17:01:33Z, merge b775dfdda09bce96e3b50ede40bc65cb084a9bd2; all six required CI aggregates passed. Fresh SF 0.1 comparison on merged source: 4 listed-query cells match on Polars and pandas. SQL row counts: {\"44\":10,\"49\":2}. Vacuous queries: none. Empty/single-NULL matches are documented scale-specific evidence, not nonempty or official-answer certification. /tmp/dfparity-merged-baseline-sf01.jsonl; /tmp/dfparity-2588-tracker-proof.json. Fresh binding/inventory tests at published head 6a3e1d4289907dc6d5ca9ab8c5d475b9a290f444: 796 passed, eight xfails belong only to the separate hard-coded batch. /tmp/dfparity-merged-2588-binding-proof.log. SQL substitutions and implementation-read keys are checked across two seeds and two streams; stand-in array refusal and repeating alarms retained. Known remaining SF 0.1 divergences are separate Q4/Q9/Q11/Q19/Q46/Q68 follow-ups; these listed queries all match. Broader NULL and gate work stays open. Q44 retained a dead year default and Q49 read month through a fallback without a supplied default. The dead key is removed and Q49 adapter binds the logged month; both leave the diagnostic gap/fallback lists. Dedicated binding-coverage tests provide the proof rather than name heuristics.",
   "description": "#2526 added adapters for Q39, Q44, Q49 and Q93 (ADAPTERS in benchbox/core/tpcds/dataframe_queries/parameter_adapters.py), yet on develop Q44 and Q49 are still in BINDING_GAP and Q49 is still in LITERAL_FALLBACK in tests/unit/core/tpcds/test_parameter_consumption_inventory.py, and neither query is in any t05a-g batch. Find out whether the inventory ignores what an adapter binds or the two adapters are incomplete. Then either complete the adapters and implementations or make the inventory account for ADAPTERS, so that 'removed from BINDING_GAP' measures real binding coverage for every batch. Keep the stand-in's properties from #2560 (refuses __array__, repeating alarm, pytest-timeout re-armed).",
   "sessions": [
     {
@@ -67,6 +67,14 @@
       "generation": "f98daa2229264ac4beb5f8b21256230a",
       "op": "take",
       "op_id": "7fc8744930e04a06a6482cb7f537453d",
+      "session_id": "44c67cd709da49ea99eeabde2893ca2a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07",
+      "at": "2026-10-03T17:56:24Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "945fdebbef9242f0956adec9e2103298",
       "session_id": "44c67cd709da49ea99eeabde2893ca2a"
     }
   ]
