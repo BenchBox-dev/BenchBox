@@ -1,4 +1,4 @@
-"""Bind release distributions to one successful merge-queue producer attempt.
+"""Bind release distributions to one successful trunk producer attempt on develop.
 
 This admission boundary never builds or publishes packages. Older artifacts
 without a producer receipt are deliberately unsupported.
@@ -28,7 +28,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 REPOSITORY = "BenchBox-dev/BenchBox"
-WORKFLOW = ".github/workflows/ci.yml"
+WORKFLOW = ".github/workflows/trunk.yml"
+PRODUCER_BRANCH = "develop"
+PRODUCER_EVENT = "push"
 JOB_NAME = "dist-artifact"
 PRODUCER_RECEIPT = "producer-receipt.json"
 MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
@@ -189,7 +191,8 @@ def _pages(api: Api, path: str, key: str) -> list[dict[str, Any]]:
 def _run_identity(run: dict[str, Any], sha: str, repository_id: int) -> None:
     _require(bool(re.fullmatch(r"[0-9a-f]{40}", sha)), "invalid candidate SHA")
     _require(_positive(repository_id), "invalid repository ID")
-    _require(run.get("head_sha") == sha and run.get("event") == "merge_group", "wrong producer SHA or event")
+    _require(run.get("head_sha") == sha and run.get("event") == PRODUCER_EVENT, "wrong producer SHA or event")
+    _require(run.get("head_branch") == PRODUCER_BRANCH, "wrong producer branch")
     _require(run.get("path") == WORKFLOW, "wrong producer workflow")
     for field in ("repository", "head_repository"):
         repository = run.get(field)
@@ -205,8 +208,12 @@ def select_producer(sha: str, api: Api = github_json) -> tuple[dict[str, Any], d
     """Select the latest exact-SHA run, never falling back to an older success."""
     repository = api("")
     _require(repository.get("full_name") == REPOSITORY, "wrong repository")
-    runs = _pages(api, f"actions/workflows/ci.yml/runs?head_sha={sha}&event=merge_group", "workflow_runs")
-    _require(bool(runs), "no merge-queue producer")
+    runs = _pages(
+        api,
+        f"actions/workflows/trunk.yml/runs?head_sha={sha}&event={PRODUCER_EVENT}&branch={PRODUCER_BRANCH}",
+        "workflow_runs",
+    )
+    _require(bool(runs), "no trunk producer on develop")
     for run in runs:
         _run_identity(run, sha, repository.get("id"))
         _timestamp(run.get("created_at"))
