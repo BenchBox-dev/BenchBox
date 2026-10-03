@@ -1499,16 +1499,6 @@ def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: li
 
 
 def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
-    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort).
-
-    When every key points the same way one ``na_position`` is enough (last when ascending, first when
-    descending). A mix sorts on an ``isna`` flag column ahead of each key, in the key's own direction.
-
-    On Dask a plain ``drop`` of the flags after the sort fails once a ``head`` follows: the optimizer
-    rewrites sort-then-head into a top-N selection and removes the flag columns from its input first. The
-    flags are therefore dropped inside ``map_partitions``, which the optimizer treats as opaque, and the
-    partitions keep their sorted order.
-    """
     if all(descending):
         return frame.sort_values(columns, ascending=[False] * len(columns), na_position="first")
     if not any(descending):
@@ -1524,7 +1514,6 @@ def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[b
 
 
 def _drop_columns(partition: Any, columns: list[str]) -> Any:
-    """Drop ``columns`` from one partition (a named function so Dask can tokenize it)."""
     return partition.drop(columns=columns)
 
 

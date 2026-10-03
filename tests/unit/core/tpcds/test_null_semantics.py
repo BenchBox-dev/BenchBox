@@ -210,7 +210,6 @@ def _dask_context(tables, npartitions=2):
 
 @pytest.mark.parametrize("npartitions", [1, 3])
 def test_mixed_direction_sort_places_nulls_per_key_on_dask(npartitions):
-    """An ascending key puts NULL last and a descending key puts it first, in the same sort, as on pandas."""
     from benchbox.core.tpcds.dataframe_queries import queries
 
     spec = {
@@ -235,7 +234,6 @@ def test_mixed_direction_sort_places_nulls_per_key_on_dask(npartitions):
 
 @pytest.mark.parametrize("npartitions", [1, 4, 7])
 def test_mixed_direction_sort_then_limit_matches_pandas_on_dask(npartitions):
-    """A ``head`` after the sort used to make Dask drop the NULL flag columns; the order must still match."""
     import numpy as np
     import pandas as pd
 
@@ -252,7 +250,6 @@ def test_mixed_direction_sort_then_limit_matches_pandas_on_dask(npartitions):
             "row": np.arange(size),
         }
     )
-    # ``row`` makes the order total: Dask does not keep ties in input order.
     keys, descending = ["a", "b", "c", "row"], [False, True, False, False]
 
     expected = queries._sort_null_largest_pandas(frame, keys, descending).head(40)
