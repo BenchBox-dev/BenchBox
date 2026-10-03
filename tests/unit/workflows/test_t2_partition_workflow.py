@@ -90,7 +90,6 @@ def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
         "plan-capture-gate",
         "datafusion-integration",
         "package-smoke",
-        "dist-artifact",
         "dependency-audit",
     )
     count = 0
@@ -98,7 +97,7 @@ def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
         assert jobs[name]["runs-on"] == "ubuntu-latest"
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
-    assert count == 12
+    assert count == 11
 
 
 def test_native_binary_framing_remains_required_before_merge() -> None:
