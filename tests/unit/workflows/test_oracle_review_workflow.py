@@ -38,16 +38,17 @@ def test_job_id_and_name_are_the_required_check_name() -> None:
     assert workflow["jobs"]["oracle-review"]["name"] == "oracle-review"
 
 
-def test_triggers_cover_pushes_reviews_and_manual_runs() -> None:
+def test_triggers_cover_pushes_reviews_merge_queue_and_manual_runs() -> None:
     triggers = _triggers()
-    assert set(triggers) == {"pull_request", "pull_request_review", "workflow_dispatch"}
+    assert set(triggers) == {"pull_request", "pull_request_review", "merge_group", "workflow_dispatch"}
+    assert triggers["merge_group"]["types"] == ["checks_requested"]
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "ready_for_review"]
     assert triggers["pull_request_review"]["types"] == ["submitted"]
     assert triggers["workflow_dispatch"]["inputs"]["pr"]["required"] is True
 
 
 def test_permissions_are_read_only() -> None:
-    assert _load()["permissions"] == {"contents": "read", "pull-requests": "read"}
+    assert _load()["permissions"] == {"actions": "read", "contents": "read", "pull-requests": "read"}
     assert "permissions" not in _load()["jobs"]["oracle-review"]
 
 
@@ -55,6 +56,7 @@ def test_concurrency_cancels_superseded_runs_per_pull_request() -> None:
     concurrency = _load()["concurrency"]
     assert concurrency["cancel-in-progress"] is True
     assert "github.event.pull_request.number || inputs.pr" in concurrency["group"]
+    assert "github.event.merge_group.head_sha" in concurrency["group"], "queued groups must not share one slot"
 
 
 def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None:
@@ -65,6 +67,7 @@ def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None
     assert step["env"]["GITHUB_TOKEN"] == "${{ github.token }}"
     assert "github.event.pull_request.number || inputs.pr" in step["env"]["PR_NUMBER"]
     assert "--pr" in step["run"]
+    assert "merge_group.head_ref" in step["env"]["MERGE_GROUP_REF"]
 
 
 def test_actions_are_pinned_to_full_commit_shas() -> None:
@@ -81,4 +84,5 @@ def test_checkout_uses_the_base_commit_so_the_judged_pull_request_cannot_change_
     assert len(checkouts) == 1
     ref = checkouts[0]["with"]["ref"]
     assert "github.event.pull_request.base.sha" in ref
+    assert "github.event.merge_group.base_sha" in ref
     assert "head" not in ref

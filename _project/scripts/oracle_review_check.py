@@ -31,6 +31,7 @@ from soundness_paths import any_soundness_path  # noqa: E402
 CONNECTOR_LOGIN = "chatgpt-codex-connector"
 API_ROOT = "https://api.github.com"
 PAGE_SIZE = 100
+WORKFLOW_PATH = ".github/workflows/oracle-review.yml"
 PASS = 0
 WAITING = 1
 ERROR = 2
@@ -153,12 +154,38 @@ def fetch_head_sha(token: str, repo: str, pr: int) -> str:
     return _request(token, f"{API_ROOT}/repos/{repo}/pulls/{pr}")["head"]["sha"]
 
 
+def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
+    """Return the latest of the commit's committer date and this workflow's pull_request run dates.
+
+    The committer date is chosen by the author and can be backdated; a
+    ``pull_request`` run of this workflow for the head SHA is created by GitHub
+    each time the head moves to that SHA, so a reaction older than it cannot
+    have seen this head.
+    """
+    return max([committer_date, *run_dates], key=_parse_time)
+
+
 def fetch_head_date(token: str, repo: str, sha: str) -> str:
-    return _request(token, f"{API_ROOT}/repos/{repo}/commits/{sha}")["commit"]["committer"]["date"]
+    committer_date = _request(token, f"{API_ROOT}/repos/{repo}/commits/{sha}")["commit"]["committer"]["date"]
+    runs = _request(
+        token,
+        f"{API_ROOT}/repos/{repo}/actions/runs?head_sha={sha}&event=pull_request&per_page={PAGE_SIZE}",
+    )["workflow_runs"]
+    return head_transition_date(committer_date, [run["created_at"] for run in runs if run.get("path") == WORKFLOW_PATH])
+
+
+def changed_paths(items: Iterable[dict[str, Any]]) -> list[str]:
+    """Return every path a pull request touches, including rename sources."""
+    paths: list[str] = []
+    for item in items:
+        paths.append(item["filename"])
+        if item.get("previous_filename"):
+            paths.append(item["previous_filename"])
+    return paths
 
 
 def fetch_files(token: str, repo: str, pr: int) -> list[str]:
-    return [item["filename"] for item in _paginate(token, f"/repos/{repo}/pulls/{pr}/files")]
+    return changed_paths(_paginate(token, f"/repos/{repo}/pulls/{pr}/files"))
 
 
 def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:

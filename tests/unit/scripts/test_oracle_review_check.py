@@ -122,3 +122,41 @@ def test_owner_thumbs_up_does_not_count() -> None:
 def test_pending_review_does_not_count() -> None:
     status, _ = _decide(reviews=[_review(state="PENDING")])
     assert status == 1
+
+
+def test_rename_out_of_a_soundness_path_is_a_soundness_change() -> None:
+    files = oracle_review_check.changed_paths(
+        [{"filename": "docs/moved.py", "previous_filename": "benchbox/core/equivalence/checker.py"}]
+    )
+    assert files == ["docs/moved.py", "benchbox/core/equivalence/checker.py"]
+    status, _ = _decide(files=files)
+    assert status == 1
+
+
+def test_changed_paths_without_a_rename_keeps_only_the_filename() -> None:
+    assert oracle_review_check.changed_paths([{"filename": "README.md"}]) == ["README.md"]
+
+
+def test_backdated_head_commit_does_not_make_an_older_thumbs_up_count() -> None:
+    backdated_commit = "2026-09-01T00:00:00Z"
+    push_run = "2026-10-01T14:00:00Z"
+    head_date = oracle_review_check.head_transition_date(backdated_commit, [push_run])
+    assert head_date == push_run
+    status, _ = oracle_review_check.decide(
+        HEAD,
+        head_date,
+        SOUNDNESS_FILES,
+        [],
+        [_reaction(created_at=AFTER_HEAD)],
+        [],
+        oracle_review_check.any_soundness_path,
+    )
+    assert status == 1
+
+
+def test_head_transition_date_falls_back_to_the_committer_date_without_runs() -> None:
+    assert oracle_review_check.head_transition_date(HEAD_DATE, []) == HEAD_DATE
+
+
+def test_head_transition_date_keeps_a_later_committer_date() -> None:
+    assert oracle_review_check.head_transition_date(AFTER_HEAD, [HEAD_DATE]) == AFTER_HEAD
