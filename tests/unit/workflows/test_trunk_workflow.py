@@ -32,3 +32,16 @@ def test_runs_queue_per_ref_without_cancelling() -> None:
 
 def test_is_read_only() -> None:
     assert _workflow()["permissions"] == {"contents": "read"}
+
+
+def test_shard_evidence_is_labelled_with_this_workflow() -> None:
+    commands = [
+        step["run"]
+        for job in _workflow()["jobs"].values()
+        for step in job["steps"]
+        if "release_canary_sharding.py" in step.get("run", "")
+    ]
+    assert commands
+    for command in commands:
+        assert "--workflow trunk.yml" in command
+        assert "--workflow ci.yml" not in command
