@@ -2169,7 +2169,7 @@ jobs:
   # Unit result: landing.
   landing:
     name: landing
-    needs: [ci-paths, site-theme-tokens, visual-inputs]
+    needs: [ci-paths, site-theme-tokens, visual-inputs, site-build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2192,7 +2192,8 @@ jobs:
             --needs "$NEEDS_JSON" \
             --always ci-paths \
             --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
-            --expect visual-inputs=${{ true }}
+            --expect visual-inputs=${{ true }} \
+            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}
 
   # Unit result: tooling.
   tooling:

@@ -546,13 +546,15 @@ def test_github_output_exposes_site_needed(rules: dict[str, list[str]], tmp_path
     assert "site-needed=false\n" in skipped.read_text(encoding="utf-8")
 
 
-def test_site_build_job_is_gated_on_the_site_filter_and_feeds_no_required_unit() -> None:
+def test_site_build_job_is_gated_on_the_site_filter_and_feeds_the_landing_unit() -> None:
     jobs = _ci_jobs()
+    landing_run = "\n".join(step.get("run", "") for step in jobs["landing"]["steps"])
 
     assert jobs["site-build"]["if"] == "${{ needs.ci-paths.outputs.site-needed == 'true' }}"
     assert "site-needed" in jobs["ci-paths"]["outputs"]
     assert tuple(unit for unit in UNIT_RESULT_JOBS if unit in jobs) == UNIT_RESULT_JOBS
-    assert all("site-build" not in _needs(job) for job in jobs.values())
+    assert [name for name, job in jobs.items() if "site-build" in _needs(job)] == ["landing"]
+    assert "--expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}" in landing_run
 
 
 def test_site_build_job_runs_the_site_gates_on_node_22_only() -> None:

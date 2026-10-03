@@ -357,7 +357,7 @@ def command_finalize(args: argparse.Namespace) -> int:
     gates["gates_sha256"] = receipt_module.receipt_sha256(gates_raw)
     checksums = _read_json(out / "probe-checksums.json")
     probes = probe_module.probe(args.base_url, checksums, out / "probe-work", attempts=args.attempts, delay=args.delay)
-    run_id = int(os.environ["GITHUB_RUN_ID"]) if "GITHUB_RUN_ID" in os.environ else args.run_id
+    run_id = args.run_id if args.run_id is not None else int(os.environ.get("GITHUB_RUN_ID", "0"))
     deployment_id = None
     if not args.no_status:
         deployment_id = deployments.find_run_deployment_id(_client(), run_id)
@@ -534,7 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--out-dir", type=Path, required=True)
     finalize.add_argument("--base-url", default=SITE_URL)
     finalize.add_argument("--target", default="github-pages")
-    finalize.add_argument("--run-id", type=int, default=0)
+    finalize.add_argument("--run-id", type=int)
     finalize.add_argument("--attempts", type=int, default=6)
     finalize.add_argument("--delay", type=float, default=10.0)
     finalize.add_argument("--artifact-name")
