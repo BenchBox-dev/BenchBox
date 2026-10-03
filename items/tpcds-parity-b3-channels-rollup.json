@@ -1,4 +1,5 @@
 {
+  "context": "Dropped 2026-10-03: scope (multi-channel unions, ROLLUP grouping sets) folded into dfparity-t24-residual-divergences.",
   "description": "Fix hand-written multi-channel union queries (store/catalog/web sales + returns concat with standardized columns) and ROLLUP/grouping-set queries among the 67 hand-written qN impls, per B0 bucketing. Normalize column names/dtypes before concat; ensure returns tables included exactly as the SQL template unions them; align rollup grouping-set order, NULL fill, grouping aliases, and grand-total level with DuckDB ROLLUP output. Fix via shared channel_helper/rollup_helper when the bug is structural; per-query only when template-specific. SCOPE: channel_helper.py, channel_mappings.yaml, rollup_helper.py, named qN impls in queries.py. GUARDRAILS: both backends pass per query; tolerance 1e-10 unchanged; no baseline additions; SQL immutable; Q38/Q88 + B1/B2 queries still pass. VERIFY: staged report + pytest -m tpcds + lint + typecheck. DECISION GATE: all multi-channel and rollup queries PASS or VACUOUS-classified.",
   "sessions": [
     {
@@ -8,6 +9,14 @@
       "op": "create",
       "op_id": "bcc6c38aa54943fb970f0d724b13392d",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:58:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b12b4185d37c4c6baf2448db59efb4ab",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
