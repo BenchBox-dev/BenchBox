@@ -479,15 +479,14 @@ def write_manifest(root: Path, inventory: dict[str, Any]) -> None:
     path.write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def refresh_inventory(root: Path) -> tuple[dict[str, Any] | None, list[str]]:
-    """Regenerate the untracked manifest from the Make sources and validate the migration proof."""
+def evaluate_inventory(root: Path) -> tuple[dict[str, Any] | None, list[str]]:
+    """Build the inventory in memory and validate the migration proof without writing anything."""
 
     root = root.resolve()
     try:
         inventory = build_inventory(root)
     except InventoryError as exc:
         return None, [str(exc)]
-    write_manifest(root, inventory)
     return inventory, validate_migration_proof(root)
 
 
@@ -523,7 +522,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print("Makefile migration proof OK: split matches the reviewed monolith delta")
         return 0
-    inventory, problems = refresh_inventory(root)
+    inventory, problems = evaluate_inventory(root)
     if inventory is None or problems:
         print("Makefile inventory error:", file=sys.stderr)
         for problem in problems:

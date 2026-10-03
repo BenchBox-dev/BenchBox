@@ -914,6 +914,12 @@ jobs:
         run: |
           uv sync --group dev
 
+      - name: Summarize Make interface changes
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: python make/interface_summary.py --base-ref "$BASE_REF" --summary "$GITHUB_STEP_SUMMARY"
+
       - name: Run cross-surface mutation target drift guard
         run: |
           uv run -- python -m pytest \

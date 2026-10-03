@@ -1,12 +1,12 @@
-"""Fail if an enrolled workflow, script or process test lacks a ledger row.
+"""Fail if a workflow, script or enrolled process test lacks a ledger row.
 
-Enrollment is frozen at the files recorded in ledger_cutover_files.txt: each
-of those that still exists must appear in
-docs/development/dev-loop-property-ledger.md so deletions cannot silently drop
-coverage. Files added after the cutover need no row. The ledger may list a
-file by exact relative path or, for the large scripts directories, by an
-explicit per-directory catch-all row that forces individual reclassification
-before any deletion.
+Every workflow and script must appear in
+docs/development/dev-loop-property-ledger.md. Test enrollment is frozen at the
+files recorded in ledger_cutover_files.txt: each of those that still exists
+must have a row so deletions cannot silently drop coverage, and tests added
+after the cutover need no row. The ledger may list a file by exact relative
+path or, for the large scripts directories, by an explicit per-directory
+catch-all row that forces individual reclassification before any deletion.
 """
 
 from __future__ import annotations
@@ -74,6 +74,14 @@ def _covered(entry: str, section: str, sections: dict[str, list[str]]) -> bool:
     return any("ledger-catch-all:" in row for row in rows)
 
 
+def _workflow_files() -> list[str]:
+    return sorted(p.name for p in WORKFLOW_DIR.glob("*.yml"))
+
+
+def _test_files(directory: Path) -> list[str]:
+    return sorted(p.name for p in directory.glob("test_*.py"))
+
+
 CUTOVER_FILES = REPO_ROOT / "tests" / "unit" / "ledger_cutover_files.txt"
 
 
@@ -97,9 +105,7 @@ def _cutover_files(directory: Path, *, recursive: bool = True, pattern: str = "*
 
 def test_ledger_lists_every_workflow() -> None:
     text = _ledger_text()
-    names = _cutover_files(WORKFLOW_DIR, recursive=False)
-    assert names, "expected enrolled workflows in the cutover set"
-    missing = [name for name in names if name not in text]
+    missing = [name for name in _workflow_files() if name not in text]
     assert not missing, f"workflows missing from ledger: {missing}"
 
 
@@ -141,8 +147,8 @@ def test_ledger_lists_auto_merge_and_release_tests() -> None:
 def test_ledger_lists_every_script() -> None:
     text = _ledger_text()
     sections = _section_rows(text)
-    top_level = _cutover_files(SCRIPTS_DIR, recursive=False, pattern="*.py")
-    project_level = _cutover_files(PROJECT_SCRIPTS_DIR, recursive=False, pattern="*.py")
+    top_level = sorted(p.name for p in SCRIPTS_DIR.glob("*.py"))
+    project_level = sorted(p.name for p in PROJECT_SCRIPTS_DIR.glob("*.py"))
     assert top_level and project_level, "expected scripts in scripts/ and _project/scripts/"
     missing = [name for name in top_level if not _covered(name, "### `scripts/`", sections)]
     missing += [name for name in project_level if not _covered(name, "### `_project/scripts/`", sections)]
