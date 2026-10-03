@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf01_snowflake_sql_20261003_113557_241439cc.json",
+  "bundle_hash": "9ee2da7b50282ebaa35d1cc0985acd5ab51e7b93c083b892a83bd564d46f5fd0",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

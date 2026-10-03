@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "scale-invariant",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "Per-query overhead on the serverless 2X-Small warehouse dominates TPC-H at these scales. Per-query means are flat across scale (geometric mean 953 ms at SF 0.1, 999 ms at SF 1, 1294 ms at SF 10, x1.37 over a 100x increase in LINEITEM). The result cache is verified off (cache_control validated, cache_disabled true) and measurement runs at 0.83 to 0.85 of warmup, so cached results do not explain the flat timings.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/6b1013f27533fe44baab6afad0933e5c331ddf71/results-data/CORPUS_NOTES.md#live-cloud-tpc-h-fresh-runs-2026-10-03",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "tpch_sf10_databricks_sql_20261003_120202_e83ea509"
+  ]
+}
