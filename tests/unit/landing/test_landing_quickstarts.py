@@ -1,9 +1,3 @@
-"""Tests for scripts/generate_landing_quickstarts.py.
-
-Marked fast/unit — these are pure validator/template tests with no I/O
-beyond reading the committed catalog.yaml.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -706,7 +700,7 @@ def test_agent_default_is_rejected(gen, catalog):
 
 
 def test_no_recipes_json_committed():
-    # Either the file is absent, or the validator catches it.
+
     assert not FORBIDDEN_JSON.exists(), "landing/prompts/recipes.json is forbidden for MVP — see the decision record"
 
 

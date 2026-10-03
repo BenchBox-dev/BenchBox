@@ -62,6 +62,15 @@ own their quiet/provider state because CliRunner does not exit a real CLI
 process. Patch wall clocks at the consuming module, not globally, so timeout
 and watchdog clocks keep running.
 
+### Skew Generator Reference Snapshots
+
+The [skew-generator byte test](unit/core/tpch_skew/test_skew_generator_coverage.py)
+compares streamed table output with SHA256 snapshots captured from the original
+in-memory transformer at seed 42. These snapshots detect changes from that
+implementation baseline; they do not independently establish the correctness of
+the skew distribution. The original provenance statement records no separate
+transformer version.
+
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
 - CLI option validation
@@ -603,6 +612,19 @@ The test suite includes comprehensive performance monitoring:
 
 Performance data is stored in `~/.benchbox/test_cache/` and can be analyzed using the performance profiler utility.
 
+## Fixture Boundaries
+
+The SDK reload tests in `unit/platforms/aws/test_emr_serverless_paths.py` and
+`unit/platforms/gcp/test_dataproc_serverless_paths.py` check imports under
+controlled `sys.modules` entries. Cleanup restores the previous entries and
+reloads the adapter. Do not assert SDK availability after restoration: installed
+boto3 and Google Cloud packages depend on the local environment.
+
+`unit/tpcds/test_parameter_log.py` uses a shortened Q8 parameter-log fixture with
+three ZIP entries. The upstream `query8.tpl` defines 400 ZIP values. The excerpt
+checks parsing of repeated values; it does not cover all 400 values or establish
+the order of a complete generated log.
+
 ## Test Utilities
 
 The test suite includes several unified utilities for efficient testing:
@@ -623,3 +645,164 @@ For issues with the test suite:
 3. Use the performance profiler to identify bottlenecks
 4. Consult the main BenchBox documentation
 5. Open an issue with detailed reproduction steps
+
+## CPU identity test isolation
+
+In [test_system_info.py](unit/utils/test_system_info.py), replace
+`benchbox.utils.system_info._proc_cpuinfo_model` to control that fallback read.
+Do not replace `builtins.open` for this purpose: psutil also reads `/proc` on
+Linux, so a broad replacement can fail an unrelated psutil call while appearing
+to work on macOS. Preserve separate hardware detection and fallback assertions.
+
+## Regression fixtures and interpretation
+
+Keep regression expectations independent of implementation constants. Names,
+assertions, parameter data and recorded fixtures describe the checked behavior;
+the notes below preserve constraints that matter when extending these tests.
+Offline or mocked checks establish their asserted contracts, rather than live
+service certification or complete SQL compliance.
+
+### Isolation and ownership
+
+- [Script fixtures](unit/scripts/conftest.py) make `scripts/` importable.
+  Tests for the BenchBox adapter boundary load `_project/scripts` explicitly.
+- [DataFrame memory fixtures](unit/platforms/dataframe/conftest.py) opt in to
+  sufficient-memory injection. Keep them non-autouse so memory-policy tests
+  still exercise actual capacity decisions and insufficient-memory behavior.
+- [Q17 Spark tests](unit/core/tpch/test_q17_spark_execution.py) own a local Spark
+  session and restore Java/PySpark environment changes with a monkeypatch
+  context. Adapter fixtures detach the shared session instead of closing it;
+  the module fixture stops it. LakeSail coverage here exercises its inherited
+  expression client, not a Sail server.
+- [CLI result tests](unit/cli/commands/test_results.py) reset the Rich console
+  singleton, disable quiet mode and use a wide capture console. Preserve literal
+  bracket-containing paths rather than interpreting them as Rich markup.
+  [Export consistency tests](unit/cli/test_run_export_consistency.py) obtain the
+  run submodule from `sys.modules` and patch its object: the package also exports
+  a Click command named `run`, so attribute lookup can select the wrong target.
+- [Monitoring tests](unit/monitoring/test_performance_monitoring.py) close the
+  `mkstemp` descriptor before using its path. Cleanup tolerates a tracker-held
+  Windows file; that tolerance is not an assertion that deletion succeeded.
+- GPU [metrics](unit/experimental/gpu/test_metrics_error_capture.py) and
+  [version detection](unit/experimental/gpu/test_capabilities_error_capture.py)
+  inject failures without CUDA/NVML hardware. Version detection disables earlier
+  branches to reach a malformed temporary version file through `CUDA_HOME`.
+- [Offline adapter tests](unit/platforms/test_offline_adapter_missing_sdks.py)
+  run actual inventory assertions in a fresh process with vendor SDK imports
+  blocked. Keep the child assertion-enabled and its explicit optimization guard;
+  remove inherited `PYTHONOPTIMIZE` before launching it. Startup and cold imports
+  justify its medium tier, rather than treating it as a fast assertion-only test.
+- [Soundness history tests](unit/test_soundness_review_history.py) use real
+  fetches and trusted checker subprocesses, which exceed the fast-test budget.
+  [Release artifact tests](unit/scripts/test_release_artifact_consumer.py) retain
+  their medium marker; consumer tests also import this module. Reassess measured
+  budgets and CI tier wiring before changing that selection.
+- [Marker tests](unit/test_marker_strategy.py) cache the discovered test modules
+  to avoid repeated tree scans. Collection may enforce quarantine and budgets,
+  but must not rewrite speed markers. In [SQL compatibility tests](unit/core/sql_compat),
+  name benchmark parameters `bmark`: pytest-benchmark owns the `benchmark` fixture,
+  and shadowing it can fail collection.
+
+### Data and SQL regression boundaries
+
+- [NYC Taxi](unit/core/nyctaxi/test_source_contract.py) pins its TLC file set;
+  [FlightData](unit/core/flightdata/test_source_contract.py) ends month windows at
+  the pinned BTS month. New upstream data must not silently change a scale
+  factor's dataset. These tests are offline. A ZIP without CSV follows the
+  download-failure cleanup path, not an uncaught-error path.
+- TPC-DS SQL depends on data scale: [bulk query retrieval](unit/tpcds/test_get_queries_scale.py),
+  [benchmark fakes](unit/core/test_tpcds_benchmark_fakes.py) and the
+  [equivalence reference builder](unit/core/equivalence/test_tpcds_gate_scale.py)
+  preserve matching scales. Q9 and Q44 illustrate scale-dependent templates;
+  the equivalence regression also names Q46 and Q68. The fake generator checks
+  forwarding; it does not establish binary generation correctness.
+- [TPC-H subsets](unit/core/tpch/test_power_test_query_subset.py) accept bare and
+  Q-prefixed IDs because the CLI forwards selected query IDs verbatim.
+  [TPC-DS identity tests](unit/scripts/test_tpcds_platform_identity.py) compare
+  repeated same-seed manifests on one platform before interpreting cross-platform
+  differences; unavailable binaries retain their explicit skip conditions.
+- [TPC-H manifest tests](unit/core/tpch/test_tpch_manifest_row_counts.py) exercise
+  discovery of all compressed shards even when passed one shard. Reuse describes
+  existing bytes, not a new generator's compression flags.
+  [Compressed Data Vault tests](unit/core/datavault/test_compressed_source_buffers.py)
+  retain the two-shard, 512 MB reproduction with plain input as the row-identity
+  reference. This fixture targets the compressed-stream seek failure observed
+  with DuckDB 1.5.5; it is not a general memory-capacity guarantee.
+- [TPC-DS-OBT comparisons](unit/core/tpcds_obt/test_tpcds_obt_dataframe_queries.py)
+  compare values as well as shape, including empty-set zero results for
+  Q10/Q15/Q16. [SSB tuning](unit/core/tuning/test_tpc_workload_profiles.py) excludes
+  `LO_ORDERKEY`: LINEORDER is denormalized and has no ORDERS join. The
+  [replication prototype](unit/core/joinorder_replicated/test_replication_prototype.py)
+  keeps company-type lookup identities shared across replicas.
+- [Firebolt DDL](unit/core/tuning/generators/test_firebolt_ddl.py) stores the full
+  `PRIMARY INDEX` clause in `distribute_by`. [ClickHouse DDL](unit/core/tuning/generators/test_clickhouse_ddl.py)
+  stores a bare partition-column list but wraps it at rendering as a single
+  partition expression for both single and multiple columns.
+- Query-plan tests use recorded fixtures without their live services. Preserve
+  Firebolt nested-parenthesis details, Synapse's RETURN root and linear chain,
+  Snowflake's real Result root over stray parentless nodes, and Fabric's dedicated
+  SHOWPLAN_TEXT handling that excludes the initial statement row. ClickHouse
+  column expansion and multi-word names are not relational joins or table names.
+  Presto/Starburst/Athena wiring uses a fake DBAPI cursor with recorded EXPLAIN JSON,
+  reusing the connection to inspect the last SQL.
+- Light [DSDGen](validation/test_dsdgen_integration_light.py) and
+  [DSQGen](validation/test_dsqgen_integration_light.py) tests require the actual
+  platform binaries. DSDGen streams a small table and checks compressed output;
+  DSQGen validates base-query generation without assuming every template set
+  contains variants. [Plan comparison performance](performance/test_comparison_performance.py)
+  measures ten comparisons of 200-node chains against a one-second budget.
+
+### Producers, consumers and publication
+
+- Public-export [environment fixtures](unit/core/results/test_environment_schema_compatibility.py)
+  reject dropped identifier keys anywhere in serialized output.
+  [Client-link wiring](unit/platforms/base/test_client_link_wiring.py) cannot break
+  a successful run when collection fails, and records unavailable when neither
+  region nor overhead exists. Keep link fields nested in result payloads;
+  DataFrame engines collect the locality half without a SQL overhead probe.
+- [Provenance bundles](unit/core/results/test_provenance_bundle.py) omit the
+  optional block for absent/empty funding and source rather than emitting an empty
+  dictionary. [Timing payloads](unit/core/results/test_schema_timing_contract.py)
+  retain credential redaction, explicit producer tagging and the missing-run-type
+  fallback. [Result status](unit/core/results/test_status.py) distinguishes
+  unexecuted validation from executed failure: unvalidated results are non-clean
+  for publication without necessarily failing the CLI. Its unvalidated set is
+  the non-clean set minus CLI-failure statuses.
+- [Databricks cache tests](unit/platforms/test_databricks_cache_control.py) keep
+  session setup outside the first measured harness query. Concrete adapters
+  explicitly declare plan-capture phase eligibility; registry wrappers read the
+  currently rebound registry singleton. Adapter config helpers preserve plan
+  options and skip `None` values. Redshift query errors and Firebolt load errors
+  retain complete nonempty driver messages, with defensive empty-message handling.
+- [Livy tests](unit/platforms/azure/test_livy_mixin.py) preserve statement timing
+  and counts, wait delegation and abstract header/session hooks. Azure credential
+  fixtures inject the credential class and refresh five minutes before expiry.
+  GCS path tests retain ConfigurationError wording, empty bucket-only prefixes
+  and trailing-slash normalization shared by Dataproc adapters.
+- [Corpus digest tests](unit/scripts/publication/test_db_digest.py) compare
+  canonical logical content rather than database file bytes: build timestamps
+  and bounded floating-point noise are ignored, while content changes differ.
+  Explorer ranking rejects unofficial compliance even with an eligible trust
+  label. The read-model version expectation is an independent migration pin;
+  update it with the compatibility matrix deliberately, not by copying a changed
+  production constant.
+- [Promotion fixtures](unit/scripts/publication/test_verify_corpus_promotion.py)
+  isolate inventory/site failures by substituting privacy and bijection checks;
+  they do not establish those checks independently. Candidate archive validation
+  packages real files; linear Git fixture helpers return oldest-first commits,
+  and parent-bound fixtures retain their manifest generation/digest relationship.
+- Trusted mirror publication may allow partial validation while community
+  submission may not; privacy and inventory still apply. Corpus workflows use
+  trusted-base code, explicit permits and parity checks. Empty changed-corpus
+  lists do not bypass a separately required manifest. Release tag finalization
+  binds the verified merge commit and recovers a tag created before its push.
+- Release-tree tests tolerate the intentional absence of development-only
+  `_project` files. Code-owner ruleset tests assert that specific predicate, not
+  a branch-wide approval count. The project-reference guard rejects new stale
+  paths while retaining its protected historical baseline. Lock revision guards
+  reject decreases while permitting unchanged or increased revisions.
+- Explorer override fixtures traverse bundle and override companion publication
+  together. Static receipt tests check presentation-file contracts, not browser
+  rendering. Notebook content tests accept declared platform extras or explicit
+  dependencies and require a core-runner reference; those textual checks do not
+  prove notebook execution or installed extra contents.

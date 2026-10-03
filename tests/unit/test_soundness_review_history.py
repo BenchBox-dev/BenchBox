@@ -1,5 +1,3 @@
-"""Workflow-shell checks over deep independent Git histories."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -8,7 +6,6 @@ import pytest
 
 from tests.unit.test_soundness_review_flag import _git, _run_queue_guard, queue_history as queue_history
 
-# Real fetches and trusted checker subprocesses exceed the fast-test budget.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 

@@ -1,5 +1,3 @@
-"""Tests for scripts/tpcds_platform_identity.py."""
-
 from __future__ import annotations
 
 import copy
@@ -123,7 +121,7 @@ def test_compare_command_exit_code_and_report(tmp_path: Path, capsys):
 
 
 def test_manifest_is_deterministic_on_one_platform_and_covers_the_pinned_seed():
-    """Two builds with the same seed must compare equal, or a cross-platform difference would be noise."""
+
     from benchbox.core.tpcds.c_tools import DSQGenBinary, TPCDSError
 
     try:

@@ -1,5 +1,3 @@
-"""Regression tests for measured TPC-H manifest row counts."""
-
 from __future__ import annotations
 
 import json
@@ -56,8 +54,6 @@ def test_manifest_records_uneven_rows_for_legacy_compressed_shards(tmp_path: Pat
     _write_rows(raw_paths[1], 5)
     shard_paths = [generator.compress_existing_file(path, remove_original=True) for path in raw_paths]
 
-    # Passing one shard exercises the legacy discovery branch, which must
-    # discover and measure every compressed shard in the output directory.
     generator._write_manifest(tmp_path, {"lineitem": shard_paths[0]})
 
     assert _manifest_lineitem_counts(tmp_path) == [2, 5]
@@ -172,8 +168,6 @@ def test_reused_manifest_preserves_compression_metadata_from_compressed_files(tm
     _write_rows(raw_path, 6)
     compressed_path = writer.compress_existing_file(raw_path, remove_original=True)
 
-    # Reuse under a different current compression configuration. The manifest
-    # describes the bytes that exist, not the flags on this new generator.
     generator = TPCHDataGenerator(
         scale_factor=0.01,
         output_dir=tmp_path,

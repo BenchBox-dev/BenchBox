@@ -1,5 +1,3 @@
-"""Fast coverage for the deprecated ``run-official`` compatibility command."""
-
 from __future__ import annotations
 
 import click
@@ -12,7 +10,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def test_run_official_accepts_and_forwards_platform_options(monkeypatch):
-    """The throughput UAT command must accept credentials with ``--streams``."""
+
     captured: dict[str, object] = {}
 
     def fake_run(**kwargs):
@@ -47,7 +45,7 @@ def test_run_official_accepts_and_forwards_platform_options(monkeypatch):
 
 
 def test_run_official_quiet_forwards_to_run_and_suppresses_banner(monkeypatch):
-    """`run-official --quiet` must reuse the standard bare result-path contract."""
+
     captured: dict[str, object] = {}
 
     def fake_run(**kwargs):

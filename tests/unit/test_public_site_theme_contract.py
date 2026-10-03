@@ -1,5 +1,3 @@
-"""Static checks for the shared public-site theme contract."""
-
 from __future__ import annotations
 
 import importlib.util

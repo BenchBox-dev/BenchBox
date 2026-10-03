@@ -1,5 +1,3 @@
-"""Contract tests for the curated Results Explorer Pages publication path."""
-
 from __future__ import annotations
 
 from pathlib import Path

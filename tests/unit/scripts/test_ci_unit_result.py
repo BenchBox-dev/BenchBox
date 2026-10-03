@@ -1,5 +1,3 @@
-"""Tests for scripts/ci_unit_result.py, the per-unit result aggregator."""
-
 from __future__ import annotations
 
 import json
@@ -29,7 +27,7 @@ def test_required_job_must_succeed() -> None:
 
 
 def test_required_job_skipped_is_a_failure() -> None:
-    """A skipped required job must never green the unit."""
+
     problems = evaluate(needs(lint="skipped"), {"lint": True}, [])
     assert problems == ["lint=skipped (required for this change; expected success)"]
 

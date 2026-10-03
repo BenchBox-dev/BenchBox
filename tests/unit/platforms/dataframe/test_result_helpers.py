@@ -1,12 +1,3 @@
-"""Unit tests for DataFrame _result_helpers.
-
-Pins the shape contract shared by expression-family and pandas-family adapters:
-  * build_success_result_dict contains all required keys with correct values;
-  * build_failure_result_dict contains all required keys with correct values;
-  * first_row=None is preserved as-is (not coerced);
-  * error message is stored verbatim.
-"""
-
 from __future__ import annotations
 
 import pytest

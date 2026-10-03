@@ -58,14 +58,7 @@ def test_generate_create_table_ddl_with_and_without_tuning():
 
 
 def test_generate_create_table_ddl_wraps_partition_by_in_parens():
-    """PR #1180 review: ClickHouse requires a single expression for
-    PARTITION BY; multi-column partitioning needs a tuple (parens), else
-    schema creation fails for otherwise-valid tuning configs. The stored
-    clauses.partition_by field stays a bare comma list (see
-    test_generate_tuning_clauses_combines_cluster_sort_and_partition), so the
-    render site must always wrap it - single or multi-column - to be correct
-    for both.
-    """
+
     generator = ClickHouseDDLGenerator()
     columns = [ColumnDefinition("id", "BIGINT", ColumnNullability.NOT_NULL)]
 

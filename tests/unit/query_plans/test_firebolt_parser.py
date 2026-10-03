@@ -1,9 +1,3 @@
-"""Unit tests for FireboltQueryPlanParser.
-
-Driven by a recorded indented ``EXPLAIN`` text fixture under
-tests/fixtures/query_plans/ so they run with no live Firebolt engine.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -78,8 +72,7 @@ class TestFireboltParserDetailExtraction:
         )
         dag = parser.parse_explain_output("q", text)
         join = next(n for n in _collect(dag.logical_root) if n.operator_type == LogicalOperatorType.JOIN)
-        # The detail value contains nested parens; it must be captured whole, not
-        # truncated at the first ")".
+
         assert join.join_conditions == ["lower(o_comment) = lower(l_comment)"]
 
 

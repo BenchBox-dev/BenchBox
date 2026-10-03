@@ -1,5 +1,3 @@
-"""Tests for the reusable GitHub Pages site assembler."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -84,7 +82,7 @@ def test_prose_only_skips_explorer_build_requirement(tmp_path: Path) -> None:
 
 
 def test_prose_only_omits_cname_and_404(tmp_path: Path) -> None:
-    """Finding #6: prose_only must not emit CNAME (apex domain) nor 404 (SPA fallback)."""
+
     _pages_inputs(tmp_path, explorer=True)
     site_dir = tmp_path / "site"
 
@@ -92,7 +90,7 @@ def test_prose_only_omits_cname_and_404(tmp_path: Path) -> None:
     assert not (site_dir / "CNAME").exists(), "prose_only must not emit CNAME"
     assert not (site_dir / "404.html").exists(), "prose_only must not emit 404.html (results SPA fallback)"
     assert (site_dir / ".nojekyll").is_file()
-    # Non-prose full site still emits both
+
     assemble_public_site(repo_root=tmp_path, site_dir=site_dir, prose_only=False)
     assert (site_dir / "CNAME").is_file()
     assert (site_dir / "404.html").is_file()

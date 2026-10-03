@@ -1,11 +1,3 @@
-"""The TPC-DS cross-surface gate must render its reference SQL at the gate's scale factor.
-
-dsqgen derives some values from the scale (Q9, Q44, Q46 and Q68 differ between scale factor 1 and 0.01), so
-SQL rendered at scale 1 against data generated at 0.01 is a different query from the one the DataFrame
-side is compared with. The builder gets its SQL from ``benchmark.get_queries``; these tests pin that the
-benchmark is built at the gate's scale and that the SQL it yields is the scale's SQL.
-"""
-
 from __future__ import annotations
 
 import pytest

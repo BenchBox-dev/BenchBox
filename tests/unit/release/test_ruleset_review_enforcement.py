@@ -1,11 +1,3 @@
-"""The live develop ruleset must require a code-owner review.
-
-The predicate is intentionally scoped to ``require_code_owner_review``. The
-branch-wide ``required_approving_review_count`` setting is not asserted here,
-because requiring it would gate every develop PR rather than only
-CODEOWNERS-owned soundness paths.
-"""
-
 from __future__ import annotations
 
 import importlib.util

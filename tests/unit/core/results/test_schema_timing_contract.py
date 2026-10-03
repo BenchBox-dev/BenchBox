@@ -1,5 +1,3 @@
-"""Schema timing contract tests for canonical execution_time_seconds."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -56,7 +54,7 @@ def _result_with_queries(query_results: list[dict[str, Any]], execution_id: str 
 
 
 def test_build_result_payload_redacts_platform_metadata_credential_sentinels() -> None:
-    """Timing payload construction must not bypass the platform metadata boundary."""
+
     import json
 
     from benchbox.core.results.models import BenchmarkResults
@@ -258,9 +256,8 @@ def test_build_result_payload_run_type_contract_and_compat_fallback() -> None:
     payload = build_result_payload(result)
     queries = {q["id"]: q for q in payload["queries"]}
 
-    # Explicit producer tagging is preserved as-is.
     assert queries["1"]["run_type"] == "warmup"
-    # Missing run_type uses compatibility fallback.
+
     assert queries["2"]["run_type"] == "warmup"
 
 

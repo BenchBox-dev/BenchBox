@@ -1,5 +1,3 @@
-"""Tests for the ClickHouse certification exact-row gate."""
-
 from __future__ import annotations
 
 import json

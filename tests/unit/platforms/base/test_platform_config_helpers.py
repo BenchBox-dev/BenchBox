@@ -102,7 +102,7 @@ def test_apply_standard_unified_tuning_preserves_dispatch_order() -> None:
 
 
 def test_build_adapter_config_forwards_plan_keys_and_skips_none() -> None:
-    """from_config helpers built on build_adapter_config must not drop --show-plans."""
+
     result = build_adapter_config(
         {
             "benchmark": "tpch",

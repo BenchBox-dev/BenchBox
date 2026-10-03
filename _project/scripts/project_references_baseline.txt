@@ -40,7 +40,6 @@ make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.
 results-explorer/src/lib/starterQueries.ts::_project/TODO/.../explorer-canonical-browser-duckdb-read-model.yaml
 scripts/phase2_metrics.py::_project/handoffs/review.md
 scripts/release_readiness_check.py::_project/release-evidence/uat-gate-summary.json
-tests/integration/test_submission_validation.py::_project/DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml
 tests/uat/_cli.py::_project/release-evidence/uat-gate-summary.json
 tests/uat/gate_summary.py::_project/release-evidence/uat-gate-summary.json
 tests/unit/core/tpcds/test_tpcds_stdout_datagen.py::_project/DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml

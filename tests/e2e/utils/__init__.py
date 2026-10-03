@@ -1,5 +1,3 @@
-"""E2E test utilities for BenchBox CLI testing."""
-
 from tests.e2e.utils.platform_detection import (
     CLOUD_PLATFORMS,
     DATAFRAME_PLATFORMS,
@@ -25,7 +23,6 @@ from tests.e2e.utils.result_validators import (
 )
 
 __all__ = [
-    # Platform detection
     "LOCAL_PLATFORMS",
     "CLOUD_PLATFORMS",
     "DATAFRAME_PLATFORMS",
@@ -37,7 +34,6 @@ __all__ = [
     "requires_dataframe",
     "requires_gpu",
     "requires_cloud_credentials",
-    # Result validators
     "ResultValidator",
     "ValidationError",
     "load_result_json",

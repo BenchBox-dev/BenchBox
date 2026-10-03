@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/phases/validate.py."""
-
 from __future__ import annotations
 
 import json

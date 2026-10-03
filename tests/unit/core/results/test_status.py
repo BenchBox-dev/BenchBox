@@ -1,5 +1,3 @@
-"""Tests for shared result status policy."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -123,8 +121,7 @@ def test_result_non_clean_translation_statuses_are_not_clean(status: str) -> Non
 
 @pytest.mark.parametrize("status", ["not_run", "NOT_RUN", "not_validated", "uncertain", "unknown"])
 def test_unexecuted_validation_is_not_a_cli_failure(status: str) -> None:
-    """Validation that never ran keeps the result non-clean for publication
-    but must not fail the CLI invocation (v0.3.0 exit semantics)."""
+
     result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
     assert not result_is_clean_pass(result)
     assert result_cli_failure_reason(result) is None
@@ -153,7 +150,7 @@ def test_translation_fallback_is_a_cli_failure() -> None:
 
 
 def test_validation_status_set_partition() -> None:
-    """UNVALIDATED is the derived NON_CLEAN - CLI_FAILURE partition; keep it that way."""
+
     assert CLI_FAILURE_VALIDATION_STATUSES < NON_CLEAN_VALIDATION_STATUSES
     assert UNVALIDATED_VALIDATION_STATUSES == NON_CLEAN_VALIDATION_STATUSES - CLI_FAILURE_VALIDATION_STATUSES
     assert UNVALIDATED_VALIDATION_STATUSES

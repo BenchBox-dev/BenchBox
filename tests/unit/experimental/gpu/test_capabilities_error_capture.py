@@ -1,9 +1,3 @@
-"""Tests that CUDA version-file parse failures are logged at debug level.
-
-Hermetic: writes a malformed version file to a tmp path and points CUDA_HOME
-at it; no real CUDA install required.
-"""
-
 import logging
 import os
 
@@ -22,7 +16,6 @@ class TestCUDACapabilitiesErrorCapture:
         monkeypatch.setenv("CUDA_HOME", str(tmp_path))
         monkeypatch.delenv("CUDA_PATH", raising=False)
 
-        # Disable earlier detection branches so we reach the version-file path
         def raise_on_run(*args, **kwargs):
             raise FileNotFoundError("nvcc not available")
 

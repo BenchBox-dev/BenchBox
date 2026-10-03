@@ -1,5 +1,3 @@
-"""Compatibility tests for normalized execution-environment result fixtures."""
-
 from __future__ import annotations
 
 import json
@@ -116,7 +114,6 @@ def test_environment_capture_golden_cases_anonymized_public_export(case: dict[st
     for leaked in case["public_export"]["absent"]:
         assert leaked not in serialized
     for key in case["public_export"].get("absent_keys", []):
-        # Dropped identifier keys must not reappear anywhere in the public export.
         assert f'"{key}"' not in serialized, f"dropped key still present: {key}"
     for dotted_path, prefix in case["public_export"]["prefixes"].items():
         value = _get_path(payload, dotted_path)
