@@ -806,6 +806,17 @@ def test_python_sql_context_avoids_docstrings_and_fstring_fragments() -> None:
     ]
 
 
+@pytest.mark.parametrize("keyword", ["query", "sql", "statement_sql"])
+def test_python_sql_context_routes_designated_keyword_arguments(keyword: str) -> None:
+    source = f'conn.execute({keyword}="SELECT 1 -- explanation")\n'
+    assert [f.text for f in python_findings("a.py", source)] == ["-- explanation"]
+
+
+def test_python_sql_context_rejects_unrelated_keyword_arguments() -> None:
+    assert not python_findings("a.py", 'conn.execute(timeout="SELECT 1 -- explanation")\n')
+    assert not python_findings("a.py", 'logger.info(message="not SQL -- explanation")\n')
+
+
 @pytest.mark.parametrize(
     "source", ["SELECT [1 /* explanation */, 2];", "SELECT 1 FROM t WHERE x = 1 AND [--flag] = 1;"]
 )
@@ -844,6 +855,16 @@ def test_zsh_shebang_is_minimum_directive() -> None:
 )
 def test_heredoc_arguments_and_script_input_are_data(source: str) -> None:
     assert not scan("a.sh", source, "bash")
+
+
+@pytest.mark.parametrize("header", ["uv run --project . python -", "uv run --with pkg python -", "env -u FOO python -"])
+def test_heredoc_wrapper_option_operands_reach_stdin_consumer(header: str) -> None:
+    assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
+
+
+def test_heredoc_unknown_wrapper_option_fails_closed() -> None:
+    findings = scan("a.sh", "uv run --unknown value python - <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
 
 
 def test_multiple_heredocs_and_continued_header() -> None:

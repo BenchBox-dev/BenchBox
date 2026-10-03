@@ -109,17 +109,152 @@ def example_blocks(source: str) -> list[tuple[int, str, str, str]]:
     return blocks
 
 
+def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: set[str], wrapper: str) -> list[str]:
+    """Return the wrapped command after consuming a wrapper's known options."""
+    index = 0
+    while index < len(words):
+        word = words[index]
+        if word == "--":
+            return words[index + 1 :]
+        if "=" in word and word.startswith("--"):
+            option, _ = word.split("=", 1)
+            if option in value_options:
+                index += 1
+                continue
+        if word in value_options:
+            if index + 1 >= len(words):
+                raise ValueError(f"{wrapper} option requires an operand: {word}")
+            index += 2
+            continue
+        if word in flag_options:
+            index += 1
+            continue
+        if word.startswith("-"):
+            raise ValueError(f"unregistered {wrapper} option: {word}")
+        return words[index:]
+    return []
+
+
 def stdin_language(words: list[str]) -> str | None:
     if not words:
         raise ValueError("dynamic shell command receiving a heredoc")
     name = words[0].rsplit("/", 1)[-1]
     if name == "env":
-        return stdin_language([word for word in words[1:] if not word.startswith("-") and "=" not in word])
-    if name == "uv" and words[1:2] == ["run"]:
-        tail = words[2:]
-        if "--" in tail:
-            tail = tail[tail.index("--") + 1 :]
+        tail = _wrapper_tail(
+            words[1:],
+            value_options={
+                "-u",
+                "--unset",
+                "-C",
+                "--chdir",
+                "-S",
+                "--split-string",
+                "--block-signal",
+                "--default-signal",
+                "--ignore-signal",
+                "--argv0",
+            },
+            flag_options={"-i", "--ignore-environment", "-0", "--null"},
+            wrapper="env",
+        )
         return stdin_language(tail)
+    if name == "uv" and words[1:2] == ["run"]:
+        return stdin_language(
+            _wrapper_tail(
+                words[2:],
+                value_options={
+                    "--allow-insecure-host",
+                    "--config-setting",
+                    "--config-settings-package",
+                    "--cache-dir",
+                    "--config-file",
+                    "--directory",
+                    "--env-file",
+                    "--exclude-newer",
+                    "--exclude-newer-package",
+                    "--extra",
+                    "--extra-index-url",
+                    "--find-links",
+                    "--fork-strategy",
+                    "--group",
+                    "--index",
+                    "--index-strategy",
+                    "--index-url",
+                    "--keyring-provider",
+                    "--link-mode",
+                    "--module",
+                    "--no-editable-package",
+                    "--no-extra",
+                    "--no-group",
+                    "--no-sources-package",
+                    "--only-group",
+                    "--package",
+                    "--python-platform",
+                    "--project",
+                    "--python",
+                    "--prerelease",
+                    "--refresh-package",
+                    "--reinstall-package",
+                    "--resolution",
+                    "--upgrade-group",
+                    "--upgrade-package",
+                    "--with",
+                    "--with-editable",
+                    "--with-requirements",
+                    "--color",
+                    "-C",
+                    "-f",
+                    "-i",
+                    "-p",
+                    "-P",
+                    "-w",
+                },
+                flag_options={
+                    "--active",
+                    "--all-extras",
+                    "--all-groups",
+                    "--all-packages",
+                    "--compile-bytecode",
+                    "--exact",
+                    "--frozen",
+                    "--inexact",
+                    "--isolated",
+                    "--locked",
+                    "--managed-python",
+                    "--native-tls",
+                    "--no-active",
+                    "--no-binary",
+                    "--no-build",
+                    "--no-build-isolation",
+                    "--no-cache",
+                    "--no-config",
+                    "--no-default-groups",
+                    "--no-dev",
+                    "--no-editable",
+                    "--no-managed-python",
+                    "--no-project",
+                    "--no-python-downloads",
+                    "--no-reinstall",
+                    "--no-sources",
+                    "--no-sync",
+                    "--offline",
+                    "--only-dev",
+                    "--quiet",
+                    "--refresh",
+                    "--reinstall",
+                    "--verbose",
+                    "--system-certs",
+                    "--no-env-file",
+                    "--no-index",
+                    "--no-progress",
+                    "-U",
+                    "-n",
+                    "-q",
+                    "-v",
+                },
+                wrapper="uv run",
+            )
+        )
     if name.startswith("python") or name in {"node", "bash", "sh", "zsh", "ksh"}:
         args = words[1:]
         if "-c" in args or "-e" in args or "--eval" in args or any(not arg.startswith("-") for arg in args):

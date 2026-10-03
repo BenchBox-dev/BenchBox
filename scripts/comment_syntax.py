@@ -252,35 +252,48 @@ def sql_comments(source: str, dialect: str | None = None) -> list[tuple[int, str
     return result
 
 
+def _is_sql_callable(func: ast.AST) -> bool:
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr in {"execute", "executemany", "sql", "query", "prepare", "read_sql", "read_sql_query"}
+    ) or (isinstance(func, ast.Name) and func.id in {"text", "read_sql", "read_sql_query"})
+
+
+def _is_sql_keyword(name: str | None) -> bool:
+    return name is not None and (name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")))
+
+
+def _python_sql_context(node: ast.AST, parent: ast.AST | None, grandparent: ast.AST | None) -> bool:
+    if isinstance(parent, ast.Call):
+        callable_is_sql = _is_sql_callable(parent.func)
+        if node in parent.args:
+            return callable_is_sql
+        return callable_is_sql and any(
+            keyword.value is node and _is_sql_keyword(keyword.arg) for keyword in parent.keywords
+        )
+    if isinstance(parent, ast.keyword) and parent.value is node and isinstance(grandparent, ast.Call):
+        return _is_sql_callable(grandparent.func) and _is_sql_keyword(parent.arg)
+    if isinstance(parent, (ast.Assign, ast.AnnAssign)):
+        targets = parent.targets if isinstance(parent, ast.Assign) else [parent.target]
+        names = [child.id.lower() for target in targets for child in ast.walk(target) if isinstance(child, ast.Name)]
+        return any(name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")) for name in names)
+    if isinstance(parent, ast.Dict):
+        return any(
+            value is node
+            and isinstance(key, ast.Constant)
+            and isinstance(key.value, str)
+            and (key.value in {"sql", "query"} or key.value.endswith("_sql"))
+            for key, value in zip(parent.keys, parent.values)
+        )
+    return False
+
+
 def python_findings(path: str, source: str) -> list[Finding]:
     tree = ast.parse(source)
     result: list[Finding] = []
     scopes: list[tuple[int, int, str]] = []
 
-    def sql_context(node: ast.AST, parent: ast.AST | None) -> bool:
-        if isinstance(parent, ast.Call) and node in parent.args:
-            func = parent.func
-            return (
-                isinstance(func, ast.Attribute)
-                and func.attr in {"execute", "executemany", "sql", "query", "prepare", "read_sql", "read_sql_query"}
-            ) or (isinstance(func, ast.Name) and func.id in {"text", "read_sql", "read_sql_query"})
-        if isinstance(parent, (ast.Assign, ast.AnnAssign)):
-            targets = parent.targets if isinstance(parent, ast.Assign) else [parent.target]
-            names = [
-                child.id.lower() for target in targets for child in ast.walk(target) if isinstance(child, ast.Name)
-            ]
-            return any(name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")) for name in names)
-        if isinstance(parent, ast.Dict):
-            return any(
-                value is node
-                and isinstance(key, ast.Constant)
-                and isinstance(key.value, str)
-                and (key.value in {"sql", "query"} or key.value.endswith("_sql"))
-                for key, value in zip(parent.keys, parent.values)
-            )
-        return False
-
-    def visit(node: ast.AST, symbol: str, parent: ast.AST | None = None) -> None:
+    def visit(node: ast.AST, symbol: str, parent: ast.AST | None = None, grandparent: ast.AST | None = None) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             symbol = f"{symbol}.{node.name}".strip(".")
             scopes.append((node.lineno, node.end_lineno or node.lineno, symbol))
@@ -316,7 +329,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             sql_text = "".join(
                 str(value.value) if isinstance(value, ast.Constant) else "__expression__" for value in node.values
             )
-        if sql_text and sql_context(node, parent) and re.search(r"--|/\*|#", sql_text):
+        if sql_text and _python_sql_context(node, parent, grandparent) and re.search(r"--|/\*|#", sql_text):
             try:
                 result.extend(
                     Finding(path, node.lineno + sql_text[:offset].count("\n"), "comment", text, symbol, sql_text)
@@ -325,7 +338,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             except ValueError as exc:
                 result.append(Finding(path, node.lineno, "payload-error", str(exc), symbol, sql_text))
         for child in ast.iter_child_nodes(node):
-            visit(child, symbol, node)
+            visit(child, symbol, node, parent)
 
     visit(tree, "")
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
