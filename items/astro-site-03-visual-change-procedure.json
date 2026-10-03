@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Runbook section published in the visual check runbook / docs/operations/repo-admin-settings.md",
+    "One real PR with an intentional docs visual change merged using both approval slots; run ids recorded",
+    "No change to the required context, its semantics or the ruleset"
+  ],
+  "description": "Several migration items change what the live Sphinx site renders before cutover: rst→MyST (astro-site-30), authored API contracts (astro-site-34), and the shared-token adoption if it touches landing or docs CSS (astro-site-21). Their PRs must be able to land with intentional, reviewed visual changes.\n\nPer _project/decisions/public-site-visual-required-check-2026-09-24.md, an approval is bound to an exact tree:\n- one slot for the PR head SHA\n- a second, separate slot for the merge_group head_sha, each with its own nonempty review note\n- group values are cleared after the reviewed run\nA PR approval is never valid for the merge group, and queue position does not change this.\n\nWrite a migration runbook section that covers:\n- how to review the visual diagnostics\n- setting both approval slots\n- what to do when the merge group is re-formed\n- the known stacked-merge-group baseline gap\n- how to recover a missing exact-SHA baseline\n\nRehearse it once on a small real docs change.",
+  "links": [
+    "_project/decisions/public-site-visual-required-check-2026-09-24.md",
+    ".github/workflows/docs.yml",
+    "ci-dedupe-11-required-public-site-visual-check"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:44:57Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d025ffb66a244d6ab977facd447bce65",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
+    }
+  ]
+}
