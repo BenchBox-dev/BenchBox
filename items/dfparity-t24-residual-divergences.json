@@ -4,7 +4,7 @@
     "Each fix states its cause with evidence and does not change another query's status in the per-query probe",
     "Comparator strictness and the SQL reference are unchanged"
   ],
-  "context": "2026-10-03 progress. Local fix branches on the combined adapter branch (all commit-only): (a) fix/tpcds-q9-q46-q68 daf65b303: parameter drift (defaults equal the SF 1 draw); adapters added; Q9 now reads its drawn columns. (b) fix/tpcds-q4-q11-q19-pandas c4f873b59: Q4/Q11 return and order by the customer column drawn as SELECTONE, but the code hard-coded c_preferred_cust_flag; pandas year totals dropped NULL c_login groups (dropna); Q19 pandas counted NULL zips as different (astype(str) gives 'nan'). Adapters were added for Q4, Q11 and Q19. They match at SF 0.01, 0.1 and 1 and on 12 draws. (c) fix/tpcds-q18-q27-null-values e2d102944: pandas returns NULL, not NaN, for averages over no input; matches at 8 draws. (d) fix/tpcds-q70-top-states 15d4fb5e6. With (a) and (b) on top of the combined branch, SF 0.1 has 0 divergent cells on both families (11 on the combined branch alone, 18 on develop). OPEN: an SF 1 re-measure of everything combined; Q25 stddev_samp on a one-row group (untested); pandas mixed-direction sort_values calls that put NULLs last on descending keys (n04 finding: queries.py around 168, 2827, 4017, 6474 on develop). Plan: after the combined PR merges, integrate (a) to (d) and t05g into one follow-up PR.",
+  "context": "2026-10-03 progress. Local fix branches on the combined adapter branch (all commit-only): (a) fix/tpcds-q9-q46-q68 daf65b303: parameter drift; adapters added; Q9 reads its drawn columns. (b) fix/tpcds-q4-q11-q19-pandas c4f873b59: Q4/Q11 SELECTONE column; pandas NULL c_login groups; Q19 NULL zip. (c) fix/tpcds-q18-q27-null-values e2d102944: pandas NULL vs NaN. (d) fix/tpcds-q70-top-states 15d4fb5e6. (e) fix/tpcds-pandas-descending-nulls 76aefac08 (on t05g): descending sorts use the NULL-as-largest helpers (Q3 42 52 55 72 36 70 86 78); no result changes today. With (a)+(b), SF 0.1 has 0 divergent cells. OPEN latent NULL bugs (from (e)): Q3/Q42/Q52/Q55 return 0.0 where SQL returns NULL for an all-NULL SUM (both families); _date_item_sales_pandas drops NULL group keys (no dropna=False); many Polars ascending-only sorts lack nulls_last=True (NULL first vs SQL last); rank() on NULL vs SQL RANK. Also open: SF 1 re-measure of everything combined; Q25 stddev_samp on a one-row group. Plan: integrate (a)-(e) and t05g into one follow-up PR after the combined PR merges.",
   "description": "After every query binds the dsqgen values (t05a-h), some cells will still diverge for reasons other than parameters: implementation logic, shared helpers (helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml), multi-channel unions, ROLLUP grouping sets, windows, NULL and decimal semantics. Using the t14 report at the gate scale (about SF 0.1, per t20), fix each at its cause, preferring the shared helper over per-query copies, or classify it with evidence. No item owned this work before: t20 requires zero unclassified divergences but nothing fixed them. Guardrails: SQL reference unchanged; comparator tolerance 1e-10 and NULL vs NaN unchanged; NULL order fixed in implementations (D4); tie canonicalization only where t14 proves a true tie; no known_divergences entries. queries.py PRs serialize with any other queries.py PR.",
   "sessions": [
     {
@@ -45,6 +45,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "9182742ae3544b428966cc35a7c5961b",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:11:43Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "90e55b8e90bc4e4496f7215b68ffdf50",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
