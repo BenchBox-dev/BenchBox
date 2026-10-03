@@ -1,7 +1,8 @@
 {
   "acceptance": [
-    "The classified-empty set is regenerated at the gate scale with a rationale per query naming the table and filter",
-    "Each entry cites the answer-set evidence of template validity",
+    "The classified-empty set is regenerated at the gate scale, after parameter binding, with a rationale per query naming the table and filter",
+    "For each candidate, a discriminating gate cell (another seed, stream or scale within budget) was sought first, and the attempt is recorded",
+    "Each entry cites the answer-set evidence of template validity and is covered on non-empty data by the t18 lane",
     "A backlog list of queries diverging at other scales exists and is excluded from coverage counts"
   ],
   "context": "Source: DataFrame query parity proposal v3 (item T19). Supersedes legacy tpcds-parity-b5-vacuity (dropped 2026-10-03). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03: the gate moves to about SF 0.1 in t20, so the list is regenerated at that scale. Any SF 0.01 entries from n10 (#2544, if it merges) are interim and are replaced here.",
@@ -29,6 +30,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "c0aafccfe8a44de78f25166fb81acd60",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:11:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5ffc2decc53b43a0ae8859841601d706",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
