@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-10-02T12:50:03.225686+00:00",
+  "generated_at": "2026-10-03T13:21:32.458873+00:00",
   "source": "f02f42f3b75d1674f18b1d4686c37729d26426f9",
   "source_ref": "origin/published-results",
-  "source_resolved_at": "2026-10-02T12:50:03.225686+00:00",
+  "source_resolved_at": "2026-10-03T13:21:32.458873+00:00",
   "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
   "bidirectional": false,
@@ -51,6 +51,7 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
@@ -381,6 +382,7 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json": "accepted",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json": "accepted",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "accepted",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "legacy_overlay",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "accepted",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "accepted",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "accepted",
@@ -711,6 +713,7 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json": "d62e8498e2a4461222c54896def7bc42af5c00df29869952d399951727905756",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json": "de640bc2f645a1acf922745af64d3f443c0e94c3cba01026284ad11c306852a6",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "52ea84ec8b3272fea65c93af9545df151a40d96051cbb5070bd5ee3d019d52ea",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "262f235e9acfea7d431c57affeff6b1ca8132c972061c5de455bbe51275e5fe5",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "2ea72f0a8164e756b36bba0023129779242b9ddd049dd99c09fc4fd90075f2ec",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "3a3892389747b7b38285d4afb0ff96f0d68b3f92225e4ddebb891e6f63f6751a",
@@ -999,6 +1002,7 @@
   },
   "published_only": [],
   "legacy_overlay": [
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
     "results-data/bundles/datavault_sf01_bigquery_sql_20260930_072535_d291326d.json",
     "results-data/bundles/datavault_sf01_databricks_sql_20260930_175402_7225e491.json",
     "results-data/bundles/datavault_sf01_snowflake_sql_20260926_082823_c709896c.json",
@@ -1084,5 +1088,5 @@
     "results-data/bundles/write_primitives_sf1_databricks_sql_20261001_184834_88ba12ba.json",
     "results-data/bundles/write_primitives_sf1_snowflake_sql_20261001_083039_3c313d6f.json"
   ],
-  "count": 328
+  "count": 329
 }

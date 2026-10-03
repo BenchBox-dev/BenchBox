@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-02T12:49:49.206723+00:00",
+  "generated_at": "2026-10-03T13:21:28.444009+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -651,6 +651,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81"
+    },
+    {
+      "file": "datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-27T10:05:30.313826",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "52ea84ec8b3272fea65c93af9545df151a40d96051cbb5070bd5ee3d019d52ea"
     },
     {
       "file": "datavault_sf01_bigquery_sql_20260930_072535_d291326d.json",
@@ -4333,6 +4346,7 @@
       "SQLite v3.53.1"
     ],
     "datavault@sf0.01": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
@@ -4688,12 +4702,12 @@
     ]
   },
   "summary": {
-    "total_bundles": 328,
+    "total_bundles": 329,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
       "coffeeshop": 17,
-      "datavault": 15,
+      "datavault": 16,
       "flightdata": 18,
       "h2odb": 18,
       "joinorder": 6,
@@ -4712,7 +4726,7 @@
       "write_primitives": 9
     },
     "by_platform": {
-      "BigQuery": 28,
+      "BigQuery": 29,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
@@ -4730,10 +4744,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 328
+      "maintainer-run": 329
     },
     "by_funding": {
-      "unspecified": 328
+      "unspecified": 329
     }
   }
 }

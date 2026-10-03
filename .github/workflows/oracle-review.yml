@@ -1,0 +1,54 @@
+name: oracle-review
+
+run-name: oracle-review (${{ github.event.action || github.event_name }})
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: oracle-review-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  oracle-review:
+    name: oracle-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'develop' }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Require the Codex connector's review
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PR_NUMBER" ]; then
+            [[ "$MERGE_GROUP_REF" =~ /pr-([0-9]+)- ]] || { echo "oracle-review: error: no pull request number in '$MERGE_GROUP_REF'" >&2; exit 2; }
+            PR_NUMBER="${BASH_REMATCH[1]}"
+          fi
+          python _project/scripts/oracle_review_check.py --repo "$REPO" --pr "$PR_NUMBER"
