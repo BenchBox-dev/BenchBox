@@ -1744,6 +1744,20 @@ def q96_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"count": [count]})
 
 
+# The template fixes the base month (``d1.d_moy = 4``) and the return and re-purchase window
+# (``d_moy between 4 and 10``); it draws the year and the aggregate applied to all three measures.
+_Q25_FIRST_MONTH = 4
+_Q25_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+
+
+def _q25_aggregate(name: str) -> str:
+    """The column-aggregate method (Polars-style and pandas share these names) for a template ``AGG`` value."""
+    try:
+        return _Q25_AGGREGATES[name]
+    except KeyError:
+        raise ValueError(f"Q25 AGG must be one of {sorted(_Q25_AGGREGATES)}, got {name!r}") from None
+
+
 def q25_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q25: Store/Catalog Sales Item Analysis (Expression Family).
 
@@ -1754,7 +1768,8 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
     """
     params = get_parameters(25)
     year = params.get("year", 2000)
-    month = params.get("month", 4)
+    agg = _q25_aggregate(params.get("agg", "sum"))
+    month = _Q25_FIRST_MONTH
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
@@ -1791,9 +1806,9 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
         .join(d3.select("d_date_sk"), left_on="cs_sold_date_sk", right_on="d_date_sk")
         .group_by("i_item_id", "i_item_desc", "s_store_id", "s_store_name")
         .agg(
-            col("ss_net_profit").sum().alias("store_sales_profit"),
-            col("sr_net_loss").sum().alias("store_returns_loss"),
-            col("cs_net_profit").sum().alias("catalog_sales_profit"),
+            getattr(col("ss_net_profit"), agg)().alias("store_sales_profit"),
+            getattr(col("sr_net_loss"), agg)().alias("store_returns_loss"),
+            getattr(col("cs_net_profit"), agg)().alias("catalog_sales_profit"),
         )
         .sort("i_item_id", "i_item_desc", "s_store_id", "s_store_name")
         .limit(100)
@@ -1804,7 +1819,8 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q25: Store/Catalog Sales Item Analysis (Pandas Family)."""
     params = get_parameters(25)
     year = params.get("year", 2000)
-    month = params.get("month", 4)
+    agg = _q25_aggregate(params.get("agg", "sum"))
+    month = _Q25_FIRST_MONTH
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
@@ -1838,9 +1854,9 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     return (
         merged.groupby(["i_item_id", "i_item_desc", "s_store_id", "s_store_name"], as_index=False)
         .agg(
-            store_sales_profit=("ss_net_profit", "sum"),
-            store_returns_loss=("sr_net_loss", "sum"),
-            catalog_sales_profit=("cs_net_profit", "sum"),
+            store_sales_profit=("ss_net_profit", agg),
+            store_returns_loss=("sr_net_loss", agg),
+            catalog_sales_profit=("cs_net_profit", agg),
         )
         .sort_values(["i_item_id", "i_item_desc", "s_store_id", "s_store_name"])
         .head(100)
@@ -5094,6 +5110,24 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+_Q31_ORDER_COLUMNS = (
+    "ca_county",
+    "d_year",
+    "web_q1_q2_increase",
+    "store_q1_q2_increase",
+    "web_q2_q3_increase",
+    "store_q2_q3_increase",
+)
+
+
+def _q31_order_column(order_by: str) -> str:
+    """The output column for the template's ``ORDER BY [AGG]`` (a column, optionally qualified as ``ss1.``)."""
+    column = order_by.rpartition(".")[2]
+    if column not in _Q31_ORDER_COLUMNS:
+        raise ValueError(f"Q31 ORDER BY must be one of {list(_Q31_ORDER_COLUMNS)}, got {order_by!r}")
+    return column
+
+
 def q31_expression_impl(ctx: DataFrameContext) -> Any:
     """Q31: Store/Web quarterly sales growth by county (Polars).
 
@@ -5106,6 +5140,7 @@ def q31_expression_impl(ctx: DataFrameContext) -> Any:
     # Parameters
     params = get_parameters(31)
     year = params.get("year", 2000)
+    order_by = _q31_order_column(params.get("order_by", "ss1.ca_county"))
 
     # Get tables
     store_sales, web_sales, date_dim, customer_address = _tables(
@@ -5199,7 +5234,7 @@ def q31_expression_impl(ctx: DataFrameContext) -> Any:
             col("web_q2_q3_increase"),
             col("store_q2_q3_increase"),
         ]
-    ).sort("ca_county")
+    ).sort(order_by)
 
 
 def q31_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5207,6 +5242,7 @@ def q31_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q31: Store/Web quarterly sales growth by county (Pandas)."""
     params = get_parameters(31)
     year = params.get("year", 2000)
+    order_by = _q31_order_column(params.get("order_by", "ss1.ca_county"))
 
     # Get tables
     store_sales, web_sales, date_dim, customer_address = _tables(
@@ -5292,7 +5328,7 @@ def q31_pandas_impl(ctx: DataFrameContext) -> Any:
             "web_q2_q3_increase",
             "store_q2_q3_increase",
         ]
-    ].sort_values("ca_county")
+    ].sort_values(order_by)
 
 
 # =============================================================================
@@ -10469,8 +10505,8 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     from datetime import timedelta
 
     params = get_parameters(21)
-    price_min = params.get("price_min", 0.99)
-    price_max = params.get("price_max", 1.49)
+    # The template fixes the price band (``i_current_price between 0.99 and 1.49``); only the date is drawn.
+    price_min, price_max = 0.99, 1.49
     sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
@@ -10540,8 +10576,8 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     from datetime import timedelta
 
     params = get_parameters(21)
-    price_min = params.get("price_min", 0.99)
-    price_max = params.get("price_max", 1.49)
+    # The template fixes the price band (``i_current_price between 0.99 and 1.49``); only the date is drawn.
+    price_min, price_max = 0.99, 1.49
     sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
