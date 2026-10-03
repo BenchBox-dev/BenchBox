@@ -53,25 +53,25 @@ def test_first_generation_deploys_and_first_rollback_is_refused() -> None:
     assert gate(SHA_A, mode="rollback").action == REFUSE
 
 
-@pytest.mark.parametrize(
-    ("trunk", "tag", "expected"),
-    [
-        (SHA_C, "v0.4.1", DEPLOY),
-        (SHA_B, "v0.4.2", DEPLOY),
-        (SHA_C, "v0.5.0", DEPLOY),
-        (SHA_B, "v0.4.1", NOOP),
-        (SHA_A, "v0.4.1", REFUSE),
-        (SHA_C, "v0.4.0", REFUSE),
-        (SHA_A, "v0.5.0", REFUSE),
-        (SIDE, "v0.4.1", REFUSE),
-        (SHA_B, "v0.4.0", REFUSE),
-        (SHA_B, "v0.10.0", DEPLOY),
-        (SHA_B, "v0.3.9", REFUSE),
-    ],
-)
-def test_forward_modes_never_regress_trunk_or_release(trunk: str, tag: str, expected: str) -> None:
-    for mode in ("deploy", "preview"):
-        assert gate(trunk, tag, deployed(), mode).action == expected
+FORWARD_CASES = [
+    (SHA_C, "v0.4.1", DEPLOY),
+    (SHA_B, "v0.4.2", DEPLOY),
+    (SHA_C, "v0.5.0", DEPLOY),
+    (SHA_B, "v0.4.1", NOOP),
+    (SHA_A, "v0.4.1", REFUSE),
+    (SHA_C, "v0.4.0", REFUSE),
+    (SHA_A, "v0.5.0", REFUSE),
+    (SIDE, "v0.4.1", REFUSE),
+    (SHA_B, "v0.4.0", REFUSE),
+    (SHA_B, "v0.10.0", DEPLOY),
+    (SHA_B, "v0.3.9", REFUSE),
+]
+
+
+def test_forward_modes_never_regress_trunk_or_release() -> None:
+    for trunk, tag, expected in FORWARD_CASES:
+        for mode in ("deploy", "preview"):
+            assert gate(trunk, tag, deployed(), mode).action == expected
 
 
 def test_rollback_may_move_backwards_and_diverge_but_identical_state_is_noop() -> None:

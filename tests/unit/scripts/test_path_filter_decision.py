@@ -513,12 +513,12 @@ def _needs(job: dict) -> list[str]:
     return [needs] if isinstance(needs, str) else list(needs)
 
 
-@pytest.mark.parametrize("path", SITE_BUILD_INPUTS)
-def test_site_build_inputs_trigger_the_site_build_gate(rules: dict[str, list[str]], path: str) -> None:
-    decision = classify_paths([path], rules)
+def test_site_build_inputs_trigger_the_site_build_gate(rules: dict[str, list[str]]) -> None:
+    for path in SITE_BUILD_INPUTS:
+        decision = classify_paths([path], rules)
 
-    assert decision["site_needed"] is True
-    assert decision["site_paths"] == [path]
+        assert decision["site_needed"] is True
+        assert decision["site_paths"] == [path]
 
 
 def test_unrelated_change_skips_the_site_build_gate(rules: dict[str, list[str]]) -> None:

@@ -9,7 +9,7 @@ from scripts.assemble_public_site import REPO_ROOT
 from scripts.site_deploy import mixed_version as mv
 from scripts.site_deploy.mixed_version import FORWARD, PHASE_FULL, PHASE_UI_FIRST, ROLLBACK, Versions
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def _snapshot(path: Path, version: int | None) -> Path:
@@ -104,4 +104,4 @@ def test_ui_first_pairs_describe_the_composed_artifact_not_a_restored_snapshot()
     full = [pair.name for pair in mv.required_pairs(restored, current, ROLLBACK, PHASE_FULL)]
     assert full == ["candidate-ui/candidate-snapshot", "restored-ui/current-snapshot", "current-ui/restored-snapshot"]
     evaluation = mv.evaluate(restored, current, ROLLBACK, PHASE_UI_FIRST)
-    assert [pair["name"] for pair in evaluation.to_dict()["pairs"]] == names
+    assert [pair.name for pair in evaluation.pairs] == names

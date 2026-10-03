@@ -1197,18 +1197,18 @@ def test_astro_template_comments_are_found_without_flagging_embedded_blocks() ->
     ]
 
 
-@pytest.mark.parametrize(
-    "source",
-    [
-        '<a title="<!-- data -->">x</a>\n',
-        "<a title='<!-- data -->'>x</a>\n",
-        '<p>{"<!-- data -->"}</p>\n',
-        "<p>{`<!-- ${x} -->`}</p>\n",
-        "---\nconst s = '<!-- data -->';\n---\n<p>x</p>\n",
-    ],
-)
-def test_astro_html_comment_markers_inside_strings_are_data(source: str) -> None:
-    assert not [f for f in scan("a.astro", source, "astro", {}) if f.text.startswith("<!--")]
+ASTRO_STRING_MARKER_SOURCES = [
+    '<a title="<!-- data -->">x</a>\n',
+    "<a title='<!-- data -->'>x</a>\n",
+    '<p>{"<!-- data -->"}</p>\n',
+    "<p>{`<!-- ${x} -->`}</p>\n",
+    "---\nconst s = '<!-- data -->';\n---\n<p>x</p>\n",
+]
+
+
+def test_astro_html_comment_markers_inside_strings_are_data() -> None:
+    for source in ASTRO_STRING_MARKER_SOURCES:
+        assert not [f for f in scan("a.astro", source, "astro", {}) if f.text.startswith("<!--")]
 
 
 @pytest.mark.parametrize(

@@ -12,7 +12,7 @@ from scripts.assemble_public_site import REPO_ROOT, assemble_public_site, main
 from scripts.publication.assembler import PathOwnershipError
 from scripts.site_deploy import routes
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 MANIFEST = REPO_ROOT / "deploy" / "routes.yml"
 

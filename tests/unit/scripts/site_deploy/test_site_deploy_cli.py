@@ -10,7 +10,7 @@ from scripts.publication.assembler import compute_tree_digest
 from scripts.site_deploy import checksums, cli, publish, receipt
 from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, make_receipt
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 ROUTES = ["/", "/docs/", "/docs/dev/", "/blog/", "/results/"]
 FALLBACK = "<script>sessionStorage.setItem('benchbox.results.redirect', 1)</script>"

@@ -60,11 +60,10 @@ def test_canonical_bytes_are_stable_and_hash_matches() -> None:
     assert len(r.receipt_sha256(r.canonical_bytes(built))) == 64
 
 
-@pytest.mark.parametrize("key", list(make_receipt(run_id=1, trunk=SHA_A)))
-def test_validation_rejects_missing_keys(key: str) -> None:
-    broken = make_receipt(run_id=1, trunk=SHA_A)
-    broken.pop(key)
-    if key in r.REQUIRED_KEYS:
+def test_validation_rejects_every_missing_required_key() -> None:
+    for key in r.REQUIRED_KEYS:
+        broken = make_receipt(run_id=1, trunk=SHA_A)
+        broken.pop(key)
         with pytest.raises(r.ReceiptError):
             r.validate_receipt(broken)
 

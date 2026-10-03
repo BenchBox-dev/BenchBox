@@ -11,7 +11,7 @@ import pytest
 from scripts.site_deploy import candidate, checksums, cli, generation, receipt
 from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, SHA_B, FakeGitHub, make_receipt
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 TRUNK_PATH = ".github/workflows/trunk.yml"
 

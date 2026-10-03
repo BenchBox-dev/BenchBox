@@ -45,22 +45,22 @@ def test_newest_certified_sha_wins_and_uncertified_newer_sha_is_skipped() -> Non
     assert (found.trunk_sha, found.certifying_run_id, found.release_tag) == (SHA_B, 7, "v0.4.1")
 
 
-@pytest.mark.parametrize(
-    "run",
-    [
-        _run(SHA_A, conclusion="failure"),
-        _run(SHA_A, conclusion="cancelled"),
-        _run(SHA_A, event="merge_group"),
-        _run(SHA_A, event="pull_request"),
-        _run(SHA_A, branch="feature"),
-        _run(SHA_A, path=".github/workflows/ci.yml"),
-        _run(SHA_B),
-    ],
-)
-def test_refuses_when_no_successful_trunk_push_run_matches_the_exact_sha(run: dict[str, object]) -> None:
-    api = FakeGitHub(runs=[run])
-    with pytest.raises(candidate.CandidateError, match="successful push run of trunk.yml"):
-        candidate.find_candidate(api.client(), [SHA_A], "v0.4.1")
+REFUSED_RUNS = [
+    _run(SHA_A, conclusion="failure"),
+    _run(SHA_A, conclusion="cancelled"),
+    _run(SHA_A, event="merge_group"),
+    _run(SHA_A, event="pull_request"),
+    _run(SHA_A, branch="feature"),
+    _run(SHA_A, path=".github/workflows/ci.yml"),
+    _run(SHA_B),
+]
+
+
+def test_refuses_when_no_successful_trunk_push_run_matches_the_exact_sha() -> None:
+    for run in REFUSED_RUNS:
+        api = FakeGitHub(runs=[run])
+        with pytest.raises(candidate.CandidateError, match="successful push run of trunk.yml"):
+            candidate.find_candidate(api.client(), [SHA_A], "v0.4.1")
 
 
 def test_run_conclusion_decides_even_if_the_server_filter_returns_a_failed_run() -> None:

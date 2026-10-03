@@ -8,7 +8,7 @@ import pytest
 
 from scripts.site_deploy import gates as g
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 ROUTES = Path(__file__).resolve().parents[4] / "deploy" / "routes.yml"
 TRUNK = "a" * 40
