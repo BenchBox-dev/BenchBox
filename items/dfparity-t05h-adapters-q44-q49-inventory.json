@@ -1,8 +1,8 @@
 {
   "acceptance": [
-    "The cause of Q44 and Q49 staying in BINDING_GAP is stated with evidence",
+    "The cause of Q44 and Q49 staying in BINDING_GAP is stated with evidence (Codex review 2026-10-03: Q44 keeps a dead year default, default_parameters.yaml ~297; Q49 reads month with a literal fallback of 12 that no default or adapter supplies, queries.py ~575-578)",
     "Q44 and Q49 leave BINDING_GAP and LITERAL_FALLBACK and the inventory test passes",
-    "The inventory's classification is consistent with ADAPTERS for all adapted queries (Q39, Q44, Q49, Q93), pinned by a test",
+    "A binding-coverage test asserts, per query and family, that every substitution the SQL template uses is mapped by the adapter and every key the implementation reads is supplied by the binding, for at least two seeds and two streams; the inventory categories remain diagnostics, not the proof",
     "Q44 and Q49 match the DuckDB reference on both families at SF 0.1 with adapter binding, or the reason is documented"
   ],
   "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Cause not yet determined. queries.py edits serialize with the other t05 batches.",
@@ -14,6 +14,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "8563da17480346c7a576bd70b8932c86",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:10:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "0ef8c776e1a741a789f3aa50b86dd28a",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
