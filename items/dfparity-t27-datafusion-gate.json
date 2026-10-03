@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A feasibility report lists, per query, whether the expression implementation runs on DataFusion at SF 0.01, with the error for each failure.",
+    "The gate gains a DataFusion expression cell; all 99 queries run on it at the gate scale.",
+    "Every DataFusion cell matches SQL or carries an evidenced classification.",
+    "The DataFusion cell is enforced in CI with the repeat-run check, its whole-gate time is measured, and a maintainer signs off."
+  ],
+  "description": "Owner decision D6 (2026-10-03) puts DataFusion in the parity goal. Today the cross-surface gate runs the expression family on Polars only (DATAFRAME_BACKENDS = (\"expression\", \"pandas\") in benchbox/core/equivalence/dataframe_surface.py). benchbox/platforms/dataframe/datafusion_df.py exists. First establish whether the 99 TPC-DS expression implementations run on DataFusion, then add a DataFusion cell to the gate and enforce it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:19:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2608a5cab7044a5d925ce823202b5259",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}
