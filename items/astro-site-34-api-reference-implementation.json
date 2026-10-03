@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "Every URL under /docs/api.html and /docs/reference/python-api/** resolves per the D7 URL map (inventory diff test)",
-    "No new docstrings introduced (comment-policy-check green)",
-    "API examples, if any, are covered by example-validation",
+    "Every public-surface symbol from the ADR list has an authored contract",
+    "Every URL under /docs/api.html and /docs/reference/python-api/** and every mapped anchor resolves per the D7 URL map (inventory diff test)",
+    "Optional drift check green and fails on a seeded signature change",
+    "No new docstrings (comment-policy-check green); examples covered by example-validation",
     "api-docs lane outputs documented and tested"
   ],
-  "description": "Build whatever ADR D7 chose: hand-written API guide pages (option A), and if option B was chosen, a signatures-only reference made by static analysis with no docstring dependency.\n\nEvery current reference URL either serves the new page or a static redirect page to its mapped target. Update the api-docs lane contract (whatever site-deploy or publication copies) to the new outputs.\n\nDo not add docstrings to code to feed the reference (COMMENT-POLICY-001).",
+  "description": "Implement ADR D7. For each symbol on the selected public surface, write Markdown contract pages: purpose, parameters, return semantics, errors, examples and compatibility notes. The content is harvested from the docstrings at the pinned SHA and edited; it is not a module dump.\n\nIf D7 chose a drift tool, wire it as a CI check that compares the authored contracts with signatures and types (with lazy exports verified). It renders nothing.\n\nThe reference is release-pinned: built from the release tag's sources per D5 and adr-independent-publication-authorities.\n\nEvery current reference URL and anchor serves the new page or a counted redirect page. Update the api-docs lane contract to the new outputs.\n\nDelete the 27 autodoc .rst files only in this item's PR, once their replacements exist. Do not add docstrings to code (COMMENT-POLICY-001).",
   "links": [
     "docs/reference/python-api",
     "docs/api.rst"
@@ -17,6 +18,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "6f74251cf60649aea0d5346f10b2e167",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:09:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2512a74796f54e7c962d50396ad9833b",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]

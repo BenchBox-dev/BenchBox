@@ -996,7 +996,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Implement the API reference decision from the gate in the Astro site"
+      "title": "Write the authored API contract pages and retire the autodoc reference"
     },
     "athena-configuration-validation": {
       "claim": null,
