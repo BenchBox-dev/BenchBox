@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Sweep: no remaining references to sphinx, furo, ablog, myst_parser, landing/shared, docs/_build in maintained code, workflows or Makefiles (grep output in PR)",
+    "Dependency audit and inventory drift checks green after removal",
+    "All required checks green; public-site visual acceptance passes with no baseline change",
+    "Owner informed of the status of comment-cleanup-* and dlv2-61 items"
+  ],
+  "description": "Start only after:\n- production deploys from the Astro build stay green for 24 hours or 3 deploys, whichever comes first (matching dlv2-62)\n- the release-pinned /docs/ route is served by Astro, so no live route still needs Sphinx\n\nRemove:\n- docs/conf.py, docs/_extensions, docs/_templates, docs/Makefile, make.bat, the Sphinx-only parts of docs/_static\n- landing/ and landing/shared\n- Sphinx targets in make/documentation.mk and Makefile ci-docs, plus make/inventory.json entries\n- the pyproject docs extra and the docs entries in the dev group (sphinx, furo, myst-parser, sphinxcontrib-mermaid, sphinx-tags, sphinx-design, ablog and its git source override)\n- token-drift scan scripts made redundant by the single token source\n- Sphinx-specific tests (tests/docs/test_sphinx_warnings.py, tests/unit/docs/test_docs_build.py), each replaced by its Astro equivalent\n\nCoordinate with dlv2-61 (docs.yml retirement). Check whether comment-cleanup-site-assets and comment-cleanup-generators still apply, and report back so the owner can update or drop them; do not drop them yourself.",
+  "links": [
+    "dlv2-61-retire-docs-yml-pages-fallback",
+    "comment-cleanup-site-assets",
+    "comment-cleanup-generators",
+    "pyproject.toml",
+    "make/documentation.mk"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:13:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9685e5e2dda141a592e671738b5c73c4",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}

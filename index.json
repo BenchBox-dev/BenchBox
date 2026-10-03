@@ -1069,6 +1069,15 @@
       "status": "open",
       "title": "Decision gate G3: cut docs/ authoring and production routes over to the Astro site in one reviewed PR"
     },
+    "astro-site-54-retire-sphinx-and-legacy-site": {
+      "claim": null,
+      "needs": [
+        "astro-site-53-cutover"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Retire Sphinx, ablog, the static landing page, and duplicate theme tooling after the Astro site is stable"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
