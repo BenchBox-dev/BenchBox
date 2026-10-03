@@ -36,7 +36,9 @@ class FakeRun:
         dirty: str = "",
         fail: dict[str, int] | None = None,
         origin: str = "git@github.com:BenchBox-dev/BenchBox.git",
+        branch_exists: bool = False,
     ):
+        self.branch_exists = branch_exists
         self.origin = origin
         self.pr_view = pr_view
         self.dirty = dirty
@@ -51,7 +53,11 @@ class FakeRun:
             return 0, self.dirty
         if cmd[:4] == ["git", "remote", "get-url", "--push"]:
             return 0, self.origin
-        if cmd[:2] == ["gh", "pr"] and cmd[2] == "create":
+        if cmd[:3] == ["git", "rev-parse", "--verify"]:
+            return (0, "") if self.branch_exists else (1, "")
+        if cmd[:3] == ["git", "branch", "--show-current"]:
+            return 0, "work/topic\n"
+        if cmd[:3] == ["gh", "pr", "create"] and "gh pr create" not in self.fail:
             return 0, "https://github.com/BenchBox-dev/BenchBox/pull/99\n"
         for prefix, code in self.fail.items():
             if " ".join(cmd).startswith(prefix):
@@ -84,6 +90,8 @@ def test_builds_the_expected_revert_and_pr_commands(capsys: pytest.CaptureFixtur
         ["gh", "pr", "view", "12", "--repo", trunk_revert.REPOSITORY, "--json", "state,mergeCommit,title"],
         ["git", "status", "--porcelain"],
         ["git", "remote", "get-url", "--push", "origin"],
+        ["git", "rev-parse", "--verify", "--quiet", "refs/heads/fix/revert-12"],
+        ["git", "branch", "--show-current"],
         ["git", "fetch", "origin", "develop", "--quiet"],
         ["git", "merge-base", "--is-ancestor", OID, "origin/develop"],
         ["git", "switch", "--no-track", "-c", "fix/revert-12", "origin/develop"],
@@ -128,8 +136,33 @@ def test_aborts_the_revert_when_it_conflicts(capsys: pytest.CaptureFixture[str])
     run = FakeRun(pr_view=_merged(), fail={"git revert --no-edit": 1})
     assert trunk_revert.revert(12, run=run) == 1
     assert ["git", "revert", "--abort"] in run.calls
+    assert ["git", "switch", "work/topic"] in run.calls
+    assert ["git", "branch", "-D", "fix/revert-12"] in run.calls
     assert not any(call[:2] == ["git", "push"] for call in run.calls)
     assert "git revert failed" in capsys.readouterr().err
+
+
+def test_restores_the_original_branch_when_the_push_fails() -> None:
+    run = FakeRun(pr_view=_merged(), fail={"git push": 1})
+    assert trunk_revert.revert(12, run=run) == 1
+    assert ["git", "switch", "work/topic"] in run.calls
+    assert ["git", "branch", "-D", "fix/revert-12"] in run.calls
+
+
+def test_keeps_the_pushed_branch_and_says_how_to_finish_when_pr_creation_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run = FakeRun(pr_view=_merged(), fail={"gh pr create": 1})
+    assert trunk_revert.revert(12, run=run) == 1
+    assert ["git", "branch", "-D", "fix/revert-12"] not in run.calls
+    assert "gh pr create --repo" in capsys.readouterr().err
+
+
+def test_refuses_when_the_revert_branch_already_exists(capsys: pytest.CaptureFixture[str]) -> None:
+    run = FakeRun(pr_view=_merged(), branch_exists=True)
+    assert trunk_revert.revert(12, run=run) == 1
+    assert "already exists" in capsys.readouterr().err
+    assert not any(call[:2] == ["git", "switch"] for call in run.calls)
 
 
 def test_refuses_a_merge_commit_that_is_not_on_develop() -> None:

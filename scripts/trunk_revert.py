@@ -148,7 +148,14 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
             raise TrunkError(f"PR #{number} has no title")
         if _check(run, ["git", "status", "--porcelain"], "checking the worktree").strip():
             raise TrunkError("the worktree has uncommitted or untracked changes; commit or remove them first")
-        head = head_spec(run, repo, f"{REVERT_PREFIX}{number}")
+        branch = f"{REVERT_PREFIX}{number}"
+        head = head_spec(run, repo, branch)
+        if run(["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"])[0] == 0:
+            raise TrunkError(f"local branch {branch} already exists; delete it or finish its PR by hand")
+        current = _check(run, ["git", "branch", "--show-current"], "reading the current branch").strip()
+        original = (
+            [current] if current else ["--detach", _check(run, ["git", "rev-parse", "HEAD"], "reading HEAD").strip()]
+        )
         fetch, switch, revert_cmd, amend, push, create = revert_commands(number, oid, title, repo, head)
         _check(run, fetch, "fetching origin/develop")
         _check(
@@ -156,14 +163,25 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
             ["git", "merge-base", "--is-ancestor", oid, f"origin/{BASE_BRANCH}"],
             f"confirming {oid[:9]} is on origin/{BASE_BRANCH}",
         )
-        _check(run, switch, f"creating {REVERT_PREFIX}{number}")
-        code, out = run(revert_cmd)
-        if code != 0:
+        _check(run, switch, f"creating {branch}")
+        try:
+            code, out = run(revert_cmd)
+            if code != 0:
+                raise TrunkError(f"git revert failed (the revert conflicts with later changes?): {out.strip()}")
+            _check(run, amend, "writing the revert commit message")
+            _check(run, push, "pushing the revert branch")
+        except TrunkError:
             run(["git", "revert", "--abort"])
-            raise TrunkError(f"git revert failed (the revert conflicts with later changes?): {out.strip()}")
-        _check(run, amend, "writing the revert commit message")
-        _check(run, push, "pushing the revert branch")
-        print(_check(run, create, "opening the revert PR").strip())
+            run(["git", "switch", *original])
+            run(["git", "branch", "-D", branch])
+            raise
+        code, out = run(create)
+        if code != 0:
+            raise TrunkError(
+                f"opening the revert PR failed: {out.strip()}; {branch} is pushed, open it with: "
+                f"gh pr create --repo {repo} --base {BASE_BRANCH} --head {head} --fill"
+            )
+        print(out.strip())
     except (TrunkError, ValueError, AttributeError) as exc:
         print(f"trunk-revert: refusing: {exc}", file=sys.stderr)
         return 1
