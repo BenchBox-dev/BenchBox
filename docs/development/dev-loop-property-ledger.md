@@ -70,7 +70,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `fast-lane-baseline.yml` | tooling | Develop-tip fast-lane count that the ci.yml delta guard restores |
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
-| `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3 |
+| `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
