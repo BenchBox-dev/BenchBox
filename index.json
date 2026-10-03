@@ -887,10 +887,15 @@
       "title": "ASCII chart golden-output test: make a missing golden file a hard, non-self-healing failure"
     },
     "astro-site-00-decisions-adr": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-04T15:09:41Z",
+        "generation": "4a69ac5f8c4b42cd83b2621bb12516a2",
+        "renewals": 0,
+        "worker": "mcp:claude-code:root@vm:18597091d1eeb494a4ae3b6f"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Decision gate: record the ADR for moving benchbox.dev to one Astro site"
     },
     "astro-site-01-url-content-inventory": {
