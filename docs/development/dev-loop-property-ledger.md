@@ -195,6 +195,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_arm.py` | pure-process |
 | `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
+| `test_trunk_revert.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
@@ -311,6 +312,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `path_filter_decision.py` | tooling | Path classifier shared with ci.yml units |
 | `pytest_shard_evidence.py` | product-safety | Exact assigned, collected, and executed medium test evidence |
 | `pr_landing.py` | pure-process | PR-loop mechanics |
+| `trunk_revert.py` | pure-process | Revert of a merged PR and the red-trunk gate on `make pr-open` |
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |
 | `post_merge_signature.py` | pure-process | Post-merge mechanics |

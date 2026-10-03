@@ -1060,29 +1060,26 @@ class TestReleaseInfrastructure:
         recipe = _make_target_recipe("pr-refresh")
         assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
 
-    def test_pr_open_refuses_behind_origin_develop(self):
-        """Open-stale branches use the verified queue or the refresh path.
+    def test_pr_open_publishes_behind_branches_without_a_queue_check(self):
+        """A behind but conflict-free branch is published as is.
 
-        #1751 opened already behind because pr-open fetched origin/develop
-        for path filters and then ignored ancestry. A verified native queue can
-        validate the speculative merge without a local refresh; every other
-        state stays on make pr-refresh (one PR at a time). pr-open must not
-        merge develop itself or pr-fanout becomes a refresh storm.
+        Required checks and auto-merge gate the merge, so pr-open verifies no
+        queue state. It still refuses a genuine base conflict and must not merge
+        develop itself, or pr-fanout becomes a refresh storm.
         """
         recipe = _make_target_recipe("pr-open")
         assert "git merge-base --is-ancestor origin/develop HEAD" in recipe
         assert "git merge-tree --write-tree origin/develop HEAD" in recipe
-        assert "scripts/ruleset_drift_check.py --queue-policy" in recipe
-        assert "--require-bypass-actor-visibility" in recipe
-        assert "scripts/pr_landing.py --worktree . queue-policy" in recipe
+        assert "queue-policy" not in recipe
+        assert "ruleset_drift_check" not in recipe
         assert "git merge --no-edit origin/develop" not in recipe
         fetch_at = recipe.find("git fetch origin develop --quiet")
         gate_at = recipe.find("git merge-base --is-ancestor origin/develop HEAD")
         conflict_at = recipe.find("git merge-tree --write-tree origin/develop HEAD")
-        queue_at = recipe.find("scripts/ruleset_drift_check.py --queue-policy")
+        trunk_at = recipe.find("scripts/trunk_revert.py gate")
         push_at = recipe.find("git push -u origin")
-        assert fetch_at != -1 and gate_at != -1 and conflict_at != -1 and queue_at != -1 and push_at != -1
-        assert fetch_at < gate_at < conflict_at < queue_at < push_at
+        assert fetch_at != -1 and gate_at != -1 and conflict_at != -1 and trunk_at != -1 and push_at != -1
+        assert fetch_at < gate_at < conflict_at < trunk_at < push_at
 
         refresh = _make_target_recipe("pr-refresh")
         assert "git merge --no-edit origin/develop" in refresh
@@ -1095,11 +1092,9 @@ class TestReleaseInfrastructure:
         makefile_content = _makefile_text()
         assert "worktree-release-locked" not in makefile_content
 
-    def test_stale_override_cannot_bypass_unknown_queue_state(self):
+    def test_pr_open_has_no_stale_override(self):
         recipe = _make_target_recipe("pr-open")
         assert "STALE" not in recipe
-        assert "native merge queue and its protections could not be verified" in recipe
-        assert "current-base gate" in recipe
 
         worktree_recipe = (REPO_ROOT / "make" / "worktrees.mk").read_text(encoding="utf-8")
         worktree_helper = (REPO_ROOT / "scripts" / "worktree_lifecycle.sh").read_text(encoding="utf-8")
