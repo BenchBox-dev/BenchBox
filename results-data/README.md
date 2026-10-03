@@ -68,15 +68,16 @@ document already described in prose.
 ## Seed Corpus
 
 After the 2026-08-28 trust boundary, the checked-in
-corpus holds **333** maintainer-run bundles across **20** benchmarks and **59**
-cohorts. All 58 power cohorts are at the >=3-identity validator floor. The one
-throughput cohort (`tpch@sf1.0#throughput`, DuckDB only) is below it. Covered
-families include the
+corpus holds **361** maintainer-run bundles across **20** benchmarks and **59**
+cohorts. All 58 power cohorts meet the >=3-identity validator floor. The
+throughput cohort (`tpch@sf1.0#throughput`, DuckDB only) has one identity and
+does not meet that floor. Covered families include the
 local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
 ssb, tpcds, tpch, tpch_skew), the admitted datavault, flightdata, nyctaxi,
-tpcdi, tpcds_obt, and tpchavoc cohorts, and 84 live cloud bundles (BigQuery,
-Snowflake, Databricks; 2026-10-02) that also add metadata_primitives,
-write_primitives, transaction_primitives and tsbs_devops. See `CORPUS_NOTES.md`
+tpcdi, tpcds_obt, and tpchavoc cohorts, and 112 live cloud bundles (BigQuery,
+Snowflake, Databricks; added 2026-10-02 and 2026-10-03) that also add
+metadata_primitives, write_primitives, transaction_primitives and tsbs_devops.
+See `CORPUS_NOTES.md`
 for the cloud cohorts. `star_schema` is an alias of `ssb` and is not admitted
 separately. See `REGENERATION.md` for deferral detail.
 

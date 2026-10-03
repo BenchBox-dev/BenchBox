@@ -386,7 +386,6 @@ class TestMain:
         power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
         power["benchmark"]["test_type"] = "power"
         (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
-        # A different platform per phase: a merged cohort would list both.
         tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DataFusion")
         tp["benchmark"]["test_type"] = "throughput"
         (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")

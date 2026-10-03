@@ -87,13 +87,13 @@ make pr-open
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first. For a
-  conflict-free stale branch it requires a live, complete
-  `ruleset_drift_check.py --queue-policy` result covering the queue
-  parameters, required checks, strict current-base policy, review enforcement,
-  and bypass-actor visibility. Only that verified queue permits publication
-  without a local refresh; absent, unknown, or drifted queue state keeps the
-  current-base gate and requires `make pr-refresh`.
+- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first and
+  refuses only a genuine conflict. A conflict-free branch that is behind
+  `origin/develop` is published without a local refresh and without any live
+  queue check. It also refuses a non-revert branch while the newest completed
+  `trunk.yml` run on develop has been red for more than 30 minutes; run
+  `make trunk-revert PR=<number>` to open a `fix/revert-<number>` PR, which is
+  exempt.
 - `make pr-ready` verifies the exact checkout, live PR identity, review state,
   required checks, holds, and readiness evidence before arming the queue.
 - Once approved and green on initial `pull_request` checks, GitHub automatically adds the PR to the merge queue.
@@ -118,3 +118,25 @@ gh api --method PUT repos/BenchBox-dev/BenchBox/rulesets/15611785 \
 ```
 
 Disabling the queue restores immediate single-PR squash merges under the `SHADOW_ONLY` strict-base policy.
+
+---
+
+## 5. Post-Merge Soundness Digest
+
+`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. Each commit is judged by the manifest and predicate (`_project/scripts/soundness_paths.py`) as they stood at its first parent, so a later commit that removes a rule cannot hide an earlier change, and a commit that removes a rule cannot hide its own. The manifest, the predicate, the digest script and the digest workflow are always kept, whatever the manifest says. The digest script and workflow are also listed in the manifest and in CODEOWNERS. For each one it finds the pull request that merged into `develop` as that commit and records which review signal the pull request had at merge, for its final content:
+
+- the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it;
+- the connector's thumbs-up reaction, or
+- an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`).
+
+The reaction and the comment must come after the last content commit and before the merge. The digest dates that commit by when GitHub first ran this pull request's workflows for it, because commit dates are set by the author. When that commit has no run (for example it was pushed with `[skip ci]`, or its runs expired), the digest uses the first run of a later commit, and when there is none, the merge time. Each fallback makes the date later, so it can report a gap that was not one and cannot hide a real gap. A review submitted after the merge, or still pending, does not count.
+
+A merge of `develop` into the branch is a refresh, not content, when it has two parents, one of them already on `develop`, and its tree equals what merging the parents mechanically produces. A merge that needed conflict resolution, carries any other change, merges two branches that are not on `develop`, or has more than two parents counts as content. An "eyes" reaction is not a signal.
+
+The connector review names a commit, so it cannot be backdated. A posted review is text the author can write, so it shows that a review was recorded, not what it examined. A run that lists no pull request is matched to one by repository and branch name, so an author who reuses a branch name across pull requests, shares a commit between them and pushes the final content with `[skip ci]` can make the date earlier than it was. That needs deliberate set-up of the same kind as posting a review comment that was never written, and the digest does not defend against it.
+
+A commit gets an issue labelled `soundness-review-gap` when it has no signal, no merged pull request, or a reviewer thread that was resolved with no commit after it. An agent runs the external review and either records a clean result on the issue or opens a fix or revert pull request.
+
+The checkpoint is stored in the body of the one issue labelled `soundness-merge-digest`, and it must be on the first-parent history of `develop`. A missing issue, a second issue with the label, a body without the checkpoint marker, or a checkpoint off that history fails the run, so a damaged checkpoint cannot silently skip commits. Record the first checkpoint by dispatching the workflow with `bootstrap` set; the run reports nothing and later runs report the commits after it. Restore a damaged checkpoint with `--since <sha> --apply`. A read that fails or comes back incomplete also fails the run and leaves the checkpoint where it was.
+
+Run it locally without changing anything: `uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>`.

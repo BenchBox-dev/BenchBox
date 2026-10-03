@@ -196,14 +196,6 @@ def _platform_version(data: dict) -> str:
 
 
 def _bundle_phase(data: dict) -> str:
-    """Resolve a bundle's benchmark phase with transformer parity.
-
-    Mirrors ``_project/scripts/explorer_pipeline/transformer.py``: an
-    explicit ``benchmark.test_type`` wins, otherwise the ``phases`` object
-    decides between power and throughput, ignoring ``NOT_RUN`` placeholders. ``or`` (not ``dict.get``
-    defaults) so an explicit ``null`` can never poison downstream
-    sorting with ``None``.
-    """
     benchmark = data.get("benchmark") or {}
     declared = benchmark.get("test_type") or ""
     if declared:
@@ -217,12 +209,6 @@ def _bundle_phase(data: dict) -> str:
 
 
 def _phase_executed(phase: object) -> bool:
-    """Whether a ``phases`` entry records a phase that actually ran.
-
-    Bundles list skipped phases as ``{"status": "NOT_RUN"}`` placeholders,
-    which are non-empty and therefore truthy; only a non-empty entry whose
-    status is not ``NOT_RUN`` counts.
-    """
     if not isinstance(phase, dict) or not phase:
         return False
     return str(phase.get("status") or "").upper() != "NOT_RUN"
@@ -284,10 +270,6 @@ def generate_inventory(bundles_dir: Path) -> dict:
         )
     )
 
-    # Phase-suffixed throughput cohorts keep multi-stream throughput runs out of
-    # single-stream power cohorts, which share (benchmark, sf) keys downstream.
-    # Power and unknown phases both use the legacy bare key, so members merge
-    # by final key instead of overwriting one another.
     cohort_members: defaultdict[str, set[str]] = defaultdict(set)
     for entry in entries:
         phase = str(entry.get("phase", "unknown"))
