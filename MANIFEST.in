@@ -48,6 +48,7 @@ prune .mypy_cache
 prune .ruff_cache
 prune htmlcov
 prune landing
+prune website
 prune scripts
 exclude .pre-commit-config.yaml
 exclude .coveragerc_core
@@ -66,3 +67,4 @@ exclude pytest-ci.ini
 exclude Makefile
 
 global-exclude *.py[cod] __pycache__ *.so *.dylib *.dll *.log
+prune deploy

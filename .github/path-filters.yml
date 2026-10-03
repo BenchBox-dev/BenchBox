@@ -63,6 +63,7 @@ code-ci:
   - "landing/**"
   - "results-data/**"
   - "results-explorer/**"
+  - "website/**"
   - "docker/**"
   - "_binaries/**"
   - "_sources/**"
@@ -190,3 +191,15 @@ site-theme:
   - "docs/_static/custom.css"
   - "docs/_templates/page.html"
   - "results-explorer/index.html"
+
+site:
+  - "website/**"
+  - "docs/**"
+  - "landing/**"
+  - "results-explorer/**"
+  - "results-data/**"
+  - "_project/scripts/explorer_pipeline/**"
+  - "_project/scripts/explorer_publish.py"
+  - "scripts/generate_query_docs.py"
+  - ".github/workflows/ci.yml"
+  - ".github/path-filters.yml"

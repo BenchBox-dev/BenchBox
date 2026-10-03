@@ -1,0 +1,77 @@
+---
+const options = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+---
+
+<div class="theme-toggle" role="radiogroup" aria-label="Color theme">
+  {
+    options.map((option) => (
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-theme-option={option.value}>
+        {option.label}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  const KEY = "benchbox:theme";
+  const CHOICES = ["system", "light", "dark"];
+
+  function normalize(value: string | null | undefined) {
+    return value && CHOICES.includes(value) ? value : "system";
+  }
+
+  function stored() {
+    try {
+      return normalize(localStorage.getItem(KEY));
+    } catch {
+      return "system";
+    }
+  }
+
+  function apply(choice: string) {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const effective = choice === "dark" || (choice === "system" && media.matches) ? "dark" : "light";
+    const root = document.documentElement;
+    root.dataset.bbThemeChoice = choice;
+    root.dataset.bbTheme = effective;
+    root.dataset.theme = effective;
+    root.style.colorScheme = effective;
+    document.querySelectorAll<HTMLButtonElement>("[data-theme-option]").forEach((button) => {
+      const selected = button.dataset.themeOption === choice;
+      button.setAttribute("aria-checked", selected ? "true" : "false");
+      button.tabIndex = selected ? 0 : -1;
+    });
+  }
+
+  function choose(choice: string) {
+    try {
+      if (choice === "system") localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, choice);
+    } catch {}
+    apply(choice);
+  }
+
+  document.querySelectorAll<HTMLElement>(".theme-toggle").forEach((group) => {
+    const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>("[data-theme-option]"));
+    buttons.forEach((button) => button.addEventListener("click", () => choose(button.dataset.themeOption ?? "system")));
+    group.addEventListener("keydown", (event) => {
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (index < 0) return;
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+      if (step === undefined) return;
+      event.preventDefault();
+      const next = buttons[(index + step + buttons.length) % buttons.length];
+      choose(next.dataset.themeOption ?? "system");
+      next.focus();
+    });
+  });
+
+  apply(stored());
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (stored() === "system") apply("system");
+  });
+</script>

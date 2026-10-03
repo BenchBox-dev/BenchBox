@@ -183,7 +183,7 @@ failed job. A PR diagnostic artifact is never a substitute.
 
 ## What CI gates
 
-The `explorer-e2e` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)
 (Chromium full suite, blocking) runs on **pull requests** and **merge groups**
 when the change touches the explorer unit (with the `explorer` unit result
 always reporting; the job is skipped when no relevant files change).
