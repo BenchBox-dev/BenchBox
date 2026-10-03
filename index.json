@@ -1068,7 +1068,7 @@
       ],
       "priority": "medium-high",
       "status": "open",
-      "title": "Wire the Astro build into site-deploy routes while keeping per-artifact provenance, gates, and rollback"
+      "title": "Add an Astro renderer to site-deploy with an all-or-nothing renderer invariant and an explicit visual guard"
     },
     "astro-site-53-cutover": {
       "claim": null,
