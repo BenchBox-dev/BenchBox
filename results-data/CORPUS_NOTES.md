@@ -198,6 +198,35 @@ What these results are and are not:
   tpch_skew SF 10) predate the `provenance.source` field; their manifests
   record `result_source: internal`.
 
+## Live cloud corpus, second batch (2026-10-03)
+
+19 maintainer-run bundles from live BigQuery and Snowflake runs (2026-09-19 to
+2026-09-20) were added with `result_source: internal` submission manifests.
+Each joins an existing cohort, so the cohort count is unchanged:
+SSB at SF 0.1, 1 and 10 on Snowflake; AMPLab at SF 0.1 and 1 and JoinOrder at
+SF 1 on BigQuery and Snowflake; ClickBench at SF 1 on BigQuery and Snowflake;
+and CoffeeShop and H2ODB at SF 0.1 and 1 on BigQuery and Snowflake.
+
+The runs had no submission manifests. Each manifest was written from the
+original run output, and every bundle was re-run through the public anonymiser
+(`_project/scripts/results_explorer_corpus_migrate.py`), so no raw bucket,
+dataset or warehouse name remains.
+
+What these results are and are not:
+
+- Every bundle passes `scripts/validate_submission.py --require-manifest` with
+  no error, warning or override.
+- BigQuery jobs ran with the query cache disabled in configuration. Snowflake
+  runs declare the result cache off in configuration. Neither bundle records a
+  cache-control receipt, so both claims rest on the declared setting.
+- ClickBench timings move little across scale: from SF 0.1 to SF 10 the
+  geometric mean grows 1.45x on BigQuery and 1.33x on Snowflake. BenchBox's
+  generator creates 1,000,000 rows per scale factor, so fixed per-query
+  overhead dominates. Only the SF 1 cells are included.
+- Not included: Databricks cells (the runs enabled the result cache and have
+  no receipt), BigQuery SSB (needs validator overrides), ClickBench SF 0.1 and
+  SF 10 (scale-invariant), TPC-DS, TPC-DI and TPC-H.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
