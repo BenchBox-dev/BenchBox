@@ -1,5 +1,5 @@
 {
-  "context": "Released 2026-09-28T16:56Z by same worker to take over interrupted agy dev-loop v2 session (conversation 9a56add9) per explicit user request. No work performed on this item in the current session; re-take to resume.",
+  "context": "Dropped 2026-10-03: scope folded into dfparity-t24-residual-divergences (shared helpers are named there); parameter alignment is t05a-h.",
   "description": "Fix shared-helper TPC-DS queries (19 helper_query_specs.yaml + 13 query_specs.yaml entries: Q3/Q7/Q42/Q43 joined paths, promotion/sales helpers, state_average_returns). Audit default_parameters.yaml vs SQL template literals for these queries; audit rollup_helper.expand_rollup_expression/expand_rollup_pandas grouping-set order, NULL fill, empty-group grand total; audit channel_helper union column mappings. Fix helpers, not per-query copies. SCOPE: benchbox/core/tpcds/dataframe_queries/helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml, default_parameters.yaml + affected call sites in queries.py only. GUARDRAILS: both expression and pandas impls must pass per query; comparator tolerance stays 1e-10, treat_nan_as_null/strip_strings unchanged; no known_divergences additions; SQL reference immutable; Q38/Q88 still pass. VERIFY: staged report + uv run -- pytest tests/ -m tpcds -q + make lint + make typecheck. DECISION GATE: every shared-helper query is PASS or VACUOUS-classified, zero DIVERGENT among them, no regressions.",
   "sessions": [
     {
@@ -44,6 +44,14 @@
       "op": "release",
       "op_id": "291c806230824587a0069c3bb60cfbaf",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:58:44Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4c82dad35d504a09816832bb8aeb05cc",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
