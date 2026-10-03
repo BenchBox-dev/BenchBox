@@ -68,11 +68,11 @@ document already described in prose.
 ## Seed Corpus
 
 After the 2026-08-28 trust boundary, the checked-in
-corpus holds **357** maintainer-run bundles across **20** benchmarks and **58**
+corpus holds **364** maintainer-run bundles across **20** benchmarks and **58**
 cohorts, all at the >=3-identity validator floor. Covered families include the
 local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
 ssb, tpcds, tpch, tpch_skew), the admitted datavault, flightdata, nyctaxi,
-tpcdi, tpcds_obt, and tpchavoc cohorts, and 112 live cloud bundles (BigQuery,
+tpcdi, tpcds_obt, and tpchavoc cohorts, and 119 live cloud bundles (BigQuery,
 Snowflake, Databricks; added 2026-10-02 and 2026-10-03) that also add
 metadata_primitives, write_primitives, transaction_primitives and tsbs_devops.
 See `CORPUS_NOTES.md`
