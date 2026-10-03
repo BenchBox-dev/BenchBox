@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,8 @@ spec.loader.exec_module(pt)
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, env=env)
 
 
 def _write(repo: Path, rel: str, text: str = "x = 1\n") -> None:
