@@ -1,5 +1,7 @@
 # Decision: approving-review count stays zero; review gates stay advisory
 
+> Partly superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md): item 3 (no merge-blocking automated review gate); the required `oracle-review` check is one for result-affecting changes. Items 1 and 2 stand.
+
 Date: 2026-09-15
 Status: Accepted. This record pins two constraints so they are not re-derived
 from first principles in a later review.

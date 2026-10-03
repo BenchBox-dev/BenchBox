@@ -25,19 +25,23 @@ develop shares it. The full list of those workflows, what each loses when a push
 is dropped, and how to recover is in
 [`develop-push-drop-inventory.md`](develop-push-drop-inventory.md).
 
-## What changed with the six-unit CI
+## What changed with trunk.yml
 
-The post-merge workflow (`develop-post-merge.yml`), its hourly tip sweep, and
-its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
-Required checks now run on the exact tree that lands: the merge queue runs the
-six units on the speculative merge commit, so a dropped push on develop no
-longer leaves the tip ungated. What a dropped push can still cost is confined
-to the push-only workflows in the inventory. Two matter for the queue itself:
+The earlier post-merge workflow (`develop-post-merge.yml`), its hourly tip sweep,
+and its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
+`.github/workflows/trunk.yml` now closes the gap: it tests `develop` after each
+merge (fast lane, four-shard medium tier and correctness gate), and a trunk run
+that finds a failure leads to a revert (`make trunk-revert PR=<n>`). Its runs
+queue behind each other and one pending run is kept, so busy hours batch. A
+push that GitHub never delivers produces no run for that commit, but the next
+delivered push tests a tree that contains it. What a dropped push can still cost
+is confined to the push-only workflows in the inventory. Two of them matter for
+pull requests:
 
 | Workflow | Loses when its push is dropped | Recovery |
 | --- | --- | --- |
 | `fast-lane-baseline.yml` | The fast-lane count for that commit. The PR delta guard restores it by exact base SHA and **fails closed** on a miss, so PRs cut from that commit fail `guard-fast-lane-delta` until it exists. | `gh workflow run fast-lane-baseline.yml --ref develop` |
-| `docs.yml` | The protected public-site visual baseline for that commit. A PR or queue entry whose render inputs changed then fails closed at the baseline download. | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
+| `docs.yml` | The protected public-site visual baseline for that commit. A PR whose render inputs changed then has no baseline to compare against at the download step (the comparison is advisory). | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 
 Check whether a commit has a baseline before blaming a PR for either failure.
 

@@ -1,5 +1,7 @@
 # Merge-queue visual baseline: leader candidate plus bounded follower wait
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-09-26
 Status: Decided. Supersedes the "re-queue-after-leader" decision in
 `visual-baseline-queue-follower-policy-2026-09-25.md`. The ancestor-resolution

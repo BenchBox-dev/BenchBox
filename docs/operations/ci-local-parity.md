@@ -229,8 +229,8 @@ The tool pin is fixed independently in
 `scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
 clean preview/apply/check/verify proof and full CI. GitHub classification
 binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
-`develop` advances during the run, strict current-base enforcement may mark
-that correctly certified run BEHIND. Refresh such PRs one at a time.
+`develop` advances during the run, the run still certifies the base it started
+from; the strict up-to-date rule is off, so the PR does not need a refresh.
 
 ### Local preflight routing
 
@@ -257,8 +257,9 @@ authority, resolved and commit-range identity, wrapper budgets, and
 tracked-artifact hygiene. A missing wrapper fails the preflight.
 
 Routing does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
-or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole
-currency refusal point and `make pr-refresh` remains the one-at-a-time absorb.
+or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` refuses a branch
+that conflicts with `origin/develop` and `make pr-refresh` remains the
+one-at-a-time absorb for resolving that conflict.
 
 `GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
 every GitHub Actions job already has, so local runs (including
@@ -312,7 +313,7 @@ attestation; a manifest consistency check alone does not establish provenance.
 The explicit exceptions cover inputs that only exist in their hosted gate:
 
 - cross-platform binary smoke tests and promoted slow/medium regression nodes;
-- fresh-runner skill-source cloning and PR-base/merge-queue ancestry checks;
+- fresh-runner skill-source cloning and PR-base ancestry checks;
 - release-branch curation and release-artifact reports; and
 - the audit-SHA comparison against the immutable PR event base.
 

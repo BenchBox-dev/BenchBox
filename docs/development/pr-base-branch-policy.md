@@ -1,8 +1,8 @@
 # PR base branch policy
 
-BenchBox does **not** support stacked PRs (a PR whose base is another feature
-branch). Open every change against an integration branch and rebase children
-after each parent lands.
+Open every change against an integration branch. Stacked PRs (a PR whose base is
+another feature branch) are allowed only under the conditions in the Stacked PRs
+section below; retarget and rebase children after each parent lands.
 
 ## Allowed bases
 
@@ -12,7 +12,29 @@ after each parent lands.
 | `release` | Release-lane PRs only |
 | `published-results` | Published-results lane only |
 
-Any other base (including a sibling feature branch) is out of policy.
+Any other base is out of policy, except the parent branch of a stacked PR (see Stacked PRs below).
+
+## Stacked PRs
+
+A stack is allowed when all of these hold:
+
+- One author owns every PR in the stack, and the stack serves one tracker item.
+- The stack is at most three PRs deep.
+- Only the bottom PR targets `develop`. Each upper PR is a draft that targets its
+  parent's branch.
+
+When the parent squash-merges, retarget the child to `develop` and replay only
+the child's own commits before arming it:
+
+```bash
+gh pr edit <child> --base develop
+git fetch origin develop
+git rebase --onto origin/develop <old parent tip> <child branch>
+git push --force-with-lease
+```
+
+`<old parent tip>` is the last commit of the parent branch before it was
+squash-merged. Do not arm a child before it is retargeted and rebased.
 
 ## Why stacked bases used to get zero CI
 
@@ -30,9 +52,9 @@ reach `develop` only when the parent merged — never validated on its own and
 attributed to the parent's PR.
 
 `.github/workflows/ci.yml` has **no** `branches:` filter on `pull_request`, so
-a PR against any base now gets the six unit results. We still do not support
-stacking: squash-merge chains need rebases, and running the units against a
-feature base would not validate the tree that lands on `develop`.
+a PR against any base now gets the six unit results. Running the units against
+a feature base does not validate the tree that lands on `develop`, which is why
+an upper PR stays a draft and is retargeted and rebased after its parent merges.
 
 ## Loud failure: the `base-guard` job
 
@@ -59,13 +81,15 @@ there. Porting it is a manual maintainer step (see
 
 ## After a parent merges
 
-`develop` is squash-merge only. A stacked chain would need a rebase and
-force-push after every parent merge anyway. Preferred workflow:
+`develop` is squash-merge only, so a stacked chain needs a retarget, rebase and
+force-push after every parent merge. Workflow:
 
-1. Open each PR against `develop` (or the appropriate integration base).
-2. If work depends on an unmerged parent, wait or fold into the parent PR.
-3. After the parent squash-merges, rebase the child onto the updated base and
-   force-push with `--force-with-lease` on the feature branch only.
+1. Open the bottom PR against `develop` (or the appropriate integration base).
+2. If work depends on an unmerged parent, either stack under the conditions
+   above, wait, or fold into the parent PR.
+3. After the parent squash-merges, retarget the child to `develop`, run
+   `git rebase --onto origin/develop <old parent tip>`, and force-push with
+   `--force-with-lease` on the feature branch only.
 
 ## "No checks" is not one failure mode
 
@@ -91,7 +115,7 @@ conflicts, or a filter bug, from an empty or partial check list alone.
 
 - `make pr-open` (and manual `gh pr create`) must target `develop` unless the
   change is explicitly for `release` or `published-results`.
-- Never open a PR with `--base` set to another feature branch.
+- Never open a PR with `--base` set to another feature branch unless it is an upper PR of a stack that meets the conditions in the Stacked PRs section.
 - If `pr-base-guard` fails, fix the base; do not try to "add CI" to the
   stacked base by editing branch filters.
 - Short agent-facing summary: `AGENTS.md` → section **Verification and

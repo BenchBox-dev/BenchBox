@@ -1,5 +1,7 @@
 # Decision: strict-base refresh activation
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-08-14
 Status: Accepted. This record selects the program path. It does not change
 GitHub settings, required contexts, or workflow skip conditions.
