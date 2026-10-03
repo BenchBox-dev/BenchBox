@@ -247,7 +247,3 @@ node_modules/
 /.agents/skills/
 /.claude/skills/.system/
 /.claude/skills/blog/
-
-# Generated from the Makefile by make/check_makefile_inventory.py; not tracked.
-# benchbox-ignore-lint: allow-next-line tracked
-/make/inventory.json
