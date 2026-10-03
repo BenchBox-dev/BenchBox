@@ -8,7 +8,7 @@
     "known_divergences is empty and legitimately-empty entries meet dfparity-t19's criteria",
     "A maintainer signs off on promotion"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T20). Relates to existing tracker item tpcds-parity-b6-promote, dropped 2026-10-03 as superseded by this item. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 re-evaluation: (1) The 14 s at SF 0.1 was one run on a loaded Mac with default parameters; adapters change which rows match, so re-measure on an Ubuntu runner after t24 before committing to the 20 s budget. (2) Owner decision pending: whether the pandas family gets an enforced job (no item exists for it) and whether DataFusion is explicitly out of scope; record the answer here and in t23. (3) The merge path is changing (#2551 review threads, #2556 owner review as soundness signal, draft #2567 retiring the merge queue for an oracle-review check); follow the current ADR and make pr-arm, not older notes.",
+  "context": "Source: DataFrame query parity proposal v3 (item T20). Relates to existing tracker item tpcds-parity-b6-promote, dropped 2026-10-03 as superseded by this item. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 re-evaluation: (1) The 14 s at SF 0.1 was one run on a loaded Mac with default parameters; adapters change which rows match, so re-measure on an Ubuntu runner after t24 before committing to the 20 s budget. (2) Owner decision pending: whether the pandas family gets an enforced job (no item exists for it) and whether DataFusion is explicitly out of scope; record the answer here and in t23. (3) The merge path is changing (#2551 review threads, #2556 owner review as soundness signal, draft #2567 retiring the merge queue for an oracle-review check); follow the current ADR and make pr-arm, not older notes.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): promotion prepared as a separate commit 2363f2f4b for maintainer sign-off. TPC-DS moves to GATES at SF 0.01 on all 103 statements with backends expression, pandas, datafusion (owner decision D6). CI correctness-gate job: make tpcds-cross-surface-equivalence-report (Polars+DataFusion, partition b) and make tpcds-pandas-cross-surface-equivalence-report (partition a). Scheduled failing job parity-draws in tpcds-official-qualification.yml runs make tpcds-cross-surface-draws-report (three other draws, all backends, --repeats 2); all clean locally. Mutation target Q7 (56 rows), all four mutations caught; pinning guard passes; oracle map and applicability report regenerated; staged maturation workflow retired. Gate is clean on all three backends: 70 nonvacuous, 0 divergent. Local Linux ARM64 4-CPU timing, three runs each, whole process: Polars 6.1-7.2 s, pandas 15.0-15.3 s, DataFusion 7.2-8.0 s, peak RSS under 0.65 GB (evidence/resume-20261003/linux-arm64-tpcds-gate-timing-94a6ab351.txt). Not yet done: hosted Ubuntu three-run receipts, maintainer sign-off, publication.",
   "description": "Move the Polars ('expression') family gate to GATES at about SF=0.1 over all queries, as ONE PR that also lands the mutation-target and Make/CI pinning guards (ci.yml ~1045-1057: test_targets_cover_every_enforced_gate and test_cross_surface_gates_are_pinned_in_make_and_ci), the Make report target and the CI step, and refreshes the oracle coverage map. Promotion is a reviewer-signed decision, not an automatic step, and requires zero unexplained divergences with no large known_divergences list. Pandas becomes a separate parallel job (measured about 27 s at SF=0.1 without Q78). Measured on one loaded Mac, one run: expression-only all 99 queries at SF=0.1 about 14 s including a 2.1 s import, against a 20 s budget; the Polars family only (the expression cell is the Polars adapter, not DataFusion).",
   "sessions": [
     {
@@ -50,6 +50,14 @@
       "op": "update",
       "op_id": "82da3724007d428a87ee1e48e5ac0f30",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-03T22:23:28Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "dc79a5e3c3d346878e12891d80c2f490",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
