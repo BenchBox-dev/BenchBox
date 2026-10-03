@@ -297,7 +297,6 @@
 44:
   null_col: ss_addr_sk
   store_sk: 4
-  year: 2001
 45:
   qoy: 2
   quarters:
@@ -355,6 +354,7 @@
   - WV
   year: 1998
 49:
+  month: 12
   year: 2001
 50:
   channel: store channel
