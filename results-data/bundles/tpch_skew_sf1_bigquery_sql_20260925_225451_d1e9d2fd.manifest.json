@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_skew_sf1_bigquery_sql_20260925_225451_d1e9d2fd.json",
+  "bundle_hash": "0ea8db8cec4e25efb71d70e41fa3fb23be1c191396a98cd48d00ddf753f7302a",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
