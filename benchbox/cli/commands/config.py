@@ -8,7 +8,20 @@ from benchbox.cli.config import ConfigManager
 from benchbox.cli.shared import console
 
 
-@click.command("validate")
+@click.command(
+    "validate",
+    help=(
+        "Validate BenchBox configuration files for syntax and completeness.\n"
+        "\n"
+        "Checks configuration file syntax, validates platform settings, and verifies\n"
+        "that required options are properly specified.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox validate                    # Validate default configuration\n"
+        "    benchbox validate --config custom.yaml  # Validate specific config file"
+    ),
+)
 @click.option("--config", type=str, help="Configuration file path (optional)")
 @click.pass_context
 def validate(ctx, config):

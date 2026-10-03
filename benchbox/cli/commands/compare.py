@@ -174,7 +174,66 @@ def _discover_result_files_with_metadata(
     return discovered
 
 
-@click.command("compare")
+@click.command(
+    "compare",
+    help=(
+        "Compare benchmark results, query plans, or run cross-platform benchmarks.\n"
+        "\n"
+        "Mode is automatically detected:\n"
+        "\n"
+        "\b\n"
+        "RUN MODE (with -p/--platform):\n"
+        "  Run benchmarks across multiple platforms and compare.\n"
+        "  benchbox compare -p duckdb -p sqlite\n"
+        "\n"
+        "\b\n"
+        "FILE MODE (with file paths):\n"
+        "  Compare existing benchmark result files.\n"
+        "  benchbox compare baseline.json current.json\n"
+        "\n"
+        "\b\n"
+        "INTERACTIVE MODE (no arguments):\n"
+        "  Launch interactive wizard to guide you through comparison.\n"
+        "  benchbox compare\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Run SQL platform comparison\n"
+        "    benchbox compare -p duckdb -p sqlite -p clickhouse\n"
+        "\n"
+        "\b\n"
+        "    # Run DataFrame platform comparison\n"
+        "    benchbox compare -p polars-df -p pandas-df --scale 0.1\n"
+        "\n"
+        "\b\n"
+        "    # Compare two result files\n"
+        "    benchbox compare baseline.json current.json\n"
+        "\n"
+        "\b\n"
+        "    # Compare with regression threshold (CI/CD)\n"
+        "    benchbox compare baseline.json current.json --fail-on-regression 10%\n"
+        "\n"
+        "\b\n"
+        "    # Compare files with query plan analysis\n"
+        "    benchbox compare baseline.json current.json --include-plans\n"
+        "\n"
+        "\b\n"
+        "    # Show only significant plan changes (< 90% similar)\n"
+        "    benchbox compare baseline.json current.json --include-plans --plan-threshold 0.9\n"
+        "\n"
+        "\b\n"
+        "    # List available platforms\n"
+        "    benchbox compare --list-platforms\n"
+        "\n"
+        "\b\n"
+        "    # Generate charts with results\n"
+        "    benchbox compare -p duckdb -p sqlite -o ./comparison --generate-charts\n"
+        "\n"
+        "\b\n"
+        "    # Non-interactive mode (CI/CD)\n"
+        "    benchbox compare --non-interactive -p duckdb -p sqlite"
+    ),
+)
 @click.argument("result_files", nargs=-1, type=click.Path(exists=True))
 # Platform options (triggers run mode when provided)
 @click.option(

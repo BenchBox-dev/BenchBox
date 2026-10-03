@@ -16,12 +16,12 @@ from benchbox.cli.submit_auth import (
 )
 
 
-@click.group("auth")
+@click.group("auth", help=("Manage hosted result-submission credentials."))
 def auth() -> None:
     """Manage hosted result-submission credentials."""
 
 
-@auth.command("login")
+@auth.command("login", help=("Store a hosted results service token in the OS keyring."))
 @click.option(
     "--service",
     "service_url",
@@ -79,7 +79,7 @@ def login(ctx: click.Context, service_url: str, token: str | None, token_stdin: 
     console.print(f"  Service URL: {normalize_service_url(service_url)}")
 
 
-@auth.command("status")
+@auth.command("status", help=("Show whether hosted submission credentials are available."))
 @click.option(
     "--service",
     "service_url",
@@ -107,7 +107,7 @@ def status(ctx: click.Context, service_url: str) -> None:
         console.print("[dim]BENCHBOX_SERVICE_TOKEN is also accepted as a fallback.[/dim]")
 
 
-@auth.command("refresh")
+@auth.command("refresh", help=("Replace the stored hosted results service token."))
 @click.option(
     "--service",
     "service_url",
@@ -130,7 +130,7 @@ def refresh(ctx: click.Context, service_url: str) -> None:
     console.print(f"  Service URL: {normalize_service_url(service_url)}")
 
 
-@auth.command("logout")
+@auth.command("logout", help=("Remove the stored hosted results service token from the OS keyring."))
 @click.option(
     "--service",
     "service_url",

@@ -17,7 +17,39 @@ from benchbox.core.results.loader import (
 )
 
 
-@click.command("export")
+@click.command(
+    "export",
+    help=(
+        "Export benchmark results to various formats.\n"
+        "\n"
+        "Re-export existing benchmark results in different formats (JSON, CSV, HTML)\n"
+        "without re-running the benchmark. Useful for sharing results, generating\n"
+        "reports, or converting to spreadsheet-friendly formats.\n"
+        "\n"
+        "RESULT_FILE: Path to result JSON file to export (optional)\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Export specific result to CSV\n"
+        "    benchbox export results/tpch_sf1_duckdb.json --format csv\n"
+        "\n"
+        "\b\n"
+        "    # Export to multiple formats\n"
+        "    benchbox export results/tpcds_sf10.json --format csv --format html\n"
+        "\n"
+        "\b\n"
+        "    # Export most recent result\n"
+        "    benchbox export --last --format html\n"
+        "\n"
+        "\b\n"
+        "    # Export latest TPC-H result to all formats\n"
+        "    benchbox export --last --benchmark tpc_h --format json --format csv --format html\n"
+        "\n"
+        "\b\n"
+        "    # Export to custom directory\n"
+        "    benchbox export --last --format csv --output-dir ./reports/"
+    ),
+)
 @click.argument("result_file", required=False, type=click.Path(exists=True))
 @click.option(
     "--format",

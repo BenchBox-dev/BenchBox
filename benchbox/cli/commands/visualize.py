@@ -128,7 +128,7 @@ def _resolve_source_paths(ctx: click.Context, sources: Sequence[str]) -> list[st
     return source_paths
 
 
-@click.command("visualize")
+@click.command("visualize", help=("Generate ASCII charts from BenchBox results."))
 @click.argument("sources", nargs=-1, type=click.Path(), required=False)
 @click.option(
     "--chart-type",

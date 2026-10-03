@@ -5,7 +5,12 @@ import click
 from benchbox.cli.shared import console
 
 
-@click.command("calculate-qphh", hidden=True, deprecated=True)
+@click.command(
+    "calculate-qphh",
+    hidden=True,
+    deprecated=True,
+    help=("Calculate TPC-H QphH@Size. Deprecated; use `benchbox metrics qphh`."),
+)
 @click.option("--power-results", type=click.Path(exists=True), required=True, help="Path to power results JSON")
 @click.option(
     "--throughput-results",

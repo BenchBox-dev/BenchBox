@@ -9,7 +9,35 @@ from benchbox.cli.shared import console
 from benchbox.core.run_service import resolve_lifecycle_phases
 
 
-@click.command("datagen")
+@click.command(
+    "datagen",
+    help=(
+        "Generate benchmark data without running queries.\n"
+        "\n"
+        "Standalone data generation command that generates benchmark data files\n"
+        "without loading or executing queries. Useful for pre-generating data\n"
+        "that can be reused across multiple benchmark runs.\n"
+        "\n"
+        "This is a convenience wrapper for: benchbox run --phases generate\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Generate TPC-H data at scale factor 0.1\n"
+        "    benchbox datagen --benchmark tpch --scale 0.1 --output ./data/tpch_0.1\n"
+        "\n"
+        "\b\n"
+        "    # Generate TPC-DS data with specific seed\n"
+        "    benchbox datagen --benchmark tpcds --scale 1 --seed 42 --output ./data/tpcds_1\n"
+        "\n"
+        "\b\n"
+        "    # Generate ClickBench data\n"
+        "    benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench\n"
+        "\n"
+        "\b\n"
+        "    # Generate with verbose logging\n"
+        "    benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose"
+    ),
+)
 @click.option(
     "--benchmark",
     type=str,

@@ -503,7 +503,53 @@ def _print_submission_summary(
         console.print("\n[yellow](dry run; no files written)[/yellow]")
 
 
-@click.command("submit")
+@click.command(
+    "submit",
+    help=(
+        "Submit a benchmark result bundle to the BenchBox results platform.\n"
+        "\n"
+        "Two modes, selected by the flag set:\n"
+        "\n"
+        "  --output PATH (Phase 2, default)\n"
+        "    Package the canonical bundle + submission manifest into PATH ready\n"
+        "    for opening a PR against the BenchBox repository's results-data/\n"
+        "    directory. No network. No credentials. Existing v0.2.x behavior.\n"
+        "\n"
+        "  --service [URL] (Phase 3)\n"
+        "    Upload the canonical bundle to a hosted ingest API. Requires\n"
+        "    authentication via 'benchbox auth login'. With --dry-run, validates\n"
+        "    the bundle and prints what would be uploaded - no credentials\n"
+        "    needed for the dry-run path.\n"
+        "\n"
+        "RESULT_FILE: Path to result JSON file (optional; with --last, picked\n"
+        "from history).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Package most recent result for PR contribution (Phase 2; default)\n"
+        "    benchbox submit --last\n"
+        "\n"
+        "\b\n"
+        "    # Print exact result paths, then package one for PR contribution\n"
+        "    benchbox results --paths\n"
+        "    benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission\n"
+        "\n"
+        "\b\n"
+        "    # Submit most recent result to the hosted platform (Phase 3)\n"
+        "    benchbox submit --last --service\n"
+        "\n"
+        "\b\n"
+        "    # Submit a specific bundle to a non-default service URL\n"
+        "    benchbox submit results/tpch_sf01_duckdb.json --service https://staging.benchbox.dev/v1\n"
+        "\n"
+        "\b\n"
+        "    # Preview what would be uploaded without sending bytes\n"
+        "    benchbox submit --last --service --dry-run\n"
+        "\n"
+        "Note: benchbox submit shares results publicly. To copy a result to\n"
+        "storage you control (local path, S3, etc.), use 'benchbox publish'."
+    ),
+)
 @click.argument("result_file", required=False, type=click.Path(exists=True))
 @click.option(
     "--last",

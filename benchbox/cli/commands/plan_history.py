@@ -11,7 +11,28 @@ from benchbox.cli.shared import console
 from benchbox.core.query_plans.history import PlanHistory
 
 
-@click.command("plan-history")
+@click.command(
+    "plan-history",
+    help=(
+        "Show plan evolution history for a query.\n"
+        "\n"
+        "Displays how a query's execution plan has changed across benchmark runs.\n"
+        "Use this to identify:\n"
+        "\n"
+        "- When plan changes occurred\n"
+        "- How plan changes correlate with performance\n"
+        "- Plan flapping (unstable optimizer behavior)\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Show history for query q05\n"
+        "    benchbox plan-history --query-id q05 --history-dir ./plan_history\n"
+        "\n"
+        "\b\n"
+        "    # Check for plan instability\n"
+        "    benchbox plan-history --query-id q05 --history-dir ./plan_history --check-flapping"
+    ),
+)
 @click.option(
     "--query-id",
     required=True,

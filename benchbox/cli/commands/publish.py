@@ -30,7 +30,32 @@ from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError
 # ---------------------------------------------------------------------------
 
 
-@click.group("publish")
+@click.group(
+    "publish",
+    help=(
+        "Publish and track schema-v2 result bundles.\n"
+        "\n"
+        "Copies an already-exported result bundle to a storage destination and\n"
+        "records a durable reference in the publication history. Distinct from\n"
+        "'benchbox export', which serialises live benchmark results to disk.\n"
+        "\n"
+        "\b\n"
+        "Backends and reference types:\n"
+        "  local path         -> file:///abs/path/to/bundle.json\n"
+        "  s3://bucket/prefix -> s3://bucket/prefix/bundle.json\n"
+        "  gs://bucket/prefix -> gs://bucket/prefix/bundle.json\n"
+        "  abfss://...        -> abfss://.../bundle.json\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json --target /mnt/shared/benchbox\n"
+        "  benchbox publish results/tpch_sf1_duckdb.json --target s3://my-bucket/benchbox\n"
+        "  benchbox publish list\n"
+        "  benchbox publish show abc123def456\n"
+        "  benchbox publish remove abc123def456"
+    ),
+)
 def publish() -> None:
     """Publish and track schema-v2 result bundles.
 
@@ -61,7 +86,14 @@ def publish() -> None:
 # ---------------------------------------------------------------------------
 
 
-@publish.command("run")
+@publish.command(
+    "run",
+    help=(
+        "Publish a schema-v2 result bundle to a storage destination.\n"
+        "\n"
+        "RESULT_FILE: Path to the primary .json result file (optional; use --last for auto-select)."
+    ),
+)
 @click.argument("result_file", required=False, type=click.Path())
 @click.option(
     "--target",
@@ -156,7 +188,7 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
 # ---------------------------------------------------------------------------
 
 
-@publish.command("list")
+@publish.command("list", help=("List published artifacts from the publication history."))
 @click.option("--benchmark", type=str, help="Filter by benchmark name.")
 @click.option("--platform", type=str, help="Filter by platform name.")
 @click.option("--label", type=str, help="Filter by label.")
@@ -212,7 +244,7 @@ def publish_list(benchmark, platform, label):
 # ---------------------------------------------------------------------------
 
 
-@publish.command("show")
+@publish.command("show", help=("Show details of a published artifact by ID."))
 @click.argument("pub_id")
 def publish_show(pub_id):
     """Show details of a published artifact by ID."""
@@ -239,7 +271,17 @@ def publish_show(pub_id):
 # ---------------------------------------------------------------------------
 
 
-@publish.command("remove")
+@publish.command(
+    "remove",
+    help=(
+        "Remove a publication record.\n"
+        "\n"
+        "This removes the metadata entry only. The underlying artifact files are\n"
+        "NOT deleted from the destination.\n"
+        "\n"
+        "PUB_ID: The publication ID to remove (from 'benchbox publish list')."
+    ),
+)
 @click.argument("pub_id")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt.")
 def publish_remove(pub_id, yes):

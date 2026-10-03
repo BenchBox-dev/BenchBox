@@ -692,12 +692,24 @@ def _print_readiness_details(results: tuple[PlatformReadinessResult, ...]) -> No
 # CLI Commands
 
 
-@click.group()
+@click.group(help=("Manage database platform adapters."))
 def platforms():
     """Manage database platform adapters."""
 
 
-@platforms.command("list")
+@platforms.command(
+    "list",
+    help=(
+        "List all available platforms and their status.\n"
+        "\n"
+        "The default table is ordered by support tier and omits category and\n"
+        "description so it stays readable at 80 columns. Use --detail to add them\n"
+        "back, or --json/--format json for the full record.\n"
+        "\n"
+        "Use --show-deployments to see available deployment modes for platforms\n"
+        "that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server)."
+    ),
+)
 @click.option(
     "--all",
     "show_all",
@@ -748,7 +760,7 @@ def list_platforms(show_all: bool, format: str, json_output: bool, detail: bool,
         manager.display_platform_list(show_all=show_all)
 
 
-@platforms.command("status")
+@platforms.command("status", help=("Show detailed status for all platforms or a specific platform."))
 @click.argument("platform", required=False)
 def platform_status(platform: Optional[str]):
     """Show detailed status for all platforms or a specific platform."""
@@ -813,7 +825,7 @@ def platform_status(platform: Optional[str]):
         manager.display_platform_status()
 
 
-@platforms.command("enable")
+@platforms.command("enable", help=("Enable a database platform."))
 @click.argument("platform")
 @click.option("--force", is_flag=True, help="Enable platform even if dependencies are missing")
 def enable_platform(platform: str, force: bool):
@@ -856,7 +868,7 @@ def enable_platform(platform: str, force: bool):
         sys.exit(1)
 
 
-@platforms.command("disable")
+@platforms.command("disable", help=("Disable a database platform."))
 @click.argument("platform")
 def disable_platform(platform: str):
     """Disable a database platform."""
@@ -892,7 +904,7 @@ def disable_platform(platform: str):
         sys.exit(1)
 
 
-@platforms.command("install")
+@platforms.command("install", help=("Guide installation of platform dependencies."))
 @click.argument("platform")
 @click.option("--dry-run", is_flag=True, help="Show installation commands without executing")
 def install_platform(platform: str, dry_run: bool):
@@ -951,7 +963,7 @@ def install_platform(platform: str, dry_run: bool):
     sys.exit(0)
 
 
-@platforms.command("check")
+@platforms.command("check", help=("Check platform availability and configuration."))
 @click.argument("platforms_to_check", nargs=-1)
 @click.option("--enabled-only", is_flag=True, help="Check only enabled platforms")
 def check_platforms(platforms_to_check: tuple, enabled_only: bool):
@@ -1013,7 +1025,22 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
         sys.exit(1)
 
 
-@platforms.command("setup")
+@platforms.command(
+    "setup",
+    help=(
+        "Enable and install local platform adapters, interactively.\n"
+        "\n"
+        "This is about which adapters are available on this machine. For cloud\n"
+        "CREDENTIALS -- Databricks, Snowflake, BigQuery, Redshift, Athena,\n"
+        "MotherDuck, SingleStore -- use `benchbox setup --platform <name>`.\n"
+        "\n"
+        'The two commands are both spelled "setup", and adapter error messages have\n'
+        "repeatedly sent users to `benchbox platforms setup --platform <name>`,\n"
+        "which had no such option and exited 2. Rather than leave that a dead end,\n"
+        "`--platform` here delegates to `benchbox setup`, which is what the user\n"
+        "meant. `benchbox setup` rejects a non-cloud platform with its own list."
+    ),
+)
 @click.option("--interactive/--non-interactive", default=True, help="Interactive setup mode")
 @click.option(
     "--platform",

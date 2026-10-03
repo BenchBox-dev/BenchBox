@@ -11,7 +11,26 @@ import click
 from benchbox.cli.shared import console
 
 
-@click.group("metrics")
+@click.group(
+    "metrics",
+    help=(
+        "Calculate benchmark performance metrics.\n"
+        "\n"
+        "The metrics command group provides tools for calculating\n"
+        "official TPC performance metrics from benchmark results.\n"
+        "\n"
+        "Available subcommands:\n"
+        "\n"
+        "\b\n"
+        "  qphh    Calculate TPC-H QphH@Size composite metric\n"
+        "\n"
+        "Examples:\n"
+        "    # Calculate TPC-H QphH metric\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json"
+    ),
+)
 def metrics_group():
     """Calculate benchmark performance metrics.
 
@@ -31,7 +50,42 @@ def metrics_group():
     """
 
 
-@metrics_group.command("qphh")
+@metrics_group.command(
+    "qphh",
+    help=(
+        "Calculate TPC-H QphH@Size composite metric.\n"
+        "\n"
+        "Calculate the official TPC-H QphH@Size (Queries per Hour) composite\n"
+        "metric from power test and throughput test results according to TPC-H\n"
+        "specification.\n"
+        "\n"
+        "Formula: QphH@Size = geometric_mean(Power@Size, Throughput@Size)\n"
+        "Where:\n"
+        "    Power@Size = 3600 × SF / Power_Test_Time\n"
+        "    Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Calculate QphH from test results\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results results/power/results.json \\\n"
+        "      --throughput-results results/throughput/results.json\n"
+        "\n"
+        "\b\n"
+        "    # Specify scale factor explicitly\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json \\\n"
+        "      --scale-factor 100\n"
+        "\n"
+        "\b\n"
+        "    # Export to JSON\n"
+        "    benchbox metrics qphh \\\n"
+        "      --power-results power.json \\\n"
+        "      --throughput-results throughput.json \\\n"
+        "      --format json --output qphh.json"
+    ),
+)
 @click.option(
     "--power-results",
     type=click.Path(exists=True),

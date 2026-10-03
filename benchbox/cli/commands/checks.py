@@ -10,7 +10,22 @@ from rich.table import Table
 from benchbox.cli.shared import console
 
 
-@click.command("check-deps")
+@click.command(
+    "check-deps",
+    help=(
+        "Check dependency status and provide installation guidance.\n"
+        "\n"
+        "Verifies platform dependencies and provides installation commands for\n"
+        "missing packages. Shows comprehensive installation matrix for all platforms.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox check-deps                      # Overview of all platforms\n"
+        "    benchbox check-deps --platform databricks # Check specific platform\n"
+        "    benchbox check-deps --matrix             # Show installation matrix\n"
+        "    benchbox check-deps --verbose            # Detailed guidance"
+    ),
+)
 @click.option("--platform", type=str, help="Check dependencies for specific platform")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed dependency information")
 @click.option(

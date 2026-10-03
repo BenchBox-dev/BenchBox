@@ -13,7 +13,38 @@ from benchbox.cli.shared import console
 from benchbox.core.results.metrics import geometric_mean_ms, percentile_ms
 
 
-@click.command("aggregate")
+@click.command(
+    "aggregate",
+    help=(
+        "Aggregate multiple benchmark results into performance trends.\n"
+        "\n"
+        "Scan a directory for benchmark result files and aggregate timing metrics\n"
+        "into a CSV file suitable for tracking performance over time or generating\n"
+        "visualizations.\n"
+        "\n"
+        "Output includes: timestamp, benchmark, platform, scale, geometric mean,\n"
+        "total time, and per-query statistics (p50, p95, p99).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Aggregate all results in directory\n"
+        "    benchbox aggregate --input-dir benchmark_runs/ --output-file trends.csv\n"
+        "\n"
+        "\b\n"
+        "    # Filter by benchmark\n"
+        "    benchbox aggregate \\\n"
+        "      --input-dir benchmark_runs/ \\\n"
+        "      --output-file tpch_trends.csv \\\n"
+        "      --benchmark tpch\n"
+        "\n"
+        "\b\n"
+        "    # Filter by platform\n"
+        "    benchbox aggregate \\\n"
+        "      --input-dir benchmark_runs/ \\\n"
+        "      --output-file duckdb_trends.csv \\\n"
+        "      --platform duckdb"
+    ),
+)
 @click.option(
     "--input-dir",
     type=click.Path(exists=True),

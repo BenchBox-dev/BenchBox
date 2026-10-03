@@ -20,7 +20,23 @@ from benchbox.core.results.database import (
 from benchbox.core.results.regression_policy import is_meaningful_improvement
 
 
-@click.group("report")
+@click.group(
+    "report",
+    help=(
+        "Historical result analysis and platform rankings.\n"
+        "\n"
+        "Commands for analyzing benchmark results over time, generating platform\n"
+        "rankings, and detecting performance regressions.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report rankings --benchmark TPC-H --scale-factor 1\n"
+        "    benchbox report trends --platform DuckDB --benchmark TPC-H\n"
+        "    benchbox report regressions\n"
+        "    benchbox report import benchmark_runs/results/\n"
+        "    benchbox report stats"
+    ),
+)
 def report() -> None:
     """Historical result analysis and platform rankings.
 
@@ -37,7 +53,20 @@ def report() -> None:
     """
 
 
-@report.command("rankings")
+@report.command(
+    "rankings",
+    help=(
+        "Generate platform rankings for a benchmark.\n"
+        "\n"
+        "Ranks platforms based on performance metrics from historical results.\n"
+        "Shows trend indicators comparing current to previous period.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report rankings --benchmark TPC-H --scale-factor 1\n"
+        "    benchbox report rankings -b TPC-DS -s 10 --metric power_at_size"
+    ),
+)
 @click.option(
     "--benchmark",
     "-b",
@@ -144,7 +173,19 @@ def rankings(
     console.print(table)
 
 
-@report.command("trends")
+@report.command(
+    "trends",
+    help=(
+        "Show performance trends over time.\n"
+        "\n"
+        "Displays period-over-period performance changes for a platform,\n"
+        "highlighting any regressions (>10% slowdown).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report trends --platform DuckDB --benchmark TPC-H --scale-factor 1"
+    ),
+)
 @click.option("--platform", "-p", required=True, help="Platform name")
 @click.option("--benchmark", "-b", required=True, help="Benchmark name")
 @click.option("--scale-factor", "-s", type=float, required=True, help="Scale factor")
@@ -213,7 +254,20 @@ def trends(
     console.print(table)
 
 
-@report.command("regressions")
+@report.command(
+    "regressions",
+    help=(
+        "Detect performance regressions across all platforms.\n"
+        "\n"
+        "Scans all platforms and benchmarks for significant performance\n"
+        "slowdowns compared to the previous period.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report regressions\n"
+        "    benchbox report regressions --threshold 15 --lookback-days 14"
+    ),
+)
 @click.option("--threshold", type=float, default=10.0, help="Regression threshold percentage")
 @click.option("--lookback-days", type=int, default=30, help="Comparison period in days")
 @click.option(
@@ -269,7 +323,25 @@ def regressions(
     console.print(f"\n[yellow]Found {len(regressions_list)} regression(s) exceeding {threshold}% threshold[/yellow]")
 
 
-@report.command("import")
+@report.command(
+    "import",
+    help=(
+        "Import benchmark results from a directory.\n"
+        "\n"
+        "Scans a directory for JSON result files and imports them into the\n"
+        "historical database for analysis.\n"
+        "\n"
+        "By default, unofficial TPC-DS results (subscale or non-standard scale factor)\n"
+        "are excluded from the database to prevent contamination of comparative rankings.\n"
+        "Use --include-unofficial to import them explicitly.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report import benchmark_runs/results/\n"
+        '    benchbox report import ./results --pattern "*.json"\n'
+        "    benchbox report import ./results --include-unofficial"
+    ),
+)
 @click.argument("directory", type=click.Path(exists=True, path_type=Path))
 @click.option("--pattern", default="**/*.json", help="Glob pattern for result files")
 @click.option(
@@ -321,7 +393,19 @@ def import_results(
         console.print(f"[yellow]Skipped (duplicates/invalid): {skipped}[/yellow]")
 
 
-@report.command("stats")
+@report.command(
+    "stats",
+    help=(
+        "Show database summary statistics.\n"
+        "\n"
+        "Displays overview of stored results including counts, platforms,\n"
+        "and date ranges.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report stats"
+    ),
+)
 @click.option(
     "--db-path",
     type=click.Path(path_type=Path),
@@ -369,7 +453,19 @@ def stats(db_path: Path | None) -> None:
         console.print(f"[cyan]Benchmarks:[/cyan] {', '.join(benchmarks)}")
 
 
-@report.command("list")
+@report.command(
+    "list",
+    help=(
+        "List stored benchmark results.\n"
+        "\n"
+        "Shows recent results with optional platform and benchmark filters.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report list\n"
+        "    benchbox report list --platform DuckDB --limit 10"
+    ),
+)
 @click.option("--platform", "-p", help="Filter by platform")
 @click.option("--benchmark", "-b", help="Filter by benchmark")
 @click.option("--limit", type=int, default=20, help="Maximum results to show")

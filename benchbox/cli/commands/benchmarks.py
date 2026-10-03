@@ -8,12 +8,25 @@ from benchbox.cli.benchmarks import BenchmarkManager
 from benchbox.cli.shared import console
 
 
-@click.group()
+@click.group(help=("Manage benchmark suites."))
 def benchmarks():
     """Manage benchmark suites."""
 
 
-@benchmarks.command("list")
+@benchmarks.command(
+    "list",
+    help=(
+        "List available benchmark suites with descriptions and characteristics.\n"
+        "\n"
+        "Shows all supported benchmarks including TPC standards (TPC-H, TPC-DS, TPC-DI),\n"
+        "industry benchmarks (ClickBench, H2ODB), academic benchmarks (SSB, AMPLab),\n"
+        "and testing benchmarks (ReadPrimitives, WritePrimitives, TPC-Havoc).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox benchmarks list"
+    ),
+)
 @click.pass_context
 def list_benchmarks(ctx):
     """List available benchmark suites with descriptions and characteristics.

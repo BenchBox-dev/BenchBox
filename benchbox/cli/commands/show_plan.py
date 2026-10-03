@@ -33,7 +33,32 @@ def _find_query(results, query_id: str):
     )
 
 
-@click.command("show-plan")
+@click.command(
+    "show-plan",
+    help=(
+        "Display query plan as ASCII tree.\n"
+        "\n"
+        "Shows the logical query plan for a specific query from a benchmark run.\n"
+        "The plan must have been captured using --capture-plans during the benchmark.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Show plan as tree\n"
+        "    benchbox show-plan --run results.json --query-id q05\n"
+        "\n"
+        "\b\n"
+        "    # Show summary statistics only\n"
+        "    benchbox show-plan --run results.json --query-id 1 --format summary\n"
+        "\n"
+        "\b\n"
+        "    # Export plan as JSON\n"
+        "    benchbox show-plan --run results.json --query-id q05 --format json\n"
+        "\n"
+        "\b\n"
+        "    # Compact tree view without properties\n"
+        "    benchbox show-plan --run results.json --query-id q05 --compact --no-properties"
+    ),
+)
 @click.option(
     "--run",
     "run_path",

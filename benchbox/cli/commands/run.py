@@ -2866,7 +2866,30 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         ctx.exit(1)
 
 
-@click.command("run", cls=BenchBoxCommand)
+@click.command(
+    "run",
+    cls=BenchBoxCommand,
+    help=(
+        "Run benchmarks.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox run --platform duckdb --benchmark tpch\n"
+        "  benchbox run --platform duckdb --benchmark tpch --queries Q1,Q6,Q17\n"
+        "  benchbox run --dry-run ./preview --platform snowflake --benchmark tpch\n"
+        "  benchbox run --official --platform snowflake --benchmark tpch --scale 100 --seed 42\n"
+        "\n"
+        "\b\n"
+        "Deployment Targets:\n"
+        "  benchbox run --platform clickhouse:local --benchmark tpch    # ClickHouse local mode via chDB\n"
+        "  benchbox run --platform clickhouse:server --benchmark tpch   # ClickHouse server\n"
+        "  benchbox run --platform clickhouse-cloud --benchmark tpch    # ClickHouse Cloud\n"
+        "  benchbox run --platform firebolt:core --benchmark tpch       # Firebolt Core (Docker)\n"
+        "  benchbox run --platform firebolt:cloud --benchmark tpch      # Firebolt Cloud\n"
+        "\n"
+        "Use --help-topic examples for more, --help-topic all for advanced options."
+    ),
+)
 # === Core Options (Tier 1 - Always visible) ===
 @click.option("--platform", type=str, help="Platform with optional deployment mode (platform:mode).")
 @click.option(

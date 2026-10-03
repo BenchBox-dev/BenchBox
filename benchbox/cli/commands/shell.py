@@ -266,7 +266,51 @@ def select_database_interactive(databases: list[dict[str, Any]]) -> dict[str, An
         return None
 
 
-@click.command("shell")
+@click.command(
+    "shell",
+    help=(
+        "Launch an interactive SQL shell for a database platform.\n"
+        "\n"
+        "Opens an interactive SQL prompt connected to the specified platform,\n"
+        "useful for debugging queries, inspecting benchmark data, and exploring\n"
+        "database state after benchmark execution.\n"
+        "\n"
+        "Supports automatic database discovery from benchmark_runs/datagen/ or\n"
+        "a custom output directory. Can filter by benchmark name and scale factor.\n"
+        "\n"
+        "Supported platforms: DuckDB, SQLite, ClickHouse (more coming soon)\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Interactive selection from available databases\n"
+        "    benchbox shell\n"
+        "\n"
+        "\b\n"
+        "    # List available databases\n"
+        "    benchbox shell --list\n"
+        "\n"
+        "\b\n"
+        "    # Connect to most recent database\n"
+        "    benchbox shell --last\n"
+        "\n"
+        "\b\n"
+        "    # Filter and select\n"
+        "    benchbox shell --benchmark tpch --scale 1.0\n"
+        "\n"
+        "\b\n"
+        "    # Direct connection\n"
+        "    benchbox shell --platform duckdb --database benchmark.duckdb\n"
+        "\n"
+        "\b\n"
+        "    # Use database from specific output directory\n"
+        "    benchbox shell --output benchmark_runs/results/tpch_20250101_120000\n"
+        "\n"
+        "\b\n"
+        "    # ClickHouse shell\n"
+        "    benchbox shell --platform clickhouse --host localhost --port 9000 \\\n"
+        "      --user default --database benchbox"
+    ),
+)
 @click.option(
     "--platform",
     type=str,

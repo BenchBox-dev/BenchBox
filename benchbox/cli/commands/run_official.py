@@ -45,7 +45,12 @@ def _forward_requested_streams(streams: int | None) -> Iterator[None]:
         BenchmarkOrchestrator.execute_benchmark = original
 
 
-@click.command("run-official", hidden=True, deprecated=True)
+@click.command(
+    "run-official",
+    hidden=True,
+    deprecated=True,
+    help=("Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."),
+)
 @click.argument("benchmark", type=click.Choice(["tpch", "tpcds"], case_sensitive=False))
 @click.option("--platform", type=str, required=True, help="Platform to run on")
 @click.option("--scale", type=float, required=True, help="TPC scale factor")

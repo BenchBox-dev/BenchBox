@@ -83,7 +83,23 @@ def _reconstruct_cli_command(
     return base_cmd
 
 
-@click.group("results", invoke_without_command=True)
+@click.group(
+    "results",
+    invoke_without_command=True,
+    help=(
+        "Show exported benchmark results and execution history.\n"
+        "\n"
+        "Displays a summary of recent benchmark executions including performance\n"
+        "metrics, execution times, and result file locations.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox results              # Show last 10 results\n"
+        "    benchbox results --limit 25   # Show last 25 results\n"
+        "    benchbox results --paths      # Print exact result paths for benchbox submit\n"
+        "    benchbox results show-cli <file>  # Show CLI command to reproduce a run"
+    ),
+)
 @click.option("--limit", type=int, default=10, help="Number of results to show")
 @click.option("--submitted", is_flag=True, help="Show hosted submission history")
 @click.option(
@@ -171,7 +187,20 @@ def _show_submitted_results(exporter: ResultExporter, *, limit: int) -> None:
     console.print(table)
 
 
-@results.command("show-cli")
+@results.command(
+    "show-cli",
+    help=(
+        "Reconstruct the CLI command from a benchmark result file.\n"
+        "\n"
+        "Reads a benchmark result JSON file and reconstructs the CLI command\n"
+        "that can be used to reproduce the benchmark run.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox results show-cli benchmark_runs/results/tpch_sf001_duckdb_20240101_120000.json\n"
+        "    benchbox results show-cli ./result.json --full"
+    ),
+)
 @click.argument("result_file", type=click.Path(exists=True))
 @click.option("--full", is_flag=True, help="Show full command with all options")
 def show_cli(result_file: str, full: bool) -> None:

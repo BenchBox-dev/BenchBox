@@ -12,7 +12,12 @@ from benchbox.core.results.loader import iter_query_results, load_result_file
 from benchbox.core.results.query_normalizer import normalize_query_id
 
 
-@click.command("compare-plans", hidden=True, deprecated=True)
+@click.command(
+    "compare-plans",
+    hidden=True,
+    deprecated=True,
+    help=("Compare query plans between benchmark runs. Deprecated; use `benchbox compare --include-plans`."),
+)
 @click.option("--run1", "run1_path", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--run2", "run2_path", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--query-id", help="Query ID to compare")

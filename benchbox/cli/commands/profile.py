@@ -8,7 +8,19 @@ from benchbox.cli.shared import console
 from benchbox.cli.system import SystemProfiler
 
 
-@click.command("profile")
+@click.command(
+    "profile",
+    help=(
+        "Profile the current system and provide optimization recommendations.\n"
+        "\n"
+        "Analyzes CPU, memory, disk space, and system configuration to recommend\n"
+        "appropriate scale factors and benchmark configurations.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox profile"
+    ),
+)
 @click.pass_context
 def profile(ctx):
     """Profile the current system and provide optimization recommendations.

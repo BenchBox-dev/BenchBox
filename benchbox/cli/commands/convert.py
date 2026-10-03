@@ -80,7 +80,67 @@ def _get_schemas_from_manifest(manifest: ManifestV2, benchmark_name: str | None)
         raise click.ClickException(f"Failed to load benchmark '{benchmark_name}': {e}") from e
 
 
-@click.command("convert")
+@click.command(
+    "convert",
+    help=(
+        "Convert benchmark data to optimized table formats.\n"
+        "\n"
+        "Converts TPC benchmark data from TBL (pipe-delimited) format to columnar\n"
+        "formats like Parquet, Vortex, Delta Lake, or Apache Iceberg. This enables\n"
+        "significant query performance improvements (2-10x faster).\n"
+        "\n"
+        "The command reads the manifest file in the input directory to discover\n"
+        "tables and their source files, then converts each table to the target format.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Parquet with default settings\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Vortex for high compression\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format vortex\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Delta Lake with Zstd compression\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format delta --compression zstd\n"
+        "\n"
+        "\b\n"
+        "    # Convert to partitioned Parquet by date column\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet \\\n"
+        "        --partition l_shipdate\n"
+        "\n"
+        "\b\n"
+        "    # Convert with multiple partition columns\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet \\\n"
+        "        --partition l_shipdate --partition l_returnflag\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Iceberg without validation (faster, not TPC compliant)\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format iceberg --no-validate\n"
+        "\n"
+        "\b\n"
+        "    # Specify benchmark explicitly for schema lookup\n"
+        "    benchbox convert --input ./data/custom --format parquet --benchmark tpch\n"
+        "\n"
+        "\b\n"
+        "Supported Formats:\n"
+        "    parquet  - Apache Parquet (columnar, compressed)\n"
+        "    vortex   - Vortex (high compression, fast scans)\n"
+        "    delta    - Delta Lake (ACID transactions, time travel)\n"
+        "    iceberg  - Apache Iceberg (schema evolution, hidden partitioning)\n"
+        "    ducklake - DuckLake (DuckDB native, ACID transactions, time travel)\n"
+        "\n"
+        "\b\n"
+        "Compression Options:\n"
+        "    snappy   - Fast compression, moderate ratio (default)\n"
+        "    gzip     - Better ratio, slower\n"
+        "    zstd     - Best ratio, moderate speed\n"
+        "    none     - No compression"
+    ),
+)
 @click.option(
     "--input",
     "input_dir",

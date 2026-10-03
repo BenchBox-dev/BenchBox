@@ -9,7 +9,30 @@ import click
 from benchbox.cli.shared import console
 
 
-@click.command("download-answers")
+@click.command(
+    "download-answers",
+    help=(
+        "Pre-download TPC answer files for offline validation.\n"
+        "\n"
+        "Answer files are required for row-count validation of TPC-H and TPC-DS\n"
+        "benchmark results. They are included in source distributions but not in\n"
+        "wheel installs. This command downloads them on-demand to a local cache.\n"
+        "\n"
+        "The cache directory is $XDG_CACHE_HOME/benchbox/answers/ (or\n"
+        "~/.cache/benchbox/answers/ if XDG_CACHE_HOME is not set).\n"
+        "\n"
+        "Set BENCHBOX_ANSWERS_URL to override the default download URL.\n"
+        "Set BENCHBOX_NO_DOWNLOAD=1 to disable all automatic downloads.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox download-answers                        # Download both TPC-H and TPC-DS\n"
+        "    benchbox download-answers --benchmark tpch       # TPC-H only\n"
+        "    benchbox download-answers --benchmark tpcds      # TPC-DS only\n"
+        "    benchbox download-answers --force                # Re-download even if cached\n"
+        "    benchbox download-answers --show-cache-dir       # Print cache location"
+    ),
+)
 @click.option(
     "--benchmark",
     type=click.Choice(["tpch", "tpcds", "all"], case_sensitive=False),

@@ -37,7 +37,32 @@ PLATFORM_DISPLAY_NAMES = {
 }
 
 
-@click.command("setup")
+@click.command(
+    "setup",
+    help=(
+        "Interactive setup for cloud platform credentials.\n"
+        "\n"
+        "Guides you through setting up authentication for Databricks, Snowflake,\n"
+        "BigQuery, Redshift, Athena, MotherDuck, and SingleStore platforms. Most platforms use\n"
+        "secure local credential storage; MotherDuck validates MOTHERDUCK_TOKEN\n"
+        "without storing the token.\n"
+        "\n"
+        "This is about CREDENTIALS. `benchbox platforms setup` is a different\n"
+        "command that enables and installs local platform adapters. The two share\n"
+        'the word "setup"; this is the one for cloud authentication, and\n'
+        "`benchbox platforms setup --platform <name>` delegates here.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox setup --platform databricks    # Interactive Databricks setup\n"
+        "    benchbox setup --platform motherduck    # Validate MOTHERDUCK_TOKEN\n"
+        "    benchbox setup --list-platforms         # Show all platforms\n"
+        "    benchbox setup --status                 # Check credential status\n"
+        "    benchbox setup --platform databricks --validate-only  # Validate only\n"
+        "    benchbox setup --platform redshift --diagnose         # Run connectivity diagnostics\n"
+        "    benchbox setup --platform databricks --remove         # Remove credentials"
+    ),
+)
 @click.option(
     "--platform",
     type=click.Choice(SUPPORTED_SETUP_PLATFORMS, case_sensitive=False),
