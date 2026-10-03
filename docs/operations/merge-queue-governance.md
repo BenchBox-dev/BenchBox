@@ -8,7 +8,7 @@ This document defines the operational architecture, required status check contra
 
 1. **Squash Integration Only:** All pull requests targeting `develop` must be integrated via squash merge. Merge commits and rebase-and-merge remain forbidden.
 2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history, or code owner review.
-3. **Soundness Review Boundary:** A pull request touching a path in `.github/soundness-paths.txt` needs a completed external adversarial review before it is armed. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. `make pr-arm` will refuse until the review is visible on the current head. A scheduled digest will list the soundness-path commits that merged and the review signal each had, and open a tracker item for any with none. The review is not an attestation in the PR body: the author of a change can write that text, so it cannot bind. The arming refusal and the digest are added in later changes, and the attestation check in `ci.yml` stays in force until they exist.
+3. **Soundness Review Boundary:** A pull request touching a path in `.github/soundness-paths.txt` needs a completed external adversarial review before it is armed. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. The review is not an attestation in the PR body: the author of a change can write that text, so it cannot bind. The attestation check in `ci.yml` has been removed; the Codex connector reviews soundness-path changes, and required thread resolution binds its findings. Arming only once the connector's review is on the current head is a rule for agents (`AGENTS.md`); a mechanical check of it follows.
 4. **Fail-Closed Execution:** If an Actions workflow encounter an unknown or malformed `merge_group` event payload, it must fail closed and withhold reporting green.
 
 ---
@@ -24,9 +24,11 @@ The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queu
 | `results-data` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
 | `docs` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, and the visual comparison on docs changes. |
 | `landing` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Site theme token scan and the visual comparison on landing changes. |
-| `tooling` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Every event. Validates soundness review evidence from the immutable base revision and fails closed for malformed or missing review attestations. Also runs the base-branch guard, content guard, skill integrity, audit checks by path, and, in the merge queue, ruleset drift from the trusted base checkout. |
+| `tooling` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Every event. The Codex connector reviews soundness-path changes, and required thread resolution binds its findings. Also runs the base-branch guard, content guard, skill integrity, audit checks by path, and, in the merge queue, ruleset drift from the trusted base checkout. |
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA and fails closed when that baseline is absent (see the follower policy below). The baseline is captured by `.github/workflows/docs.yml` on every push to `develop`.
+
+The visual comparison is advisory until the public site is in production: it still runs and uploads its report, but the explorer, docs and landing results do not wait on it.
 
 ### Merge-queue follower visual baseline policy
 
