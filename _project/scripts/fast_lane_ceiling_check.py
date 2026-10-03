@@ -60,8 +60,8 @@ CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 # the grace covers one delta limit for every possible queued entry rather than
 # assuming a one-PR group.
 #
-# Keep this synchronized with APPROVED_MERGE_QUEUE["max_entries_to_merge"] in
-# scripts/ruleset_drift_check.py. The value is an explicit CLI flag, not an
+# The grace applies only to merge_group events, which no longer occur once the
+# develop ruleset has no merge queue. The value is an explicit CLI flag, not an
 # environment variable: ci.yml runs the PR's own workflow file, so an env-var
 # decision could be self-granted by editing the workflow. The pull_request lane
 # passes no grace, so a PR whose own merge ref crosses still fails there, and the

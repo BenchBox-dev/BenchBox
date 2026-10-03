@@ -338,21 +338,9 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
-# Approved native merge-queue parameters for refs/heads/develop, per
-# _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
-# amendment: ALLGREEN, 60-minute timeout; 2026-10-02 amendment: 90-minute timeout
-# to prevent runner-starvation ejections during peak contention; builds reduced to 2
-# and merges to 3 with the unit-check cutover). One expected-policy source;
-# protected-setting changes are reported for operator action, never silently repaired.
-APPROVED_MERGE_QUEUE: dict[str, object] = {
-    "merge_method": "SQUASH",
-    "grouping_strategy": "ALLGREEN",
-    "min_entries_to_merge": 1,
-    "max_entries_to_build": 2,
-    "max_entries_to_merge": 3,
-    "check_response_timeout_minutes": 90,
-    "min_entries_to_merge_wait_minutes": 0,
-}
+# The approved develop policy merges with required checks and auto-merge, with
+# no merge queue, per _project/decisions/merge-queue-retirement-2026-10-03.md.
+# A merge_queue rule reappearing is drift for operator action, never repaired.
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "core",
     "explorer",
@@ -363,53 +351,11 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
 )
 
 
-def _approved_queue_summary() -> str:
-    return (
-        f"{APPROVED_MERGE_QUEUE['merge_method']}/"
-        f"{APPROVED_MERGE_QUEUE['grouping_strategy']}/"
-        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge']}/"
-        f"{APPROVED_MERGE_QUEUE['max_entries_to_build']}/"
-        f"{APPROVED_MERGE_QUEUE['max_entries_to_merge']}/"
-        f"{APPROVED_MERGE_QUEUE['check_response_timeout_minutes']}m/"
-        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge_wait_minutes']}"
-    )
-
-
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
-    """Validate the live merge_queue rule against the approved parameters.
-
-    A missing rule is blocking when the payload is otherwise well-formed
-    (other rules visible proves the API is not redacting): an absent queue
-    rule invalidates queue-aware publication policy. Only an empty or
-    unreadable payload stays a non-blocking warning; present-but-different
-    parameters are blocking findings for operator action.
-    """
-    findings: list[str] = []
-    rule = _rule_by_type(live, "merge_queue")
-    if rule is None:
-        summary = _approved_queue_summary()
-        if live.get("rules"):
-            return [
-                f"{name}: ruleset payload lists rules but no merge_queue rule; "
-                f"queue-aware publication is unverified, verify queue parameters "
-                f"({summary}) in repository settings"
-            ]
-        return [
-            f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
-            f"verify queue parameters ({summary}) in repository settings"
-        ]
-    raw_params = rule.get("parameters")
-    if raw_params is None:
-        params: dict[str, Any] = {}
-    elif not isinstance(raw_params, dict):
-        return [f"{name}: merge_queue parameters are malformed; queue-aware publication is unverified"]
-    else:
-        params = raw_params
-    for key, approved in APPROVED_MERGE_QUEUE.items():
-        live_value = params.get(key)
-        if live_value != approved:
-            findings.append(f"{name}: merge_queue {key} is {live_value!r}, expected {approved!r}")
-    return findings
+    """Report a merge_queue rule on a ruleset whose approved policy has none."""
+    if _rule_by_type(live, "merge_queue") is None:
+        return []
+    return [f"{name}: a merge_queue rule is present; the approved develop policy has no merge queue"]
 
 
 def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None) -> list[str]:
