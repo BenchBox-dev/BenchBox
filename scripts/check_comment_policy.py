@@ -67,7 +67,6 @@ def load_policy(raw: bytes) -> dict:
         if any(matches(path, entry["path"]) or matches(entry["path"], path) for entry in policy["external"]):
             raise ValueError("completed and external scopes cannot overlap")
     identities = set()
-    expired_identities = set()
     for entry in policy["exceptions"]:
         required = {"path", "symbol", "text", "kind", "consumer", "necessity", "alternative", "owner", "removal"}
         fixture_fields = {"payload", "finding_kind"} if entry.get("kind") == "fixture" else set()
@@ -98,9 +97,6 @@ def load_policy(raw: bytes) -> dict:
             )
             if suppression and "expires" not in entry:
                 raise ValueError("directive exception needs an unexpired review date")
-        expired = (
-            entry["kind"] == "directive" and "expires" in entry and date.fromisoformat(entry["expires"]) < date.today()
-        )
         identity = (
             entry["path"],
             entry["symbol"],
@@ -112,13 +108,30 @@ def load_policy(raw: bytes) -> dict:
         if identity in identities:
             raise ValueError("duplicate exception identity")
         identities.add(identity)
-        expired_identities.update({identity} if expired else set())
-    policy["_expired_exception_identities"] = expired_identities
     return policy
 
 
+def exception_identity(entry: dict) -> tuple[str, str, str, str, str, str]:
+    return (
+        entry["path"],
+        entry["symbol"],
+        entry["text"],
+        entry["kind"],
+        entry.get("payload", ""),
+        entry.get("finding_kind", "comment"),
+    )
+
+
+def expired_exception_identities(policy: dict) -> set[tuple[str, str, str, str, str, str]]:
+    return {
+        exception_identity(entry)
+        for entry in policy["exceptions"]
+        if entry["kind"] == "directive" and "expires" in entry and date.fromisoformat(entry["expires"]) < date.today()
+    }
+
+
 def expired_policy_findings(policy: dict) -> list[Finding]:
-    expired = policy.get("_expired_exception_identities", set())
+    expired = expired_exception_identities(policy)
     return [
         Finding(
             POLICY_PATH,
@@ -127,15 +140,7 @@ def expired_policy_findings(policy: dict) -> list[Finding]:
             f"expired directive exception: {entry['path']} {entry['text']}",
         )
         for entry in policy["exceptions"]
-        if (
-            entry["path"],
-            entry["symbol"],
-            entry["text"],
-            entry["kind"],
-            entry.get("payload", ""),
-            entry.get("finding_kind", "comment"),
-        )
-        in expired
+        if (exception_identity(entry)) in expired
     ]
 
 
@@ -167,7 +172,13 @@ def bootstrap_base_allowed(root: Path, base: str) -> bool:
     return contains_rollout and not installed
 
 
-def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None = None) -> bool:
+def allowed(
+    finding: Finding,
+    policy: dict,
+    source: str,
+    budget: Counter | None = None,
+    expired: set[tuple[str, str, str, str, str, str]] | None = None,
+) -> bool:
     text = finding.text
     if finding.kind == "comment" and not finding.symbol:
         if (
@@ -188,16 +199,9 @@ def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None 
         ):
             return codecs.lookup(cookie.group(1)).name != "utf-8"
     for index, entry in enumerate(policy["exceptions"]):
-        identity = (
-            entry["path"],
-            entry["symbol"],
-            entry["text"],
-            entry["kind"],
-            entry.get("payload", ""),
-            entry.get("finding_kind", "comment"),
-        )
+        identity = exception_identity(entry)
         if (
-            identity not in policy.get("_expired_exception_identities", set())
+            identity not in (expired if expired is not None else expired_exception_identities(policy))
             and finding.path == entry["path"]
             and finding.symbol == entry["symbol"]
             and text == entry["text"]
@@ -264,11 +268,12 @@ def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Fi
     }
     js_results = native_results(root, requests)
     budget = Counter({index: entry.get("count", 1) for index, entry in enumerate(policy["exceptions"])})
+    expired = expired_exception_identities(policy)
     return errors + [
         finding
         for path, text in decoded.items()
         for finding in scan(path, text, source_language(path, text), js_results)
-        if not allowed(finding, policy, text, budget)
+        if not allowed(finding, policy, text, budget, expired)
     ]
 
 

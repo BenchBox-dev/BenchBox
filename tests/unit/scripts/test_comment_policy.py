@@ -180,6 +180,7 @@ def test_expired_directive_is_reported_and_does_not_allow_source() -> None:
     registered = load_policy(json.dumps(policy(exceptions=[exception(expires="2000-01-01")])).encode())
     finding = Finding("a.py", 1, "comment", "# noqa: F401")
     policy_findings = expired_policy_findings(registered)
+    assert json.loads(json.dumps(registered)) == registered
     assert [finding.kind for finding in policy_findings] == ["policy-error"]
     assert check_comment_policy.exit_status("strict", registered, policy_findings) == 1
     assert check_comment_policy.exit_status("report", registered, policy_findings) == 0
