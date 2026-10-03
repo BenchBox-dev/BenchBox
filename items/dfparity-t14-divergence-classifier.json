@@ -4,7 +4,7 @@
     "Q4, Q11, Q20 and Q78 are classified",
     "The comparator's strictness (tolerance 1e-10, NaN vs NULL) is unchanged by this item"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T14). Owner decision D4 in dfparity-t00-owner-decisions. Probe results exist only in a session scratchpad; regenerate with the gate. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T14). Owner decision D4 in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 state: #2553 (feat/tpcds-divergence-classifier, BenchBox.wt-tpcds-t14): scripts/tpcds_divergence_report.py with --repeat N flaky detection, 22 tests; CI was green at last check, NOT armed, merges cleanly into develop 922eaba6e. Closes when #2553 merges. Its --repeat mode may also satisfy n03's flaky-detection acceptance (owner decision pending; see n03). t25 uses this script for the re-measured baseline.",
   "description": "Build a classifier (script or report mode) that labels each divergent cell as parameter drift, tie, NULL order, DECIMAL/float, or logic, using the full divergence detail text (the earlier probe truncated at 200 characters, so Q4, Q11, Q20 and Q78 could not be judged). Known examples: Q71 NULL ordering, Q76 NULL ordering (no ties possible), Q70 float tie, Q11 pandas row-count difference (not a tie). Tie canonicalization in the comparator is allowed only for causes this classifier proves are true ties, applied to both sides; NULL ordering is fixed in implementations, not the comparator.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "e0ff28b1ecc341a19925d4abc6324c7e",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:57:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b40eb46c159d464da1d364a92ec3c63a",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
