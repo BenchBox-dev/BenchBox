@@ -6595,7 +6595,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Enforce the TPC-DS pandas-family gate, or record that the parity goal is Polars-only"
+      "title": "Enforce the TPC-DS pandas-family gate (owner decision D6: pandas is in the parity goal)"
     },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
