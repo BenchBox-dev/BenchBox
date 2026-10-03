@@ -20,16 +20,33 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-for _git_location_key in (
+_GIT_LOCAL_ENV_FALLBACK = [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
     "GIT_DIR",
     "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
     "GIT_INDEX_FILE",
-    "GIT_COMMON_DIR",
-    "GIT_OBJECT_DIRECTORY",
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
     "GIT_PREFIX",
-):
-    os.environ.pop(_git_location_key, None)
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+]
+try:
+    import subprocess as _subprocess
+
+    _git_local_env = _subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"], capture_output=True, text=True, check=True, timeout=10
+    ).stdout.split()
+except (OSError, _subprocess.SubprocessError):
+    _git_local_env = []
+for _git_local_key in {*_git_local_env, *_GIT_LOCAL_ENV_FALLBACK}:
+    os.environ.pop(_git_local_key, None)
 # DuckDB ignores env vars; patched in pytest_configure below.
 
 import sys

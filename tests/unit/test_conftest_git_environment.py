@@ -9,14 +9,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[2]
 
-_KEYS = (
-    "GIT_DIR",
-    "GIT_WORK_TREE",
-    "GIT_INDEX_FILE",
-    "GIT_COMMON_DIR",
-    "GIT_OBJECT_DIRECTORY",
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-    "GIT_PREFIX",
+_KEYS = tuple(
+    subprocess.run(["git", "rev-parse", "--local-env-vars"], capture_output=True, text=True, check=True).stdout.split()
 )
 
 
@@ -25,7 +19,8 @@ def test_session_drops_inherited_repository_location() -> None:
         assert key not in os.environ
 
 
-def test_a_hook_environment_cannot_redirect_scratch_git_commands(tmp_path: Path) -> None:
+@pytest.mark.parametrize("redirect", ["git_dir", "git_config"])
+def test_a_hook_environment_cannot_redirect_scratch_git_commands(tmp_path: Path, redirect: str) -> None:
     outer = tmp_path / "outer"
     subprocess.run(["git", "init", "-q", str(outer)], check=True)
     probe = tmp_path / "probe.py"
@@ -39,7 +34,10 @@ def test_a_hook_environment_cannot_redirect_scratch_git_commands(tmp_path: Path)
         "subprocess.run(['git', 'config', 'user.name', 'Scratch'], cwd=scratch, check=True)\n",
         encoding="utf-8",
     )
-    env = dict(os.environ, GIT_DIR=str(outer / ".git"), GIT_WORK_TREE=str(outer))
+    if redirect == "git_dir":
+        env = dict(os.environ, GIT_DIR=str(outer / ".git"), GIT_WORK_TREE=str(outer))
+    else:
+        env = dict(os.environ, GIT_CONFIG=str(outer / ".git" / "config"))
     subprocess.run(
         [sys.executable, str(probe), str(ROOT), str(tmp_path / "scratch")],
         check=True,
