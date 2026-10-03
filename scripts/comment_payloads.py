@@ -110,12 +110,39 @@ def example_blocks(source: str) -> list[tuple[int, str, str, str]]:
 
 
 def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: set[str], wrapper: str) -> list[str]:
-    """Return the wrapped command after consuming a wrapper's known options."""
     index = 0
     while index < len(words):
         word = words[index]
         if word == "--":
             return words[index + 1 :]
+        if word in {"-S", "--split-string"} and word in value_options:
+            if index + 1 >= len(words):
+                raise ValueError(f"{wrapper} option requires an operand: {word}")
+            try:
+                split_words = shlex.split(words[index + 1])
+            except ValueError as exc:
+                raise ValueError(f"malformed {wrapper} split-string operand") from exc
+            if not split_words:
+                raise ValueError(f"empty {wrapper} split-string operand")
+            return _wrapper_tail(
+                [*split_words, *words[index + 2 :]],
+                value_options=value_options,
+                flag_options=flag_options,
+                wrapper=wrapper,
+            )
+        if word.startswith("--split-string=") and "--split-string" in value_options:
+            try:
+                split_words = shlex.split(word.split("=", 1)[1])
+            except ValueError as exc:
+                raise ValueError(f"malformed {wrapper} split-string operand") from exc
+            if not split_words:
+                raise ValueError(f"empty {wrapper} split-string operand")
+            return _wrapper_tail(
+                [*split_words, *words[index + 1 :]],
+                value_options=value_options,
+                flag_options=flag_options,
+                wrapper=wrapper,
+            )
         if "=" in word and word.startswith("--"):
             option, _ = word.split("=", 1)
             if option in value_options:
@@ -157,6 +184,8 @@ def stdin_language(words: list[str]) -> str | None:
             flag_options={"-i", "--ignore-environment", "-0", "--null"},
             wrapper="env",
         )
+        while tail and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tail[0]):
+            tail = tail[1:]
         return stdin_language(tail)
     if name == "uv" and words[1:2] == ["run"]:
         return stdin_language(
@@ -182,7 +211,6 @@ def stdin_language(words: list[str]) -> str | None:
                     "--index-url",
                     "--keyring-provider",
                     "--link-mode",
-                    "--module",
                     "--no-editable-package",
                     "--no-extra",
                     "--no-group",
@@ -251,6 +279,7 @@ def stdin_language(words: list[str]) -> str | None:
                     "-n",
                     "-q",
                     "-v",
+                    "--module",
                 },
                 wrapper="uv run",
             )

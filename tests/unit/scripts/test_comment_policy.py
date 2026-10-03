@@ -16,6 +16,7 @@ import pytest
 import run_comment_policy as policy_runner
 import yaml
 from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources, source_paths
+from comment_payloads import stdin_language
 from comment_syntax import Finding, javascript_requests, python_findings, scan, sql_comments
 from run_comment_policy import TRUSTED_FILES, parser_environment, resolve_base
 
@@ -857,9 +858,45 @@ def test_heredoc_arguments_and_script_input_are_data(source: str) -> None:
     assert not scan("a.sh", source, "bash")
 
 
-@pytest.mark.parametrize("header", ["uv run --project . python -", "uv run --with pkg python -", "env -u FOO python -"])
+@pytest.mark.parametrize(
+    "header",
+    ["uv run --project . python -", "uv run --with pkg python -", "uv run --module python -", "env -u FOO python -"],
+)
 def test_heredoc_wrapper_option_operands_reach_stdin_consumer(header: str) -> None:
     assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "FOO=bar python -",
+        "env FOO=bar python -",
+        'env -S "python -"',
+        'env --split-string="python -"',
+    ],
+)
+def test_heredoc_env_assignments_and_static_split_string_reach_stdin_consumer(header: str) -> None:
+    assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "env -S \"$COMMAND\" <<'PY'\n# explanation\nPY\n",
+        "env -S \"python script.py -\" <<'PY'\n# input data\nPY\n",
+    ],
+)
+def test_heredoc_dynamic_or_wrong_stdin_interpreter_fails_closed(source: str) -> None:
+    findings = scan("a.sh", source, "bash")
+    if "script.py" in source:
+        assert not findings
+    else:
+        assert findings[0].kind == "coverage-error"
+
+
+def test_env_split_string_malformed_operand_fails_closed() -> None:
+    with pytest.raises(ValueError, match="malformed env split-string operand"):
+        stdin_language(["env", "-S", "'python -"])
 
 
 def test_heredoc_unknown_wrapper_option_fails_closed() -> None:
