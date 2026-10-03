@@ -92,6 +92,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
 | `todo-state-validate.yml` | tooling | Tracker state validation |
 | `tpcds-staged-maturation.yml` | tooling | Weekly TPC-DS cross-surface maturation report |
+| `trunk.yml` | product-safety | Post-merge fast lane, medium tier and correctness gate on develop |
 | `upload-answers.yml` | product-safety | Answer file publication |
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
@@ -112,6 +113,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the connector-review check |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
+| `test_trunk_workflow.py` | product-safety | Post-merge workflow triggers, per-ref queueing and read-only permissions |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
 | `test_publication_recover.py` | product-safety | Publication recovery |
