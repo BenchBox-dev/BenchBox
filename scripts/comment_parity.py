@@ -176,7 +176,7 @@ class DocstringStripper(ast.NodeTransformer):
         visited = super().generic_visit(node)
         if isinstance(visited, SCOPE_NODES) and leading_docstring(visited) is not None:
             del visited.body[0]
-            if not visited.body:
+            if not visited.body and not isinstance(visited, ast.Module):
                 visited.body.append(ast.Pass())
                 self.emptied += 1
         return visited
