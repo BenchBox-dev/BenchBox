@@ -4,7 +4,7 @@
     "Each entry cites the answer-set evidence of template validity",
     "A backlog list of queries diverging at other scales exists and is excluded from coverage counts"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T19). Add every batch item created by dfparity-t05 to this item's needs when they exist. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T19). Supersedes legacy tpcds-parity-b5-vacuity (dropped 2026-10-03). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03: the gate moves to about SF 0.1 in t20, so the list is regenerated at that scale. Any SF 0.01 entries from n10 (#2544, if it merges) are interim and are replaced here.",
   "description": "After parameter alignment, re-derive _TPCDS_LEGITIMATELY_EMPTY. A query may be classified empty only when, at the gate's scale, the SQL reference returns 0 rows, both DataFrame families return 0 rows, parameters match, and the template is shown valid because the qualification binding returns rows (answer set). Queries that diverge at other scales go on an explicit backlog and are excluded from coverage counts; classified empties never count as coverage. Measured: emptiness is not monotonic in scale (23 queries are empty at some scales and not others; 5 go from rows to empty), the 8 SF=1-empty queries have non-empty official answer sets, and 7 of 12 queries empty at SF=0.1 diverge at SF=1.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "update",
       "op_id": "532ff82837f44ca584d9573ca9822c3d",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:56:41Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c0aafccfe8a44de78f25166fb81acd60",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
