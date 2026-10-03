@@ -16,6 +16,7 @@ REVERT_PREFIX = "fix/revert-"
 GRACE = timedelta(minutes=30)
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 RUN_FIELDS = "conclusion,status,updatedAt"
+RUN_WINDOW = 30
 
 Runner = Callable[[list[str]], tuple[int, str]]
 
@@ -44,7 +45,7 @@ def _parse_time(value: str) -> datetime:
 def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime | None:
     code, out = run(
         ["gh", "run", "list", "--repo", repo, "--workflow", TRUNK_WORKFLOW, "--branch", BASE_BRANCH]
-        + ["--status", "completed", "--limit", "5", "--json", RUN_FIELDS]
+        + ["--status", "completed", "--limit", str(RUN_WINDOW), "--json", RUN_FIELDS]
     )
     if code != 0:
         raise TrunkError(f"gh run list failed: {out.strip()}")
@@ -59,12 +60,13 @@ def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime 
         ]
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise TrunkError(f"unreadable gh run list output: {exc}") from exc
+    red_start = None
     for finished, conclusion in sorted(completed, key=lambda pair: pair[0], reverse=True):
         if conclusion == "success":
-            return None
+            break
         if conclusion in RED_CONCLUSIONS:
-            return finished
-    return None
+            red_start = finished
+    return red_start
 
 
 def trunk_gate(
@@ -88,13 +90,15 @@ def trunk_gate(
         return None
     minutes = int(age.total_seconds() // 60)
     return (
-        f"develop has been red for {minutes} minutes (newest completed {TRUNK_WORKFLOW} run failed at "
+        f"develop has been red for {minutes} minutes (first failing {TRUNK_WORKFLOW} run since the last success finished at "
         f"{red_since.isoformat()}). Fix it or revert the culprit with `make trunk-revert PR=<number>`; "
         f"branches named {REVERT_PREFIX}* are exempt."
     )
 
 
-def revert_commands(number: int, oid: str, title: str, repo: str = REPOSITORY) -> list[list[str]]:
+def revert_commands(
+    number: int, oid: str, title: str, repo: str = REPOSITORY, head: str | None = None
+) -> list[list[str]]:
     branch = f"{REVERT_PREFIX}{number}"
     subject = f'Revert "{title}" (#{number})'
     return [
@@ -103,8 +107,26 @@ def revert_commands(number: int, oid: str, title: str, repo: str = REPOSITORY) -
         ["git", "revert", "--no-edit", oid],
         ["git", "commit", "--amend", "-m", subject, "-m", f"This reverts commit {oid}."],
         ["git", "push", "-u", "origin", branch],
-        ["gh", "pr", "create", "--repo", repo, "--base", BASE_BRANCH, "--head", branch, "--fill"],
+        ["gh", "pr", "create", "--repo", repo, "--base", BASE_BRANCH, "--head", head or branch, "--fill"],
     ]
+
+
+def origin_owner(url: str) -> tuple[str, str] | None:
+    match = re.fullmatch(
+        r"(?:git@github\.com:|ssh://git@github\.com/|https://github\.com/)([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?",
+        url.strip(),
+    )
+    return (match.group(1), match.group(2)) if match else None
+
+
+def head_spec(run: Runner, repo: str, branch: str) -> str:
+    url = _check(run, ["git", "remote", "get-url", "--push", "origin"], "resolving the origin remote")
+    origin = origin_owner(url)
+    if origin is None:
+        raise TrunkError("origin is not a supported GitHub URL or SSH form")
+    if f"{origin[0]}/{origin[1]}".lower() == repo.lower():
+        return branch
+    return f"{origin[0]}:{branch}"
 
 
 def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
@@ -126,7 +148,8 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
             raise TrunkError(f"PR #{number} has no title")
         if _check(run, ["git", "status", "--porcelain"], "checking the worktree").strip():
             raise TrunkError("the worktree has uncommitted or untracked changes; commit or remove them first")
-        fetch, switch, revert_cmd, amend, push, create = revert_commands(number, oid, title, repo)
+        head = head_spec(run, repo, f"{REVERT_PREFIX}{number}")
+        fetch, switch, revert_cmd, amend, push, create = revert_commands(number, oid, title, repo, head)
         _check(run, fetch, "fetching origin/develop")
         _check(
             run,

@@ -29,7 +29,15 @@ trunk_revert = _load()
 
 
 class FakeRun:
-    def __init__(self, *, pr_view: dict | None = None, dirty: str = "", fail: dict[str, int] | None = None):
+    def __init__(
+        self,
+        *,
+        pr_view: dict | None = None,
+        dirty: str = "",
+        fail: dict[str, int] | None = None,
+        origin: str = "git@github.com:BenchBox-dev/BenchBox.git",
+    ):
+        self.origin = origin
         self.pr_view = pr_view
         self.dirty = dirty
         self.fail = fail or {}
@@ -41,6 +49,8 @@ class FakeRun:
             return 0, json.dumps(self.pr_view)
         if cmd[:3] == ["git", "status", "--porcelain"]:
             return 0, self.dirty
+        if cmd[:4] == ["git", "remote", "get-url", "--push"]:
+            return 0, self.origin
         if cmd[:2] == ["gh", "pr"] and cmd[2] == "create":
             return 0, "https://github.com/BenchBox-dev/BenchBox/pull/99\n"
         for prefix, code in self.fail.items():
@@ -73,6 +83,7 @@ def test_builds_the_expected_revert_and_pr_commands(capsys: pytest.CaptureFixtur
     assert run.calls == [
         ["gh", "pr", "view", "12", "--repo", trunk_revert.REPOSITORY, "--json", "state,mergeCommit,title"],
         ["git", "status", "--porcelain"],
+        ["git", "remote", "get-url", "--push", "origin"],
         ["git", "fetch", "origin", "develop", "--quiet"],
         ["git", "merge-base", "--is-ancestor", OID, "origin/develop"],
         ["git", "switch", "--no-track", "-c", "fix/revert-12", "origin/develop"],
@@ -93,6 +104,13 @@ def test_builds_the_expected_revert_and_pr_commands(capsys: pytest.CaptureFixtur
         ],
     ]
     assert "pull/99" in capsys.readouterr().out
+
+
+def test_qualifies_the_head_when_origin_is_a_fork() -> None:
+    run = FakeRun(pr_view=_merged(), origin="https://github.com/someone/BenchBox.git")
+    assert trunk_revert.revert(12, run=run) == 0
+    create = next(call for call in run.calls if call[:3] == ["gh", "pr", "create"])
+    assert create[create.index("--head") + 1] == "someone:fix/revert-12"
 
 
 def test_title_with_quotes_and_command_substitution_stays_one_argument() -> None:
@@ -140,7 +158,7 @@ def _gate(runs: list[dict] | None, branch: str = "fix/thing", *, code: int = 0, 
             "--status",
             "completed",
             "--limit",
-            "5",
+            "30",
         ]
         assert cmd[-2:] == ["--json", "conclusion,status,updatedAt"]
         return code, payload
@@ -180,6 +198,26 @@ def test_gate_allows_red_then_green() -> None:
     runs = _runs(
         ("completed", "failure", timedelta(hours=2)),
         ("completed", "success", timedelta(hours=1)),
+    )
+    assert _gate(runs) is None
+
+
+def test_gate_ages_the_first_failure_of_the_continuous_red_interval() -> None:
+    runs = _runs(
+        ("completed", "failure", timedelta(minutes=10)),
+        ("completed", "failure", timedelta(minutes=50)),
+        ("completed", "success", timedelta(hours=3)),
+    )
+    refusal = _gate(runs)
+    assert refusal is not None
+    assert "red for 50 minutes" in refusal
+
+
+def test_gate_does_not_look_past_a_success() -> None:
+    runs = _runs(
+        ("completed", "failure", timedelta(minutes=10)),
+        ("completed", "success", timedelta(minutes=20)),
+        ("completed", "failure", timedelta(hours=2)),
     )
     assert _gate(runs) is None
 
