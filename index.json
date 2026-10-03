@@ -921,6 +921,15 @@
       "status": "open",
       "title": "Decision gate G1: run a time-boxed Astro spike and record go/no-go plus custom-vs-Starlight"
     },
+    "astro-site-20-package-scaffold-and-ci": {
+      "claim": null,
+      "needs": [
+        "astro-site-10-spike-and-go-gate"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Scaffold website/ with pinned tooling, make targets, and a non-required site-build CI job"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

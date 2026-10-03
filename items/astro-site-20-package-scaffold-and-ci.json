@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "make site-build produces website/dist locally and in CI",
+    "site-build job green and non-required; ci-required-result unchanged",
+    "comment-policy-check scans website/ (prove with a deliberately failing local sample, not committed)",
+    "npm audit:high clean; lockfile committed; no root package.json unless ADR D10 changed",
+    "visual-inputs classifies website/** as a render input (test in test_path_filter_decision.py)"
+  ],
+  "description": "Create the website/ Astro package using the layout variant chosen at G1:\n- TypeScript strict\n- `astro check` as the typecheck\n- exact package-lock.json\n- Node 20, matching ci.yml setup-node\n- an `audit:high` script mirroring results-explorer\n\nAdd make targets site-build, site-dev and site-check, registered in make/inventory.json.\n\nAdd a ci.yml job `site-build` that runs npm ci, check, build and audit:high. Do not add it to required checks yet. Extend the visual-inputs path classifier for website/.\n\nMake sure comment-policy-check, the dependency audit and the inventory drift checks cover website/.",
+  "links": [
+    ".github/workflows/ci.yml",
+    "make/inventory.json",
+    "quality/comment-policy.json",
+    "results-explorer/package.json"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:01:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "266f0114db12460d9868725c7e469520",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
