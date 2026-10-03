@@ -5,6 +5,7 @@
     "With the adapter binding, each query matches the DuckDB reference on both families at SF 0.1, or the reason is documented",
     "No other query's status changes in the SF 0.1 per-query probe"
   ],
+  "context": "\n\n2026-10-03 independent closeout: #2588 is MERGED at 2026-10-03T17:01:33Z, merge b775dfdda09bce96e3b50ede40bc65cb084a9bd2; all six required CI aggregates passed. Fresh SF 0.1 comparison on merged source: 18 listed-query cells match on Polars and pandas. SQL row counts: {\"32\":1,\"33\":100,\"34\":51,\"35\":100,\"36\":100,\"37\":0,\"38\":1,\"40\":41,\"45\":25}. Vacuous queries: 37. Empty/single-NULL matches are documented scale-specific evidence, not nonempty or official-answer certification. /tmp/dfparity-merged-baseline-sf01.jsonl; /tmp/dfparity-2588-tracker-proof.json. Fresh binding/inventory tests at published head 6a3e1d4289907dc6d5ca9ab8c5d475b9a290f444: 796 passed, eight xfails belong only to the separate hard-coded batch. /tmp/dfparity-merged-2588-binding-proof.log. SQL substitutions and implementation-read keys are checked across two seeds and two streams; stand-in array refusal and repeating alarms retained. Known remaining SF 0.1 divergences are separate Q4/Q9/Q11/Q19/Q46/Q68 follow-ups; these listed queries all match. Broader NULL and gate work stays open.",
   "description": "For each listed query: add an adapter in benchbox/core/tpcds/dataframe_queries/parameter_adapters.py from dsqgen -LOG names to the DataFrame keys (reproduce template arithmetic); make the implementation read the mapped keys with no literal fallback (Q33, Q34 and Q45 currently have literal fallbacks); delete dead YAML keys in default_parameters.yaml; remove the query from BINDING_GAP (and LITERAL_FALLBACK) in tests/unit/core/tpcds/test_parameter_consumption_inventory.py. Follow the t04 pattern. Q32 is one of the six all-NULL empties (see dfparity-n10). queries.py PRs queue one at a time. Effort about 2 days (judgement).",
   "sessions": [
     {
@@ -22,6 +23,14 @@
       "generation": "e3afa217bde2483396d5f58425cbc248",
       "op": "take",
       "op_id": "233f31f516044f4c8a713c2f6e3462da",
+      "session_id": "44c67cd709da49ea99eeabde2893ca2a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07",
+      "at": "2026-10-03T17:54:14Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "9dec68f655624eea991a3321d132f0e0",
       "session_id": "44c67cd709da49ea99eeabde2893ca2a"
     }
   ]
