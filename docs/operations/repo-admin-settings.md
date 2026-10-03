@@ -73,7 +73,7 @@ required check can stay pending forever on a change that does not touch it.
 | `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and in the merge queue the heavy tier: medium tests, correctness gate, plan-capture gate, DataFusion integration; package smoke and dependency audit on packaging changes |
 | `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite, public-site visual comparison |
 | `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
-| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, visual comparison |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, visual comparison |
 | `landing` | `landing/`, quickstart inputs | site theme token scan, visual comparison |
 | `tooling` | every event | soundness review flag; content guard, skill integrity, and audit checks by path; ruleset drift in the merge queue |
 
