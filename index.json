@@ -957,6 +957,16 @@
       "status": "open",
       "title": "Convert the 53 non-API .rst docs pages to MyST Markdown inside the current Sphinx build"
     },
+    "astro-site-31-myst-to-mdx-converter": {
+      "claim": null,
+      "needs": [
+        "astro-site-20-package-scaffold-and-ci",
+        "astro-site-30-rst-to-myst-in-place"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Write a build-time MyST-to-Astro converter that fails closed on unknown constructs"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
