@@ -67,6 +67,7 @@ def load_policy(raw: bytes) -> dict:
         if any(matches(path, entry["path"]) or matches(entry["path"], path) for entry in policy["external"]):
             raise ValueError("completed and external scopes cannot overlap")
     identities = set()
+    expired_identities = set()
     for entry in policy["exceptions"]:
         required = {"path", "symbol", "text", "kind", "consumer", "necessity", "alternative", "owner", "removal"}
         fixture_fields = {"payload", "finding_kind"} if entry.get("kind") == "fixture" else set()
@@ -95,10 +96,11 @@ def load_policy(raw: bytes) -> dict:
                 r"noqa|type: ignore|pragma: no|fmt: (?:off|skip)|disable=|@ts-(?:expect-error|ignore|nocheck)",
                 entry["text"],
             )
-            if (suppression and "expires" not in entry) or (
-                "expires" in entry and date.fromisoformat(entry["expires"]) < date.today()
-            ):
+            if suppression and "expires" not in entry:
                 raise ValueError("directive exception needs an unexpired review date")
+        expired = (
+            entry["kind"] == "directive" and "expires" in entry and date.fromisoformat(entry["expires"]) < date.today()
+        )
         identity = (
             entry["path"],
             entry["symbol"],
@@ -110,7 +112,31 @@ def load_policy(raw: bytes) -> dict:
         if identity in identities:
             raise ValueError("duplicate exception identity")
         identities.add(identity)
+        expired_identities.update({identity} if expired else set())
+    policy["_expired_exception_identities"] = expired_identities
     return policy
+
+
+def expired_policy_findings(policy: dict) -> list[Finding]:
+    expired = policy.get("_expired_exception_identities", set())
+    return [
+        Finding(
+            POLICY_PATH,
+            1,
+            "policy-error",
+            f"expired directive exception: {entry['path']} {entry['text']}",
+        )
+        for entry in policy["exceptions"]
+        if (
+            entry["path"],
+            entry["symbol"],
+            entry["text"],
+            entry["kind"],
+            entry.get("payload", ""),
+            entry.get("finding_kind", "comment"),
+        )
+        in expired
+    ]
 
 
 def check_ratchet(policy: dict, baseline: dict) -> None:
@@ -162,8 +188,17 @@ def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None 
         ):
             return codecs.lookup(cookie.group(1)).name != "utf-8"
     for index, entry in enumerate(policy["exceptions"]):
+        identity = (
+            entry["path"],
+            entry["symbol"],
+            entry["text"],
+            entry["kind"],
+            entry.get("payload", ""),
+            entry.get("finding_kind", "comment"),
+        )
         if (
-            finding.path == entry["path"]
+            identity not in policy.get("_expired_exception_identities", set())
+            and finding.path == entry["path"]
             and finding.symbol == entry["symbol"]
             and text == entry["text"]
             and finding.kind == entry.get("finding_kind", "comment")
@@ -302,7 +337,9 @@ def annotation_text(value: str, *, property_value: bool = False) -> str:
     return value.replace(":", "%3A").replace(",", "%2C") if property_value else value
 
 
-def exit_status(mode: str, baseline_policy: dict, failed: list[Finding]) -> int:
+def exit_status(mode: str, baseline_policy: dict, failed: list[Finding], *, policy_owner_failure: bool = False) -> int:
+    if policy_owner_failure and mode == "transition":
+        return int(bool(failed))
     rejects = bool(failed) and mode != "report"
     if not (rejects and mode == "transition" and baseline_policy.get("enforcement", "blocking") == "advisory"):
         return int(rejects)
@@ -352,6 +389,7 @@ def main(argv: list[str] | None = None) -> int:
             validate_path(scope)
             if not any(matches(path, scope) for path in paths):
                 raise ValueError(f"scope matches no registered source: {scope}")
+        changed: set[str] = set()
         if args.mode == "transition":
             revoked = [e["path"] for e in baseline_policy["exceptions"] if e not in policy["exceptions"]]
             revoked.extend(e["path"] for e in baseline_policy["external"] if e not in policy["external"])
@@ -369,6 +407,9 @@ def main(argv: list[str] | None = None) -> int:
                 for path in paths
                 if path in changed or any(matches(path, scope) for scope in [*policy["completed"], *revoked])
             ]
+        policy_owner_failure = (
+            args.mode == "transition" and POLICY_PATH in changed and bool(expired_policy_findings(policy))
+        )
         if args.path:
             paths = [path for path in paths if any(matches(path, scope) for scope in args.path)]
         sources = {
@@ -385,12 +426,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "transition":
             base_paths = git(root, "ls-tree", "-r", "--name-only", "-z", args.base).decode().split("\0")
             effective_policy["external_members"] = set(base_paths)
-        current = scan_sources(root, sources, effective_policy)
+        current = expired_policy_findings(policy) + scan_sources(root, sources, effective_policy)
         failed = current
         if args.mode == "transition":
             base_sources = {path: git(root, "show", f"{args.base}:{path}") for path in base_paths if path in sources}
-            baseline = scan_sources(root, base_sources, baseline_policy)
+            baseline = expired_policy_findings(baseline_policy) + scan_sources(root, base_sources, baseline_policy)
             failed = introduced(current, baseline, policy["completed"])
+            if POLICY_PATH in changed:
+                failed.extend(finding for finding in expired_policy_findings(policy) if finding not in failed)
         if args.json_out:
             args.json_out.write_text(
                 json.dumps(
@@ -411,7 +454,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"comment-policy: {len(sources)} source files, {len(current)} violations, {len(failed)} enforced failures ({args.mode})"
         )
-        return exit_status(args.mode, baseline_policy, failed)
+        return exit_status(args.mode, baseline_policy, failed, policy_owner_failure=policy_owner_failure)
     except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as exc:
         print(plain_text(f"comment-policy: configuration or parser failure: {exc}"), file=sys.stderr)
         return 2

@@ -15,7 +15,16 @@ import check_comment_policy
 import pytest
 import run_comment_policy as policy_runner
 import yaml
-from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources, source_paths
+from check_comment_policy import (
+    allowed,
+    check_ratchet,
+    expired_policy_findings,
+    introduced,
+    load_policy,
+    main,
+    scan_sources,
+    source_paths,
+)
 from comment_payloads import stdin_language
 from comment_syntax import Finding, javascript_requests, python_findings, scan, sql_comments
 from run_comment_policy import TRUSTED_FILES, parser_environment, resolve_base
@@ -167,9 +176,25 @@ def test_valid_directive_needs_exact_registry_identity() -> None:
     assert not allowed(Finding("a.py", 20, "comment", finding.text, "different"), registered, "")
 
 
-def test_expired_or_explanatory_exception_fails() -> None:
-    with pytest.raises(ValueError):
-        load_policy(json.dumps(policy(exceptions=[exception(expires="2000-01-01")])).encode())
+def test_expired_directive_is_reported_and_does_not_allow_source() -> None:
+    registered = load_policy(json.dumps(policy(exceptions=[exception(expires="2000-01-01")])).encode())
+    finding = Finding("a.py", 1, "comment", "# noqa: F401")
+    policy_findings = expired_policy_findings(registered)
+    assert [finding.kind for finding in policy_findings] == ["policy-error"]
+    assert check_comment_policy.exit_status("strict", registered, policy_findings) == 1
+    assert check_comment_policy.exit_status("report", registered, policy_findings) == 0
+    assert check_comment_policy.exit_status("transition", policy(enforcement="advisory"), policy_findings) == 0
+    assert (
+        check_comment_policy.exit_status(
+            "transition", policy(enforcement="advisory"), policy_findings, policy_owner_failure=True
+        )
+        == 1
+    )
+    assert introduced(policy_findings, policy_findings, []) == []
+    assert not allowed(finding, registered, "# noqa: F401\n")
+
+
+def test_malformed_exception_still_fails_configuration_validation() -> None:
     with pytest.raises(ValueError):
         load_policy(json.dumps(policy(exceptions=[exception(kind="explanation")])).encode())
 
@@ -244,6 +269,60 @@ def test_transition_worktree_and_staged_content(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "add", "a.py"], check=True)
     (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
     assert main([*args, "--staged"]) == 1
+
+
+def test_expired_policy_fails_owner_transition_but_not_inherited_advisory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git_repo(tmp_path, "# noqa: F401\n")
+    advisory_policy = policy(enforcement="advisory")
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(advisory_policy), encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "advisory",
+        ],
+        check=True,
+    )
+    advisory_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    expired = policy(enforcement="advisory", exceptions=[exception(consumer="a.py", expires="2000-01-01")])
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(expired), encoding="utf-8")
+    args = ["--root", str(tmp_path), "--mode", "transition", "--base", advisory_base]
+    assert main(args) == 1
+    assert "quality/comment-policy.json:1: CP policy-error" in capsys.readouterr().out
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "expired",
+        ],
+        check=True,
+    )
+    inherited_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    (tmp_path / "a.py").write_text("# noqa: F401\nx = 1\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", inherited_base]) == 0
+    assert "configuration or parser failure" not in capsys.readouterr().err
 
 
 def test_enforcement_value_is_validated_and_defaults_to_blocking() -> None:
