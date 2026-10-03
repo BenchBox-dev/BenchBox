@@ -1,6 +1,6 @@
 """Ruleset drift coverage: live develop review + v* tag protection.
 
-The develop ``require_code_owner_review`` rule is currently active in GitHub
+The develop ``required_review_thread_resolution`` rule is currently active in GitHub
 (ruleset id 15611785), so a missing rule must be a blocking finding by
 default. The explicit warning-only override remains covered for migration
 fixtures. The v* tag-creation ruleset (id 18774756) is likewise live and
@@ -58,9 +58,7 @@ def _develop_expected():
     ]
 
 
-def _live_develop_ruleset(
-    *, review_count: int = 0, code_owner_review: bool = True, thread_resolution: bool = True
-) -> dict:
+def _live_develop_ruleset(*, review_count: int = 0, thread_resolution: bool = True) -> dict:
     return {
         "name": "develop-squash-only",
         "enforcement": "active",
@@ -71,7 +69,6 @@ def _live_develop_ruleset(
                 "type": "pull_request",
                 "parameters": {
                     "required_approving_review_count": review_count,
-                    "require_code_owner_review": code_owner_review,
                     "required_review_thread_resolution": thread_resolution,
                 },
             },
@@ -101,13 +98,13 @@ def _live_develop_ruleset(
 
 
 def test_missing_develop_review_rule_is_blocking_by_default():
-    live = _live_develop_ruleset(code_owner_review=False)
+    live = _live_develop_ruleset(thread_resolution=False)
 
     findings = compare_ruleset(_develop_expected(), live)
 
     assert findings and blocking_findings(findings) == findings
     assert not any(f.startswith(WARNING_PREFIX) for f in findings)
-    assert any("require_code_owner_review" in finding for finding in findings)
+    assert any("required_review_thread_resolution" in finding for finding in findings)
 
 
 def test_develop_review_rule_passes_when_live_rule_is_present():
@@ -116,7 +113,7 @@ def test_develop_review_rule_passes_when_live_rule_is_present():
 
 def test_develop_review_rule_can_be_warn_only_for_explicit_migration_override():
     findings = compare_ruleset(
-        _develop_expected(), _live_develop_ruleset(code_owner_review=False), enforce_review_rule=False
+        _develop_expected(), _live_develop_ruleset(thread_resolution=False), enforce_review_rule=False
     )
 
     assert findings and all(f.startswith(WARNING_PREFIX) for f in findings)

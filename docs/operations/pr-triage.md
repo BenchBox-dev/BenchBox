@@ -118,9 +118,7 @@ a PR's mergeability — both only alert.
   and never arms (its draft→ready arm point never fired once and was deleted
   — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
   D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
-  label; the evidence transaction also refuses for soundness paths, and
-  `auto-merge-on-open.yml` disarms a soundness-path PR on each push, so arm
-  such a PR with `make pr-arm` after its last push.
+  label; the evidence transaction also refuses for soundness paths.
 
   **Classifier (arm intent):** a PR is stranded only when auto-merge is off
   *and* the issue/PR timeline includes at least one of

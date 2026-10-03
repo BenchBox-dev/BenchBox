@@ -8,11 +8,11 @@
 ## The signal, and what it is not
 
 Soundness-path PRs (see `_project/scripts/auto_merge_soundness_paths.py`'s
-`SOUNDNESS_PREFIXES`, mirrored in `.github/CODEOWNERS`) correctly **never
-auto-merge**. `.github/workflows/auto-merge-on-open.yml` withholds or revokes
-squash auto-merge the moment a PR's diff touches the comparator/parser
-surface, the oracle-adjacent reference data, the `sql_compat` rule-dispatch
-core, or the gate machinery itself. That withholding is intentional — CI
+`SOUNDNESS_PREFIXES`) correctly **never auto-merge**. The readiness
+transaction in `scripts/pr_landing.py` withholds squash auto-merge when a PR's
+diff touches the comparator/parser surface, the oracle-adjacent reference
+data, the `sql_compat` rule-dispatch core, or the gate machinery itself. That
+withholding is intentional — CI
 cannot catch a change that redefines the oracle it validates against, so
 those PRs must be reviewed and merged by hand.
 
@@ -44,8 +44,8 @@ hold:
 - **(b) awaiting the owner** — auto-merge is currently OFF, **and** either
   the diff touches a soundness-critical path (reused via
   `any_soundness_path` imported from `auto_merge_soundness_paths.py` —
-  never re-derived or edited), or the owner (`joeharris76`, per
-  `.github/CODEOWNERS`) is a requested reviewer.
+  never re-derived or edited), or the owner (`joeharris76`) is a requested
+  reviewer.
 - **(c) parked > 24h** — more than 24 hours of park time (see below).
   The gate deliberately does NOT use `updated_at`: the script's own label
   writes and ordinary human comments bump `updated_at`, so an idle-based

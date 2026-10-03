@@ -1,7 +1,7 @@
 # Shared soundness review surface.
 # Format: kind<TAB>pattern. Kinds are prefix, file, glob, or regex.
 # Prefixes end in / and exact paths use file. The glob and regex entries are
-# matching rules, not CODEOWNERS spellings.
+# matching rules.
 regex	^benchbox/core/(?:.+/)?validation\.py$
 glob	results-data/bundles/**/*.override.json
 
@@ -51,10 +51,8 @@ file	.github/workflows/publication-canaries.yml
 file	scripts/publication/verify_lane_isolation.py
 file	_project/scripts/auto_merge_soundness_paths.py
 file	_project/scripts/soundness_paths.py
-file	_project/scripts/check_soundness_review.py
 file	.github/soundness-paths.txt
 file	.github/PULL_REQUEST_TEMPLATE.md
-file	.github/CODEOWNERS
 file	AGENTS.md
 file	.github/workflows/ci.yml
 file	.github/ci-units.yml
