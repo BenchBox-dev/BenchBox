@@ -1,5 +1,3 @@
-"""Tests ensuring pytest profiles are split between local and CI runs."""
-
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -42,8 +40,6 @@ def test_ci_profile_includes_full_instrumentation():
     section = _load_pytest_section("pytest-ci.ini")
     addopts = _tokenize_addopts(section["addopts"])
 
-    # Coverage source and branch rules live in pyproject.toml. Makefile targets
-    # select tests and set their blocking threshold.
     assert "--cov-config=pyproject.toml" in addopts
     assert "--junit-xml=test-results.xml" in section["addopts"]
     assert "no:cov" not in addopts

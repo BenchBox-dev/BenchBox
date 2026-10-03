@@ -1,5 +1,3 @@
-"""A run stops before measuring when a benchmark's query tables were not loaded."""
-
 from types import SimpleNamespace
 
 import pytest
@@ -31,7 +29,7 @@ def test_benchmarks_without_requirements_are_not_checked():
 
 
 def test_public_obt_wrapper_exposes_the_contract():
-    """The guard and orchestration read these from the object the CLI and API run."""
+
     from benchbox.tpcds_obt import TPCDSOBT
 
     assert TPCDSOBT.REQUIRED_LOADED_TABLES == ("tpcds_sales_returns_obt",)

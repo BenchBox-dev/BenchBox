@@ -1,5 +1,3 @@
-"""Tests for scripts/check_windows_antipatterns.py."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,15 +9,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _write(tmp_path: Path, source: str) -> Path:
-    """Write source to a temp .py file and return the path."""
+
     p = tmp_path / "test_source.py"
     p.write_text(source)
     return p
-
-
-# ------------------------------------------------------------------ #
-# WA001 tests                                                          #
-# ------------------------------------------------------------------ #
 
 
 def test_wa001_bare_os_access(tmp_path: Path) -> None:
@@ -52,11 +45,6 @@ def test_wa001_unguarded_else_branch(tmp_path: Path) -> None:
     violations = check_file(_write(tmp_path, src))
     assert len(violations) == 1
     assert violations[0].code == "WA001"
-
-
-# ------------------------------------------------------------------ #
-# WA002 tests                                                          #
-# ------------------------------------------------------------------ #
 
 
 def test_wa002_bare_signal(tmp_path: Path) -> None:
@@ -113,11 +101,6 @@ def test_wa002_all_signal_names(tmp_path: Path) -> None:
         assert violations[0].code == "WA002"
 
 
-# ------------------------------------------------------------------ #
-# WA003 tests                                                          #
-# ------------------------------------------------------------------ #
-
-
 @pytest.mark.parametrize(
     "call",
     [
@@ -154,9 +137,7 @@ def test_wa003_binary_reads_are_unchanged(tmp_path: Path) -> None:
     assert check_file(_write(tmp_path, src)) == []
 
 
-# ------------------------------------------------------------------ #
 # noqa suppression tests                                               #
-# ------------------------------------------------------------------ #
 
 
 def test_noqa_suppresses_wa001(tmp_path: Path) -> None:
@@ -181,11 +162,6 @@ def test_noqa_wrong_code_no_effect(tmp_path: Path) -> None:
 def test_noqa_suppresses_wa003(tmp_path: Path) -> None:
     src = "def read(path):\n    return path.read_text()  # noqa: WA003\n"
     assert check_file(_write(tmp_path, src)) == []
-
-
-# ------------------------------------------------------------------ #
-# Integration: check_tree                                              #
-# ------------------------------------------------------------------ #
 
 
 def test_check_tree_walks_directory(tmp_path: Path) -> None:

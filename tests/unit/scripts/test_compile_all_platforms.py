@@ -1,5 +1,3 @@
-"""Container-engine selection tests for compile-all-platforms.sh."""
-
 from __future__ import annotations
 
 import os

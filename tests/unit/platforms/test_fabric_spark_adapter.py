@@ -1,5 +1,3 @@
-"""Compatibility tests for public Fabric Spark adapter module."""
-
 from __future__ import annotations
 
 import pytest
@@ -14,12 +12,12 @@ pytestmark = [
 
 
 def test_public_fabric_spark_import_is_available():
-    """Fabric Spark adapter is exposed via benchbox.platforms.fabric_spark."""
+
     assert FabricSparkAdapter is not None
 
 
 def test_build_fabric_spark_config_from_env(monkeypatch):
-    """Environment helper maps configured Fabric Spark variables."""
+
     env = {
         "FABRIC_WORKSPACE_ID": "workspace-1",
         "FABRIC_LAKEHOUSE_ID": "lakehouse-1",
@@ -40,7 +38,7 @@ def test_build_fabric_spark_config_from_env(monkeypatch):
 
 
 def test_build_fabric_spark_config_ignores_invalid_timeout(monkeypatch):
-    """Invalid timeout values are ignored instead of raising."""
+
     monkeypatch.setenv("FABRIC_TIMEOUT_MINUTES", "not-an-int")
 
     config = build_fabric_spark_config_from_env()

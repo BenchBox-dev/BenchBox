@@ -1,5 +1,3 @@
-"""Coverage-focused tests for verbosity utilities."""
-
 from __future__ import annotations
 
 import logging

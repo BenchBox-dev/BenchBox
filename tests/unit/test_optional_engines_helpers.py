@@ -1,5 +1,3 @@
-"""Tests for the shared optional-engine usability helpers."""
-
 from __future__ import annotations
 
 import os
@@ -35,9 +33,6 @@ def _patch_import_chdb(monkeypatch: pytest.MonkeyPatch, result: object) -> None:
     monkeypatch.setattr(clickhouse_dependencies, "import_chdb", fake)
 
 
-# --------------------------------------------------------------------------- #
-# chDB                                                                         #
-# --------------------------------------------------------------------------- #
 class ProbeConnection:
     def __init__(self, *, fail_on: str = "", result: str = "1\n", close_error: bool = False):
         self.fail_on = fail_on
@@ -164,9 +159,6 @@ def test_long_reasons_are_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     assert reason.endswith("...")
 
 
-# --------------------------------------------------------------------------- #
-# PySpark                                                                      #
-# --------------------------------------------------------------------------- #
 def _patch_pyspark(monkeypatch: pytest.MonkeyPatch, *, available: bool = True, java_reason: str = "") -> None:
     import benchbox.platforms.pyspark as pyspark_platform
 
@@ -285,7 +277,7 @@ def test_spark_fixture_restores_environment_on_skip_or_failure(monkeypatch, fail
     _patch_pyspark(monkeypatch)
     monkeypatch.delenv("JAVA_HOME", raising=False)
     monkeypatch.delenv("PYSPARK_PYTHON", raising=False)
-    # A previously cached successful probe does not own the later live selection.
+
     assert optional_engines.pyspark_skip_reason() is None
 
     def select_java():

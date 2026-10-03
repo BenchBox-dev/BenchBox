@@ -1,5 +1,3 @@
-"""Tests for the sqlglot repro-retirement upgrade trigger."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -70,7 +68,7 @@ class TestNoUpgradePath:
         monkeypatch.setattr(checker, "merge_base", fake_merge_base)
         monkeypatch.setattr(checker, "locked_sqlglot_version", lambda ref=None: "30.18.0")
         assert checker.main(["--base-ref", "origin/release"]) == 0
-        # A ref that differs from merge_base's default proves --base-ref is forwarded.
+
         assert seen["ref"] == "origin/release"
 
     def test_crash_without_summary_fails_closed(self, monkeypatch, capsys):

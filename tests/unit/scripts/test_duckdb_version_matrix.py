@@ -1,5 +1,3 @@
-"""Unit tests for the operator-run DuckDB version-matrix helpers."""
-
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,5 +1,3 @@
-"""PySpark SQL smoke tests that exercise real SparkSession when available."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,8 +17,6 @@ pytestmark = [
 
 
 class _MiniBenchmark:
-    """Minimal benchmark stub providing schema SQL and table mapping."""
-
     def __init__(self, table_dir: Path):
         self.tables = {"nation": [table_dir / "nation.tbl"]}
 
@@ -38,7 +34,7 @@ def _write_sample_tbl(file_path: Path) -> None:
 
 
 def test_select_one(tmp_path, pyspark_test_environment):
-    """Ensure adapter can execute simple SELECT 1 when Spark is available."""
+
     adapter = PySparkSQLAdapter(master="local[1]", database="pyspark_sql_tests", warehouse_dir=str(tmp_path))
     connection = adapter.create_connection()
 
@@ -49,7 +45,7 @@ def test_select_one(tmp_path, pyspark_test_environment):
 
 
 def test_schema_creation_and_loading(tmp_path, pyspark_test_environment):
-    """Validate schema creation and data loading end-to-end."""
+
     table_dir = tmp_path / "data"
     table_dir.mkdir()
     _write_sample_tbl(table_dir / "nation.tbl")

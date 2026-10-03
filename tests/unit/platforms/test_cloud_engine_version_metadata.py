@@ -1,5 +1,3 @@
-"""Tests for cloud engine-version metadata extraction and schema serialization."""
-
 import pytest
 
 from benchbox.core.results.platform_info import PlatformInfoInput, merge_platform_info
@@ -12,8 +10,6 @@ pytestmark = [
 
 
 class TestEngineVersionMetadataFields:
-    """Verify engine_version fields exist and propagate correctly."""
-
     def test_platform_info_input_has_engine_version_fields(self):
         info = PlatformInfoInput(
             name="Snowflake",
@@ -44,8 +40,6 @@ class TestEngineVersionMetadataFields:
 
 
 class TestCollectEngineVersionMetadata:
-    """Verify _collect_engine_version_metadata extracts from all sources."""
-
     def test_from_direct_result_fields(self):
         class FakeResult:
             engine_version = "8.42.0"
@@ -98,7 +92,6 @@ class TestCollectEngineVersionMetadata:
         assert meta == {}
 
     def test_execution_metadata_takes_precedence_over_platform_info(self):
-        """When direct fields are None, execution_metadata wins over platform_info."""
 
         class FakeResult:
             engine_version = None

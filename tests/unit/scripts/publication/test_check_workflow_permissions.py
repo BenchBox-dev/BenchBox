@@ -1,5 +1,3 @@
-"""Unit tests for workflow permissions audit script."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -216,14 +214,12 @@ def test_repo_publication_recover_passes_audit() -> None:
 def test_publication_recover_permissions_detects_violations(tmp_path: Path) -> None:
     wf = tmp_path / "publication-recover.yml"
 
-    # Top-level not contents: read
     bad_top = {"permissions": {"contents": "write"}, "jobs": {}}
     assert any(
         "Top-level permissions must be 'contents: read'" in e
         for e in checker.check_publication_recover_permissions(wf, bad_top)
     )
 
-    # Scan job escalated
     bad_scan = {
         "permissions": {"contents": "read"},
         "jobs": {
@@ -236,7 +232,6 @@ def test_publication_recover_permissions_detects_violations(tmp_path: Path) -> N
     }
     assert any("job 'scan'" in e for e in checker.check_publication_recover_permissions(wf, bad_scan))
 
-    # Act job wrong environment
     bad_env = {
         "permissions": {"contents": "read"},
         "jobs": {

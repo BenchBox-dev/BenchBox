@@ -1,5 +1,3 @@
-"""Behavioral tests for safe pruning of worktree-less merged branches."""
-
 from __future__ import annotations
 
 import importlib.util

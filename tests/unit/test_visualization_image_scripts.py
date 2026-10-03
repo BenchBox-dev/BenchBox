@@ -1,5 +1,3 @@
-"""Tests for visualization screenshot automation scripts."""
-
 from __future__ import annotations
 
 import sys

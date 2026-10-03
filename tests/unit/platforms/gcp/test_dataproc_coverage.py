@@ -1,5 +1,3 @@
-"""Additional coverage tests for Dataproc adapter."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -93,11 +91,6 @@ def test_apply_tuning_configuration_collects_results() -> None:
     assert result["platform_optimizations"] == {"opt": 1}
 
 
-# ---------------------------------------------------------------------------
-# DataprocJobState constants
-# ---------------------------------------------------------------------------
-
-
 def test_dataproc_job_state_constants_defined() -> None:
     from benchbox.platforms.gcp.dataproc_adapter import DataprocJobState
 
@@ -106,11 +99,6 @@ def test_dataproc_job_state_constants_defined() -> None:
     assert DataprocJobState.DONE == "DONE"
     assert DataprocJobState.ERROR == "ERROR"
     assert DataprocJobState.CANCELLED == "CANCELLED"
-
-
-# ---------------------------------------------------------------------------
-# Cluster config defaults
-# ---------------------------------------------------------------------------
 
 
 def test_adapter_stores_cluster_config_defaults() -> None:
@@ -135,11 +123,6 @@ def test_adapter_custom_cluster_config() -> None:
     assert adapter.region == "us-east1"
 
 
-# ---------------------------------------------------------------------------
-# _upload_to_gcs
-# ---------------------------------------------------------------------------
-
-
 def test_upload_to_gcs_calls_storage_upload() -> None:
     adapter = _adapter()
     mock_storage = MagicMock()
@@ -155,22 +138,12 @@ def test_upload_to_gcs_calls_storage_upload() -> None:
     mock_blob.upload_from_string.assert_called_once_with("spark code here")
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info basic fields
-# ---------------------------------------------------------------------------
-
-
 def test_get_platform_info_basic_fields() -> None:
     adapter = _adapter()
     info = adapter.get_platform_info()
     assert info["platform"] == "dataproc"
     assert info["vendor"] == "Google Cloud"
     assert info["project_id"] == "proj"
-
-
-# ---------------------------------------------------------------------------
-# _retrieve_results: JSON parse from GCS
-# ---------------------------------------------------------------------------
 
 
 def test_retrieve_results_parses_json_lines() -> None:
@@ -188,11 +161,6 @@ def test_retrieve_results_parses_json_lines() -> None:
 
     assert len(results) == 2
     assert results[0]["a"] == 1
-
-
-# ---------------------------------------------------------------------------
-# _create_cluster
-# ---------------------------------------------------------------------------
 
 
 def test_create_cluster_calls_client_and_waits() -> None:
@@ -224,11 +192,6 @@ def test_create_cluster_includes_preemptible_workers() -> None:
     assert "secondary_worker_config" in call_kwargs["cluster"]["config"]
 
 
-# ---------------------------------------------------------------------------
-# _ensure_cluster_exists
-# ---------------------------------------------------------------------------
-
-
 def test_ensure_cluster_exists_running_returns_immediately() -> None:
     adapter = _adapter()
     client = MagicMock()
@@ -236,7 +199,7 @@ def test_ensure_cluster_exists_running_returns_immediately() -> None:
     client.get_cluster.return_value = cluster
 
     with patch.object(adapter, "_get_cluster_client", return_value=client):
-        adapter._ensure_cluster_exists()  # should not raise
+        adapter._ensure_cluster_exists()
 
 
 def test_ensure_cluster_exists_creating_waits_for_running() -> None:
@@ -296,11 +259,6 @@ def test_ensure_cluster_exists_not_found_raises_without_ephemeral() -> None:
         adapter._ensure_cluster_exists()
 
 
-# ---------------------------------------------------------------------------
-# _delete_cluster
-# ---------------------------------------------------------------------------
-
-
 def test_delete_cluster_calls_client() -> None:
     adapter = _adapter()
     adapter._cluster_created_by_us = True
@@ -322,7 +280,7 @@ def test_delete_cluster_logs_warning_on_error() -> None:
     client.delete_cluster.side_effect = RuntimeError("forbidden")
 
     with patch.object(adapter, "_get_cluster_client", return_value=client):
-        adapter._delete_cluster()  # should not raise
+        adapter._delete_cluster()
 
 
 def test_delete_cluster_skips_when_not_created_by_us() -> None:
@@ -336,11 +294,6 @@ def test_delete_cluster_skips_when_not_created_by_us() -> None:
     client.delete_cluster.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
-
-
 def test_create_schema_submits_spark_sql_job() -> None:
     adapter = _adapter()
     with (
@@ -352,11 +305,6 @@ def test_create_schema_submits_spark_sql_job() -> None:
 
     mock_submit.assert_called_once()
     assert "my_db" in mock_submit.call_args[0][0]
-
-
-# ---------------------------------------------------------------------------
-# _submit_spark_sql_job
-# ---------------------------------------------------------------------------
 
 
 def test_submit_spark_sql_job_with_wait() -> None:
@@ -389,11 +337,6 @@ def test_submit_spark_sql_job_without_wait() -> None:
         job_id, state = adapter._submit_spark_sql_job("SELECT 1", wait_for_completion=False)
 
     assert state == "PENDING"
-
-
-# ---------------------------------------------------------------------------
-# load_data
-# ---------------------------------------------------------------------------
 
 
 def test_load_data_skips_when_tables_exist(tmp_path) -> None:
@@ -434,11 +377,6 @@ def test_load_data_raises_on_missing_source_dir() -> None:
         adapter.load_data(_benchmark("lineitem"), None, "/nonexistent/path")
 
 
-# ---------------------------------------------------------------------------
-# execute_query
-# ---------------------------------------------------------------------------
-
-
 def test_execute_query_returns_results() -> None:
     adapter = _adapter()
     with (
@@ -465,20 +403,10 @@ def test_execute_query_raises_on_failed_state() -> None:
     assert "job failed" in result["error"]
 
 
-# ---------------------------------------------------------------------------
-# close with job time logging
-# ---------------------------------------------------------------------------
-
-
 def test_close_logs_total_job_time() -> None:
     adapter = _adapter()
     adapter._total_job_time_seconds = 42.5
-    adapter.close()  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# add_cli_arguments
-# ---------------------------------------------------------------------------
+    adapter.close()
 
 
 def test_add_cli_arguments_registers_options() -> None:
@@ -487,11 +415,6 @@ def test_add_cli_arguments_registers_options() -> None:
     parser.add_argument_group.return_value = group
     DataprocAdapter.add_cli_arguments(parser)
     assert group.add_argument.call_count >= 6
-
-
-# ---------------------------------------------------------------------------
-# from_config
-# ---------------------------------------------------------------------------
 
 
 def test_from_config_generates_cluster_name_when_missing() -> None:
@@ -513,11 +436,6 @@ def test_from_config_uses_provided_cluster_name() -> None:
     }
     adapter = DataprocAdapter.from_config(config)
     assert adapter.cluster_name == "my-cluster"
-
-
-# ---------------------------------------------------------------------------
-# apply_tuning_configuration
-# ---------------------------------------------------------------------------
 
 
 def test_apply_tuning_configuration_sets_scale_factor() -> None:

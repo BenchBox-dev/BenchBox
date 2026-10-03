@@ -1,5 +1,3 @@
-"""Tests for revision/readiness/queue/follow-up landing transactions."""
-
 from __future__ import annotations
 
 import argparse
@@ -29,8 +27,6 @@ OTHER = "b" * 40
 
 
 class FakeRun:
-    """Scripted gh stand-in; records every invocation for hold-safety audits."""
-
     def __init__(self, responses: list[tuple[int, object]]) -> None:
         self.responses = list(responses)
         self.calls: list[list[str]] = []
@@ -998,9 +994,7 @@ def test_followup_new_head_clears_terminal_result_and_final_pr(tmp_path: Path) -
 
 
 def test_live_check_verdicts_uses_get_only_invocation() -> None:
-    # gh api sends POST whenever -F/--field/--paginate flags are present, and
-    # list endpoints answer GET only: a POST 404s, rc != 0, and every landing
-    # arm would refuse. Pin the GET-only shape.
+
     run = FakeRun([(0, _live_checks_payload(HEAD))])
     landing.live_check_verdicts(run, "o/r", HEAD)
     (cmd,) = run.calls
@@ -1513,12 +1507,11 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
     assert "HEAD_SPEC" in open_body and '--head "$$HEAD_SPEC"' in open_body
     assert "Next: make pr-arm once the review fixes are pushed" in open_body
     assert "withheld" not in open_body and "held" not in open_body
-    # READY=1 with no evidence arms through pr-arm for the PR number resolved from the URL, so a fork
-    # checkout never lets pr-arm search by a bare branch name.
+
     evidence_route = open_body.index('elif [ -n "$(EVIDENCE)$(BATCH)" ]')
     plain_route = open_body.index("PR_NUMBER=$$(gh pr view --repo", evidence_route)
     assert 'pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"' in open_body[plain_route:]
-    # Any EVIDENCE or BATCH keeps the evidence transaction (batch validation), never a silent pr-arm.
+
     evidence_branch = open_body[evidence_route:plain_route]
     assert 'pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)"' in evidence_branch
     assert 'EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"' in evidence_branch

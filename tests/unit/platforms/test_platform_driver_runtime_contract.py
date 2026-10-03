@@ -16,10 +16,6 @@ pytestmark = [
 ]
 
 
-# --------------------------------------------------------------------------- #
-# Shared helpers to reduce monkeypatch duplication
-# --------------------------------------------------------------------------- #
-
 _DUMMY_PLATFORM_INFO = SimpleNamespace(
     installation_command="uv add dummy-driver",
     driver_package="dummy-driver",
@@ -32,7 +28,6 @@ def _make_resolution_factory(
     runtime_path: str | None = "/tmp/dummy-runtime",
     resolved_version: str = "1.0.0",
 ):
-    """Return a mock ensure_driver_version callable with the given strategy."""
 
     def _resolve(package_name, requested_version, auto_install=False, install_hint=None):
         return DriverResolution(
@@ -50,7 +45,7 @@ def _make_resolution_factory(
 
 
 def _mock_sql_registry(monkeypatch, adapter_cls, *, runtime_strategy="isolated-site-packages"):
-    """Apply the standard SQL adapter registry mocks."""
+
     monkeypatch.setattr("benchbox.platforms.PlatformRegistry.resolve_platform_name", lambda _: "dummy")
     monkeypatch.setattr("benchbox.platforms.PlatformRegistry.get_adapter_class", lambda _: adapter_cls)
     monkeypatch.setattr("benchbox.platforms.PlatformRegistry.get_platform_info", lambda _: _DUMMY_PLATFORM_INFO)
@@ -63,11 +58,6 @@ def _mock_sql_registry(monkeypatch, adapter_cls, *, runtime_strategy="isolated-s
     )
 
 
-# --------------------------------------------------------------------------- #
-# Tests
-# --------------------------------------------------------------------------- #
-
-
 def test_ensure_driver_version_rejects_requested_version_without_package():
     with pytest.raises(RuntimeError, match="does not declare a driver package"):
         ensure_driver_version(
@@ -78,8 +68,7 @@ def test_ensure_driver_version_rejects_requested_version_without_package():
 
 
 def test_dataframe_adapter_rejects_requested_version_for_non_package_platform():
-    # pandas-df has driver_package=None - version pinning should be rejected with a clear error.
-    # (polars-df previously had driver_package=None but now has driver_package="polars".)
+
     with pytest.raises(RuntimeError, match="does not declare a driver package"):
         get_adapter(
             "pandas-df",
@@ -146,7 +135,7 @@ def test_sql_adapter_contract_does_not_infer_requested_version(monkeypatch):
 
 
 def _mock_dataframe_registry(monkeypatch, adapter_cls, *, runtime_strategy="current-process", resolved_version="2.0.0"):
-    """Apply the standard DataFrame adapter registry mocks."""
+
     monkeypatch.setattr(
         "benchbox.platforms.adapter_factory.PlatformRegistry.get_platform_info",
         lambda _: _DUMMY_PLATFORM_INFO,
@@ -186,12 +175,7 @@ def test_dataframe_adapter_contract_rejects_isolated_runtime_without_binding_sup
         _get_dataframe_adapter("datafusion", driver_version="2.0.0")
 
 
-# --- w15: Capability declaration tests ---
-
-
 class TestDriverIsolationCapabilityDeclarations:
-    """Verify all platform adapters declare explicit driver_isolation_capability."""
-
     def test_duckdb_declares_supported(self):
         from benchbox.platforms.duckdb import DuckDBAdapter
 
@@ -239,8 +223,6 @@ class TestDriverIsolationCapabilityDeclarations:
 
 
 class TestCheckIsolationCapability:
-    """Verify check_isolation_capability produces capability-specific error messages."""
-
     def test_supported_does_not_raise(self):
         class Adapter:
             driver_isolation_capability = DriverIsolationCapability.SUPPORTED
@@ -272,5 +254,4 @@ class TestCheckIsolationCapability:
         class Adapter:
             driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-        # Should not raise for non-isolation strategy
         check_isolation_capability(Adapter, "test", "current-process")

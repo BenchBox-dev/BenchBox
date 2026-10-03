@@ -1,5 +1,3 @@
-"""Tests for cloud sorted-ingestion strategy selection and dry-run behavior."""
-
 from __future__ import annotations
 
 import logging

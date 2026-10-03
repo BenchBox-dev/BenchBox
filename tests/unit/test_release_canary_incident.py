@@ -1,5 +1,3 @@
-"""Tests for turning a release-canary run into an owned incident update."""
-
 from __future__ import annotations
 
 import json

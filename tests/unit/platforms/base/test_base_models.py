@@ -1,5 +1,3 @@
-"""Tests for benchmark platform base models."""
-
 from __future__ import annotations
 
 import pytest

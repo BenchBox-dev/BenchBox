@@ -1,5 +1,3 @@
-"""Tests for centralized timing helpers."""
-
 from __future__ import annotations
 
 from datetime import timezone

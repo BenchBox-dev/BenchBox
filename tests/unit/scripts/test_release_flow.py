@@ -1,5 +1,3 @@
-"""Tests for the tag-on-develop release preparation and pre-tag check."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -59,7 +57,7 @@ LANDING = """<a
 
 
 def write_tree(root: Path, version: str = VERSION) -> Path:
-    """Write the minimum tree the version, changelog, and lock checks read."""
+
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     for name in ("update_version.py", "generate_changelog_entry.py", "release_flow.py"):
         shutil.copy(SCRIPTS / name, root / "scripts" / name)
@@ -344,12 +342,12 @@ def git(cwd: Path, *args: str) -> None:
 def test_prep_updates_every_marker_and_drafts_the_changelog(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str
 ) -> None:
-    """A fixture release, never a real one: prep yields exactly the files check reads."""
+
     monkeypatch.setenv("BENCHBOX_CHANGELOG_SUMMARIZE", "0")
     monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
     root = write_tree(tmp_path, "1.2.2")
     (root / "CHANGELOG.md").write_text(CHANGELOG.split("## [1.2.3]")[0] + "## [1.2.2] - 2025-12-01\n", encoding="utf-8")
-    # Offline-resolvable lock: the fixture project has no dependencies.
+
     subprocess.run(["uv", "lock", "--offline"], cwd=root, check=True, capture_output=True)
     git(root, "init", "-q")
     git(root, "add", "--all")

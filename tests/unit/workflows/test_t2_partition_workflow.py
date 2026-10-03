@@ -1,5 +1,3 @@
-"""Pin full tier selection, gate conservation, and raw binary framing placement."""
-
 from __future__ import annotations
 
 from collections import Counter

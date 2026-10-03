@@ -1,5 +1,3 @@
-"""Unit tests for publication control-plane checker."""
-
 from __future__ import annotations
 
 import json
@@ -28,7 +26,7 @@ def test_check_codeowners_missing_patterns(monkeypatch: pytest.MonkeyPatch, tmp_
     codeowners = tmp_path / "CODEOWNERS"
     codeowners.write_text("# incomplete\n*.py @dev\n", encoding="utf-8")
     monkeypatch.setattr(control_mod, "ROOT", tmp_path.parent)
-    # mock .github directory
+
     gh_dir = tmp_path.parent / ".github"
     gh_dir.mkdir(parents=True, exist_ok=True)
     (gh_dir / "CODEOWNERS").write_text("# incomplete\n*.py @dev\n", encoding="utf-8")
@@ -39,22 +37,20 @@ def test_check_codeowners_missing_patterns(monkeypatch: pytest.MonkeyPatch, tmp_
 
 
 def test_check_permissions_journal_role() -> None:
-    # Journal role requires ONLY contents write
+
     journal_perms = {"contents": "write"}
     assert control_mod.check_permissions(journal_perms, role="journal") == []
 
-    # Missing contents fails
     assert len(control_mod.check_permissions({}, role="journal")) == 1
     assert control_mod.check_permissions({"contents": "read"}, role="journal")
     assert control_mod.check_permissions({"contents": "write", "workflows": "write"}, role="journal")
 
 
 def test_check_permissions_legacy_app_role() -> None:
-    # Legacy app role requires contents, pull_requests, and workflows
+
     full_perms = {"contents": "write", "pull_requests": "write", "workflows": "write"}
     assert control_mod.check_permissions(full_perms, role="legacy_app") == []
 
-    # Journal-only perms fail legacy_app check
     journal_perms = {"contents": "write"}
     errors = control_mod.check_permissions(journal_perms, role="legacy_app")
     assert len(errors) == 2

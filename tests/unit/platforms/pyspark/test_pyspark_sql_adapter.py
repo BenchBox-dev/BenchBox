@@ -1,5 +1,3 @@
-"""Unit tests for PySparkSQLAdapter using mocked SparkSessionManager."""
-
 from __future__ import annotations
 
 import sys
@@ -8,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Check if pyspark is available before importing
 try:
     import pyspark  # noqa: F401
 
@@ -16,7 +13,7 @@ try:
 except ImportError:
     PYSPARK_AVAILABLE = False
 
-# Skip entire module if pyspark not installed
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -34,7 +31,7 @@ else:
 
 @pytest.fixture
 def mock_pyspark_env(monkeypatch: pytest.MonkeyPatch):
-    """Mock pyspark so PySparkSQLAdapter can be instantiated without Java."""
+
     mock_session = MagicMock()
     mock_session.catalog.listDatabases.return_value = []
     mock_session.sql.return_value = MagicMock()
@@ -60,7 +57,7 @@ def mock_pyspark_env(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_platform_name(mock_pyspark_env) -> None:
-    """Ensure platform name is distinct for SQL mode."""
+
     adapter = PySparkSQLAdapter(master="local[2]", database="benchbox_sql")
 
     assert adapter.platform_name == "PySpark SQL"
@@ -68,7 +65,7 @@ def test_platform_name(mock_pyspark_env) -> None:
 
 
 def test_create_connection_uses_session_manager(monkeypatch: pytest.MonkeyPatch, mock_pyspark_env) -> None:
-    """Validate that create_connection obtains SparkSession from manager."""
+
     captured_calls: list[dict] = []
 
     def fake_get_or_create(cls, **kwargs):
@@ -92,7 +89,6 @@ def test_create_connection_uses_session_manager(monkeypatch: pytest.MonkeyPatch,
     assert first_call["app_name"] == adapter.app_name
     assert first_call["shuffle_partitions"] == adapter.shuffle_partitions
 
-    # Ensure warehouse path is propagated when provided
     adapter_with_dir = PySparkSQLAdapter(master="local[2]", database="benchbox_sql", warehouse_dir=str(Path("/tmp")))
     adapter_with_dir.create_connection()
     second_call = captured_calls[1]
@@ -103,7 +99,7 @@ def test_create_connection_uses_session_manager(monkeypatch: pytest.MonkeyPatch,
 
 
 def test_close_clears_reference(monkeypatch: pytest.MonkeyPatch, mock_pyspark_env) -> None:
-    """Verify close() releases the session manager reference."""
+
     released = {"value": False}
 
     monkeypatch.setattr(
