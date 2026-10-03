@@ -4,6 +4,7 @@
     "The PR has a passing Soundness review section",
     "t19 notes that these entries are interim"
   ],
+  "context": "2026-10-03 state: #2544 (fix/tpcds-classify-all-null-empties, BenchBox.wt-tpcds-n10) is OPEN, merges cleanly, but its latest required CI run on the head was CANCELLED, so it is not green. It needs a fresh run and a maintainer merge (soundness path). Owner decision pending: t20 moves the gate to about SF 0.1 and t19 regenerates the empty list at that scale, so these SF 0.01 entries are short-lived. Options: land as the approved interim exception, or close #2544 and drop this item in favour of t19. The soundness merge procedure is changing (#2551, #2556, draft #2567); the 'Soundness review section' acceptance line may be replaced by the review-thread or oracle-review signal.",
   "description": "Since #2396 stopped counting a scalar aggregate that collapses to one all-NULL row as coverage, the staged TPC-DS gate at SF 0.01 fails closed on Q13, Q23, Q32, Q61, Q90 and Q92, which are not in _TPCDS_LEGITIMATELY_EMPTY. Owner decision (2026-10-02): classify them now with a rationale each. This edits soundness paths, so it needs external review and a maintainer merge. t19 re-baselines the list later with scale-scoped criteria and answer-set evidence, so this is a deliberate interim exception.",
   "sessions": [
     {
@@ -13,6 +14,14 @@
       "op": "create",
       "op_id": "950c9169ff3b478394e6ce82911e50cc",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:57:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "39b987f517b247b099e0d8428cf7f72d",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
