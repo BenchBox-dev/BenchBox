@@ -1,0 +1,1928 @@
+{
+  "benchmark": {
+    "id": "metadata_primitives",
+    "name": "Metadata Primitives",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "saved_config",
+      "default_output_location": "saved_config",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "location": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "project_id": "project_6ab0d019ccae",
+      "show_query_plans": "saved_config",
+      "staging_root": "path_d969e086da79",
+      "status": "saved_config",
+      "storage_bucket": "bucket_aa4b9df65128",
+      "storage_prefix": "prefix_5c53d7013283",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "dataset_85fd478089fd",
+      "default_output_location": "path_399fe063fc9e",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T18:56:25.263788",
+      "location": "US",
+      "normalize_plan_literals": false,
+      "project_id": "project_9d60772868dd",
+      "show_query_plans": false,
+      "staging_root": "path_399fe063fc9e",
+      "status": "valid",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "",
+      "tuning_source": "baseline"
+    }
+  },
+  "cost": {
+    "model": "actual",
+    "total_usd": 0.011205673217773438
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 420.354,
+        "min": 338.702,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "serverless",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "google-cloud-bigquery",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "3.45.1",
+    "driver_version_resolved": "3.45.1",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "timestamp": "2026-09-29T20:39:20.313801",
+    "translation": {
+      "attempt_count": 1,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "bigquery",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "bigquery",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 1,
+      "target_dialects": [
+        "bigquery"
+      ],
+      "total_transpilation_calls": 1,
+      "translators": [
+        "sqlglot"
+      ]
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-09-29T20:44:56.128872",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "tib_scanned",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "normalized",
+    "cost_usd": "0.011205673217773438",
+    "deployment": {
+      "cloud_provider": "gcp",
+      "cloud_region": "US",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0.011205673217773438",
+    "pricing_region": "US"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 0,
+      "status": "SKIPPED"
+    },
+    "power_test": {
+      "duration_ms": 279572,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 8626,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 372,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "3.45.1",
+    "cloud": {
+      "collection_status": "partial",
+      "location": "US",
+      "project": "project_9d60772868dd",
+      "provider": "gcp",
+      "source": "observed"
+    },
+    "compute": {
+      "cache_enabled": false,
+      "collection_status": "available",
+      "dataset_metadata_collection_status": "available",
+      "edition": "ON_DEMAND",
+      "job_priority": "INTERACTIVE",
+      "pricing_model": "on-demand",
+      "source": "observed"
+    },
+    "config": {
+      "cloud_provider": "GCP",
+      "connection_mode": "remote",
+      "dataset_id": "dataset_5405e8eca0a1",
+      "driver_package": "google-cloud-bigquery",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "3.45.1",
+      "driver_version_resolved": "3.45.1",
+      "execution_mode": "sql",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "dataset": "dataset_5405e8eca0a1",
+      "deployment_type": "serverless",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "requested"
+    },
+    "driver_actual_version": "3.45.1",
+    "driver_package": "google-cloud-bigquery",
+    "driver_resolved_version": "3.45.1",
+    "driver_runtime_strategy": "current-process",
+    "name": "BigQuery",
+    "raw_config": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "dataset_5405e8eca0a1",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e",
+      "tuning_source": "baseline",
+      "type": "bigquery"
+    },
+    "raw_metadata": {
+      "cloud_provider": "GCP",
+      "compute_configuration": {
+        "dataset_created": "2026-09-30T00:39:51.064000+00:00",
+        "dataset_location": "US",
+        "dataset_metadata_collection_status": "available",
+        "dataset_modified": "2026-09-30T00:39:51.064000+00:00",
+        "edition": "ON_DEMAND",
+        "pricing_model": "on-demand"
+      }
+    },
+    "storage": {
+      "bucket": "bucket_71a5e582935b",
+      "collection_status": "partial",
+      "prefix": "prefix_60098b0cc37e",
+      "source": "requested",
+      "staging_location": "path_399fe063fc9e"
+    },
+    "version": "unknown"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "schema_list_schemata",
+      "iter": 0,
+      "ms": 921.6,
+      "rows": 40,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_list_tables",
+      "iter": 0,
+      "ms": 1231.3,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_list_tables_filtered",
+      "iter": 0,
+      "ms": 1021.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_table_count",
+      "iter": 0,
+      "ms": 1011.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_list_views",
+      "iter": 0,
+      "ms": 749.3,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_object_types",
+      "iter": 0,
+      "ms": 1020.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_search_tables",
+      "iter": 0,
+      "ms": 841.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_tables_by_schema",
+      "iter": 0,
+      "ms": 842.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_recent_tables",
+      "iter": 0,
+      "ms": 839.2,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_list_all",
+      "iter": 0,
+      "ms": 1190.3,
+      "rows": 61,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_for_table",
+      "iter": 0,
+      "ms": 1491.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_count_by_table",
+      "iter": 0,
+      "ms": 873.1,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_data_types",
+      "iter": 0,
+      "ms": 808.4,
+      "rows": 16,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_nullable_analysis",
+      "iter": 0,
+      "ms": 936.4,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_search_by_name",
+      "iter": 0,
+      "ms": 1297.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_numeric_columns",
+      "iter": 0,
+      "ms": 808.1,
+      "rows": 28,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "column_string_columns",
+      "iter": 0,
+      "ms": 772.6,
+      "rows": 29,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_row_counts",
+      "iter": 0,
+      "ms": 1183.6,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_table_sizes",
+      "iter": 0,
+      "ms": 862.7,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_column_count_summary",
+      "iter": 0,
+      "ms": 1094.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_schema_summary",
+      "iter": 0,
+      "ms": 1211.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_data_type_summary",
+      "iter": 0,
+      "ms": 1006.1,
+      "rows": 16,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "stats_largest_tables",
+      "iter": 0,
+      "ms": 990.5,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "explain_simple",
+      "iter": 0,
+      "ms": 734.4,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "explain_join",
+      "iter": 0,
+      "ms": 1492.0,
+      "rows": 61,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "explain_aggregate",
+      "iter": 0,
+      "ms": 989.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "wide_table_column_list",
+      "iter": 0,
+      "ms": 959.8,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "wide_table_column_count",
+      "iter": 0,
+      "ms": 816.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "wide_table_type_distribution",
+      "iter": 0,
+      "ms": 1088.5,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "wide_table_nullable_analysis",
+      "iter": 0,
+      "ms": 1001.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "wide_table_column_search",
+      "iter": 0,
+      "ms": 833.3,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "view_hierarchy_list",
+      "iter": 0,
+      "ms": 947.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "view_hierarchy_depth_analysis",
+      "iter": 0,
+      "ms": 951.5,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "view_hierarchy_column_introspection",
+      "iter": 0,
+      "ms": 1637.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "view_hierarchy_definition_search",
+      "iter": 0,
+      "ms": 1045.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "complex_type_column_list",
+      "iter": 0,
+      "ms": 1061.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "complex_type_array_columns",
+      "iter": 0,
+      "ms": 818.1,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "complex_type_struct_columns",
+      "iter": 0,
+      "ms": 1150.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "complex_type_distribution",
+      "iter": 0,
+      "ms": 898.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_table_list",
+      "iter": 0,
+      "ms": 1656.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_table_count",
+      "iter": 0,
+      "ms": 1127.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_column_count",
+      "iter": 0,
+      "ms": 1324.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_pattern_search",
+      "iter": 0,
+      "ms": 819.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_schema_summary",
+      "iter": 0,
+      "ms": 1310.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "large_catalog_column_type_analysis",
+      "iter": 0,
+      "ms": 865.9,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "schema_list_schemata",
+      "iter": 1,
+      "ms": 844.1,
+      "rows": 40,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_list_tables",
+      "iter": 1,
+      "ms": 870.9,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_list_tables_filtered",
+      "iter": 1,
+      "ms": 959.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_table_count",
+      "iter": 1,
+      "ms": 882.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_list_views",
+      "iter": 1,
+      "ms": 840.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_object_types",
+      "iter": 1,
+      "ms": 1016.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_search_tables",
+      "iter": 1,
+      "ms": 809.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_tables_by_schema",
+      "iter": 1,
+      "ms": 1237.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_recent_tables",
+      "iter": 1,
+      "ms": 945.3,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_list_all",
+      "iter": 1,
+      "ms": 995.6,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_for_table",
+      "iter": 1,
+      "ms": 849.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_count_by_table",
+      "iter": 1,
+      "ms": 890.8,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_data_types",
+      "iter": 1,
+      "ms": 770.6,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_nullable_analysis",
+      "iter": 1,
+      "ms": 972.8,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_search_by_name",
+      "iter": 1,
+      "ms": 774.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_numeric_columns",
+      "iter": 1,
+      "ms": 878.2,
+      "rows": 28,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "column_string_columns",
+      "iter": 1,
+      "ms": 926.4,
+      "rows": 29,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_row_counts",
+      "iter": 1,
+      "ms": 1035.8,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_table_sizes",
+      "iter": 1,
+      "ms": 1913.6,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_column_count_summary",
+      "iter": 1,
+      "ms": 1138.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_schema_summary",
+      "iter": 1,
+      "ms": 1131.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_data_type_summary",
+      "iter": 1,
+      "ms": 887.9,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "stats_largest_tables",
+      "iter": 1,
+      "ms": 95464.0,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "explain_simple",
+      "iter": 1,
+      "ms": 1151.1,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "explain_join",
+      "iter": 1,
+      "ms": 2586.2,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "explain_aggregate",
+      "iter": 1,
+      "ms": 1007.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "wide_table_column_list",
+      "iter": 1,
+      "ms": 983.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "wide_table_column_count",
+      "iter": 1,
+      "ms": 852.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "wide_table_type_distribution",
+      "iter": 1,
+      "ms": 1155.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "wide_table_nullable_analysis",
+      "iter": 1,
+      "ms": 1154.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "wide_table_column_search",
+      "iter": 1,
+      "ms": 901.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "view_hierarchy_list",
+      "iter": 1,
+      "ms": 1059.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "view_hierarchy_depth_analysis",
+      "iter": 1,
+      "ms": 886.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "view_hierarchy_column_introspection",
+      "iter": 1,
+      "ms": 1000.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "view_hierarchy_definition_search",
+      "iter": 1,
+      "ms": 1576.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "complex_type_column_list",
+      "iter": 1,
+      "ms": 2392.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "complex_type_array_columns",
+      "iter": 1,
+      "ms": 1120.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "complex_type_struct_columns",
+      "iter": 1,
+      "ms": 870.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "complex_type_distribution",
+      "iter": 1,
+      "ms": 1097.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_table_list",
+      "iter": 1,
+      "ms": 754.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_table_count",
+      "iter": 1,
+      "ms": 787.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_column_count",
+      "iter": 1,
+      "ms": 1136.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_pattern_search",
+      "iter": 1,
+      "ms": 1022.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_schema_summary",
+      "iter": 1,
+      "ms": 1631.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "large_catalog_column_type_analysis",
+      "iter": 1,
+      "ms": 1005.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "schema_list_schemata",
+      "iter": 2,
+      "ms": 762.7,
+      "rows": 40,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_list_tables",
+      "iter": 2,
+      "ms": 970.7,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_list_tables_filtered",
+      "iter": 2,
+      "ms": 922.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_table_count",
+      "iter": 2,
+      "ms": 911.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_list_views",
+      "iter": 2,
+      "ms": 1396.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_object_types",
+      "iter": 2,
+      "ms": 763.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_search_tables",
+      "iter": 2,
+      "ms": 1020.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_tables_by_schema",
+      "iter": 2,
+      "ms": 1022.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_recent_tables",
+      "iter": 2,
+      "ms": 732.1,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_list_all",
+      "iter": 2,
+      "ms": 898.3,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_for_table",
+      "iter": 2,
+      "ms": 730.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_count_by_table",
+      "iter": 2,
+      "ms": 792.3,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_data_types",
+      "iter": 2,
+      "ms": 866.6,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_nullable_analysis",
+      "iter": 2,
+      "ms": 778.8,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_search_by_name",
+      "iter": 2,
+      "ms": 928.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_numeric_columns",
+      "iter": 2,
+      "ms": 855.6,
+      "rows": 28,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "column_string_columns",
+      "iter": 2,
+      "ms": 688.6,
+      "rows": 29,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_row_counts",
+      "iter": 2,
+      "ms": 925.3,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_table_sizes",
+      "iter": 2,
+      "ms": 841.3,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_column_count_summary",
+      "iter": 2,
+      "ms": 1176.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_schema_summary",
+      "iter": 2,
+      "ms": 1523.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_data_type_summary",
+      "iter": 2,
+      "ms": 1181.4,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "stats_largest_tables",
+      "iter": 2,
+      "ms": 790.2,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "explain_simple",
+      "iter": 2,
+      "ms": 681.9,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "explain_join",
+      "iter": 2,
+      "ms": 997.2,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "explain_aggregate",
+      "iter": 2,
+      "ms": 3409.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "wide_table_column_list",
+      "iter": 2,
+      "ms": 945.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "wide_table_column_count",
+      "iter": 2,
+      "ms": 786.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "wide_table_type_distribution",
+      "iter": 2,
+      "ms": 1475.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "wide_table_nullable_analysis",
+      "iter": 2,
+      "ms": 739.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "wide_table_column_search",
+      "iter": 2,
+      "ms": 804.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "view_hierarchy_list",
+      "iter": 2,
+      "ms": 987.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "view_hierarchy_depth_analysis",
+      "iter": 2,
+      "ms": 1047.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "view_hierarchy_column_introspection",
+      "iter": 2,
+      "ms": 1105.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "view_hierarchy_definition_search",
+      "iter": 2,
+      "ms": 974.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "complex_type_column_list",
+      "iter": 2,
+      "ms": 828.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "complex_type_array_columns",
+      "iter": 2,
+      "ms": 677.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "complex_type_struct_columns",
+      "iter": 2,
+      "ms": 1148.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "complex_type_distribution",
+      "iter": 2,
+      "ms": 1098.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_table_list",
+      "iter": 2,
+      "ms": 949.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_table_count",
+      "iter": 2,
+      "ms": 1368.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_column_count",
+      "iter": 2,
+      "ms": 1263.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_pattern_search",
+      "iter": 2,
+      "ms": 993.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_schema_summary",
+      "iter": 2,
+      "ms": 1759.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "large_catalog_column_type_analysis",
+      "iter": 2,
+      "ms": 1194.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "schema_list_schemata",
+      "iter": 3,
+      "ms": 666.5,
+      "rows": 40,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_list_tables",
+      "iter": 3,
+      "ms": 838.1,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_list_tables_filtered",
+      "iter": 3,
+      "ms": 988.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_table_count",
+      "iter": 3,
+      "ms": 1008.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_list_views",
+      "iter": 3,
+      "ms": 690.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_object_types",
+      "iter": 3,
+      "ms": 863.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_search_tables",
+      "iter": 3,
+      "ms": 880.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_tables_by_schema",
+      "iter": 3,
+      "ms": 964.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "schema_recent_tables",
+      "iter": 3,
+      "ms": 826.1,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_list_all",
+      "iter": 3,
+      "ms": 1031.4,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_for_table",
+      "iter": 3,
+      "ms": 741.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_count_by_table",
+      "iter": 3,
+      "ms": 853.0,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_data_types",
+      "iter": 3,
+      "ms": 971.5,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_nullable_analysis",
+      "iter": 3,
+      "ms": 1285.2,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_search_by_name",
+      "iter": 3,
+      "ms": 816.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_numeric_columns",
+      "iter": 3,
+      "ms": 934.7,
+      "rows": 28,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "column_string_columns",
+      "iter": 3,
+      "ms": 763.7,
+      "rows": 29,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_row_counts",
+      "iter": 3,
+      "ms": 1133.6,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_table_sizes",
+      "iter": 3,
+      "ms": 992.7,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_column_count_summary",
+      "iter": 3,
+      "ms": 916.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_schema_summary",
+      "iter": 3,
+      "ms": 758.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_data_type_summary",
+      "iter": 3,
+      "ms": 948.2,
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "stats_largest_tables",
+      "iter": 3,
+      "ms": 1331.5,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "explain_simple",
+      "iter": 3,
+      "ms": 773.8,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "explain_join",
+      "iter": 3,
+      "ms": 836.2,
+      "rows": 61,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "explain_aggregate",
+      "iter": 3,
+      "ms": 951.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "wide_table_column_list",
+      "iter": 3,
+      "ms": 961.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "wide_table_column_count",
+      "iter": 3,
+      "ms": 1123.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "wide_table_type_distribution",
+      "iter": 3,
+      "ms": 1026.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "wide_table_nullable_analysis",
+      "iter": 3,
+      "ms": 1536.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "wide_table_column_search",
+      "iter": 3,
+      "ms": 887.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "view_hierarchy_list",
+      "iter": 3,
+      "ms": 834.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "view_hierarchy_depth_analysis",
+      "iter": 3,
+      "ms": 814.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "view_hierarchy_column_introspection",
+      "iter": 3,
+      "ms": 1544.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "view_hierarchy_definition_search",
+      "iter": 3,
+      "ms": 761.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "complex_type_column_list",
+      "iter": 3,
+      "ms": 702.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "complex_type_array_columns",
+      "iter": 3,
+      "ms": 1623.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "complex_type_struct_columns",
+      "iter": 3,
+      "ms": 720.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "complex_type_distribution",
+      "iter": 3,
+      "ms": 1375.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_table_list",
+      "iter": 3,
+      "ms": 779.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_table_count",
+      "iter": 3,
+      "ms": 800.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_column_count",
+      "iter": 3,
+      "ms": 1147.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_pattern_search",
+      "iter": 3,
+      "ms": 714.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_schema_summary",
+      "iter": 3,
+      "ms": 1204.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "large_catalog_column_type_analysis",
+      "iter": 3,
+      "ms": 826.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "e435b418",
+    "iterations": 3,
+    "query_time_ms": 233039,
+    "streams": 4,
+    "timestamp": "2026-09-29T20:44:56.111762",
+    "total_duration_ms": 331376
+  },
+  "summary": {
+    "cost": {
+      "total_bytes_billed": 1971322880,
+      "total_bytes_scanned": 1971322880
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 135,
+      "total": 135
+    },
+    "timing": {
+      "avg_ms": 1726.2,
+      "geometric_mean_ms": 1018.7,
+      "max_ms": 95464.0,
+      "min_ms": 666.5,
+      "p90_ms": 1396.4,
+      "p95_ms": 1631.6,
+      "p99_ms": 3409.9,
+      "stdev_ms": 8135.9,
+      "total_ms": 233039.5
+    },
+    "validation": "passed"
+  },
+  "version": "2.2"
+}

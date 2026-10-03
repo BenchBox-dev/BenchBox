@@ -38,6 +38,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
+        "_project/scripts/oracle_review_check.py",
+        ".github/workflows/oracle-review.yml",
         # Publication privacy: the anonymizer decides every published byte and
         # the public pseudonym identity. Both failure modes are silent, and
         # PR #1512 auto-merged a change to all of them before this widening.
