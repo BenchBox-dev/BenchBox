@@ -22,6 +22,7 @@ CANONICAL_REVIEW_SKILL = ".claude/skills/shared-review-protocol/SKILL.md"
 CANONICAL_COMMIT_SKILL = ".claude/skills/shared-change-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
+    "COMMENT-POLICY-001",
     "COMMIT-IDENTITY-001",
     "DURABLE-ARTIFACTS-001",
     "EVIDENCE-FRESHNESS-001",
@@ -123,6 +124,14 @@ AGENT_WRITE_ANCHORS = {
         "explicitly forbids publication",
         "authorizes only a local commit",
         "gate fails",
+    )
+}
+AGENT_COMMENT_POLICY_ANCHORS = {
+    "COMMENT-POLICY-001": (
+        "docs/development/comment-policy.md",
+        "no explanatory comments or docstrings",
+        "make comment-policy-check",
+        "resolve every finding while enforcement is advisory",
     )
 }
 # Agent-facing text must not tell an agent or operator to stop and hand a finished PR back to a
@@ -371,6 +380,13 @@ def audit_commit_policy(project: Path) -> list[str]:
         missing_anchors = _missing_anchors(section, anchors)
         if not section:
             errors.append(f"AGENTS.md write policy misses policy ID: {policy_id}")
+        elif missing_anchors:
+            errors.append(f"AGENTS.md {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    for policy_id, anchors in AGENT_COMMENT_POLICY_ANCHORS.items():
+        section = _policy_section(agents, policy_id)
+        missing_anchors = _missing_anchors(section, anchors)
+        if not section:
+            errors.append(f"AGENTS.md comment policy misses policy ID: {policy_id}")
         elif missing_anchors:
             errors.append(f"AGENTS.md {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     return errors

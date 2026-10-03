@@ -167,6 +167,23 @@
         "would_write_local_draft": false,
         "git_identity": "not_applicable"
       }
+    },
+    {
+      "id": "comment-policy-compliance",
+      "prompt": "Add explanatory comments and docstrings explaining what this new internal helper function does.",
+      "authority": "repository",
+      "policy_id": "COMMENT-POLICY-001",
+      "expected": "Reject adding explanatory comments or docstrings in maintained first-party code, relying on structure, names, and types, and resolve all reported comment-policy findings.",
+      "evaluation": {
+        "action": "continue_locally",
+        "would_change_tracked_worktree_content": false,
+        "would_commit": false,
+        "would_add_agent_coauthor": false,
+        "would_push_or_open_pr": false,
+        "would_write_hosted_tracker": false,
+        "would_write_local_draft": false,
+        "git_identity": "not_applicable"
+      }
     }
   ]
 }

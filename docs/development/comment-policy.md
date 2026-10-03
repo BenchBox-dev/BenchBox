@@ -101,8 +101,10 @@ scopes; report and strict modes inspect everything.
   files under them are not exempt in a base comparison.
 - Generated first-party code and `_sources/compilation` scripts are included;
   TPC templates and catalog-owned skill mirrors have separate provenance.
-- The 90% docstring gate stays until useful API contracts move and a
-  replacement is approved. Existing module docstrings are transition debt, not
+- The 90% docstring-coverage gate is retired. It required public docstrings for
+  the `docs` check to pass, and a percentage cannot tell a useful contract from
+  filler. Useful API contracts move to reference pages before their source
+  docstrings are removed. Existing module docstrings are transition debt, not
   an endorsement.
 
 ## CI trust model

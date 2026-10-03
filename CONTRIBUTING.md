@@ -140,7 +140,7 @@ This runs the broader CI mirror:
 | Documentation build | `make ci-docs` |
 | Package build + install test | `make test-package` |
 
-Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
+Or run any of those individually. Additional one-offs: `make security-audit` and `make spellcheck`.
 
 Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge queue, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
 

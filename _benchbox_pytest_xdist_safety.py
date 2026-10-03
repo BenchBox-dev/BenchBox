@@ -1,4 +1,4 @@
-"""Early pytest plugin that caps unsafe xdist worker counts on developer Macs."""
+"""Early pytest plugin that caps unsafe xdist worker counts and refuses unsafe pytest settings."""
 
 from __future__ import annotations
 
@@ -148,9 +148,30 @@ def pytest_xdist_auto_num_workers(config) -> int:
     return _safe_worker_count()
 
 
+FAULTHANDLER_TIMEOUT_REFUSAL = (
+    "[benchbox] faulthandler_timeout is not supported here. Its watchdog thread dumps the stack of a test "
+    "that is still running Python code without holding the GIL, so it can read a frame while that frame is "
+    "being replaced. On CPython 3.12 the watchdog can then spin forever inside the dump: the stack is cut "
+    "off mid-dump, the test thread blocks in cancel_dump_traceback_later when the test ends, and the "
+    "pytest-xdist worker hangs or dies. Use pytest-timeout (--timeout or @pytest.mark.timeout) instead: "
+    "its signal method prints the stacks from the test thread itself."
+)
+
+
+def _faulthandler_timeout(config) -> float:
+    """Return the effective ``faulthandler_timeout`` ini value, or 0 when the plugin is disabled."""
+    try:
+        return float(config.getini("faulthandler_timeout") or 0.0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def pytest_configure(config) -> None:
     if hasattr(config, "workerinput"):
         return
+
+    if _faulthandler_timeout(config) > 0:
+        pytest.exit(FAULTHANDLER_TIMEOUT_REFUSAL, returncode=pytest.ExitCode.USAGE_ERROR)
 
     requested = os.environ.pop("BENCHBOX_XDIST_CAP_REQUESTED", None)
     effective = os.environ.pop("BENCHBOX_XDIST_CAP_EFFECTIVE", None)
