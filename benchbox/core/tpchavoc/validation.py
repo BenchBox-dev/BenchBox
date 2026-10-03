@@ -267,12 +267,18 @@ class ResultValidator:
         # sort on a None-safe surrogate rather than the raw row (a bare ``sorted``
         # would raise TypeError, which a caller would then mislabel as an execution
         # "error:" instead of a clean MISMATCH/match - see _row_sort_key).
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
 
         detail = self._first_positional_mismatch(original_sorted, variant_sorted, query_id, variant_id)
         if detail is None:
             return True
+
+        paired_variant = self._pair_variant_rows(original_sorted, variant_sorted)
+        if paired_variant is not None:
+            detail = self._first_positional_mismatch(original_sorted, paired_variant, query_id, variant_id)
+            if detail is None:
+                return True
 
         if tie_aware and self._is_boundary_tie_equivalent(original_results, variant_results, query_id, variant_id):
             return True
@@ -399,8 +405,8 @@ class ResultValidator:
             if i == last_index and tie_aware and final_key_tied_beyond_limit:
                 continue
             detail = self._first_positional_mismatch(
-                sorted(orig_rows, key=self._row_sort_key),
-                sorted(var_rows, key=self._row_sort_key),
+                sorted(orig_rows, key=self._pairing_sort_key),
+                sorted(var_rows, key=self._pairing_sort_key),
                 query_id,
                 variant_id,
             )
@@ -441,13 +447,17 @@ class ResultValidator:
 
         Sorts both on the None-safe :meth:`_row_sort_key` (so a NULL-mixed column
         never raises) and compares positionally with :meth:`_values_equal`, so the
-        float tolerance and NULL handling stay identical to the strict path.
+        float tolerance and NULL handling stay identical to the strict path. If
+        positional ordering differs because of float noise or tie reshuffling within the
+        multiset, pairs rows using the validator's comparison semantics.
         """
         if len(left) != len(right):
             return False
-        left_sorted = sorted(left, key=self._row_sort_key)
-        right_sorted = sorted(right, key=self._row_sort_key)
-        return all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted))
+        left_sorted = sorted(left, key=self._pairing_sort_key)
+        right_sorted = sorted(right, key=self._pairing_sort_key)
+        if all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted)):
+            return True
+        return self._pair_variant_rows(left_sorted, right_sorted) is not None
 
     def _row_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
         """A total, never-raising sort key for a result row.
@@ -475,6 +485,16 @@ class ResultValidator:
         if self.treat_nan_as_null:
             return tuple(self._cell_sort_key(value) for value in row)
         return _row_sort_key(row)
+
+    def _pairing_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
+        """A total sort key for ordering result rows ahead of pairing.
+
+        Delegates to :meth:`_row_sort_key` so sorting is deterministic and total. Rows
+        that differ by float noise within the comparator's tolerance are paired under
+        :meth:`_pair_variant_rows`. The value digest (:func:`calculate_checksum`) keeps
+        using the exact :func:`_row_sort_key`.
+        """
+        return self._row_sort_key(row)
 
     def _cell_sort_key(self, value: Any) -> tuple[Any, ...]:
         """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
@@ -536,6 +556,109 @@ class ResultValidator:
         """
         extra = mismatched[1:]
         return f"; also columns {extra}" if extra else ""
+
+    def _rows_match(
+        self,
+        orig_row: tuple[Any, ...],
+        var_row: tuple[Any, ...],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> bool:
+        """True if orig_row and var_row match across all columns under the comparator's rules."""
+        if len(orig_row) != len(var_row):
+            return False
+        return not self._row_value_mismatch_columns(orig_row, var_row, aggregation_columns)
+
+    def _pair_variant_rows(
+        self,
+        original_sorted: list[tuple[Any, ...]],
+        variant_sorted: list[tuple[Any, ...]],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> list[tuple[Any, ...]] | None:
+        """Pair variant rows to matching original rows under the configured comparison semantics.
+
+        Two query engines can compute identical aggregations in different internal orders and
+        differ by float noise within the comparator's tolerance. When otherwise-tied rows (such
+        as detail and subtotal rows produced by ROLLUP in Q36) sort in different orders on the
+        two sides, a purely positional zip pairs the wrong rows.
+
+        This pairs variant rows to matching original rows using `self._rows_match` (which
+        respects `self.tolerance` rather than any fixed decimal bucket). Fast paths check the
+        positional diagonal and nearby neighbors first (sorted order clusters ties). Returns
+        the reordered variant rows aligned with original_sorted if an exact 1-to-1 matching
+        exists, or None if the rows cannot be matched.
+        """
+        n = len(original_sorted)
+        if n != len(variant_sorted):
+            return None
+        if n == 0:
+            return []
+
+        # Fast path: already 100% positionally matched
+        if all(self._rows_match(original_sorted[i], variant_sorted[i], aggregation_columns) for i in range(n)):
+            return variant_sorted
+
+        var_match = [-1] * n
+
+        # Greedy pass: check diagonal first, then nearby neighbors (sorted order clusters ties)
+        for u in range(n):
+            if var_match[u] == -1 and self._rows_match(original_sorted[u], variant_sorted[u], aggregation_columns):
+                var_match[u] = u
+                continue
+            matched = False
+            for offset in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5):
+                v = u + offset
+                if (
+                    0 <= v < n
+                    and var_match[v] == -1
+                    and self._rows_match(original_sorted[u], variant_sorted[v], aggregation_columns)
+                ):
+                    var_match[v] = u
+                    matched = True
+                    break
+            if matched:
+                continue
+            for v in range(n):
+                if var_match[v] == -1 and self._rows_match(original_sorted[u], variant_sorted[v], aggregation_columns):
+                    var_match[v] = u
+                    break
+
+        if not self._augmenting_path_match(original_sorted, variant_sorted, var_match, aggregation_columns):
+            return None
+
+        paired: list[Optional[tuple[Any, ...]]] = [None] * n
+        for v, u in enumerate(var_match):
+            paired[u] = variant_sorted[v]
+        return paired  # type: ignore[return-value]
+
+    def _augmenting_path_match(
+        self,
+        original_sorted: list[tuple[Any, ...]],
+        variant_sorted: list[tuple[Any, ...]],
+        var_match: list[int],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> bool:
+        """Find augmenting paths for remaining unmatched rows."""
+        n = len(original_sorted)
+        matched_u = {u for u in var_match if u != -1}
+        for u in range(n):
+            if u in matched_u:
+                continue
+            visited = [False] * n
+
+            def dfs(curr_u: int) -> bool:
+                for v in range(n):
+                    if visited[v]:
+                        continue
+                    if self._rows_match(original_sorted[curr_u], variant_sorted[v], aggregation_columns):
+                        visited[v] = True
+                        if var_match[v] == -1 or dfs(var_match[v]):
+                            var_match[v] = curr_u
+                            return True
+                return False
+
+            if not dfs(u):
+                return False
+        return True
 
     def _first_positional_mismatch(
         self,
@@ -762,8 +885,11 @@ class ResultValidator:
 
         # Sort both result sets on the None-safe surrogate so a NULL-bearing or
         # mixed-type column never raises TypeError (see _row_sort_key).
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
+        paired_variant = self._pair_variant_rows(original_sorted, variant_sorted, aggregation_columns)
+        if paired_variant is not None:
+            variant_sorted = paired_variant
 
         agg_columns = set(aggregation_columns or ())
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
