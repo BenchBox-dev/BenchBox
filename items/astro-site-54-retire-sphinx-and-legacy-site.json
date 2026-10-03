@@ -1,17 +1,17 @@
 {
   "acceptance": [
+    "Evidence pack: observation window dates, per-route-class deploy receipts with green probes, fresh rollback drill, all-Astro receipt",
+    "Last Sphinx artifact and receipt retained and proven redeployable after source removal",
     "Sweep: no remaining references to sphinx, furo, ablog, myst_parser, landing/shared, docs/_build in maintained code, workflows or Makefiles (grep output in PR)",
-    "Dependency audit and inventory drift checks green after removal",
-    "All required checks green; public-site visual acceptance passes with no baseline change",
-    "Owner informed of the status of comment-cleanup-* and dlv2-61 items"
+    "Dependency audit and inventory drift checks green; all required checks green; visual acceptance passes with no baseline change",
+    "dev-loop-property-ledger rows touched by the site updated"
   ],
-  "description": "Start only after:\n- production deploys from the Astro build stay green for 24 hours or 3 deploys, whichever comes first (matching dlv2-62)\n- the release-pinned /docs/ route is served by Astro, so no live route still needs Sphinx\n\nRemove:\n- docs/conf.py, docs/_extensions, docs/_templates, docs/Makefile, make.bat, the Sphinx-only parts of docs/_static\n- landing/ and landing/shared\n- Sphinx targets in make/documentation.mk and Makefile ci-docs, plus make/inventory.json entries\n- the pyproject docs extra and the docs entries in the dev group (sphinx, furo, myst-parser, sphinxcontrib-mermaid, sphinx-tags, sphinx-design, ablog and its git source override)\n- token-drift scan scripts made redundant by the single token source\n- Sphinx-specific tests (tests/docs/test_sphinx_warnings.py, tests/unit/docs/test_docs_build.py), each replaced by its Astro equivalent\n\nCoordinate with dlv2-61 (docs.yml retirement). Check whether comment-cleanup-site-assets and comment-cleanup-generators still apply, and report back so the owner can update or drop them; do not drop them yourself.",
+  "description": "Start only when there is evidence, not just elapsed time or a deploy count:\n- a minimum observation window of 5 working days since the astro-site-53 production cutover\n- in that window, at least one successful production deploy for each route class (stable docs from a release tag, dev docs, blog, and a results/corpus update), each with green public probes on every route\n- the exact-artifact rollback drill evidence from astro-site-53 is on record, and a fresh drill on the current artifact passes\n- the latest receipt shows every actively served route rendered by Astro\n- the D14 agreements on overlapping items are honoured\n\nKeep a deployable rollback target: the last Sphinx-rendered artifact and its receipt stay retained and redeployable after the source tooling is deleted, at least until the next release after retirement; the owner may extend this.\n\nThen remove:\n- docs/conf.py, docs/_extensions, docs/_templates, docs/Makefile, make.bat, the Sphinx-only parts of docs/_static\n- landing/ and landing/shared\n- Sphinx targets in make/documentation.mk and Makefile ci-docs, plus make/inventory.json entries\n- the pyproject docs extra and the docs entries in the dev group (sphinx, furo, myst-parser, sphinxcontrib-mermaid, sphinx-tags, sphinx-design, ablog and its git source override)\n- the Sphinx build from required CI, with its drift guard updated in the same PR\n- redundant token-drift scripts\n- Sphinx-specific tests, each replaced by its Astro equivalent\n\ndocs/ stays the content directory. Separately decide whether to rewrite the remaining MyST constructs to plain Markdown and retire the converter; if yes, record it as a follow-up item.",
   "links": [
     "dlv2-61-retire-docs-yml-pages-fallback",
-    "comment-cleanup-site-assets",
-    "comment-cleanup-generators",
     "pyproject.toml",
-    "make/documentation.mk"
+    "make/documentation.mk",
+    "docs/development/dev-loop-property-ledger.md"
   ],
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "op": "create",
       "op_id": "9685e5e2dda141a592e671738b5c73c4",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:49:24Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6a67d0fbfad54c57bb242fb672506390",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
     }
   ]
 }
