@@ -6900,15 +6900,10 @@
       "title": "Tier tests by measured duration: durations file, T1 0.5 s budget, and a quarantine marker"
     },
     "dlv2-14-adapter-offline-inventory": {
-      "claim": {
-        "expires_at": "2026-10-04T14:45:33Z",
-        "generation": "5995817c129c48e8a2db6559fcd38216",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:9509e403d03f67d617690747"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Inventory offline test coverage for every registered platform adapter and fill the gaps"
     },
     "dlv2-15-required-t2-cases": {
