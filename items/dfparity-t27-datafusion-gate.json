@@ -5,7 +5,7 @@
     "Every DataFusion cell matches SQL or carries an evidenced classification.",
     "The DataFusion cell is enforced in CI with the repeat-run check, its whole-gate time is measured, and a maintainer signs off."
   ],
-  "context": "2026-10-03 feasibility (develop 964bea289, SF 0.01, evidence/rev3/t27_datafusion_feasibility.md): 97/99 run on DataFusion, 76 match SQL. Fix branches, all local and waiting for preflight: (A+C) fix/datafusion-rollup-names-true-division 2603e4fb9: rollup names and true division, 76 -> 86 match, Polars and pandas unchanged; preflight's fast tier passed. (D) fix/datafusion-rank-without-window 0d05688b9: whole-frame rank when rank() has no over(); Q44 matches 5/5 runs (was 12-13 rows), no other change. (E) inside fix/tpcds-q18-q27-null-values e2d102944: Q27 no longer errors. Expected after A+C+D+E: about 88/99 (Q18 and Q27 match once A is in). OPEN: group B (unified_frame.py aggregate rewrite multiplies aggregates inside CASE: Q20 59 66 76 77 78 98), group F (Q51 cum_sum/cum_max frames + SanityCheckPlan), and the .over() rank path still ranks NULLs first on ascending order (unlike Polars). Gate plumbing (backend-to-family map, materialize_rows for pa.Table) is a soundness path and waits for #2567.",
+  "context": "2026-10-03 feasibility (develop 964bea289, SF 0.01, evidence/rev3/t27_datafusion_feasibility.md): 97/99 run, 76 match SQL. Fix branches (local, waiting for preflight):\n- (A+C) fix/datafusion-rollup-names-true-division 2603e4fb9: 76 -> 86; preflight rerun queued.\n- (B) fix/datafusion-aggregate-in-case bd2bf8c7a: removed the regex rewrite over DataFusion's Debug AST in unified_frame.py. DataFusion >= 54 (the pyproject minimum) plans aggregates inside expressions itself; the rewrite multiplied aggregates inside CASE and turned sum(expr) into sum(col). 76 -> 82 (Q20, Q59, Q66, Q76, Q78, Q98); Q77 needs A as well. Also fixes TPC-H Q1/3/5/10/14/15 and TPC-H skew on DataFusion (15 -> 21 and 16 -> 22 of 22), coffeeshop QC1 and two read_primitives queries; no regressions across 13 other benchmarks. Polars unchanged.\n- (D) fix/datafusion-rank-without-window 0d05688b9: Q44 matches 5/5 runs.\n- (E) in fix/tpcds-q18-q27-null-values e2d102944: Q27 no longer errors.\nExpected with A-E: about 94/99 on DataFusion. OPEN: group F (Q51), the .over() rank NULL placement, and the gate plumbing (soundness path, waits for #2567).",
   "description": "Owner decision D6 (2026-10-03) puts DataFusion in the parity goal. Today the cross-surface gate runs the expression family on Polars only (DATAFRAME_BACKENDS = (\"expression\", \"pandas\") in benchbox/core/equivalence/dataframe_surface.py). benchbox/platforms/dataframe/datafusion_df.py exists. First establish whether the 99 TPC-DS expression implementations run on DataFusion, then add a DataFusion cell to the gate and enforce it.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "34bbe450636b42f68a4d0272873a6709",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:17:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "54361f78ffe9447e9b4c34bcf7560685",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
