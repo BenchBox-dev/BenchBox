@@ -78,11 +78,13 @@ rebased before it can land:
 2. Rebase it onto the squash commit with
    `git rebase --onto origin/develop <old parent tip>` and force-push with
    `--force-with-lease` on the feature branch only.
-3. Wait for CI on the new head. For a soundness-path change, also wait for a
+3. Mark it ready for review (`gh pr ready`). `make pr-arm` rejects drafts, and
+   the transition re-runs the base guard and requests a connector review.
+4. Wait for CI on the new head. For a soundness-path change, also wait for a
    Codex connector review or thumbs-up on the rebased head: the rebase
    rewrites the head, so review of the draft against its parent no longer
    covers it.
-4. Arm it with `make pr-arm`.
+5. Arm it with `make pr-arm`.
 
 ## "No checks" is not one failure mode
 
