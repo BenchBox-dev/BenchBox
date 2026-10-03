@@ -1139,7 +1139,7 @@ class TestReleaseInfrastructure:
         env = os.environ.copy()
         env.pop("BENCHBOX_PREPUSH", None)
         env.update({"HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{env['PATH']}"})
-        result = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=env)
+        result = subprocess.run(shlex.split(entry), cwd=REPO_ROOT, capture_output=True, text=True, env=env)
         assert result.returncode == 0, result.stderr
         assert trace.read_text(encoding="utf-8").split() == ["pr-preflight"]
 

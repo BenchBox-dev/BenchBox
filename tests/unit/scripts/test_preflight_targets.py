@@ -1,5 +1,3 @@
-"""Tests for the changed-file selection behind `make pr-preflight`."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -102,15 +100,37 @@ def test_uncommitted_and_untracked_changes_are_included(repo: Path) -> None:
     paths = pt.changed_paths(repo, "origin/develop")
 
     assert paths == ["benchbox/core/engine.py", "scripts/untracked.py", "tests/unit/test_new.py"]
-    assert pt.changed_python(paths) == paths
+    assert pt.changed_python(repo, paths) == paths
 
 
-def test_deleted_files_are_not_selected(repo: Path) -> None:
-    (repo / "tests/unit/test_unrelated.py").unlink()
-    (repo / "benchbox/platforms/other.py").unlink()
+def test_deleted_source_still_selects_its_remaining_tests(repo: Path) -> None:
+    (repo / "benchbox/core/engine.py").unlink()
     _commit_all(repo)
 
-    assert pt.changed_paths(repo, "origin/develop") == []
+    paths = pt.changed_paths(repo, "origin/develop")
+
+    assert paths == ["benchbox/core/engine.py"]
+    assert pt.changed_python(repo, paths) == []
+    assert pt.map_tests(repo, paths) == ["tests/integration/test_engine.py", "tests/unit/core/test_engine.py"]
+
+
+def test_deleted_test_file_is_not_selected(repo: Path) -> None:
+    (repo / "tests/unit/test_unrelated.py").unlink()
+    _commit_all(repo)
+
+    paths = pt.changed_paths(repo, "origin/develop")
+
+    assert paths == ["tests/unit/test_unrelated.py"]
+    assert pt.map_tests(repo, paths) == []
+
+
+def test_project_scripts_module_maps_to_its_test(repo: Path) -> None:
+    _write(repo, "_project/scripts/audit.py")
+    _write(repo, "tests/unit/scripts/test_audit.py")
+    _commit_all(repo)
+    _write(repo, "_project/scripts/audit.py", "x = 2\n")
+
+    assert pt.map_tests(repo, pt.changed_paths(repo, "origin/develop")) == ["tests/unit/scripts/test_audit.py"]
 
 
 def test_cli_prints_selection_and_reports_missing_base(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:

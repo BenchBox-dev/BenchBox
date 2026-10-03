@@ -1,5 +1,3 @@
-"""Tests for the shared test-lock helpers."""
-
 from __future__ import annotations
 
 import errno

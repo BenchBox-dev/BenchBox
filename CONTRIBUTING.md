@@ -81,8 +81,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
 4. **Run the local preflight, then open the PR:**
 
    ```bash
-   make pr-preflight      # ruff + tests for the changed files
-   make pr-open           # push + gh pr create --base develop
+   make pr-preflight
+   make pr-open
    ```
 
    `make pr-open` refuses to run from `develop` or `release`.

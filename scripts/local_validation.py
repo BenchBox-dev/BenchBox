@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""Shared test-lock helpers.
-
-Parallel pytest runs serialize on one machine-wide lock file. This module owns
-the bounded wait, the holder description written for other waiters, and the
-``clear-test-lock`` command that empties the holder text of an inactive lock.
-It is loaded by tests/conftest.py and tests/utilities/session_isolation.py.
-
-Usage:
-  python scripts/local_validation.py clear-test-lock ~/.benchbox/test.lock
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -54,7 +43,6 @@ def write_holder(fd: int, lock_path: Path, *, phase: str, gate: str | None = Non
 
 
 def _close_lock(fd: int) -> None:
-    """Release a lock fd acquired via :func:`wait_on_fd`."""
     if sys.platform == "win32":
         try:
             try:
@@ -191,7 +179,7 @@ def clear_inactive_lock(lock_path: Path) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     clear = sub.add_parser("clear-test-lock", help="clear an inactive shared test lock")
     clear.add_argument("path", type=Path)

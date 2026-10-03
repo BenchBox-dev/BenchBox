@@ -65,9 +65,6 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-      # Push-time gate: ruff on the changed Python files and the tests mapped
-      # from them. The full fast lane is CI's job; `make pr-preflight-fast-tests`
-      # runs it locally on request.
       - id: pr-preflight
         name: pr-preflight (changed-file lint and tests)
         entry: make pr-preflight

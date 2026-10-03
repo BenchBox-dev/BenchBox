@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""List the changed Python files and the test files that cover them.
-
-`make pr-preflight` lints the changed Python files and runs only their tests.
-Changed paths are the branch diff against the merge base with the base ref,
-plus staged, unstaged, and untracked files.
-
-Test mapping:
-
-* a changed ``tests/**/test_*.py`` maps to itself;
-* a changed ``benchbox/**/<mod>.py`` or ``scripts/<mod>.py`` maps to every
-  ``tests/**/test_<mod>.py``.
-
-Usage:
-  python _project/scripts/preflight_targets.py python [--base-ref origin/develop]
-  python _project/scripts/preflight_targets.py tests [--base-ref origin/develop]
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -23,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
-SOURCE_ROOTS = ("benchbox/", "scripts/")
+SOURCE_ROOTS = ("benchbox/", "scripts/", "_project/scripts/")
 TESTS_ROOT = "tests"
 
 
@@ -33,16 +16,15 @@ def _git_lines(repo: Path, *args: str) -> list[str]:
 
 
 def changed_paths(repo: Path, base_ref: str) -> list[str]:
-    """Return existing changed paths, sorted, relative to *repo*."""
     base = _git_lines(repo, "merge-base", base_ref, "HEAD")[0]
-    names = set(_git_lines(repo, "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD"))
-    names.update(_git_lines(repo, "diff", "--name-only", "--diff-filter=d", "HEAD"))
+    names = set(_git_lines(repo, "diff", "--name-only", f"{base}...HEAD"))
+    names.update(_git_lines(repo, "diff", "--name-only", "HEAD"))
     names.update(_git_lines(repo, "ls-files", "--others", "--exclude-standard"))
-    return sorted(name for name in names if (repo / name).is_file())
+    return sorted(names)
 
 
-def changed_python(paths: list[str]) -> list[str]:
-    return [path for path in paths if path.endswith(".py")]
+def changed_python(repo: Path, paths: list[str]) -> list[str]:
+    return [path for path in paths if path.endswith(".py") and (repo / path).is_file()]
 
 
 def _is_test_file(path: str) -> bool:
@@ -60,9 +42,12 @@ def _test_index(repo: Path) -> dict[str, list[str]]:
 def map_tests(repo: Path, paths: list[str]) -> list[str]:
     index = _test_index(repo)
     selected: set[str] = set()
-    for path in changed_python(paths):
+    for path in paths:
+        if not path.endswith(".py"):
+            continue
         if _is_test_file(path):
-            selected.add(path)
+            if (repo / path).is_file():
+                selected.add(path)
         elif path.startswith(SOURCE_ROOTS):
             module = PurePosixPath(path).stem
             if module != "__init__":
@@ -71,7 +56,7 @@ def map_tests(repo: Path, paths: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser()
     parser.add_argument("kind", choices=("python", "tests"))
     parser.add_argument("--base-ref", default="origin/develop")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
@@ -81,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError) as exc:
         print(f"preflight_targets: cannot compute changed paths against {args.base_ref}: {exc}", file=sys.stderr)
         return 2
-    selected = changed_python(paths) if args.kind == "python" else map_tests(args.repo_root, paths)
+    selected = changed_python(args.repo_root, paths) if args.kind == "python" else map_tests(args.repo_root, paths)
     for path in selected:
         print(path)
     return 0

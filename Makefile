@@ -1337,12 +1337,6 @@ release-check:
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
-# Local gate before pushing: ruff on the changed Python files, then the test
-# files that cover them, serially. A changed tests/**/test_*.py maps to itself
-# and a changed benchbox/ or scripts/ module maps to tests/**/test_<module>.py
-# (_project/scripts/preflight_targets.py). Without xdist the run never takes the shared
-# test lock. CI runs the full fast lane and every other gate; run
-# `make pr-preflight-fast-tests` for the full lane locally.
 pr-preflight:
 	@set -eu; \
 	git fetch origin develop --quiet; \
@@ -1368,9 +1362,6 @@ pr-preflight:
 	if [ "$$STATUS" -eq 5 ]; then echo "Mapped tests are all deselected by the default markers."; STATUS=0; fi; \
 	exit "$$STATUS"
 
-# Full fast lane, as CI runs it (content guard plus the CI marker selection).
-# Direct invocation creates classifier artifacts when the caller did not
-# already supply them.
 pr-preflight-fast-tests:
 	@set -eu; \
 	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
