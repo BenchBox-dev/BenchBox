@@ -628,6 +628,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  # TODO: drop the registration guard once the quarantine marker is registered
+  # on develop and every quarantined test carries owner, expiry, and issue
+  # metadata.
   quarantine:
     name: "t3:quarantine | quarantined tests"
     runs-on: ubuntu-latest
