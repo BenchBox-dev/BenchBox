@@ -1,13 +1,13 @@
 {
   "acceptance": [
     "The policy sets enforcement to blocking in a single reviewed change; the base policy at the time of the change is advisory, so the change itself is not blocked.",
-    "Immediately after the change, a probe pull request that adds one explanatory comment fails the comment-policy check, and one that changes no comments passes.",
+    "Isolated tests of the actual workflow path reject an injected explanatory comment and accept an unchanged clean candidate. After the one final PR merges, verify the fresh trusted blocking base and collect hosted enforcement evidence from the next legitimate PR; no extra probe PR.",
     "Strict, report, staged and CI behavior match the documentation under blocking enforcement; the whole-project strict check passes on develop.",
-    "Open pull requests that would now fail are listed and their authors told before the change lands.",
+    "Open PRs affected by blocking enforcement are assessed from fresh exact-head evidence. Give the impact list and proposed notices to the repository owner; an authorized operator sends required notices before activation. Tracker text grants no messaging authority.",
     "The change passes an independent external soundness review with the receipt linked in the pull request body, and is merged by the repository owner."
   ],
-  "context": "Created 2026-10-02 from delivery plan v2 (/tmp/benchbox-comment-cleanup-plan-v2.md, step R2), approved by the user. Until this item lands the checker stays advisory (decision D3).",
-  "description": "The last change of the program (R2 in the delivery plan): set `enforcement` to `blocking` in quality/comment-policy.json so the checker, which landed in advisory mode and has only reported violations, starts failing pull requests that add or reword comments and docstrings. It is a one-line policy change that the advisory base does not block; the ratchet in the checker forbids moving back.\n\nDo it only after the final whole-scope scan (comment-cleanup-final-enforcement) shows zero unapproved comments and docstrings, the exception register is merged, and no open pull request is likely to be surprised: list the open PRs that the checker would reject, tell their authors, and land the flip at a quiet time. Confirm that strict mode, report mode, the staged pre-commit hook, `make comment-policy-check` and the CI `comment-policy` job all behave as documented in docs/development/comment-policy.md under blocking enforcement. Make sure the required CI wiring for strict whole-project enforcement is in the same change.\n\nquality/comment-policy.json is a soundness-manifest path: an external review with a `Soundness review:` section and the repository owner's manual merge are required. This item authorizes no deployment, live cloud or stress test, historical-result rewriting or write to another repository.",
+  "context": "Created 2026-10-02 from delivery plan v2 (/tmp/benchbox-comment-cleanup-plan-v2.md, step R2), approved by the user. Until this item lands the checker stays advisory (decision D3).\n\n2026-10-03 delivery correction: the user explicitly requires all remaining changes on feat/comment-cleanup-program until the entire scope is complete and validated, then one final develop-based PR. This supersedes all earlier wave, foundation, payload, soundness, register and blocking-switch PR splits. Tracker lifecycle stays serial; tasks finish only after actual final merge. Durable handoff: /Users/joe/.agents/handoffs/benchbox-comment-cleanup-20261003.md. Root alone writes tracked files; workers provide ignored proposals and independent reviews. No schema cutover, extra probe PR or automatic author notification is authorized.",
+  "description": "The last change of the program (R2 in the delivery plan): set `enforcement` to `blocking` in quality/comment-policy.json so the checker, which landed in advisory mode and has only reported violations, starts failing pull requests that add or reword comments and docstrings. It is a one-line policy change that the advisory base does not block; the ratchet in the checker forbids moving back.\n\nDo it only after the final whole-scope scan (comment-cleanup-final-enforcement) shows zero unapproved comments and docstrings, the exception register is integrated and validated on the same branch, and no open pull request is likely to be surprised: list the open PRs that the checker would reject and give the repository owner the impact list and notification text; an authorized operator sends any required notices before activation. Confirm that strict mode, report mode, the staged pre-commit hook, `make comment-policy-check` and the CI `comment-policy` job all behave as documented in docs/development/comment-policy.md under blocking enforcement. Make sure the required CI wiring for strict whole-project enforcement is in the same change.\n\nquality/comment-policy.json is a soundness-manifest path: an external review with a `Soundness review:` section and the repository owner's manual merge are required. This item authorizes no deployment, live cloud or stress test, historical-result rewriting or write to another repository.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
@@ -16,6 +16,14 @@
       "op": "create",
       "op_id": "7195ea277a624724bdf328bbe0ed3bad",
       "session_id": "bec2d032574a4742968b229c90460810"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:d71324714cd05b47117924ac",
+      "at": "2026-10-03T13:52:20Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "d6e6f162d34b45fea888169586f5c3a2",
+      "session_id": "478589c5678249f8b1396af48cc8f140"
     }
   ]
 }
