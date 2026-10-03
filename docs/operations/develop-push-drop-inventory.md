@@ -72,7 +72,7 @@ Not push-drop *subjects*, but they **mitigate** the class for other workflows:
 
 ### Safety-critical without schedule
 
-Three develop-push workflows lack a schedule:
+Two develop-push workflows lack a schedule:
 
 1. **`sync-results-data-to-published.yml`** — The 2026-08-03 incident was
    exactly this failure mode: three consecutive develop merges got no push
