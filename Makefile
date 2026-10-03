@@ -1734,11 +1734,12 @@ pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
 
-# Opens a revert PR for a merged PR: `make trunk-revert PR=<number>`. Creates
-# fix/revert-<number> from origin/develop in this worktree, reverts the squash
-# merge commit, pushes, and opens the PR against develop. Revert branches are
-# exempt from the red-trunk gate in `pr-open`. Refuses a PR that is not merged
-# and a dirty worktree; the primary clone is refused by `agent-write-preflight`.
+# Opens a revert PR for a merged PR: `make trunk-revert PR=<number>`. Creates a
+# sibling worktree on fix/revert-<number> with `worktree-create`, reverts the
+# squash merge commit there, pushes, and opens the PR against develop. This
+# worktree is left untouched. Revert branches are exempt from the red-trunk
+# gate in `pr-open`. Refuses a PR that is not merged; the primary clone is
+# refused by `agent-write-preflight`.
 trunk-revert:
 	@$(MAKE) -s agent-write-preflight
 	@case "$(PR)" in ""|*[!0-9]*) echo "PR=<merged PR number> is required" >&2; exit 2 ;; esac

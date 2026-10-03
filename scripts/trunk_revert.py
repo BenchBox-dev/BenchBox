@@ -8,6 +8,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 REPOSITORY = "BenchBox-dev/BenchBox"
 BASE_BRANCH = "develop"
@@ -97,16 +98,16 @@ def trunk_gate(
 
 
 def revert_commands(
-    number: int, oid: str, title: str, repo: str = REPOSITORY, head: str | None = None
+    number: int, oid: str, title: str, worktree: str, repo: str = REPOSITORY, head: str | None = None
 ) -> list[list[str]]:
     branch = f"{REVERT_PREFIX}{number}"
     subject = f'Revert "{title}" (#{number})'
     return [
         ["git", "fetch", "origin", BASE_BRANCH, "--quiet"],
-        ["git", "switch", "--no-track", "-c", branch, f"origin/{BASE_BRANCH}"],
-        ["git", "revert", "--no-edit", oid],
-        ["git", "commit", "--amend", "-m", subject, "-m", f"This reverts commit {oid}."],
-        ["git", "push", "-u", "origin", branch],
+        ["make", "worktree-create", f"BRANCH={branch}", f"WORKTREE_PATH={worktree}"],
+        ["git", "-C", worktree, "revert", "--no-edit", oid],
+        ["git", "-C", worktree, "commit", "--amend", "-m", subject, "-m", f"This reverts commit {oid}."],
+        ["git", "-C", worktree, "push", "-u", "origin", branch],
         ["gh", "pr", "create", "--repo", repo, "--base", BASE_BRANCH, "--head", head or branch, "--fill"],
     ]
 
@@ -146,24 +147,20 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
         title = view.get("title") or ""
         if not title.strip():
             raise TrunkError(f"PR #{number} has no title")
-        if _check(run, ["git", "status", "--porcelain"], "checking the worktree").strip():
-            raise TrunkError("the worktree has uncommitted or untracked changes; commit or remove them first")
         branch = f"{REVERT_PREFIX}{number}"
         head = head_spec(run, repo, branch)
-        if run(["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"])[0] == 0:
-            raise TrunkError(f"local branch {branch} already exists; delete it or finish its PR by hand")
-        current = _check(run, ["git", "branch", "--show-current"], "reading the current branch").strip()
-        original = (
-            [current] if current else ["--detach", _check(run, ["git", "rev-parse", "HEAD"], "reading HEAD").strip()]
+        top = _check(run, ["git", "rev-parse", "--show-toplevel"], "locating this worktree").strip()
+        worktree = str(Path(top).parent / f"BenchBox.wt-revert-{number}")
+        fetch, create_worktree, revert_cmd, amend, push, create = revert_commands(
+            number, oid, title, worktree, repo, head
         )
-        fetch, switch, revert_cmd, amend, push, create = revert_commands(number, oid, title, repo, head)
         _check(run, fetch, "fetching origin/develop")
         _check(
             run,
             ["git", "merge-base", "--is-ancestor", oid, f"origin/{BASE_BRANCH}"],
             f"confirming {oid[:9]} is on origin/{BASE_BRANCH}",
         )
-        _check(run, switch, f"creating {branch}")
+        _check(run, create_worktree, f"creating the {branch} worktree")
         try:
             code, out = run(revert_cmd)
             if code != 0:
@@ -171,17 +168,18 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
             _check(run, amend, "writing the revert commit message")
             _check(run, push, "pushing the revert branch")
         except TrunkError:
-            run(["git", "revert", "--abort"])
-            run(["git", "switch", *original])
+            run(["git", "-C", worktree, "revert", "--abort"])
+            run(["git", "worktree", "remove", "--force", worktree])
             run(["git", "branch", "-D", branch])
             raise
         code, out = run(create)
         if code != 0:
             raise TrunkError(
-                f"opening the revert PR failed: {out.strip()}; {branch} is pushed, open it with: "
+                f"opening the revert PR failed: {out.strip()}; {branch} is pushed from {worktree}, open it with: "
                 f"gh pr create --repo {repo} --base {BASE_BRANCH} --head {head} --fill"
             )
         print(out.strip())
+        print(f"Revert worktree: {worktree}")
     except (TrunkError, ValueError, AttributeError) as exc:
         print(f"trunk-revert: refusing: {exc}", file=sys.stderr)
         return 1

@@ -28,20 +28,19 @@ def _load():
 trunk_revert = _load()
 
 
+WORKTREE = "/work/BenchBox.wt-revert-12"
+
+
 class FakeRun:
     def __init__(
         self,
         *,
         pr_view: dict | None = None,
-        dirty: str = "",
         fail: dict[str, int] | None = None,
         origin: str = "git@github.com:BenchBox-dev/BenchBox.git",
-        branch_exists: bool = False,
     ):
-        self.branch_exists = branch_exists
         self.origin = origin
         self.pr_view = pr_view
-        self.dirty = dirty
         self.fail = fail or {}
         self.calls: list[list[str]] = []
 
@@ -49,14 +48,10 @@ class FakeRun:
         self.calls.append(cmd)
         if cmd[:3] == ["gh", "pr", "view"]:
             return 0, json.dumps(self.pr_view)
-        if cmd[:3] == ["git", "status", "--porcelain"]:
-            return 0, self.dirty
         if cmd[:4] == ["git", "remote", "get-url", "--push"]:
             return 0, self.origin
-        if cmd[:3] == ["git", "rev-parse", "--verify"]:
-            return (0, "") if self.branch_exists else (1, "")
-        if cmd[:3] == ["git", "branch", "--show-current"]:
-            return 0, "work/topic\n"
+        if cmd[:3] == ["git", "rev-parse", "--show-toplevel"]:
+            return 0, "/work/BenchBox.wt-current\n"
         if cmd[:3] == ["gh", "pr", "create"] and "gh pr create" not in self.fail:
             return 0, "https://github.com/BenchBox-dev/BenchBox/pull/99\n"
         for prefix, code in self.fail.items():
@@ -73,31 +68,32 @@ def test_refuses_a_pr_that_is_not_merged(capsys: pytest.CaptureFixture[str]) -> 
     run = FakeRun(pr_view={"state": "OPEN", "mergeCommit": None, "title": "t"})
     assert trunk_revert.revert(12, run=run) == 1
     assert "not MERGED" in capsys.readouterr().err
-    assert not any(call[:2] == ["git", "revert"] or call[:2] == ["git", "switch"] for call in run.calls)
+    assert not any(call[:1] == ["make"] or call[:2] == ["git", "revert"] for call in run.calls)
 
 
-def test_refuses_a_dirty_worktree(capsys: pytest.CaptureFixture[str]) -> None:
-    run = FakeRun(pr_view=_merged(), dirty=" M scripts/x.py\n")
-    assert trunk_revert.revert(12, run=run) == 1
-    assert "uncommitted or untracked" in capsys.readouterr().err
-    assert not any(call[:2] == ["git", "switch"] for call in run.calls)
-
-
-def test_builds_the_expected_revert_and_pr_commands(capsys: pytest.CaptureFixture[str]) -> None:
+def test_builds_the_expected_worktree_revert_and_pr_commands(capsys: pytest.CaptureFixture[str]) -> None:
     run = FakeRun(pr_view=_merged("fix(x): thing"))
     assert trunk_revert.revert(12, run=run) == 0
     assert run.calls == [
         ["gh", "pr", "view", "12", "--repo", trunk_revert.REPOSITORY, "--json", "state,mergeCommit,title"],
-        ["git", "status", "--porcelain"],
         ["git", "remote", "get-url", "--push", "origin"],
-        ["git", "rev-parse", "--verify", "--quiet", "refs/heads/fix/revert-12"],
-        ["git", "branch", "--show-current"],
+        ["git", "rev-parse", "--show-toplevel"],
         ["git", "fetch", "origin", "develop", "--quiet"],
         ["git", "merge-base", "--is-ancestor", OID, "origin/develop"],
-        ["git", "switch", "--no-track", "-c", "fix/revert-12", "origin/develop"],
-        ["git", "revert", "--no-edit", OID],
-        ["git", "commit", "--amend", "-m", 'Revert "fix(x): thing" (#12)', "-m", f"This reverts commit {OID}."],
-        ["git", "push", "-u", "origin", "fix/revert-12"],
+        ["make", "worktree-create", "BRANCH=fix/revert-12", f"WORKTREE_PATH={WORKTREE}"],
+        ["git", "-C", WORKTREE, "revert", "--no-edit", OID],
+        [
+            "git",
+            "-C",
+            WORKTREE,
+            "commit",
+            "--amend",
+            "-m",
+            'Revert "fix(x): thing" (#12)',
+            "-m",
+            f"This reverts commit {OID}.",
+        ],
+        ["git", "-C", WORKTREE, "push", "-u", "origin", "fix/revert-12"],
         [
             "gh",
             "pr",
@@ -111,7 +107,19 @@ def test_builds_the_expected_revert_and_pr_commands(capsys: pytest.CaptureFixtur
             "--fill",
         ],
     ]
-    assert "pull/99" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "pull/99" in out
+    assert f"Revert worktree: {WORKTREE}" in out
+
+
+def test_leaves_the_current_worktree_untouched() -> None:
+    run = FakeRun(pr_view=_merged())
+    assert trunk_revert.revert(12, run=run) == 0
+    assert any(call[:2] == ["make", "worktree-create"] for call in run.calls)
+    for call in run.calls:
+        assert call[:2] != ["git", "switch"] and call[:2] != ["git", "checkout"]
+        if call[:2] in (["git", "revert"], ["git", "commit"], ["git", "push"]):
+            raise AssertionError(f"ran in the current worktree: {call}")
 
 
 def test_qualifies_the_head_when_origin_is_a_fork() -> None:
@@ -125,27 +133,26 @@ def test_title_with_quotes_and_command_substitution_stays_one_argument() -> None
     title = 'fix: "quoted" $(touch /tmp/pwned) `id` ; rm -rf /'
     run = FakeRun(pr_view=_merged(title))
     assert trunk_revert.revert(5, run=run) == 0
-    amend = next(call for call in run.calls if call[:3] == ["git", "commit", "--amend"])
-    assert amend[3] == "-m"
-    assert amend[4] == f'Revert "{title}" (#5)'
+    amend = next(call for call in run.calls if "--amend" in call)
+    assert amend[amend.index("-m") + 1] == f'Revert "{title}" (#5)'
     assert all(isinstance(part, str) for call in run.calls for part in call)
     assert not any(call[0] == "sh" or "-c" in call[:2] for call in run.calls)
 
 
-def test_aborts_the_revert_when_it_conflicts(capsys: pytest.CaptureFixture[str]) -> None:
-    run = FakeRun(pr_view=_merged(), fail={"git revert --no-edit": 1})
+def test_removes_the_new_worktree_when_the_revert_conflicts(capsys: pytest.CaptureFixture[str]) -> None:
+    run = FakeRun(pr_view=_merged(), fail={"git -C": 1})
     assert trunk_revert.revert(12, run=run) == 1
-    assert ["git", "revert", "--abort"] in run.calls
-    assert ["git", "switch", "work/topic"] in run.calls
+    assert ["git", "-C", WORKTREE, "revert", "--abort"] in run.calls
+    assert ["git", "worktree", "remove", "--force", WORKTREE] in run.calls
     assert ["git", "branch", "-D", "fix/revert-12"] in run.calls
-    assert not any(call[:2] == ["git", "push"] for call in run.calls)
+    assert not any(call[3:4] == ["push"] for call in run.calls)
     assert "git revert failed" in capsys.readouterr().err
 
 
-def test_restores_the_original_branch_when_the_push_fails() -> None:
-    run = FakeRun(pr_view=_merged(), fail={"git push": 1})
+def test_removes_the_new_worktree_when_the_push_fails() -> None:
+    run = FakeRun(pr_view=_merged(), fail={f"git -C {WORKTREE} push": 1})
     assert trunk_revert.revert(12, run=run) == 1
-    assert ["git", "switch", "work/topic"] in run.calls
+    assert ["git", "worktree", "remove", "--force", WORKTREE] in run.calls
     assert ["git", "branch", "-D", "fix/revert-12"] in run.calls
 
 
@@ -158,17 +165,17 @@ def test_keeps_the_pushed_branch_and_says_how_to_finish_when_pr_creation_fails(
     assert "gh pr create --repo" in capsys.readouterr().err
 
 
-def test_refuses_when_the_revert_branch_already_exists(capsys: pytest.CaptureFixture[str]) -> None:
-    run = FakeRun(pr_view=_merged(), branch_exists=True)
+def test_does_not_create_a_worktree_when_worktree_create_refuses() -> None:
+    run = FakeRun(pr_view=_merged(), fail={"make worktree-create": 1})
     assert trunk_revert.revert(12, run=run) == 1
-    assert "already exists" in capsys.readouterr().err
-    assert not any(call[:2] == ["git", "switch"] for call in run.calls)
+    assert not any(call[:3] == ["git", "worktree", "remove"] for call in run.calls)
+    assert not any(call[:3] == ["git", "-C", WORKTREE] for call in run.calls)
 
 
 def test_refuses_a_merge_commit_that_is_not_on_develop() -> None:
     run = FakeRun(pr_view=_merged(), fail={"git merge-base": 1})
     assert trunk_revert.revert(12, run=run) == 1
-    assert not any(call[:2] == ["git", "switch"] for call in run.calls)
+    assert not any(call[:1] == ["make"] for call in run.calls)
 
 
 def _runs(*items: tuple[str, str | None, timedelta]) -> list[dict]:
