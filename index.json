@@ -968,6 +968,15 @@
       "status": "open",
       "title": "Write a build-time MyST-to-Astro converter that fails closed on unknown constructs"
     },
+    "astro-site-32-port-docs-generators": {
+      "claim": null,
+      "needs": [
+        "astro-site-31-myst-to-mdx-converter"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Repoint the docs content generators and validators at the Astro build"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

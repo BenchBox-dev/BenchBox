@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "make site-build runs every generator before astro build; no generator depends on Sphinx import or hooks",
+    "Query docs pages present at their current URLs in the Astro output",
+    "example-validation and spellcheck run against the canonical docs/ sources and stay green",
+    "Drift checks (prompt-quickstarts-check, query-docs, image validation) fail on a seeded drift in tests"
+  ],
+  "description": "Several Python generators feed the current site:\n- scripts/generate_query_docs.py, run from the conf.py config-inited hook into docs/benchmarks/queries/\n- scripts/generate_compat_docs.py\n- scripts/generate_landing_quickstarts.py\n- the prompt-quickstarts write/check targets (landing/prompts/catalog.yaml → catalog.generated.js)\n- scripts/validate_visualization_images.py\n- the CI example-validation and spellcheck jobs\n\nMake each one run as an explicit pre-build step of make site-build, not as a Sphinx hook, and target the Astro inputs. The generators stay in Python. Their check modes must fail on drift exactly as they do today.",
+  "links": [
+    "scripts/generate_query_docs.py",
+    "scripts/generate_compat_docs.py",
+    "scripts/generate_landing_quickstarts.py",
+    "scripts/validate_visualization_images.py",
+    "make/documentation.mk"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:04:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a74d64317b3a4c32822d7a0c2ded5438",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
