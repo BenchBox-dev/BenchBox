@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "Cutover PR merged with all required checks green and the visual change approved on the exact head",
-    "Production receipt shows Astro artifacts on trunk routes; probes green",
-    "Production rollback drill and roll-forward evidence recorded",
-    "Inventory diff against production: zero missing paths; atom.xml ids unchanged",
-    "Release-pinned /docs/ switches automatically at the next release that contains website/ (verified at that release)"
+    "Develop PR merged with all required checks green and both visual approval slots recorded",
+    "Release tag contains website/ and migrated content",
+    "One production receipt shows every route rendered by Astro; probes green",
+    "Production rollback drill to the Sphinx artifact and roll-forward recorded",
+    "Inventory diff against production: zero broken URLs or fragments; atom.xml ids unchanged"
   ],
-  "description": "Go only if all of these hold:\n- the G2 parity sign-off is current, re-run on the cutover base SHA\n- the visual approval runbook is ready\n- site-deploy has a successful Astro preview with a rollback drill on record\n- the owner approves in writing\n\nOne PR to develop, alone at the queue front:\n1. Commit the converted content as the new canonical source under website/src/content. Make docs/ read-only by deleting the Sphinx sources, or keep them only if the ADR says so.\n2. Swap the docs unit in ci.yml from docs-build to site-build. Required-CI wiring and the drift guard change in the same PR.\n3. Point visual capture at the Astro build and accept the one intentional baseline change through the exact-head approval path.\n4. Switch the trunk routes in routes.yml to Astro.\n\nAfter merge: deploy through site-deploy, probe every route, record the receipt, run one production rollback drill to the last Sphinx artifact and forward again.\n\nRollback trigger: any probe failure, a feed id change, or a missing inventory path. Response: redeploy the prior artifact by receipt and revert the PR.",
+  "context": "Between step 1 and step 3, trunk routes (blog, /docs/dev/) are still rendered by Sphinx from the same docs/ sources, so publishing is not frozen. Keep that window short: cut the release promptly after step 1.",
+  "description": "Go only if all of these hold:\n- the G2 URL compatibility sign-off is re-run on the cutover base SHA\n- site-deploy has an all-Astro preview with a rollback drill on record (astro-site-52)\n- the owner approves in writing\n\nSequence:\n1. PR to develop:\n   - make site-build a required context, with its drift guard, in the same PR\n   - switch visual capture to the Astro render, with intentional approvals in both slots per astro-site-03\n   - set routes.yml to select Astro from the next release\n   Sphinx still builds docs/ and still renders production.\n2. Cut the next release through the normal release flow. The tag now contains website/ and all migrated content.\n3. site-deploy builds one all-Astro artifact: / and /docs/ from the tag; /docs/dev/, /blog/ and /results/ from trunk. Deploy, probe every route, record the receipt.\n4. Run one production rollback drill to the last Sphinx artifact by receipt, then roll forward.\n\nRollback triggers: any probe failure, a broken URL or fragment against the inventory, or a changed feed id. Response: redeploy the prior artifact by receipt. Mixed-renderer artifacts are never a fallback (D13).",
   "sessions": [
     {
       "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
@@ -15,6 +16,14 @@
       "op": "create",
       "op_id": "8097f824517b4be6bdbe7d422d6e6d07",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:49:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d9254d1792284d59bfc8944dc1e804ce",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
     }
   ]
 }

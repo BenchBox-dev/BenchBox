@@ -1079,7 +1079,7 @@
       ],
       "priority": "medium-high",
       "status": "open",
-      "title": "Decision gate G3: cut docs/ authoring and production routes over to the Astro site in one reviewed PR"
+      "title": "Decision gate G3: switch every production route from Sphinx to Astro in one release-driven deploy"
     },
     "astro-site-54-retire-sphinx-and-legacy-site": {
       "claim": null,
