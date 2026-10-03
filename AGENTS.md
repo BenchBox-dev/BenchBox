@@ -1,8 +1,8 @@
 # BenchBox Agent Guide
 
 This file is the project authority for agent work. Keep it compact: detailed
-operations belong in the linked docs, and generated skill mirrors belong to
-the catalog checkouts named in `skill-sync.conf`.
+operations belong in linked docs, and generated skill mirrors belong to
+catalog checkouts named in `skill-sync.conf`.
 
 ## Authority and provenance
 
@@ -14,7 +14,7 @@ Apply instructions in this order:
 4. loaded skills and mechanical tool output;
 5. recommendations, examples, and historical notes.
 
-Personal-global agent defaults apply only where this guide is silent; where behavior conflicts, this guide and the active project protocol win.
+Personal defaults apply only where this guide is silent; where behavior conflicts, this guide and the active protocol win.
 
 `[AUTH-PROVENANCE-001]` Classify a requirement before acting: task authority, repository policy, mechanical constraint, or recommendation. State the source when it changes scope, identity, publication, or destructive behavior. Never turn a recommendation or earlier task instruction into a standing requirement.
 
@@ -65,32 +65,31 @@ make agent-write-preflight
 
 `worktree-create` pins identity via `git config --worktree`, so later writes cannot reauthor it.
 
-Stop if `git rev-parse --show-toplevel` is the primary clone; emergency writes there need explicit user authorization plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`. Preserve unrelated dirty work; never use destructive Git/filesystem commands without approval. Use `rg`; stage only authorized paths; never `git add -A`.
+Stop if `git rev-parse --show-toplevel` is the primary clone; emergency writes there need explicit authorization plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`. Preserve unrelated dirty work; never use destructive Git/filesystem commands without approval. Use `rg`; stage only authorized paths; never `git add -A`.
 
-A disposable clone (remote agent session, CI runner) has no canonical clone; it declares `BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. Local agent sessions must use linked worktrees. Never run `git worktree prune` or `gc` inside a container mounting `.git` (pruning destroys host registrations); unlock only for safe removal after confirming the mount is inactive.
+A disposable clone (remote session, CI runner) declares `BENCHBOX_EPHEMERAL_CLONE=1`. Local sessions must use linked worktrees. Never run `git worktree prune` or `gc` inside a container mounting `.git` (pruning destroys host registrations); unlock only after confirming the mount is inactive.
 
 ## Tooling and implementation
 
 - Prefer repository `make` targets and existing helpers.
 - Python tooling is `uv` only: `uv run -- ...`, `uv add`, `uv sync`, `uv lock`.
+- `[COMMENT-POLICY-001]` Follow the comment and docstring policy (`docs/development/comment-policy.md`). Maintained first-party code has no explanatory comments or docstrings: clarify intent with structure, names, and types. Put public contracts in API docs, not source prose. Permitted directives, notices, and fixtures must be registered in `quality/comment-policy.json`. Verify with `make comment-policy-check`; resolve every finding while enforcement is advisory.
 - Research the affected path, make the narrowest coherent change, and preserve compatibility and critical-path performance. Before writing a new helper, search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
 - Use Python 3.11+, four spaces, 120 columns, Ruff, and public API type hints.
 - No credentials in Git; redact logs and use environment variables.
 - Live cloud tests and broad/destructive cleanup require explicit approval.
 
-For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stress runs use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` (announce command, maximum runtime, log path, and stop condition). Do not commit raw logs, screenshots, browser reports, or generated binaries.
+For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stress runs use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` (announce command, max runtime, log path, and stop condition). Do not commit raw logs, screenshots, browser reports, or generated binaries.
 
 ## Verification and close-out
 
 `[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a scheduled validation of the `todo-state` branch dates a past state, never a current one. A validator pass is not a `submit` pass.
 
-Before creating a batch ledger under `.todo-batch/`, add that directory to the
-checkout's `.git/info/exclude` and confirm the ledger path with `git check-ignore`.
-Do not track batch ledgers.
+Before creating a batch ledger under `.todo-batch/`, add it to `.git/info/exclude` and confirm with `git check-ignore`. Never track batch ledgers.
 
-Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
+Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
-Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Soundness-path changes get Codex connector review: resolve every thread citing the commit; arm only once its review or thumbs-up is on the current head (silent four hours: the owner's comment counts). A drift/pinning guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`, each passing when untouched. Stacked/feature-base PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
+Dev PRs target `develop` (or `release` / `published-results`), squash-merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Soundness-path changes get Codex connector review: resolve every thread citing the commit; arm only once its review or thumbs-up is on the current head (silent four hours: the owner's comment counts). A drift/pinning guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`, each passing when untouched. Stacked PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
 
 ## TODO tracker
 
@@ -102,19 +101,18 @@ Serial mode is the default for independent, cross-repository, review-separated,
 approval-separated, or otherwise unrelated work: follow the ordinary claim,
 implementation, verification, review, merge, and deployment boundaries.
 
-Feature delivery mode is opt-in for related items only after its prerequisites
-are already deployed and verified. It requires the active todo-db MCP server to
-advertise the registered-batch capability on a compatible schema; a source PR,
+Feature delivery mode is opt-in for related items only after prerequisites
+are deployed and verified. It requires the active todo-db MCP server to
+advertise registered-batch support on a compatible schema; a source PR,
 catalog pin, or local mirror is not an installation. The mode uses one shared
 integration branch and worktree, one integrator, an immutable base, an explicit
 ordered member set, frozen member scopes, explicit member/base/head/final-tree
 evidence, and one final PR. It never creates a feature-base PR, skips CI, or
 bypasses hosted/native review, merge, deployment, or authority controls.
 
-Feature delivery cannot certify or unlock the runtime, source, catalog, or
-workflow changes that make feature delivery possible. If the capability or
-schema is absent, retain serial mode and record the owned blocker and next
-operator step.
+Feature delivery cannot certify or unlock the changes that make it possible.
+If the capability or schema is absent, retain serial mode, record the owned blocker,
+and state the next operator step.
 
 ## BenchBox invariants
 
@@ -124,14 +122,14 @@ operator step.
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (release-guide.md). Mocker is local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service. `docs/operations/uat-framework.md` ("Mocker validation status") holds per-stack state. Never prune globally.
+Apple/macOS: correctness-gate digests are Linux-generated; use `make ci-linux` (`release-guide.md`). Mocker is local-only, never CI: databend's `minio` was observed to exit under it; doris/starrocks are single-service. `docs/operations/uat-framework.md` holds per-stack status. Never prune globally.
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs and owns tracker actions. Skill sources are the local catalog checkouts named in `skill-sync.conf`, copied by the vendored `tools/skill-sync` wrapper; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored local materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state, not content parity.
+Stable wrappers are `code`, `test`, `todo`, `docs`, `blog`, `benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs and owns tracker actions. Skill sources are local catalog checkouts named in `skill-sync.conf`, copied by `tools/skill-sync`; only `.claude/skills` is tracked. `.agents/skills` is the shared, gitignored materialization for Codex, Gemini, and Antigravity. Regenerate mirrors with `make skill-sync` in a write worktree; never hand-edit one. `scripts/check_untracked_skill_mirrors.sh` guards tracking state.
 
 ## Operational references
 
 - Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy), `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
-- Agent: unpublished `docs/agent/` (`review-protocol.md`). Development: `docs/development/` — `adding-new-platforms.md`, `pr-base-branch-policy.md`
+- Agent: unpublished `docs/agent/` (`review-protocol.md`). Development: `docs/development/` — `adding-new-platforms.md`, `comment-policy.md`, `pr-base-branch-policy.md`
 - SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`
