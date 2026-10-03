@@ -397,6 +397,8 @@ def command_record(args: argparse.Namespace) -> int:
     built = receipt_module.validate_receipt(json.loads(raw))
     if not isinstance(built["deployment_id"], int):
         raise deployments.DeploymentLookupError("the receipt carries no deployment id to record against")
+    if not receipt_module.is_last_known_good(built):
+        raise deployments.DeploymentLookupError("the receipt is not last-known-good; only passing deploys are recorded")
     client = _client()
     deployments.post_receipt_status(
         client,

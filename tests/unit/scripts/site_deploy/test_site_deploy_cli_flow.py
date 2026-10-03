@@ -304,6 +304,16 @@ def test_record_refuses_a_receipt_without_a_deployment_id(tmp_path: Path, capsys
     assert "no deployment id" in capsys.readouterr().err
 
 
+def test_record_refuses_a_receipt_whose_probes_failed(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    built = make_receipt(run_id=77, trunk=SHA_A)
+    built["deployment_id"] = 5
+    built["probes"]["ok"] = False
+    (tmp_path / "receipt").mkdir()
+    (tmp_path / "receipt" / "receipt.json").write_bytes(receipt.canonical_bytes(built))
+    assert cli.main(["record", "--out-dir", str(tmp_path)]) == 1
+    assert "not last-known-good" in capsys.readouterr().err
+
+
 def test_receipt_artifact_names_pick_the_run_and_order_attempts_newest_first() -> None:
     names = [
         "site-deploy-receipt-9-1",

@@ -347,7 +347,7 @@ jobs:
           retention-days: 90
 
       - name: Record the receipt on the deployment
-        if: always() && steps.receipt_upload.outcome == 'success'
+        if: always() && steps.finalize.outcome == 'success' && steps.receipt_upload.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m scripts.site_deploy record --out-dir out --base-url https://benchbox.dev

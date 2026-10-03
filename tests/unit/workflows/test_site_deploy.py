@@ -76,6 +76,7 @@ def test_receipt_is_uploaded_before_the_deployment_status_is_posted() -> None:
     assert steps[upload]["id"] == "receipt_upload"
     assert steps[upload]["with"]["if-no-files-found"] == "error"
     assert "steps.receipt_upload.outcome == 'success'" in steps[record]["if"]
+    assert "steps.finalize.outcome == 'success'" in steps[record]["if"]
     assert "scripts.site_deploy record" in steps[record]["run"]
     assert "record" not in steps[finalize]["run"]
 
