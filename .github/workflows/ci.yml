@@ -383,9 +383,22 @@ jobs:
               exit 1
             fi
             while IFS= read -r pr_number; do
-              gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
-              gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
-                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
+              gh api "repos/$REPO/pulls/$pr_number" > "$RUNNER_TEMP/pr-metadata.json"
+              PR_HEAD="$(jq -er '.head.sha' "$RUNNER_TEMP/pr-metadata.json")"
+              PR_BASE="$(jq -er '.base.sha' "$RUNNER_TEMP/pr-metadata.json")"
+              if ! [[ "$PR_HEAD" =~ ^[0-9a-f]{40}$ && "$PR_BASE" =~ ^[0-9a-f]{40}$ ]]; then
+                echo "soundness-flag: invalid base or head of PR #$pr_number; failing closed" >&2
+                exit 1
+              fi
+              git fetch --no-tags origin "$PR_HEAD" "$PR_BASE"
+              git cat-file -e "${PR_HEAD}^{commit}"
+              git cat-file -e "${PR_BASE}^{commit}"
+              git diff --name-only --no-renames "${PR_BASE}...${PR_HEAD}" > "$RUNNER_TEMP/changed-paths.txt"
+              if [ ! -s "$RUNNER_TEMP/changed-paths.txt" ]; then
+                echo "soundness-flag: PR #$pr_number changed no files; failing closed" >&2
+                exit 1
+              fi
+              jq -r '.body // ""' "$RUNNER_TEMP/pr-metadata.json" > "$RUNNER_TEMP/pr-body.md"
               check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
             done < "$RUNNER_TEMP/merge-group-prs.txt"
             if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then

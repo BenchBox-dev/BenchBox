@@ -124,8 +124,7 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     assert "--always soundness-flag" in next(step for step in tooling["steps"] if "run" in step)["run"]
     assert "MERGE_GROUP_PRS" in soundness_step["env"]
     assert "BASE_SHA" in soundness_step["env"]
-    assert "gh api --paginate" in soundness_step["run"]
-    assert "previous_filename" in soundness_step["run"]
+    assert "/files" not in soundness_step["run"]
     assert '"$MERGE_GROUP_PRS" = "null"' in soundness_step["run"]
     assert "resolving anchor from queue ref" in soundness_step["run"]
     assert "content verified in queue" in soundness_step["run"]
@@ -219,7 +218,8 @@ gh() {
     *".head.sha") printf '%s' "$TEST_HEAD" ;;
     *".base.sha") printf '%s' "$TEST_BASE" ;;
     *".body // empty") printf '%s' "$TEST_BODY" ;;
-    *"/files "*) printf '%s\n' "$TEST_SOURCE_PATH" ;;
+    *"/files "*) echo "capped file listing must not be used" >&2; return 1 ;;
+    *"repos/$REPO/pulls/"*) "$TEST_PYTHON" -c 'import json, os; print(json.dumps({"head": {"sha": os.environ["TEST_HEAD"]}, "base": {"sha": os.environ["TEST_BASE"]}, "body": os.environ["TEST_BODY"]}))' ;;
     *) echo "unexpected gh call: $*" >&2; return 1 ;;
   esac
 }
@@ -418,3 +418,85 @@ def test_pull_request_head_without_a_merge_commit_keeps_the_event_base_compariso
     result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["event_base"])
     assert result.returncode == 0, result.stderr
     assert paths == ["docs/x.md", "docs/y.md"], "a single-parent head must not be compared with HEAD^"
+
+
+def _extend_queue_anchor(history: dict[str, Any], files: dict[str, str | None]) -> None:
+    repo = history["repo"]
+    _git(repo, "checkout", "source")
+    for relative, content in files.items():
+        path = repo / relative
+        if content is None:
+            path.unlink()
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+    _git(repo, "add", *files)
+    _git(repo, "commit", "-m", "Extend approved source fixture")
+    history["head"] = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "queue")
+    _git(repo, "cherry-pick", history["head"])
+
+
+def test_payload_present_queue_checks_soundness_path_after_three_thousand_files(
+    queue_history: dict[str, Any],
+) -> None:
+    files = {f"docs/bulk/{index:04}.txt": "changed\n" for index in range(3001)}
+    protected = "quality/comment-policy.json"
+    files[protected] = "{}\n"
+    _extend_queue_anchor(queue_history, files)
+    result = _run_queue_guard(queue_history, MERGE_GROUP_PRS='[{"number": 1}]')
+    assert result.returncode != 0
+    assert "Soundness review:" in result.stderr
+    paths = (queue_history["runner"] / "changed-paths.txt").read_text(encoding="utf-8").splitlines()
+    assert len(paths) == 3003
+    assert paths.index(protected) >= 3000
+    reviewed = _run_queue_guard(queue_history, MERGE_GROUP_PRS='[{"number": 1}]', TEST_BODY=VALID_REVIEW)
+    assert reviewed.returncode == 0, reviewed.stdout + reviewed.stderr
+
+
+@pytest.mark.parametrize("operation", ["delete", "rename"])
+def test_payload_present_queue_keeps_removed_protected_path(queue_history: dict[str, Any], operation: str) -> None:
+    protected = "quality/comment-policy.json"
+    _extend_queue_anchor(queue_history, {protected: "{}\n"})
+    queue_history["base"] = queue_history["head"]
+    changes: dict[str, str | None] = {protected: None}
+    if operation == "rename":
+        changes["docs/moved-policy.json"] = "{}\n"
+    _extend_queue_anchor(queue_history, changes)
+    result = _run_queue_guard(queue_history, MERGE_GROUP_PRS='[{"number": 1}]')
+    assert result.returncode != 0
+    assert "Soundness review:" in result.stderr
+    paths = (queue_history["runner"] / "changed-paths.txt").read_text(encoding="utf-8").splitlines()
+    assert protected in paths
+    if operation == "rename":
+        assert "docs/moved-policy.json" in paths
+    reviewed = _run_queue_guard(queue_history, MERGE_GROUP_PRS='[{"number": 1}]', TEST_BODY=VALID_REVIEW)
+    assert reviewed.returncode == 0, reviewed.stdout + reviewed.stderr
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"TEST_HEAD": ""},
+        {"TEST_BASE": ""},
+        {"TEST_HEAD": "f" * 40},
+        {"TEST_BASE": "e" * 40},
+        {"TEST_HEAD": "HEAD"},
+        {"TEST_HEAD": "--help"},
+    ],
+)
+def test_payload_present_queue_refuses_incomplete_commit_evidence(
+    queue_history: dict[str, Any], overrides: dict[str, str]
+) -> None:
+    result = _run_queue_guard(queue_history, MERGE_GROUP_PRS='[{"number": 1}]', **overrides)
+    assert result.returncode != 0, result.stdout + result.stderr
+
+
+def test_payload_present_queue_refuses_empty_anchor_change(queue_history: dict[str, Any]) -> None:
+    result = _run_queue_guard(
+        queue_history,
+        MERGE_GROUP_PRS='[{"number": 1}]',
+        TEST_HEAD=queue_history["base"],
+    )
+    assert result.returncode != 0
+    assert "changed no files; failing closed" in result.stderr
