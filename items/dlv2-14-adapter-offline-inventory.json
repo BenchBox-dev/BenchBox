@@ -4,7 +4,7 @@
     "Every adapter has at least translation and DDL offline cases, or a recorded justified exemption",
     "Offline adapter tests run in T1 (touched core) and T2"
   ],
-  "context": "Muse A7 / agy A1 / codex C6.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN, plan only; no Task14 worktree/branch/source edits/tests or claim. Scratch /tmp/dlv2-task14-manifest.json. Approved approach uses get_adapter_imports()49 concrete adapters from52metadata; explicit canonical inventory conserved when SDKs missing, meaningful translation+DDL or justified positive alternatives, about98new semantic cases. Reuse real config/CLI/compat fixtures; no population availability filter/nonempty-SQL-only/mocked translator. Polars expression/schema and Influx measurement/line-protocol are positive exemptions. Fix unscoped SnowflakeAdapter.add_cli_arguments overwrite in tests/fixtures/platform_fixtures.py with owned cleanup. Budget0.5sT1 retained. Create mandated linked worktree fix/offline-adapter-coverage only after resume; obtain shared serial test slot. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
+  "context": "Closed 2026-10-03 by owner decision. Delivered by #2488 (squash d8cfc57e3fd28cb9e8a28be26df4d02d5682a0e5): tests/unit/platforms/test_offline_adapter_inventory.py enumerates the 49 adapters from get_adapter_imports() and fails on any without an inventory entry (acceptance 1); each adapter has real DDL and query translation cases, with positive exemptions for Polars and InfluxDB (acceptance 2). Acceptance 3 is met through the medium tier only, accepted by the owner: the module is marked unit+medium because importing every adapter from cold exceeds the fast-lane budget, and since #2558 (d419b9488) the medium tier runs in PR CI whenever core inputs change and in trunk.yml after every merge to develop.",
   "description": "T2 runs only four local engines, so breakage in the other 50+ adapters must be caught offline in T1/T2. Build a machine-checked inventory mapping every adapter registered in the platform registry to its offline cases: SQL translation/dialect (e.g. tests/unit/platforms/test_athena_sql_generation.py), DDL generation, sql_compat rules, CLI argument wiring. Missing cases become tests in this item (or child items if large).",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "update",
       "op_id": "34b17a34e0ea4fe5ac61d3a84daa3386",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:9509e403d03f67d617690747",
+      "at": "2026-10-03T14:44:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "99c5e87db0ab47fe8d2d03c735776a42",
+      "session_id": "cc596d308acb47cca2393bab672e93be"
     }
   ]
 }
