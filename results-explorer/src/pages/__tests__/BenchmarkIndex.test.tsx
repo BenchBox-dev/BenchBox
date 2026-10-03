@@ -1062,6 +1062,43 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(scrollIntoView.mock.instances).toContain(rankCard));
   });
 
+  it("anchors every saveable analysis card so saved views deep-link to their chart", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // Every card SummaryChartOverview can render a save control for needs a
+    // stable anchor: the saved URL stores it, and reopening resolves it.
+    const chartIds = [
+      "query_heatmap",
+      "percentile_ladder",
+      "cdf_chart",
+      "query_histogram",
+      "stacked_phase",
+      "time_series",
+      "rank_table",
+      "cost_scatter",
+    ];
+    for (const chartId of chartIds) {
+      const card = await screen.findByTestId(`summary-chart-preview-${chartId}`);
+      expect(card.getAttribute("id")).toMatch(/^benchmark-section-/);
+    }
+    const anchorIds = chartIds.map((chartId) =>
+      container.querySelector(`[data-testid="summary-chart-preview-${chartId}"]`)?.getAttribute("id")
+    );
+    expect(new Set(anchorIds).size).toBe(chartIds.length);
+  });
+
+  it("opens the saved analysis card for a card deep link", async () => {
+    window.history.replaceState(null, "", "/results/tpch/#benchmark-section-cdf");
+    Element.prototype.scrollIntoView = vi.fn();
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+
+    // A saved CDF (or percentile, histogram, phase, trend, or cost) view
+    // returns to the page with that card open, not closed.
+    await waitFor(() =>
+      expect(screen.getByTestId("summary-chart-full-cdf_chart").textContent).not.toBe("")
+    );
+  });
+
   it("list view sorts rows from table headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());

@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { RunDateChip } from "@/components/RunAge";
 import { formatCount } from "@/lib/copyFormatters";
+import { loadDashboards } from "@/lib/dashboards";
 import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -109,6 +110,8 @@ export function Home(_: RoutableProps) {
       />
 
       <FlywheelStrip />
+
+      <DashboardStrip />
 
       <section aria-label="Corpus summary" class="mb-8 grid grid-cols-2 gap-4 text-center sm:mb-12 lg:grid-cols-4">
         <StatCard
@@ -227,6 +230,33 @@ const FLYWHEEL_STEPS = [
   { label: "Compare your result", href: "/results/query" },
   { label: "Submit a bundle", href: "/docs/contributing-results.html" },
 ];
+
+/** Entry point to user dashboards: always linked, previews names when any exist. */
+function DashboardStrip() {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      setNames(loadDashboards().map((dashboard) => dashboard.name));
+    } catch {
+      setNames([]);
+    }
+  }, []);
+  return (
+    <section aria-label="Your dashboards" class="mb-8 sm:mb-12">
+      <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h2 class="text-xl font-semibold text-[var(--bb-data-fg-primary)]">Your dashboards</h2>
+        <a href="/results/dashboards/" class="text-sm font-medium text-[var(--bb-accent)] no-underline hover:underline">
+          Open dashboards
+        </a>
+      </div>
+      <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+        {names.length === 0
+          ? "Saved chart configurations live in this browser only. Open any chart and choose Save view to start one."
+          : `Saved chart configurations: ${names.join(", ")}.`}
+      </p>
+    </section>
+  );
+}
 
 function FlywheelStrip() {
   return (
