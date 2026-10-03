@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Both components exist with tests; the cited variant shows snapshot identity",
+    "A withdrawn result fixture renders as withdrawn in both variants",
+    "Metric values match the Explorer for the same snapshot (shared-code test)",
+    "Pages without embeds still fetch zero Explorer bytes; axe clean"
+  ],
+  "description": "A post-cutover feature with its own owner approval before starting. Add two distinct Preact-island components:\n- **Cited result.** Frozen to a named corpus snapshot or bundle id. Shows that id and date, and never changes after publication. Use this in blog analysis.\n- **Current results.** Explicitly labelled live, reading the current published snapshot.\n\nBoth use the Explorer's canonical metric definitions, imported from the Explorer package, never reimplemented. Both honour the same visibility, admission and withdrawal rules as the Explorer: a withdrawn result renders as withdrawn and is never silently dropped or kept. Both load DuckDB only when scrolled into view, and pages without embeds ship zero Explorer bytes.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:14:18Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f320205e4b414fa69cabec54697ed0cc",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}

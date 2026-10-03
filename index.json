@@ -1078,6 +1078,15 @@
       "status": "open",
       "title": "Retire Sphinx, ablog, the static landing page, and duplicate theme tooling after the Astro site is stable"
     },
+    "astro-site-60-results-embeds": {
+      "claim": null,
+      "needs": [
+        "astro-site-54-retire-sphinx-and-legacy-site"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Add result embeds for docs and blog that cite their snapshot and obey Explorer withdrawal rules"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
