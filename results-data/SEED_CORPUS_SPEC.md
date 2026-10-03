@@ -29,7 +29,7 @@ repeated runs of one platform/version do not pad that matrix.
 | Workflow | `.github/workflows/seed-corpus.yml` |
 | Trigger | Monthly cron `0 7 1 * *` (07:00 UTC on the 1st) plus manual `workflow_dispatch` |
 | Producer identity | `benchbox-bot` via GitHub Actions |
-| Benchmark phases | `generate,load,power` |
+| Benchmark phases | `generate,load,power` plus `throughput` repetitions, segregated into `#throughput` cohorts so multi-stream runs never pollute power cohorts |
 | Trust label | `maintainer-run` |
 | Visibility | `public-curated` |
 | Supported identities | DuckDB, DataFusion, Polars DataFrame, and ClickHouse Local; no cloud credentials |

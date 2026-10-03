@@ -195,6 +195,39 @@ def _platform_version(data: dict) -> str:
     return str(value) if value and value != "unknown" else "unknown"
 
 
+def _bundle_phase(data: dict) -> str:
+    """Resolve a bundle's benchmark phase with transformer parity.
+
+    Mirrors ``_project/scripts/explorer_pipeline/transformer.py``: an
+    explicit ``benchmark.test_type`` wins, otherwise the ``phases`` object
+    decides between power and throughput, ignoring ``NOT_RUN`` placeholders. ``or`` (not ``dict.get``
+    defaults) so an explicit ``null`` can never poison downstream
+    sorting with ``None``.
+    """
+    benchmark = data.get("benchmark") or {}
+    declared = benchmark.get("test_type") or ""
+    if declared:
+        return str(declared)
+    phases = data.get("phases") or {}
+    if _phase_executed(phases.get("power_test")):
+        return "power"
+    if _phase_executed(phases.get("throughput_test")):
+        return "throughput"
+    return "unknown"
+
+
+def _phase_executed(phase: object) -> bool:
+    """Whether a ``phases`` entry records a phase that actually ran.
+
+    Bundles list skipped phases as ``{"status": "NOT_RUN"}`` placeholders,
+    which are non-empty and therefore truthy; only a non-empty entry whose
+    status is not ``NOT_RUN`` counts.
+    """
+    if not isinstance(phase, dict) or not phase:
+        return False
+    return str(phase.get("status") or "").upper() != "NOT_RUN"
+
+
 def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     """Extract inventory metadata from a bundle file."""
     try:
@@ -214,6 +247,7 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "platform": platform.get("name", "unknown"),
         "platform_version": _platform_version(data),
         "scale_factor": benchmark.get("scale_factor", 0),
+        "phase": _bundle_phase(data),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
         "trust_label": _bundle_trust_label(bundle_path, bundles_dir),
@@ -250,22 +284,27 @@ def generate_inventory(bundles_dir: Path) -> dict:
         )
     )
 
-    cohorts: dict[str, list[str]] = {}
-    cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+    # Phase-suffixed throughput cohorts keep multi-stream throughput runs out of
+    # single-stream power cohorts, which share (benchmark, sf) keys downstream.
+    # Power and unknown phases both use the legacy bare key, so members merge
+    # by final key instead of overwriting one another.
+    cohort_members: defaultdict[str, set[str]] = defaultdict(set)
     for entry in entries:
-        key = (entry["benchmark"], str(entry["scale_factor"]))
+        phase = str(entry.get("phase", "unknown"))
+        suffix = "" if phase in ("power", "unknown") else f"#{phase}"
+        key = f"{entry['benchmark']}@sf{entry['scale_factor']}{suffix}"
         identity = entry["platform"]
         if entry["platform_version"] != "unknown":
             identity = f"{identity} v{entry['platform_version']}"
         cohort_members[key].add(identity)
 
-    for (benchmark, scale_factor), platforms in sorted(cohort_members.items()):
-        cohorts[f"{benchmark}@sf{scale_factor}"] = sorted(platforms)
+    cohorts: dict[str, list[str]] = {key: sorted(platforms) for key, platforms in sorted(cohort_members.items())}
 
     by_benchmark = Counter(entry["benchmark"] for entry in entries)
     by_platform = Counter(entry["platform"] for entry in entries)
     by_trust_label = Counter(entry["trust_label"] for entry in entries)
     by_funding = Counter(entry["funding"] for entry in entries)
+    by_phase = Counter(entry.get("phase", "unknown") for entry in entries)
 
     return {
         "schema_version": "2.3",
@@ -278,6 +317,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
             "by_platform": dict(sorted(by_platform.items())),
             "by_trust_label": dict(sorted(by_trust_label.items())),
             "by_funding": dict(sorted(by_funding.items())),
+            "by_phase": dict(sorted(by_phase.items())),
         },
     }
 

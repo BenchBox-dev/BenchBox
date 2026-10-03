@@ -67,6 +67,7 @@ class TestGenerateInventory:
             "by_platform": {},
             "by_trust_label": {},
             "by_funding": {},
+            "by_phase": {},
         }
 
     def test_sidecar_sets_community_trust_label(self, tmp_path: Path) -> None:
@@ -317,3 +318,80 @@ class TestMain:
 
         assert script.main(["--check"]) == 1
         assert "out of date" in capsys.readouterr().err
+
+    def test_phase_extraction_and_summary(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        tp["benchmark"]["test_type"] = "throughput"
+        (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases["power.json"] == "power"
+        assert phases["throughput.json"] == "throughput"
+        assert inventory["summary"]["by_phase"] == {"power": 1, "throughput": 1}
+
+    def test_phase_handles_null_test_type_and_phases_object(self, tmp_path: Path) -> None:
+        null_tt = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        null_tt["benchmark"]["test_type"] = None
+        (tmp_path / "null.json").write_text(json.dumps(null_tt), encoding="utf-8")
+        via_phases = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        via_phases["phases"] = {"throughput_test": {"streams": 3}}
+        (tmp_path / "viaphases.json").write_text(json.dumps(via_phases), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases["null.json"] == "unknown"
+        assert phases["viaphases.json"] == "throughput"
+        assert inventory["summary"]["by_phase"] == {"throughput": 1, "unknown": 1}
+
+    def test_phase_fallback_ignores_not_run_placeholders(self, tmp_path: Path) -> None:
+        throughput_only = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        throughput_only["phases"] = {
+            "power_test": {"status": "NOT_RUN"},
+            "throughput_test": {"status": "COMPLETED", "duration_ms": 10},
+        }
+        (tmp_path / "tp.json").write_text(json.dumps(throughput_only), encoding="utf-8")
+        power_only = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        power_only["phases"] = {
+            "power_test": {"status": "COMPLETED", "duration_ms": 10},
+            "throughput_test": {"status": "NOT_RUN"},
+        }
+        (tmp_path / "pw.json").write_text(json.dumps(power_only), encoding="utf-8")
+        neither = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        neither["phases"] = {"power_test": {"status": "NOT_RUN"}, "throughput_test": {"status": "NOT_RUN"}}
+        (tmp_path / "none.json").write_text(json.dumps(neither), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases == {"tp.json": "throughput", "pw.json": "power", "none.json": "unknown"}
+
+    def test_unknown_phase_merges_with_power_cohort(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        unknown = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DataFusion")
+        (tmp_path / "unknown.json").write_text(json.dumps(unknown), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["cohorts"] == {"tpch@sf1.0": ["DataFusion v1.0.0", "DuckDB v1.0.0"]}
+
+    def test_throughput_runs_do_not_pollute_power_cohorts(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        # A different platform per phase: a merged cohort would list both.
+        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DataFusion")
+        tp["benchmark"]["test_type"] = "throughput"
+        (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["cohorts"]["tpch@sf1.0"] == ["DuckDB v1.0.0"]
+        assert inventory["cohorts"]["tpch@sf1.0#throughput"] == ["DataFusion v1.0.0"]
