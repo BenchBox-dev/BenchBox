@@ -61,6 +61,7 @@ def test_ruleset_drift_runs_trusted_develop_code_with_the_token() -> None:
     workflow = yaml.safe_load(NIGHTLY.read_text(encoding="utf-8"))
     job = workflow["jobs"]["ruleset-drift"]
 
+    assert "needs" not in job
     assert job["continue-on-error"] is True
     checkout = next(step for step in job["steps"] if str(step.get("uses", "")).startswith("actions/checkout@"))
     assert checkout["with"]["ref"] == "develop"

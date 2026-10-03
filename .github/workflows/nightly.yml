@@ -1236,7 +1236,6 @@ jobs:
 
   ruleset-drift:
     name: ruleset-drift
-    needs: []
     runs-on: ubuntu-latest
     timeout-minutes: 5
     continue-on-error: true
