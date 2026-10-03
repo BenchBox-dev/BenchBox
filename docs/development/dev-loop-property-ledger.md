@@ -91,6 +91,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
 | `todo-state-validate.yml` | tooling | Tracker state validation |
 | `tpcds-staged-maturation.yml` | tooling | Weekly TPC-DS cross-surface maturation report |
+| `trunk.yml` | product-safety | Post-merge fast lane, medium tier and correctness gate on develop |
 | `upload-answers.yml` | product-safety | Answer file publication |
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |

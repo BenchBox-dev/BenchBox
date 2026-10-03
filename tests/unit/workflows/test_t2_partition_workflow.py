@@ -46,7 +46,7 @@ def test_correctness_partitions_preserve_each_gate_once() -> None:
 def test_medium_selection_and_receipts_gate_core() -> None:
     jobs = _jobs("ci.yml")
     medium = jobs["medium-test"]
-    assert medium["strategy"] == {"fail-fast": False, "matrix": {"shard_index": [0, 1]}}
+    assert medium["strategy"] == {"fail-fast": False, "matrix": {"shard_index": [0, 1, 2, 3]}}
     assert medium["needs"] == ["ci-paths", "medium-collect"]
     selector = "medium and not (slow or stress or resource_heavy or live_integration)"
     collect_text = "\n".join(step.get("run", "") for step in jobs["medium-collect"]["steps"])
@@ -81,7 +81,7 @@ def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
     assert names.index(memory_step["name"]) == names.index(run_step["name"]) + 1
 
 
-def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
+def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
     jobs = _jobs("ci.yml")
     payload = (
         "medium-collect",
@@ -98,7 +98,7 @@ def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
         assert jobs[name]["runs-on"] == "ubuntu-latest"
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
-    assert count == 10
+    assert count == 12
 
 
 def test_native_binary_framing_remains_required_before_merge() -> None:
