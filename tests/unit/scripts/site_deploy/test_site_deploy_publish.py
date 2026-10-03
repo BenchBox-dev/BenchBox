@@ -89,6 +89,17 @@ def test_probe_matches_served_bytes_and_flags_a_changed_route(tmp_path: Path) ->
         assert bad["attempts"] == 2
 
 
+def test_probe_retries_a_stale_deep_link_fallback_with_the_checksums(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deep_links = iter([{"ok": False, "status": 404, "detail": "404 fallback body missing"}, {"ok": True}])
+    monkeypatch.setattr(probe, "run_verify_live", lambda *_: {"ok": True, "matched_checksums": {"/": "a" * 64}})
+    monkeypatch.setattr(probe, "check_deep_link", lambda *_: next(deep_links))
+    result = probe.probe("http://example.invalid", {"/": "a" * 64}, tmp_path, attempts=3, delay=0, sleep=lambda _: None)
+    assert result["ok"] is True
+    assert result["attempts"] == 2
+
+
 def test_probe_fails_when_the_target_is_unreachable(tmp_path: Path) -> None:
     result = probe.probe("http://127.0.0.1:9", {"/": "a" * 64}, tmp_path, attempts=1, delay=0, timeout=1)
     assert result["ok"] is False

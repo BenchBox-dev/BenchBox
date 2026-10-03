@@ -501,6 +501,9 @@ SITE_BUILD_INPUTS = [
     "results-data/corpus-inventory.json",
     "scripts/generate_query_docs.py",
     "benchbox/core/query_catalog.py",
+    "benchbox/__init__.py",
+    "benchbox/utils/dialect_utils.py",
+    "_binaries/tpc-h/linux-x86_64/dbgen",
     "benchbox/core/tpch/benchmark.py",
     "_sources/tpc-h/dbgen/queries/1.sql",
     "scripts/publication/check_artifact_privacy.py",
@@ -530,7 +533,7 @@ def test_site_build_inputs_trigger_the_site_build_gate(rules: dict[str, list[str
 
 
 def test_unrelated_change_skips_the_site_build_gate(rules: dict[str, list[str]]) -> None:
-    decision = classify_paths(["benchbox/cli/run.py", "tests/unit/test_x.py"], rules)
+    decision = classify_paths(["tests/unit/test_x.py", "examples/getting_started/run.py"], rules)
 
     assert decision["site_needed"] is False
     assert decision["site_paths"] == []
@@ -550,7 +553,7 @@ def test_github_output_exposes_site_needed(rules: dict[str, list[str]], tmp_path
     assert "site-needed=true\n" in output.read_text(encoding="utf-8")
 
     skipped = tmp_path / "skipped-output.txt"
-    write_github_output(skipped, classify_paths(["benchbox/cli/run.py"], rules))
+    write_github_output(skipped, classify_paths(["tests/unit/test_x.py"], rules))
     assert "site-needed=false\n" in skipped.read_text(encoding="utf-8")
 
 

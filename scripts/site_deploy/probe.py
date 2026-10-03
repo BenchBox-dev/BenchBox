@@ -67,14 +67,15 @@ def probe(
     write_manifest(manifest, checksums)
     endpoints = sorted(checksums)
     report: dict[str, Any] = {}
+    deep_link: dict[str, Any] = {"ok": False, "status": None, "detail": "not probed"}
     used = 0
     for used in range(1, attempts + 1):
         report = run_verify_live(base_url, manifest, endpoints, timeout)
-        if report.get("ok") is True:
+        deep_link = check_deep_link(base_url, timeout)
+        if report.get("ok") is True and deep_link["ok"]:
             break
         if used < attempts:
             sleep(delay)
-    deep_link = check_deep_link(base_url, timeout)
     return {
         "ok": report.get("ok") is True and deep_link["ok"],
         "base_url": base_url,
