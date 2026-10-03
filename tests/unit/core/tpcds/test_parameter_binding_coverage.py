@@ -78,6 +78,15 @@ def _flatten(values) -> Iterator[object]:
             yield value
 
 
+def _canonical(value: object) -> str:
+    """A drawn or bound value in a form that ignores numeric type and letter case."""
+    text = str(value).strip()
+    try:
+        return repr(float(text))
+    except ValueError:
+        return text.lower()
+
+
 def _values_in_sql(dsqgen, query_id: int, logged: Mapping[str, str]) -> set[str]:
     """The logged names (``NAME.NN``) whose own value reaches the SQL that BenchBox runs.
 
@@ -125,10 +134,11 @@ def test_adapter_reads_every_value_that_reaches_the_sql(dsqgen, query_id, seed, 
     unread = reaching - recording.read
     assert not unread, f"Q{query_id} seed={seed} stream={stream_id}: the adapter never reads {sorted(unread)}"
     # Reading a value is not enough: it must reach the output. A derived value (Q39's MONTH+1) sits
-    # beside its base value, so the base value itself is still expected to appear. Case is ignored
-    # because column names drawn in upper case (Q1's SR_FEE) are bound as the lower-case column.
-    output = {str(value).lower() for value in _flatten(parameters.values())}
-    dropped = {key for key in reaching if logged[key].lower() not in output}
+    # beside its base value, so the base value itself is still expected to appear. Values are compared
+    # after _canonical, because adapters convert types (Q33's GMT "-5" is bound as -5.0) and bind column
+    # names drawn in upper case (Q1's SR_FEE) as the lower-case column.
+    output = {_canonical(value) for value in _flatten(parameters.values())}
+    dropped = {key for key in reaching if _canonical(logged[key]) not in output}
     assert not dropped, f"Q{query_id} seed={seed} stream={stream_id}: the adapter drops {sorted(dropped)}"
 
 
