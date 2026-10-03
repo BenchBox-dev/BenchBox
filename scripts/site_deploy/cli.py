@@ -207,12 +207,7 @@ def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any
     shas = candidate_module.first_parent_shas(args.repo_dir, "HEAD")
     found = candidate_module.find_candidate(client, shas, tag)
     bootstrap = args.bootstrap or args.mode == "preview"
-    try:
-        deployed = generation.read_deployed(client, loader, allow_bootstrap=bootstrap)
-    except generation.GenerationAuthorityError:
-        if args.mode != "preview":
-            raise
-        deployed = None
+    deployed = generation.read_deployed(client, loader, allow_bootstrap=bootstrap)
     decision = generation.generation_gate(
         candidate_trunk=found.trunk_sha,
         candidate_tag=tag,

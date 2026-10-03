@@ -67,6 +67,23 @@ def test_bootstrap_resolve_orders_against_the_newest_receipt_and_records_the_car
     assert code == 1
 
 
+def test_preview_refuses_when_the_recorded_receipt_is_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api = FakeGitHub()
+    _green(api)
+    api.record_deployment(10, make_receipt(run_id=1, trunk=SHA_A, generation=4), "2026-01-01T00:00:01Z")
+    _use(monkeypatch, api)
+
+    def gone(run_id: int, expected_sha256: str | None = None) -> bytes:
+        raise OSError("expired")
+
+    monkeypatch.setattr(cli, "gh_receipt_loader", lambda repo: gone)
+    code, resolved = _resolve(tmp_path, "--mode", "preview")
+    assert code == 1
+    assert resolved == {}
+
+
 def test_current_unknown_rollback_requires_a_recorded_target_and_marks_the_parent_unknown(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
