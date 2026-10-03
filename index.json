@@ -915,7 +915,8 @@
       "claim": null,
       "needs": [
         "astro-site-00-decisions-adr",
-        "astro-site-01-url-content-inventory"
+        "astro-site-01-url-content-inventory",
+        "astro-site-02-api-reference-decision"
       ],
       "priority": "medium-high",
       "status": "open",
