@@ -176,14 +176,37 @@ def test_complete_file_list_uses_the_soundness_predicate() -> None:
     assert matcher(SOUNDNESS_FILES) is True
 
 
+def _run(created_at: str, action: str, path: str = ".github/workflows/oracle-review.yml") -> dict[str, Any]:
+    return {"path": path, "created_at": created_at, "display_title": f"oracle-review ({action})"}
+
+
 def test_own_run_dates_match_plain_and_ref_qualified_workflow_paths() -> None:
     runs = [
-        {"path": ".github/workflows/oracle-review.yml", "created_at": "2026-10-01T14:00:00Z"},
-        {"path": ".github/workflows/oracle-review.yml@refs/pull/7/merge", "created_at": "2026-10-01T15:00:00Z"},
-        {"path": ".github/workflows/ci.yml", "created_at": "2026-10-01T16:00:00Z"},
+        _run("2026-10-01T14:00:00Z", "opened"),
+        _run("2026-10-01T15:00:00Z", "synchronize", ".github/workflows/oracle-review.yml@refs/pull/7/merge"),
+        _run("2026-10-01T16:00:00Z", "synchronize", ".github/workflows/ci.yml"),
         {"created_at": "2026-10-01T17:00:00Z"},
     ]
-    assert oracle_review_check.own_run_dates(runs) == ["2026-10-01T14:00:00Z", "2026-10-01T15:00:00Z"]
+    assert oracle_review_check.own_run_dates(runs) == [
+        "2026-10-01T14:00:00Z",
+        "2026-10-01T14:00:00Z",
+        "2026-10-01T15:00:00Z",
+    ]
+
+
+def test_reopened_and_ready_runs_do_not_move_the_head_transition() -> None:
+    runs = [
+        _run("2026-10-01T12:30:00Z", "opened"),
+        _run("2026-10-01T15:00:00Z", "reopened"),
+        _run("2026-10-01T15:30:00Z", "ready_for_review"),
+    ]
+    dates = oracle_review_check.own_run_dates(runs)
+    assert oracle_review_check.head_transition_date(HEAD_DATE, dates) == "2026-10-01T12:30:00Z"
+
+
+def test_first_run_for_a_head_that_advanced_while_closed_is_a_transition() -> None:
+    dates = oracle_review_check.own_run_dates([_run("2026-10-01T15:00:00Z", "reopened")])
+    assert oracle_review_check.head_transition_date(HEAD_DATE, dates) == "2026-10-01T15:00:00Z"
 
 
 def test_latest_run_for_a_restored_head_moves_the_head_transition() -> None:

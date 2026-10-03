@@ -35,7 +35,7 @@ def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
     triggers = _triggers()
     assert set(triggers) == {"pull_request", "pull_request_review", "merge_group"}
     assert triggers["merge_group"]["types"] == ["checks_requested"]
-    assert triggers["pull_request"]["types"] == ["opened", "synchronize"]
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "ready_for_review"]
     assert triggers["pull_request_review"]["types"] == ["submitted", "dismissed"]
 
 
@@ -78,3 +78,7 @@ def test_checkout_uses_the_base_commit_so_the_judged_pull_request_cannot_change_
     assert "github.event.pull_request.base.sha" in ref
     assert "github.event.merge_group.base_sha" in ref
     assert "head" not in ref
+
+
+def test_run_name_records_the_event_action_the_script_uses_to_find_head_moves() -> None:
+    assert _load()["run-name"] == "oracle-review (${{ github.event.action || github.event_name }})"

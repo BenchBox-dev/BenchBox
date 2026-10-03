@@ -17,6 +17,7 @@ CONNECTOR_LOGIN = "chatgpt-codex-connector"
 API_ROOT = "https://api.github.com"
 PAGE_SIZE = 100
 WORKFLOW_PATH = ".github/workflows/oracle-review.yml"
+HEAD_MOVING_RUN_SUFFIXES = ("(opened)", "(synchronize)")
 PASS = 0
 WAITING = 1
 ERROR = 2
@@ -137,7 +138,14 @@ def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
 
 
 def own_run_dates(runs: Iterable[dict[str, Any]]) -> list[str]:
-    return [run["created_at"] for run in runs if (run.get("path") or "").split("@", 1)[0] == WORKFLOW_PATH]
+    own = [run for run in runs if (run.get("path") or "").split("@", 1)[0] == WORKFLOW_PATH]
+    if not own:
+        return []
+    first_run = min((run["created_at"] for run in own), key=_parse_time)
+    head_moves = [
+        run["created_at"] for run in own if (run.get("display_title") or "").endswith(HEAD_MOVING_RUN_SUFFIXES)
+    ]
+    return [first_run, *head_moves]
 
 
 def fetch_head_date(token: str, repo: str, sha: str) -> str:

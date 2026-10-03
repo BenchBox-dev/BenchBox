@@ -1,8 +1,10 @@
 name: oracle-review
 
+run-name: oracle-review (${{ github.event.action || github.event_name }})
+
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_review:
     types: [submitted, dismissed]
   merge_group:
