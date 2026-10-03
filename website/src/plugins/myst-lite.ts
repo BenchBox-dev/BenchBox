@@ -8,7 +8,7 @@ type MdNode = {
   type: string;
   value?: string;
   depth?: number;
-  data?: { hProperties?: Record<string, string> };
+  data?: { hProperties?: Record<string, string>; hName?: string };
   lang?: string | null;
   url?: string;
   align?: (string | null)[];
@@ -118,10 +118,100 @@ function transformDirectives(children: MdNode[], parse: Parse, file: string): Md
   return out;
 }
 
-function walk(node: MdNode, file: string, parse: Parse): void {
+function enablesDeflist(file: string): boolean {
+  const front = readFileSync(file, "utf-8").match(/^---\n([\s\S]*?)\n---\n/);
+  return !!front && /^myst:\s*\n\s+enable_extensions:\s*\n(\s+-\s+\S+\n)*?\s+-\s+deflist\s*$/m.test(front[1] + "\n");
+}
+
+function splitLines(children: MdNode[]): MdNode[][] {
+  const lines: MdNode[][] = [[]];
+  for (const child of children) {
+    if (child.type !== "text") {
+      lines[lines.length - 1].push(child);
+      continue;
+    }
+    (child.value ?? "").split("\n").forEach((part, index) => {
+      if (index > 0) lines.push([]);
+      if (part) lines[lines.length - 1].push({ type: "text", value: part });
+    });
+  }
+  return lines;
+}
+
+function trimLine(line: MdNode[]): MdNode[] {
+  const out = line.map((node) => ({ ...node }));
+  const first = out[0];
+  const last = out[out.length - 1];
+  if (first?.type === "text") first.value = (first.value ?? "").trimStart();
+  if (last?.type === "text") last.value = (last.value ?? "").trimEnd();
+  return out.filter((node) => node.type !== "text" || node.value);
+}
+
+function isDefinitionLine(line: MdNode[]): boolean {
+  return line[0]?.type === "text" && /^: /.test(line[0].value ?? "");
+}
+
+function definitionNode(lines: MdNode[][]): MdNode {
+  const inline: MdNode[] = [];
+  lines.forEach((line, index) => {
+    if (index > 0) inline.push({ type: "text", value: "\n" });
+    inline.push(...line);
+  });
+  return {
+    type: "deflistDescription",
+    data: { hName: "dd" },
+    children: [{ type: "paragraph", children: inline }],
+  };
+}
+
+function transformDeflists(children: MdNode[], file: string): MdNode[] {
+  const out: MdNode[] = [];
+  for (const child of children) {
+    const lines = child.type === "paragraph" ? splitLines(child.children ?? []) : [];
+    if (!lines.some(isDefinitionLine)) {
+      out.push(child);
+      continue;
+    }
+    const previous = out[out.length - 1];
+    const firstDefinition = lines.findIndex(isDefinitionLine);
+    if (firstDefinition === 0 && previous?.type !== "deflist") {
+      throw new Error(`myst-lite: definition ": ${textOf(child).slice(2, 42)}" has no preceding term in ${file}`);
+    }
+    const list: MdNode = previous?.type === "deflist" ? previous : { type: "deflist", data: { hName: "dl" }, children: [] };
+    if (list !== previous) out.push(list);
+    const items = list.children ?? [];
+    lines.slice(0, firstDefinition).forEach((line) => {
+      items.push({ type: "deflistTerm", data: { hName: "dt" }, children: trimLine(line) });
+    });
+    let current: MdNode[][] = [];
+    const flush = () => {
+      if (current.length) items.push(definitionNode(current));
+      current = [];
+    };
+    for (const line of lines.slice(firstDefinition)) {
+      if (isDefinitionLine(line)) {
+        flush();
+        const stripped = line.map((node) => ({ ...node }));
+        stripped[0].value = (stripped[0].value ?? "").slice(2);
+        current.push(trimLine(stripped));
+      } else {
+        current.push(trimLine(line));
+      }
+    }
+    flush();
+    list.children = items;
+  }
+  return out;
+}
+
+type WalkContext = { file: string; parse: Parse; deflist: boolean };
+
+function walk(node: MdNode, context: WalkContext): void {
+  const { file, parse } = context;
   if (node.children) {
-    node.children = expandRoles(transformDirectives(node.children, parse, file), file);
-    node.children.forEach((child) => walk(child, file, parse));
+    const directives = transformDirectives(node.children, parse, file);
+    node.children = expandRoles(context.deflist ? transformDeflists(directives, file) : directives, file);
+    node.children.forEach((child) => walk(child, context));
   }
   if (node.type === "heading") node.data = { hProperties: { id: docutilsSlug(textOf(node)) } };
   if ((node.type === "link" || node.type === "image") && node.url) node.url = rewrite(node.url, file);
@@ -130,6 +220,6 @@ function walk(node: MdNode, file: string, parse: Parse): void {
 export function mystLite(this: { parse: Parse }) {
   const parse = this.parse.bind(this);
   return (tree: unknown, vfile: { path?: string }) => {
-    if (vfile.path) walk(tree as MdNode, vfile.path, parse);
+    if (vfile.path) walk(tree as MdNode, { file: vfile.path, parse, deflist: enablesDeflist(vfile.path) });
   };
 }
