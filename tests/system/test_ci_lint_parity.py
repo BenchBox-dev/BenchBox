@@ -62,33 +62,7 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # Steps that are genuinely CI-only. Every entry needs a reason, and the test
 # below fails if a listed step is renamed or removed -- so this dict can't
 # rot into cover for a guard that quietly stopped existing.
-MERGE_GROUP_ONLY_NOTE = (
-    "merge_group-only input, honored by `fast_lane_ceiling_check.py` only when the "
-    "runner's own event file also says merge_group: the script rejects the "
-    "flag on any other event, so a PR editing its own workflow copy cannot "
-    "self-grant grace, and ci-lint's local run carries no event file and "
-    "therefore enforces the strict ceiling."
-)
-
-EXCLUDED_STEPS: dict[str, str] = {
-    # The fast-lane ceiling step is excluded only because its merge_group-only
-    # branch has no local equivalent. The dedicated strict-command test below
-    # pins the ordinary --strict command to the Makefile recipe, while the
-    # merge-group branch and skip aggregation are pinned by workflow assertions.
-    "Fast lane ceiling": MERGE_GROUP_ONLY_NOTE,
-    "Fast lane ceiling delta vs develop": (
-        "CI-cache-dependent, no local equivalent: the guard's input is "
-        "`fast-lane-count.txt`, restored from the GitHub Actions cache "
-        "(`actions/cache/restore@v5.1.0`, exact key "
-        "`fast-lane-count-develop-<base-sha>`, populated by "
-        "fast-lane-baseline.yml's cache-save step) -- "
-        "there is no Actions cache to restore from in a local shell. The "
-        "pull-request command passes `--require-develop-baseline`, so a "
-        "missing cache fails closed with `DELTA_CHECK_BASELINE_ERROR`; "
-        "direct callers without that flag retain the compatibility skip. "
-        "See docs/operations/fast-lane-budget.md."
-    ),
-}
+EXCLUDED_STEPS: dict[str, str] = {}
 
 # The develop PR umbrella is not the only merge-gating workflow. Keep the
 # guard-shaped steps in the release test workflow and the independent
@@ -547,16 +521,15 @@ def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
     assert strict_command in workflow_run
 
 
-def test_fast_lane_ceiling_strict_command_is_mirrored_in_ci_lint() -> None:
-    """The merge-group-only branch must not hide the ordinary strict guard."""
-    ceiling = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-ceiling")
-    workflow_run = str(ceiling["run"])
+def test_fast_lane_guard_command_is_mirrored_in_ci_lint() -> None:
+    """The marker and path guards run the same command in the workflow and in ci-lint."""
+    guard = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-markers")
+    workflow_run = str(guard["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
     strict_command = "uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict"
 
     assert strict_command in recipe_lines
-    assert "args=(--strict)" in workflow_run
-    assert 'fast_lane_ceiling_check.py "${args[@]}"' in workflow_run
+    assert strict_command in workflow_run
 
 
 def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemption() -> None:
@@ -704,27 +677,11 @@ def test_lint_guard_summary_step_exists() -> None:
     assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
 
 
-def test_lint_guard_summary_accepts_only_success_or_intentional_merge_skip() -> None:
+def test_lint_guard_summary_accepts_only_success() -> None:
     aggregator = next(step for step in _load_lint_job_steps() if step.get("name") == AGGREGATOR_STEP_NAME)
     run = aggregator["run"]
 
     assert 'if [ "$outcome" = "success" ]; then' in run
-    assert '[ "$id" = "guard-fast-lane-delta" ]' in run
-    assert '[ "${GITHUB_EVENT_NAME:-}" = "merge_group" ]' in run
-    assert '[ "$outcome" = "skipped" ]' in run
-    assert "merge_group composition" in run
+    assert "skipped" not in run
     assert 'echo "FAILED: $id ($outcome)"' in run
     assert "All lint guards passed." in run
-
-
-def test_delta_baseline_restore_is_keyed_to_the_pr_base_sha() -> None:
-    step = next(
-        step for step in _load_lint_job_steps() if step.get("name") == "Restore fast-lane develop baseline count"
-    )
-    cache_key = step["with"]["key"]
-
-    assert (
-        cache_key
-        == "fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
-    )
-    assert "restore-keys" not in step["with"]

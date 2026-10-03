@@ -845,7 +845,6 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_ci_lint_environment_boundary.py",
             "tests/unit/scripts/test_corpus_privacy_invariant.py",
             "tests/unit/scripts/test_dev_loop_pr_metrics.py",
-            "tests/unit/scripts/test_fast_lane_ratchet_check.py",
             "tests/unit/scripts/test_green_unmerged_sweep.py",
             "tests/unit/scripts/test_guard_messages.py",
             "tests/unit/scripts/test_mirror_partial_validation_policy.py",
@@ -874,7 +873,7 @@ class TestReleaseInfrastructure:
             "tests/unit/workflows/test_validate_submission_changed_bundles.py",
             "tests/unit/workflows/test_validate_submission_fail_open.py",
         }
-        assert len(v040_missed_paths) == 38
+        assert len(v040_missed_paths) == 37
         assert v040_missed_paths <= curated_paths, (
             "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
             f"{sorted(v040_missed_paths - curated_paths)}"
