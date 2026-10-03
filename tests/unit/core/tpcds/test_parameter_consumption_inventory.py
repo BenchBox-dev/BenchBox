@@ -39,11 +39,12 @@ from __future__ import annotations
 import collections
 import re
 import signal
-import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+
+from benchbox.utils.clock import elapsed_seconds, mono_time
 
 pytestmark = [
     pytest.mark.unit,
@@ -242,7 +243,7 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
         _Stub() if isinstance(value, _Stub) else original_to_datetime(value, *args, **kwargs)
     )
     previous_handler = signal.signal(signal.SIGALRM, _raise_timeout)
-    started = time.monotonic()
+    started = mono_time()
     # pytest-timeout's signal method shares this timer; it is re-armed with its remaining time below.
     outer_delay, outer_interval = signal.setitimer(signal.ITIMER_REAL, 0)
     complete = True
@@ -257,7 +258,7 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)
         if outer_delay:
-            remaining = max(outer_delay - (time.monotonic() - started), 0.001)
+            remaining = max(outer_delay - elapsed_seconds(started), 0.001)
             signal.setitimer(signal.ITIMER_REAL, remaining, outer_interval)
         query_module.get_parameters = original_get_parameters
         pd.to_datetime = original_to_datetime
