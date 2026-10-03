@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SCRIPT = REPO_ROOT / "_project/scripts/oracle_review_check.py"
+SPEC = importlib.util.spec_from_file_location("oracle_review_check", SCRIPT)
+assert SPEC and SPEC.loader
+oracle_review_check = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = oracle_review_check
+SPEC.loader.exec_module(oracle_review_check)
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+HEAD = "a" * 40
+OLDER = "b" * 40
+HEAD_DATE = "2026-10-01T12:00:00Z"
+BEFORE_HEAD = "2026-10-01T11:00:00Z"
+AFTER_HEAD = "2026-10-01T13:00:00Z"
+SOUNDNESS_FILES = ["benchbox/core/equivalence/checker.py", "README.md"]
+OTHER_FILES = ["README.md", "docs/index.md"]
+CONNECTOR = "chatgpt-codex-connector[bot]"
+
+
+def _decide(
+    files: list[str] = SOUNDNESS_FILES,
+    reviews: list[dict[str, Any]] | None = None,
+    reactions: list[dict[str, Any]] | None = None,
+    threads: list[dict[str, Any]] | None = None,
+) -> tuple[int, str]:
+    return oracle_review_check.decide(
+        HEAD,
+        HEAD_DATE,
+        files,
+        reviews or [],
+        reactions or [],
+        threads or [],
+        oracle_review_check.any_soundness_path,
+    )
+
+
+def _review(login: str = CONNECTOR, commit_id: str = HEAD, state: str = "COMMENTED") -> dict[str, Any]:
+    return {"login": login, "commit_id": commit_id, "state": state}
+
+
+def _reaction(content: str = "+1", created_at: str = AFTER_HEAD, login: str = CONNECTOR) -> dict[str, Any]:
+    return {"login": login, "content": content, "created_at": created_at}
+
+
+def _thread(resolved: bool, author: str = "chatgpt-codex-connector") -> dict[str, Any]:
+    return {"resolved": resolved, "author": author}
+
+
+def test_non_soundness_change_skips() -> None:
+    status, message = _decide(files=OTHER_FILES)
+    assert status == 0
+    assert message == "oracle-review: not a soundness path change"
+
+
+def test_review_on_head_passes() -> None:
+    status, message = _decide(reviews=[_review()])
+    assert status == 0
+    assert "review" in message
+    assert HEAD in message
+
+
+def test_review_on_older_commit_waits() -> None:
+    status, message = _decide(reviews=[_review(commit_id=OLDER)])
+    assert status == 1
+    assert message == (
+        f"oracle-review: waiting for the Codex connector's review of {HEAD}; rerun this check after it lands"
+    )
+
+
+def test_thumbs_up_after_head_passes() -> None:
+    status, message = _decide(reactions=[_reaction()])
+    assert status == 0
+    assert "+1" in message
+
+
+def test_thumbs_up_before_head_waits() -> None:
+    status, _ = _decide(reactions=[_reaction(created_at=BEFORE_HEAD)])
+    assert status == 1
+
+
+def test_eyes_only_waits() -> None:
+    status, _ = _decide(reactions=[_reaction(content="eyes")])
+    assert status == 1
+
+
+def test_unresolved_connector_thread_waits_even_with_review() -> None:
+    status, message = _decide(reviews=[_review()], threads=[_thread(resolved=False)])
+    assert status == 1
+    assert "unresolved" in message
+
+
+def test_resolved_connector_thread_with_review_passes() -> None:
+    status, _ = _decide(reviews=[_review()], threads=[_thread(resolved=True)])
+    assert status == 0
+
+
+def test_unresolved_thread_by_another_author_does_not_block() -> None:
+    status, _ = _decide(reviews=[_review()], threads=[_thread(resolved=False, author="joeharris76")])
+    assert status == 0
+
+
+def test_owner_review_does_not_count() -> None:
+    status, _ = _decide(reviews=[_review(login="joeharris76")])
+    assert status == 1
+
+
+def test_owner_thumbs_up_does_not_count() -> None:
+    status, _ = _decide(reactions=[_reaction(login="joeharris76")])
+    assert status == 1
+
+
+def test_pending_review_does_not_count() -> None:
+    status, _ = _decide(reviews=[_review(state="PENDING")])
+    assert status == 1
