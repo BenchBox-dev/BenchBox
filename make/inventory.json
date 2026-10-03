@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "01bf70124a912552634b2820598f91c6e5e8496d112e48017e1d422b825f482c",
+  "contract_sha256": "8be67124e2f41469d0f7ece11232ba621ca0438c54c81cc6fab9a8aeaa935cc8",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1250,6 +1250,11 @@
     ],
     "pr-preflight": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "pr-preflight:",
         "recipe": "\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
         "recipe_sha256": "dbb6d6261fab5d2fbbfdf5aa7e35f78a4bb52b12c4c2abc02a9d534604b8a949"
@@ -2221,7 +2226,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "ab2ca7ebb7232706c49e1fb8c04962583873861f1b81bf48aaf2d22182721e2b",
+  "semantic_sha256": "f4829cbb3827636d8b747df6d041dc954f28b9549c432508af3ce99828c92da4",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2350,10 +2355,10 @@
       "sha256": "293dcd6f40e208240417878919e8f488ea36aec45931f510d57ae17e5e6dba92"
     },
     {
-      "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
+      "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-preflight pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
       "kind": "variable",
       "name": "DEVELOPMENT_TREE_ONLY_TARGETS",
-      "sha256": "d53aff086f65f315fb1cabb23a3fe4b32e53ea92ba107429f67f231107fd18be"
+      "sha256": "93bfcb8d27d574a2338b1a52b64fbc2ddc52c9f3a6a15846522f61ba8292d2c3"
     },
     {
       "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit",
@@ -2402,6 +2407,7 @@
         "agent-commit-range-check",
         "skill-integrity-check",
         "ci-lint",
+        "pr-preflight",
         "pr-arm-auto-merge",
         "shrink-rollup",
         "pr-review-followups-list",
@@ -4892,7 +4898,7 @@
     ],
     "DEVELOPMENT_TREE_ONLY_TARGETS": [
       {
-        "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
+        "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-preflight pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
         "directive": "",
         "operator": ":="
       }

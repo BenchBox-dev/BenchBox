@@ -39,7 +39,7 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	quality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
-	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
+	agent-commit-range-check skill-integrity-check ci-lint pr-preflight pr-arm-auto-merge shrink-rollup \
 	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
 	soundness-drain-report soundness-drain-self-test worktree-audit worktree-finish
