@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The cause of Q44 and Q49 staying in BINDING_GAP is stated with evidence",
+    "Q44 and Q49 leave BINDING_GAP and LITERAL_FALLBACK and the inventory test passes",
+    "The inventory's classification is consistent with ADAPTERS for all adapted queries (Q39, Q44, Q49, Q93), pinned by a test",
+    "Q44 and Q49 match the DuckDB reference on both families at SF 0.1 with adapter binding, or the reason is documented"
+  ],
+  "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Cause not yet determined. queries.py edits serialize with the other t05 batches.",
+  "description": "#2526 added adapters for Q39, Q44, Q49 and Q93 (ADAPTERS in benchbox/core/tpcds/dataframe_queries/parameter_adapters.py), yet on develop Q44 and Q49 are still in BINDING_GAP and Q49 is still in LITERAL_FALLBACK in tests/unit/core/tpcds/test_parameter_consumption_inventory.py, and neither query is in any t05a-g batch. Find out whether the inventory ignores what an adapter binds or the two adapters are incomplete. Then either complete the adapters and implementations or make the inventory account for ADAPTERS, so that 'removed from BINDING_GAP' measures real binding coverage for every batch. Keep the stand-in's properties from #2560 (refuses __array__, repeating alarm, pytest-timeout re-armed).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:55:07Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8563da17480346c7a576bd70b8932c86",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}
