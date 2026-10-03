@@ -1,10 +1,3 @@
-"""The oracle-review workflow reports a check named exactly ``oracle-review``.
-
-A ruleset requires the check by that name, so the job name, the triggers that
-let a landed review re-run it, the read-only token and the script invocation
-are pinned here.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -38,13 +31,12 @@ def test_job_id_and_name_are_the_required_check_name() -> None:
     assert workflow["jobs"]["oracle-review"]["name"] == "oracle-review"
 
 
-def test_triggers_cover_pushes_reviews_merge_queue_and_manual_runs() -> None:
+def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
     triggers = _triggers()
-    assert set(triggers) == {"pull_request", "pull_request_review", "merge_group", "workflow_dispatch"}
+    assert set(triggers) == {"pull_request", "pull_request_review", "merge_group"}
     assert triggers["merge_group"]["types"] == ["checks_requested"]
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "ready_for_review"]
     assert triggers["pull_request_review"]["types"] == ["submitted"]
-    assert triggers["workflow_dispatch"]["inputs"]["pr"]["required"] is True
 
 
 def test_permissions_are_read_only() -> None:
@@ -55,7 +47,7 @@ def test_permissions_are_read_only() -> None:
 def test_concurrency_cancels_superseded_runs_per_pull_request() -> None:
     concurrency = _load()["concurrency"]
     assert concurrency["cancel-in-progress"] is True
-    assert "github.event.pull_request.number || inputs.pr" in concurrency["group"]
+    assert "github.event.pull_request.number" in concurrency["group"]
     assert "github.event.merge_group.head_sha" in concurrency["group"], "queued groups must not share one slot"
 
 
@@ -65,7 +57,7 @@ def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None
     assert len(runs) == 1
     step = runs[0]
     assert step["env"]["GITHUB_TOKEN"] == "${{ github.token }}"
-    assert "github.event.pull_request.number || inputs.pr" in step["env"]["PR_NUMBER"]
+    assert "github.event.pull_request.number" in step["env"]["PR_NUMBER"]
     assert "--pr" in step["run"]
     assert "merge_group.head_ref" in step["env"]["MERGE_GROUP_REF"]
 

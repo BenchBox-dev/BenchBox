@@ -9,6 +9,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "_project/scripts/oracle_review_check.py"
+sys.path.insert(0, str(SCRIPT.parent))
 SPEC = importlib.util.spec_from_file_location("oracle_review_check", SCRIPT)
 assert SPEC and SPEC.loader
 oracle_review_check = importlib.util.module_from_spec(SPEC)

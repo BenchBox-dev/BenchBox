@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""Require the Codex connector's review on result-affecting pull requests.
-
-Every human and agent in this repository posts as the owner account, so the
-connector's GitHub App identity is the only review signal that cannot be
-forged. The connector either submits a review (recording the commit it
-reviewed) or, when it finds nothing, adds a thumbs-up reaction to the PR.
-
-Exit codes: 0 pass or skip, 1 waiting for the review, 2 error.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -19,14 +9,9 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-from soundness_paths import any_soundness_path  # noqa: E402
+from soundness_paths import any_soundness_path
 
 CONNECTOR_LOGIN = "chatgpt-codex-connector"
 API_ROOT = "https://api.github.com"
@@ -54,7 +39,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
 
 
 class CheckError(RuntimeError):
-    """A GitHub call failed or returned an unusable response."""
+    pass
 
 
 def _login(value: str | None) -> str:
@@ -78,13 +63,6 @@ def decide(
     threads: Iterable[dict[str, Any]],
     paths: Callable[[Iterable[str]], bool],
 ) -> tuple[int, str]:
-    """Return ``(status, message)`` for one pull request.
-
-    ``reviews`` items carry ``login``, ``commit_id`` and ``state``;
-    ``reactions`` items carry ``login``, ``content`` and ``created_at``;
-    ``threads`` items carry ``resolved`` and ``author`` (the first comment's
-    login). ``paths`` reports whether any changed file is result-affecting.
-    """
     if not paths(files):
         return PASS, "oracle-review: not a soundness path change"
 
@@ -155,13 +133,6 @@ def fetch_head_sha(token: str, repo: str, pr: int) -> str:
 
 
 def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
-    """Return the latest of the commit's committer date and this workflow's pull_request run dates.
-
-    The committer date is chosen by the author and can be backdated; a
-    ``pull_request`` run of this workflow for the head SHA is created by GitHub
-    each time the head moves to that SHA, so a reaction older than it cannot
-    have seen this head.
-    """
     return max([committer_date, *run_dates], key=_parse_time)
 
 
@@ -175,7 +146,6 @@ def fetch_head_date(token: str, repo: str, sha: str) -> str:
 
 
 def changed_paths(items: Iterable[dict[str, Any]]) -> list[str]:
-    """Return every path a pull request touches, including rename sources."""
     paths: list[str] = []
     for item in items:
         paths.append(item["filename"])
@@ -233,7 +203,9 @@ def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description="Require the Codex connector's review on result-affecting pull requests."
+    )
     parser.add_argument("--repo", required=True, help="Repository as OWNER/NAME.")
     parser.add_argument("--pr", required=True, type=int, help="Pull request number.")
     return parser.parse_args(argv)
