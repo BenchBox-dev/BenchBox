@@ -44,6 +44,8 @@ from typing import Any
 
 import pytest
 
+from benchbox.utils.clock import elapsed_seconds, mono_time
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
@@ -113,6 +115,12 @@ class _Stub:
     def __delitem__(self, key: Any) -> None:
         return None
 
+    def __array__(self, *args: Any, **kwargs: Any) -> Any:
+        # Without this, NumPy coerces a stub as a sequence of length 2 whose items are stubs, nested to
+        # NumPy's dimension limit: ``ndarray | stub`` then allocates without end. NumPy can also swallow
+        # the timeout raised inside ``__len__`` during that coercion, so the time bound alone does not stop it.
+        raise TypeError("the stand-in is not array-like")
+
     __hash__ = object.__hash__
 
 
@@ -126,11 +134,21 @@ for _operator in _OPERATORS:
     setattr(_Stub, f"__{_operator}__", lambda self, *args: _Stub())
 
 
+# Each implementation run against the stand-in gets this long, then the timeout is raised again at this
+# interval until it propagates.
+_RUN_SECONDS = 3.0
+_RETRY_SECONDS = 0.5
+
+
 class _Timeout(Exception):
     pass
 
 
 def _raise_timeout(signum: int, frame: Any) -> None:
+    # The timer repeats so a timeout swallowed by native code is raised again. A signal that lands in
+    # _read_keys itself, after the implementation has stopped, is ignored so it cannot escape the cleanup.
+    if frame is not None and frame.f_code is _read_keys.__code__:
+        return
     raise _Timeout
 
 
@@ -225,17 +243,23 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
         _Stub() if isinstance(value, _Stub) else original_to_datetime(value, *args, **kwargs)
     )
     previous_handler = signal.signal(signal.SIGALRM, _raise_timeout)
+    started = mono_time()
+    # pytest-timeout's signal method shares this timer; it is re-armed with its remaining time below.
+    outer_delay, outer_interval = signal.setitimer(signal.ITIMER_REAL, 0)
     complete = True
     try:
         query = get_tpcds_query(f"Q{query_id}")
         implementation = query.expression_impl if family == "expression" else query.pandas_impl
-        signal.alarm(3)
+        signal.setitimer(signal.ITIMER_REAL, _RUN_SECONDS, _RETRY_SECONDS)
         implementation(_Stub())
     except Exception:  # noqa: BLE001 - a partial read is still evidence; completeness is reported
         complete = False
     finally:
-        signal.alarm(0)
+        signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)
+        if outer_delay:
+            remaining = max(outer_delay - elapsed_seconds(started), 0.001)
+            signal.setitimer(signal.ITIMER_REAL, remaining, outer_interval)
         query_module.get_parameters = original_get_parameters
         pd.to_datetime = original_to_datetime
     return read, complete
@@ -366,3 +390,47 @@ def test_listed_categories_match_the_inventory(inventory):
 def test_hard_coded_queries_stay_within_the_adapter_budget(inventory):
     hard_coded = [entry.query_id for entry in inventory.values() if entry.category == "c"]
     assert len(hard_coded) <= HARD_CODED_BUDGET, f"{len(hard_coded)} hard-coded queries: budget the adapters separately"
+
+
+def test_numpy_refuses_the_stand_in_instead_of_expanding_it():
+    """``ndarray | stub`` must fail at once; it once grew a worker past 14 GB in CI.
+
+    Runs in a child process with a short wall-clock limit, so a regression fails this test after
+    about 1.5 GB of growth (the observed rate is about 45 MB/s) instead of exhausting the machine.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    code = (
+        "import numpy as np\n"
+        "from tests.unit.core.tpcds.test_parameter_consumption_inventory import _Stub\n"
+        "try:\n"
+        "    np.array([False, False]) | _Stub()\n"
+        "except TypeError:\n"
+        "    pass\n"
+        "else:\n"
+        "    raise SystemExit('numpy coerced the stand-in')\n"
+    )
+
+    subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[4],
+        timeout=30,
+        check=True,
+    )
+
+
+def test_reading_keys_keeps_the_outer_timer_armed():
+    """pytest-timeout's signal method shares ITIMER_REAL; reading keys must hand it back armed."""
+    from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
+
+    previous_handler = signal.signal(signal.SIGALRM, lambda signum, frame: None)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, 30)
+    try:
+        _read_keys(88, "pandas", TPCDS_DEFAULT_PARAMS)
+        remaining, _ = signal.getitimer(signal.ITIMER_REAL)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, *previous_timer)
+        signal.signal(signal.SIGALRM, previous_handler)
+    assert 0 < remaining <= 30

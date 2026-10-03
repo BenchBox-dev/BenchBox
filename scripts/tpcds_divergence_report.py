@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""Label every TPC-DS DataFrame-versus-SQL divergence by its likely cause.
+
+This is a report, not a gate. It runs the same per-query comparison as the staged cross-surface
+gate (``benchbox.core.equivalence.cross_surface``) at one or more scale factors, and for every
+cell (query, DataFrame family) that diverges it records the cause and the full divergence
+text as evidence. It does not change a verdict, the comparator, or any gate.
+
+Causes:
+
+``parameter drift``
+    The cell matches when the implementation runs on the values dsqgen put in the SQL (the adapter
+    binding) but diverges on the defaults file. The gate already applies the binding for the queries
+    that have an adapter, so this shows up as a cell that the adapter fixed.
+``unbound (no adapter)``
+    The query has no adapter, so the DataFrame side runs on the defaults file while the SQL carries
+    dsqgen's values. A value or row-count difference cannot be told apart from drift until the query
+    has an adapter. The detail-based label is kept as the secondary cause.
+``null order``
+    An ORDER BY key is NULL on one side and a value on the other at the first mismatching position.
+``decimal/float``
+    A value or an ORDER BY key that differs only by float noise (relative difference under 1e-6).
+
+A tie between rows cannot be proved from the detail text, so no cell is labelled a tie here: a cell that
+looks like one (an ORDER BY or value mismatch between small integers, say) is ``unclassified``, and a tie
+that comes and goes between runs shows up as ``flaky`` with ``--repeat``. Tie canonicalization belongs to
+the comparator and only for causes shown to be ties.
+``row count/logic``
+    A different number of rows or columns, or a value that differs by more than noise.
+``flaky``
+    With ``--repeat N``, the cell did not give the same outcome on every run.
+``error``
+    The comparison raised.
+``unclassified``
+    The detail text fits none of the above.
+
+Usage::
+
+    uv run python scripts/tpcds_divergence_report.py --scale 0.03 --scale 0.1 --out report.md --json report.json
+    uv run python scripts/tpcds_divergence_report.py --scale 0.03 --repeat 5 --query 36
+
+Copyright 2026 Joe Harris / BenchBox Project
+
+TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
+
+Licensed under the MIT License. See LICENSE file in the project root for details.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import re
+import sys
+import tempfile
+from collections import Counter
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from typing import Any
+
+PARAMETER_DRIFT = "parameter drift"
+UNBOUND = "unbound (no adapter)"
+NULL_ORDER = "null order"
+DECIMAL_FLOAT = "decimal/float"
+ROW_COUNT_LOGIC = "row count/logic"
+FLAKY = "flaky"
+ERROR = "error"
+UNCLASSIFIED = "unclassified"
+
+FLOAT_NOISE = 1e-6
+
+_ORDER_KEY = re.compile(
+    r"ORDER BY key mismatch at position (\d+)\. Original key: (.*?), Variant key: (.*?) \(order-key", re.S
+)
+_VALUE = re.compile(
+    r"Value mismatch at row (\d+), column (\d+)\. Original: (.*?), Variant: (.*?)(?:, Tolerance:|; also columns|$)",
+    re.S,
+)
+_ROW_COUNT = re.compile(r"Row count mismatch\. Original: (\d+), Variant: (\d+)")
+_COLUMN_COUNT = re.compile(r"Column count mismatch")
+_HARNESS_FAILURES = ("error:", "reference query failed:")
+_NUMBER = re.compile(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$")
+
+
+def _number(text: str) -> float | None:
+    text = text.strip().strip("'\"")
+    return float(text) if _NUMBER.match(text) else None
+
+
+def _close(left: float, right: float) -> bool:
+    scale = max(abs(left), abs(right))
+    return scale == 0 or abs(left - right) / scale < FLOAT_NOISE or abs(left - right) < 1e-10
+
+
+def _key_cells(text: str) -> list[str]:
+    """Split a printed key tuple such as ``(None, 7008009)`` into its cell texts."""
+    inner = text.strip()
+    if inner.startswith("(") and inner.endswith(")"):
+        inner = inner[1:-1]
+    return [part.strip() for part in re.split(r",\s*(?=(?:[^']*'[^']*')*[^']*$)", inner)]
+
+
+def label_detail(detail: str) -> tuple[str, str]:
+    """Return ``(cause, why)`` for one full divergence detail string, from the text alone."""
+    if _COLUMN_COUNT.search(detail):
+        return ROW_COUNT_LOGIC, "different number of columns"
+    match = _ROW_COUNT.search(detail)
+    if match:
+        return ROW_COUNT_LOGIC, f"{match.group(1)} rows against {match.group(2)}"
+    match = _ORDER_KEY.search(detail)
+    if match:
+        original, variant = _key_cells(match.group(2)), _key_cells(match.group(3))
+        pairs = [(a, b) for a, b in zip(original, variant) if a != b]
+        if pairs:
+            a, b = pairs[0]
+            if (a == "None") != (b == "None"):
+                return NULL_ORDER, f"first differing key cell is NULL on one side ({a} against {b})"
+            left, right = _number(a), _number(b)
+            if left is not None and right is not None and _close(left, right):
+                return DECIMAL_FLOAT, f"order key differs by float noise ({a} against {b})"
+        return UNCLASSIFIED, "order key differs and the keys do not show NULL placement or float noise"
+    match = _VALUE.search(detail)
+    if match:
+        a, b = match.group(3).strip(), match.group(4).strip()
+        if (a == "None") != (b == "None"):
+            return NULL_ORDER, f"value is NULL on one side ({a} against {b})"
+        left, right = _number(a), _number(b)
+        if left is not None and right is not None:
+            if _close(left, right):
+                return DECIMAL_FLOAT, f"values differ by float noise ({a} against {b})"
+            return ROW_COUNT_LOGIC, f"values differ by more than noise ({a} against {b})"
+        return UNCLASSIFIED, f"non-numeric values differ ({a} against {b})"
+    return UNCLASSIFIED, "detail text not recognised"
+
+
+def classify_cell(
+    detail: str,
+    *,
+    adapted: bool,
+    drift_fixed: bool = False,
+    outcomes: Sequence[str] | None = None,
+    error: str | None = None,
+) -> dict[str, str]:
+    """Cause record for one divergent cell.
+
+    ``adapted`` says the query has a parameter adapter. ``outcomes`` are the per-run detail strings
+    when the cell was repeated; a cell whose runs differ is flaky whatever the detail says.
+    """
+    if outcomes is not None and len(set(outcomes)) > 1:
+        return {
+            "cause": FLAKY,
+            "why": f"{len(set(outcomes))} different outcomes in {len(outcomes)} runs",
+            "secondary": "",
+        }
+    if error:
+        return {"cause": ERROR, "why": error, "secondary": ""}
+    if drift_fixed:
+        return {
+            "cause": PARAMETER_DRIFT,
+            "why": "diverges on the defaults, matches on dsqgen's values",
+            "secondary": "",
+        }
+    cause, why = label_detail(detail)
+    if not adapted and cause in {ROW_COUNT_LOGIC, UNCLASSIFIED, DECIMAL_FLOAT}:
+        # NULL placement is evidence on its own; anything else may just be different parameters.
+        return {"cause": UNBOUND, "why": f"no adapter, so parameters are not bound ({why})", "secondary": cause}
+    return {"cause": cause, "why": why, "secondary": ""}
+
+
+@dataclasses.dataclass
+class Cell:
+    scale: float
+    backend: str
+    query: str
+    status: str
+    cause: str = ""
+    why: str = ""
+    secondary: str = ""
+    evidence: str = ""
+    adapted: bool = False
+    runs: int = 1
+
+
+def _run_cell(
+    xs: Any, gate: Any, data: Any, contexts: Any, query: str, backend: str, dataframe_query: Callable
+) -> tuple[str, str]:
+    """One comparison. Returns ``(status, text)`` where text is the full detail or the error."""
+    try:
+        divergences = xs.find_cross_surface_divergences(
+            data.connection,
+            query_ids=[query],
+            reference_sql=data.reference_sql,
+            dataframe_query=dataframe_query,
+            contexts=contexts,
+            validator=gate.build_validator(),
+            backends=(backend,),
+        )
+    except Exception as exc:  # noqa: BLE001 - a comparison that raises is a result, not a crash
+        return "error", f"{type(exc).__name__}: {exc}"
+    if divergences:
+        detail = divergences[0].detail
+        # The harness catches execution failures itself and reports them as divergences with these prefixes.
+        if detail.startswith(_HARNESS_FAILURES):
+            return "error", detail
+        return "divergent", detail
+    return "match", ""
+
+
+def collect(scale: float, *, queries: Sequence[str] | None = None, repeat: int = 1) -> list[Cell]:
+    """Compare every query at ``scale`` and return a record for each divergent or drift-fixed cell."""
+    from benchbox.core.equivalence import cross_surface as xs
+    from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
+    from benchbox.core.tpcds.dataframe_queries.parameter_adapters import adapter_query_ids
+
+    adapted_ids = {str(query_id) for query_id in adapter_query_ids()}
+    gate = dataclasses.replace(xs.STAGED_GATES["tpcds"], scale_factor=scale)
+
+    def unbound(query_id: str) -> Any:
+        return TPCDS_DATAFRAME_QUERIES.get_or_raise(f"Q{query_id}")
+
+    cells: list[Cell] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        data = gate.build(scale, Path(tmp))
+        try:
+            wanted = [str(q) for q in data.query_ids if queries is None or str(q) in queries]
+            for backend in gate.backends:
+                contexts = xs.build_production_contexts(
+                    data.benchmark, data.data_dir, backends=(backend,), scale_factor=scale
+                )
+                for query in wanted:
+                    runs = [
+                        _run_cell(xs, gate, data, contexts, query, backend, data.dataframe_query)
+                        for _ in range(max(1, repeat))
+                    ]
+                    status, text = runs[0]
+                    texts = [run[1] for run in runs]
+                    is_adapted = query in adapted_ids
+                    flaky = len({run[:2] for run in runs}) > 1
+                    drift_fixed = False
+                    if status == "match" and not flaky and is_adapted:
+                        raw_status, raw_text = _run_cell(xs, gate, data, contexts, query, backend, unbound)
+                        drift_fixed = raw_status == "divergent"
+                        if drift_fixed:
+                            text = f"on the defaults file: {raw_text}"
+                    if status == "match" and not flaky and not drift_fixed:
+                        continue
+                    record = classify_cell(
+                        "" if drift_fixed else text,
+                        adapted=is_adapted,
+                        drift_fixed=drift_fixed,
+                        outcomes=texts if flaky else None,
+                        error=text if status == "error" and not drift_fixed else None,
+                    )
+                    cells.append(
+                        Cell(
+                            scale=scale,
+                            backend=backend,
+                            query=query,
+                            status="drift fixed by adapter" if drift_fixed else ("flaky" if flaky else status),
+                            cause=record["cause"],
+                            why=record["why"],
+                            secondary=record["secondary"],
+                            evidence=text if text else "; ".join(sorted(set(texts))),
+                            adapted=is_adapted,
+                            runs=len(runs),
+                        )
+                    )
+                del contexts
+        finally:
+            data.connection.close()
+    return cells
+
+
+def render_markdown(cells: Sequence[Cell], scales: Sequence[float] = ()) -> str:
+    lines = ["# TPC-DS divergence report", ""]
+    for scale in sorted({cell.scale for cell in cells} | set(scales)):
+        subset = [cell for cell in cells if cell.scale == scale]
+        counts = Counter(cell.cause for cell in subset)
+        lines += [
+            f"## Scale factor {scale}",
+            "",
+            ", ".join(f"{cause}: {count}" for cause, count in sorted(counts.items())) or "no divergent cells",
+            "",
+        ]
+        lines += ["| Query | Family | Status | Cause | Why | Evidence |", "|---|---|---|---|---|---|"]
+        for cell in sorted(subset, key=lambda c: (int(c.query), c.backend)):
+            evidence = cell.evidence.replace("|", "\\|").replace("\n", " ")
+            cause = cell.cause + (f" ({cell.secondary})" if cell.secondary else "")
+            lines.append(f"| Q{cell.query} | {cell.backend} | {cell.status} | {cause} | {cell.why} | {evidence} |")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--scale", type=float, action="append", help="scale factor (repeatable; default 0.03 and 0.1)")
+    parser.add_argument("--query", action="append", help="limit to a query number (repeatable)")
+    parser.add_argument("--repeat", type=int, default=1, help="runs per cell; a cell that differs across runs is flaky")
+    parser.add_argument("--out", type=Path, help="write the markdown report here")
+    parser.add_argument("--json", type=Path, help="write the JSON report here")
+    args = parser.parse_args(argv)
+
+    scales = args.scale or [0.03, 0.1]
+    cells: list[Cell] = []
+    for scale in scales:
+        cells.extend(collect(scale, queries=args.query, repeat=args.repeat))
+    markdown = render_markdown(cells, scales)
+    if args.out:
+        args.out.write_text(markdown + "\n", encoding="utf-8")
+    else:
+        print(markdown)
+    if args.json:
+        args.json.write_text(
+            json.dumps([dataclasses.asdict(cell) for cell in cells], indent=1) + "\n", encoding="utf-8"
+        )
+    print(f"{len(cells)} cell(s) reported", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

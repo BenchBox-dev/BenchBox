@@ -68,17 +68,35 @@ def _none_for_null(frame: Any, columns: list[str]) -> Any:
     """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does.
 
     Only a column that actually holds a NULL is converted, so a result without NULLs keeps its native
-    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame is
-    returned unchanged: finding out whether a column holds a NULL would compute it.
+    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame cannot
+    be asked whether a column holds a NULL without computing it, so every named column is converted
+    lazily (``notna`` is missing on a Dask Series, hence ``~isna()``).
     """
     if hasattr(frame, "npartitions"):
-        return frame
+        return frame.assign(
+            **{column: frame[column].astype(object).where(~frame[column].isna(), None) for column in columns}
+        )
     frame = frame.copy()
     for column in columns:
         nulls = frame[column].isna()
         if nulls.any():
             frame[column] = frame[column].astype(object).where(~nulls, None)
     return frame
+
+
+def _round_half_up_expression(expr: Any, decimals: int) -> Any:
+    """SQL ``ROUND`` for a non-negative value: halves round up, where Polars rounds them to even.
+
+    ``0.625`` is exact in binary, so ``round(0.625, 2)`` is 0.63 in SQL and 0.62 on Polars.
+    """
+    scale = 10**decimals
+    return (expr * scale + 0.5).floor() / scale
+
+
+def _round_half_up_pandas(values: Any, decimals: int) -> Any:
+    """pandas counterpart of ``_round_half_up_expression`` (``Series.round`` rounds halves to even)."""
+    scale = 10**decimals
+    return ((values * scale + 0.5) // 1) / scale
 
 
 def _filter_value(params: Any, param_name: str | None, default: Any) -> Any:
@@ -280,10 +298,11 @@ def _item_category_sales_expression(
             .alias("itemrevenue")
         )
     )
-    ranked = grouped.with_columns(
+    with_ratio = grouped.with_columns(
         (col("itemrevenue") * 100 / ctx.window_sum("itemrevenue", partition_by=["i_class"])).alias("revenueratio")
     )
-    ranked = _sort_null_largest_expression(ctx, ranked, list(sort_by), [False] * len(sort_by))
+    # Every key ascends, so the reference puts NULLs last; Polars puts them first.
+    ranked = _sort_null_largest_expression(ctx, with_ratio, list(sort_by), [False] * len(sort_by))
     return ranked if limit is None else ranked.limit(limit)
 
 
@@ -309,15 +328,18 @@ def _item_category_sales_pandas(
     filtered = merged[
         (merged["i_category"].isin(categories)) & (merged["d_date"] >= start_date) & (merged["d_date"] <= end_date)
     ]
-    # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it.
-    # SQL GROUP BY and PARTITION BY keep NULL keys (as one group each); pandas drops them unless told not to.
+    # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it. Dask has no lambda
+    # aggregation, so the sum is masked where no input was non-NULL. A NULL key is its own group in SQL.
     grouped = filtered.groupby(list(group_by), as_index=False, dropna=False).agg(
-        itemrevenue=(value_col, lambda values: values.sum(min_count=1))
+        itemrevenue=(value_col, "sum"), priced=(value_col, "count")
     )
+    grouped["itemrevenue"] = grouped["itemrevenue"].where(grouped["priced"] > 0)
+    grouped = grouped.drop(columns=["priced"])
     grouped["revenueratio"] = (
         grouped["itemrevenue"] * 100 / grouped.groupby("i_class", dropna=False)["itemrevenue"].transform("sum")
     )
-    ordered = _sort_null_largest_pandas(grouped, list(sort_by), [False] * len(sort_by))
+    ordered = grouped.sort_values(list(sort_by), na_position="last")
+    # A NULL group key is NULL in SQL, not NaN.
     result = _none_for_null(ordered if limit is None else ordered.head(limit), list(group_by))
     # Only a group with no non-NULL input is NULL; a zero-total class gives NaN (0/0) in SQL too.
     null_groups = result["itemrevenue"].isna()
@@ -6167,9 +6189,15 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
     ) -> Any:
         return (
             ctx.get_table(sales_table)
-            .join(ctx.get_table(returns_table), left_on=left_on, right_on=right_on, how="left")
+            # SQL tests the returns key for NULL. A join drops that key from the result, so keep a copy.
+            .join(
+                ctx.get_table(returns_table).with_columns(col(return_null_col).alias("_returned")),
+                left_on=left_on,
+                right_on=right_on,
+                how="left",
+            )
             .join(date_dim, left_on=date_key, right_on="d_date_sk")
-            .filter(col(return_null_col).is_null())
+            .filter(col("_returned").is_null())
             .group_by(group_cols)
             .agg(
                 [
@@ -6196,7 +6224,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["ss_ticket_number", "ss_item_sk"],
         ["sr_ticket_number", "sr_item_sk"],
         "ss_sold_date_sk",
-        "sr_returned_date_sk",
+        "sr_ticket_number",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         "ss_quantity",
         "ss_wholesale_cost",
@@ -6209,7 +6237,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["cs_order_number", "cs_item_sk"],
         ["cr_order_number", "cr_item_sk"],
         "cs_sold_date_sk",
-        "cr_returned_date_sk",
+        "cr_order_number",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         "cs_quantity",
         "cs_wholesale_cost",
@@ -6228,7 +6256,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["ws_order_number", "ws_item_sk"],
         ["wr_order_number", "wr_item_sk"],
         "ws_sold_date_sk",
-        "wr_returned_date_sk",
+        "wr_order_number",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         "ws_quantity",
         "ws_wholesale_cost",
@@ -6261,12 +6289,11 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .with_columns(
             [
-                (
+                _round_half_up_expression(
                     col("ss_qty").cast_float64()
-                    / (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).cast_float64()
-                )
-                .round(2)
-                .alias("ratio"),
+                    / (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).cast_float64(),
+                    2,
+                ).alias("ratio"),
                 (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).alias("other_chan_qty"),
                 (col("ws_wc").fill_null(0) + col("cs_wc").fill_null(0)).alias("other_chan_wholesale_cost"),
                 (col("ws_sp").fill_null(0) + col("cs_sp").fill_null(0)).alias("other_chan_sales_price"),
@@ -6346,7 +6373,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["ss_ticket_number", "ss_item_sk"],
         ["sr_ticket_number", "sr_item_sk"],
         "ss_sold_date_sk",
-        "sr_returned_date_sk",
+        "sr_ticket_number",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         {
             "ss_qty": "ss_quantity",
@@ -6361,7 +6388,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["cs_order_number", "cs_item_sk"],
         ["cr_order_number", "cr_item_sk"],
         "cs_sold_date_sk",
-        "cr_returned_date_sk",
+        "cr_order_number",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         {
             "cs_qty": "cs_quantity",
@@ -6376,7 +6403,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["ws_order_number", "ws_item_sk"],
         ["wr_order_number", "wr_item_sk"],
         "ws_sold_date_sk",
-        "wr_returned_date_sk",
+        "wr_order_number",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         {
             "ws_qty": "ws_quantity",
@@ -6410,7 +6437,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
     result["other_chan_qty"] = result["ws_qty"].fillna(0) + result["cs_qty"].fillna(0)
     result["other_chan_wholesale_cost"] = result["ws_wc"].fillna(0) + result["cs_wc"].fillna(0)
     result["other_chan_sales_price"] = result["ws_sp"].fillna(0) + result["cs_sp"].fillna(0)
-    result["ratio"] = (result["ss_qty"] / result["other_chan_qty"]).round(2)
+    result["ratio"] = _round_half_up_pandas(result["ss_qty"] / result["other_chan_qty"], 2)
 
     result = result.rename(
         columns={

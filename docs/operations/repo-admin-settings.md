@@ -73,7 +73,7 @@ required check can stay pending forever on a change that does not touch it.
 | `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and in the merge queue the heavy tier: medium tests, correctness gate, plan-capture gate, DataFusion integration; package smoke and dependency audit on packaging changes |
 | `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite, public-site visual comparison |
 | `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
-| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, visual comparison |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, visual comparison |
 | `landing` | `landing/`, quickstart inputs | site theme token scan, visual comparison |
 | `tooling` | every event | soundness review flag; content guard, skill integrity, and audit checks by path; ruleset drift in the merge queue |
 
@@ -172,7 +172,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 - **Queue Timeout:** `check_response_timeout_minutes: 90` allows sufficient time for merge-group checks across parallel shards to complete without premature ejection during runner contention.
 - **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
+- **Soundness Gate:** a PR that touches a path in `.github/soundness-paths.txt` is reviewed by the Codex connector, required thread resolution binds its findings, and the code owner's review is still required by the ruleset. The PR-body attestation check has been removed.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)

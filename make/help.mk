@@ -58,7 +58,6 @@ help:
 	@echo "  make test-package    Build and test package installation"
 	@echo "  make security-audit  Run pip-audit security check"
 	@echo "  make spellcheck      Run codespell on codebase"
-	@echo "  make docstring-coverage  Check docstring coverage with interrogate"
 	@echo "  make complexity-check    Check cyclomatic complexity (fails on violations)"
 	@echo "  make complexity-report   Report cyclomatic complexity (no failure)"
 	@echo ""
