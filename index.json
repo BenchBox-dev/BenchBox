@@ -943,7 +943,8 @@
     "astro-site-21-single-design-token-source": {
       "claim": null,
       "needs": [
-        "astro-site-20-package-scaffold-and-ci"
+        "astro-site-20-package-scaffold-and-ci",
+        "astro-site-03-visual-change-procedure"
       ],
       "priority": "medium",
       "status": "open",
