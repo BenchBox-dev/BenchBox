@@ -1516,21 +1516,22 @@ def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: li
 
 
 def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
-    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort).
-
-    When every key points the same way one ``na_position`` is enough (last when ascending, first when
-    descending). A mix needs the ``is_null`` flag columns, which Dask cannot sort on (its optimizer
-    drops them), so on Dask a mixed sort keeps NULLs last for every key.
-    """
     if all(descending):
         return frame.sort_values(columns, ascending=[False] * len(columns), na_position="first")
-    if not any(descending) or hasattr(frame, "npartitions"):
-        return frame.sort_values(columns, ascending=[not value for value in descending], na_position="last")
+    if not any(descending):
+        return frame.sort_values(columns, ascending=[True] * len(columns), na_position="last")
     flags = [f"_null_{index}" for index in range(len(columns))]
     keyed = frame.assign(**{flag: frame[name].isna() for name, flag in zip(columns, flags)})
     by = [name for pair in zip(flags, columns) for name in pair]
     ascending = [not value for value in descending for _ in range(2)]
-    return keyed.sort_values(by, ascending=ascending, na_position="last").drop(columns=flags)
+    ordered = keyed.sort_values(by, ascending=ascending, na_position="last")
+    if hasattr(frame, "npartitions"):
+        return ordered.map_partitions(_drop_columns, flags, meta=frame._meta)
+    return ordered.drop(columns=flags)
+
+
+def _drop_columns(partition: Any, columns: list[str]) -> Any:
+    return partition.drop(columns=columns)
 
 
 def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
