@@ -172,7 +172,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 - **Queue Timeout:** `check_response_timeout_minutes: 90` allows sufficient time for merge-group checks across parallel shards to complete without premature ejection during runner contention.
 - **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
+- **Soundness Gate:** a PR that touches a path in `.github/soundness-paths.txt` is reviewed by the Codex connector, required thread resolution binds its findings, and the code owner's review is still required by the ruleset. The PR-body attestation check has been removed.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)
