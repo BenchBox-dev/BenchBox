@@ -19,12 +19,11 @@ pytestmark = [
 ]
 
 try:
-    import datafusion  # noqa: F401
     import pyarrow as pa
 
-    from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
+    from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE, DataFusionDataFrameAdapter
 
-    HAS_DATAFUSION = True
+    HAS_DATAFUSION = DATAFUSION_DF_AVAILABLE
 except ImportError:
     HAS_DATAFUSION = False
 
@@ -167,7 +166,6 @@ def test_compute_grouping_function_and_lochierarchy_fallback(monkeypatch):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_expand_rollup_expression_aligns_levels_on_datafusion():
-    """DataFusion unions by position, so every level must share one column order."""
     adapter = DataFusionDataFrameAdapter()
     ctx = adapter.create_context()
     table = pa.table(
@@ -199,27 +197,23 @@ def test_expand_rollup_expression_aligns_levels_on_datafusion():
 
 
 def _selects_names(cols) -> bool:
-    """True when select() is given column names (a reorder), not expressions."""
     flat = [c for item in cols for c in (item if isinstance(item, list) else [item])]
     return any(isinstance(c, str) for c in flat)
 
 
 def test_expand_rollup_expression_surfaces_reorder_failure():
-    """A reorder that cannot be applied must raise, not silently misalign levels."""
 
     class _FailingSelectFrame(_FakeFrame):
-        def group_by(self, *cols):  # noqa: ARG002
+        def group_by(self, *_cols):
             return self
 
-        def agg(self, *exprs):  # noqa: ARG002
+        def agg(self, *_exprs):
             return self
 
-        def with_columns(self, expr):  # noqa: ARG002
+        def with_columns(self, _expr):
             return self
 
         def select(self, *cols):
-            # Only the reorder (which selects column names) fails; the grand-total
-            # level aggregates through select() with expressions.
             if _selects_names(cols):
                 raise RuntimeError("No field named sv")
             return _FakeFrame(list(cols))
@@ -234,15 +228,12 @@ def test_expand_rollup_expression_surfaces_reorder_failure():
 
 
 def test_expand_rollup_expression_skips_reorder_with_warning_for_unknown_expr_type(caplog):
-    """Expressions whose name cannot be read are not selected by a made-up name."""
 
     class _OpaqueExpr:
         pass
 
     class _NoSelectFrame(_FakeFrame):
         def select(self, *cols):
-            # The grand-total level aggregates through select(); only a reorder
-            # (which selects column names) must be skipped.
             if _selects_names(cols):
                 raise AssertionError("reorder must be skipped when output names are unknown")
             return _FakeFrame(list(cols))

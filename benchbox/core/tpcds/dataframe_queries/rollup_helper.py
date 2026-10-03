@@ -72,11 +72,6 @@ def expand_rollup_expression(
     n = len(group_cols)
 
     def get_output_name(expr: Any) -> str | None:
-        """Get the alias/output name from an aggregation expression.
-
-        Returns None when the engine's expression type is not recognized, so
-        the caller can tell a real name from a placeholder.
-        """
         # Unwrap UnifiedExpr if needed
         native = expr.native if isinstance(expr, UnifiedExpr) else expr
         # Polars - use meta.output_name()
@@ -95,7 +90,6 @@ def expand_rollup_expression(
                 return name.strip("`")
             except Exception:
                 pass
-        # DataFusion - Expr.schema_name() is the output column name, alias included
         if hasattr(native, "schema_name"):
             try:
                 return native.schema_name()
@@ -146,9 +140,6 @@ def expand_rollup_expression(
         grouping_id = sum(2**j for j in range(i))
         grouped = grouped.with_columns(lit(grouping_id).alias("grouping_id"))
 
-        # Reorder columns to one layout for every level. Engines that union by
-        # position (DataFusion) need this to line the levels up, so a failure
-        # here must surface instead of producing misaligned rows.
         if names_resolved:
             all_cols = group_cols + agg_col_names + ["grouping_id"]
             # Use *args for UnifiedLazyFrame, list for native

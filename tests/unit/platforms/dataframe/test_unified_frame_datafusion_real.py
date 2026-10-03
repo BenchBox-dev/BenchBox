@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -518,7 +519,6 @@ def test_datafusion_string_add_concat(datafusion_frame):
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_integer_division_is_true_division(datafusion_frame):
-    """Int64 / Int64 is true division, as in SQL and Polars, not integer division."""
     _, frame = datafusion_frame
 
     result = frame.select(
@@ -641,3 +641,217 @@ def test_datafusion_global_select_case_over_aggregates(agg_frame):
         .to_pydict()
     )
     assert result == {"s": [6], "half_y": [8.0]}
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+@pytest.mark.parametrize(
+    "dtype", [pa.int8(), pa.int32(), pa.int64(), pa.uint32(), pa.uint64()] if HAS_DATAFUSION else []
+)
+def test_datafusion_computed_integral_division(dtype):
+    ctx = datafusion.SessionContext()
+    table = pa.table({"a": pa.array([1, 3], type=dtype), "b": pa.array([4, 4], type=dtype)})
+    frame = UnifiedLazyFrame(ctx.from_arrow(table), SimpleNamespace(platform_name="DataFusion"))
+    a = UnifiedExpr(datafusion.col("a"))
+    b = UnifiedExpr(datafusion.col("b"))
+
+    result = frame.select(
+        ((a + 1) / (b + 1)).alias("computed"),
+        (UnifiedExpr(datafusion.lit(1)) / b).alias("wrapped_literal"),
+        ((a / b).cast(int) / b).alias("nested"),
+        ((a / b).cast_string().str.len_chars()).alias("length"),
+    ).collect()
+
+    assert [float(value) for value in result.column("computed").to_pylist()] == pytest.approx([0.4, 0.8])
+    assert result.column("wrapped_literal").to_pylist() == pytest.approx([0.25, 0.25])
+    assert result.column("nested").to_pylist() == pytest.approx([0.0, 0.0])
+    assert result.column("length").to_pylist() == [4, 4]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+@pytest.mark.parametrize("dtype", [pa.decimal128(30, 2), pa.decimal256(40, 4)] if HAS_DATAFUSION else [])
+def test_datafusion_decimal_division_preserves_native_values_and_types(dtype):
+    ctx = datafusion.SessionContext()
+    table = pa.table(
+        {
+            "amount": pa.array([Decimal("9007199254740993.20"), Decimal("1.20"), None], type=dtype),
+            "divisor": [4, 0, 4],
+            "decimal_divisor": pa.array([Decimal("4.00"), Decimal("0.00"), Decimal("4.00")], type=dtype),
+        }
+    )
+    native_frame = ctx.from_arrow(table)
+    frame = UnifiedLazyFrame(native_frame, SimpleNamespace(platform_name="DataFusion"))
+    amount = UnifiedExpr(datafusion.col("amount"))
+    divisor = UnifiedExpr(datafusion.col("divisor"))
+    decimal_divisor = UnifiedExpr(datafusion.col("decimal_divisor"))
+    literal = pa.scalar(Decimal("9007199254740993.20"), type=dtype)
+    literal_value = Decimal("9007199254740993.20")
+    wrapped_literal = UnifiedExpr(datafusion.lit(literal))
+
+    expressions = [
+        (amount / divisor).alias("decimal_by_integer"),
+        (amount / decimal_divisor).alias("decimal_by_decimal"),
+        (amount / 4).alias("decimal_by_literal"),
+        (4 / amount).alias("integer_by_decimal"),
+        (literal_value / amount).alias("decimal_literal_by_decimal"),
+        (wrapped_literal / amount).alias("wrapped_decimal_literal"),
+    ]
+    f = datafusion.functions
+    expected = native_frame.select(
+        (datafusion.col("amount") / f.nullif(datafusion.col("divisor"), datafusion.lit(0))).alias("decimal_by_integer"),
+        (datafusion.col("amount") / f.nullif(datafusion.col("decimal_divisor"), datafusion.lit(0))).alias(
+            "decimal_by_decimal"
+        ),
+        (datafusion.col("amount") / datafusion.lit(4)).alias("decimal_by_literal"),
+        (datafusion.lit(4) / f.nullif(datafusion.col("amount"), datafusion.lit(0))).alias("integer_by_decimal"),
+        (datafusion.lit(literal_value) / f.nullif(datafusion.col("amount"), datafusion.lit(0))).alias(
+            "decimal_literal_by_decimal"
+        ),
+        (datafusion.lit(literal) / f.nullif(datafusion.col("amount"), datafusion.lit(0))).alias(
+            "wrapped_decimal_literal"
+        ),
+    ).to_arrow_table()
+
+    result = frame.select(expressions).collect()
+
+    assert result.schema.equals(expected.schema)
+    assert result.equals(expected)
+    assert all(pa.types.is_decimal(field.type) for field in result.schema)
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_decimal_division_keeps_full_numerator_range():
+    ctx = datafusion.SessionContext()
+    value = Decimal("110000000000000000000000000000000.00")
+    table = pa.table({"amount": pa.array([value], type=pa.decimal128(38, 2)), "divisor": [1000]})
+    native_frame = ctx.from_arrow(table)
+    frame = UnifiedLazyFrame(native_frame, SimpleNamespace(platform_name="DataFusion"))
+
+    result = frame.select((UnifiedExpr(datafusion.col("amount")) / 1000).alias("ratio")).collect()
+    expected = native_frame.select((datafusion.col("amount") / datafusion.lit(1000)).alias("ratio")).to_arrow_table()
+
+    assert result.schema.equals(expected.schema)
+    assert result.equals(expected)
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_division_binds_each_input_schema():
+    ctx = datafusion.SessionContext()
+    expression = (UnifiedExpr(datafusion.col("amount")) / 4).alias("ratio")
+    adapter = SimpleNamespace(platform_name="DataFusion")
+    integer_frame = UnifiedLazyFrame(ctx.from_pydict({"amount": [1]}), adapter)
+    decimal_frame = UnifiedLazyFrame(
+        ctx.from_arrow(pa.table({"amount": pa.array([Decimal("9007199254740993.20")], type=pa.decimal128(30, 2))})),
+        adapter,
+    )
+
+    integer_result = integer_frame.select(expression).collect()
+    decimal_result = decimal_frame.select(expression).collect()
+
+    assert integer_result.column("ratio").to_pylist() == [0.25]
+    assert integer_result.schema.field("ratio").type == pa.float64()
+    assert decimal_result.column("ratio").to_pylist() == [Decimal("2251799813685248.300000")]
+    assert decimal_result.schema.field("ratio").type == pa.decimal128(34, 6)
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_deferred_division_captures_literal_lists():
+    ctx = datafusion.SessionContext()
+    frame = UnifiedLazyFrame(ctx.from_pydict({"a": [1, 3], "b": [4, 4]}), SimpleNamespace(platform_name="DataFusion"))
+    values = [0.25]
+    expression = (UnifiedExpr(datafusion.col("a")) / UnifiedExpr(datafusion.col("b"))).is_in(values).alias("selected")
+    values.append(0.75)
+
+    result = frame.select(expression).collect()
+
+    assert result.column("selected").to_pylist() == [True, False]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_division_propagates_through_frame_operations(datafusion_frame):
+    from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
+
+    _, frame = datafusion_frame
+    a = UnifiedExpr(datafusion.col("a"))
+    b = UnifiedExpr(datafusion.col("b"))
+    ratio = a / b
+    ctx = DataFusionDataFrameAdapter().create_context()
+
+    result = frame.with_columns(
+        ctx.when(ratio > 0.4).then(ratio).otherwise(0).alias("conditional"),
+        ctx.coalesce(ratio, ctx.lit(0)).alias("coalesced"),
+        ctx.struct(ratio.alias("ratio")).struct.field("ratio").alias("struct_ratio"),
+    ).collect()
+    filtered = frame.filter(ratio > 0.4).select("a").collect()
+    sorted_result = frame.sort((b / a).desc()).select("a").collect()
+    grouped = frame.group_by(ratio.alias("ratio")).agg(a.sum().alias("total")).collect()
+    windowed = frame.with_columns(ratio.sum().over("b").alias("window_ratio")).collect()
+
+    assert result.column("conditional").to_pylist() == pytest.approx([0.0, 0.5])
+    assert result.column("coalesced").to_pylist() == pytest.approx([1 / 3, 0.5])
+    assert result.column("struct_ratio").to_pylist() == pytest.approx([1 / 3, 0.5])
+    assert filtered.column("a").to_pylist() == [2]
+    assert sorted_result.column("a").to_pylist() == [1, 2]
+    assert sorted(grouped.column("ratio").to_pylist()) == pytest.approx([1 / 3, 0.5])
+    assert windowed.column("window_ratio").to_pylist() == pytest.approx([1 / 3, 0.5])
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_division_resolves_join_keys_on_each_side():
+    ctx = datafusion.SessionContext()
+    adapter = SimpleNamespace(platform_name="DataFusion")
+    left = UnifiedLazyFrame(ctx.from_pydict({"x": [1, 2]}), adapter)
+    right = UnifiedLazyFrame(
+        ctx.from_arrow(pa.table({"y": pa.array([Decimal("1.00"), Decimal("3.00")], type=pa.decimal128(12, 2))})),
+        adapter,
+    )
+
+    result = left.join(
+        right,
+        left_on=UnifiedExpr(datafusion.col("x")) / 2,
+        right_on=UnifiedExpr(datafusion.col("y")) / 2,
+    ).collect()
+
+    assert result.column("x").to_pylist() == [1]
+    assert result.column("y").to_pylist() == [Decimal("1.00")]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_division_over_aggregate_operands():
+    ctx = datafusion.SessionContext()
+    table = pa.table(
+        {
+            "group": ["x", "x"],
+            "a": [1, 3],
+            "b": [4, 4],
+            "amount": pa.array([Decimal("9007199254740993.20"), Decimal("1.20")], type=pa.decimal128(30, 2)),
+        }
+    )
+    native_frame = ctx.from_arrow(table)
+    frame = UnifiedLazyFrame(native_frame, SimpleNamespace(platform_name="DataFusion"))
+    a = UnifiedExpr(datafusion.col("a"))
+    b = UnifiedExpr(datafusion.col("b"))
+    amount = UnifiedExpr(datafusion.col("amount"))
+    integer_ratio = (a.sum() / b.sum()).alias("integer_ratio")
+    decimal_ratio = (amount.sum() / b.sum()).alias("decimal_ratio")
+    reverse_ratio = (4 / amount.sum()).alias("reverse_ratio")
+    row_ratio_sum = (a / b).filter(a > 1).sum().alias("row_ratio_sum")
+    f = datafusion.functions
+    native_expressions = [
+        (f.sum(datafusion.col("a")).cast(pa.float64()) / f.sum(datafusion.col("b"))).alias("integer_ratio"),
+        (f.sum(datafusion.col("amount")) / f.sum(datafusion.col("b"))).alias("decimal_ratio"),
+        (datafusion.lit(4) / f.sum(datafusion.col("amount"))).alias("reverse_ratio"),
+        f.sum(datafusion.col("a").cast(pa.float64()) / datafusion.col("b"))
+        .filter(datafusion.col("a") > datafusion.lit(1))
+        .build()
+        .alias("row_ratio_sum"),
+    ]
+
+    result = frame.select(integer_ratio, decimal_ratio, reverse_ratio, row_ratio_sum).collect()
+    expected = native_frame.aggregate([], native_expressions).to_arrow_table()
+    grouped = frame.group_by("group").agg(integer_ratio, decimal_ratio, reverse_ratio, row_ratio_sum).collect()
+    grouped_expected = native_frame.aggregate([datafusion.col("group")], native_expressions).to_arrow_table()
+
+    assert result.schema.equals(expected.schema)
+    assert result.equals(expected)
+    assert grouped.schema.equals(grouped_expected.schema)
+    assert grouped.equals(grouped_expected)
