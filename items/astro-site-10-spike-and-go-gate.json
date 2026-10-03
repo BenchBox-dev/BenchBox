@@ -1,13 +1,14 @@
 {
   "acceptance": [
-    "Spike report with measured build time, page weight, axe results and URL check for both layout variants",
-    "All 4 sample routes served at their current URLs (inventory diff for those routes clean)",
-    "Explorer served unchanged at /results/ and its smoke test passes against the spike build",
-    "Owner decision recorded: GO with D6 resolved (custom or Starlight), or NO-GO (then drop downstream astro-site-* items)",
-    "Spike code not merged into a required CI path"
+    "Spike report covers all 10 scope points with evidence",
+    "All sample routes served at their current URLs (inventory diff for those routes clean)",
+    "Explorer deep links and worker/WASM loading verified in a real browser; Explorer test suites green",
+    "Docs/blog pages proven to fetch no Explorer runtime",
+    "Owner decision recorded: GO with D6 resolved, or NO-GO (drop downstream astro-site-* items)",
+    "Spike not wired into required CI"
   ],
-  "context": "Go criteria: exact URL preservation is achievable; zero axe serious or critical violations; build time no worse than the current Sphinx docs-build step; no explorer source changes needed. Any miss means NO-GO, or a documented mitigation the owner explicitly accepts. Time box: stop and report once both variants build, even if the report is negative.",
-  "description": "Build a throwaway spike on a branch, not merged, or merged under website/ only with no required CI. Scope:\n- landing hero\n- docs/usage/getting-started.md converted from MyST\n- the blog post 2026-05-18-v0-3-0-release-overview at its current .html URL\n- the existing results-explorer dist copied to /results/\n- shared header and dark mode using the same localStorage key benchbox:theme\n- Pagefind search over the sample\n\nBuild it twice, with custom layouts and with Starlight, so the layout choice rests on evidence.\n\nMeasure on the same CI runner class: build time vs the current docs-build step, HTML+JS bytes per sample page vs Sphinx, axe results, and whether the exact current URLs are produced.\n\nWrite _project/decisions/astro-spike-report.md with the numbers and a go/no-go recommendation.",
+  "context": "Go criteria: exact URL preservation achievable; zero axe serious or critical violations; build time no worse than the current Sphinx docs-build step; Explorer integration needs only shell extraction and config edits, no logic changes. Any miss means NO-GO, or a documented mitigation the owner explicitly accepts. Time box: stop and report once the scope builds, even if the report is negative.",
+  "description": "Build a spike under website/ with no required CI. Build Starlight inside the shared shell first. Build a custom docs layout only if the Starlight overrides prove brittle; record which overrides those were.\n\nRepresentative scope, all required:\n1. One complex RST page with toctree and :doc: roles, e.g. docs/benchmarks/industry-benchmarks.rst\n2. One MyST page, docs/usage/getting-started.md\n3. One real blog post, 2026-05-18-v0-3-0-release-overview, at its current .html URL\n4. One authored API contract page using the astro-site-02 template\n5. One generated query docs page from scripts/generate_query_docs.py\n6. Landing hero\n7. Explorer at /results/ with working deep links (direct load of a nested /results/... route and of a query-string state URL)\n8. Shared header and theme, using localStorage key benchbox:theme\n9. Browser back/forward navigation, and DuckDB worker/WASM loading verified in Chromium\n10. Pagefind over docs and blog\n\nMeasure on the same CI runner class:\n- build time vs the current docs-build step\n- HTML+JS bytes per page\n- that docs and blog pages load zero Explorer/DuckDB bytes\n- axe results\n- exact URL output\n\nWrite _project/decisions/astro-spike-report.md with the numbers and a go/no-go recommendation.",
   "sessions": [
     {
       "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
@@ -15,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "a029d65aff0d455f8138f1a69155c700",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:06:58Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7489d43900a94075a7533c153f926be5",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
