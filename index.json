@@ -903,12 +903,17 @@
       "title": "Build the URL and content inventory that serves as the parity oracle for the Astro migration"
     },
     "astro-site-02-api-reference-decision": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-04T17:59:56Z",
+        "generation": "8b30a1ce9a1b4eaa818a13ac11876bac",
+        "renewals": 0,
+        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
+      },
       "needs": [
         "astro-site-00-decisions-adr"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Decision gate: define authored API contracts as the source of truth that replaces the 27 autodoc pages"
     },
     "astro-site-03-visual-change-procedure": {
