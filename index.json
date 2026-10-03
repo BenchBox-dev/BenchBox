@@ -947,7 +947,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Build the shared site shell: header, footer, docs sidebar, theme toggle, and Pagefind search"
+      "title": "Build the shared site shell: header, footer, docs layout, theme toggle, and docs/blog search"
     },
     "astro-site-30-rst-to-myst-in-place": {
       "claim": null,

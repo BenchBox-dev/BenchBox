@@ -3,9 +3,10 @@
     "Header parity test extended to the Astro header and green",
     "axe: zero serious/critical on a docs page, blog post and landing at desktop and 390px widths",
     "Theme toggle persists via benchbox:theme and matches explorer behaviour",
-    "Pagefind search returns results for a docs term and a blog title in the built site"
+    "Pagefind returns a docs term and a blog title; results section is absent or empty until astro-site-61",
+    "Starlight overrides used are listed; none patch Starlight internals"
   ],
-  "description": "Build Astro components for the header (Docs, Blog, Results, GitHub, search, theme toggle), the footer, the docs layout (sidebar, breadcrumbs, on-page TOC, edit link) and the blog layout.\n\nThe header must match the current header contract: results-explorer/src headerContract.ts and tests/unit/test_site_header_parity.py. Explorer and site then render the same header.\n\nThe sidebar is generated from a config that the converter (astro-site-31) derives from the toctrees.\n\nPagefind indexes docs and blog. Results pages may be indexed by title only.\n\nUse real <a>/<button> elements, keep 44px touch targets, and make the layout work at phone width.",
+  "description": "Build the shell in the layout variant chosen at G1 (default: Starlight docs inside a custom shell).\n\nComponents:\n- header: Docs, Blog, Results, GitHub, search, theme toggle\n- footer\n- docs layout: sidebar, breadcrumbs, on-page TOC, edit link\n- blog layout\n\nThe header must match the current header contract (results-explorer/src headerContract.ts and tests/unit/test_site_header_parity.py), and is extracted as a shared component so the Explorer renders the same shell (see astro-site-40).\n\nThe sidebar comes from config that the converter derives from toctrees.\n\nSearch: Pagefind indexes docs and blog HTML only. The search UI reserves a separate \"Results\" section. It stays empty until astro-site-61 supplies generated result summaries; Pagefind never indexes DuckDB-WASM content.\n\nUse real <a>/<button> elements, keep 44px touch targets, and make the layout work at phone width.",
   "links": [
     "tests/unit/test_site_header_parity.py",
     "landing/shared/site-header.js",
@@ -18,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "7144923988ee4c96894161285e508213",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:08:07Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2623342103cc418aaa85d0c1e318d193",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
