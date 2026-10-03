@@ -30,7 +30,7 @@ consumers use GNU Make's evaluated target graph.
 | `make/worktrees.mk` | Disposable worktree creation, exact-path removal, manual release, finish preview, and listing | Keep the native Git lifecycle wrappers here; do not add slot allocation or automatic branch cleanup |
 | `make/worktree-maintenance.mk` | Finding and soundness reporting utilities | Keep unrelated reporting targets here; worktree reaping remains exact-path and operator-driven — the only branch reaper (`branch-prune-merged` in the root `Makefile`) is an explicit exception for worktree-less branches at their historically proven merge-time PR head |
 | `make/help.mk` | Exact ordered `make help` recipe | Preserve existing category and command order; add a help line in the same change as a new user-facing target |
-| `make/inventory.json` | Untracked, git-ignored evaluated target, alias, prerequisite, recipe, variable, macro, statement-order, default-goal, and include-order contract, derived wholly from the `Makefile`, its included modules, and the migration files below | Never edit or commit it; only `make/check_makefile_inventory.py --write` writes it |
+| `make/inventory.json` | Locally generated target, alias, prerequisite, recipe, variable, macro, statement-order, default-goal, and include-order contract, derived wholly from the `Makefile`, its included modules, and the migration files below | Never edit or commit it; only `make/check_makefile_inventory.py --write` writes it |
 | `make/monolith-baseline.json` | Durable inventory of the committed pre-split monolith: 198 targets, 195 public targets, and default goal `test` | Do not regenerate during ordinary Make changes; changing this migration proof requires a separate architectural decision |
 | `make/migration-proof.json` | Compact hashes, counts, include order, and reviewed delta for the initial split | The normal inventory writer never changes this file; preserve it with the monolith baseline as historical evidence |
 | `make/check_makefile_inventory.py` | Inventory reader, writer, and historical verifier | Keep it with the release-retained Make runtime so the public guard remains executable after curation |
@@ -119,14 +119,15 @@ That evidence does not freeze the Make interface; changing a target, prerequisit
 or recipe needs no manifest update. Pull requests that change `Makefile` or
 `make/` get an informational public-target and recipe diff against their base
 in the CI step summary (`make/interface_summary.py`). To write the evaluated
-contract to the ignored manifest for inspection, run:
+contract to a local manifest for inspection, run:
 
 ```bash
 uv run -- python make/check_makefile_inventory.py --write
 ```
 
 The writer validates but never rewrites `monolith-baseline.json` or
-`migration-proof.json`.
+`migration-proof.json`. Its generated `make/inventory.json` is visible as an
+untracked file; remove it after inspection.
 
 At the introducing split commit, or a checkout reconstructed from it, reproduce
 the historical comparison explicitly:
