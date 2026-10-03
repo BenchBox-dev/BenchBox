@@ -36,7 +36,13 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
+import time
+import uuid
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -101,6 +107,53 @@ DATAFRAME_CACHE_VERSION = "v8"
 # Used by clear_cache() to selectively remove cached conversions without
 # destroying raw datagen output (e.g. .tbl files) in the same directory.
 _KNOWN_FORMAT_DIRS = frozenset(f.value for f in DataFormat)  # {"csv", "parquet", "arrow"}
+
+# Temp files written by ``_atomic_cache_write`` are named
+# ``<final name>.<pid>.<32 hex digits>.tmp`` and live next to the final file so
+# the closing ``os.replace`` stays on one filesystem.
+_CACHE_TEMP_FILE_PATTERN = re.compile(r"\.\d+\.[0-9a-f]{32}\.tmp$")
+
+# A temp file untouched for this long belongs to a crashed writer. A live writer
+# keeps modifying its temp file, so younger files are left alone: another
+# process may still be writing one.
+CACHE_TEMP_FILE_MAX_AGE_SECONDS = 30 * 60
+
+
+def _is_cache_temp_file(name: str) -> bool:
+    """Return True when ``name`` looks like an in-progress atomic cache write."""
+    return _CACHE_TEMP_FILE_PATTERN.search(name) is not None
+
+
+def _fsync_path(path: Path) -> None:
+    """Flush a finished file to disk so a crash cannot leave the rename ahead of its data."""
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _atomic_cache_write(target_path: Path) -> Iterator[Path]:
+    """Yield a unique temp path that replaces ``target_path`` when the block succeeds.
+
+    The cache is shared by every BenchBox process on a machine, and readers
+    (Polars, DuckDB) memory-map cache files. Writing straight to the final
+    path truncates a file another process may have mapped, which crashes that
+    reader (SIGBUS, ``Invalid argument (os error 22)``, or a footer error).
+    Replacing the path with a fully written file leaves existing mappings on
+    the old inode and gives new readers a complete file.
+
+    On any error the temp file is removed and ``target_path`` is untouched.
+    """
+    tmp_path = target_path.with_name(f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        yield tmp_path
+        _fsync_path(tmp_path)
+        os.replace(tmp_path, target_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 class ConversionStatus(Enum):
@@ -484,7 +537,8 @@ class FormatConverter:
 
             # Write Parquet
             logger.debug(f"Writing {target_path}")
-            pq.write_table(table, target_path, **write_kwargs)
+            with _atomic_cache_write(target_path) as tmp_path:
+                pq.write_table(table, tmp_path, **write_kwargs)
 
             row_count = table.num_rows
             logger.info(f"Converted {source_path.name} → {target_path.name}: {row_count:,} rows")
@@ -829,7 +883,7 @@ class DataCache:
         manifest_path = self.get_manifest_path(benchmark, scale_factor, format)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        with _atomic_cache_write(manifest_path) as tmp_path, open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(manifest.to_dict(), f, indent=2)
 
     def clear_cache(
@@ -898,10 +952,32 @@ class DataCache:
         return removed
 
 
+_HASH_CHUNK_BYTES = 8 * 1024 * 1024
+
+
+def _file_content_digest(file_path: Path) -> str:
+    """Return the SHA-256 digest of a file's bytes (compressed files are hashed as stored)."""
+    digest = hashlib.sha256()
+    buffer = bytearray(_HASH_CHUNK_BYTES)
+    view = memoryview(buffer)
+    with open(file_path, "rb", buffering=0) as handle:
+        while True:
+            read = handle.readinto(buffer)
+            if not read:
+                break
+            digest.update(view[:read])
+    return digest.hexdigest()
+
+
 def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]]) -> str:
     """Compute hash of source files for cache validation.
 
-    Uses file modification times for fast validation.
+    The hash covers each file's table, name, size and a digest of its bytes.
+    It deliberately ignores modification times: a run that regenerates
+    identical data in a fresh temporary directory gets new mtimes, and keying
+    on them forced every such run to rewrite the shared cache. Hashing the
+    content means a cache hit can only serve Parquet converted from the same
+    bytes, whatever the file times say.
 
     Args:
         source_dir: Source data directory
@@ -910,14 +986,22 @@ def _compute_source_hash(source_dir: Path, tables: dict[str, Path | list[Path]])
     Returns:
         Hash string
     """
-    hash_data = []
+    entries: list[tuple[str, Path]] = []
     for table_name in sorted(tables.keys()):
         file_paths = tables[table_name]
         file_list = file_paths if isinstance(file_paths, list) else [file_paths]
-        for file_path in file_list:
-            if file_path.exists():
-                stat = file_path.stat()
-                hash_data.append(f"{table_name}:{file_path.name}:{stat.st_mtime}:{stat.st_size}")
+        entries.extend((table_name, file_path) for file_path in file_list if file_path.exists())
+
+    def describe(entry: tuple[str, Path]) -> str:
+        table_name, file_path = entry
+        return f"{table_name}:{file_path.name}:{file_path.stat().st_size}:{_file_content_digest(file_path)}"
+
+    # hashlib releases the GIL on large buffers, so threads hash files in parallel.
+    if len(entries) > 1:
+        with ThreadPoolExecutor(max_workers=min(8, len(entries))) as pool:
+            hash_data = list(pool.map(describe, entries))
+    else:
+        hash_data = [describe(entry) for entry in entries]
 
     combined = "|".join(hash_data)
     return hashlib.md5(combined.encode()).hexdigest()[:12]
@@ -1467,6 +1551,9 @@ class DataFrameDataLoader:
         """Prune untracked leaf files from a cache directory.
 
         Keeps `_manifest.json` and the tracked file names for the current run.
+        Temp files from atomic writes are kept while they are recent, because
+        another process may still be writing one; only those untouched for
+        ``CACHE_TEMP_FILE_MAX_AGE_SECONDS`` (a crashed writer) are removed.
         """
         if not cache_path.exists():
             return 0
@@ -1474,9 +1561,17 @@ class DataFrameDataLoader:
         preserved = set(tracked_files)
         preserved.add("_manifest.json")
         removed = 0
+        now = time.time()
         for child in cache_path.iterdir():
             if child.is_dir() or child.name in preserved:
                 continue
+            if _is_cache_temp_file(child.name):
+                try:
+                    age = now - child.stat().st_mtime
+                except FileNotFoundError:
+                    continue  # the writer just renamed it into place
+                if age < CACHE_TEMP_FILE_MAX_AGE_SECONDS:
+                    continue
             child.unlink(missing_ok=True)
             removed += 1
         return removed

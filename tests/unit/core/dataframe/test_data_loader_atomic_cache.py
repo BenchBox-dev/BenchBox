@@ -1,0 +1,283 @@
+"""Atomic cache writes, temp-file pruning and content-based source hashing.
+
+The DataFrame cache is shared by every BenchBox process on a machine and its
+Parquet files are memory-mapped by readers, so a writer must never modify a
+cache file in place.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from pathlib import Path
+from unittest.mock import patch
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
+from benchbox.core.dataframe.capabilities import DataFormat
+from benchbox.core.dataframe.data_loader import (
+    CACHE_TEMP_FILE_MAX_AGE_SECONDS,
+    ConversionStatus,
+    DataCache,
+    DataFrameDataLoader,
+    FormatConverter,
+    _atomic_cache_write,
+    _compute_source_hash,
+)
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
+
+def _temp_files(directory: Path) -> list[Path]:
+    return sorted(directory.glob("*.tmp"))
+
+
+def _write_source(path: Path, rows: int) -> None:
+    path.write_text("".join(f"{i}|name{i}|\n" for i in range(rows)), encoding="utf-8")
+
+
+def _convert(source: Path, target: Path) -> tuple[ConversionStatus, int]:
+    return FormatConverter.convert_csv_to_parquet(source, target, column_names=["id", "name"])
+
+
+class TestAtomicCacheWrite:
+    def test_final_file_is_complete_until_the_replace(self, tmp_path: Path) -> None:
+        target = tmp_path / "t.bin"
+        target.write_bytes(b"old complete content")
+
+        with _atomic_cache_write(target) as tmp:
+            assert tmp.parent == target.parent
+            assert tmp != target
+            tmp.write_bytes(b"new")
+            # Half way through the write, readers still see the previous file.
+            assert target.read_bytes() == b"old complete content"
+
+        assert target.read_bytes() == b"new"
+        assert _temp_files(tmp_path) == []
+
+    def test_failed_write_keeps_previous_file_and_leaves_no_temp(self, tmp_path: Path) -> None:
+        target = tmp_path / "t.bin"
+        target.write_bytes(b"previous")
+
+        with pytest.raises(RuntimeError, match="disk full"), _atomic_cache_write(target) as tmp:
+            tmp.write_bytes(b"partial")
+            raise RuntimeError("disk full")
+
+        assert target.read_bytes() == b"previous"
+        assert _temp_files(tmp_path) == []
+
+    def test_failure_without_previous_file_creates_nothing(self, tmp_path: Path) -> None:
+        target = tmp_path / "t.bin"
+
+        with pytest.raises(RuntimeError), _atomic_cache_write(target) as tmp:
+            tmp.write_bytes(b"partial")
+            raise RuntimeError("boom")
+
+        assert not target.exists()
+        assert list(tmp_path.iterdir()) == []
+
+    def test_concurrent_writers_use_distinct_temp_files(self, tmp_path: Path) -> None:
+        target = tmp_path / "t.bin"
+        with _atomic_cache_write(target) as first, _atomic_cache_write(target) as second:
+            assert first != second
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+        assert target.read_bytes() in {b"first", b"second"}
+        assert _temp_files(tmp_path) == []
+
+
+class TestParquetConversionIsAtomic:
+    def test_target_is_never_partial_while_writing(self, tmp_path: Path) -> None:
+        source = tmp_path / "src.tbl"
+        _write_source(source, 50)
+        target = tmp_path / "out.parquet"
+        assert _convert(source, target) == (ConversionStatus.SUCCESS, 50)
+        _write_source(source, 80)
+
+        real_write_table = pq.write_table
+        observed: list[int] = []
+
+        def observing_write_table(table, where, **kwargs):
+            real_write_table(table, where, **kwargs)
+            # The new file is fully written but not yet published.
+            assert Path(where) != target
+            observed.append(pq.read_table(target).num_rows)
+
+        with patch("pyarrow.parquet.write_table", side_effect=observing_write_table):
+            assert _convert(source, target) == (ConversionStatus.SUCCESS, 80)
+
+        assert observed == [50]
+        assert pq.read_table(target).num_rows == 80
+        assert _temp_files(tmp_path) == []
+
+    def test_failed_conversion_keeps_previous_parquet_and_no_temp(self, tmp_path: Path) -> None:
+        source = tmp_path / "src.tbl"
+        _write_source(source, 50)
+        target = tmp_path / "out.parquet"
+        _convert(source, target)
+        previous = target.read_bytes()
+
+        def failing_write_table(table, where, **kwargs):
+            Path(where).write_bytes(b"PAR1 truncated")
+            raise OSError("no space left on device")
+
+        with patch("pyarrow.parquet.write_table", side_effect=failing_write_table):
+            status, rows = _convert(source, target)
+
+        assert (status, rows) == (ConversionStatus.FAILED, 0)
+        assert target.read_bytes() == previous
+        assert _temp_files(tmp_path) == []
+
+    def test_memory_mapped_reader_survives_a_rewrite(self, tmp_path: Path) -> None:
+        source = tmp_path / "src.tbl"
+        _write_source(source, 200)
+        target = tmp_path / "out.parquet"
+        _convert(source, target)
+
+        with pa.memory_map(str(target), "r") as mapped:
+            _write_source(source, 10)
+            assert _convert(source, target) == (ConversionStatus.SUCCESS, 10)
+            # The old mapping still reads the old, complete file.
+            assert pq.read_table(mapped).num_rows == 200
+
+        assert pq.read_table(target).num_rows == 10
+
+
+class TestManifestWriteIsAtomic:
+    def _save(self, cache: DataCache, source_hash: str) -> Path:
+        cache.save_manifest("tpch", 0.01, DataFormat.PARQUET, source_hash, {"t": {"file": "t.parquet", "row_count": 1}})
+        return cache.get_manifest_path("tpch", 0.01, DataFormat.PARQUET)
+
+    def test_save_manifest_leaves_no_temp_file(self, tmp_path: Path) -> None:
+        cache = DataCache(tmp_path)
+        manifest_path = self._save(cache, "hash1")
+        assert json.loads(manifest_path.read_text())["source_hash"] == "hash1"
+        assert _temp_files(manifest_path.parent) == []
+
+    def test_failed_manifest_write_keeps_previous_manifest(self, tmp_path: Path) -> None:
+        cache = DataCache(tmp_path)
+        manifest_path = self._save(cache, "hash1")
+
+        with patch("benchbox.core.dataframe.data_loader.json.dump", side_effect=OSError("disk full")):
+            with pytest.raises(OSError, match="disk full"):
+                self._save(cache, "hash2")
+
+        assert json.loads(manifest_path.read_text())["source_hash"] == "hash1"
+        assert _temp_files(manifest_path.parent) == []
+
+
+class TestPruneStaleTempFiles:
+    def _loader_and_cache(self, tmp_path: Path) -> tuple[DataFrameDataLoader, Path]:
+        loader = DataFrameDataLoader(cache_dir=tmp_path)
+        cache_path = loader.cache.get_cache_path("tpch", 0.01, DataFormat.PARQUET)
+        cache_path.mkdir(parents=True, exist_ok=True)
+        return loader, cache_path
+
+    @staticmethod
+    def _make_temp(cache_path: Path, name: str, age_seconds: float) -> Path:
+        path = cache_path / f"{name}.4242.{'ab' * 16}.tmp"
+        path.write_bytes(b"partial")
+        stamp = time.time() - age_seconds
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def test_recent_temp_file_of_another_writer_is_kept(self, tmp_path: Path) -> None:
+        loader, cache_path = self._loader_and_cache(tmp_path)
+        live = self._make_temp(cache_path, "orders.parquet", age_seconds=5)
+
+        loader._prune_cache_leaf_files(cache_path, set())
+
+        assert live.exists()
+
+    def test_stale_temp_file_is_removed(self, tmp_path: Path) -> None:
+        loader, cache_path = self._loader_and_cache(tmp_path)
+        stale = self._make_temp(cache_path, "orders.parquet", age_seconds=CACHE_TEMP_FILE_MAX_AGE_SECONDS + 60)
+
+        removed = loader._prune_cache_leaf_files(cache_path, set())
+
+        assert not stale.exists()
+        assert removed == 1
+
+    def test_untracked_non_temp_files_are_still_pruned(self, tmp_path: Path) -> None:
+        loader, cache_path = self._loader_and_cache(tmp_path)
+        tracked = cache_path / "keep.parquet"
+        tracked.write_bytes(b"x")
+        (cache_path / "_manifest.json").write_text("{}")
+        untracked = cache_path / "gone.parquet"
+        untracked.write_bytes(b"x")
+        # A name that only resembles a temp file is not protected.
+        lookalike = cache_path / "notes.tmp"
+        lookalike.write_bytes(b"x")
+
+        loader._prune_cache_leaf_files(cache_path, {"keep.parquet"})
+
+        assert tracked.exists()
+        assert (cache_path / "_manifest.json").exists()
+        assert not untracked.exists()
+        assert not lookalike.exists()
+
+
+class TestContentBasedSourceHash:
+    def test_identical_content_with_different_mtimes_hashes_equal(self, tmp_path: Path) -> None:
+        first = tmp_path / "run1"
+        second = tmp_path / "run2"
+        first.mkdir()
+        second.mkdir()
+        for directory, stamp in ((first, 1_000_000_000), (second, 1_700_000_000)):
+            (directory / "a.tbl").write_text("1|x|\n2|y|\n")
+            (directory / "b.tbl").write_text("3|z|\n")
+            for file in directory.iterdir():
+                os.utime(file, (stamp, stamp))
+
+        hash_first = _compute_source_hash(first, {"a": [first / "a.tbl"], "b": first / "b.tbl"})
+        hash_second = _compute_source_hash(second, {"a": [second / "a.tbl"], "b": second / "b.tbl"})
+
+        assert hash_first == hash_second
+
+    def test_different_content_of_same_size_and_mtime_hashes_differently(self, tmp_path: Path) -> None:
+        file = tmp_path / "a.tbl"
+        file.write_text("1|aaa|\n")
+        os.utime(file, (1_000_000_000, 1_000_000_000))
+        before = _compute_source_hash(tmp_path, {"a": file})
+
+        file.write_text("1|bbb|\n")
+        os.utime(file, (1_000_000_000, 1_000_000_000))
+        after = _compute_source_hash(tmp_path, {"a": file})
+
+        assert before != after
+
+    def test_different_size_hashes_differently(self, tmp_path: Path) -> None:
+        file = tmp_path / "a.tbl"
+        file.write_text("1|a|\n")
+        before = _compute_source_hash(tmp_path, {"a": file})
+        file.write_text("1|a|\n2|b|\n")
+        assert _compute_source_hash(tmp_path, {"a": file}) != before
+
+    def test_file_larger_than_the_read_chunk_is_fully_hashed(self, tmp_path: Path) -> None:
+        file = tmp_path / "big.tbl"
+        with patch("benchbox.core.dataframe.data_loader._HASH_CHUNK_BYTES", 16):
+            file.write_bytes(b"A" * 100)
+            before = _compute_source_hash(tmp_path, {"big": file})
+            file.write_bytes(b"A" * 99 + b"B")  # change only the last byte
+            assert _compute_source_hash(tmp_path, {"big": file}) != before
+
+    def test_regenerated_identical_data_is_a_cache_hit(self, tmp_path: Path) -> None:
+        loader = DataFrameDataLoader(cache_dir=tmp_path / "cache")
+        hashes = []
+        for run, stamp in (("run1", 1_000_000_000), ("run2", 1_700_000_000)):
+            directory = tmp_path / run
+            directory.mkdir()
+            file = directory / "t.tbl"
+            file.write_text("1|a|\n")
+            os.utime(file, (stamp, stamp))
+            hashes.append(_compute_source_hash(directory, {"t": file}))
+        loader.cache.save_manifest("tpch", 0.01, DataFormat.PARQUET, hashes[0], {"t": {"file": "t.parquet"}})
+        (loader.cache.get_cache_path("tpch", 0.01, DataFormat.PARQUET) / "t.parquet").write_bytes(b"x")
+
+        assert loader.cache.has_cached_data("tpch", 0.01, DataFormat.PARQUET, hashes[1])

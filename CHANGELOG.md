@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compare these queries one-for-one with results recorded before this change
   at other scale factors.
 
+### Fixed
+
+- **DataFrame runs no longer crash when two BenchBox processes share the
+  Parquet cache.** The cache was rewritten in place, so a run that loaded data
+  while another run was scanning it could crash that run with a Polars
+  `Invalid argument (os error 22)` panic, a SIGBUS or a "must end with PAR1"
+  error. Cache files and manifests are now written to a temporary file and
+  renamed into place. The cache key now hashes file contents instead of
+  modification times, so regenerating identical data reuses the cache instead
+  of rewriting it. The first run after upgrading reads each source file once to
+  compute the hash, and temporary files left by a crashed run are removed after
+  30 minutes.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade
