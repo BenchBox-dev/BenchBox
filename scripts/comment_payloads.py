@@ -379,6 +379,35 @@ def stdin_language(words: list[str]) -> str | None:
     raise ValueError(f"unregistered heredoc consumer: {name}")
 
 
+HERESTRING_DATA_CONSUMERS = {"read", "mapfile", "readarray", "jq", "grep", "sort", "tr", "wc", "head", "tail", "cut"}
+
+
+def herestring_data_only(header: str) -> None:
+    text = re.sub(r"^(\s*)(?:if|elif|while|until)(?=\s)", lambda match: match.group(1) + "  ", header)
+    text = re.sub(r"^(\s*)!(?=\s)", lambda match: match.group(1) + " ", text)
+    text = re.sub(r"\s*;?\s*(?:then|do)\s*$", "\n", text)
+    try:
+        trees = bashlex.parse(text, strictmode=False)
+    except (bashlex.errors.ParsingError, NotImplementedError) as exc:
+        raise ValueError("shell here-string requires an executable-payload adapter") from exc
+    consumers: list[str] = []
+
+    def visit(node: bashlex.ast.node) -> None:
+        if node.kind == "command":
+            words = [part.word for part in node.parts if part.kind == "word"]
+            if any(part.kind == "redirect" and part.type == "<<<" for part in node.parts):
+                consumers.append(words[0].rsplit("/", 1)[-1] if words else "")
+        for child in [*getattr(node, "parts", []), *getattr(node, "list", [])]:
+            visit(child)
+        if getattr(node, "command", None) is not None:
+            visit(node.command)
+
+    for tree in trees:
+        visit(tree)
+    if not consumers or any(consumer not in HERESTRING_DATA_CONSUMERS for consumer in consumers):
+        raise ValueError("shell here-string requires an executable-payload adapter")
+
+
 def heredoc_redirects(header: str) -> list[tuple[bashlex.ast.node, list[str], bool]]:
     redirects = []
     header = re.sub(r"^(\s*)if(?=\s)", lambda match: match.group(1) + "  ", header)
@@ -422,7 +451,7 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
             index += 1
         if not re.search(r"(?<!<)<<(?!<)", header):
             if "<<<" in header and not re.match(r"\s*done\s+<<<\s+", header):
-                raise ValueError("shell here-string requires an executable-payload adapter")
+                herestring_data_only(header)
             continue
         redirects = heredoc_redirects(header)
         for redirect, consumer, effective in redirects:
@@ -452,13 +481,105 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
     return result
 
 
+def unwrap_static_command(words: list) -> list:
+    command = words[0].word.rsplit("/", 1)[-1]
+    if not any(word.parts for word in words):
+        return words
+    if command == "uv" and [word.word for word in words[1:2]] == ["run"]:
+        separator = next((i for i, word in enumerate(words) if word.word == "--" and not word.parts), None)
+        if separator is not None and separator + 1 < len(words):
+            return words[separator + 1 :]
+    if command == "env":
+        index = 1
+        while index < len(words) and (
+            re.match(r"[A-Za-z_][A-Za-z0-9_]*=", words[index].word)
+            or (not words[index].parts and words[index].word in {"-i", "--ignore-environment"})
+        ):
+            index += 1
+        if index < len(words) and not words[index].parts and not words[index].word.startswith("-"):
+            return words[index:]
+    return words
+
+
+SHELL_INLINE_INTERPRETER = re.compile(
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ce]|--eval)\b"
+)
+
+
+def shell_logical_chunks(source: str) -> list[tuple[int, str]]:
+    chunks = []
+    start = index = depth = 0
+    quote = None
+    heredoc = None
+    length = len(source)
+    while index < length:
+        char = source[index]
+        if heredoc is not None:
+            end = source.find("\n", index)
+            end = length if end < 0 else end
+            if source[index:end].strip("\t") == heredoc:
+                heredoc = None
+                start = end + 1
+            index = end + 1
+            continue
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            index += 1
+        elif quote == '"':
+            if char == '"':
+                quote = None
+            elif source.startswith("$(", index):
+                depth += 1
+                index += 1
+            elif char == ")" and depth:
+                depth -= 1
+        elif char in "'\"":
+            quote = char
+        elif source.startswith("$(", index):
+            depth += 1
+            index += 1
+        elif char == ")" and depth:
+            depth -= 1
+        elif char == "#" and (index == 0 or source[index - 1] in " \t\n;"):
+            end = source.find("\n", index)
+            index = (length if end < 0 else end) - 1
+        elif char == "\n" and depth == 0:
+            chunk = source[start:index]
+            marker = re.search(r"(?<!<)<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?", chunk)
+            chunks.append((start, chunk))
+            start = index + 1
+            if marker:
+                heredoc = marker.group(1)
+        index += 1
+    if quote is not None or depth or heredoc is not None:
+        raise ValueError("shell command source requires an executable-payload adapter")
+    if start < length:
+        chunks.append((start, source[start:]))
+    return chunks
+
+
 def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
-    if not re.search(r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ce]|--eval)\b", source):
+    if not SHELL_INLINE_INTERPRETER.search(source):
         return []
     try:
-        trees = bashlex.parse(source)
+        units = [(0, source, bashlex.parse(source))]
     except (bashlex.errors.ParsingError, NotImplementedError) as exc:
-        raise ValueError("shell command source requires an executable-payload adapter") from exc
+        units = []
+        for offset, chunk in shell_logical_chunks(source):
+            if not SHELL_INLINE_INTERPRETER.search(chunk):
+                continue
+            try:
+                units.append((offset, chunk, bashlex.parse(chunk)))
+            except (bashlex.errors.ParsingError, NotImplementedError):
+                raise ValueError("shell command source requires an executable-payload adapter") from exc
+    result = []
+    for offset, text, trees in units:
+        result.extend(shell_command_unit(path, source, offset, text, trees))
+    return result
+
+
+def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: list) -> list:
     result = []
 
     def visit(node: bashlex.ast.node, symbol: str = "") -> None:
@@ -467,6 +588,8 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
         if node.kind == "command":
             words = [part for part in node.parts if part.kind == "word"]
             if words:
+                command = words[0].word.rsplit("/", 1)[-1]
+                words = unwrap_static_command(words)
                 command = words[0].word.rsplit("/", 1)[-1]
                 if command in {"env", "uv"}:
                     if any(word.parts for word in words):
@@ -497,9 +620,9 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
                 )
                 if language and payload_words:
                     if any(word.parts for word in payload_words):
-                        raise ValueError("unresolved executable shell argument: " + source[node.pos[0] : node.pos[1]])
+                        raise ValueError("unresolved executable shell argument: " + unit[node.pos[0] : node.pos[1]])
                     text = " ".join(word.word for word in payload_words)
-                    line = source[: payload_words[0].pos[0]].count("\n") + 1
+                    line = source[: offset + payload_words[0].pos[0]].count("\n") + 1
                     result.append((line, path + "." + language, text, language, f"{symbol}:command:{command}"))
         for child in getattr(node, "parts", []):
             visit(child, symbol)
@@ -670,11 +793,14 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
                             if github_script and key.value == "script"
                             else "sql"
                         )
+                        text = value.value
+                        if path.startswith(".github/") and nested_lang in {"bash", "javascript"}:
+                            text = github_expression_placeholders(text)
                         result.append(
                             (
                                 value.start_mark.line + 1,
                                 path + "." + nested_lang,
-                                value.value,
+                                text,
                                 nested_lang,
                                 f"{symbol}.{key.value}",
                             )
@@ -721,6 +847,15 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
             if any(start <= match.start() and match.end() <= end for start, end in spans)
         ]
     return []
+
+
+def github_expression_placeholders(text: str) -> str:
+    return re.sub(
+        r"\$\{\{.*?\}\}",
+        lambda match: "GITHUB_EXPRESSION" + "\n" * match.group().count("\n"),
+        text,
+        flags=re.S,
+    )
 
 
 def parsed_template(source: str) -> Any:

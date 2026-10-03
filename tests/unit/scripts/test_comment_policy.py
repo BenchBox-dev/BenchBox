@@ -2561,3 +2561,61 @@ def test_literal_path_executable_must_not_be_an_option(literal: str, kinds: list
 )
 def test_jinja_html_template_logic_is_bounded(source: str, kinds: list) -> None:
     assert [f.kind for f in scan("docs/_templates/a.html", source, "html+jinja", {})] == kinds
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('read -r -a parts <<< "$(git rev-list --parents -n 1 HEAD)"\n', []),
+        ('if ! jq -e . <<<"$payload" >/dev/null; then\n  exit 1\nfi\n', []),
+        ('value=$(jq -r .a <<< "$json")\n', []),
+        ('python3 <<< "$code"\n', ["coverage-error"]),
+        ('hammerdbcli <<< "$script"\n', ["coverage-error"]),
+        ('xargs -n1 <<< "$items"\n', ["coverage-error"]),
+    ],
+)
+def test_here_string_consumers_are_classified(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_github_expressions_in_run_scripts_are_data() -> None:
+    source = (
+        "jobs:\n  a:\n    steps:\n      - run: |\n"
+        '          uv run -- python -c "\n'
+        "          name = '${{ matrix.comparison }}'\n"
+        "          # hidden\n"
+        "          print(name)\n"
+        '          "\n'
+    )
+    findings = scan(".github/workflows/a.yml", source, "yaml", {})
+    assert [f.kind for f in findings] == ["comment"]
+    assert findings[0].text == "# hidden"
+
+
+def test_github_expressions_outside_workflows_stay_dynamic() -> None:
+    source = "steps:\n  - run: |\n      uv run -- python -c \"print('${{ x }}')\"\n"
+    assert [f.kind for f in scan("docs/a.yml", source, "yaml", {})] == ["coverage-error"]
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('uv run --with "$wheel" -- python -c "import sys  # note"\n', ["comment"]),
+        ('env A="$x" python -c "print(1)  # note"\n', ["comment"]),
+        ('uv run --with "$wheel" python -c "print(1)"\n', ["coverage-error"]),
+        ('uv run -- python -c "$code"\n', ["coverage-error"]),
+    ],
+)
+def test_wrapper_dynamic_words_before_the_command(source: str, kinds: list) -> None:
+    assert sorted(f.kind for f in scan("a.sh", source, "bash")) == kinds
+
+
+def test_shell_fallback_scans_interpreter_chunks_when_full_parse_fails() -> None:
+    source = 'X=$(git show a:b 2>/dev/null \\\n  || echo "{}")\npython3 -c "import sys  # note"\n'
+    findings = scan("a.sh", source, "bash")
+    assert [(f.kind, f.line, f.text) for f in findings] == [("comment", 3, "# note")]
+
+
+def test_shell_fallback_keeps_unparsable_interpreter_chunks_visible() -> None:
+    source = 'X=$(git show a:b 2>/dev/null \\\n  || echo "{}")\npython3 -c "$(cat <<EOF\nprint(1)\nEOF\n)"\n'
+    assert any(f.kind == "coverage-error" for f in scan("a.sh", source, "bash"))

@@ -233,16 +233,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The rebuilt root DB must be canonical-digest-equivalent to the live
-          # production DB pinned in the baseline (live_database sha256 + url).
-          # Exact bytes can never match: every build stamps a wall-clock
-          # generated_at and float aggregates drift 1 ULP across runners. The
-          # canonical digest excludes the build stamp and rounds floats, so it
-          # still fails on any added/removed table, column, row, rank, or
-          # material value change. This proves the deploy cannot change
-          # production content at root; only /preview/<generation>/ is new.
-          # Any mismatch, and any failure to fetch live for comparison, fails
-          # here BEFORE any Pages write.
           LIVE_DB_SHA=$(uv run -- python -c \
             "import json; print(json.load(open('docs/operations/publication-baseline-2026-08-31.json'))['live_database']['sha256'])")
           LIVE_DB_URL=$(uv run -- python -c \

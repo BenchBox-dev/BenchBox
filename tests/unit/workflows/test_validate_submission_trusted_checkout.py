@@ -46,11 +46,11 @@ def test_shas_resolved_via_event_and_fetch_head_fallback():
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "github.event.pull_request.base.sha" in text
     assert "git merge-base" not in text
-    assert "$BASE_SHA...$MERGE_SHA" in text or "${BASE_SHA}...${MERGE_SHA}" in text
+    assert '"$EFFECTIVE_BASE...$EFFECTIVE_MERGE"' in text
     assert "pull/${PR_NUMBER}/merge" in text or "pull/${{ github.event.pull_request.number }}/merge" in text
     assert "--depth=1" in text
     assert "FETCH_HEAD" in text
-    assert "fallback" in text.lower()
+    assert 'EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"' in text
     assert "BASE_SHA" in text and "MERGE_SHA" in text and "CORPUS_CHANGED_PATHS_FILE" in text
     assert "GITHUB_ENV" in text
 

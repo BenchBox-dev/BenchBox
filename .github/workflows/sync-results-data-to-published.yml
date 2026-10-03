@@ -298,8 +298,6 @@ jobs:
           PUBLISHED_BASE_SHA: ${{ steps.drift.outputs.published_base_sha }}
           MIRROR_HEAD_SHA: ${{ steps.build.outputs.mirror_head_sha }}
         run: |
-          # Reuse an existing PR opened by this workflow against the same
-          # mirror branch; otherwise open a new draft PR.
           EXISTING=$(gh pr list \
             --base published-results \
             --head "${MIRROR_BRANCH}" \
@@ -307,7 +305,6 @@ jobs:
             --json number \
             --jq '.[0].number // empty')
 
-          # Same indentation-stripping concern as the commit message above.
           BODY=$(cat <<EOF | awk '{sub(/^[[:space:]]{10}/,""); print}'
           Auto-mirror of develop's \`results-data/\` changes onto the slim
           \`published-results\` branch. Triggered by develop@\`${GITHUB_SHA::8}\`.
@@ -339,8 +336,6 @@ jobs:
             gh pr edit "${EXISTING}" --body "${BODY}"
           fi
 
-          # Resolve the PR after create/update so the post-creation freshness
-          # check can inspect the exact proposal that this run left open.
           PR_NUMBER=$(gh pr list \
             --base published-results \
             --head "${MIRROR_BRANCH}" \
@@ -369,9 +364,6 @@ jobs:
             exit 1
           fi
 
-          # Read both the live branch tip and the PR's recorded base/head.
-          # Comparing all three identities catches a stale accepted branch as
-          # well as an unexpected PR being selected for the deterministic head.
           CURRENT_PUBLISHED_SHA=$(gh api \
             "repos/${{ github.repository }}/git/ref/heads/published-results" \
             --jq '.object.sha')

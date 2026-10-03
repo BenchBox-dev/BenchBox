@@ -236,9 +236,6 @@ jobs:
                   echo "::error::durable publication head lacks a complete attested parent binding"
                   exit 1
                 }
-                # Generations are monotonic but not dense: a voided pre-send
-                # reservation retires its number, so the durable head may
-                # precede this generation by more than one.
                 [ "$PARENT_GENERATION" -lt "$GENERATION" ] || {
                   echo "::error::durable generation $PARENT_GENERATION does not precede generation $GENERATION"
                   exit 1
@@ -313,9 +310,6 @@ jobs:
                 echo "::error::prior_live_receipt_id is stale; current live head is $RECEIPT_ID"
                 exit 1
               }
-              # Same density rule as the durable branch above: the new
-              # generation must strictly advance beyond the attested live
-              # head, which need not be its immediate predecessor.
               [ "$RECEIPT_GENERATION" -lt "$GENERATION" ] || {
                 echo "::error::generation $GENERATION does not advance beyond live generation $RECEIPT_GENERATION"
                 exit 1

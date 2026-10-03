@@ -58,7 +58,6 @@ jobs:
                 ;;
             esac
           done
-          # Literal comparison: glob metacharacters in input cannot match.
           if [ "$run_postgres" = false ] && [ "$run_clickhouse" = false ] && [ "$run_trino" = false ]; then
             echo "::error::No services selected."
             exit 1

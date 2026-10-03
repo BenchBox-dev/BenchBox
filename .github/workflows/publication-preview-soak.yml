@@ -52,10 +52,6 @@ jobs:
         run: |
           set -euo pipefail
           WANT_GENERATION="${{ inputs.generation }}"
-          # Dispatch titles are the workflow name, never the generation, so a
-          # title search can never resolve a run (it yields null and the
-          # artifact fetch 404s). Resolve the latest successful deploy and,
-          # when a generation was requested, prove the record matches it.
           RUN_ID=$(gh run list --workflow=publication-preview-deploy.yml \
             --status=success --limit=1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then

@@ -49,7 +49,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Always read ledger head from live published-results — authoritative source
           LEDGER_CONTENT=$(git show origin/published-results:publication/ledger.json 2>/dev/null || echo "")
 
           if [ -n "$LEDGER_CONTENT" ]; then
@@ -69,7 +68,6 @@ jobs:
             LEDGER_SHA=""
           fi
 
-          # Use manual override if provided and branch has no ledger
           if [ -z "$LEDGER_SHA" ] && [ -n "${{ inputs.ledger-head-sha }}" ]; then
             LEDGER_SHA="${{ inputs.ledger-head-sha }}"
           fi

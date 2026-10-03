@@ -292,8 +292,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Use bash on all platforms so glob expansion works cross-platform.
-          # GitHub Actions Windows runners have Git Bash available.
           wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
           if [ "$wheel_count" != "1" ]; then
             echo "::error::Expected exactly one wheel, found $wheel_count"
@@ -303,9 +301,6 @@ jobs:
           wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
           tmpdir=$(mktemp -d)
           cd "$tmpdir"
-          # Minimal-surface gate: a clean core install must import benchbox AND
-          # must not pull pandas (optional engine/DataFrame dep). This is the
-          # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 

@@ -79,7 +79,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create the 'answers-v1' release if it doesn't exist yet
           if ! gh release view answers-v1 &>/dev/null; then
             echo "Creating answers-v1 release..."
             gh release create answers-v1 \

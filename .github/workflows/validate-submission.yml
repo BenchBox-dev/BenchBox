@@ -181,8 +181,6 @@ jobs:
           set -euo pipefail
           : "${BASE_SHA:?BASE_SHA required}"
           EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"
-          # All diffs use three-dot $BASE_SHA...$MERGE_SHA (via EFFECTIVE_MERGE fallback) and --diff-filter=ACMRD where deletions matter
-          # Test pin: $BASE_SHA...$MERGE_SHA — actual uses $BASE_SHA...$EFFECTIVE_MERGE for harness fallback
           CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
             | grep -vi '\.plans\.json$' \
             | grep -vi '\.tuning\.json$' \
@@ -209,13 +207,6 @@ jobs:
 
               deleted_dir="${deleted_bundle%/*}"
               deleted_name="${deleted_bundle##*/}"
-              # Check every case variant, not just the first. Git orders an uppercase
-              # variant ahead of the authoritative lowercase file, so stopping at the
-              # first match lets an unrelated uppercase manifest hide the dangling
-              # lowercase reference. The grep prefilter keeps the shell comparison
-              # cheap in directories with many entries, and comparing paths in the
-              # shell rather than awk avoids depending on how each awk handles a NUL
-              # record separator.
               expected_manifest_lower=$(printf '%s' "$deleted_dir/submission-manifest.json" | tr 'A-Z' 'a-z')
               while IFS= read -r -d '' legacy_manifest; do
                 if [ "$(printf '%s' "$legacy_manifest" | tr 'A-Z' 'a-z')" != "$expected_manifest_lower" ]; then
@@ -302,7 +293,6 @@ jobs:
           if [ -z "$CHANGED" ]; then
             echo "No bundle files changed."
             echo "has_bundles=false" >> "$GITHUB_OUTPUT"
-            # Ensure corpus file still respected even when no bundles
             if [ -s "$CORPUS_CHANGED_PATHS_FILE" ]; then
               echo "Corpus changed but no bundles - will run corpus inventory check"
               echo "has_bundles=corpus-only" >> "$GITHUB_OUTPUT"
@@ -312,15 +302,12 @@ jobs:
             echo "$CHANGED"
             echo "has_bundles=true" >> "$GITHUB_OUTPUT"
             echo "$CHANGED" > /tmp/changed_bundles.txt
-            # Also prepare MERGE_SHA payload via git show / sparse checkout to /tmp/payload
-            # Extract bundles + companions for trusted validation
             rm -rf /tmp/payload
             mkdir -p /tmp/payload
             while IFS= read -r bundle; do
               dir=$(dirname "$bundle")
               mkdir -p "/tmp/payload/$dir"
               git show "$EFFECTIVE_MERGE:$bundle" > "/tmp/payload/$bundle" 2>/dev/null || echo "Warning: cannot extract $bundle at $EFFECTIVE_MERGE" >&2
-              # Extract companions if present at MERGE_SHA
               stem="${bundle%.json}"
               for suffix in ".manifest.json" ".applied.json" ".plans.json" ".tuning.json" ".override.json"; do
                 companion="${stem}${suffix}"
@@ -329,7 +316,6 @@ jobs:
                 fi
               done
             done <<< "$CHANGED"
-            # Rewrite changed_bundles.txt to point at /tmp/payload for validator
             sed 's|^|/tmp/payload/|' /tmp/changed_bundles.txt > /tmp/changed_bundles_payload.txt
             mv /tmp/changed_bundles_payload.txt /tmp/changed_bundles.txt
           fi
@@ -400,10 +386,6 @@ jobs:
           OVERRIDES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.override.json' ':(icase,glob)results-data/bundles/**/*.override.json' \
             || true)
-          # Reused artifacts need approval too: touching a bundle covered by
-          # an unchanged override would otherwise inherit the old artifact
-          # with no review on this PR. Enumerate the override sibling of
-          # every changed primary bundle alongside changed overrides.
           CHANGED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
             | grep -viE '\.(manifest|plans|tuning|applied|override)\.json$' \
@@ -442,9 +424,6 @@ jobs:
               failed=1
               continue
             fi
-            # The approval must review the current head commit: an APPROVED left
-            # on an earlier push must not satisfy an artifact the approver
-            # never saw.
             approved=$(WANT="$approver" WANT_SHA="$HEAD_SHA" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
               | WANT="$approver" WANT_SHA="$HEAD_SHA" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); want_sha=os.environ.get('WANT_SHA',''); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED') and (not want_sha or r.get('commit_id')==want_sha)), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
             if [ "$approved" != "yes" ]; then
