@@ -1,4 +1,5 @@
 {
+  "context": "Dropped 2026-10-03 as superseded by dfparity-t20-promote-polars-gate (same promotion scope, plus scale and pinning guards), on the owner's instruction to update the tracker after the parity re-evaluation.",
   "description": "Promote tpcds from STAGED_GATES to GATES with known_divergences={} and legitimately_empty wired, add tpcds Make report target to the blocking gate set (mirroring existing *_cross-surface-equivalence-report targets), add the pr.yml CI step (mirroring the ssb/amplab/coffeeshop/clickbench/joinorder/h2odb/read_primitives/flightdata/datavault steps), refresh oracle-coverage-map (make oracle-coverage-map + check), update/retire the staged maturation workflow, add the Make/CI pinning coverage for tpcds (test_cross_surface_gates_are_pinned_in_make_and_ci) and mutation-target coverage. PRECONDITIONS: B0-B5 complete (198/198 cells = discriminating PASS + classified vacuous, 0 unclassified divergences, 0 missing backends, empty known_divergences). SCOPE: cross_surface.py gate move, builders/tpcds.py, Makefile, .github/workflows/pr.yml, oracle map artifacts, maturation workflow, pinning/mutation tests. GUARDRAILS: no comparator weakening; promotion is a reviewer-signed decision, not an auto-step. VERIFY: gate exits 0; make pr-preflight; full CI green. DECISION GATE: tpcds blocks CI green with empty divergence baseline.",
   "sessions": [
     {
@@ -8,6 +9,14 @@
       "op": "create",
       "op_id": "17302c5da6734d939d8d3eb47253f384",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:58:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b92371de2d854fedb53b82baffe39e05",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
