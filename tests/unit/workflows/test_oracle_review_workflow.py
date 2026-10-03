@@ -73,3 +73,12 @@ def test_actions_are_pinned_to_full_commit_shas() -> None:
         if "uses" in step:
             ref = step["uses"].split("@", 1)[1]
             assert len(ref) == 40 and all(c in "0123456789abcdef" for c in ref), step["uses"]
+
+
+def test_checkout_uses_the_base_commit_so_the_judged_pull_request_cannot_change_the_check() -> None:
+    steps = _load()["jobs"]["oracle-review"]["steps"]
+    checkouts = [step for step in steps if step.get("uses", "").startswith("actions/checkout@")]
+    assert len(checkouts) == 1
+    ref = checkouts[0]["with"]["ref"]
+    assert "github.event.pull_request.base.sha" in ref
+    assert "head" not in ref
