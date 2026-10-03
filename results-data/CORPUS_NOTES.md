@@ -230,28 +230,39 @@ What these results are and are not:
 
 ## Live cloud TPC-H, fresh runs (2026-10-03)
 
-Four maintainer-run TPC-H bundles from live runs on 2026-10-03 were added with
-`result_source: internal` submission manifests: SF 1 on BigQuery, Snowflake and
-Databricks, and SF 10 on BigQuery. They replace part of the coverage withdrawn
-on 2026-09-25 and were run on code that includes the cloud fixes made since:
+Nine maintainer-run TPC-H bundles from live runs on 2026-10-03 were added with
+`result_source: internal` submission manifests: SF 0.1, 1 and 10 on BigQuery,
+Snowflake and Databricks. They replace the cloud coverage withdrawn on
+2026-09-25 and were run on code that includes the cloud fixes made since:
 Snowflake and Databricks session cache receipts, load hardening, region
 capture and the Snowflake query-history fix.
 
 What these results are and are not:
 
-- All four were run in `--official` mode with `--seed 42`, so each is stamped
-  `compliance_class: official`. Each passes `scripts/validate_submission.py
-  --require-manifest` with no error, warning or override.
+- The SF 1 and SF 10 runs used `--official` with `--seed 42` and are stamped
+  `compliance_class: official`. The SF 0.1 runs are
+  `compliance_class: unofficial_subscale`, as every sub-SF-1 TPC-H run is; they
+  are carried like the other unofficial cohorts and no official TPC-H metrics
+  are computed for them.
+- Four bundles pass `scripts/validate_submission.py --require-manifest` with
+  no error, warning or override: SF 1 on all three platforms and SF 10 on
+  BigQuery. Snowflake SF 10 and Databricks SF 10 pass with the overrides
+  described below. The three SF 0.1 bundles fail the submission class gate for
+  the reason above and are admitted through the lenient mirror lane.
 - Snowflake and Databricks runs disabled the result cache per session and
   record a validated cache receipt with the cache disabled. BigQuery jobs ran
   with the query cache disabled in configuration.
-- Row counts match the TPC-H scale factor (LINEITEM 6,001,215 at SF 1 and
-  59,986,052 at SF 10) and all 22 queries ran in every bundle.
-- Not included: the SF 0.1 runs on all three platforms (unofficial subscale
-  runs), and SF 10 on Snowflake and Databricks. Those runs completed but their
-  timings move little across scale (geometric mean about 1.35x from SF 0.1 to
-  SF 10 on both platforms), which the validator flags as scale-invariant and
-  which needs a maintainer-written override before publication.
+- Row counts match the TPC-H scale factor (LINEITEM 600,572 at SF 0.1,
+  6,001,215 at SF 1 and 59,986,052 at SF 10) and all 22 queries ran in every
+  bundle.
+- Two bundles carry reviewed validator overrides (`<bundle>.override.json`):
+  `scale-invariant` for Snowflake SF 10 and for Databricks SF 10. On both
+  platforms the geometric mean grows about 1.35x from SF 0.1 to SF 10 while
+  LINEITEM grows 100x. The result cache is confirmed off and measurement runs
+  at 0.8 to 0.9 of warmup, so per-query overhead explains the flat timings.
+- The BigQuery SF 0.1 bundle also shows a `timing-plateau` finding (per-query
+  means span 824 to 1173 ms, a fixed per-job latency floor); it is carried in
+  the lenient lane without an override because the class gate already applies.
 
 ## Public-path single-pass status (2026-08-05)
 
