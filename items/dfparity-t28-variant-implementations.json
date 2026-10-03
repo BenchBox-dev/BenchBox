@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Each variant has expression and pandas implementations of the template's second statement, bound to the dsqgen draw, that match DuckDB at SF 0.01 and 0.1 on several draws; OR the DataFrame path refuses to run a variant without an implementation (no silent fallback) and the result says so",
+    "The silent variant fallback can no longer produce a result labelled as that variant"
+  ],
+  "description": "Production TPC-DS power runs include the variant queries 14b, 23b and 39b (the second statement of templates 14, 23 and 39). The DataFrame side has no implementation for them and, with variant fallback on by default, silently runs the base implementation (the first statement). So the DataFrame result is a different query from the SQL it is compared with. Found by the t07 end-to-end check (evidence/rev3/t07/compare.txt). The cross-surface gate does not see this, because BenchBox's gate SQL is only the first statement.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:28:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c2b2db2da49e4a56a500f536c567c8d4",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}

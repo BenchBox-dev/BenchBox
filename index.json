@@ -6835,6 +6835,13 @@
       "status": "open",
       "title": "Run and enforce the TPC-DS expression family on DataFusion (owner decision D6)"
     },
+    "dfparity-t28-variant-implementations": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Implement or refuse TPC-DS variant queries 14b, 23b and 39b on the DataFrame side"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
