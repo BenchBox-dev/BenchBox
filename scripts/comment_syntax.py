@@ -12,7 +12,12 @@ from pathlib import PurePosixPath
 
 import yaml
 from comment_execution import PythonBindings, python_html_sources
-from comment_payloads import nested_sources, shell_payloads, sql_template_sources, static_html_template
+from comment_payloads import (
+    bounded_html_template,
+    nested_sources,
+    shell_payloads,
+    sql_template_sources,
+)
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
 
@@ -511,7 +516,7 @@ def template_coverage(path: str, source: str, lang: str) -> list[Finding]:
     try:
         if "{#" in source:
             raise ValueError("unresolved HTML template comment expansion")
-        static_html_template(source)
+        bounded_html_template(source)
     except ValueError as exc:
         return [Finding(path, 1, "coverage-error", str(exc))]
     return []

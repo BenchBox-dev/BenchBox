@@ -2131,13 +2131,13 @@ def test_groovy_shell_payload_location():
     assert [(finding.line, finding.text) for finding in findings if finding.kind == "comment"] == [(2, "# shell prose")]
 
 
-def test_owned_template_scripts_are_scanned_without_approving_rendered_output():
+def test_owned_template_scripts_are_scanned_beside_rendered_output():
     source = "{% block body %}{{ body }}<script>// owned\nconsole.log(1)</script>{% endblock %}"
     requests = javascript_requests("page.html", source, "html+jinja")
     assert list(requests.values()) == ["// owned\nconsole.log(1)"]
     results = {key: [{"kind": "comment", "line": 1, "text": "// owned"}] for key in requests}
     findings = scan("page.html", source, "html+jinja", results)
-    assert any(finding.kind == "coverage-error" for finding in findings)
+    assert not any(finding.kind == "coverage-error" for finding in findings)
     assert any(finding.kind == "comment" and finding.text == "// owned" for finding in findings)
 
 
@@ -2155,10 +2155,10 @@ def test_template_output_is_not_treated_as_literal_javascript(source):
     assert any(finding.kind == "coverage-error" for finding in scan("page.html", source, "html+jinja"))
 
 
-def test_owned_template_css_preserves_comments_and_unresolved_output():
+def test_owned_template_css_comments_are_found_inside_template_logic():
     source = "{% if x %}<style>/* owned CSS */a{color:red}</style>{% endif %}"
     findings = scan("page.html", source, "html+jinja")
-    assert any(finding.kind == "coverage-error" for finding in findings)
+    assert not any(finding.kind == "coverage-error" for finding in findings)
     assert any(finding.kind == "comment" and "owned CSS" in finding.text for finding in findings)
 
 
@@ -2547,3 +2547,17 @@ def test_tailwind_apply_does_not_hide_css_comments() -> None:
 def test_literal_path_executable_must_not_be_an_option(literal: str, kinds: list) -> None:
     source = f"import subprocess\nfrom pathlib import Path\nexe = Path({literal!r})\nsubprocess.run([str(exe), '-c', 'print(1)'])\n"
     assert [f.kind for f in scan("a.py", source, "python", {})] == kinds
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ("{% for p in posts %}<li>{{ p.title }}</li>{% endfor %}\n", []),
+        ("{% if x %}<!-- note -->{% endif %}\n", ["comment"]),
+        ("<script>var a = '{{ name }}';</script>\n", ["coverage-error"]),
+        ("{{ '<!-- x -->' }}\n", ["coverage-error"]),
+        ('<script data-v="{{ v }}">var a = 1;</script>\n', []),
+    ],
+)
+def test_jinja_html_template_logic_is_bounded(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("docs/_templates/a.html", source, "html+jinja", {})] == kinds

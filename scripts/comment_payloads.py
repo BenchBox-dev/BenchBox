@@ -732,6 +732,18 @@ def parsed_template(source: str) -> Any:
         raise ValueError(f"invalid template syntax at line {exc.lineno}: {exc.message}") from exc
 
 
+def bounded_html_template(source: str) -> None:
+    from jinja2 import nodes
+
+    tree = parsed_template(source)
+    for match in re.finditer(r"<(script|style)\b[^>]*>(.*?)</\1\s*>", source, re.I | re.S):
+        if re.search(r"\{\{|\{%|\{#", match.group(2)):
+            raise ValueError("template syntax inside script or style requires an adapter")
+    for constant in tree.find_all(nodes.Const):
+        if isinstance(constant.value, str) and "<" in constant.value:
+            raise ValueError("template string constant may emit markup")
+
+
 def static_html_template(source: str) -> None:
     from jinja2 import nodes
 
