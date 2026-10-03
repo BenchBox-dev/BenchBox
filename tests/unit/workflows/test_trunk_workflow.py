@@ -53,3 +53,37 @@ def test_fast_job_enforces_the_ungraced_fast_lane_ceiling() -> None:
     assert len(ceiling) == 1
     assert "--strict" in ceiling[0]
     assert "--ceiling-grace" not in ceiling[0]
+
+
+def test_builds_the_release_distribution_on_each_push_to_develop() -> None:
+    job = _workflow()["jobs"]["dist-artifact"]
+    assert job["name"] == "dist-artifact"
+    assert job["if"] == "${{ github.event_name == 'push' }}"
+    assert "needs" not in job
+    upload = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@"))
+    assert upload["with"]["name"] == "dist-${{ github.sha }}-attempt-${{ github.run_attempt }}"
+    assert upload["with"]["retention-days"] == 90
+    assert upload["with"]["if-no-files-found"] == "error"
+
+
+def test_distribution_job_alone_reads_actions_and_holds_no_write_permission() -> None:
+    workflow = _workflow()
+    assert workflow["jobs"]["dist-artifact"]["permissions"] == {"contents": "read", "actions": "read"}
+    for name, job in workflow["jobs"].items():
+        if name != "dist-artifact":
+            assert "permissions" not in job
+    granted = [permission for job in workflow["jobs"].values() for permission in job.get("permissions", {}).values()]
+    assert set(granted) == {"read"}
+
+
+def test_distribution_job_runs_the_producer_binding_after_the_build() -> None:
+    steps = _workflow()["jobs"]["dist-artifact"]["steps"]
+    runs = [step.get("run", "") for step in steps]
+    build = next(index for index, run in enumerate(runs) if "uv build" in run)
+    bind = next(index for index, run in enumerate(runs) if "release_artifact_consumer.py producer --dist dist" in run)
+    upload = next(
+        index for index, step in enumerate(steps) if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert build < bind < upload
+    assert any("scripts/verify_distribution_binaries.py" in run for run in runs)
+    assert any("scripts/bundled_binary_manifest.py" in run for run in runs)

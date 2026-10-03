@@ -273,3 +273,58 @@ jobs:
       - name: Run TPC-H cross-surface SQL<->DataFrame equivalence gate
         if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
+
+  dist-artifact:
+    name: dist-artifact
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Verify source bundled binary manifest
+        run: uv run --locked --no-dev -- python scripts/bundled_binary_manifest.py
+
+      - name: Build wheel and sdist
+        run: |
+          set -euo pipefail
+          uv build
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          sdist_count=$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ] || [ "$sdist_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel and one sdist, found $wheel_count wheel(s) and $sdist_count sdist(s)"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          uv run --locked --no-dev -- python scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz
+          (cd dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Bind distributions to the producer attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I -S scripts/release_artifact_consumer.py producer --dist dist
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dist-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+            dist/producer-receipt.json
+          if-no-files-found: error
+          retention-days: 90
