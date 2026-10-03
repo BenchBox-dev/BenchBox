@@ -65,14 +65,12 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-      # Mirror the CI gate locally so PR pushes don't need to discover lint
-      # failures via the network roundtrip. ruff-format is enforced via the
-      # ruff-format hook below at commit time, so pre-push only re-checks
-      # `ruff check` (catches anything bypassed with --no-verify on commit)
-      # plus the fast test lane.
+      # Opt-in full fast lane at push time (BENCHBOX_PREPUSH=1), the same
+      # selection CI runs. `make pr-preflight` is the default pre-push gate:
+      # it lints the changed Python files and runs only their tests.
       - id: pr-preflight-fast-tests
         name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make local-validation GATE=local-focused-check CMD="make pr-preflight-focused-tests"; else exec uv run -- python scripts/local_validation.py skip --gate local-focused-check; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make pr-preflight-fast-tests; else echo "SKIPPED (the full fast lane runs at pre-push only when BENCHBOX_PREPUSH=1)"; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
