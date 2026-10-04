@@ -19,4 +19,15 @@ benchmarks/amplab
 benchmarks/h2odb
 benchmarks/read-primitives
 benchmarks/write-primitives
+benchmarks/transaction-primitives
+benchmarks/tpch-skew
+benchmarks/tpchavoc
+benchmarks/tsbs-devops
+benchmarks/vector-search
+benchmarks/coffeeshop
+benchmarks/datavault
+benchmarks/flightdata
+benchmarks/metadata-primitives
+benchmarks/nyctaxi
+benchmarks/tpcds-obt
 ```

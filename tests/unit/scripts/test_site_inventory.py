@@ -310,6 +310,39 @@ def test_expected_removals_file_requires_reason(tmp_path: Path, capsys: pytest.C
     assert "1 stale allowance" in capsys.readouterr().out
 
 
+def test_repeated_expected_removals_files_merge_and_report_stale_entries_from_either(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    baseline_site, candidate_site = _fixture(tmp_path / "base"), _fixture(tmp_path / "cand")
+    (candidate_site / "blog" / "a.html").unlink()
+    (candidate_site / "blog" / "b.html").unlink()
+    baseline_path, candidate_path = tmp_path / "base.json", tmp_path / "cand.json"
+    site_inventory.main(["build", "--site-dir", str(baseline_site), "--output", str(baseline_path)])
+    site_inventory.main(["build", "--site-dir", str(candidate_site), "--output", str(candidate_path)])
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    first.write_text(json.dumps([_removal("/blog/a.html")]), encoding="utf-8")
+    second.write_text(json.dumps([_removal("/blog/b.html")]), encoding="utf-8")
+    args = ["diff", "--baseline", str(baseline_path), "--candidate", str(candidate_path)]
+
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--expected-removals", str(first)]) == 1
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--expected-removals", str(first), "--expected-removals", str(second)]) == 0
+    assert "(matched nothing)" not in capsys.readouterr().out
+
+    first.write_text(json.dumps([_removal("/blog/a.html"), _removal("/gone-first/")]), encoding="utf-8")
+    second.write_text(json.dumps([_removal("/blog/b.html"), _removal("/gone-second/")]), encoding="utf-8")
+    capsys.readouterr()
+    code = site_inventory.main(
+        [*args, "--expected-removals", str(first), "--expected-removals", str(second), "--strict"]
+    )
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "/gone-first/ (matched nothing)" in out
+    assert "/gone-second/ (matched nothing)" in out
+    assert "/blog/a.html (matched nothing)" not in out
+
+
 def test_feed_links_are_link_sources(tmp_path: Path) -> None:
     site = _fixture(tmp_path / "site")
     _write(site, "blog/atom.xml", ATOM.replace('href="a.html"', 'href="blog/a.html"'))
