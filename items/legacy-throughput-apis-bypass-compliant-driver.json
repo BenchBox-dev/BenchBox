@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Public throughput entry points enforce the stream capability gate and open per-stream sessions via open_stream_connection",
+    "Legacy TPC-DS throughput/official paths route to TPCDSThroughputTest or are deprecated with honest messages",
+    "No legacy path publishes a metric when its phase failed",
+    "Tests cover the gate on the public entry point"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Reported by two reviewers (core runtime and TPC semantics). Related decision item: comment-cleanup-tpcds-stream-decision.",
+  "description": "`adapter.run_throughput_test` (platforms/base/execution.py:1694-1714) always uses `_make_stream_cursor(connection)` and never calls `require_throughput_stream_capability`. PostgreSQL, Doris and SingleStore streams therefore share one psycopg/pymysql connection, and UNSUPPORTED platforms run anyway.\n\nFor TPC-DS it routes to the legacy `TPCDSBenchmark.run_throughput_test` (tpcds/benchmark/runner.py), which:\n- orders queries with random.shuffle (:1527-1528), not dsqgen -STREAMS;\n- uses one seed for every query in a stream (:1572);\n- publishes Throughput@Size even when success=False (:1470-1490);\n- shares one connection across streams (:1240-1242);\n- computes power as 3600 x SF / T and publishes it even when queries fail (:1676-1693).\n\nDeprecation messages at runner.py:56 and :1019 describe this API as spec-compliant.\n\nThe read-only decision item comment-cleanup-tpcds-stream-decision covers which ordering design to keep. This item covers the defects that exist regardless of that decision: the capability bypass, metrics published over failures, and the false compliance claims.",
+  "links": [
+    "benchbox/platforms/base/execution.py",
+    "benchbox/core/tpcds/benchmark/runner.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:59:12Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "84a8927e374742a697330d0a5f58866a",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
