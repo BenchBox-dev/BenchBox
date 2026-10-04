@@ -580,7 +580,9 @@ def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemptio
 def test_merge_gate_local_equivalents_and_exemptions_are_documented() -> None:
     """Keep the parity inventory fail-closed and its exceptions reviewable."""
     docs = (REPO_ROOT / "docs" / "operations" / "ci-local-parity.md").read_text(encoding="utf-8")
-    makefile = MAKEFILE.read_text(encoding="utf-8")
+    makefile = "\n".join(
+        path.read_text(encoding="utf-8") for path in [MAKEFILE, *sorted((REPO_ROOT / "make").glob("*.mk"))]
+    )
     assert "Hosted-only guard inventory" in docs
 
     for key, target in MERGE_GATE_LOCAL_EQUIVALENTS.items():
