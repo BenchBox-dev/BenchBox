@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Each bundled TPC-DS binary is run by a scheduled or path-triggered job (native runner or emulation) and its manifest compared with the reference"
+  ],
+  "description": "The TPC-DS platform identity check runs only linux-x86_64, darwin-arm64 and windows-x86_64. The bundled darwin-x86_64, linux-arm64 and windows-arm64 dsdgen/dsqgen binaries are never executed in CI, so a platform-specific generation defect there (like the Windows option-prefix and macOS dbgen bugs found this cycle) would go unnoticed.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:13:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c28da15e9f46483aa54c0a85bddc8b9d",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

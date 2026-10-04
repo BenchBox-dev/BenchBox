@@ -20342,6 +20342,13 @@
       "status": "open",
       "title": "Give the 26 always-empty TPC-DS statements nonempty coverage in a blocking lane"
     },
+    "tpcds-identity-unexercised-binaries": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Exercise the darwin-x86_64, linux-arm64 and windows-arm64 TPC-DS binaries in the identity check"
+    },
     "tpcds-identity-windows-required": {
       "claim": null,
       "needs": [],
