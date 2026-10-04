@@ -67,6 +67,8 @@ uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_1200
 uv run -- benchbox submit --last --dry-run
 ```
 
+The commands package the most recent result, list result paths, package a specific result file, and preview what would be packaged without writing files. The `--paths` option writes one path per line to stdout, so it is safe to pipe to `xargs`. Use it to find the exact path when you need to choose a specific run.
+
 This creates a `submission/` directory containing:
 
 | File | Description |
@@ -246,6 +248,8 @@ uv run -- python scripts/validate_submission.py results-data/bundles/
 
 uv run -- python scripts/generate_corpus_inventory.py --check
 ```
+
+The first command validates one bundle, the second validates every bundle in a directory, and the third verifies the inventory is current before you open the PR.
 
 If you use pre-commit locally, install the shared hooks once from the primary
 clone (never from a linked worktree) so inventory drift is checked

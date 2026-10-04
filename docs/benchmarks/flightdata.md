@@ -56,6 +56,8 @@ benchbox run --platform duckdb --benchmark flightdata --scale 1.0 \
   --benchmark-option seed=42
 ```
 
+The first command uses the default scale (SF=1.0, about 24M flights, about 2.8 GB of uncompressed CSV). The second is a quick development sample. The third pins the most recent year included; the default is `LAST_AVAILABLE_YEAR`. The fourth makes runs reproducible through a seed.
+
 ## Benchmark Options
 
 | Option             | Default                | Description                                 |

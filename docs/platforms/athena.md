@@ -24,6 +24,8 @@ pip install pyathena boto3
 pip install "benchbox[athena]"
 ```
 
+The first command installs the dependencies directly. The second installs them through BenchBox extras.
+
 ## Configuration
 
 ### Environment Variables
@@ -35,6 +37,8 @@ export AWS_DEFAULT_REGION=us-east-1
 
 export AWS_PROFILE=your-profile
 ```
+
+Set the access key variables, or use an AWS profile instead.
 
 ### CLI Options
 
@@ -109,6 +113,8 @@ benchbox run --platform athena --benchmark tpch --scale 1.0 \
   --output s3://my-bucket/benchmarks/tpch_sf1/
 ```
 
+The `--output` option specifies the data location.
+
 ### Recommended Data Format
 
 For best performance, use Parquet with Snappy compression:
@@ -140,6 +146,8 @@ aws athena create-work-group \
   --name benchbox \
   --configuration "BytesScannedCutoffPerQuery=10737418240"
 ```
+
+The cutoff value is in bytes, so 10737418240 is a 10 GB limit per query.
 
 ### Cost Estimation
 
@@ -189,8 +197,15 @@ benchbox run --platform athena --benchmark tpch \
 
 ```bash
 aws s3 ls s3://your-bucket/
-
 ```
+
+The command verifies S3 permissions. The IAM policy must include:
+
+- `s3:GetObject`
+- `s3:ListBucket`
+- `s3:PutObject` (for results)
+- `athena:StartQueryExecution`
+- `glue:GetTable` and `glue:GetDatabase`
 
 ### Query Timeout
 
@@ -199,6 +214,8 @@ benchbox run --platform athena --benchmark tpcds \
   --platform-option query_timeout=1800
 ```
 
+The timeout is in seconds, so 1800 is 30 minutes. Increase it for long-running queries.
+
 ### Data Not Found
 
 ```bash
@@ -206,6 +223,8 @@ aws glue get-table --database-name benchmarks --name lineitem
 
 MSCK REPAIR TABLE lineitem;
 ```
+
+The first command verifies that the Glue table exists. Run `MSCK REPAIR TABLE` for partitioned tables so Athena discovers their partitions.
 
 ## Related Documentation
 

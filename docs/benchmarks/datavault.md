@@ -159,6 +159,8 @@ queries = dv.get_queries()
 query_1 = dv.get_query(1)
 ```
 
+`generate_data()` transforms TPC-H data into Data Vault tables.
+
 ### DuckDB Integration
 
 ```python
@@ -184,6 +186,8 @@ for query_id in range(1, 23):
     print(f"Q{query_id}: {len(result)} rows")
 ```
 
+The example generates the Data Vault data, creates the schema, loads the tables in loading order, and then runs all 22 queries.
+
 ### CLI Usage
 
 ```bash
@@ -193,6 +197,8 @@ benchbox run --platform duckdb --benchmark datavault --scale 1.0 --phases power
 
 benchbox run --dry-run ./preview --platform duckdb --benchmark datavault --scale 0.1
 ```
+
+The commands generate data, run the power test, and do a dry run that previews the queries.
 
 ## Configuration Options
 
@@ -213,6 +219,8 @@ benchbox run --platform duckdb --benchmark datavault --scale 1 \
   --benchmark-option record_source=MY_SOURCE
 ```
 
+This sets a custom record source. The hash algorithm stays `md5`, because the CLI rejects SHA-256.
+
 ### Initialization Parameters
 
 ```python
@@ -227,6 +235,15 @@ DataVault(
     compression_type="gzip"
 )
 ```
+
+- `scale_factor`: TPC-H scale factor (1.0 is about 1 GB of source data).
+- `output_dir`: directory for generated files.
+- `parallel`: parallel workers for TPC-H generation.
+- `force_regenerate`: regenerate even if data exists.
+- `hash_algorithm`: hash algorithm (only `md5` is supported).
+- `record_source`: source identifier for audit columns.
+- `compress_data`: enable file compression.
+- `compression_type`: compression type (`gzip` or `zstd`).
 
 ### TPC-H Source File Discovery
 
@@ -270,6 +287,8 @@ print(report.tables_passed,
       report.tables_validated)
 report.to_dict()
 ```
+
+`use_manifest=True` prefers `_datagen_manifest.json` when it is present, and `tolerance_pct=1.0` is the default variance allowance. `print(report)` gives a human-readable summary, and `report.is_valid` is `True` when every table is within tolerance. The three counts are populated by `__post_init__`. `to_dict()` returns a serializable form for JSON output.
 
 Fields on `DataVaultValidationReport`:
 

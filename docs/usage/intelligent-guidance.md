@@ -224,6 +224,8 @@ print(f"Recommended database: {recommended_db} ({performance_rating})")
 print(f"Recommended scale for TPC-H: {recommended_scale}")
 ```
 
+The example gets system-specific recommendations, intelligent database recommendations, and a smart benchmark configuration.
+
 ### Batch Processing with Smart Defaults
 
 ```python
@@ -249,6 +251,8 @@ def run_appropriate_benchmarks():
         print(f"  Memory estimate: {manager._estimate_memory_usage(benchmark_info, recommended_scale):.1f}GB")
 ```
 
+The function runs benchmarks with system-configured settings, using the recommended scale and query subset for each one.
+
 ## Best Practices
 
 ### System Optimization Tips
@@ -266,11 +270,15 @@ benchbox run --benchmark tpch --scale 0.1
 benchbox run --benchmark tpcds --scale 0.01
 ```
 
+This development cycle starts with a quick smoke test, moves to a moderate validation, and ends with a complex benchmark test.
+
 ### Production Benchmarking
 
 ```bash
 benchbox run --benchmark tpch --scale 1.0
 benchbox run --benchmark tpcds --scale 1.0
 ```
+
+These commands run the full TPC-H and the full TPC-DS for a production evaluation.
 
 The intelligent guidance features make BenchBox accessible to users of all experience levels while ensuring appropriate performance for any system configuration.

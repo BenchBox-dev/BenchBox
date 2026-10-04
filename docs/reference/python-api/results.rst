@@ -1254,8 +1254,9 @@ For an independently known expected row count, compare normalized query records:
             mismatches.append((query.query_id, expected, query.rows_returned))
     print(mismatches)
 
-These example counts assume the standard TPC-H query definitions and parameters;
-use expectations appropriate to the actual benchmark and parameter set.
+These example counts assume the standard TPC-H query definitions and parameters.
+Q1 returns 4 rows, and Q6 returns 1 row because it is a single aggregation.
+Use expectations appropriate to the actual benchmark and parameter set.
 
 Execution Context and Phases
 ----------------------------

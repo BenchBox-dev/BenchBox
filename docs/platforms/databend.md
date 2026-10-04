@@ -24,6 +24,8 @@ Databend supports two deployment modes: **Databend Cloud** (managed service) and
 
 ## Quick Start
 
+Install the `databend-driver` dependency directly or through the Databend extra, then configure the connection for Databend Cloud and run TPC-H:
+
 ```bash
 uv add databend-driver
 
@@ -37,6 +39,8 @@ benchbox run --platform databend --benchmark tpch --scale 0.01
 ```
 
 ### Self-Hosted Quick Start
+
+The Docker image needs MinIO or S3-compatible storage. Configure the self-hosted host and port, and disable SSL for local development:
 
 ```bash
 docker run -p 8000:8000 datafuselabs/databend:latest
@@ -138,6 +142,8 @@ benchbox run --platform databend --benchmark tpch --scale 10.0
 ```
 
 ### Self-Hosted Configuration
+
+Disable SSL for a local Databend:
 
 ```bash
 export DATABEND_HOST=localhost
@@ -241,7 +247,7 @@ The adapter automatically applies optimizations when running benchmarks:
 
 ### Clustering Keys
 
-Databend supports `CLUSTER BY` to optimize data layout for frequently queried columns, similar to Snowflake clustering keys:
+Databend supports `CLUSTER BY` to optimize data layout for frequently queried columns, similar to Snowflake clustering keys. BenchBox applies this automatically via the tuning configuration:
 
 ```sql
 ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey)

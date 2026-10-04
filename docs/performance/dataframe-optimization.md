@@ -33,6 +33,8 @@ adapter = PolarsDataFrameAdapter(
 )
 ```
 
+`streaming=True` enables streaming for large datasets. `rechunk=True` rechunks data for a better memory layout.
+
 **Best Practices:**
 - Use `ctx.scalar()` instead of `.collect()[0, 0]` for single-value extraction
 - Chain operations before calling `.collect()`
@@ -55,6 +57,8 @@ adapter = PandasDataFrameAdapter(
     dtype_backend="pyarrow",
 )
 ```
+
+`copy_on_write=True` enables copy-on-write for Pandas 2.0+. `dtype_backend="pyarrow"` uses the PyArrow backend.
 
 **Best Practices:**
 - Enable CoW for read-heavy workloads with many intermediate operations
@@ -81,6 +85,8 @@ adapter = PySparkDataFrameAdapter(
 )
 ```
 
+`master="local[*]"` uses all cores locally. `driver_memory` increases driver memory. `shuffle_partitions` should be tuned for your data size. `enable_aqe=True` enables Adaptive Query Execution.
+
 **Best Practices:**
 - Use `ctx.scalar()` instead of `.collect()[0][0]` for single values
 - Cache frequently-accessed DataFrames with `.cache()`
@@ -105,12 +111,14 @@ adapter = DataFusionDataFrameAdapter(
 )
 ```
 
+`repartition_joins=True` enables parallel hash joins. `parquet_pushdown=True` pushes predicates into the Parquet scan. `batch_size` sets the row batch size.
+
 ## Common Optimization Patterns
 
 ### Scalar Extraction
 
 When extracting a single value (e.g., for use in a subsequent filter), use the
-optimized `scalar()` method:
+optimized `scalar()` method. The first line is the inefficient form, and the second is the optimized form:
 
 ```python
 total = df.select(col("value").sum()).collect()[0, 0]
@@ -126,7 +134,7 @@ This uses platform-native methods for efficient scalar extraction:
 
 ### Filter Push-down
 
-Write queries that allow predicate push-down to file scans:
+Write queries that allow predicate push-down to file scans. The first example filters early, before the join (good). The second filters after the expensive operation (avoid):
 
 ```python
 filtered = lineitem.filter(col("l_shipdate") >= lit(start_date))
@@ -137,7 +145,7 @@ result = lineitem.join(orders, ...).filter(col("l_shipdate") >= lit(start_date))
 
 ### Column Pruning
 
-Select only needed columns early in the query:
+Select only needed columns early in the query. The first example selects columns early (good). The second carries unnecessary columns through the joins (avoid):
 
 ```python
 subset = lineitem.select("l_orderkey", "l_quantity", "l_extendedprice")
@@ -168,7 +176,7 @@ For datasets larger than available memory:
 
 ## Profiling Queries
 
-BenchBox provides built-in profiling for DataFrame queries:
+BenchBox provides built-in profiling for DataFrame queries. The profile gives a timing breakdown, and a query plan on lazy platforms only:
 
 ```python
 result, profile = adapter.execute_query_profiled(ctx, query)
@@ -183,7 +191,7 @@ if profile.query_plan:
 
 ## Tuning Configuration
 
-Use YAML tuning configurations for reproducible optimization:
+Use YAML tuning configurations for reproducible optimization. This example is saved as `tuning/performance.yaml`:
 
 ```yaml
 platform: polars-df

@@ -13,14 +13,14 @@ This document defines standards for writing effective, maintainable tests in Ben
 
 ### 1. Enum/Constant Count Tests
 
-**Bad**: Testing that a collection has a specific count.
+**Bad**: Testing that a collection has a specific count. The test breaks whenever tables are added or removed.
 
 ```python
 def test_table_count():
     assert len(TABLES) == 21
 ```
 
-**Good**: Test structural properties or specific members.
+**Good**: Test structural properties or specific members. These tests check behavior, not an implementation detail, and the second one checks a specific requirement.
 
 ```python
 def test_all_tables_have_required_columns():
@@ -35,7 +35,7 @@ def test_required_tables_present():
 
 ### 2. Tautological Assertions
 
-**Bad**: Asserting something that would raise an exception anyway.
+**Bad**: Asserting something that would raise an exception anyway. `import_module` raises `ImportError` on failure and never returns `None`, and a constructor raises on failure, so both assertions below are redundant.
 
 ```python
 module = importlib.import_module("mypackage")
@@ -45,7 +45,7 @@ obj = MyClass()
 assert obj is not None
 ```
 
-**Good**: Remove redundant assertions or replace with meaningful ones.
+**Good**: Remove redundant assertions or replace with meaningful ones. A bare import already fails with a clear `ImportError` message, and the second example verifies behavior after construction.
 
 ```python
 importlib.import_module("mypackage")
@@ -75,14 +75,14 @@ assert result["row_count"] >= 0
 
 ### 4. Constant Equality Tests
 
-**Bad**: Testing that a constant equals its expected value.
+**Bad**: Testing that a constant equals its expected value. The test just duplicates the constant definition.
 
 ```python
 def test_default_scale():
     assert DEFAULT_SCALE == 0.01
 ```
 
-**Good**: Test that the constant is used correctly.
+**Good**: Test that the constant is used correctly. This test passes no `scale_factor` argument, so it shows the default is actually applied.
 
 ```python
 def test_default_scale_applied():
@@ -113,7 +113,7 @@ def test_query_returns_expected_rows():
 
 ## Valid Uses of `is not None`
 
-Sometimes `assert x is not None` is appropriate:
+Sometimes `assert x is not None` is appropriate. In the first example the function legitimately returns `None` for invalid input, because the parser returns `None` for unparseable input. In the second, the field is optional but should be present in this test case, even though some users might not have an email.
 
 ```python
 plan = parser.parse(malformed_input)

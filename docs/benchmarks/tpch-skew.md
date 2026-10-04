@@ -99,6 +99,8 @@ queries = benchmark.get_queries()
 print(benchmark.get_skew_info())
 ```
 
+This uses the moderate skew preset, which is the default. The queries are the same as in standard TPC-H, and `get_skew_info()` shows the skew configuration.
+
 ### Using Different Presets
 
 ```python
@@ -112,6 +114,8 @@ extreme_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="extreme")
 
 realistic_benchmark = TPCHSkew(scale_factor=1.0, skew_preset="realistic")
 ```
+
+Use `light` skew for initial testing, `heavy` for optimizer stress testing, `extreme` for edge cases, and `realistic` for e-commerce-like patterns.
 
 ### Custom Skew Configuration
 
@@ -154,6 +158,8 @@ for query_id, result in results.items():
     print(f"Q{query_id}: {result['execution_time']:.3f}s")
 ```
 
+The example generates data with heavy skew, loads it with the DuckDB adapter, runs the queries and prints the time for each. Compare the times with a baseline run.
+
 ### Comparing Uniform vs Skewed Performance
 
 ```python
@@ -175,6 +181,8 @@ for benchmark, name in [(uniform, "Uniform"), (skewed, "Skewed")]:
     print(f"{name} Q3: {result['execution_time']:.3f}s")
 ```
 
+The uniform standard TPC-H run is the baseline, and the heavy-skew run is the test. Q3 (Shipping Priority) is a join-heavy query, so skew affects it the most.
+
 ## CLI Options (`--benchmark-option`)
 
 Configure TPC-H Skew via `--benchmark-option KEY=VALUE`:
@@ -192,6 +200,8 @@ benchbox run --platform duckdb --benchmark tpch_skew --scale 1 \
 
 benchbox run --help-topic benchmarks
 ```
+
+The first command runs a heavy skew distribution, and the second lists all preset options.
 
 ## Scale Factor Guidelines
 

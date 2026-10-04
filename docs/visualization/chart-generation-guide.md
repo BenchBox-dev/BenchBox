@@ -115,6 +115,8 @@ benchbox visualize results/*.json
 benchbox visualize results/*.json --chart-type performance_bar
 ```
 
+The first command lets BenchBox decide which charts to generate. The second generates specific charts only.
+
 ---
 
 ## Display Options
@@ -132,6 +134,8 @@ benchbox visualize results/*.json --no-color > charts.txt
 
 benchbox visualize results/*.json --no-unicode
 ```
+
+`--no-color` strips ANSI colors for file output. `--no-unicode` uses ASCII-only characters for basic terminals.
 
 ### Specific Chart Types
 

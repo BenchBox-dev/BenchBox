@@ -42,6 +42,8 @@ Quick Start
     if errors:
         print(f"Validation errors: {errors}")
 
+Disabling foreign keys speeds up data loading.
+
 API Reference
 -------------
 
@@ -69,6 +71,12 @@ Enumeration of supported database tuning types.
         BLOOM_FILTERS = "bloom_filters"
         MATERIALIZED_VIEWS = "materialized_views"
 
+The values fall into three groups:
+
+- ``PARTITIONING``, ``CLUSTERING``, ``DISTRIBUTION`` and ``SORTING`` are table-level performance tunings.
+- ``PRIMARY_KEYS``, ``FOREIGN_KEYS``, ``UNIQUE_CONSTRAINTS`` and ``CHECK_CONSTRAINTS`` are schema constraint tunings.
+- The rest are platform-specific optimizations: ``Z_ORDERING`` (Databricks Delta Lake), ``AUTO_OPTIMIZE`` and ``AUTO_COMPACT`` (Databricks), ``BLOOM_FILTERS`` (various platforms) and ``MATERIALIZED_VIEWS`` (query acceleration).
+
 **Methods**:
 
 - **from_string(value: str)**: Create TuningType from string
@@ -84,6 +92,8 @@ Enumeration of supported database tuning types.
 
     is_supported = TuningType.Z_ORDERING.is_compatible_with_platform("duckdb")
 
+The first call returns ``True`` because Databricks supports Z-ordering. The second returns ``False`` because DuckDB does not.
+
 TuningColumn Class
 ~~~~~~~~~~~~~~~~~~
 
@@ -96,6 +106,8 @@ Represents a column used in table tuning configurations.
         name: str
         type: str
         order: int
+
+``name`` is the column name, ``type`` is the SQL data type (for example ``'DATE'`` or ``'INTEGER'``), and ``order`` is the column's 1-based position in the tuning.
 
 **Methods**:
 
@@ -117,6 +129,8 @@ Represents a column used in table tuning configurations.
     col_dict = col.to_dict()
 
     col_restored = TuningColumn.from_dict(col_dict)
+
+``to_dict()`` returns ``{'name': 'order_date', 'type': 'DATE', 'order': 1}``, which ``from_dict`` turns back into a ``TuningColumn``.
 
 TableTuning Class
 ~~~~~~~~~~~~~~~~~
@@ -164,6 +178,8 @@ Represents the complete tuning configuration for a database table.
         print(f"Validation errors: {errors}")
 
     all_cols = lineitem_tuning.get_all_columns()
+
+``get_all_columns()`` returns every column used in the tuning, here ``{'l_shipdate', 'l_orderkey', 'l_linenumber'}``.
 
 BenchmarkTunings Class
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -305,6 +321,8 @@ ForeignKeyConfiguration
         enforce_referential_integrity: bool = True
         on_delete_action: str = "RESTRICT"
         on_update_action: str = "RESTRICT"
+
+``on_delete_action`` accepts ``RESTRICT``, ``CASCADE``, ``SET NULL`` or ``SET DEFAULT``.
 
 UniqueConstraintConfiguration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -557,6 +575,8 @@ Constraint Management
     print(f"Primary keys enabled: {config.primary_keys.enabled}")
     print(f"Foreign keys enabled: {config.foreign_keys.enabled}")
 
+``disable_all_constraints()`` is the alternative to configuring each constraint when loading in bulk.
+
 Configuration Serialization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -622,7 +642,7 @@ Platform Compatibility Validation
 Best Practices
 --------------
 
-1. **Disable foreign keys for bulk loading**: Improves load performance significantly
+1. **Disable foreign keys for bulk loading**: Improves load performance significantly. Load the data after disabling them and re-enable them afterwards if needed
 
    .. code-block:: python
 
@@ -638,7 +658,7 @@ Best Practices
            print(f"Fix these issues before applying: {errors}")
            return
 
-3. **Use platform-specific optimizations**: Take advantage of platform strengths
+3. **Use platform-specific optimizations**: Take advantage of platform strengths, such as Z-ordering on Databricks for selective queries, clustering on Snowflake for large tables and distribution keys on Redshift for joins
 
    .. code-block:: python
 

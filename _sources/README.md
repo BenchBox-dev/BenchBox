@@ -138,6 +138,8 @@ grep -n "zstdout" _sources/tpc-h/dbgen/dss.h
 grep -n '"FILTER"' _sources/tpc-ds/tools/params.h
 ```
 
+The first command checks the TPC-H `-z` flag and should print `EXTERN int  zstdout;`. The second checks the TPC-DS FILTER fix and should show `"FILTER"` without a leading underscore.
+
 ## Compiling Binaries
 
 ### Prerequisites
@@ -161,6 +163,8 @@ make -f makefile.suite CC=clang MACHINE=LINUX DATABASE=ORACLE WORKLOAD=TPCH
 cd _sources/tpc-ds/tools
 make CC=clang CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon"
 ```
+
+The TPC-H build produces `dbgen` and `qgen`. The TPC-DS build requires the patches to be applied first and produces `dsdgen`, `dsqgen` and `distcomp`.
 
 ### Full Multi-Platform Compilation
 
@@ -195,6 +199,8 @@ docker build -f _sources/compilation/docker/Dockerfile.linux-arm64 \
     -t benchbox/tpc-linux-arm64 _sources/compilation/docker/
 ```
 
+The first command builds the Linux x86_64 image and the second builds the Linux ARM64 image.
+
 ## Binary Verification
 
 After compilation, verify binaries work correctly:
@@ -210,6 +216,8 @@ cat /tmp/ship_mode.dat | head -5
 
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -FILTER Y | head -5
 ```
+
+The four checks run in order: TPC-H small dataset, TPC-H stdout mode (`-z`), TPC-DS small dataset, and TPC-DS stdout mode (`-FILTER Y`). The first should create `customer.tbl`, `orders.tbl` and the other TPC-H tables. The TPC-DS checks use `-SCALE 1` because the bundled binaries require a scale factor of at least 1.
 
 ## Important Constraints
 
@@ -250,6 +258,8 @@ done
 wait
 cat customer.tbl.* > customer.tbl
 ```
+
+This generates the customer table in 4 parallel chunks and then concatenates them.
 
 ## Git Tracking Strategy
 

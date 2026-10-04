@@ -67,6 +67,14 @@ make coverage-opt-in-all
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```
 
+Each `uv run` line is the direct equivalent of the `make` target above it. In order, the blocks run:
+
+- Fast tests for quick feedback (`make test`).
+- The full test suite (`make test-all`).
+- Unit tests only (`make test-unit`).
+- Integration tests (`make test-integration`).
+- Coverage: `make coverage-fast` covers fast tests only, for quick feedback. `make coverage-all` is routine coverage that excludes stress, resource-heavy and live tests. `make coverage-opt-in-all` covers the full tree, including opt-in stress, resource-heavy and live tests, and needs services and credentials. The final `uv run` command is the direct equivalent for coverage.
+
 Linting and formatting run through Ruff:
 
 ```bash
@@ -77,12 +85,16 @@ make lint
 uv run ruff check .
 ```
 
+Each `uv run` command is the direct equivalent of the `make` target above it.
+
 Type checking is available via:
 
 ```bash
 make typecheck
 uv run ty check
 ```
+
+`uv run ty check` is the direct equivalent of `make typecheck`.
 
 ## Contributing
 

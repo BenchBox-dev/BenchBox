@@ -62,6 +62,8 @@ With S3 Data Loading
         iam_role="arn:aws:iam::123456789:role/RedshiftCopyRole"
     )
 
+This configuration loads data efficiently through the S3 COPY command.
+
 API Reference
 -------------
 
@@ -315,6 +317,9 @@ Configuration Examples
 IAM Role Authentication (Recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The commands below create an IAM role with S3 read permissions, attach the S3
+read policy to it, and associate the role with the cluster.
+
 .. code-block:: bash
 
     aws iam create-role --role-name RedshiftCopyRole \
@@ -371,6 +376,9 @@ Workload Management (WLM)
         wlm_query_slot_count=3
     )
 
+Using multiple query slots gives large queries more resources. This example uses
+3 slots.
+
 Data Loading
 ------------
 
@@ -402,6 +410,9 @@ Via S3 COPY (Recommended)
 
     print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
 
+The data is generated locally. ``load_data`` automatically uploads it to S3 and
+then loads it with COPY.
+
 Direct Loading (Small Datasets)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -412,6 +423,9 @@ Direct Loading (Small Datasets)
         username="admin",
         password="password"
     )
+
+For small datasets (under 100 MB), skip S3. No ``s3_bucket`` is specified here,
+so the adapter loads with direct INSERT statements.
 
 Advanced Features
 -----------------
@@ -434,6 +448,8 @@ Distribution Keys
         SORTKEY (o_orderdate)
     """)
 
+This creates a table with a distribution key.
+
 Sort Keys
 ~~~~~~~~~
 
@@ -447,6 +463,9 @@ Illustrative SQL fragments; supply complete table definitions before execution.
     CREATE TABLE lineitem (...)
     INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
 
+The first table uses a compound sort key, which is the most common choice. The
+second uses an interleaved sort key, which suits queries with multiple filters.
+
 Compression
 ~~~~~~~~~~~
 
@@ -456,6 +475,12 @@ Compression
         host="my-cluster...",
         compression_encoding="AUTO"
     )
+
+``AUTO`` enables automatic compression analysis: Redshift analyzes the data and
+applies the optimal encoding. The query below then checks the compression
+encoding of each column.
+
+.. code-block:: python
 
     cursor.execute("""
         SELECT
@@ -479,6 +504,9 @@ Vacuum and Analyze
         auto_analyze=True
     )
 
+The first two calls run maintenance manually. The adapter settings run it
+automatically.
+
 Best Practices
 --------------
 
@@ -495,6 +523,10 @@ Distribution Strategy
 
        CREATE TABLE nation (...) DISTSTYLE ALL
 
+   ``EVEN`` suits small tables with no joins. ``KEY`` suits large fact tables;
+   distribute by the join key. ``ALL`` suits small dimension tables, which are
+   broadcast to all nodes.
+
 Sort Keys
 ~~~~~~~~~
 
@@ -504,11 +536,15 @@ Sort Keys
 
        SORTKEY (l_shipdate, l_orderkey)
 
+   This suits queries such as ``WHERE l_shipdate BETWEEN ... AND l_orderkey = ...``.
+
 2. **Use interleaved for multiple filter combinations**:
 
    .. code-block:: sql
 
        INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
+
+   This suits varying filter combinations.
 
 Data Loading
 ~~~~~~~~~~~~
@@ -534,7 +570,9 @@ Connection Timeout
 
 **Problem**: Cannot connect to cluster
 
-**Solutions**:
+**Solutions**: check the cluster status, verify that the security group allows
+inbound traffic on port 5439, check VPC routing and the NAT gateway, and test
+connectivity:
 
 .. code-block:: bash
 
@@ -548,7 +586,9 @@ S3 COPY Errors
 
 **Problem**: COPY command fails
 
-**Solutions**:
+**Solutions**: verify the IAM role permissions (the role needs
+``s3:GetObject`` and ``s3:ListBucket``), check that the S3 bucket region matches
+the cluster region, and view the error details:
 
 .. code-block:: python
 
@@ -563,7 +603,8 @@ Slow Query Performance
 
 **Problem**: Queries slower than expected
 
-**Solutions**:
+**Solutions**: check the query execution plan, verify the distribution keys,
+check sort key usage, and run VACUUM and ANALYZE:
 
 .. code-block:: python
 

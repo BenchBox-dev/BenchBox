@@ -28,6 +28,8 @@ benchbox check-deps --matrix
 benchbox check-deps --verbose
 ```
 
+The commands, in order, give an overview of all platform dependencies, check one platform, show the detailed installation matrix, and give verbose output with recommendations.
+
 (cli-profile)=
 ## `profile` - System Profiling
 
@@ -89,6 +91,8 @@ benchbox validate
 benchbox validate --config ./custom-config.yaml
 ```
 
+The first command validates the default configuration and the second validates a specific configuration file.
+
 (cli-validate-results)=
 ## `validate_results.py` - Result Integrity Validation
 
@@ -132,6 +136,8 @@ uv run _project/scripts/validate_results.py benchmark_runs/results/ --json
 
 uv run _project/scripts/validate_results.py benchmark_runs/results/ --fail-on-warn
 ```
+
+The commands, in order, validate all results for one benchmark, validate a single result file with verbose output, produce machine-readable JSON output for CI pipelines, and use strict mode, which treats warnings as failures.
 
 ### Output Format
 

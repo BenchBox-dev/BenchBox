@@ -25,6 +25,8 @@ export MOTHERDUCK_TOKEN=your-token
 benchbox run --platform motherduck --benchmark tpch --scale 1.0
 ```
 
+The first command installs DuckDB, which includes MotherDuck support. The second sets your token. The third runs the benchmark.
+
 ## Authentication
 
 ### Getting Your Token
@@ -84,6 +86,8 @@ benchbox run --platform motherduck --benchmark tpch --scale 1.0
 benchbox run --platform motherduck --benchmark tpcds --scale 10.0
 ```
 
+The first command runs TPC-H at scale factor 1. The second runs TPC-DS at scale factor 10.
+
 ### Custom Database Name
 
 ```bash
@@ -97,6 +101,8 @@ benchbox run --platform motherduck --benchmark tpch --scale 1.0 \
 benchbox run --platform motherduck --benchmark tpch --scale 10.0 \
     --platform-option memory_limit=8GB
 ```
+
+This increases local memory for hybrid queries.
 
 ## Python API
 
@@ -116,6 +122,8 @@ adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
 ```
 
+Pass `token` explicitly, or omit it to use the `MOTHERDUCK_TOKEN` environment variable.
+
 ## Architecture
 
 MotherDuck inherits from DuckDB, which means:
@@ -132,12 +140,11 @@ family = PlatformRegistry.get_platform_family("motherduck")
 parent = PlatformRegistry.get_inherited_platform("motherduck")
 ```
 
+`get_platform_family` returns `"duckdb"`, and `get_inherited_platform` also returns `"duckdb"`.
+
 ## Hybrid Queries
 
-MotherDuck supports hybrid queries that access both local and cloud data:
-
-```python
-```
+MotherDuck supports hybrid queries that access both local and cloud data. The adapter handles this automatically: local data is uploaded to MotherDuck during benchmark loading.
 
 ## Comparison: MotherDuck vs DuckDB
 
@@ -193,6 +200,8 @@ MotherDuck databases are created automatically when you first connect. If you se
 benchbox run --platform motherduck --benchmark tpch --scale 0.1 \
     --platform-option database=fresh_benchmark_db
 ```
+
+This specifies a fresh database name.
 
 ## Related Documentation
 

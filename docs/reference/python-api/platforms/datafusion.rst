@@ -214,6 +214,8 @@ In-memory analytics with default settings:
         working_dir="/fast/ssd/datafusion"
     )
 
+The first adapter uses the defaults (Parquet format, 16G memory). The second sets a custom working directory.
+
 Performance Optimized
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -231,6 +233,8 @@ Optimized for high-performance benchmarks:
         batch_size=16384,
         temp_dir="/fast/ssd/temp"
     )
+
+``target_partitions=os.cpu_count()`` uses all cores, Parquet is a columnar format with compression, and ``batch_size=16384`` uses larger batches for throughput.
 
 Memory Constrained
 ~~~~~~~~~~~~~~~~~~
@@ -262,6 +266,8 @@ Choose between CSV and Parquet formats:
         data_format="csv",
         memory_limit="8G"
     )
+
+Parquet is recommended for query performance. CSV gives a faster initial load and a lower memory footprint.
 
 Configuration from Unified Config
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -315,6 +321,8 @@ Directly registers CSV files as external tables:
 
     adapter = DataFusionAdapter(data_format="csv")
 
+The CSV reader handles the TPC format automatically: pipe-delimited fields (``|``), a trailing delimiter and no header row.
+
 
 **Characteristics**:
 
@@ -332,6 +340,14 @@ Converts CSV to Parquet format first:
 
     adapter = DataFusionAdapter(data_format="parquet")
 
+The conversion process is:
+
+1. Read the CSV files with PyArrow.
+2. Handle trailing delimiters.
+3. Apply the schema from the benchmark.
+4. Write compressed Parquet files.
+5. Register the Parquet tables in DataFusion.
+
 
 **Characteristics**:
 
@@ -348,6 +364,8 @@ Performance Comparison
     adapter_csv = DataFusionAdapter(data_format="csv")
 
     adapter_parquet = DataFusionAdapter(data_format="parquet")
+
+For scale factor 1, CSV mode loads in about 5 seconds and is the query-time baseline. Parquet mode loads in about 30 seconds, and its queries are faster than CSV (varies by query).
 
 Query Execution
 ---------------
@@ -410,6 +428,8 @@ Preview queries without execution:
     for query_id, sql in adapter.captured_sql.items():
         print(f"{query_id}: {sql[:100]}...")
 
+Queries are validated but not executed, and the SQL is available in ``adapter.captured_sql``.
+
 Platform Information
 --------------------
 
@@ -470,6 +490,8 @@ Configure DataFusion SessionContext options:
         batch_size=16384
     )
 
+The adapter also configures these automatically: Parquet optimizations (pruning and pushdown) and identifier normalization (lowercase, for TPC compatibility).
+
 Working Directory Management
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -485,6 +507,8 @@ Manage DataFusion working directory:
         adapter.drop_database()
 
     adapter = DataFusionAdapter(force_recreate=True)
+
+Drop existing data if needed, or create the adapter with ``force_recreate=True``.
 
 PyArrow Integration
 ~~~~~~~~~~~~~~~~~~~
@@ -674,6 +698,8 @@ Out of Memory Errors
         temp_dir="/large/disk/temp"
     )
 
+The first adapter reduces the memory limit and uses CSV format. The second enables disk spilling through ``temp_dir``.
+
 Slow Query Performance
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -706,6 +732,8 @@ SQL Feature Errors
         print("Platform warnings:")
         for warning in validation.warnings:
             print(f"  - {warning}")
+
+DataFusion uses the PostgreSQL dialect, so some advanced SQL features may not be supported.
 
 
 See Also

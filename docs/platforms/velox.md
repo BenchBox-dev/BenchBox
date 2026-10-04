@@ -29,6 +29,10 @@ The Gluten Velox bundle jar is **Linux-only**. There are no prebuilt jars for ma
 
 ### Option A - Docker (recommended on macOS/Windows)
 
+Build the image first. Then pick one of two workflows. (a) All-in-one: run the benchmark inside the container with
+`docker compose run`. (b) Host-driver and container-backend: start a Gluten-enabled Spark-Connect server, then run
+`benchbox` on the host.
+
 ```bash
 cd docker/velox
 docker build \
@@ -46,6 +50,10 @@ benchbox run --platform velox --platform-option deployment=remote \
 See [Velox Docker Dev Workflow](velox_docker_dev.md) for a full walkthrough of both Docker workflows, arch selection, memory sizing, and CI integration. See [Velox Jar Setup](velox_jar_setup.md) for the published release tarball and verification steps.
 
 ### Option B - Native Linux
+
+Install the Velox extra, which pulls in `pyspark[connect]>=3.5.0`. Also download the Gluten Velox bundle jar for your
+Spark 4.0, Scala 2.13 and architecture (see `docs/platforms/velox_jar_setup.md` for release tarballs and verification
+steps). The `benchbox run` command then runs locally with Gluten wired into an in-process SparkSession.
 
 ```bash
 uv add benchbox --extra velox
@@ -120,6 +128,9 @@ Overriding `spark.shuffle.manager` via `spark_config` raises `ValueError` - `Col
 
 ### Local Mode (Linux or inside Docker)
 
+The first command runs TPC-H SF1 with 16 GB off-heap memory. The second runs TPC-DS SF10 with specific queries. The
+third is a dry-run preview.
+
 ```bash
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
     --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=16g
@@ -134,6 +145,8 @@ benchbox run --dry-run ./preview --platform velox --benchmark tpch --scale 1.0
 
 ### Remote Mode (Spark-Connect)
 
+First start a Gluten-enabled Spark-Connect server. Then run `benchbox` on the host, connecting to the container.
+
 ```bash
 cd docker/velox
 docker compose up -d velox-connect
@@ -146,6 +159,9 @@ benchbox run --platform velox --benchmark tpch --scale 1.0 \
 The adapter does **not** auto-start a server - if `sc://host:port` is unreachable, connection fails with a clear error.
 
 ### Accelerated-Spark Tier Comparison
+
+The commands run an Apache Spark baseline, the same workload with Gluten + Velox, and LakeSail Sail (Rust/DataFusion).
+The last command compares the three results.
 
 ```bash
 benchbox run --platform spark --benchmark tpch --scale 10.0
@@ -181,6 +197,8 @@ results = adapter.run_benchmark(benchmark)
 info = adapter.get_platform_info(connection=adapter._spark_session)
 print("Velox active:", info["velox_active"])
 ```
+
+The last two lines confirm that native execution happened.
 
 ## Architecture
 
@@ -278,6 +296,8 @@ cd docker/velox
 docker compose up -d velox-connect
 docker compose logs velox-connect
 ```
+
+The `logs` command shows startup errors.
 
 ### Out-of-memory / excessive JVM fallback
 

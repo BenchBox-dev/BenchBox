@@ -352,6 +352,8 @@ git revert "$BAD_SHA"
 git push "$REMOTE" HEAD:published-results
 ```
 
+Stop after `git show` unless the commit is the exact non-accepted change approved for archive reversal. Run `git revert` and `git push` only after that check.
+
 Then comment on the reverted PR explaining why archive reversal was permitted,
 whether the material was broken or merely misleading, and whether a corrected
 resubmission is welcome. Record the erasure approval when that exception was used.

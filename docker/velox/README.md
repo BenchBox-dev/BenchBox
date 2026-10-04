@@ -4,7 +4,7 @@ Builds a `linux/amd64` image containing Apache Spark 4.0.2 with the Gluten Velox
 
 ## Build
 
-Run from the **project root** (the build context must include the full BenchBox source tree):
+Run from the **project root** (the build context must include the full BenchBox source tree). The first command is a quick single-architecture dev build. The second is a distribution build and requires `docker buildx` with a multi-arch builder:
 
 ```bash
 docker build \
@@ -30,6 +30,8 @@ The Dockerfile downloads the official Apache Gluten 1.6.0 release tarball, verif
 
 ## Workflow A — Connect Mode (host client, container backend)
 
+Start the server, wait for `docker compose ps velox-connect` to report `healthy` (about 90 seconds), then run `benchbox` on the host:
+
 ```bash
 docker compose up -d velox-connect
 
@@ -53,6 +55,8 @@ docker compose up -d velox-connect
 A nested default (`${VAR:-${OTHER}}`) and the `${VAR:?message}` required-variable form are both unsupported by [mocker](../../docs/operations/uat-framework.md), the Apple-silicon local Docker-compatible engine — mocker leaves either form unresolved instead of erroring or substituting — which is why the mount uses the bare `${BENCHBOX_DATA_DIR}` form with no modifier at all.
 
 ## Workflow B — All-in-one Runner
+
+The first command runs TPC-H at scale factor 1 inside the container. The second runs selected TPC-DS queries.
 
 ```bash
 docker compose run --rm velox-runner \
@@ -85,6 +89,8 @@ Apache Gluten 1.6.0 publishes an `amd64`-only release jar. The Dockerfile and co
 - **Apple Silicon (arm64):** `linux/amd64` runs under Rosetta emulation. Acceptable for smoke testing and setup; timing numbers are invalid under emulation.
 - **Intel Linux/Mac:** `linux/amd64` runs natively — valid for benchmarking.
 - **For timing-valid benchmark runs on arm64:** use a native x86_64 Linux host.
+
+To force `amd64` explicitly and override host architecture detection:
 
 ```bash
 VELOX_DOCKER_PLATFORM=linux/amd64 docker compose up -d velox-connect

@@ -24,6 +24,8 @@ pip install psycopg2-binary
 pip install psycopg2
 ```
 
+The first command installs the binary package. The second uses a system `psycopg2` build, which is recommended for production.
+
 ## Configuration
 
 ### Environment Variables
@@ -133,6 +135,8 @@ effective_io_concurrency = 200
 random_page_cost = 1.1
 ```
 
+The three `SET` statements are connection-level settings, which you set through platform options. The last three lines (`shared_buffers`, `effective_io_concurrency` and `random_page_cost`) are server-level settings that belong in `postgresql.conf`.
+
 ### Tuning Mode
 
 BenchBox supports automatic tuning configuration:
@@ -144,6 +148,8 @@ benchbox run --platform postgresql --benchmark tpch \
 benchbox run --platform postgresql --benchmark tpch \
   --tuning notuning
 ```
+
+The first command runs with tuning enabled. The second runs the baseline with no tuning.
 
 ## Query Plan Capture
 
@@ -172,8 +178,9 @@ This captures EXPLAIN ANALYZE output including:
 
 ```bash
 pg_isready -h localhost -p 5432
-
 ```
+
+Verify that PostgreSQL is running, then check `pg_hba.conf` for access rules.
 
 ### Permission Denied
 
@@ -182,12 +189,16 @@ GRANT CREATE ON DATABASE benchbox TO your_user;
 GRANT USAGE ON SCHEMA public TO your_user;
 ```
 
+Grant the necessary permissions.
+
 ### Memory Errors
 
 ```bash
 benchbox run --platform postgresql --benchmark tpcds \
   --platform-option work_mem=512MB
 ```
+
+Increase `work_mem` for complex queries.
 
 ## Related Documentation
 

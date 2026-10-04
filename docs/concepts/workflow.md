@@ -97,6 +97,8 @@ benchbox run --benchmark tpcds --platform databricks --scale 1 \
 cat benchmark_runs/tpcds_1_databricks_*/results.json
 ```
 
+The steps are: set the cloud credentials, preview the queries without executing them (to avoid costs), run the benchmark, and read the results. Review the generated queries in `./preview/queries/` before the real run, because the second command executes queries and incurs costs. The saved results include cloud execution metadata.
+
 **External Table Mode**:
 
 Skip native table materialization (COPY/CTAS) and query directly over staged Parquet files:
@@ -131,6 +133,8 @@ tree ./preview
 
 cat ./preview/summary.json
 ```
+
+The dry run writes generated queries and configuration. The preview directory holds `queries/` (one `.sql` file per query, such as `q1.sql`), `schema/` (DDL files such as `store_sales.ddl`) and `summary.json`.
 
 **Use Cases**:
 - Query validation before cloud execution
@@ -199,6 +203,8 @@ benchbox metrics qphh \
   --throughput-results results/throughput/results.json
 ```
 
+The first command is the Power Test (a single query stream), the second is the Throughput Test (concurrent streams), and `benchbox metrics qphh` calculates the composite metric from both.
+
 `run-official` is deprecated (kept for backward compatibility) in favor of
 `benchbox run --official`; see
 [CLI Reference → Deprecated: `run-official`](../reference/cli/run.md#deprecated-run-official)
@@ -230,6 +236,8 @@ benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
 
 benchbox compare baseline/results.json tuned/results.json
 ```
+
+The first run is the baseline with no tunings. The second applies tunings (partitioning, sorting, indexes), and the last command compares the results.
 
 **Example Tuning Config** (`tunings/clickhouse_tpcds.yaml`):
 ```yaml
@@ -277,8 +285,9 @@ Verifying benchmark results for correctness:
 ```bash
 benchbox run --benchmark tpch --platform duckdb --scale 0.1 \
   --validation strict
-
 ```
+
+Validation checks row counts, result checksums, data type compliance and constraint satisfaction.
 
 **Validation Modes**:
 - `none`: No validation (fastest)
@@ -327,6 +336,8 @@ benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
 
 benchbox shell --platform duckdb --database benchmark.duckdb
 ```
+
+The first command enables debug logging and uses the shell to redirect output to a file. The second runs a single query with maximum detail, and `--show-plans` shows the query plan. The last command opens an interactive SQL shell to inspect database state.
 
 **Common Issues**:
 - Data generation failures → Check disk space, permissions

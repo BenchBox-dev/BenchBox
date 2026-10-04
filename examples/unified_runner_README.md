@@ -8,6 +8,8 @@ The `unified_runner.py` script provides a fully worked **single-file** example o
 
 ## Quick Start
 
+Run from the `examples` directory. Replace `tpch` with any benchmark name listed below.
+
 ```bash
 cd examples
 
@@ -20,6 +22,8 @@ python unified_runner.py --platform duckdb --benchmark tpch --scale 0.01 --phase
 
 ### 1. TPC-H (Standard OLAP)
 **Best for:** General analytical query performance, vendor comparison
+
+The examples below run a basic power test, a tuned run, a run of queries 1, 6 and 12 only, and a dry run that previews the plan without executing (output goes to `./preview`).
 
 ```bash
 python unified_runner.py --platform duckdb --benchmark tpch --scale 0.1 --phases power
@@ -65,7 +69,7 @@ python unified_runner.py --platform duckdb --benchmark tpcdi --scale 0.01 --phas
 python unified_runner.py --platform duckdb --benchmark tpcdi --scale 1.0 --phases generate,load
 ```
 
-**Note:** TPC-DI focuses on data loading rather than query execution
+**Note:** TPC-DI focuses on data loading rather than query execution. The scale 0.01 command is the standard test (data loading and transformation); the scale 1.0 command is the full workflow.
 
 **Scale Factor Guide:**
 - `0.01` = Tiny (< 1 min)
@@ -76,6 +80,8 @@ python unified_runner.py --platform duckdb --benchmark tpcdi --scale 1.0 --phase
 
 ### 4. SSB (Star Schema Benchmark)
 **Best for:** Star schema queries, dimensional modeling
+
+The power test runs 13 queries.
 
 ```bash
 python unified_runner.py --platform duckdb --benchmark ssb --scale 0.1 --phases power
@@ -93,6 +99,8 @@ python unified_runner.py --platform duckdb --benchmark ssb --scale 1.0 --phases 
 ### 5. ClickBench (Web Analytics)
 **Best for:** Real-time analytics, web/log data
 
+The power test runs 43 queries.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark clickbench --scale 0.01 --phases power
 
@@ -108,6 +116,8 @@ python unified_runner.py --platform duckdb --benchmark clickbench --scale 0.1 --
 
 ### 6. AMPLab Big Data Benchmark
 **Best for:** Big data query patterns, Hadoop/Spark comparison
+
+The power test covers three query types: scan, aggregation and join.
 
 ```bash
 python unified_runner.py --platform duckdb --benchmark amplab --scale 0.1 --phases power
@@ -125,6 +135,8 @@ python unified_runner.py --platform duckdb --benchmark amplab --scale 1.0 --phas
 ### 7. H2O.ai Database Benchmark
 **Best for:** Data science workloads, GroupBy operations
 
+The power test runs GroupBy-heavy queries.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark h2odb --scale 0.1 --phases power
 ```
@@ -139,6 +151,8 @@ python unified_runner.py --platform duckdb --benchmark h2odb --scale 0.1 --phase
 ### 8. Join Order Benchmark
 **Best for:** Query optimizer testing, join algorithm evaluation
 
+The power test runs complex multi-way joins.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark joinorder --scale 1 --phases power
 ```
@@ -152,6 +166,8 @@ python unified_runner.py --platform duckdb --benchmark joinorder --scale 1 --pha
 
 ### 9. Read Primitives (Basic OLAP)
 **Best for:** Quick smoke tests, basic functionality validation
+
+The power test runs simple analytical queries. The second command, limited to queries 1, 2 and 3, is a quick CI/CD check.
 
 ```bash
 python unified_runner.py --platform duckdb --benchmark read_primitives --scale 0.01 --phases power
@@ -169,6 +185,8 @@ python unified_runner.py --platform duckdb --benchmark read_primitives --scale 0
 ### 10. Write Primitives (Write Operations)
 **Best for:** Write performance testing, MERGE/UPSERT testing, transaction validation
 
+The first command tests write operations at a small scale; the second runs larger write tests.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark write_primitives --scale 0.01 --phases generate,load
 
@@ -185,6 +203,8 @@ python unified_runner.py --platform duckdb --benchmark write_primitives --scale 
 ### 11. TPC-H Havoc (Optimizer Stress Test)
 **Best for:** Query optimizer validation, edge case testing
 
+The power test runs modified TPC-H queries designed to stress optimizers.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark tpchavoc --scale 0.1 --phases power
 ```
@@ -200,7 +220,7 @@ python unified_runner.py --platform duckdb --benchmark tpchavoc --scale 0.1 --ph
 
 ## Platform Options
 
-Use `--platform` to run on different databases:
+Use `--platform` to run on different databases. `duckdb` runs in memory or against a persistent file, and `sqlite` uses a SQLite database; both need no credentials. `clickhouse-server` targets a self-hosted ClickHouse server. `databricks` (SQL Warehouse), `bigquery`, `snowflake` and `redshift` are cloud platforms and require credentials.
 
 ```bash
 --platform duckdb
@@ -215,6 +235,12 @@ Use `--platform` to run on different databases:
 ```
 
 ### Cloud Platform Examples
+
+Credentials required by each example:
+
+- Databricks: `DATABRICKS_TOKEN` and `DATABRICKS_HOST`.
+- BigQuery: `GOOGLE_APPLICATION_CREDENTIALS` or `BIGQUERY_PROJECT`. The example uses `--dry-run` to preview the run before spending credits.
+- Snowflake: Snowflake account credentials.
 
 ```bash
 python unified_runner.py \
@@ -241,7 +267,7 @@ python unified_runner.py \
 
 ## Test Execution Types
 
-Use `--phases` to control what executes:
+Use `--phases` to control what executes. The examples below show, in order: a power test (sequential query execution), a throughput test (concurrent streams), a maintenance test (data modifications), a combined run, data generation only, loading data without running queries, and the full workflow.
 
 ```bash
 --phases power
@@ -264,6 +290,8 @@ Use `--phases` to control what executes:
 ## Common Options
 
 ### Query Selection
+Use a comma-separated list for specific queries and a dash for a range.
+
 ```bash
 --queries 1,6,12,14
 
@@ -271,6 +299,8 @@ Use `--phases` to control what executes:
 ```
 
 ### Tuning
+`tuned` applies optimizations from `tunings/{platform}/{benchmark}_tuned.yaml`, `notuning` is the baseline without optimizations, and a path selects a custom tuning file.
+
 ```bash
 --tuning tuned
 
@@ -280,6 +310,8 @@ Use `--phases` to control what executes:
 ```
 
 ### Output & Export
+In order: preview without execution, export results in several formats, set the output directory, quiet mode (minimal console output), verbose mode (detailed logging), and very verbose.
+
 ```bash
 --dry-run ./preview_output
 
@@ -295,6 +327,8 @@ Use `--phases` to control what executes:
 ```
 
 ### Data Management
+In order: force data regeneration, compress generated data, and set the data location.
+
 ```bash
 --force
 
@@ -308,6 +342,8 @@ Use `--phases` to control what executes:
 ## Complete Examples
 
 ### Development Workflow
+Steps: a quick smoke test, a test of a specific benchmark, a preview of the cloud run, then execution on the cloud.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark primitives --scale 0.01 --phases power
 
@@ -319,6 +355,8 @@ python unified_runner.py --platform databricks --benchmark tpch --scale 1.0 --ph
 ```
 
 ### Performance Testing
+Run a baseline without tuning, then an optimized run with tuning, and compare the results (see the `result_analysis.py` example).
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark tpch --scale 1.0 --phases power \
   --tuning notuning --output-dir ./results/baseline
@@ -329,12 +367,16 @@ python unified_runner.py --platform duckdb --benchmark tpch --scale 1.0 --phases
 ```
 
 ### CI/CD Integration
+This is a fast validation test that finishes in under 30 seconds.
+
 ```bash
 python unified_runner.py --platform duckdb --benchmark primitives --scale 0.01 \
   --phases power --quiet --formats json --output-dir ./ci_results
 ```
 
 ### Multi-Platform Comparison
+This runs the same benchmark on three platforms.
+
 ```bash
 for platform in duckdb clickhouse-local databricks; do
   python unified_runner.py --platform $platform --benchmark tpch --scale 1.0 \
@@ -345,6 +387,8 @@ done
 ---
 
 ## Getting Help
+
+The commands below show all options, list available platforms, list available benchmarks, and show platform-specific help.
 
 ```bash
 python unified_runner.py --help
@@ -370,13 +414,13 @@ python unified_runner.py --platform databricks --help
 
 ## Troubleshooting
 
-**Import errors:**
+**Import errors:** install the package, optionally with a platform extra.
 ```bash
 uv add benchbox
 uv add benchbox --extra databricks
 ```
 
-**Platform not available:**
+**Platform not available:** check the required dependencies, then install platform extras (`cloud` covers all cloud platforms; `databricks` covers a single platform).
 ```bash
 python unified_runner.py --list-platforms
 
@@ -384,7 +428,7 @@ pip install "benchbox[cloud]"
 pip install "benchbox[databricks]"
 ```
 
-**Credentials missing:**
+**Credentials missing:** set the required environment variables for your platform (Databricks shown).
 ```bash
 export DATABRICKS_TOKEN="your-token"
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"

@@ -150,6 +150,8 @@ print(hourly_query)
 
 ### Configuring Data Year and Months
 
+This example uses January through March 2023 only (Q1):
+
 ```python
 nyctaxi_2023 = NYCTaxi(
     scale_factor=0.1,
@@ -231,6 +233,8 @@ Configure NYC Taxi data generation via `--benchmark-option KEY=VALUE`:
 | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
 
 Options accept hyphenated aliases (e.g. `taxi-types` for `taxi_types`).
+
+This example loads only yellow and green trips from January through March 2022:
 
 ```bash
 benchbox run --platform duckdb --benchmark nyctaxi --scale 1 \
@@ -397,6 +401,8 @@ nyctaxi = NYCTaxi(scale_factor=0.1)
 data_files = nyctaxi.generate_data()
 ```
 
+**Solution**: The synthetic data fallback is automatic. If the download fails, the benchmark generates synthetic data.
+
 ### Memory Issues with Large Scale Factors
 
 **Issue**: Out of memory during data generation
@@ -410,12 +416,16 @@ for month in [1, 2, 3]:
     data_files = nyctaxi.generate_data()
 ```
 
+**Solution**: Process the data in smaller chunks by month, and unload each month's data before generating the next.
+
 ### Query Date Range Issues
 
 **Issue**: Queries return no results
 ```python
 nyctaxi = NYCTaxi(year=2023, months=[1])
 ```
+
+**Solution**: Ensure the query date parameters match the generated data. Here the data covers January 2023, so queries are parameterized for January 1-31, 2023.
 
 ## Related Documentation
 

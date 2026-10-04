@@ -100,6 +100,8 @@ Data Generation
 
     benchmark2 = TPCDS(scale_factor=1.0, output_dir="./tpcds_data")
 
+The second benchmark reuses the data generated in the same directory. Generation is skipped when the data already exists.
+
 Query Access
 ~~~~~~~~~~~~
 
@@ -114,6 +116,8 @@ Query Access
     q1 = benchmark.get_query("q1")
 
     q1_parameterized = benchmark.get_query("q1", params={"date": "1998-09-02"})
+
+The example gets all queries, one specific query, and a query with parameters.
 
 Platform Execution
 ~~~~~~~~~~~~~~~~~~
@@ -135,6 +139,8 @@ Platform Execution
         query_subset=["Q1", "Q2", "Q3"]
     )
 
+The ``query_subset`` argument is optional. It limits the run to the listed queries.
+
 Result Analysis
 ~~~~~~~~~~~~~~~
 
@@ -152,6 +158,8 @@ Result Analysis
     times = [qr.execution_time for qr in results.query_results
              if qr.status == "SUCCESS"]
     geomean = math.prod(times) ** (1.0 / len(times))
+
+The example loads results from a file, prints the time of each successful query, and calculates the geometric mean of the successful query times.
 
 Cross-Platform Comparison
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -177,6 +185,8 @@ Cross-Platform Comparison
     for name, result in results.items():
         print(f"{name}: {result.total_execution_time:.2f}s")
 
+The final loop compares performance across the platforms.
+
 Error Handling
 ~~~~~~~~~~~~~~
 
@@ -200,6 +210,8 @@ Error Handling
         print(f"Configuration error: {e}")
     except Exception as e:
         print(f"Execution error: {e}")
+
+The ``failed_queries`` check reports query failures after the run.
 
 Type Hints
 ----------
@@ -248,6 +260,8 @@ Platform adapters accept configuration via constructor parameters:
             "max_threads": 8
         }
     )
+
+The first adapter is a DuckDB configuration. ``database_path`` accepts ``":memory:"`` or a file path. The second adapter is a ClickHouse configuration.
 
 See Also
 --------

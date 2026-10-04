@@ -25,6 +25,8 @@ benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01
 ```
 
+The first command uses self-hosted mode (the default). The second uses TigerData managed cloud.
+
 ### Self-Hosted Mode
 
 Use your own PostgreSQL server with TimescaleDB extension installed.
@@ -69,6 +71,8 @@ export TIGERDATA_DATABASE='tsdb'
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01 --non-interactive
 ```
 
+`TIGERDATA_HOST` and `TIGERDATA_PASSWORD` are the required variables. `TIGERDATA_USER` (default `tsdbadmin`), `TIGERDATA_PORT` (default `5432`) and `TIGERDATA_DATABASE` (default `tsdb`) are optional.
+
 Fallback (used if `TIGERDATA_*` is unset):
 
 ```bash
@@ -105,6 +109,8 @@ benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0 \
   --non-interactive
 ```
 
+The commands run, in order: a TPC-H smoke test on TigerData cloud, TSBS on self-hosted TimescaleDB, and self-hosted TSBS with compression options.
+
 ## Platform Options
 
 | Option | Default | Description |
@@ -131,6 +137,8 @@ psql -c "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb';"
 
 psql "$TIGERDATA_SERVICE_URL"
 ```
+
+The first command verifies the TimescaleDB extension. The second checks cloud connectivity manually.
 
 ## Related
 

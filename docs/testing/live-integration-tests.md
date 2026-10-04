@@ -97,7 +97,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 ### 3. Verify Setup
 
-Test that credentials are configured correctly:
+Test that credentials are configured correctly. The first command checks what would run (dry run). The second runs a single platform test:
 
 ```bash
 make test-live-databricks --dry-run
@@ -108,11 +108,13 @@ make test-live-databricks
 ## Running Tests
 
 ### Run All Live Tests
+This runs all platforms and requires all credentials:
 ```bash
 make test-live-all
 ```
 
 ### Run Individual Platforms
+The commands below run Databricks only, Snowflake only, and BigQuery only:
 ```bash
 make test-live-databricks
 
@@ -122,6 +124,7 @@ make test-live-bigquery
 ```
 
 ### Run with pytest Directly
+The commands below run all live tests, one platform's tests, and one test file:
 ```bash
 uv run -- python -m pytest -m live_integration -v
 
@@ -210,7 +213,7 @@ Create dedicated service accounts with minimal permissions:
 
 **Problem**: All tests show `SKIPPED`
 
-**Solution**: Check that required environment variables are set:
+**Solution**: Check that required environment variables are set. The commands below check Databricks, Snowflake, and BigQuery in that order:
 ```bash
 echo $DATABRICKS_TOKEN
 
@@ -252,7 +255,7 @@ echo $GOOGLE_APPLICATION_CREDENTIALS
 
 **Impact**: Usually benign - schemas with timestamps avoid conflicts
 
-**Solution**: Manually drop test schemas if needed:
+**Solution**: Manually drop test schemas if needed. The statements below apply to Databricks, Snowflake, and BigQuery in that order, and are identical across the three:
 ```sql
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
@@ -265,7 +268,7 @@ DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
 ### GitHub Actions
 
-Tests can run in CI with secrets:
+Tests can run in CI with secrets. In this workflow, `workflow_dispatch` is a manual trigger and the cron schedule runs weekly on Sunday:
 
 ```yaml
 name: Live Integration Tests
@@ -314,7 +317,7 @@ jobs:
 
 ### Testing Without Credentials
 
-Regular smoke tests don't require credentials:
+Regular smoke tests don't require credentials and use stubs. Either command runs them:
 ```bash
 make test-smoke
 uv run -- python -m pytest -m platform_smoke -v
@@ -322,7 +325,7 @@ uv run -- python -m pytest -m platform_smoke -v
 
 ### Debugging Live Tests
 
-Enable verbose output:
+Enable verbose pytest output, and capture logs with the second command:
 ```bash
 uv run -- python -m pytest -m live_databricks -vv -s
 

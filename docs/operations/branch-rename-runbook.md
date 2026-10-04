@@ -37,6 +37,8 @@ the branch before the PR merges, or `release-cut` would open PRs against a
    gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {id, name, target}'
    gh api repos/BenchBox-dev/BenchBox/rulesets/<old-id>
    ```
+
+   The first command lists the rulesets. The second captures the rules of the old one.
    Recreate with: target `refs/heads/release`; required checks `validate-base`,
    `release-required-result`; `strict_required_status_checks_policy: false`;
    `required_linear_history: true`; `non_fast_forward: true`; deletion blocked;
@@ -53,6 +55,13 @@ gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {name, target}'
 
 uv run -- python scripts/ruleset_drift_check.py --token "$RULESET_DRIFT_TOKEN" --require-bypass-actor-visibility
 ```
+
+Expected results:
+
+- The `release` branch query returns `release`, so the branch is renamed.
+- The `main` branch query returns 404; the redirect covers old URLs.
+- The ruleset listing shows a release-only ruleset that targets `refs/heads/release`.
+- The drift check parses this document and matches live state, once the PR is on `develop`.
 
 Then confirm the next real `release-cut` opens its PR against `release`,
 `validate-release-pr` passes for the `vX.Y.Z` head, and `release-finalize`

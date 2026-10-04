@@ -75,7 +75,7 @@ print(f"Batch types: {etl_status['batch_types']}")
 
 ### Backwards Compatibility
 
-The ETL mode is fully backwards compatible with existing TPC-DI usage:
+The ETL mode is fully backwards compatible with existing TPC-DI usage. Traditional mode (the default, `etl_mode=False`) generates warehouse tables directly. ETL mode provides the full ETL pipeline capabilities:
 
 ```python
 tpcdi_traditional = TPCDI(scale_factor=1.0, etl_mode=False)
@@ -88,6 +88,8 @@ source_files = tpcdi_etl.generate_source_data()
 ## ETL Mode Configuration
 
 ### Configuration Options
+
+`scale_factor` sets the data volume, `output_dir` is the base directory for all artifacts, `etl_mode=True` enables ETL mode, and `verbose=True` enables detailed logging. The remaining options are ETL-specific configuration reserved for future extensions: `batch_size` is the number of records per batch for loading, `parallel_workers` is the number of parallel processing workers, and `validate_on_load` runs validation after each load.
 
 ```python
 tpcdi = TPCDI(
@@ -112,6 +114,8 @@ tpcdi = TPCDI(
 | 3.0+         | ~300+ MB         | Enterprise-scale | Stress testing            |
 
 ### Environment Configuration
+
+The development configuration uses a small scale factor. The production-like configuration uses a larger one and sets `verbose=False` to reduce logging in production tests.
 
 ```python
 tpcdi_dev = TPCDI(
@@ -269,6 +273,8 @@ conn.close()
 ```
 
 ### Advanced-level Pipeline Execution
+
+This example uses DuckDB for better SQL support and processes several batch types in sequence. It validates only the key batches (`historical` and `scd`).
 
 ```python
 import duckdb
@@ -511,6 +517,8 @@ for batch_type, status in metrics['batch_status'].items():
 
 ### Performance Benchmarking
 
+The benchmark sets `validate_data=False` to skip validation, so it measures pure ETL performance.
+
 ```python
 import time
 
@@ -654,7 +662,7 @@ print(f"  Peak Memory: {resource_summary['peak_memory_gb']:.2f} GB")
 
 ### Slowly Changing Dimension (SCD) Processing
 
-The ETL implementation includes built-in SCD Type 2 logic for dimension tables:
+The ETL implementation includes built-in SCD Type 2 logic for dimension tables. The example processes an SCD batch and then verifies the result. The verification query lists customers with multiple versions (`HAVING COUNT(*) > 1`):
 
 ```python
 scd_result = tpcdi.run_etl_pipeline(
@@ -731,6 +739,8 @@ for conn in databases.values():
 ```
 
 ### Custom Transformation Logic
+
+The custom tier calculation assigns a tier from age: over 65 is tier 3 (senior), over 35 is tier 2 (standard), and the rest are tier 1 (basic). When the date of birth cannot be parsed, the age defaults to 40.
 
 ```python
 class CustomETLTransformer:
@@ -1014,6 +1024,8 @@ if __name__ == "__main__":
 
 ### dbt Integration
 
+The first model below adds data quality flags and audit columns.
+
 ```sql+jinja
 
 {{ config(materialized='view') }}
@@ -1050,6 +1062,8 @@ SELECT
 FROM {{ source('tpcdi_raw', 'customers_historical') }}
 WHERE Status IS NOT NULL
 ```
+
+The second model implements SCD logic. `is_new_version` is 1 for a new record (no previous values) or a changed record (the last name or address differs from the previous version), and 0 when nothing changed.
 
 ```sql+jinja
 
@@ -1106,6 +1120,8 @@ SELECT
 FROM scd_logic
 WHERE is_new_version = 1
 ```
+
+The project file is `dbt_project.yml`:
 
 ```yaml
 name: 'tpcdi_etl'
@@ -1164,7 +1180,7 @@ sources:
 
 **Error**: `ValueError: ETL mode must be enabled to generate source data`
 
-**Solution**:
+**Solution**: the first line below is incorrect because ETL mode is not enabled (`etl_mode` is `False` by default). The second line is correct.
 ```python
 tpcdi = TPCDI(scale_factor=1.0)
 
@@ -1175,7 +1191,7 @@ tpcdi = TPCDI(scale_factor=1.0, etl_mode=True)
 
 **Error**: Database schema not found or table does not exist
 
-**Solution**:
+**Solution**: always create the schema before running ETL.
 ```python
 schema_sql = tpcdi.get_create_tables_sql()
 if isinstance(connection, sqlite3.Connection):
@@ -1192,7 +1208,7 @@ else:
 
 **Error**: Out of memory during ETL processing
 
-**Solutions**:
+**Solutions**: (1) reduce the scale factor, for example to 0.1 instead of 1.0 or more; (2) use an in-memory database for testing; (3) process in smaller batches by splitting a large batch into several smaller incremental batches.
 ```python
 tpcdi = TPCDI(scale_factor=0.1, etl_mode=True)
 
@@ -1210,7 +1226,7 @@ for i in range(5):
 
 **Error**: Low data quality scores or validation failures
 
-**Investigation**:
+**Investigation**: run detailed validation to identify issues, then check the specific validation queries, the data quality issues, and completeness.
 ```python
 validation_results = tpcdi.validate_etl_results(conn)
 
@@ -1230,7 +1246,7 @@ for table, completeness in validation_results['completeness_checks'].items():
 
 **Symptoms**: ETL pipeline takes too long to complete
 
-**Solutions**:
+**Solutions**: (1) skip the time-consuming validation for performance testing; (2) use a faster database engine, such as in-memory DuckDB instead of SQLite; (3) monitor resource usage.
 ```python
 pipeline_result = tpcdi.run_etl_pipeline(
     connection=conn,
@@ -1359,6 +1375,7 @@ except Exception as e:
 ### 1. Environment Configuration
 
 #### Development Environment
+Use a minimal scale factor for fast iteration, verbose logging, and an in-memory database for speed.
 ```python
 tpcdi_dev = TPCDI(
     scale_factor=0.01,
@@ -1371,6 +1388,7 @@ conn = duckdb.connect(':memory:')
 ```
 
 #### Testing Environment
+Use a reasonable data size, reduce log noise with `verbose=False`, and use a persistent database for test reproducibility.
 ```python
 tpcdi_test = TPCDI(
     scale_factor=0.1,
@@ -1383,6 +1401,7 @@ conn = duckdb.connect('test_warehouse.duckdb')
 ```
 
 #### Production-like Environment
+Use the full scale factor and a production database connection.
 ```python
 tpcdi_prod = TPCDI(
     scale_factor=1.0,
@@ -1397,6 +1416,7 @@ conn = your_production_db_connection()
 ### 2. Data Quality Best Practices
 
 #### Comprehensive Validation Strategy
+The strategy runs pre-ETL environment checks, then the ETL pipeline, then post-ETL validation and business rule validation, and finally calculates an overall validation score. The disk space check requires at least 1 GB free.
 ```python
 def systematic_etl_validation(tpcdi, connection):
 
@@ -1483,6 +1503,7 @@ def calculate_business_rule_score(business_rules):
 ### 3. Performance Optimization
 
 #### Batch Processing Optimization
+The function pre-warms the database cache (`PRAGMA cache_size`, a SQLite optimization) and processes batches in a fixed order. It validates only the historical batch, records time and memory (in MB) per batch, and runs `VACUUM` with a brief pause between batches for system recovery.
 ```python
 def configured_batch_processing(tpcdi, connection, batch_types):
 

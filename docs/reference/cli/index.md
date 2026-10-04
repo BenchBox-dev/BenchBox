@@ -45,6 +45,9 @@ BenchBox provides the following commands:
 
 ## Quick Start
 
+`--help-topic all` shows all options including advanced ones, and
+`--help-topic examples` shows categorized usage examples.
+
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 

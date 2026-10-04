@@ -146,7 +146,7 @@ BenchBox follows semantic versioning (SemVer):
 
 ### Version Information in Logs
 
-When debugging is enabled (verbose mode), version information is automatically included:
+When debugging is enabled (verbose mode), `log_debug_info()` automatically includes version information in its output:
 
 ```python
 from benchbox.utils.verbosity import VerbosityMixin
@@ -158,7 +158,7 @@ class MyClass(VerbosityMixin):
 
 ### Error Context
 
-All CLI errors automatically include version information for debugging:
+All CLI errors automatically include version information in their error details:
 
 ```python
 from benchbox.cli.exceptions import BenchboxCLIError
@@ -205,6 +205,8 @@ context = ErrorContext(
 )
 ```
 
+Setting `include_version_info=True` adds the version information automatically.
+
 ## Best Practices
 
 ### For Developers
@@ -250,7 +252,7 @@ When imports fail, version information helps identify compatibility issues:
 
 ### Debug Information
 
-For comprehensive debugging:
+For comprehensive debugging, enable debug logging, run with verbose output (`-vv`), and check version consistency:
 
 ```bash
 export BENCHBOX_LOG_LEVEL=DEBUG

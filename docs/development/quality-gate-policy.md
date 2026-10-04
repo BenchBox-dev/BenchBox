@@ -195,11 +195,16 @@ The gate fails when an entry stops reproducing its divergence, so stale entries
 cannot mask a different regression on the same key. Prune them with
 `make cross-surface-update-baseline BENCHMARK=<gate>`, which removes only entries
 that no longer reproduce and refuses to write when the run has any other failure.
+Commit the pruned file in a reviewed change.
 
 An entry that needs an executable acceptance predicate, such as a
 `ClassifiedDivergence` pinned to a column position, numeric bound or error text,
-stays in `benchbox/core/equivalence/cross_surface.py`. Each gate merges its
-section of this file with its in-code entries.
+stays in `benchbox/core/equivalence/cross_surface.py`. The `h2odb`,
+`read_primitives` and `clickbench` gates merge their section of this file with
+their in-code entries.
+
+Sections are keyed by gate name. The file is currently empty (`{}`): no gate
+tolerates a baseline-only divergence today.
 
 ## Rejected alternatives and deferrals
 

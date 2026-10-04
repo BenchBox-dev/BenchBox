@@ -50,6 +50,8 @@ benchbox shell
 benchbox shell --list
 ```
 
+The first command discovers the available databases and lets you select one. `--list` lists all available databases without connecting.
+
 ### Quick Connection
 
 ```bash
@@ -59,6 +61,8 @@ benchbox shell --last --benchmark tpch
 
 benchbox shell --benchmark tpch --scale 1.0
 ```
+
+These commands connect to the most recent database, the most recent TPC-H database, and the TPC-H database at scale factor 1.0.
 
 ### Direct Connection
 
@@ -70,6 +74,8 @@ benchbox shell --platform sqlite --database benchmark.db
 benchbox shell --database benchmark.duckdb
 ```
 
+The first two commands connect to a specific DuckDB database and a specific SQLite database. The third omits `--platform`, so the platform is auto-detected from the file extension (here, DuckDB).
+
 ### Custom Output Directory
 
 ```bash
@@ -77,6 +83,8 @@ benchbox shell --output benchmark_runs/results/tpch_20250101_120000
 
 benchbox shell --output ./my-benchmarks --benchmark tpcds --scale 10
 ```
+
+The first command uses the database from a specific benchmark run. The second filters within a custom directory.
 
 ### Remote Database Connection
 
@@ -125,6 +133,8 @@ duckdb> SELECT l_returnflag, COUNT(*) FROM lineitem GROUP BY l_returnflag;
 duckdb> .quit
 ```
 
+The session connects to the benchmark database, verifies that the data loaded correctly, tests individual queries, and exits when done.
+
 ### Exploring Schema
 
 ```bash
@@ -135,6 +145,8 @@ duckdb> .schema
 duckdb> .schema customer
 duckdb> SELECT * FROM customer LIMIT 5;
 ```
+
+`.schema` shows all table schemas. `.schema customer` inspects one table.
 
 ### Comparing Scale Factors
 
@@ -148,6 +160,8 @@ duckdb> .quit
 benchbox shell --benchmark tpch --scale 1.0
 duckdb> SELECT COUNT(*) FROM orders;
 ```
+
+`--list` shows the available databases to compare. The two sessions connect to scale factor 0.1 and scale factor 1.0 in turn.
 
 ## Database Discovery
 
@@ -180,14 +194,14 @@ When multiple databases match your criteria:
 
 ## Troubleshooting
 
-**No databases found:**
+**No databases found:** verify that databases exist, then run a benchmark first to create one.
 ```bash
 ls benchmark_runs/datagen/
 
 benchbox run --benchmark tpch --scale 0.1 --platform duckdb
 ```
 
-**Wrong database selected:**
+**Wrong database selected:** use more specific filters, or connect directly.
 ```bash
 benchbox shell --benchmark tpch --scale 1.0 --platform duckdb
 

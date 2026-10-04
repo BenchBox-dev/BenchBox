@@ -19,8 +19,9 @@ Amazon EMR Serverless is AWS's serverless deployment option for running Apache S
 
 ```bash
 uv add benchbox --extra emr-serverless
-
 ```
+
+This installs the `boto3` dependency.
 
 ## Prerequisites
 
@@ -49,6 +50,8 @@ export EMR_DATABASE=benchbox
 export EMR_RELEASE_LABEL=emr-7.0.0
 ```
 
+`EMR_S3_STAGING_DIR` and `EMR_EXECUTION_ROLE_ARN` are required. You must also set one of `EMR_APPLICATION_ID` (use an existing application) or `EMR_CREATE_APPLICATION=true` (create a new application), not both. `AWS_REGION`, `EMR_DATABASE`, and `EMR_RELEASE_LABEL` are optional.
+
 ### CLI Usage
 
 ```bash
@@ -66,6 +69,8 @@ benchbox run --platform emr-serverless --benchmark tpch --dry-run ./preview \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option execution_role_arn=arn:aws:iam::123456789012:role/EMRRole
 ```
+
+The first command runs against an existing application, the second creates a new application, and the third runs a dry run that previews queries.
 
 ### Platform Options
 
@@ -111,6 +116,8 @@ result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
 adapter.close()
 ```
+
+The first adapter uses an existing application, and the second creates a new one. `create_schema` creates the database in the Glue Data Catalog. `load_data` uploads data to S3 and creates Glue tables. Each query is submitted as a job run. `close` cleans up and optionally stops the application.
 
 ## Execution Model
 

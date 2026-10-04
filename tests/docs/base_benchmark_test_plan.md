@@ -227,6 +227,8 @@ def test_feature_expected_behavior():
     mock_benchmark.cleanup()
 ```
 
+Each test follows four steps: set up the mock benchmark, exercise the method under test, verify the result and state, and clean up if needed beyond the fixture scope. Each test docstring states that a feature behaves in an expected way under given conditions.
+
 ### Mock Implementation Guidelines
 
 - Keep mock implementations as simple as possible while satisfying the interface

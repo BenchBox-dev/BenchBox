@@ -86,6 +86,8 @@ Vector embedding generation:
 
 ### CLI Usage
 
+The commands below run the benchmark on Snowflake at a small scale factor, run a dry run to estimate costs first, set a cost budget (the run fails if the budget is exceeded), and run only the `nlp` and `transform` categories on Databricks.
+
 ```bash
 benchbox run --platform snowflake --benchmark ai_primitives --scale 0.01
 
@@ -129,7 +131,7 @@ print(f"Total cost: ${result.total_cost_estimated_usd:.4f}")
 
 ### Snowflake (Cortex)
 
-Snowflake Cortex provides LLM functions directly in SQL:
+Snowflake Cortex provides LLM functions directly in SQL. The queries below show text completion, sentiment analysis, and embedding generation, in that order:
 
 ```sql
 SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3-8b', 'Summarize: ' || comment) AS summary
@@ -146,7 +148,7 @@ FROM customer LIMIT 10;
 
 ### BigQuery (ML Functions)
 
-BigQuery ML provides AI functions through external model connections:
+BigQuery ML provides AI functions through external model connections. The queries below show text generation and then embedding generation:
 
 ```sql
 SELECT ML.GENERATE_TEXT(
@@ -167,7 +169,7 @@ FROM `project.dataset.customer` LIMIT 10;
 
 ### Databricks (AI Functions)
 
-Databricks provides AI functions through Foundation Model APIs:
+Databricks provides AI functions through Foundation Model APIs. The queries below show text completion and then classification:
 
 ```sql
 SELECT ai_query(
@@ -202,6 +204,8 @@ for estimate in estimates:
 ```
 
 ### Budget Enforcement
+
+`max_cost_usd` sets the maximum cost, and execution fails if it is exceeded. A dry run produces estimates only and makes no AI calls.
 
 ```bash
 benchbox run --platform snowflake --benchmark ai_primitives \
@@ -289,7 +293,7 @@ benchbox run --platform databricks --benchmark ai_primitives --scale 0.01
 
 ### 3. Set Cost Budgets
 
-Prevent runaway costs with budget limits:
+Prevent runaway costs with budget limits. `max_cost_usd` is a hard limit:
 
 ```python
 benchmark = AIPrimitivesBenchmark(

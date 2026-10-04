@@ -243,6 +243,8 @@ After the required `develop_sha:` frontmatter, append one block per finding to a
     <anything else — repro flakiness, only-on-cold-load, etc.>
 ```
 
+`status` is `P` for pass, `F` for fail, or `Q` for open question. Screenshots are not retained in git; keep them locally and reference `"none"` in `screenshot` unless a durable path is agreed. `severity` applies only to `F` and `Q`; omit it for `P`.
+
 End the file with a single summary line: `# totals: P=<n> F=<n> Q=<n>`.
 
 For **passes**, `status: P` plus the id, page, url, browser is enough — skip the rest. I only need detail on F/Q.

@@ -200,6 +200,8 @@ cpu_query = tsbs.get_query("cpu-max-all-1-hr")
 print(cpu_query)
 ```
 
+Scale factor 1 generates 100 hosts and 2 days of time-series data.
+
 ### Custom Configuration
 
 ```python
@@ -212,6 +214,8 @@ tsbs_custom = TSBSDevOps(
 )
 data_files = tsbs_custom.generate_data()
 ```
+
+These explicit options override the values derived from the scale factor: 50 hosts, 7 days of data and 1-minute (60-second) intervals.
 
 ### DuckDB Integration
 
@@ -257,6 +261,8 @@ schema_sql = tsbs.get_create_tables_sql(
 print(schema_sql)
 ```
 
+This returns the TimescaleDB-optimized schema with hypertables. The output includes statements such as `SELECT create_hypertable('cpu', 'time', ...)`.
+
 ### ClickHouse Integration
 
 ```python
@@ -270,6 +276,8 @@ schema_sql = tsbs.get_create_tables_sql(
 )
 print(schema_sql)
 ```
+
+This returns the ClickHouse-optimized schema. The output includes clauses such as `ENGINE = MergeTree() ORDER BY (...) PARTITION BY toYYYYMMDD(time)`.
 
 ### InfluxDB Integration
 
@@ -304,7 +312,11 @@ for query_id in ["cpu-max-all-1-hr", "high-cpu-1-hr", "lastpoint"]:
 adapter.close_connection(conn)
 ```
 
+The adapter uses Core/OSS mode. InfluxDB creates the schema automatically from Line Protocol writes, and `load_data` converts the CSV files to Line Protocol. The queries use the `influxdb` dialect, which runs as DataFusion SQL.
+
 **InfluxDB Cloud mode:**
+
+The following adapter targets InfluxDB Cloud (Serverless, Dedicated or Clustered).
 
 ```python
 adapter = InfluxDBAdapter(
@@ -345,6 +357,8 @@ benchbox run --platform duckdb --benchmark tsbs_devops --scale 1 \
   --benchmark-option interval_seconds=30 \
   --benchmark-option start_time=2019-01-01T00:00:00
 ```
+
+This sets a custom host count, interval and start time.
 
 ## Scale Factor Guidelines
 

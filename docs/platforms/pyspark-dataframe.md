@@ -39,6 +39,8 @@ BenchBox defaults to DataFrame mode for historical compatibility. Use `--mode sq
 
 ## Installation
 
+Install PySpark DataFrame support with uv, with pip, or by installing PySpark directly. The last command verifies the installation:
+
 ```bash
 uv add benchbox --extra pyspark
 
@@ -55,6 +57,8 @@ python -c "from pyspark.sql import SparkSession; print('PySpark available')"
 
 ### DataFrame Mode
 
+The first command runs TPC-H on PySpark DataFrame in local mode. The second sets a custom memory allocation:
+
 ```bash
 scripts/with_supported_java.sh benchbox run --platform pyspark-df --benchmark tpch --scale 0.01
 
@@ -63,6 +67,8 @@ scripts/with_supported_java.sh benchbox run --platform pyspark-df --benchmark tp
 ```
 
 ### SQL Mode
+
+The first command runs the TPC-H power phase via Spark SQL. The second creates a warehouse directory and Delta tables:
 
 ```bash
 scripts/with_supported_java.sh benchbox run --platform pyspark --mode sql --benchmark tpch --scale 0.01 \
@@ -86,7 +92,7 @@ scripts/with_supported_java.sh benchbox run --platform pyspark --mode sql --benc
 
 ### master
 
-Specifies the Spark cluster to connect to:
+Specifies the Spark cluster to connect to. In order, the examples below select local mode with all cores, local mode with 4 cores, a standalone cluster, and a YARN cluster:
 
 ```bash
 --platform-option master="local[*]"
@@ -100,7 +106,7 @@ Specifies the Spark cluster to connect to:
 
 ### driver_memory
 
-Memory allocated to the driver process:
+Memory allocated to the driver process. Increase it for large scale factors:
 
 ```bash
 benchbox run --platform pyspark-df --benchmark tpch --scale 10 \
@@ -109,7 +115,7 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 10 \
 
 ### shuffle_partitions
 
-Number of partitions for shuffle operations (joins, aggregations):
+Number of partitions for shuffle operations (joins, aggregations). Match it to the CPU core count for local mode, and use a higher value such as 200 for cluster mode:
 
 ```bash
 benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
@@ -120,7 +126,7 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
 
 ### enable_aqe
 
-Adaptive Query Execution optimizes queries at runtime:
+Adaptive Query Execution optimizes queries at runtime. Disable it for deterministic benchmarking:
 
 ```bash
 benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
@@ -158,7 +164,7 @@ PySpark 4.x requires **Java 17 or Java 21**. Java 23+ is currently incompatible 
 
 On macOS, BenchBox automatically attempts to locate a compatible JDK via `/usr/libexec/java_home` when a newer Java (e.g., 23+) is active, so you can keep multiple versions installed without manual switching.
 
-Set `JAVA_HOME` to the desired JDK before running BenchBox. Verify with:
+Set `JAVA_HOME` to the desired JDK before running BenchBox. Verify with the command below. Expected output starts with a line such as `openjdk version "21.0.2" 2024-01-16`:
 
 ```bash
 java -version
@@ -195,7 +201,7 @@ PySpark can handle very large datasets due to distributed execution:
 
 ### Performance Tips
 
-1. **Optimize shuffle partitions** for your workload:
+1. **Optimize shuffle partitions** for your workload (for local mode, match CPU cores):
    ```bash
    --platform-option shuffle_partitions=8
    ```
@@ -215,6 +221,8 @@ PySpark can handle very large datasets due to distributed execution:
 ## SQL Mode Examples
 
 ### CLI
+
+The first command is a TPC-H smoke run in SQL mode. The second generates and loads data without executing queries:
 
 ```bash
 benchbox run --platform pyspark --mode sql --benchmark tpch --scale 0.01 \
@@ -244,11 +252,13 @@ print(result["rows_returned"])
 adapter.close()
 ```
 
+The `execute_query` call runs the SQL directly.
+
 ## Deployment Modes
 
 ### Local Mode
 
-Best for development and small-scale testing:
+Best for development and small-scale testing. `master="local[*]"` uses all local cores:
 
 ```python
 from benchbox.platforms.dataframe import PySparkDataFrameAdapter
@@ -358,6 +368,8 @@ rank = adapter.window_rank(
 )
 ```
 
+In each `order_by` entry, the boolean selects ascending (`True`) or descending (`False`) order, so the rank example orders by revenue descending.
+
 ## Troubleshooting
 
 ### JVM Memory Issues
@@ -373,7 +385,7 @@ java.lang.OutOfMemoryError: Java heap space
 
 ### Slow Startup
 
-PySpark has JVM startup overhead (~3-5 seconds). For rapid iteration:
+PySpark has JVM startup overhead (~3-5 seconds). For rapid iteration, use Polars for quick tests and PySpark for production scale:
 
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
@@ -383,7 +395,7 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 10
 
 ### Port Conflicts
 
-If you see port binding errors:
+If you see port binding errors, configure a different Spark UI port:
 
 ```python
 adapter = PySparkDataFrameAdapter(
@@ -394,7 +406,7 @@ adapter = PySparkDataFrameAdapter(
 
 ### Session Management
 
-Always close the adapter when done:
+Always close the adapter when done. Run your queries inside the `try` block; `close()` stops the SparkSession:
 
 ```python
 adapter = PySparkDataFrameAdapter(master="local[4]")

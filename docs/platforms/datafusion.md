@@ -62,6 +62,8 @@ print(f"Completed in {results.duration_seconds:.2f}s")
 print(f"Average query time: {results.average_query_time:.3f}s")
 ```
 
+This creates an adapter with default settings. Parquet is a columnar format with compression and predicate pushdown.
+
 ### CLI Usage
 
 ```bash
@@ -72,6 +74,8 @@ benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
 benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
   --platform-option temp_dir=/fast/ssd/datafusion
 ```
+
+The first command runs TPC-H with a 16G memory limit and 8 partitions. The second spills to a fast disk.
 
 ## Configuration
 
@@ -135,6 +139,8 @@ adapter = DataFusionAdapter(
 )
 ```
 
+The first example is a conservative limit for constrained environments. The second is an aggressive allocation for large-scale benchmarks. The third combines a memory limit with disk spilling, using a fast SSD for the spill directory.
+
 #### Parallelism Configuration
 
 ```python
@@ -145,6 +151,8 @@ adapter = DataFusionAdapter(target_partitions=4)
 
 adapter = DataFusionAdapter(target_partitions=32)
 ```
+
+The first example matches the CPU core count, which is the default. The second is conservative for multi-tenant systems. The third is aggressive for a dedicated benchmark server.
 
 #### Batch Size Tuning
 
@@ -163,6 +171,8 @@ adapter = DataFusionAdapter(
     memory_limit="32G"
 )
 ```
+
+The first example is the default, recommended for most workloads. Smaller batches (4096) give lower latency and lower memory use, which suits memory-constrained environments, interactive queries, and low-latency requirements. Larger batches (16384) give higher throughput and higher memory use, which suits batch processing, maximum throughput, and ample memory.
 
 **Batch Size Guidelines**:
 - **4096**: Best for interactive queries and memory-constrained environments
@@ -185,6 +195,8 @@ adapter = DataFusionAdapter(
 )
 ```
 
+The working directory holds the converted files, so it should be on fast storage.
+
 **CSV Format**:
 - Direct loading (no conversion step)
 - Lower memory footprint
@@ -197,6 +209,8 @@ adapter = DataFusionAdapter(
     memory_limit="4G"
 )
 ```
+
+CSV keeps memory requirements low, so a smaller limit works.
 
 #### Configuration from Unified Config
 
@@ -339,8 +353,9 @@ result1 = connection.sql(query1).collect()
 
 query2 = "SELECT AVG(l_extendedprice) FROM lineitem"
 result2 = connection.sql(query2).collect()
-
 ```
+
+Both queries run on the same connection. The connection is cleaned up automatically when the adapter is garbage collected, or you can close it explicitly.
 
 **When to use manual connection management**:
 - Executing multiple custom queries without benchmark overhead
@@ -366,6 +381,8 @@ print(f"Query completed in {result['execution_time']:.3f}s")
 print(f"Returned {result['rows_returned']} rows")
 ```
 
+`validate_row_count=True` runs row count validation for the query.
+
 ### Dry-Run Mode
 
 Preview queries without executing them:
@@ -375,6 +392,8 @@ adapter = DataFusionAdapter(dry_run_mode=True)
 
 results = benchmark.run_with_platform(adapter)
 ```
+
+Queries are validated but not executed. Check the generated SQL in the results.
 
 ### Platform Validation
 
@@ -387,6 +406,8 @@ else:
     print("Validation errors:", validation.errors)
     print("Warnings:", validation.warnings)
 ```
+
+This validates platform capabilities before running.
 
 ## Performance Optimization
 
@@ -429,6 +450,8 @@ adapter = DataFusionAdapter(
     data_format="csv"
 )
 ```
+
+CSV is fine for small datasets.
 
 **Medium Scale (SF 1-10)**:
 ```python
@@ -503,6 +526,8 @@ adapter = DataFusionAdapter(
 )
 ```
 
+Reduce the memory limit or use CSV format. CSV has a lower memory footprint.
+
 #### Slow CSV Loading
 
 **Problem**: CSV loading takes too long
@@ -515,6 +540,8 @@ adapter = DataFusionAdapter(
 )
 ```
 
+Parquet gives better query performance, and fast storage for the working directory helps.
+
 #### Query Failures
 
 **Problem**: Some queries fail with SQL errors
@@ -524,8 +551,9 @@ adapter = DataFusionAdapter(
 validation = adapter.validate_platform_capabilities("tpcds")
 if validation.warnings:
     print("Platform warnings:", validation.warnings)
-
 ```
+
+Validate platform capabilities first, then check query compatibility with the PostgreSQL dialect.
 
 #### Mixed-Case Column Names
 

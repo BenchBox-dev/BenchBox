@@ -156,6 +156,8 @@ from benchbox.core.visualization.ascii import ASCIIBarChart
 from textcharts import BarChart
 ```
 
+The first import is the shim path, which still works. The second is the new canonical path.
+
 4. If using table format loading, verify format support is reported for your target platform:
 
 ```bash

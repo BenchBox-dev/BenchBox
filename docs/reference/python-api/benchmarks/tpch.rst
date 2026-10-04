@@ -144,6 +144,8 @@ Get a specific TPC-H query.
 
     q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
 
+The first call returns the default query, the second a translated dialect, and the third a query with a seed and scale factor for parameter generation.
+
 Parameters:
 
 - **query_id** (int): Query ID (1-22)
@@ -208,6 +210,8 @@ Get CREATE TABLE SQL for all tables.
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
+
+The first call returns standard SQL, the second returns SQL for a dialect, and the third applies a tuning configuration.
 
 Parameters:
 
@@ -368,6 +372,8 @@ Official Benchmark Tests
     throughput_results = benchmark.run_throughput_test(connection_factory)
 
     maintenance_results = benchmark.run_maintenance_test(connection_factory)
+
+The calls run the official power test, the official throughput test and the official maintenance test, in that order.
 
 See Also
 --------

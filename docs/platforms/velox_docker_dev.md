@@ -45,6 +45,8 @@ docker run --rm benchbox-velox:dev python3 -c \
   "from benchbox.platforms.velox import VeloxAdapter; print('import OK')"
 ```
 
+The `docker build` command is a quick dev build for a single architecture, with no push. The `docker run` command verifies the build and confirms that Velox loads.
+
 ### Distribution Build (docker buildx)
 
 ```bash
@@ -82,6 +84,8 @@ benchbox run --platform velox \
 docker compose down velox-connect
 ```
 
+The steps are: start the server detached, wait for the health check to pass, run `benchbox` on the host, and stop the server when done. `BENCHBOX_DATA_DIR` is required and has no default (see the data path contract below). The health check takes about 60-90 seconds on a cold JVM. Use `docker compose ps` to watch the status become "healthy" and `docker compose logs -f` to follow the startup logs.
+
 ### Data Path Contract
 
 The Spark server runs inside the container and reads files by their **host-side absolute paths** (BenchBox sends paths over gRPC, not file contents). The compose file bind-mounts `$BENCHBOX_DATA_DIR` at the **same absolute path** inside the container, so host paths resolve identically server-side.
@@ -98,6 +102,8 @@ Container: /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parque
 export BENCHBOX_DATA_DIR=/mnt/benchdata
 docker compose up -d velox-connect
 ```
+
+Then run `benchbox` so that the paths it sends are under `/mnt/benchdata/`.
 
 The mount also stays a bare `${BENCHBOX_DATA_DIR}` reference with no inline default syntax at all, because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring.
 
@@ -123,6 +129,8 @@ VELOX_OFFHEAP=24g SPARK_DRIVER_MEM=8g \
 docker compose run --rm velox-runner \
   --benchmark tpcds --scale 10.0
 ```
+
+The first command is a TPC-H SF 0.01 smoke test. The second runs TPC-H SF 1 with specific queries. The third runs TPC-DS SF 10 and raises the memory settings; see the sizing guidance below.
 
 The entrypoint translates `run [args]` into:
 
@@ -211,6 +219,8 @@ For CI pipelines where Docker is available, the all-in-one runner is the simples
       benchbox-velox:ci \
       run --benchmark tpch --scale 0.01 --queries Q1,Q6
 ```
+
+This is a GitHub Actions example.
 
 The `tests/integration/platforms/test_velox_live.py` integration tests are gated behind the `live_integration` marker and expect to run inside the image:
 

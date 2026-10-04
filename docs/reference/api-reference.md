@@ -39,6 +39,8 @@ for file_path in data_files:
     print(f"Generated {table_name} at {file_path}")
 ```
 
+`generate_data()` returns a list of paths, such as `Path("customer.tbl")`, `Path("orders.tbl")` and `Path("lineitem.tbl")`.
+
 ##### `get_queries() -> Dict[Union[int, str], str]`
 Get all queries for this benchmark.
 
@@ -48,6 +50,8 @@ Get all queries for this benchmark.
 ```python
 queries = tpch.get_queries()
 ```
+
+The result is a dictionary such as `{1: "SELECT l_returnflag...", 2: "SELECT s_acctbal...", ...}`.
 
 ##### `get_query(query_id: Union[int, str]) -> str`
 Get a specific query by ID.
@@ -63,6 +67,8 @@ query_1 = tpch.get_query(1)
 
 primitives_query = primitives.get_query("aggregation_basic")
 ```
+
+The first call is a basic query by integer ID. String IDs, as in the second call, are used by some benchmarks.
 
 ##### `translate_query(query_id: Union[int, str], dialect: str) -> str`
 Translate query to specific SQL dialect.
@@ -80,6 +86,8 @@ mysql_query = tpch.translate_query(1, "mysql")
 duckdb_query = tpch.translate_query(1, "duckdb")
 ```
 
+DuckDB is the recommended default dialect.
+
 ##### `get_create_tables_sql() -> str`
 Get DDL statements to create benchmark tables.
 
@@ -92,6 +100,8 @@ import duckdb
 conn = duckdb.connect(":memory:")
 conn.execute(ddl)
 ```
+
+This example uses DuckDB (recommended).
 
 ##### `get_schema() -> List[Dict[str, Any]]`
 Get benchmark schema information.
@@ -148,6 +158,8 @@ for file_path in data_files:
 result = conn.execute(tpch.get_query(1)).fetchall()
 ```
 
+The example generates and loads the data, then runs a query.
+
 ### TPCDS
 
 TPC-DS Decision Support Benchmark implementation.
@@ -186,6 +198,8 @@ Get list of available query categories.
 ```python
 categories = primitives.get_query_categories()
 ```
+
+The result is a list such as `["aggregation", "join", "filter", "sort", ...]`.
 
 ##### `get_queries_by_category(category: str) -> Dict[str, str]`
 Get queries filtered by category.
@@ -256,6 +270,8 @@ tpch_prod = TPCH(
 )
 ```
 
+The first instance is a development configuration and the second is a production configuration.
+
 ---
 
 ## Database Integration
@@ -287,6 +303,8 @@ for query_id in range(1, 6):
     print(f"Query {query_id}: {len(result)} rows")
 ```
 
+DuckDB uses ANSI SQL by default. The loop runs the first five queries.
+
 ### Other Databases
 
 For other databases, use SQL dialect translation:
@@ -298,6 +316,8 @@ mysql_query = tpch.translate_query(1, "mysql")
 
 sqlite_query = tpch.translate_query(1, "sqlite")
 ```
+
+SQLite is fully supported.
 
 > **Note on Dialect Translation**: BenchBox can translate queries to many SQL dialects via SQLGlot, but this doesn't mean platform adapters exist for connecting to those databases. Currently supported platforms include: DuckDB, SQLite, PostgreSQL, ClickHouse, Databricks SQL, BigQuery, Redshift, Snowflake, Trino, Presto, Amazon Athena, Firebolt, Azure Synapse Analytics, Microsoft Fabric, and more. See the [Platform Documentation](../platforms/index.md) for the full list.
 
@@ -322,6 +342,8 @@ for query_id, query_sql in list(queries.items())[:3]:
     print(f"Query {query_id}: {execution_time:.3f}s")
 ```
 
+The loop runs the first three queries. Execute each query with your own database connection between the two `time.time()` calls; as written, the example measures no work.
+
 ### Multi-Database Testing
 
 ```python
@@ -335,6 +357,8 @@ for dialect in dialects:
     translated_query = tpch.translate_query(1, dialect)
     print(f"{dialect}: {len(translated_query)} chars")
 ```
+
+This tests different SQL dialects. Translation is not the same as having a platform adapter, so use supported platforms.
 
 ---
 

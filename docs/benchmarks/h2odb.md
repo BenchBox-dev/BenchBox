@@ -270,6 +270,8 @@ for query_id in ["Q7", "Q8"]:
 conn.close()
 ```
 
+Queries Q1 to Q6 are the basic aggregation tests. Q7 and Q8 are temporal analysis queries and take start and end dates as parameters.
+
 ### Performance Benchmarking Framework
 
 ```python
@@ -403,6 +405,8 @@ agg_results = performance_tester.analyze_aggregation_performance()
 print(f"\\nAggregation Performance Analysis: {agg_results}")
 ```
 
+The `total_queries` summary divides the number of timings by 3 because each query runs 3 iterations by default.
+
 ### Data Science Workflow Integration
 
 ```python
@@ -444,6 +448,8 @@ print(f"Statistical analysis: {stats_time:.3f}s")
 
 print(f"\\nTotal preprocessing time: {feature_eng_time + groupby_time + stats_time:.3f}s")
 ```
+
+The example loads the data into pandas to simulate ML preprocessing, then times three typical data science operations that H2O DB tests: feature engineering, GroupBy aggregation (similar to the H2O DB queries) and statistical analysis.
 
 ## Performance Characteristics
 
@@ -510,6 +516,13 @@ h2odb = H2ODB(
 )
 ```
 
+- `date_range_days`: range of trip dates.
+- `trip_distance_max`: maximum trip distance.
+- `fare_amount_max`: maximum fare amount.
+- `enable_indexing`: create performance indices.
+- `partition_by_date`: partition by pickup date.
+- `compress_output`: compress generated files.
+
 ## Integration Examples
 
 ### Apache Spark Integration
@@ -566,6 +579,8 @@ q3_result.explain(True)
 
 spark.stop()
 ```
+
+The example partitions the data by pickup date for temporal queries and caches it. Q1 is a basic count, Q3 groups by passenger count, and Q7 is a temporal analysis by hour. `explain(True)` shows the execution plan for Q3.
 
 ### ClickHouse Integration
 
@@ -642,6 +657,8 @@ q7_result = client.query(q7_configured)
 print(f"Q7 results: {len(q7_result.result_rows)} hours")
 ```
 
+The table uses a MergeTree engine partitioned by month, and the queries use ClickHouse-native functions (`count()`, `sum()`, `toHour()`) for Q1 (count), Q3 (grouping) and Q7 (temporal analysis). The CSV is loaded with ClickHouse's CSV import.
+
 ## Best Practices
 
 ### Data Generation
@@ -667,6 +684,9 @@ print(f"Q7 results: {len(q7_result.result_rows)} hours")
 ### Performance Issues
 
 **Issue: Slow aggregation queries on large datasets**
+
+Solution: create appropriate indices and use columnar storage.
+
 ```sql
 CREATE INDEX idx_trips_passenger_count ON trips(passenger_count);
 CREATE INDEX idx_trips_vendor_id ON trips(vendor_id);
@@ -679,6 +699,9 @@ PARTITIONED BY (DATE_TRUNC('month', pickup_datetime));
 ```
 
 **Issue: Memory issues with large GROUP BY operations**
+
+Solution: use incremental aggregation or external sorting. The first `SET` statement is for PostgreSQL and the second is for ClickHouse. Alternatively, break large groups into smaller pieces, such as the monthly chunk below.
+
 ```sql
 SET work_mem = '2GB';
 SET max_memory_usage = 8000000000;
@@ -693,6 +716,9 @@ GROUP BY passenger_count, vendor_id;
 ### Data Quality Issues
 
 **Issue: Incorrect temporal analysis results**
+
+Solution: ensure proper timezone handling and date parsing. The `pickup_datetime >= '1900-01-01'` filter removes invalid dates.
+
 ```sql
 SELECT
     EXTRACT(HOUR FROM pickup_datetime AT TIME ZONE 'UTC') as hour,
@@ -705,6 +731,9 @@ ORDER BY hour;
 ```
 
 **Issue: Unexpected aggregation results**
+
+Solution: handle NULL values and outliers appropriately. The `passenger_count BETWEEN 0 AND 10` filter removes unrealistic values.
+
 ```sql
 SELECT
     passenger_count,

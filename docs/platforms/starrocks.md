@@ -22,6 +22,8 @@ StarRocks is used in production by Airbnb, Alibaba, Coinbase, Pinterest, and Ten
 
 ## Quick Start
 
+Install the PyMySQL dependency directly or through the StarRocks extra. StarRocks must be running before you configure the connection and run TPC-H:
+
 ```bash
 uv add pymysql
 
@@ -34,6 +36,8 @@ benchbox run --platform starrocks --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start
+
+The Docker image runs both the FE and BE. After it starts, verify connectivity with the `mysql` client, then run the benchmark:
 
 ```bash
 docker run -p 9030:9030 -p 8030:8030 -p 8040:8040 \

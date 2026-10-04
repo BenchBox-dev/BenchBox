@@ -49,6 +49,10 @@ Basic Configuration
 Auto-Detection (Recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Auto-detection reads the Databricks SDK configuration from ``~/.databrickscfg``
+or from environment variables. Setting ``very_verbose`` shows the
+auto-detection details.
+
 .. code-block:: python
 
     from benchbox.platforms.databricks import DatabricksAdapter
@@ -352,6 +356,7 @@ Unity Catalog Configuration
         uc_volume="tpch_staging"
     )
 
+Data is staged to ``dbfs:/Volumes/staging/benchmark_data/tpch_staging/``.
 
 S3 Staging Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -385,12 +390,18 @@ Authentication
 Personal Access Token
 ~~~~~~~~~~~~~~~~~~~~~
 
+Generate the token in the Databricks UI: User Settings → Developer → Access
+Tokens → Generate New Token. Then set it in the environment:
+
 .. code-block:: bash
 
     export DATABRICKS_TOKEN="dapi1234567890abcdef"
 
 Databricks CLI Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run ``databricks configure --token`` and enter the workspace URL and token when
+prompted. Then use auto-detection with the Python call that follows it:
 
 .. code-block:: bash
 
@@ -403,6 +414,8 @@ Databricks CLI Configuration
 
 Service Principal (Production)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use a service principal for production deployments:
 
 .. code-block:: python
 
@@ -428,6 +441,11 @@ Data Loading
 UC Volumes (Recommended)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The example generates data locally, then loads it with COPY INTO. Uploading to
+the UC Volume is a manual step that the example does not perform. Run it before
+loading, for example
+``databricks fs cp -r ./tpch_data/ dbfs:/Volumes/staging/benchmark_data/tpch_volume/``.
+
 .. code-block:: python
 
     from benchbox.platforms.databricks import DatabricksAdapter
@@ -447,12 +465,14 @@ UC Volumes (Recommended)
     data_dir = Path("./tpch_data")
     benchmark.generate_data(data_dir)
 
-
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
 S3 Data Loading
 ~~~~~~~~~~~~~~~
+
+Data is loaded directly from S3 via COPY INTO. Ensure that the IAM role or
+instance profile has S3 read permissions.
 
 .. code-block:: python
 
@@ -463,14 +483,14 @@ S3 Data Loading
         staging_root="s3://my-bucket/benchbox-data"
     )
 
-
 Delta Lake Tables
 -----------------
 
 Automatic Delta Conversion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All benchmark tables are automatically created as Delta Lake tables:
+All benchmark tables are automatically created as Delta Lake tables, using
+``USING DELTA`` format with auto-optimize and auto-compact enabled:
 
 .. code-block:: python
 
@@ -479,9 +499,12 @@ All benchmark tables are automatically created as Delta Lake tables:
 
     schema_time = adapter.create_schema(benchmark, conn)
 
-
 Manual Delta Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The example optimizes one table, vacuums files older than the retention period
+(``hours=168`` is 7 days), and then applies Z-ORDER clustering for query
+performance.
 
 .. code-block:: python
 
@@ -497,6 +520,9 @@ Manual Delta Optimization
 
 Delta Lake Time Travel
 ~~~~~~~~~~~~~~~~~~~~~~
+
+The example queries historical data by version, then by timestamp, and then
+views the table history.
 
 .. code-block:: python
 
@@ -546,6 +572,8 @@ Basic Query Execution
 Query Plans and Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The first statement views the query plan and the second views query costs.
+
 .. code-block:: python
 
     cursor.execute("""
@@ -566,6 +594,9 @@ Advanced Features
 
 Spark Configuration
 ~~~~~~~~~~~~~~~~~~~
+
+The first two settings enable Adaptive Query Execution. The last two tune join
+optimization.
 
 .. code-block:: python
 
@@ -596,6 +627,9 @@ Partitioning Strategy
 Clustering and Z-ORDER
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+Z-ORDER co-locates related data. ``DESCRIBE HISTORY`` then shows the
+optimization metrics.
+
 .. code-block:: python
 
     cursor.execute("""
@@ -608,6 +642,9 @@ Clustering and Z-ORDER
 
 Photon Engine
 ~~~~~~~~~~~~~
+
+Photon is enabled automatically on compatible warehouses. This check shows
+whether it is active:
 
 .. code-block:: python
 
@@ -623,15 +660,16 @@ Warehouse Selection
 
 1. **Choose appropriate warehouse size** for workload:
 
-   .. code-block:: python
-
-
+   - Small: 1-10GB data, development
+   - Medium: 10-100GB data, testing
+   - Large: 100GB-1TB data, production
+   - X-Large/2X-Large: 1TB+ data, heavy workloads
 
 2. **Use Serverless SQL Warehouses** for variable workloads:
 
-   Faster start times
-   Better resource utilization
-   Automatic scaling
+   - Faster start times
+   - Better resource utilization
+   - Automatic scaling
 
 Data Staging
 ~~~~~~~~~~~~
@@ -666,7 +704,8 @@ Delta Lake Optimization
            delta_auto_compact=True
        )
 
-2. **Run OPTIMIZE regularly** on active tables:
+2. **Run OPTIMIZE regularly** on active tables, for example after bulk loads.
+   Add Z-ORDER to match your query patterns:
 
    .. code-block:: python
 
@@ -674,7 +713,7 @@ Delta Lake Optimization
 
        cursor.execute("OPTIMIZE lineitem ZORDER BY (l_shipdate, l_orderkey)")
 
-3. **Vacuum old files** to reduce storage costs:
+3. **Vacuum old files** to reduce storage costs. This keeps 7 days of history:
 
    .. code-block:: python
 
@@ -683,7 +722,8 @@ Delta Lake Optimization
 Cost Optimization
 ~~~~~~~~~~~~~~~~~
 
-1. **Auto-terminate idle warehouses**:
+1. **Auto-terminate idle warehouses**. This example terminates after 10
+   minutes idle:
 
    .. code-block:: python
 
@@ -691,7 +731,8 @@ Cost Optimization
            auto_terminate_minutes=10
        )
 
-2. **Use smallest warehouse** that meets SLA:
+2. **Use smallest warehouse** that meets SLA. Start small and scale up if
+   needed:
 
    .. code-block:: python
 
@@ -715,6 +756,11 @@ Warehouse Not Available
 
 **Solutions**:
 
+1. Check the warehouse status.
+2. Start the warehouse manually, or use serverless warehouses, which start
+   automatically.
+3. Wait for the auto-start, which may take 1-2 minutes.
+
 .. code-block:: python
 
     from databricks.sdk import WorkspaceClient
@@ -723,7 +769,6 @@ Warehouse Not Available
     warehouses = list(w.warehouses.list())
     for wh in warehouses:
         print(f"{wh.name}: {wh.state}")
-
 
     import time
     adapter = DatabricksAdapter(...)
@@ -745,6 +790,13 @@ Authentication Failed
 
 **Solutions**:
 
+1. Verify that the token has not expired. ``databricks workspace list`` tests
+   the token.
+2. Generate a new token in the Databricks UI under User Settings → Access
+   Tokens.
+3. Check the environment variables.
+4. Verify the token in code, as in the Python block below.
+
 .. code-block:: bash
 
     databricks workspace list
@@ -764,6 +816,11 @@ Unity Catalog Errors
 **Problem**: "Catalog not found" or "Schema not found"
 
 **Solutions**:
+
+1. Check catalog permissions by listing the available catalogs.
+2. Use the ``workspace`` catalog, which is always available. ``hive_metastore``
+   is another option.
+3. Create the catalog if you are authorized to.
 
 .. code-block:: python
 
@@ -790,6 +847,14 @@ Slow Query Performance
 
 **Solutions**:
 
+1. Enable Photon, if it is not already enabled, by using a Photon-enabled
+   warehouse.
+2. Optimize the Delta tables.
+3. Add Z-ORDER clustering.
+4. Update the table statistics.
+5. Check the query plan. If it shows a FullScan, the table may need better
+   clustering.
+
 .. code-block:: python
 
     adapter.optimize_table(conn, "lineitem")
@@ -810,6 +875,10 @@ Out of Memory Errors
 **Problem**: "Out of memory" during query execution
 
 **Solutions**:
+
+1. Use a larger warehouse, for example switch from Medium to Large or X-Large.
+2. Optimize the data layout.
+3. Reduce the data scanned by partitioning.
 
 .. code-block:: python
 

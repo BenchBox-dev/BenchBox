@@ -71,7 +71,8 @@ CPU consumer at **200%+ CPU**, not pytest.
 
 The `setproctitle` package (installed as a transitive dependency via `mutmut`)
 provides a C extension that modifies process titles via macOS kernel APIs.
-xdist's `remote.py` calls `setproctitle()` twice per test execution:
+xdist's `remote.py` (lines 224-230) calls `setproctitle()` twice per test execution, once before the test and once
+after it:
 
 ```python
 worker_title("[pytest-xdist running] %s" % item.nodeid)

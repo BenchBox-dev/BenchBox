@@ -19,8 +19,9 @@ Microsoft Fabric is Microsoft's unified analytics platform providing SaaS Spark,
 
 ```bash
 uv add benchbox --extra fabric-spark
-
 ```
+
+This installs `azure-identity`, `azure-storage-file-datalake`, and `requests`.
 
 ## Prerequisites
 
@@ -35,6 +36,8 @@ uv add benchbox --extra fabric-spark
 
 ### Environment Variables
 
+`FABRIC_WORKSPACE_ID` and `FABRIC_LAKEHOUSE_ID` are required. `AZURE_TENANT_ID` and `FABRIC_SPARK_POOL` are optional.
+
 ```bash
 export FABRIC_WORKSPACE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 export FABRIC_LAKEHOUSE_ID=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
@@ -44,6 +47,8 @@ export FABRIC_SPARK_POOL=my-spark-pool
 ```
 
 ### CLI Usage
+
+The first command is basic usage. The second adds the tenant ID for service principal authentication. The third is a dry run that previews queries.
 
 ```bash
 benchbox run --platform fabric-spark --benchmark tpch --scale 1.0 \
@@ -73,6 +78,8 @@ benchbox run --platform fabric-spark --benchmark tpch --dry-run ./preview \
 | `timeout_minutes` | 60 | Statement timeout in minutes |
 
 ## Python API
+
+`tenant_id` is optional. `create_schema()` is also optional, because the lakehouse manages schemas automatically. `load_data()` loads data to OneLake and creates Delta tables, `execute_query()` runs the query through Livy, and `close()` cleans up the session.
 
 ```python
 from benchbox.platforms.azure import FabricSparkAdapter

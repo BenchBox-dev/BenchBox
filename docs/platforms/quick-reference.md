@@ -74,6 +74,8 @@ uv add benchbox[clickhouse-cloud]
 uv add benchbox[databricks]
 ```
 
+The extras install ClickHouse Local (chDB, zero-config), ClickHouse Server (self-hosted), ClickHouse Cloud (managed) and Databricks SQL.
+
 ### 2. Use the Platform Management CLI
 
 BenchBox now includes a dedicated CLI for managing database platforms. This simplifies installation, configuration, and validation.
@@ -154,6 +156,8 @@ adapter = DuckDBAdapter()
 adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 ```
 
+The first adapter uses an in-memory database (the default). The second uses a persistent file database.
+
 ---
 
 ## Apache DataFusion
@@ -179,6 +183,8 @@ adapter = DataFusionAdapter(
 )
 ```
 
+The first adapter is the recommended in-memory analytics setup with Parquet. Use `data_format="csv"` for lower memory. The second adapter is a memory-constrained configuration.
+
 ---
 
 ## ClickHouse
@@ -199,6 +205,8 @@ adapter = ClickHouseAdapter(
     password=""
 )
 ```
+
+Verify that the server is running, then check the credentials. The default user has an empty password.
 
 ---
 
@@ -303,6 +311,8 @@ adapter = SQLiteAdapter()
 adapter = SQLiteAdapter(database_path="benchmark.db")
 ```
 
+The first adapter uses an in-memory database. The second uses a file-based database.
+
 ---
 
 ## LakeSail Sail
@@ -323,6 +333,8 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 ```
+
+In order, these commands install the Spark Connect-capable PySpark client, start the local Docker-backed Sail server, run SQL mode, run DataFrame mode and run at a larger scale. Distributed mode is selected through the Python adapter, because LakeSail registers no `--platform-option` keys.
 
 See [LakeSail Platform Guide](lakesail.md) for the full configuration reference.
 
@@ -351,6 +363,8 @@ benchbox run --platform velox --platform-option deployment=remote \
     --benchmark tpch --scale 0.1
 ```
 
+The first command installs the Velox extra, which pulls `pyspark[connect]>=3.5.0`. The first `benchbox run` is local mode, an in-process SparkSession with the Gluten bundle jar loaded. The second is remote mode, which connects to a pre-started Gluten-enabled Spark Connect server.
+
 See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) for Gluten bundle jar URLs, checksums, and the provided `benchbox-velox` Docker image.
 
 ---
@@ -372,6 +386,8 @@ os.access("benchmark.duckdb", os.W_OK)
 
 adapter = DuckDBAdapter(database_path="/full/path/to/benchmark.duckdb")
 ```
+
+Check that the file is writable, then use an absolute path.
 
 **ClickHouse**:
 ```python
@@ -404,6 +420,8 @@ except Exception as e:
     print(f"Connection failed: {e}")
 ```
 
+Verify the environment variables, then test the connection before running the benchmark.
+
 #### Authentication Issues
 
 **BigQuery**:
@@ -413,6 +431,8 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 gcloud auth application-default login
 ```
 
+Set the credentials with the service account key, or use application default credentials with `gcloud auth application-default login`.
+
 **Databricks SQL**:
 ```bash
 export DATABRICKS_TOKEN="dapi..."
@@ -420,6 +440,8 @@ export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 
 databricks configure --token
 ```
+
+Use a personal access token, or configure credentials through the Databricks CLI with `databricks configure --token`.
 
 **Snowflake**:
 ```python
@@ -444,6 +466,8 @@ adapter = DuckDBAdapter(
 )
 ```
 
+Set a memory limit, and use a persistent database for large datasets.
+
 **ClickHouse**:
 ```python
 adapter = ClickHouseAdapter(
@@ -454,6 +478,8 @@ adapter = ClickHouseAdapter(
     }
 )
 ```
+
+Increase the memory limits. The `max_memory_usage` value of 10000000000 is 10 GB.
 
 **Cloud Platforms**:
 ```python
@@ -470,6 +496,10 @@ adapter = SnowflakeAdapter(
 )
 ```
 
+BigQuery: use the query cache. `maximum_bytes_billed=10000000000` is a 10 GB limit.
+
+Snowflake: increase the warehouse size. Besides `LARGE_WH`, use `X-LARGE` or `2X-LARGE`.
+
 #### Slow Query Performance
 
 **General Debugging**:
@@ -482,6 +512,8 @@ adapter = DuckDBAdapter(enable_profiling=True)
 benchmark = TPCH(scale_factor=0.01)
 ```
 
+Enable verbose logging, run with profiling, and test with a smaller scale factor first (start small).
+
 **Platform-Specific Optimizations**:
 
 **DuckDB**:
@@ -490,6 +522,8 @@ adapter = DuckDBAdapter(thread_limit=8)
 
 adapter = DuckDBAdapter(database_path="cached.duckdb")
 ```
+
+Increase the thread count, and use a persistent database.
 
 **ClickHouse**:
 ```python
@@ -515,6 +549,10 @@ adapter = BigQueryAdapter(
 )
 ```
 
+Databricks SQL: use a larger cluster.
+
+BigQuery: use batch priority, which is slower but cheaper.
+
 #### Data Loading Failures
 
 **Check file format**:
@@ -532,6 +570,8 @@ conn.execute("""
                           auto_detect=true)
 """)
 ```
+
+DuckDB reads multiple formats. The first query reads Parquet. The second reads CSV with an explicit delimiter and schema detection.
 
 **Verify file paths**:
 ```python
@@ -555,6 +595,8 @@ adapter1 = DuckDBAdapter(database_path="db1.duckdb")
 adapter2 = DuckDBAdapter(database_path="db2.duckdb")
 ```
 
+Ensure no other process is using the file, or use separate database files as shown.
+
 #### ClickHouse
 
 **Issue**: "Memory limit exceeded" errors
@@ -567,6 +609,8 @@ adapter = ClickHouseAdapter(
     }
 )
 ```
+
+Increase the limits or enable external operations (spilling group-by and sort to disk).
 
 #### Databricks SQL
 
@@ -583,6 +627,8 @@ adapter = DatabricksAdapter(
 )
 ```
 
+Verify the HTTP path: list the available warehouses (`list_warehouses` may not be implemented in every release), then use the correct HTTP path format.
+
 #### BigQuery
 
 **Issue**: "Exceeded quota" or billing errors
@@ -597,6 +643,8 @@ adapter = BigQueryAdapter(
 )
 ```
 
+Set cost controls. The 5000000000 limit is 5 GB, `BATCH` priority lowers cost, `use_query_cache` reuses cached results, and `dry_run` tests without execution first.
+
 #### Snowflake
 
 **Issue**: Warehouse auto-suspended
@@ -609,6 +657,8 @@ adapter = SnowflakeAdapter(
     auto_suspend=300
 )
 ```
+
+Configure auto-resume. `auto_suspend=300` suspends the warehouse after 5 minutes.
 
 ### Getting Help
 

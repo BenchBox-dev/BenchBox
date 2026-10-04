@@ -48,6 +48,10 @@ benchbox run --platform polars --benchmark tpch --scale 0.1
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
+Polars is the recommended starting point because it is fast. Pandas offers a familiar API. Dask is distributed. cuDF runs on GPUs and works on Linux only. PySpark fits the Spark ecosystem. LakeSail runs on Sail, a fast Spark-compatible engine. Databricks uses Databricks Connect.
+
+The last two commands compare SQL and DataFrame execution on the same workload: `--platform polars` is SQL mode and `--platform polars-df` is DataFrame mode.
+
 ## SQL Platforms
 
 ### Core Local Databases
@@ -154,6 +158,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01
 benchbox run --platform sqlite --benchmark tpch --scale 0.01
 ```
 
+DuckDB is the default and is included in the base install. SQLite is also included in the base install.
+
 ### Cloud Platforms (Credentials Required)
 
 ```bash
@@ -163,6 +169,8 @@ benchbox run --platform bigquery --benchmark tpch --scale 1.0
 
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
+
+Databricks requires `DATABRICKS_TOKEN` and `DATABRICKS_HOST`. BigQuery requires `GOOGLE_APPLICATION_CREDENTIALS`. Snowflake requires `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD` and `SNOWFLAKE_ACCOUNT`.
 
 ## Future Platforms
 

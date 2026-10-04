@@ -144,6 +144,8 @@ duckdb -c "INSTALL vortex; LOAD vortex;"
 SELECT * FROM read_vortex('customer.vortex')
 ```
 
+The first command installs the Vortex extension, which is a one-time step. The query then reads a Vortex file.
+
 ### DataFusion Support
 
 DataFusion has experimental Vortex support in progress.
@@ -197,6 +199,8 @@ For production benchmarks, we recommend Parquet. For exploration and DuckDB-spec
 uv add vortex-data
 ```
 
+This installs the Vortex Python library.
+
 ### Running Benchmarks
 
 ```bash
@@ -204,6 +208,8 @@ benchbox convert --input ./data --format vortex
 
 benchbox run --platform duckdb --benchmark tpch --table-format vortex --scale 1
 ```
+
+The first command converts data to Vortex format. The second runs the benchmark with Vortex on DuckDB.
 
 ### Reading Vortex Files
 
@@ -215,6 +221,8 @@ table = array.to_arrow()
 conn.execute("INSTALL vortex; LOAD vortex;")
 conn.execute("SELECT * FROM read_vortex('customer.vortex')")
 ```
+
+The first half uses the Python Vortex library. The second half uses DuckDB, which requires the extension.
 
 ## See Also
 

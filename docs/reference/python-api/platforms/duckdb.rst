@@ -39,6 +39,10 @@ Basic usage:
     benchmark = TPCH(scale_factor=0.1)
     results = benchmark.run_with_platform(adapter)
 
+The first ``DuckDBAdapter()`` call creates an in-memory database (the default).
+The second creates a persistent database in ``benchmark.duckdb``. Use one or the
+other, then run the benchmark with it.
+
 API Reference
 -------------
 
@@ -323,6 +327,9 @@ For reusable benchmark data:
     adapter2 = DuckDBAdapter(database_path="./benchmarks/tpch.duckdb")
     results2 = benchmark.run_with_platform(adapter2)
 
+The first run creates the persistent database, and the data persists afterward.
+The second adapter later reuses the same database.
+
 Performance Tuning
 ~~~~~~~~~~~~~~~~~~
 
@@ -342,6 +349,9 @@ Configure for optimal performance:
         }
     )
 
+Set ``memory_limit`` appropriately for your system, match ``thread_limit`` to
+your CPU cores, and point ``temp_directory`` at fast storage.
+
 Profiling and Debugging
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -359,6 +369,7 @@ Enable query profiling for analysis:
 
     results = benchmark.run_with_platform(adapter)
 
+Profile information is saved to ``./profiles/``.
 
 Data Loading
 ------------
@@ -422,6 +433,9 @@ Execute Queries Directly
     query = "SELECT * FROM orders WHERE o_orderdate > ?"
     result = adapter.connection.execute(query, ["1995-01-01"])
 
+The first statement executes arbitrary SQL, and the second executes a query with
+parameters.
+
 Query Plans and Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -451,6 +465,9 @@ Parallel Query Execution
 
     results = benchmark.run_with_platform(adapter)
 
+DuckDB parallelizes queries automatically. ``thread_limit=8`` uses 8 threads, and
+complex aggregations use all of them.
+
 Extensions and Functions
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -468,6 +485,8 @@ Extensions and Functions
         CREATE TABLE data AS
         SELECT * FROM read_parquet('s3://bucket/data/*.parquet')
     """)
+
+After loading ``httpfs``, DuckDB can read directly from S3.
 
 Window Functions
 ~~~~~~~~~~~~~~~~
@@ -521,11 +540,9 @@ Performance Optimization
        import os
        adapter = DuckDBAdapter(thread_limit=os.cpu_count())
 
-2. **Use appropriate data types** in schema:
-
-   .. code-block:: python
-
-
+2. **Use appropriate data types** in the schema. Prefer ``HUGEINT`` over
+   ``VARCHAR`` for large integers, and use ``DATE`` or ``TIMESTAMP`` instead of
+   ``VARCHAR`` for dates.
 
 3. **Create indexes** for filtered columns:
 
@@ -543,6 +560,9 @@ Data Validation
        expected_rows = 6_000_000
        actual_rows = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
        assert actual_rows == expected_rows, f"Expected {expected_rows}, got {actual_rows}"
+
+   The expected value of 6,000,000 rows applies to TPC-H ``lineitem`` at scale
+   factor 1.
 
 2. **Check data types**:
 
@@ -572,6 +592,9 @@ Out of Memory Errors
         temp_directory="/large/disk/temp"
     )
 
+Set an explicit memory limit, or use a persistent database so DuckDB can spill
+to disk.
+
 Slow Query Performance
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -587,6 +610,9 @@ Slow Query Performance
 
     adapter = DuckDBAdapter(enable_profiling=True)
 
+These three options are, in order: increase the thread count, use a persistent
+database to avoid repeated loads, and enable profiling to identify bottlenecks.
+
 Database Lock Errors
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -600,6 +626,9 @@ Database Lock Errors
     adapter2 = DuckDBAdapter(database_path="benchmark2.duckdb")
 
     adapter = DuckDBAdapter(database_path=":memory:")
+
+Use separate database files for concurrent access, or use an in-memory database
+for read-only workloads.
 
 See Also
 --------

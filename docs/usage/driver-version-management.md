@@ -67,6 +67,8 @@ benchbox run --platform clickhouse-cloud --benchmark tpch \
   --platform-option password=your-password
 ```
 
+The examples pin the Snowflake connector, the Polars DataFrame engine, and the ClickHouse Cloud driver (the `clickhouse-connect` HTTP driver).
+
 ### Pattern 2: uv run --with (inline override)
 
 Override the installed package for a single invocation without touching `uv.lock`:
@@ -83,6 +85,8 @@ If you want every `uv run` to use a specific version permanently:
 uv add "duckdb==1.5.0" --allow-prereleases
 benchbox run --platform duckdb --benchmark tpch
 ```
+
+After `uv add` updates the lock file, run BenchBox normally.
 
 This mutates `uv.lock` and is appropriate when you want a stable, reproducible
 environment rather than a one-off test.
@@ -101,6 +105,8 @@ For scripts and CI pipelines, check the result JSON:
 jq '.execution.driver_version_actual' result.json
 jq '.platform.client_version' result.json
 ```
+
+Use either command.
 
 Both fields record the version that ran. `driver_version_actual` reflects what
 `importlib.metadata` reported from the live process; `client_version` is populated by

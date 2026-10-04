@@ -404,6 +404,8 @@ Multi-Platform Comparison
 Columnar Database Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+ClickBench is designed for columnar databases. The example creates the schema with columnar optimizations, adds ClickHouse-specific optimizations, and then runs the scan queries, which benefit most from columnar storage.
+
 .. code-block:: python
 
     from benchbox.clickbench import ClickBench
@@ -437,6 +439,8 @@ Columnar Database Optimization
 Query Translation Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The original ClickBench queries are in the ClickHouse dialect. The example translates one to other dialects.
+
 .. code-block:: python
 
     from benchbox.clickbench import ClickBench
@@ -461,6 +465,8 @@ Query Translation Example
 
 Selective Query Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The example runs only the fast queries (scan and simple aggregation), and then only the string operations queries.
 
 .. code-block:: python
 

@@ -50,7 +50,7 @@ previews without generating data or running queries.
 
 ### Complete DuckDB Example (Recommended)
 
-This example shows the complete workflow using DuckDB, the recommended database for BenchBox:
+This example shows the complete workflow using DuckDB, the recommended database for BenchBox. It uses an in-memory connection for speed, a scale factor of 0.01 (about a 10 MB dataset), DuckDB's efficient CSV reader to load data, and runs the first 5 queries:
 
 ```python
 import duckdb
@@ -92,6 +92,8 @@ print("Benchmark complete!")
 ```
 
 ### Simple TPC-H Example
+
+The scale factor of 0.01 produces about a 10 MB dataset. The data file sizes are printed in MB:
 
 ```python
 from benchbox import TPCH
@@ -148,6 +150,8 @@ for name, benchmark in benchmarks.items():
 
 ### Query Translation Example
 
+This example translates a query to several dialects, using supported platforms:
+
 ```python
 from benchbox import TPCH
 
@@ -172,6 +176,12 @@ for dialect in dialects:
 During development and debugging, running full benchmark suites is time-prohibitive. The `--queries` parameter enables selective execution of specific queries in user-defined order, dramatically accelerating development workflows.
 
 ### CLI Usage
+
+The commands below do the following, in order:
+- Run a single query for debugging (about 5 seconds, compared with 11 minutes for the full TPC-H suite).
+- Run multiple queries in a specific order.
+- Debug a failing query with verbose output.
+- Test critical production queries only.
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --queries "6" --phases power
@@ -226,7 +236,7 @@ BenchBox provides advanced execution modes for systematic performance testing wi
 
 ### Power Run Iterations Example
 
-Execute multiple test iterations to gather statistical confidence:
+Execute multiple test iterations to gather statistical confidence. Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The former `PowerRunExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. The loop runs 5 test iterations, and validation is off (`validation=False`) because answer sets exist for stream 0 only:
 
 ```python
 import statistics
@@ -280,7 +290,7 @@ for i, power_at_size in enumerate(power_values, 1):
 
 ### Concurrent Query Execution Example
 
-Execute queries concurrently to test throughput and scalability:
+Execute queries concurrently to test throughput and scalability. One throughput test owns all of its streams: the connection factory hands each stream its session, and `StreamRunner` executes them concurrently with fail-closed accounting. The former `ConcurrentQueryExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. The example generates and loads the data before opening throughput sessions, and runs 3 concurrent streams (`num_streams=3`):
 
 ```python
 import duckdb
@@ -442,7 +452,7 @@ sample_path.unlink(missing_ok=True)
 
 ### Complete Workflow Example
 
-Combine all features for systematic performance testing:
+Combine all features for systematic performance testing. The example applies the `standard` profile (balanced testing), then optimizes for the current system. Its three phases are power run testing (multiple iterations for statistical confidence), concurrent query testing (throughput and scalability), and a comprehensive analysis:
 
 ```python
 import statistics
@@ -546,6 +556,8 @@ print(f"Memory estimate: {result.resource_estimates.estimated_memory_mb} MB")
 
 ### CLI Dry Run Examples
 
+The examples below are a basic TPC-H dry run, a dry run with tuning enabled, and a preview of multiple benchmarks:
+
 ```bash
 benchbox run --dry-run ./tpch_preview \
   --platform duckdb \
@@ -568,6 +580,8 @@ done
 ```
 
 ### Dry Run Output Analysis
+
+Usage: `analyze_dry_run_output("./tpch_preview")`.
 
 ```python
 import json
@@ -600,6 +614,8 @@ def analyze_dry_run_output(dry_run_dir: str):
 **Full example:** `examples/dry_run/analyze_dry_run_output.py`
 
 ### Query Extraction and Validation
+
+The `lint_with_sqlfluff` function requires `pip install sqlfluff`.
 
 ```python
 from pathlib import Path
@@ -757,6 +773,8 @@ if __name__ == "__main__":
 
 ### DuckDB Complete Example
 
+This example uses a scale factor of 0.1 (about a 100 MB dataset):
+
 ```python
 import duckdb
 from benchbox import TPCH
@@ -840,6 +858,8 @@ if __name__ == "__main__":
 
 ### ClickHouse Integration Example
 
+The example loads data with ClickHouse's optimized CSV loading (`INSERT ... FORMAT CSV`), then optimizes the tables and tests a query.
+
 > **Note**: For PostgreSQL/MySQL integration examples, see the [Development Roadmap](../development/roadmap.md) - platform adapters are planned.
 
 ```python
@@ -904,6 +924,8 @@ if __name__ == "__main__":
 > **📁 Complete, tested example:** For database-specific integration patterns, see platform examples in [`examples/getting_started/cloud/`](../../examples/getting_started/cloud/) (Databricks and BigQuery with credential handling) and platform configuration templates in [`examples/tunings/`](../../examples/tunings/) (production-ready YAML configs).
 
 ### SQLite Example with Performance Measurement
+
+The example runs a subset of queries because SQLite may not support all TPC-H features. The queries `[1, 3, 6, 12]` are simpler ones that work well with SQLite:
 
 ```python
 import sqlite3
@@ -1003,6 +1025,8 @@ if __name__ == "__main__":
 ##  Performance Testing Examples
 
 ### Comprehensive Performance Analysis
+
+In `run_scale_factor_analysis`, the data size is reported in MB. The load step is a placeholder: load the generated data into the connection between the two timing statements so that `data_load_time` measures it.
 
 ```python
 from benchbox import TPCH, ReadPrimitives
@@ -1135,6 +1159,8 @@ if __name__ == "__main__":
 > **📁 Complete, tested example:** See [`examples/features/result_analysis.py`](../../examples/features/result_analysis.py) for programmatic result analysis with metrics aggregation, statistical comparisons, and automated reporting.
 
 ### Regression Testing Example
+
+The baseline uses 5 iterations per query, and the regression test uses 3 iterations. The script exits with an error code when regressions are detected, which makes it usable in CI/CD:
 
 ```python
 from benchbox import ReadPrimitives
@@ -1382,6 +1408,8 @@ if __name__ == "__main__":
 
 ### Multi-Database Comparison
 
+The comparison runs a subset of queries that works on all databases. Data loading is simplified for the demo: the SQLite loader inserts only the first 1000 rows of each table, and a real run would use proper CSV loading. Each query runs 3 times to compute an average:
+
 ```python
 from benchbox import TPCH
 import duckdb
@@ -1511,6 +1539,8 @@ if __name__ == "__main__":
 
 ### GitHub Actions Workflow
 
+Save this workflow as `.github/workflows/performance-test.yml`:
+
 ```yaml
 name: Performance Regression Tests
 
@@ -1551,8 +1581,9 @@ jobs:
 
 ### Performance Test Script for CI/CD
 
-```python
+This script is a performance regression test for CI/CD pipelines. Run it with `uv run -- python scripts/run_performance_tests.py`. `CI_SCALE_FACTOR = 0.001` is very small for fast CI runs, and `REGRESSION_THRESHOLD = 0.20` is a 20% regression threshold. Each query is warmed up and then measured over 3 iterations. The script loads a baseline if one exists, and on a regression it saves the results and exits with failure:
 
+```python
 import json
 import sys
 import time

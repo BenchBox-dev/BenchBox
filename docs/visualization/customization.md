@@ -14,6 +14,8 @@ benchbox visualize results/*.json --theme light
 benchbox visualize results/*.json --theme dark
 ```
 
+The light theme is the default and suits light terminals. The dark theme suits dark terminal backgrounds.
+
 **Theme Differences:**
 
 | Aspect | Light Theme | Dark Theme |
@@ -62,6 +64,8 @@ benchbox visualize results/*.json
 benchbox visualize results/*.json --no-color
 ```
 
+The first command uses full ANSI color output (the default). `--no-color` disables colors, which suits piping to files or plain terminals.
+
 ### Character Set
 
 ```bash
@@ -69,6 +73,8 @@ benchbox visualize results/*.json
 
 benchbox visualize results/*.json --no-unicode
 ```
+
+The first command uses Unicode block characters (the default): ▏▎▍▌▋▊▉█. `--no-unicode` uses ASCII-only characters for basic terminals: `.-=+#@`.
 
 ### Terminal Width
 
@@ -130,7 +136,11 @@ chart = BarChart(
 print(chart.render())
 ```
 
+`width=100` overrides terminal width detection.
+
 ### Using the Generic Factory
+
+`render_ascii_chart` renders any chart type through the generic factory.
 
 ```python
 from benchbox.core.visualization.exporters import render_ascii_chart

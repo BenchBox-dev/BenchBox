@@ -13,6 +13,8 @@ If no file is present, BenchBox uses sensible defaults. You can generate a tunin
 
 ## Minimal Example
 
+Save the following as `benchbox.yaml`:
+
 ```yaml
 benchmarks:
   default_scale: 0.1
@@ -80,6 +82,8 @@ helper.optimize_for_system(cpu_cores=16, memory_gb=64)
 config.save_config()
 ```
 
+`enable_power_run_iterations` enables a quick power run profile. `enable_concurrent_queries` turns on concurrent streams, and `optimize_for_system` optimizes for the hardware you give it.
+
 The helper updates the configuration object it captured at construction. This
 example passes the same `ConfigManager` that saves the changes. In standalone
 code without a registered provider, `ExecutionConfigHelper()` captures a fresh
@@ -106,6 +110,8 @@ uv run -- benchbox run --dry-run ./plan --platform duckdb --benchmark tpch
 
 uv run -- benchbox check-deps --matrix
 ```
+
+The first command renders the execution plan without running anything. The second checks the platform requirements declared in the config.
 
 `benchbox run` respects values from `benchbox.yaml`, so you can set project defaults once and execute repeatable runs with only a few flags.
 

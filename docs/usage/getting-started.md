@@ -16,6 +16,8 @@ Follow these steps to install BenchBox, verify your environment, and run a repro
 mkdir benchbox-demo && cd benchbox-demo
 ```
 
+Creating an isolated project directory is optional.
+
 ## Step 1 - Install BenchBox with DuckDB
 
 Install the `duckdb` extra. **DuckDB is an optional dependency** - a plain
@@ -83,6 +85,8 @@ uv run -- benchbox export --last --format html --output-dir ./reports/
 uv run -- benchbox export --last --format json --format csv --format html
 ```
 
+The commands export to CSV for spreadsheet analysis, generate an HTML report for sharing with your team, and export to all formats.
+
 The export command is useful for:
 - Creating shareable HTML reports for stakeholders
 - Analyzing query performance in spreadsheets (Excel, Google Sheets)
@@ -102,12 +106,16 @@ uv add benchbox --extra pandas
 uv run -- benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 ```
 
+Polars is included in the base install. Pandas requires an extra.
+
 ### Compare SQL vs DataFrame
 
 ```bash
 uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.1
 uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
+
+These commands run the same benchmark with different paradigms: DuckDB runs SQL, and Polars runs DataFrame operations.
 
 For more details, see the [DataFrame Platforms Guide](../platforms/dataframe.md).
 

@@ -34,6 +34,8 @@ Quick Start
 In-Memory Mode
 ~~~~~~~~~~~~~~
 
+The in-memory database is the fastest option and has no persistence.
+
 .. code-block:: python
 
     from benchbox.tpch import TPCH
@@ -46,6 +48,8 @@ In-Memory Mode
 
 File-Based Mode
 ~~~~~~~~~~~~~~~
+
+The file-based database is persistent.
 
 .. code-block:: python
 
@@ -210,6 +214,9 @@ Configuration Examples
 Development Testing
 ~~~~~~~~~~~~~~~~~~~
 
+This example uses an in-memory database and a tiny scale factor for fast
+development testing and quick benchmark validation.
+
 .. code-block:: python
 
     adapter = SQLiteAdapter(database_path=":memory:")
@@ -222,6 +229,9 @@ Development Testing
 
 Persistent Storage
 ~~~~~~~~~~~~~~~~~~
+
+This example stores results in a file for later analysis. The longer timeout
+allows for file I/O.
 
 .. code-block:: python
 
@@ -237,6 +247,10 @@ Persistent Storage
 
 CI/CD Pipeline
 ~~~~~~~~~~~~~~
+
+The ``CI`` branch is a fast in-memory test. Otherwise the example uses local
+development with a larger dataset. The assertions check benchmark quality, and
+the 60 second limit is the CI time limit.
 
 .. code-block:: python
 
@@ -258,6 +272,10 @@ CI/CD Pipeline
 
 Multi-threaded Access
 ~~~~~~~~~~~~~~~~~~~~~
+
+Enable this for multi-threaded applications. ``check_same_thread=False`` allows
+access from multiple threads, and the higher timeout allows for concurrent
+access.
 
 .. code-block:: python
 
@@ -281,6 +299,9 @@ Basic Connection
 
     conn = adapter.create_connection()
 
+The connection is configured automatically with these optimizations: WAL
+journal mode, NORMAL synchronous mode, foreign keys enabled, a cache size of
+10000 pages, and temporary storage in memory.
 
 Query Execution
 ~~~~~~~~~~~~~~~
@@ -336,6 +357,12 @@ Connection Pragmas
 ~~~~~~~~~~~~~~~~~~
 
 SQLite adapter automatically applies these optimizations:
+
+- ``journal_mode = WAL``: Write-Ahead Logging for better concurrency.
+- ``synchronous = NORMAL``: normal durability, which is faster than FULL.
+- ``cache_size = 10000``: a large cache (10K pages) that reduces disk I/O.
+- ``temp_store = MEMORY``: temporary tables are kept in memory.
+- ``foreign_keys = ON``: foreign key constraints are enforced.
 
 .. code-block:: sql
 
@@ -410,6 +437,10 @@ Use Case Selection
 Testing Strategy
 ~~~~~~~~~~~~~~~~
 
+The test uses a small scale factor for speed. It validates that all queries
+succeeded, and then validates reasonable performance: an average of under 1
+second per query at SF=0.01.
+
 .. code-block:: python
 
     from benchbox.platforms.sqlite import SQLiteAdapter
@@ -432,6 +463,13 @@ Testing Strategy
 Development Workflow
 ~~~~~~~~~~~~~~~~~~~~
 
+1. Start with an in-memory database for quick iterations.
+2. Validate query logic with test queries.
+3. Move to a file-based database for persistent testing.
+4. Graduate to a production platform (DuckDB, ClickHouse, and so on).
+
+The two adapters below cover steps 1 and 3.
+
 .. code-block:: python
 
     from benchbox.platforms.sqlite import SQLiteAdapter
@@ -444,6 +482,9 @@ Development Workflow
 
 Resource Management
 ~~~~~~~~~~~~~~~~~~~
+
+Run the benchmark operations inside the ``try`` block. The ``finally`` block
+closes the connection and, optionally, deletes the temporary database.
 
 .. code-block:: python
 
@@ -471,6 +512,11 @@ Database Locked Error
 
 **Solutions**:
 
+1. Increase the timeout. The example waits up to 2 minutes.
+2. Use WAL mode, which is already enabled by default. WAL mode allows
+   concurrent reads.
+3. Avoid concurrent writes. SQLite only supports one writer at a time.
+
 .. code-block:: python
 
     adapter = SQLiteAdapter(
@@ -487,6 +533,11 @@ Memory Error
 
 **Solutions**:
 
+1. Use a smaller scale factor, such as 0.1 and not 1.0 or higher.
+2. Use a file-based database instead of an in-memory one (not ``":memory:"``).
+3. Processing data in chunks is not directly supported. Consider using DuckDB
+   instead.
+
 .. code-block:: python
 
     benchmark = TPCH(scale_factor=0.1)
@@ -500,6 +551,11 @@ Slow Query Performance
 **Problem**: Queries take longer than expected
 
 **Solutions**:
+
+1. Reduce the scale factor.
+2. Add indexes for common joins.
+3. Consider using DuckDB for analytical queries. It uses columnar storage and
+   is optimized for OLAP workloads.
 
 .. code-block:: python
 
@@ -518,6 +574,10 @@ Missing Tables
 
 **Solutions**:
 
+1. Ensure that the schema is created before data loading.
+2. If you use an existing database with an old schema, recreate the database
+   with ``drop_database_before_connect=True``.
+
 .. code-block:: python
 
     adapter.create_schema(benchmark, conn)
@@ -535,7 +595,8 @@ Feature Not Supported
 
 **Explanation**: SQLite adapter is designed for basic testing only. Advanced TPC features (power test, throughput test, maintenance test) are not implemented.
 
-**Solution**:
+**Solution**: For full TPC-H and TPC-DS compliance testing, use an enterprise
+platform. DuckDB supports all TPC tests.
 
 .. code-block:: python
 

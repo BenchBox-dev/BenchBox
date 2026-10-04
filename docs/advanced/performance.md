@@ -150,6 +150,9 @@ print(f"  Execution time: {timing_result['execution_time_ms']:.1f} ms")
 print(f"  Rows returned: {timing_result['rows_returned']}")
 ```
 
+The example assumes `connection` is an open database connection (DuckDB is
+recommended) with the TPC-H schema and data already loaded.
+
 ### Multiple Query Timing
 
 ```python
@@ -196,6 +199,9 @@ query_results = time_multiple_queries(conn, tpch, list(range(1, 6)))
 print(f"\nTotal time for {query_results['queries_executed']} queries: "
       f"{query_results['total_execution_time']:.2f} seconds")
 ```
+
+Create the schema and load the data into `conn` before calling
+`time_multiple_queries`. The call times the first five TPC-H queries.
 
 ---
 
@@ -594,6 +600,10 @@ conn = configure_duckdb_for_benchmark(memory_limit_gb=2, num_threads=4)
 tpch = TPCH(scale_factor=0.1)
 ```
 
+`preserve_insertion_order=false` lets DuckDB reorder rows, which improves load
+and scan performance. When no thread count is given, the function uses all
+available CPU cores.
+
 ---
 
 ## Performance Comparison
@@ -789,6 +799,9 @@ if check_memory_requirements(0.5):
 else:
     print("Consider using a smaller scale factor")
 ```
+
+The estimate uses a TPC-H rule of thumb: about 1 GB of data per unit of scale
+factor, and 2.5 times that for working memory.
 
 ### Performance Optimization Tips
 

@@ -39,6 +39,8 @@ print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.total_queries}")
 ```
 
+The steps are: create the benchmark, generate data, create a platform adapter, run the benchmark, and access the results.
+
 ## Reference Examples
 
 ### Simple API Usage
@@ -74,6 +76,8 @@ benchmark = TPCDS(scale_factor=0.1, output_dir="./data")
 
 ```
 
+Other benchmarks are available: TPCDI, SSB, ClickBench, AMPLab, H2ODB, JoinOrder, ReadPrimitives, WritePrimitives, TPCHavoc and CoffeeShop.
+
 ### Platform Adapters
 
 ```python
@@ -87,6 +91,8 @@ from benchbox.platforms.clickhouse import ClickHouseAdapter
 adapter = ClickHouseAdapter(host="localhost", port=9000)
 
 ```
+
+Cloud platforms (Databricks, BigQuery, Snowflake and Redshift) are also supported. See `getting_started/cloud/` for examples.
 
 ### Running Benchmarks
 
@@ -109,6 +115,8 @@ results = adapter.run_benchmark(
 )
 ```
 
+The first call runs the full benchmark, the second runs a query subset, and the third uses a custom configuration (four throughput streams).
+
 ### Result Processing
 
 ```python
@@ -125,6 +133,8 @@ import json
 with open("results.json", "w") as f:
     json.dump(results_dict, f, indent=2)
 ```
+
+The first group of lines reads the overall metrics, the loop iterates over the query results, and the last lines export the results (`model_dump()` converts them to a dictionary).
 
 ## Common Patterns
 
@@ -167,6 +177,8 @@ class MyBenchmark(BaseBenchmark):
         pass
 ```
 
+`generate_data` is where you implement custom data generation, and `get_query` is where you implement custom query retrieval.
+
 ## Integration Examples
 
 ### Jupyter Notebooks
@@ -198,6 +210,8 @@ df = pd.DataFrame([
 df.plot(x="query", y="time", kind="bar")
 plt.show()
 ```
+
+The last lines visualize the results as a bar chart.
 
 ### FastAPI Integration
 

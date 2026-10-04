@@ -261,6 +261,8 @@ for query_id in optimizer_queries:
     query_sql = query_manager.get_query(query_id)
 ```
 
+Execute each query against a TPC-H database and measure its performance, then analyze the query plans to judge optimization effectiveness.
+
 ## Testing and Validation
 
 ### Automated Testing

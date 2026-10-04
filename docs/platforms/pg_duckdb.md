@@ -29,6 +29,8 @@ benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
 
+The first command uses self-hosted mode, the default: PostgreSQL with the pg_duckdb extension. The second uses MotherDuck mode for hybrid local and cloud queries.
+
 ### Self-Hosted Mode (Default)
 
 Connect to a PostgreSQL server with pg_duckdb extension installed:
@@ -50,6 +52,8 @@ export MOTHERDUCK_TOKEN=your-token-here
 
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
+
+Set the MotherDuck token, then run the benchmark in MotherDuck hybrid mode.
 
 ## Data Lake Support Status
 
@@ -100,6 +104,8 @@ docker run -d --name pg-duckdb \
 psql -h localhost -U postgres -c "CREATE EXTENSION pg_duckdb;"
 ```
 
+The `psql` command creates the extension, which also verifies it.
+
 ## Quick Start
 
 ```bash
@@ -115,6 +121,8 @@ benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option postgres_scan_threads=8
 ```
+
+The four commands run, in order: a basic TPC-H benchmark, a benchmark with a custom connection, a benchmark with `force_execution=false` (lets PostgreSQL choose when to use DuckDB), and a benchmark that configures parallel scan threads with `postgres_scan_threads`.
 
 ## Configuration Options
 

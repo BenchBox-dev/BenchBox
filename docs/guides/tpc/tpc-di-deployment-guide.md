@@ -104,6 +104,8 @@ uv pip install -e .
 python -m pytest tests/test_tpcdi.py -v
 ```
 
+On Windows, activate the environment with `venv\Scripts\activate` instead of `source venv/bin/activate`.
+
 ### Docker Installation
 
 #### Using Pre-built Image
@@ -665,6 +667,13 @@ memory_config = get_appropriate_memory_config()
 print(f"Recommended configuration: {memory_config}")
 ```
 
+The function reserves 25% of available memory for the system and sizes the rest in tiers:
+
+- 16 GB or more usable: batch size 50,000, memory limit capped at 32 GB.
+- 8 to 16 GB: batch size 25,000.
+- 4 to 8 GB: batch size 10,000.
+- Under 4 GB: batch size 5,000, memory limit of at least 2 GB.
+
 ### CPU Optimization
 
 ```python
@@ -693,6 +702,13 @@ def get_appropriate_cpu_config():
 cpu_config = get_appropriate_cpu_config()
 print(f"Recommended parallel config: {cpu_config}")
 ```
+
+The function picks the worker count from the core count:
+
+- 16 or more cores (high-end servers): `min(12, cpu_count - 4)`, which leaves 4 cores for the system.
+- 8 to 15 cores (mid-range): `min(6, cpu_count - 2)`.
+- 4 to 7 cores (standard): `min(3, cpu_count - 1)`.
+- Fewer than 4 cores: 1 worker.
 
 ### Storage Optimization
 
@@ -736,6 +752,14 @@ storage_settings = {
 }
 ```
 
+`optimize_storage_layout` creates each directory with mode 755, reports its free space and warns when less than 10 GB is free. The storage settings mean:
+
+- `csv_buffer_size`: 8 KB buffer for CSV operations.
+- `xml_buffer_size`: 16 KB buffer for XML operations.
+- `compression`: gzip-compress intermediate files.
+- `temp_cleanup`: remove temporary files when done.
+- `batch_write_size`: write in batches of 10,000 for better I/O performance.
+
 ### Database Optimization
 
 ```sql
@@ -776,6 +800,16 @@ ANALYZE FactTrade;
 ANALYZE DimDate;
 ANALYZE DimTime;
 ```
+
+The script is `postgresql_optimization.sql`, PostgreSQL-specific tuning for TPC-DI. In order, it sets:
+
+- Connection and memory settings.
+- Parallel processing settings.
+- WAL and checkpoint settings.
+- Optimizer settings.
+- Indexes on the TPC-DI tables.
+- Partitioning for large fact tables.
+- A final `ANALYZE` of the tables so the planner has current statistics.
 
 ## Monitoring and Maintenance
 
@@ -1010,6 +1044,8 @@ config = TPCDIConfig(
 benchmark = TPCDIBenchmark(config=config)
 ```
 
+Use a scale factor of 0.1 instead of 1.0. Reduce workers and set `chunk_size=5000` so data is processed in smaller batches.
+
 #### 2. Performance Issues
 
 **Problem**: Slow execution times
@@ -1047,6 +1083,8 @@ sudo chmod -R 755 /data/tpcdi
 export TPCDI_DATA_DIR=$HOME/tpcdi_data
 ```
 
+Fix the directory permissions as shown, or point `TPCDI_DATA_DIR` at a user-writable directory instead.
+
 #### 4. Database Connection Issues
 
 **Problem**: Database connection failures
@@ -1071,6 +1109,8 @@ from psycopg2 import pool
 connection_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, os.environ['DATABASE_URL'])
 ```
 
+Verify the connection string, test the connection on its own, and use connection pooling in production (the last statement).
+
 #### 5. Query Execution Errors
 
 **Problem**: SQL syntax errors
@@ -1086,7 +1126,11 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
+Translate the query to the correct SQL dialect, then enable debug logging to check the database-specific syntax.
+
 ### Debug Mode
+
+The debug run uses a small scale factor of 0.01, and setting `TPCDI_DEBUG` and `TPCDI_VERBOSE` enables all debug features.
 
 ```python
 import logging
@@ -1237,6 +1281,14 @@ def validate_environment():
 
     return True
 ```
+
+The directory modes are:
+
+- `config`: owner read/write/execute only (700).
+- `logs`: owner full access, group read (740).
+- Data and temp directories: owner full access, group read and execute (750).
+
+`validate_database_connection` warns and returns `False` when a PostgreSQL URL lacks `sslmode=require` (SSL is needed in production) or when the connection string embeds credentials (use environment variables instead). `secure_file_write` sets written files to owner read/write only (600).
 
 ### Data Protection
 

@@ -29,6 +29,8 @@ Use expression objects for column references and operations.
 
 **Members:** Polars, PySpark, DataFusion
 
+This is expression-style syntax:
+
 ```python
 result = (
     df.filter(col('status') == lit('active'))
@@ -49,6 +51,8 @@ Use string-based column access and boolean indexing.
 
 **Members:** Pandas, cuDF, Dask, Vaex
 
+This is Pandas-style syntax:
+
 ```python
 filtered = df[df['status'] == 'active']
 result = filtered.groupby('category').agg({'amount': 'sum'})
@@ -65,6 +69,8 @@ result = filtered.groupby('category').agg({'amount': 'sum'})
 Create a context class that provides table access and family-specific helpers.
 
 ### Expression Family Context
+
+Put this class in `benchbox/core/dataframe/context.py`.
 
 ```python
 class MyPlatformDataFrameContext(DataFrameContext):
@@ -97,6 +103,8 @@ class MyPlatformDataFrameContext(DataFrameContext):
 
 ### Pandas Family Context
 
+`get_table` returns a copy for safety. `col` and `lit` return `None` because the pandas family does not use them.
+
 ```python
 class MyPandasLikeContext(DataFrameContext):
 
@@ -128,7 +136,8 @@ class MyPandasLikeContext(DataFrameContext):
 
 Create an adapter that handles data loading and query execution.
 
-For **expression family** platforms, inherit from `ExpressionFamilyAdapter`:
+For **expression family** platforms, inherit from `ExpressionFamilyAdapter`. Put the adapter in
+`benchbox/platforms/dataframe/myplatform_df.py`. In `execute_query`, the adapter collects the result if it is lazy.
 
 ```python
 from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
@@ -188,6 +197,7 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
 ## Step 4: Register the Platform
 
 Add the platform to the DataFrame adapter registry and `PlatformRegistry` metadata. DataFrame-only platforms must set `supports_sql=False`, `supports_dataframe=True`, and exactly one `support_status`.
+The registry lives in `benchbox/platforms/dataframe/__init__.py`. The `myplatform-df` entry is the new platform.
 
 ```python
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
@@ -208,6 +218,10 @@ uv run -- python _project/scripts/platform_scaffold.py --name myplatform --kind 
 ## Step 5: Add Tests
 
 ### Unit Tests
+
+Put the unit tests in `tests/unit/platforms/test_myplatform_adapter.py`. `test_is_available` passes whether or not
+`myplatform` is installed, because the result is `True` only when it is installed. The `family` assertion expects
+`"expression"` for an expression family platform and `"pandas"` for a pandas family platform.
 
 ```python
 import pytest
@@ -245,6 +259,8 @@ class TestMyPlatformAdapter:
 ```
 
 ### Integration Tests
+
+Put the integration tests in `tests/integration/test_myplatform_tpch.py`.
 
 ```python
 import pytest

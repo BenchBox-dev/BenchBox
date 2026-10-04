@@ -53,6 +53,10 @@ Quick Start
     print(format_data_directory("tpcds", 0.1))
     print(format_schema_name("ssb", 10.0))
 
+The scale factors print as ``sf1``, ``sf01``, ``sf001`` and ``sf10``. The names
+print as ``tpch_sf1`` (benchmark name), ``tpcds_sf01_data`` (data directory) and
+``ssb_sf10`` (schema name).
+
 API Reference
 ~~~~~~~~~~~~~
 
@@ -90,6 +94,10 @@ API Reference
     format_scale_factor(1.5)
     format_scale_factor(2.25)
 
+Integer values at or above 1 return ``sf1``, ``sf10`` and ``sf100``. Decimal
+values below 1 return ``sf01``, ``sf001`` and ``sf0001``. Non-integer values at
+or above 1 return ``sf15`` and ``sf225``.
+
 .. py:function:: benchbox.utils.scale_factor.format_benchmark_name(benchmark_name: str, scale_factor: float) -> str
 
    Return benchmark_name followed by an underscore and format_scale_factor(scale_factor). Preserve the supplied benchmark name.
@@ -109,6 +117,8 @@ API Reference
     format_benchmark_name("tpch", 1.0)
     format_benchmark_name("tpcds", 0.1)
     format_benchmark_name("ssb", 10.0)
+
+These return ``tpch_sf1``, ``tpcds_sf01`` and ``ssb_sf10``.
 
 .. py:function:: benchbox.utils.scale_factor.format_data_directory(benchmark_name: str, scale_factor: float) -> str
 
@@ -130,6 +140,8 @@ API Reference
     format_data_directory("tpcds", 0.1)
     format_data_directory("ssb", 10.0)
 
+These return ``tpch_sf1_data``, ``tpcds_sf01_data`` and ``ssb_sf10_data``.
+
 .. py:function:: benchbox.utils.scale_factor.format_schema_name(benchmark_name: str, scale_factor: float) -> str
 
    Return benchmark_name followed by an underscore and the formatted scale label. The function does not sanitize database identifiers.
@@ -150,6 +162,8 @@ API Reference
     format_schema_name("tpcds", 0.1)
     format_schema_name("ssb", 10.0)
 
+These return ``tpch_sf1``, ``tpcds_sf01`` and ``ssb_sf10``.
+
 Usage Examples
 ~~~~~~~~~~~~~~
 
@@ -169,6 +183,9 @@ Consistent File Naming
 
     print(f"Data directory: {data_dir}")
 
+This creates the data directory with consistent naming and prints
+``Data directory: data/tpch_sf1_data``.
+
 Database Schema Naming
 """"""""""""""""""""""
 
@@ -185,6 +202,9 @@ Database Schema Naming
         print(f"Created schema: {schema_name}")
 
     create_benchmark_schema(conn, "tpch", 1.0)
+
+The function creates the schema with consistent naming. This call prints
+``Created schema: tpch_sf1``.
 
 Result File Naming
 """"""""""""""""""
@@ -204,6 +224,9 @@ Result File Naming
         print(f"Saved results to: {filename}")
 
     save_results(benchmark_results, "tpcds", 0.1)
+
+The function saves results with consistent naming. This call prints
+``Saved results to: results_tpcds_sf01.json``.
 
 Dependency Validation Utilities
 --------------------------------
@@ -337,6 +360,9 @@ The dependency validation utilities include a CLI tool for CI/CD integration:
         --pyproject path/to/pyproject.toml \
         --lock path/to/uv.lock
 
+The first command validates dependencies, the second displays the compatibility
+matrix, and the third uses custom file paths.
+
 **Exit Codes**:
 
 - ``0``: All dependencies validated successfully
@@ -380,6 +406,9 @@ CI/CD Integration
     if __name__ == "__main__":
         sys.exit(check_dependencies())
 
+Save this script as ``ci_check_dependencies.py``. It validates dependencies in a
+CI/CD pipeline and returns exit code 1 on failure.
+
 Pre-commit Hook
 """""""""""""""
 
@@ -394,6 +423,9 @@ Pre-commit Hook
     fi
 
     echo "✅ Dependencies validated"
+
+Save this script as ``.git/hooks/pre-commit`` and start it with the
+``#!/bin/bash`` line.
 
 Documentation Generation
 """"""""""""""""""""""""
@@ -424,6 +456,8 @@ Documentation Generation
                 print()
 
     generate_dependency_docs()
+
+This function generates dependency documentation from the validated data.
 
 System Information Utilities
 -----------------------------
@@ -457,6 +491,9 @@ Quick Start
     print(f"Memory: {info.total_memory_gb:.1f} GB total, "
           f"{info.available_memory_gb:.1f} GB available")
     print(f"Python: {info.python_version}")
+
+This collects the system information first and then prints the OS, CPU, memory
+and Python version.
 
 API Reference
 ~~~~~~~~~~~~~
@@ -694,6 +731,11 @@ Benchmark Environment Documentation
     results = run_benchmark()
     results = document_environment(results)
 
+The ``document_environment`` function adds system information to the benchmark
+results.
+
+.. code-block:: python
+
     with open("results.json", "w") as f:
         json.dump(results, f, indent=2)
 
@@ -731,6 +773,10 @@ Resource Monitoring
 
     print(f"Average memory: {avg_memory:.1f} GB")
     print(f"Average CPU: {avg_cpu:.1f}%")
+
+The ``monitor_resources`` function monitors system resources during a benchmark.
+The calls after it run the monitor for 30 seconds and then calculate the average
+memory and CPU use.
 
 System Requirements Check
 """""""""""""""""""""""""
@@ -773,6 +819,8 @@ System Requirements Check
 
     check_system_requirements(min_memory_gb=16, min_cores=8)
 
+The function checks whether the system meets the benchmark requirements.
+
 Best Practices
 --------------
 
@@ -788,6 +836,9 @@ Scale Factor Utilities
 
        data_dir = f"tpch_{1.0}_data"
 
+   The first form is the consistent one and returns ``tpch_sf1_data``. Avoid the
+   second form, manual formatting, because it gives inconsistent names.
+
 2. **Apply to All Artifacts**: Use for files, directories, schemas, results
 
 Dependency Validation
@@ -799,6 +850,8 @@ Dependency Validation
 
        - name: Validate dependencies
          run: python -m benchbox.utils.dependency_validation
+
+   Add this step to ``.github/workflows/test.yml``.
 
 2. **Run Before Releases**: Ensure dependencies are valid before releasing
 

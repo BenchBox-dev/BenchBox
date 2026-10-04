@@ -69,7 +69,9 @@ TPC-H and TPC-DS answer files (used for row-count validation) are not included i
 
 Now, wheel installs detect missing answer files at validation time and fetch them automatically. Each download is verified with SHA-256 checksums, and retries handle transient network failures.
 
-For air-gapped or restricted environments:
+For air-gapped or restricted environments, pre-populate the answer file cache on a machine with access. The `all`
+benchmark fetches both at once. `--show-cache-dir` shows where cached files are stored, and `BENCHBOX_NO_DOWNLOAD=1`
+disables auto-download entirely.
 
 ```bash
 benchbox download-answers --benchmark tpch

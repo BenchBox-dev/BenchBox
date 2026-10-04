@@ -161,6 +161,16 @@ uv add benchbox --extra clickhouse-local
 uv add benchbox --extra clickhouse-server
 ```
 
+In order, these commands install:
+
+- DuckDB, the default, which is included with BenchBox.
+- DataFusion.
+- Polars, for the DataFrame API only. Use the `polars-df` platform.
+- ClickHouse Local (chDB), which needs no configuration.
+- ClickHouse Server, which is self-hosted and requires a running instance.
+
+SQLite is built into Python and needs no installation.
+
 ---
 
 ## Cloud Data Warehouses
@@ -241,6 +251,8 @@ uv add pyathena boto3
 uv add firebolt-sdk
 ```
 
+In order, these commands install the drivers for BigQuery, Snowflake, Databricks (SQL mode), Redshift, Azure Synapse Analytics, Fabric Warehouse, Amazon Athena, and Firebolt.
+
 ---
 
 ## Distributed SQL Engines
@@ -293,6 +305,8 @@ uv add benchbox --extra clickhouse-server
 uv add singlestoredb
 ```
 
+In order, these commands install the drivers for Trino, PrestoDB, Apache Spark SQL, ClickHouse (server mode, which requires a running instance), and SingleStore.
+
 ---
 
 ## Spark-Compatible Engines
@@ -343,6 +357,8 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
 ```
 
+LakeSail uses the standard PySpark client through Spark Connect. Velox pulls in `pyspark[connect]>=3.5.0` and requires the Gluten bundle jar.
+
 See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), and [Velox Jar Setup](velox_jar_setup.md) for full setup instructions.
 
 ---
@@ -390,6 +406,8 @@ uv add psycopg2-binary
 
 uv add influxdb3-python
 ```
+
+In order, these commands install the drivers for PostgreSQL, TimescaleDB (which uses the same driver as PostgreSQL), and InfluxDB.
 
 ---
 
@@ -463,6 +481,8 @@ uv add azure-identity azure-storage-file-datalake requests
 
 uv add requests boto3
 ```
+
+In order, these commands install the dependencies for AWS Spark services (Glue, EMR Serverless, Athena for Spark), GCP Spark services (Dataproc, Dataproc Serverless), Azure Spark services (Fabric Spark, Synapse Spark), and Onehouse Quanton.
 
 ---
 
@@ -538,6 +558,15 @@ uv add dask[distributed]
 pip install cudf-cu12 --extra-index-url=https://pypi.nvidia.com
 ```
 
+The commands install, in order:
+
+- The expression-family libraries: Polars, PySpark (requires Java 17 or 21), and DataFusion.
+- Databricks DataFrame, which requires Databricks Connect.
+- Snowpark Connect, which is PySpark-compatible on Snowflake.
+- LakeSail DataFrame, which uses Spark Connect through the standard PySpark client.
+- The Pandas family: Pandas and Dask.
+- cuDF, which needs an NVIDIA GPU and Linux. It uses `pip` because of its CUDA dependencies.
+
 ---
 
 ## Hybrid Platforms (SQL + DataFrame)
@@ -568,6 +597,8 @@ benchbox run --platform databricks-df --benchmark tpch --scale 10
 
 benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 ```
+
+Polars supports DataFrame mode only. DataFusion supports SQL mode (`datafusion`) and DataFrame mode (`datafusion-df`). Databricks runs against a SQL Warehouse (`databricks`) or through Databricks Connect (`databricks-df`). Snowpark Connect runs DataFrame workloads on Snowflake.
 
 ---
 

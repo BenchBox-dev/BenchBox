@@ -39,6 +39,8 @@ uv add benchbox --extra influxdb
 pip install benchbox[influxdb]
 ```
 
+The first command installs the `influxdb` extra with uv. The second does the same with pip.
+
 This installs:
 - `influxdb3-python` - Official InfluxDB 3.x Python client
 - `pyarrow` - Apache Arrow data handling
@@ -72,6 +74,8 @@ benchbox run --platform influxdb \
   --influxdb-mode core \
   --influxdb-ssl false
 ```
+
+The first command targets InfluxDB Cloud. The second targets a local InfluxDB Core server.
 
 ### CLI Arguments
 
@@ -115,6 +119,8 @@ print(result)
 connection.close()
 ```
 
+The first adapter targets InfluxDB Cloud. The second targets InfluxDB Core running locally in Docker. The remaining lines create a connection, execute a query, and close the connection.
+
 ## Supported Benchmarks
 
 ### TSBS DevOps
@@ -149,6 +155,8 @@ TSBS DevOps simulates a DevOps monitoring scenario with:
 export INFLUXDB_TOKEN="your-token-here"
 ```
 
+Setting the authentication token in the environment is recommended for security.
+
 ### Connection Configuration
 
 ```python
@@ -164,6 +172,8 @@ config = {
 
 adapter = InfluxDBAdapter.from_config(config)
 ```
+
+This is a full configuration example.
 
 ## InfluxDB Core vs Cloud
 
@@ -181,6 +191,8 @@ docker run -d \
   -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-token \
   influxdb:3.0
 ```
+
+This starts InfluxDB Core with Docker.
 
 Core limitations:
 - No data compaction for historical queries
@@ -212,6 +224,8 @@ if connection.test_connection():
 else:
     print("Connection failed")
 ```
+
+This tests the connection.
 
 ### Common Errors
 

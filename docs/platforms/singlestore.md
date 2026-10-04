@@ -22,6 +22,9 @@ SingleStore is deployed as both a fully managed cloud service (Helios) and as a 
 
 ## Quick Start
 
+The commands install the `singlestoredb` dependency (or the SingleStore extra), configure the connection (SingleStore
+must be running), and run the TPC-H benchmark.
+
 ```bash
 uv add singlestoredb
 
@@ -37,6 +40,8 @@ benchbox run --platform singlestore --benchmark tpch --scale 0.01
 
 ### Docker Quick Start (Self-Managed)
 
+The commands start SingleStore with Docker, verify connectivity, and run the benchmark.
+
 ```bash
 docker run -d --name singlestoredb \
     -e ROOT_PASSWORD="your_password" \
@@ -49,6 +54,8 @@ benchbox run --platform singlestore --benchmark tpch --scale 0.01
 ```
 
 ### Helios (Cloud) Connection
+
+Set the Helios endpoint from your workspace connection string.
 
 ```bash
 export SINGLESTORE_HOST=xyz123.singlestore.com

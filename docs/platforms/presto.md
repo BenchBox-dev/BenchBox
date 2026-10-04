@@ -58,6 +58,8 @@ results = benchmark.run_with_platform(adapter)
 print(f"Completed in {results.duration_seconds:.2f}s")
 ```
 
+The adapter also accepts an optional `password` for basic auth.
+
 ### CLI Usage
 
 ```bash

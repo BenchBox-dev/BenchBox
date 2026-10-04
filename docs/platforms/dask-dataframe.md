@@ -66,6 +66,8 @@ pip install "benchbox[dask]"
 pip install "dask[distributed]"
 ```
 
+The last command installs `dask[distributed]` for distributed execution.
+
 ### Verify Installation
 
 ```bash
@@ -87,6 +89,8 @@ benchbox run --platform dask-df --benchmark tpch --scale 10 \
 benchbox run --platform dask-df --benchmark tpch --scale 100 \
   --platform-option scheduler_address=tcp://scheduler:8786
 ```
+
+The four commands run, in order: the default local setup, local execution with configured workers, the distributed scheduler, and a connection to an existing cluster.
 
 ## Configuration Options
 
@@ -165,6 +169,8 @@ Dask excels at out-of-core and distributed workloads:
 
 Dask uses Pandas-compatible API with lazy evaluation:
 
+This is TPC-H Q1, the Pricing Summary Report, for Dask. `lineitem` is a Dask DataFrame, and `.compute()` triggers the computation.
+
 ```python
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
@@ -220,6 +226,8 @@ result = adapter.execute_query(ctx, query)
 print(result)
 ```
 
+The first adapter runs locally. The second connects to a distributed cluster.
+
 ## Distributed Cluster Setup
 
 ### Local Cluster (Multi-Process)
@@ -251,6 +259,8 @@ benchbox run --platform dask-df --benchmark tpch --scale 100 \
   --platform-option scheduler_address=tcp://scheduler:8786
 ```
 
+Run `dask scheduler` on the scheduler machine and `dask worker` on the worker machines, then run BenchBox with the scheduler address.
+
 ### Kubernetes
 
 ```bash
@@ -259,6 +269,8 @@ helm install dask dask/dask
 benchbox run --platform dask-df --benchmark tpch --scale 1000 \
   --platform-option scheduler_address=tcp://dask-scheduler:8786
 ```
+
+Install the cluster with the Dask Kubernetes Helm chart, then connect BenchBox to the scheduler.
 
 ## Troubleshooting
 
@@ -280,6 +292,8 @@ distributed.worker - WARNING - Memory use is high but worker has no data to stor
 ```python
 ddf.npartitions
 ```
+
+The partition count should be 2-4 times the number of workers.
 
 **Repartition if needed:**
 ```python

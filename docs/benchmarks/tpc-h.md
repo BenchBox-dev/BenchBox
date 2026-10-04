@@ -176,11 +176,12 @@ for file_path in data_files:
 
 ### SQL Dialect Translation
 
+Queries are automatically translated to the requested dialect via sqlglot:
+
 ```python
 query_postgres = tpch.get_query(1, dialect="postgres")
 query_duckdb = tpch.get_query(1, dialect="duckdb")
 query_mysql = tpch.get_query(1, dialect="mysql")
-
 ```
 
 ### DuckDB Integration Example
@@ -299,6 +300,8 @@ for i, stream_info in enumerate(tpch.get_all_streams_info()):
 
 ### Advanced Configuration
 
+`verbose=True` enables detailed logging and `parallel=4` runs data generation in parallel. In `get_query()`, `seed` makes parameters reproducible, `scale_factor` overrides the scale factor, and `dialect` sets the target dialect.
+
 ```python
 tpch = TPCH(
     scale_factor=1.0,
@@ -406,11 +409,15 @@ for query_id, stats in results.items():
 ### Data Generation Issues
 
 **Issue: Out of memory during generation**
+
+Solution: use a smaller scale factor or increase the number of parallel processes.
 ```python
 tpch = TPCH(scale_factor=1.0, parallel=8)
 ```
 
 **Issue: Slow data generation**
+
+Solution: check disk I/O and use SSD storage.
 ```python
 tpch = TPCH(output_dir="/fast/ssd/path")
 ```
@@ -418,12 +425,16 @@ tpch = TPCH(output_dir="/fast/ssd/path")
 ### Query Execution Issues
 
 **Issue: Query timeout on large scale factors**
+
+Solution: start with a smaller scale factor and optimize queries.
 ```python
 tpch = TPCH(scale_factor=0.1)
 query = tpch.get_query(21, dialect="duckdb")
 ```
 
 **Issue: Parameter substitution errors**
+
+Solution: use explicit seeds for reproducible parameters.
 ```python
 query = tpch.get_query(1, seed=42)
 ```

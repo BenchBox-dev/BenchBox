@@ -126,6 +126,8 @@ df_val   = float(df_rows[0][0])
 print(abs(duck_val - df_val))
 ```
 
+Set up the two connections and fetch `duck_rows` and `df_rows` before this code (see the fixtures in `test_cross_platform.py`). A typical printed delta is `6.2e-07`.
+
 Round the epsilon up to the nearest power of ten that comfortably covers
 the observed delta:
 
@@ -192,8 +194,9 @@ adapter or query-transformer change broke something.
 ```bash
 git log --oneline --since="7 days ago" -- benchbox/platforms/datafusion/ \
     benchbox/platforms/clickhouse/ benchbox/platforms/dataframe/polars_df.py
-
 ```
+
+This lists the commits that touched the comparison platform's adapter. Narrow the list to the date the failure first appeared; the nightly run history shows it.
 
 **Step 2 - Reproduce locally.**
 
@@ -206,6 +209,8 @@ uv run -- python -m pytest tests/integration/validation/test_cross_platform.py \
     -v -m live_integration -k "TestDuckDBDataFusion and Q14"
 ```
 
+The first command uses the full node ID, which is fastest because it runs one parametrized case. The second uses `-k` keyword matching and runs all Q14 cases across classes.
+
 The comparator output shows which cell is wrong:
 ```
 Q14: DIVERGED (duckdb vs datafusion, ref=1 rows, cmp=1 rows)
@@ -217,8 +222,9 @@ Q14: DIVERGED (duckdb vs datafusion, ref=1 rows, cmp=1 rows)
 Prefer a targeted fix in the adapter. Only revert if the fix is not
 straightforward or the change needs more context.
 
-```bash
+Option A, fix forward, is preferred: edit the relevant platform module, verify locally, and open a PR. Option B reverts the offending commit:
 
+```bash
 git revert <commit-sha> --no-edit
 git push private fix/revert-datafusion-regression
 gh pr create --repo joeharris76/benchbox-private \

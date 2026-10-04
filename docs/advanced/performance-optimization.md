@@ -59,6 +59,8 @@ results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 print(f"Optimized execution: {results.total_execution_time:.2f}s")
 ```
 
+This configuration partitions `lineitem` into 12 partitions, which are monthly, and adds clustering on frequently joined columns.
+
 ### ClickHouse Local Optimizations
 
 ```python
@@ -91,6 +93,8 @@ benchmark = TPCH(scale_factor=1.0)
 adapter = ClickHouseAdapter(local_mode=True)
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
+
+This configuration partitions `lineitem` by month, orders it by common filter columns, and enables LZ4 compression.
 
 ### Databricks Delta Lake Optimizations
 
@@ -135,6 +139,8 @@ adapter = DatabricksAdapter(
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
 
+Z-ordering gives multi-dimensional clustering. Auto-optimize handles background compaction, and auto-compact merges small files. Bloom filters help on high-cardinality columns.
+
 ### Snowflake Clustering Optimizations
 
 ```python
@@ -173,6 +179,8 @@ adapter = SnowflakeAdapter(
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
 
+Clustering keys cover frequently filtered columns, large tables are partitioned, and `LARGE_WH` is a larger warehouse.
+
 ### BigQuery Optimizations
 
 ```python
@@ -204,6 +212,8 @@ adapter = BigQueryAdapter(
 
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
+
+This uses native BigQuery partitioning on a date column and clustering for multi-column optimization.
 
 ## Tuning Configuration
 
@@ -263,6 +273,8 @@ adapter = DuckDBAdapter(memory_limit="16GB", threads=16)
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
 
+For TPC-DS, the function partitions each fact table by date, clusters it by primary key, and adds primary-key tuning on the dimension tables. Partition counts depend on the scale factor.
+
 ### Constraint-Based Optimization
 
 ```python
@@ -318,6 +330,8 @@ adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 ```
 
+Primary keys are defined for referential integrity. Foreign keys enable join optimizations.
+
 ## Query Optimization
 
 ### Query Subset Selection
@@ -346,6 +360,8 @@ for query_id in slow_queries:
 
     print(f"Query {query_id}: {elapsed:.3f}s ({len(result)} rows)")
 ```
+
+The `slow_queries` list holds queries identified as slow in a previous run. Data is generated once, then only those queries run.
 
 ### Query Caching
 
@@ -389,6 +405,8 @@ result1 = cached.run_query_cached(1)
 result2 = cached.run_query_cached(1)
 ```
 
+The first call is a cache miss and executes the query. The second call is a cache hit.
+
 ## Data Generation Optimization
 
 ### Parallel Data Generation
@@ -418,6 +436,8 @@ def generate_with_parallelization(scale_factor: float, num_workers: int = 4):
 
 data_files = generate_with_parallelization(scale_factor=1.0, num_workers=8)
 ```
+
+The TPC tools handle parallelization internally for most benchmarks. Controlling the worker count is an additional optimization.
 
 ### Data Reuse Strategy
 
@@ -473,6 +493,8 @@ adapter.load_data(benchmark, conn, "s3://my-benchbox-bucket/tpch/sf10")
 results = adapter.run_benchmark(benchmark)
 ```
 
+Data is generated directly to S3 once and reused many times. DuckDB reads from S3 natively, so `load_data` pulls from the bucket without a local copy.
+
 ### Regional Optimization
 
 Use cloud storage in the same region as compute:
@@ -496,6 +518,8 @@ adapter = DatabricksAdapter(
 
 results = adapter.run_benchmark(benchmark)
 ```
+
+The Unity Catalog volume and the SQL warehouse should be in the same region as the workspace, so data is generated to regional storage.
 
 ## Resource Management
 
@@ -531,6 +555,8 @@ def run_memory_optimized_benchmark(scale_factor: float):
 results = run_memory_optimized_benchmark(scale_factor=10.0)
 ```
 
+The explicit `memory_limit` sets a hard cap, and `threads=4` limits parallelism to control memory use. Garbage collection runs before loading and after the benchmark.
+
 ### Disk Space Management
 
 Manage disk space for large benchmarks:
@@ -559,6 +585,8 @@ def run_with_cleanup(scale_factor: float, temp_dir: str = "/tmp/benchbox"):
 
 results = run_with_cleanup(scale_factor=1.0)
 ```
+
+The `finally` block removes the temporary files even if the benchmark fails.
 
 ## Performance Profiling
 
@@ -614,6 +642,8 @@ adapter.create_schema(benchmark, adapter.create_connection())
 analysis = profile_queries(benchmark, adapter, [1, 3, 6, 12, 17])
 ```
 
+The `compile` phase is an empty placeholder because DuckDB compiles on first execute. The `execute` phase holds the real work.
+
 ### Performance Regression Testing
 
 Automated regression detection:
@@ -649,6 +679,8 @@ passed = run_regression_test(baseline, threshold=10.0)
 exit(0 if passed else 1)
 ```
 
+The final lines show use in CI/CD: the script exits non-zero when a regression exceeds the threshold.
+
 ## Best Practices
 
 ### 1. Start Small, Scale Up
@@ -663,6 +695,8 @@ benchmark = TPCH(scale_factor=0.1)
 benchmark = TPCH(scale_factor=1.0)
 ```
 
+Use 0.01 for development (fast iteration), 0.1 for testing, and 1.0 for production-scale runs.
+
 ### 2. Use Appropriate Tunings
 
 Match tunings to your workload:
@@ -672,6 +706,8 @@ tuning.enable_table_tuning("fact_table", TuningType.CLUSTERING, columns=["date",
 
 tuning.enable_table_tuning("fact_table", TuningType.PRIMARY_KEY, columns=["id"])
 ```
+
+The clustering tuning suits OLAP-focused workloads (analytical queries). The primary key tuning suits OLTP-focused workloads (point lookups).
 
 ### 3. Monitor Resource Usage
 

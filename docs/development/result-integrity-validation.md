@@ -160,6 +160,16 @@ class IntegrityReport:
     summary: dict[str, int]
 ```
 
+The fields are:
+
+- `file`: the file path validated.
+- `benchmark_id`: the benchmark identifier.
+- `platform`: the platform name.
+- `scale_factor`: the scale factor.
+- `overall_status`: the worst status across all checks.
+- `checks`: the individual check results.
+- `summary`: counts by status (PASS, WARN, FAIL).
+
 **Helper methods:**
 - `report.passed()` - Returns `True` if overall status is PASS
 - `report.has_warnings()` - Returns `True` if any check has WARN status
@@ -176,6 +186,14 @@ class CheckResult:
     details: dict | None
 ```
 
+The fields are:
+
+- `category`: STRUCTURAL, COMPLETENESS, or BELIEVABILITY.
+- `name`: the check identifier, for example `query_count_math`.
+- `status`: PASS, WARN, or FAIL.
+- `message`: a human-readable description.
+- `details`: optional structured details.
+
 ## Convenience Functions
 
 The module provides two convenience functions for common use cases:
@@ -187,6 +205,8 @@ report = validate_file(Path("results/tpch_duckdb_sf1.json"))
 
 reports = validate_directory(Path("results/"), pattern="*.json")
 ```
+
+`validate_file` validates a single file. `validate_directory` validates a directory and returns a list of reports.
 
 Both functions handle invalid JSON gracefully - returning a FAIL report rather than raising exceptions.
 

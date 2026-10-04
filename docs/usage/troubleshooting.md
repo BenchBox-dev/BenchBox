@@ -107,6 +107,8 @@ curl -s http://localhost:8080
 docker ps | grep -E 'trino|presto|clickhouse|firebolt'
 ```
 
+The first `curl` checks Firebolt Core on port 3473. The second checks Trino or Presto on port 8080. The `docker ps` command lists the Docker-based platforms that are running.
+
 **Solutions:**
 
 1. **Start the platform:**
@@ -123,6 +125,7 @@ docker ps | grep -E 'trino|presto|clickhouse|firebolt'
    lsof -i :8080
    netstat -an | grep 8080
    ```
+   The `lsof` command shows whether the port is already in use.
 
 3. **Verify host/port in config:**
    ```bash
@@ -174,12 +177,15 @@ snowsql -a $SNOWFLAKE_ACCOUNT -u $SNOWFLAKE_USER
 echo $SNOWFLAKE_ACCOUNT
 ```
 
+The account should use the `account_locator.region` format. Correct values look like `xy12345.us-east-1` or `xy12345.us-east-1.aws`.
+
 #### Databricks
 ```bash
 curl -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   https://your-workspace.cloud.databricks.com/api/2.0/clusters/list
-
 ```
+
+This call tests that the token is valid. If the token has expired (the default lifetime is 90 days), regenerate it under User Settings > Developer > Access Tokens.
 
 #### BigQuery
 ```bash
@@ -195,6 +201,8 @@ psql -h $REDSHIFT_HOST -p 5439 -U $REDSHIFT_USER -d dev
 
 aws sts get-caller-identity
 ```
+
+The `aws sts get-caller-identity` command verifies the role when you use IAM authentication.
 
 ### Token Expired
 
@@ -238,6 +246,7 @@ CatalogNotFoundError: Catalog does not exist
    benchbox run --platform trino --benchmark tpch \
      --platform-option catalog=hive
    ```
+   Replace `hive` with `iceberg`, `delta`, or another catalog name as needed.
 
 3. **Common catalog names:**
    - `hive` - Hive Metastore
@@ -304,6 +313,7 @@ Statement timeout
    benchbox run --platform redshift --benchmark tpch \
      --platform-option statement_timeout=3600000
    ```
+   The Snowflake `query_timeout` is in seconds, so 3600 is one hour. The Redshift `statement_timeout` is in milliseconds.
 
 2. **Use larger compute resources:**
    ```bash
@@ -339,11 +349,15 @@ benchbox run --platform duckdb --benchmark tpch --scale 10 \
   --platform-option temp_directory=/fast/ssd/tmp
 ```
 
+The memory limit caps usage, and the temp directory is where DuckDB spills to disk once it reaches that limit.
+
 #### Polars
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 10 \
   --platform-option streaming=true
 ```
+
+Streaming mode lets Polars process large datasets without holding them all in memory.
 
 #### Spark
 ```bash
@@ -386,6 +400,8 @@ BenchBox attempts to compile these tools automatically, but if that fails, you m
 
     cd _sources/tpc-ds/tools
     ```
+
+    Use the first directory for TPC-H and the second for TPC-DS.
 
 2.  **Compile the tools**:
 
@@ -481,6 +497,8 @@ snowsql -q "ALTER WAREHOUSE BENCHMARK_WH RESUME;"
 snowsql -q "ALTER WAREHOUSE BENCHMARK_WH SET AUTO_RESUME = TRUE;"
 ```
 
+The first command resumes the suspended warehouse, and the second sets auto-resume so it restarts on demand.
+
 ### Databricks
 
 #### Cluster Not Running
@@ -488,16 +506,18 @@ snowsql -q "ALTER WAREHOUSE BENCHMARK_WH SET AUTO_RESUME = TRUE;"
 curl -X POST "https://workspace.cloud.databricks.com/api/2.0/clusters/start" \
   -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   -d '{"cluster_id": "your-cluster-id"}'
-
 ```
+
+Alternatively, use a SQL Warehouse, which has an always-on option.
 
 ### BigQuery
 
 #### Quota Exceeded
 ```bash
 gcloud compute project-info describe --project $PROJECT_ID
-
 ```
+
+To request an increase, use the Console: BigQuery > Quotas > Request Increase.
 
 ## General Tips
 

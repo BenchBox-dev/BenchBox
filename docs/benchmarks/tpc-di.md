@@ -243,6 +243,8 @@ for query_id in ["V1", "V2", "V3"]:
     validation_results[query_id] = "PASSED"
 ```
 
+This simulates the ETL process. The source data files are simulated, and the ETL step is a simplified example. The validation loop does not execute the queries: it records every result as `"PASSED"` as a simplification.
+
 ### DuckDB Integration Example
 
 ```python
@@ -338,6 +340,8 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
     return scd_logic
 ```
 
+This is a simplified example of the transformation logic for SCD Type 2 processing of the customer dimension. The first statement closes existing records that have changed. The second inserts new records for changed customers and new customers.
+
 ## Performance Characteristics
 
 ### ETL Performance Patterns
@@ -383,6 +387,8 @@ benchbox run --platform duckdb --benchmark tpcdi --scale 1 \
   --benchmark-option max_workers=4
 ```
 
+This enables parallel ETL with 4 workers.
+
 ### Scale Factor Guidelines
 
 | Scale Factor | Data Warehouse Size | ETL Complexity | Use Case |
@@ -406,6 +412,8 @@ tpcdi = TPCDI(
     parallel_loading=4
 )
 ```
+
+These are ETL-specific options: `batch_size` is the number of records per batch, `enable_scd` enables SCD Type 2 processing, `validate_data` runs data quality checks, `audit_trail` enables audit logging, and `parallel_loading` sets the number of parallel load processes.
 
 ## Integration Examples
 
@@ -476,6 +484,8 @@ validate_task = PythonOperator(
 
 extract_task >> transform_task >> validate_task
 ```
+
+The last line sets the task dependencies: extract runs first, then transform and load, then validation.
 
 ### Data Quality Framework
 
@@ -612,6 +622,8 @@ quality_results = dq_framework.run_systematic_validation()
 print(f"Data Quality Score: {quality_results}")
 ```
 
+The framework runs the validation queries first, then the data quality checks. `_check_temporal_consistency` looks for overlapping date ranges in SCD Type 2 tables.
+
 ## Best Practices
 
 ### ETL Development
@@ -640,6 +652,9 @@ print(f"Data Quality Score: {quality_results}")
 ### ETL Performance Issues
 
 **Issue: Slow SCD Type 2 processing**
+
+Use merge or upsert patterns instead of separate UPDATE and INSERT statements.
+
 ```sql
 MERGE DimCustomer AS target
 USING customer_staging AS source
@@ -652,6 +667,9 @@ WHEN NOT MATCHED THEN
 ```
 
 **Issue: Memory issues during large batch loading**
+
+Use smaller batch sizes and streaming. `batch_size=5000` gives smaller batches, and `streaming_load=True` streams large files.
+
 ```python
 tpcdi = TPCDI(
     scale_factor=1.0,
@@ -663,6 +681,9 @@ tpcdi = TPCDI(
 ### Data Quality Issues
 
 **Issue: Referential integrity violations**
+
+Load dimensions before facts and validate foreign keys. The query uses `-1` as a default surrogate key for missing dimension rows.
+
 ```sql
 INSERT INTO FactTrade (SK_CustomerID, SK_SecurityID, ...)
 SELECT COALESCE(c.SK_CustomerID, -1),

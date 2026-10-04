@@ -162,8 +162,9 @@ The best evaluation strategy often uses multiple tools.
 
 ### Example Workflow
 
-The HammerDB script `pg_oltp.tcl` runs `dbset db pg`, `buildschema`, `vuset vu 16`, `vucreate`, `vustatus` and
-`vurun` for the OLTP baseline; BenchBox then runs the OLAP comparison:
+Create a script named `pg_oltp.tcl` (it is not provided with either tool) that contains these HammerDB commands:
+`dbset db pg`, `buildschema`, `vuset vu 16`, `vucreate`, `vustatus` and `vurun`. `vustatus` only reports the
+state of the virtual users. The script is the OLTP baseline; BenchBox then runs the OLAP comparison:
 
 ```bash
 hammerdbcli auto pg_oltp.tcl

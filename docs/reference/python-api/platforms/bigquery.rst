@@ -45,6 +45,8 @@ Basic Configuration
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
+The adapter connects to BigQuery and the benchmark runs on it.
+
 Auto-Detection
 ~~~~~~~~~~~~~~
 
@@ -56,6 +58,8 @@ Auto-Detection
         "benchmark": "tpch",
         "scale_factor": 1.0,
     })
+
+The adapter auto-detects credentials from Application Default Credentials, and it detects ``project_id`` from the gcloud config.
 
 API Reference
 -------------
@@ -288,6 +292,8 @@ Application Default Credentials
         dataset_id="benchbox_tpch"
     )
 
+The ``gcloud`` command sets up the default credentials, so no ``credentials_path`` is needed.
+
 Service Account Authentication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -308,6 +314,8 @@ Service Account Authentication
         credentials_path="./key.json"
     )
 
+The ``gcloud`` commands create a service account, grant it BigQuery permissions, and download its key.
+
 GCS Integration for Data Loading
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -319,6 +327,8 @@ GCS Integration for Data Loading
         storage_bucket="my-benchmark-data",
         storage_prefix="tpch/sf1"
     )
+
+This gives efficient loading through Cloud Storage. Data is automatically uploaded to GCS and then loaded into BigQuery. This is recommended for large datasets.
 
 
 Cost Control Configuration
@@ -334,6 +344,8 @@ Cost Control Configuration
         maximum_bytes_billed=10 * 1024**3
     )
 
+This sets budget limits: ``BATCH`` priority costs less but runs slower, ``query_cache=True`` reuses cached results, and ``maximum_bytes_billed`` is a 10 GB limit per query.
+
 Table Optimization
 ~~~~~~~~~~~~~~~~~~
 
@@ -345,6 +357,8 @@ Table Optimization
         partitioning_field="l_shipdate",
         clustering_fields=["l_orderkey", "l_partkey"]
     )
+
+This configures partitioning and clustering. ``partitioning_field`` partitions on a date column, and ``clustering_fields`` clusters by the listed columns.
 
 Authentication
 --------------
@@ -364,6 +378,8 @@ Application Default Credentials (Development)
         project_id="my-project",
         dataset_id="benchbox"
     )
+
+The first ``gcloud`` command logs in with your Google account, and the second sets the default project. You can omit ``project_id`` in the adapter because it is auto-detected from the gcloud config.
 
 Service Account (Production)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -390,6 +406,8 @@ Service Account (Production)
         credentials_path="/secure/path/sa-key.json"
     )
 
+The ``gcloud`` commands create the service account with the required roles, grant BigQuery permissions, grant GCS permissions (only if you use Cloud Storage), and download the key. The Python code uses that service account key.
+
 Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -405,6 +423,8 @@ Environment Variables
         project_id=os.environ["GOOGLE_CLOUD_PROJECT"],
         dataset_id="benchbox"
     )
+
+The environment variables set the credentials, and the adapter loads them automatically.
 
 Data Loading
 ------------
@@ -432,6 +452,8 @@ Via Cloud Storage (Recommended)
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
+The example configures the adapter with a GCS bucket, generates the data, and loads it. The load automatically uploads the data to GCS first.
+
 Direct Loading (Small Datasets)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -444,6 +466,8 @@ Direct Loading (Small Datasets)
 
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
+
+For small datasets (under 1 GB), skip GCS: no ``storage_bucket`` is specified, so the adapter loads directly from local files.
 
 Query Execution
 ---------------
@@ -475,6 +499,8 @@ Basic Query Execution
     print(f"Bytes billed: {query_job.total_bytes_billed:,}")
     print(f"Slot milliseconds: {query_job.slot_millis:,}")
 
+The example executes a SQL query and then checks the query statistics.
+
 Cost Estimation (Dry Run)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -487,6 +513,8 @@ Cost Estimation (Dry Run)
     plan = adapter.get_query_plan(conn, query)
     print(f"Estimated bytes: {plan['bytes_processed']:,}")
     print(f"Estimated cost: ${plan['estimated_cost']:.4f}")
+
+``get_query_plan`` estimates the query cost and returns the plan without executing the query.
 
 Query Plans and Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -501,6 +529,8 @@ Query Plans and Optimization
     cost_per_tb = 6.25
     estimated_cost = (query_job.total_bytes_processed / 1024**4) * cost_per_tb
     print(f"Estimated cost: ${estimated_cost:.4f}")
+
+The dry run returns the query execution plan without running the query. The on-demand rate varies by location; the US, EU and Asia multi-region rate is $6.25 per TiB. See ``benchbox/core/cost/pricing_data.yaml`` for all locations.
 
 Advanced Features
 -----------------
@@ -522,6 +552,8 @@ Partitioning
         WHERE DATE(o_orderdate) BETWEEN '1995-01-01' AND '1995-12-31'
     """
 
+The first query creates a partitioned table. The second query filters on the partition column, which reduces cost because it scans only the 1995 partitions.
+
 Clustering
 ~~~~~~~~~~
 
@@ -541,6 +573,8 @@ Clustering
         AND DATE(l_shipdate) = '1995-03-15'
     """
 
+The first query creates a clustered table (up to 4 clustering columns are allowed). The second query filters on the clustered columns, so it is optimized.
+
 Query Caching
 ~~~~~~~~~~~~~
 
@@ -558,6 +592,8 @@ Query Caching
 
     job2 = conn.query(query)
     print(f"Bytes billed (cached): {job2.total_bytes_billed:,}")
+
+Query caching is enabled by default. The first execution processes the data. The second execution uses the cache and bills 0 bytes.
 
 Batch vs Interactive Priority
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -579,6 +615,8 @@ Batch vs Interactive Priority
     job = conn.query(query, job_config=job_config_batch)
     job.result()
 
+Interactive priority (the default) executes immediately. Batch priority queues the query and gets a 50% discount, so use it for non-time-sensitive queries. ``job.result()`` may wait in the queue.
+
 Best Practices
 --------------
 
@@ -594,6 +632,8 @@ Cost Optimization
            partitioning_field="l_shipdate"
        )
 
+   Partition on a date column.
+
 2. **Enable query caching**:
 
    .. code-block:: python
@@ -601,6 +641,8 @@ Cost Optimization
        adapter = BigQueryAdapter(
            query_cache=True
        )
+
+   This reuses cached results.
 
 3. **Set billing limits**:
 
@@ -610,6 +652,8 @@ Cost Optimization
            maximum_bytes_billed=10 * 1024**3
        )
 
+   This sets a 10 GB maximum per query.
+
 4. **Use BATCH priority** for non-urgent queries:
 
    .. code-block:: python
@@ -618,6 +662,8 @@ Cost Optimization
            job_priority="BATCH"
        )
 
+   BATCH priority gets a 50% discount.
+
 5. **Estimate costs** before execution:
 
    .. code-block:: python
@@ -625,6 +671,8 @@ Cost Optimization
        plan = adapter.get_query_plan(conn, query)
        if plan["estimated_cost"] > 1.0:
            print("Query too expensive, optimizing...")
+
+   The example flags any query that is estimated to cost more than $1.
 
 Data Loading Efficiency
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -637,17 +685,23 @@ Data Loading Efficiency
            storage_bucket="benchmark-data"
        )
 
+   Cloud Storage is recommended for large datasets.
+
 2. **Compress data files**:
 
    .. code-block:: bash
 
        gzip data/*.csv
 
+   BigQuery supports compressed files.
+
 3. **Use Parquet format** when possible:
 
    .. code-block:: python
 
        benchmark.generate_data(data_dir, format="parquet")
+
+   Parquet is more efficient than CSV.
 
 Performance Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -667,6 +721,8 @@ Performance Optimization
        SELECT * FROM lineitem WHERE l_orderkey = 1
 
        SELECT l_orderkey, l_quantity FROM lineitem WHERE l_orderkey = 1
+
+   The first query is bad because it scans all columns. The second is good because it scans only the columns it needs.
 
 3. **Use materialized views** for repeated queries:
 
@@ -708,6 +764,8 @@ Permission Denied
     client = bigquery.Client(project="my-project")
     print(f"Authenticated as: {client._credentials.service_account_email}")
 
+The steps are: check the required permissions, grant the BigQuery Admin role, grant the Storage permissions (only if you use GCS), and verify the credentials in code.
+
 Dataset Not Found
 ~~~~~~~~~~~~~~~~~
 
@@ -728,6 +786,8 @@ Dataset Not Found
     dataset.location = "US"
     client.create_dataset(dataset, exists_ok=True)
 
+First list the available datasets. Then create the dataset if it does not exist.
+
 Quota Exceeded
 ~~~~~~~~~~~~~~
 
@@ -744,6 +804,13 @@ Quota Exceeded
     adapter = BigQueryAdapter(
         job_priority="BATCH"
     )
+
+The steps are:
+
+1. Check the current quota usage at https://console.cloud.google.com/iam-admin/quotas.
+2. Set a maximum bytes billed (the example uses a 100 GB limit).
+3. Use BATCH priority to reduce the quota impact.
+4. Request a quota increase at the same quota page.
 
 
 Slow Query Performance
@@ -776,6 +843,8 @@ Slow Query Performance
     job_config = bigquery.QueryJobConfig(dry_run=True)
     query_job = conn.query(query, job_config=job_config)
 
+The steps are: check the query execution details, add partitioning to reduce the data scanned, add clustering for better data organization, and check for full table scans by using the query plan to identify issues.
+
 High Costs
 ~~~~~~~~~~
 
@@ -804,6 +873,13 @@ High Costs
     CLUSTER BY key1, key2
     AS SELECT * FROM dataset.table_raw
     """).result()
+
+The steps are:
+
+1. Enable ``dry_run=True`` to preview and estimate costs without running queries.
+2. Check the query costs.
+3. Set a hard billing limit (the example uses 10 GB).
+4. Use partitioning and clustering, which reduces the data scanned per query.
 
 See Also
 --------

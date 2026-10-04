@@ -136,6 +136,8 @@ Use `*_liquid_tuned.yaml` to request Liquid AUTO by passing the template as an e
 benchbox run --platform databricks --benchmark tpch --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml
 ```
 
+This command works from a source checkout only: `examples/` is not installed with the package, and the packaged templates ship Z-ORDER renderings, not the Liquid variants.
+
 Liquid templates must not enable ZORDER or carry per-table `partitioning` or
 per-table `distribution` fields; partition and ZORDER-era candidates are folded
 into Liquid workload intent, and automatic clustering does not prove that

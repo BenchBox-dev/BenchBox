@@ -43,6 +43,8 @@ conda install -c rapidsai -c conda-forge -c nvidia \
     cudf=25.02 python=3.11 cuda-version=12.0
 ```
 
+The first command installs cuDF for CUDA 12.x. Conda is the recommended alternative.
+
 ### Verify Installation
 
 ```bash
@@ -60,6 +62,8 @@ benchbox run --platform cudf-df --benchmark tpch --scale 1 \
 benchbox run --platform cudf-df --benchmark tpch --scale 10 \
   --platform-option spill_to_host=true
 ```
+
+The commands run, in order: the default setup, a specific GPU device, and spilling to host memory for large datasets.
 
 ## Configuration Options
 
@@ -80,6 +84,8 @@ rmm.reinitialize(
     initial_pool_size=8 * 1024**3,
 )
 ```
+
+Initialize the memory pool for better allocation performance. `initial_pool_size` is 8 GB here.
 
 ## Scale Factor Guidelines
 
@@ -125,6 +131,8 @@ Not all operations benefit equally from GPU acceleration. Run benchmarks with yo
 ## Query Implementation
 
 cuDF queries use Pandas-compatible API:
+
+This is TPC-H Q1, the Pricing Summary Report, for cuDF. `lineitem` is a cuDF DataFrame.
 
 ```python
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -186,6 +194,8 @@ export CUDA_HOME=/usr/local/cuda
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 ```
 
+Verify the CUDA installation, then set the CUDA path.
+
 ### Out of GPU Memory
 
 ```
@@ -205,14 +215,17 @@ python -c "import cudf; print(cudf.__version__)"
 python -c "import cudf; cudf.Series([1,2,3]).sum()"
 ```
 
+The first command verifies the installation and the second checks CUDA compatibility with a basic test.
+
 ### Multi-GPU Setup
 
 ```bash
 nvidia-smi -L
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-
 ```
+
+Verify that all GPUs are visible, then set the visible devices. For multi-GPU, use Dask-cuDF rather than `cudf-df` directly.
 
 ## Comparison: cuDF vs Other DataFrame Platforms
 

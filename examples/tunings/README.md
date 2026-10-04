@@ -45,6 +45,13 @@ benchbox run --platform polars --benchmark tpch --mode dataframe \
   --tuning examples/tunings/dataframe/polars_optimized.yaml
 ```
 
+The commands, in order:
+
+- `tuned` auto-discovers the platform and benchmark tuned template. This is the primary way to use it.
+- `notuning` is the explicit baseline, with no tuning.
+- The third command points directly at a file.
+- The last command uses a DataFrame platform. DataFrame tuning files must be referenced explicitly.
+
 `examples/unified_runner.py` is a lighter-weight alternative to the `benchbox`
 CLI for scripting/automation; it accepts the same `--tuning` values but
 **defaults to `tuned`** (the main CLI defaults to `notuning`):
@@ -92,6 +99,8 @@ export BENCHBOX_TUNING_PATH=/path/to/my-tunings
 benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ```
 
+The directory must use the same `<platform>/<benchmark>_tuned.yaml` layout.
+
 ## Default file via `benchbox.yaml` / `BENCHBOX_TUNING_CONFIG`
 
 Set a default file that `--tuning tuned` uses before falling back to
@@ -101,6 +110,8 @@ auto-discovery:
 tuning:
   default_config_file: ./tuning/my_tuning.yaml
 ```
+
+Put this setting in `benchbox.yaml`.
 
 or override it at runtime without editing the file:
 
@@ -118,6 +129,8 @@ benchbox tuning list --platform duckdb --benchmark tpch
 
 benchbox tuning show tuned --platform duckdb --benchmark tpch
 ```
+
+The first command lists everything available under `examples/tunings/`. The second filters by platform and benchmark. The third shows what `--tuning` would resolve to, including which file, if any.
 
 ## Configuration structure
 
@@ -221,6 +234,8 @@ table_tunings:
       type: INTEGER
       order: 2
 ```
+
+This is a custom TPC-H configuration with specific partitioning. The `sorting` entries add custom sorting.
 
 For the full `--tuning` precedence order and the `tuning` command group
 (`init`, `validate`, `defaults`, `list`, `show`, `platforms`), see

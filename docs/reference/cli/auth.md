@@ -41,6 +41,8 @@ uv run -- benchbox auth refresh
 uv run -- benchbox auth logout
 ```
 
+In order, these commands: prompt for a token and store it securely, store a token for a staging service, check whether BenchBox can submit to the default service, replace a stored token, and remove a stored token.
+
 Prefer the prompt or an environment variable for secrets. `benchbox auth login --token ...`
 exists for controlled automation, but command-line token values can be captured
 by shell history and process listings on some systems.

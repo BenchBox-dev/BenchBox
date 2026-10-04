@@ -23,6 +23,9 @@ QuestDB is designed for time-series and event-driven workloads, with features li
 
 ## Quick Start
 
+The commands install the `psycopg2` dependency (or the QuestDB extra), configure the connection (QuestDB must be
+running), and run the TPC-H benchmark.
+
 ```bash
 uv add psycopg2-binary
 
@@ -34,6 +37,9 @@ benchbox run --platform questdb --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start
+
+The commands start QuestDB with Docker (all ports exposed), verify PG wire protocol connectivity, verify the REST
+API, and run the benchmark.
 
 ```bash
 docker run -p 9000:9000 -p 8812:8812 -p 9009:9009 -p 9003:9003 \
@@ -113,6 +119,8 @@ QuestDB also supports the InfluxDB Line Protocol on port 9009 for high-throughpu
 
 ### Basic Benchmarks
 
+The commands run TPC-H at scale factor 0.01 (a quick test), at scale factor 1, and for specific queries only.
+
 ```bash
 benchbox run --platform questdb --benchmark tpch --scale 0.01
 
@@ -151,6 +159,8 @@ benchbox run --platform questdb --benchmark tpch --scale 1.0 \
 ```
 
 ### Dry Run (Preview)
+
+This previews the execution plan without running it.
 
 ```bash
 benchbox run --platform questdb --benchmark tpch --scale 1.0 --dry-run ./preview

@@ -104,6 +104,8 @@ python getting_started/local/duckdb_tpch_power.py --scale 0.1
 
 ### Cloud Examples (Requires Credentials)
 
+Set the environment variables first, then run the example:
+
 ```bash
 export DATABRICKS_TOKEN="your-token"
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
@@ -129,8 +131,9 @@ This creates:
 uv pip install jupyter
 
 jupyter notebook notebooks/
-
 ```
+
+Then open the desired notebook in your browser.
 
 ## Example Directory Structure
 
@@ -199,6 +202,7 @@ For detailed explanations of concepts used in these examples, see:
 ### Common Issues
 
 **`ModuleNotFoundError: No module named 'benchbox'`**
+Install BenchBox, or install it with platform-specific extras:
 ```bash
 uv add benchbox
 

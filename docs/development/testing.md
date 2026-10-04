@@ -15,6 +15,7 @@ The test suite is organized into tiers for different development workflows:
 make test-fast
 uv run -- python -m pytest -m fast
 ```
+Either command works. The `make` target wraps the pytest command.
 
 **Integration Tests** (~5 minutes, requires local databases):
 ```bash
@@ -28,12 +29,14 @@ uv run -- python -m pytest -m e2e_quick
 
 uv run -- python -m pytest tests/e2e/ -v
 ```
+The first command runs in dry-run mode and is fast. The second runs full E2E tests with local platforms.
 
 **Full Suite** (requires all dependencies):
 ```bash
 make test-all
 uv run -- python -m pytest
 ```
+Either command works.
 
 ## Pytest xdist Safety
 
@@ -68,6 +71,7 @@ Run all smoke checks:
 make test-smoke
 uv run -- python -m pytest -m platform_smoke
 ```
+Either command works.
 
 Run specific platform smoke tests:
 ```bash
@@ -81,6 +85,7 @@ uv run -- python -m pytest tests/integration/platforms/test_redshift_smoke.py
 
 uv run -- python -m pytest tests/integration/platforms/test_snowflake_smoke.py
 ```
+The first command covers the local adapters (DuckDB and SQLite). The rest cover the cloud adapters with stubbed clients: Databricks, BigQuery, Redshift, and Snowflake, in that order.
 
 Each test file installs lightweight client stubs automatically so you can run
 the suite without provisioning real services. Failures generally indicate a
@@ -107,6 +112,7 @@ uv run -- python -m pytest -m e2e_local
 
 uv run -- python -m pytest tests/e2e/ -v
 ```
+The commands run quick E2E tests (dry-run mode), local platform tests (full execution), and all E2E tests, in that order.
 
 See [E2E Testing Guide](../testing/e2e-testing.md) for detailed documentation.
 
@@ -163,6 +169,8 @@ uv run -- python -m pytest -m bigquery
 
 uv run -- python -m pytest --run-optional
 ```
+
+The first command installs the cloud platform extras. The next two run the BigQuery tests, either through the `make` target or through pytest directly. The last runs all tests, including those that require TPC binaries.
 
 ### Table-Format Integration Lane (Delta/Iceberg)
 

@@ -9,7 +9,7 @@ BenchBox supports first-class Databricks clustering strategy control so you can 
 
 ## Tuning Configuration
 
-Use unified tuning `platform_optimizations`:
+Use unified tuning `platform_optimizations`. `databricks_clustering_strategy` accepts one of the strategies listed above (`liquid_clustering`, `liquid_clustering_auto`, `z_order`, or `none`):
 
 ```yaml
 platform_optimizations:

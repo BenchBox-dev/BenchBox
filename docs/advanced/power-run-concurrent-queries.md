@@ -54,6 +54,14 @@ execution:
     collect_metrics: true
 ```
 
+- `iterations`: the number of test iterations to run.
+- `warm_up_iterations`: warm-up runs, which are excluded from statistics.
+- `timeout_per_iteration_minutes`: the maximum time for each iteration.
+- `fail_fast`: when true, stop on the first failure. When false, continue.
+- `collect_metrics`: collect detailed performance metrics.
+
+Put these settings in `benchbox.yaml`.
+
 ### Usage Examples
 
 #### Basic Power Run Setup
@@ -67,7 +75,6 @@ from benchbox import TPCH
 from benchbox.core.tpch.power_test import TPCHPowerTest
 
 tpch = TPCH(scale_factor=0.1)
-
 
 connection = duckdb.connect("test.db")
 
@@ -88,6 +95,10 @@ print(f"Average Power@Size: {statistics.mean(power_values):.2f}")
 print(f"Std Deviation: {statistics.stdev(power_values):.2f}")
 print(f"Confidence: {len(power_values)}/5 iterations successful")
 ```
+
+This example requires `test.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
+
+Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The former `PowerRunExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. Validation is off because answer sets exist for stream 0 only.
 
 #### Advanced-level Statistical Analysis
 
@@ -110,6 +121,8 @@ confidence_interval = stats.t.interval(
 print(f"95% Confidence Interval: {confidence_interval[0]:.2f} - {confidence_interval[1]:.2f}")
 print(f"Coefficient of Variation: {(np.std(power_values) / sample_mean) * 100:.1f}%")
 ```
+
+`power_values` comes from the loop above: one Power@Size per stream-ID run. The interval is a 95% confidence interval.
 
 ### Sizing Power-Run Loops
 
@@ -178,6 +191,13 @@ execution:
     max_retries: 5
 ```
 
+- `enabled`: enable concurrent execution.
+- `max_concurrent`: the maximum number of concurrent streams. The default is 2.
+- `query_timeout_seconds`: the timeout for an individual query. The default is 300.
+- `stream_timeout_seconds`: the timeout for a whole stream. The default is 3600.
+- `retry_failed_queries`: retry failed queries. The default is true.
+- `max_retries`: the maximum number of retry attempts. The default is 3.
+
 ### Usage Examples
 
 #### Basic Concurrent Execution
@@ -189,7 +209,6 @@ from benchbox import TPCH
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
 tpch = TPCH(scale_factor=0.1)
-
 
 connection = duckdb.connect("throughput.db")
 
@@ -208,6 +227,10 @@ for stream in result.stream_results:
           f"{stream.queries_successful}/{stream.queries_executed} queries, "
           f"{stream.duration:.2f}s")
 ```
+
+This example requires `throughput.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
+
+One throughput test owns all of its streams. The connection factory hands each stream its session (see the adapter session-capability contract), and `StreamRunner` executes the streams concurrently with fail-closed accounting. The former `ConcurrentQueryExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`.
 
 #### Scalability Analysis
 
@@ -242,6 +265,8 @@ for level, metrics in throughput_results.items():
     print(f"{level:<8} {metrics['successful']:<12} {metrics['success_rate']:<12.1%}")
 ```
 
+The loop tests scalability across the different concurrency levels.
+
 ## System Optimization
 
 ### Automatic Resource-Based Configuration
@@ -264,6 +289,8 @@ print(f"Optimized for {cpu_cores} cores, {memory_gb:.1f}GB RAM:")
 print(f"- Max concurrent streams: {summary['concurrent_queries']['max_streams']}")
 print(f"- Power run timeout: {summary['power_run']['settings']['timeout_per_iteration_minutes']} min")
 ```
+
+`optimize_for_system` tunes settings automatically from the system specs, and `get_execution_summary` shows the configured settings.
 
 ### Optimization Rules
 
@@ -349,6 +376,8 @@ print(f"  Single-stream efficiency: {statistics.mean(power_values):.2f} Power@Si
 print(f"  Performance consistency: ±{statistics.stdev(power_values):.1f} Power@Size")
 ```
 
+The workflow has four steps: system analysis and optimization (the `thorough` profile gives comprehensive testing), benchmark setup at production scale (SF 1.0), power run testing for statistical confidence, and concurrent throughput testing. Validation runs for stream 0 only because answer sets exist for stream 0 only.
+
 ## Best Practices
 
 ### Power Run Iterations
@@ -426,6 +455,12 @@ config = PowerRunSettings()
 config.iterations = 5
 ```
 
+With five iterations, each iteration uses a different stream (0, 1, 2, 3, 4). For example, the TPC-H stream permutations begin as follows:
+
+- Iteration 0 uses stream 0: `[14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]`
+- Iteration 1 uses stream 1: `[21, 3, 18, 5, 11, 7, 6, 20, 17, 12, 16, 15, 13, 10, 2, 8, 14, 19, 9, 22, 1, 4]`
+- Iteration 2 uses stream 2: `[6, 17, 14, 16, 19, 10, 9, 2, 15, 8, 5, 22, 12, 7, 13, 18, 1, 4, 20, 3, 11, 21]`
+
 ### Concurrent Query Compliance
 
 Each concurrent stream uses a **different permutation** as mandated by TPC specifications:
@@ -434,6 +469,8 @@ Each concurrent stream uses a **different permutation** as mandated by TPC speci
 config = ConcurrentQueriesSettings()
 config.max_concurrent = 4
 ```
+
+With four concurrent streams, each stream gets a different permutation (0, 1, 2, 3). Stream N uses TPC-H permutation N, or TPC-DS stream N permutation.
 
 ### Why TPC Compliance Matters
 
@@ -450,6 +487,8 @@ assert result.query_results[0]['query_id'] == 14
 assert result.query_results[0]['stream_id'] == 0
 assert result.query_results[0]['position'] == 1
 ```
+
+These assertions verify that the first query in a TPC-H power test follows the stream permutation. Stream 0 starts with query 14, the stream ID is recorded, and the position is the query's place in the permutation.
 
 For detailed compliance documentation, see:
 [TPC-H Official Guide → Specification Compliance](../guides/tpc/tpc-h-official-guide.md#tpc-h-specification-compliance),

@@ -354,6 +354,8 @@ Generate source data files in various formats for ETL processing.
     for format_type, files in source_files.items():
         print(f"{format_type}: {len(files)} files")
 
+The first call generates all source formats. The second generates only the specified formats and batch types.
+
 Parameters:
 
 - **formats** (list[str], optional): Data formats to generate. Options: "csv", "xml", "fixed_width", "json"
@@ -374,6 +376,8 @@ Get a specific TPC-DI query.
     a1 = benchmark.get_query("A1")
 
     dq1 = benchmark.get_query("VQ1")
+
+The examples get a validation query, an analytical query and a data quality query, in that order.
 
 Parameters:
 
@@ -398,6 +402,8 @@ Get all TPC-DI benchmark queries.
     print(f"Total queries: {len(queries)}")
 
     queries_bq = benchmark.get_queries(dialect="bigquery")
+
+The first call gets all queries. The second gets them with dialect translation.
 
 Parameters:
 
@@ -434,6 +440,8 @@ Get CREATE TABLE SQL for all TPC-DI tables.
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
+
+The three calls return standard SQL, SQL for a specific dialect, and SQL with a tuning configuration.
 
 Parameters:
 
@@ -605,6 +613,8 @@ Calculate official TPC-DI metrics.
     print(f"Composite Performance Score: {metrics.overall_performance:.2f}")
     print(f"Throughput: {metrics.etl_throughput:.2f} records/sec")
 
+Run the ETL benchmark and the validation first, then calculate the official metrics from their results.
+
 Parameters:
 
 - **etl_result** (Any): ETL execution results
@@ -716,6 +726,8 @@ Basic ETL Pipeline
     print(f"ETL completed in {etl_result['duration']:.2f}s")
     print(f"Validation status: {etl_result['validation_status']}")
 
+This example creates a benchmark with scale factor 1 (about 100MB), generates the source data, sets up the database and creates the schema, and then runs the ETL pipeline.
+
 Incremental Batch Processing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -744,6 +756,8 @@ Incremental Batch Processing
         )
         print(f"Batch {batch_id} duration: {inc_result['duration']:.2f}s")
 
+The example runs the historical load first and then processes three incremental batches.
+
 Data Quality Validation
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -769,6 +783,8 @@ Data Quality Validation
         print(f"  {check_id}: {status} ({violations} violations)")
 
     print(f"\nOverall quality score: {validation['quality_score']:.2f}%")
+
+The example runs ETL, then runs comprehensive validation, checks the validation results and reports the overall quality score.
 
 SCD Type 2 Processing Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -811,6 +827,8 @@ SCD Type 2 Processing Example
     print("\nCustomer history (CustomerID=1000):")
     for record in historical_customers:
         print(f"  {record}")
+
+The example creates the schema with slowly changing dimension (SCD) support and loads the initial data. It queries the current customer records, processes an SCD batch (which creates new versions of changed records) and then queries the historical records.
 
 Multi-Platform Comparison
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

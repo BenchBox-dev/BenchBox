@@ -34,6 +34,8 @@ Quick Start
 Server Mode
 ~~~~~~~~~~~
 
+Server mode is the default. It connects to a running ClickHouse server.
+
 .. code-block:: python
 
     from benchbox.tpch import TPCH
@@ -52,6 +54,9 @@ Server Mode
 
 Local Mode (Embedded)
 ~~~~~~~~~~~~~~~~~~~~~
+
+Local mode runs embedded ClickHouse through chDB. The ``data_path`` argument is
+optional and sets persistent storage. Omit it to keep data in memory.
 
 .. code-block:: python
 

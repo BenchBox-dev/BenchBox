@@ -229,6 +229,8 @@ results = bench.run_category("insert", connection, iterations=3)
 results = bench.run_benchmark(connection, iterations=3)
 ```
 
+The example initializes the benchmark and generates data, runs a single operation, runs the `insert` category, and runs the full benchmark.
+
 ## Performance Metrics
 
 Each operation captures:

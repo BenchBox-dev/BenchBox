@@ -34,6 +34,8 @@ pip install "benchbox[pandas]"
 python -c "import pandas; print(f'Pandas {pandas.__version__}')"
 ```
 
+Install with `uv` or with pip. The last command verifies the installation.
+
 ## Quick Start
 
 ```bash
@@ -42,6 +44,8 @@ benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1 \
   --platform-option dtype_backend=pyarrow
 ```
+
+The first command runs TPC-H on the Pandas DataFrame platform. The second uses the PyArrow backend, which is 2-5x faster for aggregations.
 
 ## Configuration Options
 
@@ -71,6 +75,8 @@ benchbox run --platform pandas-df --benchmark tpch --scale 0.1 \
 benchbox run --platform pandas-df --benchmark tpch --scale 1 \
   --platform-option dtype_backend=pyarrow
 ```
+
+This example uses the PyArrow backend for large datasets.
 
 ## Scale Factor Guidelines
 
@@ -106,12 +112,12 @@ Pandas loads entire datasets into memory with eager evaluation:
    --platform-option dtype_backend=pyarrow
    ```
 
-2. **Reduce scale factor** for faster iteration:
+2. **Reduce scale factor** for faster iteration (start small):
    ```bash
    --scale 0.01
    ```
 
-3. **Consider Polars** for larger datasets:
+3. **Consider Polars** for larger datasets, because it uses lazy evaluation and automatic parallelization:
    ```bash
    --platform polars-df
    ```
@@ -149,6 +155,8 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return result
 ```
 
+This is TPC-H Q1, the Pricing Summary Report. The implementation filters with boolean indexing, computes derived columns, and then aggregates.
+
 ## Comparison: Pandas vs Polars DataFrame
 
 | Aspect | Pandas (`pandas-df`) | Polars (`polars-df`) |
@@ -181,6 +189,8 @@ If queries involving string columns are slow:
 --platform-option dtype_backend=pyarrow
 ```
 
+PyArrow handles strings efficiently.
+
 ### Type Conversion Warnings
 
 ```
@@ -207,6 +217,8 @@ query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)
 ```
+
+The example creates an adapter with custom configuration, creates a context and loads the tables, and then executes a query.
 
 ## Related Documentation
 

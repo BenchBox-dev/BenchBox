@@ -26,6 +26,8 @@ pip install pyspark==3.5.0
 pip install delta-spark
 ```
 
+The first command installs PySpark. The second installs a specific version. The third adds Delta Lake support.
+
 ## Configuration
 
 ### Environment Variables
@@ -36,6 +38,8 @@ export PYSPARK_PYTHON=python3
 
 export SPARK_MASTER=spark://master:7077
 ```
+
+The first two variables configure Spark. `SPARK_MASTER` is needed only for distributed mode.
 
 ### CLI Options
 
@@ -69,6 +73,8 @@ benchbox run --platform spark --benchmark tpch --scale 0.1 \
   --platform-option master="local[*]"
 ```
 
+This runs locally with all cores.
+
 ### Cluster Mode
 
 ```bash
@@ -77,6 +83,8 @@ benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option num_executors=10 \
   --platform-option executor_memory=16g
 ```
+
+This runs on a Spark cluster.
 
 ### Python API
 
@@ -96,6 +104,8 @@ adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
 ```
 
+The example initializes the adapter, then loads and runs the benchmark.
+
 ### Delta Lake Integration
 
 ```python
@@ -111,6 +121,8 @@ adapter = SparkAdapter(
 )
 ```
 
+This initializes the adapter with Delta Lake.
+
 ## Deployment Modes
 
 ### Local Mode
@@ -122,6 +134,8 @@ benchbox run --platform spark --benchmark tpch --scale 0.1 \
   --platform-option master="local[4]"
 ```
 
+`local[4]` uses 4 cores.
+
 ### Standalone Cluster
 
 ```bash
@@ -132,6 +146,8 @@ $SPARK_HOME/sbin/start-worker.sh spark://master:7077
 benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option master=spark://master:7077
 ```
+
+The commands start the master, start a worker, and run the benchmark.
 
 ### Kubernetes
 
@@ -212,6 +228,8 @@ Spark provides detailed physical and logical plans:
 spark.sql("SELECT ...").explain(extended=True)
 ```
 
+This prints the query plan.
+
 ## Limitations
 
 - **Infrastructure overhead** - Requires cluster for large datasets
@@ -221,6 +239,8 @@ spark.sql("SELECT ...").explain(extended=True)
 ## Troubleshooting
 
 ### Out of Memory
+
+Increase memory:
 
 ```python
 adapter = SparkAdapter(
@@ -234,6 +254,8 @@ adapter = SparkAdapter(
 
 ### Shuffle Spill
 
+Reduce the shuffle partition size by raising the partition count:
+
 ```python
 adapter = SparkAdapter(
     spark_config={
@@ -245,9 +267,10 @@ adapter = SparkAdapter(
 
 ### Connection to Master Failed
 
+Verify that the master is running by requesting its web UI at port 8080, and check firewall rules.
+
 ```bash
 curl http://master:8080
-
 ```
 
 ## Related Documentation

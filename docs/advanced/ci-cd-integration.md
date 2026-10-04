@@ -77,6 +77,8 @@ jobs:
           path: results/*.json
 ```
 
+The schedule trigger runs the workflow daily at 2 AM UTC.
+
 ### Regression Detection Workflow
 
 Create `.github/workflows/benchmark-regression.yml`:
@@ -554,6 +556,8 @@ git commit -m "Update performance baseline"
 aws s3 cp results/*.json s3://benchmarks/baselines/$(git rev-parse HEAD)/
 ```
 
+The first two commands store the baseline in version control. The ``aws s3 cp`` command is an alternative that stores baselines in artifact storage.
+
 ### 3. Conditional Execution
 
 Run benchmarks only when relevant:
@@ -565,6 +569,8 @@ on:
       - 'src/**'
       - 'benchmarks/**'
 ```
+
+This GitHub Actions trigger runs the workflow only when files under the listed paths change.
 
 ### 4. Parallel Execution
 
@@ -611,6 +617,8 @@ baseline_files = exporter.export_result(results, formats=["json"])
 print(f"Baseline created: {baseline_files['json']}")
 ```
 
+The script runs a benchmark and exports its result as the baseline.
+
 ### Updating Baselines
 
 Update baseline after verified improvements:
@@ -624,6 +632,8 @@ cp results/tpch_sf001_duckdb.json baseline/tpch_sf001_duckdb.json
 git add baseline/tpch_sf001_duckdb.json
 git commit -m "Update baseline with verified improvements"
 ```
+
+Run the comparison first. Copy the new result over the baseline only if the improvement is verified.
 
 ## Regression Detection
 
@@ -887,12 +897,14 @@ benchbox run \
   --queries 1,6,12
 ```
 
+``--scale 0.001`` is a very small scale, and ``--queries 1,6,12`` runs a subset of queries.
+
 ### Resource Constraints
 
 **Problem**: CI runners run out of memory
 
 **Solution**: Use resource-appropriate configurations. The fragments below
-show a runner setting and a command option, not a complete workflow:
+show a runner setting (use a larger runner) and a command option (limit the benchmark scope), not a complete workflow:
 
 ```text
 # GitHub Actions - use larger runners
@@ -916,6 +928,8 @@ for i in range(3):
 
 median_time = sorted(results)[len(results) // 2]
 ```
+
+The loop runs the benchmark several times. Using the median gives a stable result.
 
 ## See Also
 

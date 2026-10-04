@@ -47,6 +47,8 @@ benchbox setup --platform redshift --diagnose
 benchbox setup --platform databricks --remove
 ```
 
+The commands, in order, run interactive credential setup, list all platforms and their status, check credential status across all platforms, validate credentials without modifying them, run connectivity diagnostics (Redshift only), and remove stored credentials.
+
 ## Notes
 
 - Credentials are stored securely via the `CredentialManager`. The `--status` command shows when credentials were last updated and validated.

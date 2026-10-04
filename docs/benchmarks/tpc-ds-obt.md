@@ -91,6 +91,8 @@ benchbox run --platform duckdb --benchmark tpcds --scale 1.0
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0
 ```
 
+The first command runs TPC-DS-OBT on DuckDB and the second runs only queries Q1, Q3 and Q7. The last two commands run standard TPC-DS and then TPC-DS-OBT at the same scale for comparison.
+
 ## CLI Options (`--benchmark-option`)
 
 Configure TPC-DS-OBT via `--benchmark-option KEY=VALUE`:
@@ -113,6 +115,8 @@ benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
   --benchmark-option output_format=dat
 ```
+
+The first command uses minimal dimensions and the store channel only. Parquet is the default output format, so it needs no flag. The second forces the legacy pipe-delimited `.dat` output, which is rarely needed.
 
 ### Storage format
 

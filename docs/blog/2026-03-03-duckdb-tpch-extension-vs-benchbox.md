@@ -153,6 +153,8 @@ DuckDB extension (`tpch_queries()`):
 SELECT query FROM tpch_queries() WHERE query_nr = 6;
 ```
 
+The extension returns one fixed text for Q6. Its predicates are `l_shipdate >= CAST('1994-01-01' AS date)`, `l_discount BETWEEN 0.05 AND 0.07` and `l_quantity < 24`.
+
 BenchBox (`TPCHBenchmark.get_query`, translated to DuckDB dialect):
 
 ```python
@@ -160,6 +162,11 @@ bench.get_query(6, seed=0, scale_factor=1.0, dialect="duckdb")
 
 bench.get_query(6, seed=7, scale_factor=1.0, dialect="duckdb")
 ```
+
+The substitution values change with the seed:
+
+- Seed 0 gives `l_shipdate >= CAST('1993-01-01' AS DATE)`, `l_discount BETWEEN 0.02 - 0.01 AND 0.02 + 0.01` and `l_quantity < 24`.
+- Seed 7 gives `l_shipdate >= CAST('1994-01-01' AS DATE)`, `l_discount BETWEEN 0.08 - 0.01 AND 0.08 + 0.01` and `l_quantity < 25`.
 
 BenchBox can also derive different substitutions from TPC-H stream permutations:
 
@@ -198,6 +205,8 @@ $ uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
 $ uv run benchbox run --platform duckdb --benchmark tpch --scale 1 \
     --phases generate,load,power --queries 1 --force datagen --non-interactive
 ```
+
+These two commands are the BenchBox path. The SQL below is the DuckDB extension path, captured through the Python duckdb API.
 
 ```sql
 INSTALL tpch; LOAD tpch; CALL dbgen(sf=<scale>); PRAGMA tpch(1);

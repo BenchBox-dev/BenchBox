@@ -34,6 +34,8 @@ export DORIS_PORT=9030
 benchbox run --platform doris --benchmark tpch --scale 0.01
 ```
 
+The first two commands are alternatives: install the PyMySQL dependency directly, or install it through the Doris extra. Doris must be running before you set the connection variables and run the benchmark.
+
 ### Docker Quick Start
 
 ```bash
@@ -47,6 +49,8 @@ mysql -h 127.0.0.1 -P 19031 -u root -e "SELECT 1"
 
 benchbox run --platform doris --benchmark tpch --scale 1.0
 ```
+
+The `docker compose` command starts the repo-managed Apache Doris 4.0.3 stack and waits for FE and BE readiness. The environment variables point BenchBox at the mapped Doris ports, and the `mysql` command verifies connectivity before the benchmark runs.
 
 The checked-in compose file uses the official `apache/doris:4.0.3-all-slim`
 image and applies a small amount of startup configuration for local Docker
@@ -309,6 +313,8 @@ ALTER TABLE lineitem SET ("bloom_filter_columns" = "l_orderkey, l_partkey");
 
 CREATE INDEX idx_shipmode ON lineitem (l_shipmode) USING BITMAP;
 ```
+
+Use a Bloom filter index for high-cardinality columns and a bitmap index for low-cardinality columns.
 
 ### Colocate Join Groups
 

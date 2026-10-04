@@ -67,7 +67,7 @@ uv add benchbox
 
 ### Database Setup
 
-The benchmark works with any database supported by Python. Examples:
+The benchmark works with any database supported by Python. The examples below show a connection factory for SQLite (for testing), PostgreSQL, and MySQL:
 
 ```python
 import sqlite3
@@ -125,6 +125,12 @@ print(f"Certification Ready: {result.certification_ready}")
 
 ### Creating a Benchmark Instance
 
+The parameters are:
+- `scale_factor`: the scale factor (1.0 is about 1 GB).
+- `output_dir`: the output directory.
+- `verbose`: enables verbose output.
+- `parallel`: the number of parallel data generation workers.
+
 ```python
 from benchbox import TPCH
 
@@ -138,6 +144,14 @@ benchmark = TPCH(
 
 ### Running the Official Benchmark
 
+The parameters are:
+- `connection_factory`: the database connection factory.
+- `num_streams`: the number of concurrent streams.
+- `output_dir`: the results output directory.
+- `verbose`: enables verbose logging.
+- `validate_results`: enables result validation.
+- `audit_trail`: enables the audit trail.
+
 ```python
 result = benchmark.run_official_benchmark(
     connection_factory=connection_factory,
@@ -150,6 +164,8 @@ result = benchmark.run_official_benchmark(
 ```
 
 ### Accessing Results
+
+The result object holds the overall results, the Power Test results, the Throughput Test results, and the validation results:
 
 ```python
 print(f"Success: {result.success}")
@@ -172,10 +188,7 @@ print(f"Validation Errors: {result.validation_errors}")
 
 ### Power Test
 
-The Power Test measures single-stream performance by executing all 22 TPC-H queries sequentially:
-
-```python
-```
+The Power Test measures single-stream performance by executing all 22 TPC-H queries sequentially. The Power Test runs automatically as part of the official benchmark. It executes queries 1-22 in order with fixed parameters.
 
 **Key characteristics:**
 - Sequential execution of all 22 queries
@@ -185,10 +198,7 @@ The Power Test measures single-stream performance by executing all 22 TPC-H quer
 
 ### Throughput Test
 
-The Throughput Test measures multi-stream performance by executing multiple concurrent query streams:
-
-```python
-```
+The Throughput Test measures multi-stream performance by executing multiple concurrent query streams. The Throughput Test runs automatically as part of the official benchmark. Each stream contains all 22 queries in randomized order.
 
 **Key characteristics:**
 - Concurrent execution of multiple query streams
@@ -300,6 +310,8 @@ print(f"Maintenance Test: {maintenance_result.total_execution_time:.2f}s")
 print("\n⚠️  Database modified - reload required before additional tests!")
 ```
 
+The example runs in three steps. Step 1 runs the power and throughput tests on clean data. Step 2 reloads the database before maintenance, which creates a fresh database. Step 3 runs the maintenance test. After step 3 the database contains modified data, so it must be reloaded before the power or throughput test runs again.
+
 **Workflow Summary:**
 
 ```
@@ -351,6 +363,8 @@ throughput_at_size = 2 * 3600 * 1.0 / 150
 
 qphh_at_size = (power_at_size * throughput_at_size) ** 0.5
 ```
+
+The results are `power_at_size = 36.0`, `throughput_at_size = 48.0`, and `qphh_at_size = (36.0 * 48.0) ** 0.5 = 41.57`.
 
 ## Reporting and Validation
 
@@ -409,6 +423,8 @@ For TPC-H certification, follow these steps:
 
 ### 1. Preparation
 
+Use an appropriate, certified scale factor for certification:
+
 ```python
 benchmark = TPCH(
     scale_factor=100.0,
@@ -425,10 +441,11 @@ data_files = benchmark.generate_data()
 
 ### 3. Database Setup
 
-```python
-```
+Set up a production database with proper configuration. Use a database system appropriate for certification.
 
 ### 4. Benchmark Execution
+
+Run with certification parameters, using an appropriate number of streams:
 
 ```python
 result = benchmark.run_official_benchmark(
@@ -472,6 +489,8 @@ else:
 
 ### Benchmark Configuration
 
+The examples below are, in order, for development, performance testing, and certification:
+
 ```python
 benchmark = TPCH(scale_factor=0.01, verbose=True)
 
@@ -492,6 +511,8 @@ benchmark = TPCH(scale_factor=100.0, verbose=True)
 
 #### Database Connection Issues
 
+Issue: connection timeouts. Solution: increase the connection timeout.
+
 ```python
 def connection_factory():
     conn = sqlite3.connect("tpch.db", timeout=30)
@@ -500,11 +521,15 @@ def connection_factory():
 
 #### Query Execution Failures
 
+Issue: query syntax errors. Solution: check SQL dialect compatibility.
+
 ```python
 query = benchmark.get_query(1, dialect="postgres")
 ```
 
 #### Memory Issues
+
+Issue: out of memory during execution. Solution: use a smaller scale factor or increase system memory.
 
 ```python
 benchmark = TPCH(scale_factor=0.1)
@@ -512,8 +537,7 @@ benchmark = TPCH(scale_factor=0.1)
 
 #### Performance Issues
 
-```python
-```
+Issue: slow query execution. Solution: optimize the database configuration and indexing.
 
 ### Debugging
 
@@ -527,10 +551,7 @@ result = benchmark.run_official_benchmark(
 )
 ```
 
-Check audit trail logs:
-
-```python
-```
+Check audit trail logs. Audit trail files are created in `output_dir`. Check the `benchmark_audit_*.log` files for detailed execution logs.
 
 ### Performance Optimization
 

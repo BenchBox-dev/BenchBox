@@ -38,6 +38,8 @@ uv add benchbox --extra fabric
 pip install "benchbox[fabric]"
 ```
 
+The first command installs BenchBox with the Fabric dependencies using uv, and the second does the same with pip.
+
 ### Required Dependencies
 
 - `pyodbc` - ODBC driver connectivity
@@ -81,6 +83,8 @@ benchbox run --platform fabric --benchmark tpch --scale 1 \
   --platform-option client_secret=your-secret
 ```
 
+The first command runs TPC-H on a Fabric Warehouse. The second does the same with service principal authentication.
+
 ### Programmatic Usage
 
 ```python
@@ -101,6 +105,8 @@ adapter.load_benchmark_data(benchmark)
 
 results = adapter.run_benchmark(benchmark)
 ```
+
+The `default_credential` authentication method uses the Azure CLI or a managed identity.
 
 ## Authentication Methods
 
@@ -229,6 +235,8 @@ benchmark = TPCH(scale_factor=1.0)
 query = benchmark.get_query(1)
 ```
 
+TPC-H queries are translated from the DuckDB dialect, so `get_query` returns a T-SQL compatible query.
+
 ## Performance Considerations
 
 ### Result Cache
@@ -242,6 +250,8 @@ adapter = FabricWarehouseAdapter(
     disable_result_cache=True
 )
 ```
+
+`disable_result_cache=True` is the default.
 
 To enable (for production-like testing):
 
@@ -273,6 +283,8 @@ az fabric capacity suspend --capacity-name my-capacity
 
 az fabric capacity resume --capacity-name my-capacity
 ```
+
+Use the Azure CLI to pause Fabric capacity between runs, and resume it when you are ready to benchmark.
 
 ## Troubleshooting
 

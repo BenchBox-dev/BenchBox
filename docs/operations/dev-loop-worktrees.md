@@ -143,6 +143,8 @@ make branch-prune-merged DRY_RUN=1
 make branch-prune-merged
 ```
 
+The first command previews the sweep and requires `gh`. The second deletes only branches whose tips are historically proven merge-time heads.
+
 `branch-prune-merged` skips the current branch, `develop`/`main`/`release`/
 `published-results`, and any branch still attached to a worktree. It fetches
 `origin/develop`, proves the latest PR's historical merge-time head from the

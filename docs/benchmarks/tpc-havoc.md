@@ -40,6 +40,8 @@ FROM (
 ) WHERE c_acctbal > avg_bal;
 ```
 
+The three queries use a correlated subquery, a `WITH` clause and a window function, in that order.
+
 A mature optimizer should recognize these equivalences and produce similar plans. TPC-Havoc systematically tests whether this holds across hundreds of query variations.
 
 ### Why This Matters
@@ -106,6 +108,8 @@ for i, variant in enumerate(variants_q1, 1):
     print(f"Q1_V{i}: {len(result)} rows")
 ```
 
+This example initializes the benchmark (which inherits TPC-H data and schema), generates and loads the data, fetches the original TPC-H Query 1 and all 10 variants of Query 1, and then runs the variants and compares them.
+
 ## Use Cases
 
 ### 1. Optimizer Robustness Testing
@@ -134,6 +138,8 @@ print(f"Min: {min(times):.2f}s, Max: {max(times):.2f}s")
 print(f"Variance: {max(times) / min(times):.2f}x")
 ```
 
+`setup_database()` stands for your own database connection. The example tests the Query 8 variants (an 8-way join) and reports the variance across them.
+
 **Expected Result**: Low variance (< 2x) indicates robust optimizer
 **Problem Indicator**: High variance (> 5x) reveals optimizer weaknesses
 
@@ -148,6 +154,8 @@ benchbox run --benchmark tpchavoc --platform postgres --scale 1.0 --output new.j
 
 benchbox compare baseline.json new.json --fail-on-regression 50%
 ```
+
+The first run is the baseline on the current database version, and the second runs after the upgrade. The `compare` command fails if any result regresses by more than 50%.
 
 ### 3. Cross-Database Optimizer Comparison
 
@@ -204,6 +212,8 @@ for pattern, times in pattern_performance.items():
     avg_time = sum(times) / len(times)
     print(f"{pattern}: {avg_time:.3f}s average")
 ```
+
+`get_variant_pattern` returns the pattern name, such as "CTE" or "Window Function". The loop finds which patterns are fastest and slowest on average.
 
 ## Key Features
 
@@ -262,6 +272,8 @@ benchbox run --benchmark tpchavoc --platform duckdb --queries Q8_V1,Q8_V2,Q8_V3
 
 benchbox run --benchmark tpchavoc --platform snowflake
 ```
+
+The commands run all queries, specific variants, and all variants of one query. There is no pattern option, so list the variants explicitly. The last command shows that variance across variants is reported in the result bundle.
 
 ## Performance Characteristics
 
@@ -333,6 +345,12 @@ class TPCHavoc(BaseBenchmark):
     def validate_variant(self, query_id: str, connection) -> bool:
         pass
 ```
+
+- `TPCHavoc(...)` initializes the benchmark and inherits from TPC-H.
+- `get_query` returns a query variant by ID, such as `Q1`, `Q1_V5` or `Q8_V10`.
+- `get_all_variants` returns all 10 variants for a query number from 1 to 22.
+- `get_variant_description` describes the transformation pattern used.
+- `validate_variant` checks that the variant produces results identical to the original.
 
 ## Related Benchmarks
 

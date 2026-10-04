@@ -44,6 +44,8 @@ benchbox run --platform datafusion-df --benchmark tpch --scale 1 \
   --platform-option target_partitions=8
 ```
 
+The second command runs with custom parallelism.
+
 ## Configuration Options
 
 | Option | Default | Description |
@@ -66,6 +68,8 @@ benchbox run --platform datafusion-df --benchmark tpch --scale 1 \
 benchbox run --platform datafusion-df --benchmark tpch --scale 10
 ```
 
+The first command uses 4 partitions, which suits limited memory. The second uses all available CPUs (the default).
+
 ### parquet_pushdown
 
 DataFusion can push predicates and projections down to the Parquet reader:
@@ -74,6 +78,8 @@ DataFusion can push predicates and projections down to the Parquet reader:
 benchbox run --platform datafusion-df --benchmark tpch --scale 1 \
   --platform-option parquet_pushdown=false
 ```
+
+Disable pushdown for debugging.
 
 ## Scale Factor Guidelines
 
@@ -124,6 +130,8 @@ DataFusion uses lazy evaluation and can handle larger datasets than eager framew
 ## Query Implementation
 
 DataFusion queries use expression-based operations:
+
+This is TPC-H Q1, the Pricing Summary Report. It filters with the expression API, computes derived columns and then aggregates.
 
 ```python
 def q1_datafusion_impl(ctx: DataFrameContext) -> Any:
@@ -241,6 +249,8 @@ query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)
 ```
+
+`memory_limit` enables memory management with spilling, and `temp_dir` is the directory for spilled data.
 
 ## Related Documentation
 

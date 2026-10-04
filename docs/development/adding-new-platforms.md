@@ -156,6 +156,8 @@ class NewDatabaseAdapter(PlatformAdapter):
 
 ```
 
+`get_target_dialect()` returns the SQL dialect identifier. This snippet is abridged: a real adapter implements all required abstract methods.
+
 ### Lifecycle and Run-Scoped State
 
 BenchBox treats `PlatformAdapter` instances as serial execution objects. Reusing
@@ -241,6 +243,14 @@ class NewDatabaseAdapter(PlatformAdapter):
 
 ```
 
+Declaring `driver_isolation_capability` is required, and CI tests validate it. Choose one of:
+- `SUPPORTED`: full driver isolation (DuckDB, DataFusion).
+- `FEASIBLE_CLIENT_ONLY`: the client can be isolated, but the engine version is external.
+- `NOT_FEASIBLE`: technical constraints prevent isolation (JVM, C libraries).
+- `NOT_APPLICABLE`: no versioned driver package (for example SQLite and DataFrames).
+
+The remaining required methods are implemented in the following steps.
+
 ### Step 2: Implement Connection Management
 
 **Important**: Ensure the returned connection object is DB API 2.0 compliant. It must support either:
@@ -248,6 +258,8 @@ class NewDatabaseAdapter(PlatformAdapter):
 2. Direct execute pattern: `connection.execute()` method available directly
 
 See [DB API 2.0 documentation](db-api-2.md) for details on both patterns.
+
+The example below creates the connection, checks existing databases, and tests the connection with the standard cursor pattern. `check_server_database_exists` uses an admin connection that does not specify a database.
 
 ```python
 def create_connection(self, **connection_config) -> Any:
@@ -376,6 +388,8 @@ def _optimize_table_definition(self, statement: str) -> str:
     return statement
 ```
 
+The `translate_sql(schema_sql, "duckdb")` call translates from the DuckDB dialect. `_optimize_table_definition` is an example hook for adding a storage engine or other platform-specific options. The `ENGINE=InnoDB` option shown is an example for MySQL-like databases.
+
 ### Step 4: Implement Data Loading
 
 ```python
@@ -464,6 +478,8 @@ def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
         if batch:
             cursor.executemany(insert_sql, batch)
 ```
+
+`load_data` uses the platform's bulk loading method when `_supports_bulk_copy()` is true (a COPY command or equivalent), and falls back to INSERT statements otherwise. The `return True` in `_supports_bulk_copy` is a placeholder: implement it based on platform capabilities.
 
 ### Step 5: Implement Query Execution
 
@@ -562,6 +578,8 @@ def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
     cursor.close()
 ```
 
+The first branch applies OLAP optimizations. The second applies OLTP optimizations.
+
 ### Step 6: Implement Platform Metadata
 
 ```python
@@ -613,6 +631,8 @@ def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
 ```
 
 ### Step 7: Implement Performance Tuning (Optional)
+
+In the example, `SORTING` is supported through indexes, `CLUSTERING` through clustered indexes, and `PARTITIONING` through table partitioning.
 
 ```python
 def supports_tuning_type(self, tuning_type) -> bool:
@@ -695,11 +715,13 @@ def run_maintenance_test(self, benchmark, **kwargs) -> Dict[str, Any]:
     return {"status": "NOT_IMPLEMENTED", "message": "Maintenance test not implemented"}
 ```
 
+The throughput test runs as a single stream for now. Extend it for true multi-stream execution later.
+
 ## Integration Steps
 
 ### Step 1: Register the Adapter
 
-Add one typed entry to the manifest source of truth:
+Add one typed entry to the manifest source of truth, `benchbox/core/platform_manifest.py`. The entry below is abridged and JSON-shaped. A real entry also carries display metadata, libraries, requirements, and adoption fields. Set `registration_order` to the next contiguous value, and do not reorder existing adapters:
 
 ```python
 {
@@ -751,7 +773,7 @@ make platform-manifest-check
 
 ### Step 2: Add SQL Dialect Support
 
-If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory.
+If your platform has a unique SQL dialect, add SQL compatibility rules or an explicit exemption under the phase-aware SQL compatibility system. Do not hide CREATE TABLE rewrites inside the adapter without registering or exempting them in the DDL governance inventory. Put the rules in `benchbox/sql_compat/rules/ddl_optimize/newdatabase_ddl_rewrites.py`:
 
 ```python
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite
@@ -767,7 +789,7 @@ register_ddl_rewrite(
 
 ### Step 3: Create Tests
 
-Create comprehensive tests in `tests/unit/platforms/test_newdatabase_adapter.py`:
+Create comprehensive tests in `tests/unit/platforms/test_newdatabase_adapter.py`. The `TestNewDatabaseIntegration` class at the end needs an actual NewDatabase instance and is skipped when the client library is not installed:
 
 ```python
 import pytest
@@ -919,7 +941,7 @@ Create platform documentation following the existing pattern in `docs/platforms/
 
 ### Step 5: Update Configuration
 
-Add the new platform to configuration files:
+Add the new platform to the example configuration files:
 
 ```yaml
 platforms:
@@ -1018,6 +1040,8 @@ print(f"Benchmark completed in {results.total_time:.2f}s")
 
 ### Connection String Parsing
 
+The example parses connection strings of the form `newdatabase://user:pass@host:port/database`:
+
 ```python
 def _parse_connection_string(self, conn_str: str) -> Dict[str, str]:
     import re
@@ -1038,6 +1062,8 @@ def _parse_connection_string(self, conn_str: str) -> Dict[str, str]:
 ```
 
 ### Retry Logic
+
+Retry transient failures with exponential backoff (the wait doubles after each attempt):
 
 ```python
 def _execute_with_retry(self, cursor, query: str, max_retries: int = 3):

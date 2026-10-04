@@ -36,6 +36,8 @@ benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench
 benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose
 ```
 
+The commands generate TPC-H data at scale factor 0.1, TPC-DS data with a specific seed, ClickBench data, and TPC-H data with verbose logging.
+
 ## Notes
 
 - Internally invokes `benchbox run --phases generate` with a dummy platform. No database connection is needed.

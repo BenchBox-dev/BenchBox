@@ -17,9 +17,10 @@ AWS Glue is a fully managed, serverless ETL service that runs Apache Spark for d
 
 ## Installation
 
+This installs Glue support and the `boto3` dependency.
+
 ```bash
 uv add benchbox --extra glue
-
 ```
 
 ## Prerequisites
@@ -36,6 +37,9 @@ uv add benchbox --extra glue
 
 ### Environment Variables
 
+`GLUE_S3_STAGING_DIR` and `GLUE_JOB_ROLE` are required. `AWS_REGION`, `AWS_PROFILE`, `GLUE_DATABASE` and
+`GLUE_VERSION` are optional.
+
 ```bash
 export GLUE_S3_STAGING_DIR=s3://your-bucket/benchbox/
 export GLUE_JOB_ROLE=arn:aws:iam::123456789012:role/GlueBenchmarkRole
@@ -49,6 +53,8 @@ export GLUE_VERSION=4.0
 ```
 
 ### CLI Usage
+
+The first command is basic usage. The second uses custom workers. The third is a dry run that previews queries.
 
 ```bash
 benchbox run --platform glue --benchmark tpch --scale 1.0 \
@@ -132,10 +138,10 @@ This batch model means:
 
 ## Spark Configuration
 
-BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor:
-
-```python
-```
+BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor. The automatic
+configuration includes Adaptive Query Execution (AQE) settings, shuffle partition tuning, memory allocation and join
+optimization. For TPC-H at SF=10 with 4 G.1X workers, it sets `spark.sql.shuffle.partitions = 200`,
+`spark.sql.adaptive.enabled = true` and `spark.sql.adaptive.skewJoin.enabled = true`.
 
 ## Cost Estimation
 

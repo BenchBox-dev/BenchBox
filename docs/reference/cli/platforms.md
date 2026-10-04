@@ -139,6 +139,14 @@ benchbox platforms enable duckdb
 benchbox platforms check --enabled-only
 ```
 
+In order, these commands:
+
+1. Check what is available.
+2. Check detailed status.
+3. Install missing dependencies.
+4. Enable the platforms you want to use.
+5. Verify that everything is ready.
+
 ### Cloud Platform Setup
 
 ```bash
@@ -148,6 +156,8 @@ benchbox setup --platform databricks
 
 benchbox platforms status databricks
 ```
+
+In order, these commands enable the cloud platform, configure credentials (a separate command) and verify availability.
 
 ### Troubleshooting
 
@@ -160,6 +170,8 @@ benchbox platforms enable <platform>
 
 benchbox platforms check <platform>
 ```
+
+In order, these commands check whether the platform dependencies are installed, get installation guidance, re-enable the platform after installing dependencies and verify that the platform works.
 
 ## Platform Categories
 

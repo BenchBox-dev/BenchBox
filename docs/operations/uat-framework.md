@@ -95,6 +95,8 @@ but never delete or move artifacts.
   make uat-artifact-hygiene OUTPUT=~/Developer/benchmark_runs THRESHOLD_BYTES=0
   ```
 
+  The first command audits the current worktree. It is also a no-op outside a Git worktree with no external root configured. The second targets an explicit root and sets the byte budget.
+
 ### Compact audit commands
 
 If a sweep is configured for an external root, confirm nothing leaked into the
@@ -108,6 +110,12 @@ find benchmark_runs -type f -mtime -1 2>/dev/null
 
 find benchmark_runs -type f -printf '%s\t%p\n' 2>/dev/null | sort -rn | head -20
 ```
+
+In order, these commands show:
+
+- The total size of the local tree, which should be nearly empty under an external root.
+- Files written under the local tree in the last day, which detects a recent leak.
+- The 20 largest local artifacts, which finds the heaviest offenders.
 
 ## Docker storage cleanup
 
@@ -130,6 +138,12 @@ cleanup:
 execute:
   liveness_probe_timeout_s: 2.0
 ```
+
+Three settings in this block need explanation:
+
+- `docker_platform_switch: "volumes"` runs `down -v --remove-orphans` at each platform switch.
+- `docker_settle_s: 10` is the wait before the one-shot readiness check after `up --wait`. It catches immediate crashes only; see below.
+- `liveness_probe_timeout_s: 2.0` is the per-cell liveness probe timeout, and 0 disables the probe. It catches a stack dying later; see below.
 
 `preserve_datagen: false` is deliberately rejected by the config
 validator; UAT may prune loaded databases at safe reuse boundaries, but
@@ -784,6 +798,8 @@ New sweeps clone a template:
 ```bash
 cp tests/uat/configs/stress-default.yaml tests/uat/configs/uat-<new>.yaml
 ```
+
+Edit `name:` in the copy, then run `make uat-sweep CONFIG=tests/uat/configs/uat-<new>.yaml`.
 
 ## Sequential platform execution
 

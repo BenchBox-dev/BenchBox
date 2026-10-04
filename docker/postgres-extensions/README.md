@@ -14,7 +14,11 @@ docker compose -f docker-compose.pg-mooncake.yaml up -d
 docker compose -f docker-compose.timescaledb.yaml up -d
 ```
 
+Start only one extension at a time on port 5432. The files start, in order, `pg_duckdb` (DuckDB-accelerated PostgreSQL), `pg_mooncake` (columnstore PostgreSQL) and TimescaleDB (time-series PostgreSQL).
+
 ## Running Benchmarks
+
+Run these commands after starting the container.
 
 ```bash
 benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 \
@@ -56,3 +60,5 @@ docker compose -f docker-compose.pg-duckdb.yaml down
 
 docker compose -f docker-compose.pg-duckdb.yaml down -v
 ```
+
+The first command stops and removes a specific container. The second also removes the volumes, which deletes the data.

@@ -367,7 +367,7 @@ BenchBox's `clickhouse-local` platform uses embedded ClickHouse through
 chDB, so it runs the headline ClickHouse sketch overrides without any
 cloud credentials or external ClickHouse server. Install BenchBox with the
 `clickhouse-local` extra (or add `chdb` to an existing BenchBox dev
-environment) and run:
+environment) and run the first command below. The second command (`uv add chdb`) applies to an existing BenchBox development checkout.
 
 ```bash
 uv add benchbox --extra clickhouse-local
@@ -484,6 +484,8 @@ operations:
           redshift: null
 ```
 
+In this example the top-level `write_sql` and validation `sql` are the defaults (DuckDB). The ClickHouse override is ClickHouse-native validation, and `redshift: null` is an explicit skip.
+
 Resolution rules (see `_resolve_validation_sql` in `benchmark.py`):
 
 - **No override key** → the active platform falls through to the default
@@ -534,6 +536,8 @@ def merge_extract(path):
 
 merge = manager.execute_aggregate_merge(target_path, merge_extract)
 ```
+
+`merge.metrics["aggregate_value"]` holds the extracted scalar.
 
 The manager owns timing, durability (Parquet write to a target dir),
 byte/file-count bookkeeping, and the `DataFrameWriteResult` envelope. The

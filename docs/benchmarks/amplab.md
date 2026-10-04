@@ -243,6 +243,8 @@ for table_name in amplab_large.get_available_tables():
     print(f"{table_name}: {size_mb:.1f} MB")
 ```
 
+This generates large-scale web analytics data for big data testing, then prints the size of each generated table file.
+
 ### DuckDB Integration Example
 
 ```python
@@ -294,6 +296,8 @@ analytics_query = amplab.get_query("3", params=query_params)
 analytics_result = conn.execute(analytics_query).fetchall()
 print(f"Analytics Query: {len(analytics_result)} user behavior patterns")
 ```
+
+The three queries test scan, join and analytics performance in turn.
 
 ### Apache Spark Integration
 
@@ -355,6 +359,8 @@ analytics_df.show(20)
 
 spark.stop()
 ```
+
+The example partitions the rankings table by ``pageRank`` and the uservisits table by ``visitDate``, then caches both. The scan query tests columnar scanning, the join query tests distributed joins, and the analytics query tests complex processing. ``explain(True)`` shows the execution plan for the scan and join queries.
 
 ### Performance Benchmarking Framework
 
@@ -451,7 +457,6 @@ class AMPLabPerformanceTester:
             )
             test_amplab.generate_data()
 
-
             results = self.run_complete_benchmark()
             scalability_results[scale_factor] = results
 
@@ -471,6 +476,8 @@ print(f"Analytics Queries: {analytics_results}")
 complete_results = performance_tester.run_complete_benchmark()
 print(f"\\nComplete Benchmark Summary: {complete_results['summary']}")
 ```
+
+The framework runs each query type with standard parameters so results are reproducible. ``analyze_scalability`` is simplified: it generates data at each scale factor but omits the data loading step, which you must add before it runs the benchmark.
 
 ## Performance Characteristics
 
@@ -529,6 +536,18 @@ amplab = AMPLab(
     compress_output=True
 )
 ```
+
+The data generation options are:
+
+- ``date_range_days``: range of visit dates.
+- ``pagerank_max``: maximum page rank value.
+- ``generate_documents``: include document content.
+- ``text_length_avg``: average document length.
+
+The performance options are:
+
+- ``partition_by_date``: partition the uservisits table by date.
+- ``compress_output``: compress the generated files.
 
 ## Integration Examples
 
@@ -618,6 +637,8 @@ join_result = client.query(join_configured)
 print(f"Optimized join: {len(join_result.result_rows)} results")
 ```
 
+The tables use data types chosen for ClickHouse. The uservisits table is partitioned by date (``toYYYYMM(visitDate)``). The scan and join queries are rewritten with ClickHouse optimizations, such as ``GLOBAL JOIN`` in the join query.
+
 ### Hadoop/Hive Integration
 
 ```python
@@ -694,6 +715,8 @@ LIMIT 100;
 """
 ```
 
+The Python code only prepares the Hive DDL and queries as strings and does not execute them. Executing the DDL requires a Hive connection. The two queries are the Hive versions of the scan and join workloads.
+
 ## Best Practices
 
 ### Data Generation
@@ -719,6 +742,9 @@ LIMIT 100;
 ### Performance Issues
 
 **Issue: Slow scan queries on large datasets**
+
+Use columnar storage and predicate pushdown. The table below uses Delta; Parquet also works. A derived ``pageRank_bucket`` column provides better partitioning.
+
 ```sql
 CREATE TABLE rankings_configured (
     pageURL STRING,
@@ -736,6 +762,9 @@ END);
 ```
 
 **Issue: Inefficient joins between large tables**
+
+Optimize the join order and use broadcast joins where appropriate.
+
 ```sql
 SELECT /*+ BROADCAST(r) */
     uv.sourceIP,
@@ -750,6 +779,9 @@ GROUP BY uv.sourceIP;
 ### Data Loading Issues
 
 **Issue: Out of memory during data generation**
+
+Use streaming generation for large scale factors. With the settings below, the generator works in chunks of 10 million rows.
+
 ```python
 amplab = AMPLab(
     scale_factor=100.0,
@@ -760,6 +792,9 @@ amplab = AMPLab(
 ```
 
 **Issue: Slow text processing in analytics queries**
+
+Use database-specific text processing functions.
+
 ```sql
 SELECT
     url,

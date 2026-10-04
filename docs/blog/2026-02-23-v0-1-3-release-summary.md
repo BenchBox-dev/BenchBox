@@ -173,7 +173,7 @@ After upgrading to v0.1.3:
 benchbox --version
 ```
 
-2. Add extras for any platforms your team uses:
+2. Add extras for any platforms your team uses (the second command restores the previous all-inclusive install):
 
 ```bash
 pip install "benchbox[duckdb,polars]"

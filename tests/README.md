@@ -202,6 +202,12 @@ integration tests. Product-critical tests that need a different selection
 belong in an explicit workflow or correctness gate.
 
 ### Quick Development Testing
+Where a `make` target is followed by a `pytest` command, the two are equivalent. `make test-fast` runs the curated fast
+lane. The `tests/unit/benchmarks/test_tpch_core.py` command runs one benchmark's tests. For coverage, `make
+coverage-fast` covers fast tests only, for quick feedback. `make coverage-all` is routine coverage, which excludes
+stress, resource-heavy and live tests. `make coverage-opt-in-all` covers the full tree, including opt-in stress,
+resource-heavy and live tests, and needs services and credentials. The final `pytest --cov` command is a direct
+equivalent that writes an HTML report.
 ```bash
 make test-fast
 uv run -- python -m pytest -m fast
@@ -215,6 +221,8 @@ uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
 
 ### E2E Testing
+`e2e_quick` runs the quick E2E tests in dry-run mode, and `e2e_local` runs the local platform E2E tests with full
+execution. The last two commands run all E2E tests and one E2E module.
 ```bash
 make test-e2e-quick
 uv run -- python -m pytest -m e2e_quick
@@ -227,6 +235,8 @@ uv run -- python -m pytest tests/e2e/test_cli_options.py -v
 ```
 
 ### Comprehensive Testing
+Each `make` target is equivalent to the `pytest` command after it. The targets run all tests, run tests in parallel,
+and run integration tests. The performance tests have no `make` target.
 ```bash
 make test-all
 uv run -- python -m pytest
@@ -241,6 +251,8 @@ uv run -- python -m pytest tests/performance/ -m performance
 ```
 
 ### Using the Unified Test Runner
+The commands run, in order: optimized development tests, CI-optimized tests, specific benchmarks with parallel
+execution, tests with coverage reporting, and benchmark validation.
 ```bash
 uv run -- python tests/utilities/unified_test_runner.py --strategy development
 
@@ -256,6 +268,8 @@ uv run -- python tests/utilities/benchmark_validator.py --benchmark all --quick-
 ## Performance Profiling
 
 ### Basic Profiling
+The commands profile a test run, profile with detailed output written to a report, and check for performance
+regressions.
 ```bash
 uv run -- python tests/utilities/performance_profiler.py python -m pytest tests/unit/
 
@@ -265,6 +279,7 @@ uv run -- python tests/utilities/performance_profiler.py --check-regressions pyt
 ```
 
 ### Advanced Profiling
+The first command updates the performance baselines. The second profiles a specific test category.
 ```bash
 uv run -- python tests/utilities/performance_profiler.py --update-baseline python -m pytest tests/unit/
 
@@ -307,6 +322,9 @@ Tests are organized using pytest markers for selective execution:
 - `primitives`: Primitive operations tests
 
 ### Example Usage
+Each `make` target is equivalent to the `pytest` command after it. The examples run only fast unit tests, run
+integration tests excluding slow ones, and run TPC-H related tests. The last command runs all tests except memory
+intensive ones.
 ```bash
 make test-dev
 uv run -- python -m pytest -m "unit and fast"
@@ -500,6 +518,8 @@ Global test configuration including:
 ### Common Issues
 
 #### Slow Test Execution
+Profile the test execution, run only fast tests, or use parallel execution. Each `make` target is equivalent to the
+`pytest` command after it.
 ```bash
 uv run -- python tests/utilities/performance_profiler.py python -m pytest tests/unit/ -v
 
@@ -511,6 +531,7 @@ uv run -- python -m pytest -n auto
 ```
 
 #### Memory Issues
+Run memory-intensive tests separately, and monitor memory usage with the profiler.
 ```bash
 uv run -- python -m pytest -m "memory_intensive" --maxfail=1
 
@@ -518,6 +539,7 @@ uv run -- python tests/utilities/performance_profiler.py --output memory_report.
 ```
 
 #### Database Connection Issues
+Run the database tests with verbose output, and test database connectivity directly.
 ```bash
 make test-integration
 uv run -- python -m pytest tests/integration/ -v -s
@@ -526,6 +548,8 @@ uv run -- python -c "import duckdb; print(duckdb.connect().execute('SELECT 1').f
 ```
 
 ### Test Cache Management
+The first command clears the pytest cache. The second prints the unified runner help. The third runs with `--dry-run`
+to show the commands without running them.
 ```bash
 uv run -- python -m pytest --cache-clear
 

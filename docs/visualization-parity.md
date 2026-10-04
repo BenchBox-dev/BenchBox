@@ -42,7 +42,13 @@ When you add a new chart type:
 
 ## Workflow for changing a computation
 
-If you change how a number is calculated (either Python or TS side):
+If you change how a number is calculated (either Python or TS side), follow these steps:
+
+1. Modify the Python implementation.
+2. Regenerate fixtures with `make parity-fixtures`. This changes the contract.
+3. Run `make parity-check` to confirm that the fixtures now match.
+4. Run Vitest. The new fixture values must pass on the TS side too.
+5. Commit the fixture diff. Reviewers must approve the numeric change.
 
 ```bash
 make parity-fixtures
@@ -57,6 +63,9 @@ git add tests/parity/fixtures/
 **Never regenerate fixtures silently.** The diff is part of the review.
 
 ## Verifying parity without regenerating
+
+`make parity-check` is the Python side: it regenerates into a temporary directory, diffs, and fails if different. The
+`npm test` command is the TS side: all fixture cases must pass.
 
 ```bash
 make parity-check
@@ -85,7 +94,7 @@ When `make parity-check` fails in CI, use this decision tree:
 
 Check `git diff` to see if the Python function or the TS helper was modified.
 
-**2. Python changed intentionally** (you updated the math in `generate_visualization_fixtures.py` or the referenced Python module):
+**2. Python changed intentionally** (you updated the math in `generate_visualization_fixtures.py` or the referenced Python module): regenerate the fixtures from the new Python source, confirm that no drift remains, and check that the TS side still passes.
 ```bash
 make parity-fixtures
 make parity-check

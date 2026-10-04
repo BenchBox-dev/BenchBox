@@ -96,6 +96,7 @@ deps:
   needs: ["fix-dataframe-parameter-parity"]
 ```
 
+- `needs` lists the items this one cannot start until they are done
 - Uses slugs (stable IDs), not file paths
 - Single source of truth: store only inbound `needs`
 - Reverse edges (`blocks`) are computed by CLI/index generation, never authored
@@ -243,6 +244,8 @@ TodoWrite([
 ])
 ```
 
+The agent creates these TodoWrite tasks from the YAML work units.
+
 Agent completes w3, updates YAML (`w3.status: done`), marks w3 completed
 in TodoWrite, moves w4 to in_progress. This is the natural rhythm
 agents already follow - the design just makes the layers explicit.
@@ -334,6 +337,8 @@ Marks a work unit complete and auto-cascades:
 $ uv run _project/scripts/todo_cli.py done motherduck-platform-adapter w3
 ```
 
+The command updates `w3.status` to `done` in the YAML and reports that w4 is now ready (all its dependencies are satisfied). If all work units are done, it prompts to complete the TODO item.
+
 ### CLI: `todo_cli.py check-graph`
 
 Validates the global DAG and per-item work graphs:
@@ -350,6 +355,8 @@ $ uv run _project/scripts/todo_cli.py check-graph
 ## Schema Changes
 
 ### New fields in TODO_SCHEMA.yaml
+
+The `id` field is added to the required fields. The `work` field replaces `tasks`. The `deferred` list is new. The `deps` field replaces `dependencies`.
 
 ```yaml
 id:
@@ -598,6 +605,8 @@ blocked_items:
     blocked_by: ["fix-dataframe-parameter-parity"]
     reason: "1 unresolved dependency"
 ```
+
+`blocked_by` is derived from `deps.needs`.
 
 This is the index agents read first. Instead of loading `by-priority`
 and mentally filtering, they get a pre-computed action list.

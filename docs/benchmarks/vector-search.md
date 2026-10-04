@@ -54,6 +54,8 @@ benchbox run --platform duckdb --benchmark vector_search --scale 1.0 \
   --benchmark-option dimensions=768
 ```
 
+The first command uses the defaults: 128-dimensional vectors at SF=1 (about 1M vectors). The second uses smaller vectors for quick tests, and the third uses higher-dimensional embeddings.
+
 ## Benchmark Options
 
 | Option       | Default | Description                    |

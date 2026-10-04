@@ -139,6 +139,8 @@ Export benchmark results to multiple formats with anonymization support.
        exporter = ResultExporter()
        files = exporter.export_result(results, formats=["json", "csv", "html"])
 
+   The returned ``files`` mapping has one entry per format, keyed by format name, such as ``json``, ``csv`` and ``html``. Each value is the ``Path`` of the exported file, named like ``tpch_sf001_duckdb_20250112_120000.json``.
+
 .. method:: list_results() -> list[dict[str, Any]]
 
    List all exported results in the output directory.
@@ -164,6 +166,8 @@ Export benchmark results to multiple formats with anonymization support.
 
        exporter = ResultExporter()
        exporter.show_results_summary()
+
+   The output starts with an ``Exported Results (15 total)`` heading (the count depends on how many results exist) and the output directory, for example ``/path/to/results``. A Rich table follows with the benchmark, timestamp, duration, queries and status of each result.
 
 .. method:: compare_results(baseline_path, current_path) -> dict[str, Any]
 
@@ -297,6 +301,8 @@ Collect detailed timing information during query execution.
 
        timings = collector.get_completed_timings()
        print(f"Query executed in {timings[0].execution_time:.3f}s")
+
+   The ``time_query`` context manager captures the timing automatically. Inside it, execute the query and then record metrics such as ``rows_returned`` on ``timing["metrics"]``.
 
 .. method:: time_phase(query_id, phase_name)
 
@@ -463,6 +469,8 @@ Analyze timing data to provide insights and statistics.
        if throughput:
            print(f"Mean throughput: {throughput['mean_rows_per_second']:.0f} rows/s")
 
+   The example prints the basic stats, the percentiles, the status breakdown and the throughput.
+
 .. method:: identify_outliers(method="iqr", factor=1.5) -> list[QueryTiming]
 
    Identify timing outliers using statistical methods.
@@ -481,6 +489,8 @@ Analyze timing data to provide insights and statistics.
        outliers_iqr = analyzer.identify_outliers(method="iqr", factor=1.5)
 
        outliers_zscore = analyzer.identify_outliers(method="zscore", factor=3.0)
+
+   The IQR method is the default. The first call uses it with a factor of 1.5, and the second uses the Z-score method with a factor of 3.0.
 
        for outlier in outliers_iqr:
            print(f"Outlier: {outlier.query_id} - {outlier.execution_time:.3f}s")
@@ -510,6 +520,8 @@ Analyze timing data to provide insights and statistics.
            print(f"⚠️ Performance regression detected ({regression['severity']})")
        elif regression['is_improvement']:
            print("✅ Performance improved!")
+
+   ``performance_change`` gives the overall performance change, and ``regression_analysis`` gives the regression assessment.
 
 Query Timing
 ~~~~~~~~~~~~
@@ -756,6 +768,8 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        machine_id = manager.get_anonymous_machine_id()
        print(f"Anonymous ID: {machine_id}")
 
+   The ID has the form ``machine_a1b2c3d4e5f6g7h8``.
+
 .. method:: anonymize_result_payload(payload) -> dict[str, Any]
 
    Anonymize a whole result bundle payload. This is the entry point that
@@ -807,6 +821,8 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        text = "Contact john@example.com or call 192.168.1.1"
        cleaned = manager.remove_pii(text)
        print(cleaned)
+
+   The output is ``Contact [REDACTED] or call [REDACTED]``.
 
 .. note::
 
@@ -934,6 +950,8 @@ Display benchmark results in standardized format.
 
     display_results(result_data, verbosity=1)
 
+The output lists the benchmark (``TPCH``), the scale factor (0.01), the platform (``duckdb``), the benchmark status (``PASSED``), the query count (``22/22 successful``), the query execution time (``12.35s``), the average query time (``0.56s``) and a final completion line.
+
 Usage Examples
 --------------
 
@@ -1054,6 +1072,8 @@ Collect and analyze detailed query timing:
         for outlier in outliers:
             print(f"  {outlier.query_id}: {outlier.execution_time:.3f}s")
 
+The example creates a timing collector and executes queries with timing. Each query has a ``parse`` phase (a simulated placeholder) and an ``execute`` phase, and a ``rows_returned`` metric is recorded. It then analyzes the timings: basic statistics, percentiles, performance analysis and outliers.
+
 Privacy-Preserving Result Export
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1099,6 +1119,8 @@ Export results with full anonymization:
         print("⚠️ Anonymization warnings:")
         for path in leaks:
             print(f"  - {path}")
+
+Path, hostname and username handling always applies (see the note above), so the configuration sets only the remaining options. The example then creates an exporter with anonymization, exports the results, and verifies that the exported payload carries no public-path leaks.
 
 Regression Detection
 ~~~~~~~~~~~~~~~~~~~~
@@ -1156,6 +1178,8 @@ Automated regression detection across benchmark runs:
     is_passing = check_for_regressions(baseline, current)
     exit(0 if is_passing else 1)
 
+The function treats a mean query time more than 10% slower as a regression and lists up to the top 5 regressed queries. The last lines show the usage in CI/CD.
+
 Best Practices
 --------------
 
@@ -1170,6 +1194,8 @@ Best Practices
        exporter = ResultExporter(output_dir="results")
        exporter.export_result(results, formats=["json", "csv"])
 
+   Export after every benchmark run.
+
 2. **Enable Anonymization for Shared Results**
 
    Use anonymization when sharing results publicly:
@@ -1179,6 +1205,8 @@ Best Practices
        public_exporter = ResultExporter(anonymize=True)
 
        internal_exporter = ResultExporter(anonymize=False)
+
+   Use the anonymizing exporter for public sharing and the other for internal use.
 
 3. **Track Baselines for Regression Detection**
 
@@ -1190,6 +1218,8 @@ Best Practices
        baseline_exporter.export_result(results, formats=["json"])
 
        comparison = exporter.compare_results(baseline_path, current_path)
+
+   The first lines save the baseline. The last line compares against the baseline regularly.
 
 4. **Use Detailed Timing for Optimization**
 
@@ -1206,6 +1236,8 @@ Best Practices
            if stats["mean"] > 1.0:
                print(f"Bottleneck: {phase} taking {stats['mean']:.2f}s")
 
+   The example treats phases that take more than 1 second as bottlenecks.
+
 5. **Monitor for Outliers**
 
    Identify and investigate timing outliers:
@@ -1219,6 +1251,8 @@ Best Practices
            print("Investigating outliers:")
            for outlier in outliers:
                print(f"  {outlier.query_id}: {outlier.execution_time:.3f}s")
+
+   Investigate the cause of each outlier.
 
 Common Issues
 -------------
@@ -1282,6 +1316,8 @@ Anonymization Validation Failures
 
     for path in find_public_path_leaks(anonymized):
         print(f"Address: {path}")
+
+The first part adds custom sanitizers. The last part re-anonymizes the payload under test with the stricter configuration and reports any remaining leaks.
 
 See Also
 --------

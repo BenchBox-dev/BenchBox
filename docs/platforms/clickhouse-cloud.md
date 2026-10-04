@@ -27,6 +27,8 @@ export CLICKHOUSE_CLOUD_PASSWORD=your-password
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```
 
+The first command installs the ClickHouse Cloud extra, the exports set your credentials, and the last command runs the benchmark.
+
 ## Authentication
 
 ### Getting Your Credentials
@@ -50,6 +52,8 @@ export CLICKHOUSE_CLOUD_USER=default
 
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```
+
+`CLICKHOUSE_CLOUD_USER` is optional and defaults to `default`.
 
 **CLI Options:**
 
@@ -103,6 +107,8 @@ benchbox run --platform clickhouse-cloud --benchmark tpcds --scale 10.0
 benchbox run --platform clickhouse-cloud --benchmark clickbench
 ```
 
+The commands run TPC-H at scale factor 1, TPC-DS at scale factor 10, and ClickBench (ClickHouse's own benchmark).
+
 ### Custom Database Name
 
 ```bash
@@ -120,11 +126,15 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 10 \
     --platform-option max_execution_time=300
 ```
 
+The first command raises the memory limit for complex queries. The second sets a query timeout.
+
 ### Dry Run (Preview)
 
 ```bash
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
+
+This previews what will be executed without running it.
 
 ## Comparison with Base ClickHouse
 

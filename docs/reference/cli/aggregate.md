@@ -42,6 +42,8 @@ The CSV output contains one row per result file with these columns:
 
 ## Usage Examples
 
+The first command aggregates all results in a directory. The second filters by benchmark, and the third filters by platform.
+
 ```bash
 benchbox aggregate --input-dir benchmark_runs/ --output-file trends.csv
 

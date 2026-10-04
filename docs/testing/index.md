@@ -24,6 +24,8 @@ make test-unit
 uv run -- python -m pytest -m unit
 ```
 
+The two commands are alternatives.
+
 ### Integration Tests
 Tests that verify interaction between components, may use embedded databases.
 
@@ -31,6 +33,8 @@ Tests that verify interaction between components, may use embedded databases.
 make test-integration
 uv run -- python -m pytest -m "integration and not live_integration"
 ```
+
+The two commands are alternatives.
 
 ### E2E Tests
 End-to-end tests that validate complete benchmark workflows through the CLI.
@@ -42,6 +46,8 @@ uv run -- python -m pytest -m e2e_local
 
 uv run -- python -m pytest tests/e2e/
 ```
+
+The `e2e_quick` marker runs quick E2E tests in dry-run mode, `e2e_local` runs local platform E2E tests with full execution, and the last command runs all E2E tests.
 
 E2E tests cover:
 - CLI option validation (`--benchmark`, `--scale`, `--phases`, `--queries`, etc.)
@@ -63,6 +69,8 @@ make test-docker-clickhouse
 make test-docker-all
 ```
 
+The first command tests a single platform and the second tests all Docker platforms.
+
 See [Docker Integration Tests](docker-integration-tests.md) for platform list and setup.
 
 ### Live Integration Tests (Cloud)
@@ -72,6 +80,8 @@ Tests that require live database credentials and cloud platforms.
 make test-live
 uv run -- python -m pytest -m live_integration
 ```
+
+The two commands are alternatives.
 
 See [Live Integration Tests](live-integration-tests.md) for detailed setup instructions.
 

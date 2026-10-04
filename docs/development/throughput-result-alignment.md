@@ -42,6 +42,8 @@ TPCHThroughputStreamResult = ThroughputStreamResult
 TPCDSThroughputStreamResult = ThroughputStreamResult
 ```
 
+The first alias lives in `tpch/throughput_test.py` and the second in `tpcds/throughput_test.py`.
+
 ---
 
 ## Test Result: TPCHThroughputTestResult ↔ TPCDSThroughputTestResult

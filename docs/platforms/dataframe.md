@@ -32,7 +32,7 @@ Traditionally, comparing these approaches required:
 
 ### The BenchBox Solution
 
-BenchBox provides **unified TPC-H benchmarking** across both paradigms:
+BenchBox provides **unified TPC-H benchmarking** across both paradigms. The first command below runs the queries as SQL on DuckDB. The second runs them through the native Polars DataFrame API:
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1
@@ -86,8 +86,9 @@ Infrastructure is in place for these platforms:
 
 ### Installation
 
-```bash
+Polars DataFrame is recommended and is a core dependency, so the base BenchBox installation already includes it. Install the other DataFrame platforms as extras:
 
+```bash
 uv add benchbox --extra pandas
 
 uv add benchbox --extra pyspark
@@ -96,6 +97,8 @@ uv add benchbox --extra dataframe-all
 ```
 
 ### Running Your First DataFrame Benchmark
+
+The commands below run TPC-H on Polars, Pandas, and PySpark in turn. The PySpark run uses local mode.
 
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
@@ -106,6 +109,8 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 0.01
 ```
 
 ### Comparing SQL vs DataFrame
+
+The first command uses the Polars SQL interface (SQL mode). The second uses the Polars expression API (DataFrame mode).
 
 ```bash
 benchbox run --platform polars --benchmark tpch --scale 0.1
@@ -586,7 +591,7 @@ BenchBox validates your tuning configuration and reports issues at three levels:
 | **WARNING** | Suboptimal or conflicting settings | `streaming_mode=true` with `engine_affinity="in-memory"` |
 | **INFO** | Suggestions for improvement | Streaming mode without `chunk_size` set |
 
-Validate your configuration before running:
+Validate your configuration before running. The output lists any issues and suggestions:
 
 ```bash
 benchbox tuning validate my_config.yaml --platform polars
@@ -632,7 +637,7 @@ For scale factors > 10:
 
 ### DataFrameContext Protocol
 
-The context provides table access and expression helpers:
+The context provides table access and expression helpers. `ctx.col` builds column references and `ctx.lit` builds literal values (the expression builders for the expression family):
 
 ```python
 from benchbox.core.dataframe import DataFrameContext

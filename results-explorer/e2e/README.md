@@ -14,6 +14,8 @@ npm run test:e2e:chromium
 npm run test:e2e:full
 ```
 
+`test:e2e:install` runs once and downloads the browser binaries. `test:e2e:chromium` writes fixtures, rebuilds `dist/` and runs Chromium. `test:e2e:full` is the local full-matrix convenience entrypoint.
+
 For a brand-new machine, `npm run test:e2e:chromium:setup` wraps the browser
 install and then runs the same deterministic Chromium entrypoint.
 

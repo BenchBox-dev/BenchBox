@@ -117,6 +117,8 @@ CREATE TABLE events (...) PARTITIONED BY (event_date);
 ALTER TABLE events ADD PARTITION FIELD hour(event_time);
 ```
 
+The table is originally partitioned by date. The `ALTER` statement adds hour-level partitioning for new data, with no rewrite.
+
 **Benchmark implications:**
 
 - Partition evolution is metadata-only (fast)
@@ -134,6 +136,8 @@ CREATE TABLE orders
 
 SELECT * FROM orders WHERE order_date = '2024-03-15';
 ```
+
+The table is partitioned by a month transform. The query filters by exact date, and Iceberg applies partition pruning automatically.
 
 **Benchmark implications:**
 
@@ -215,6 +219,8 @@ benchbox run --platform athena --benchmark tpch --scale 10 \
   --table-format iceberg --phases power
 ```
 
+Run the commands in order. The first generates and loads data with Spark. The second runs queries with Trino on the same Iceberg tables. The third runs queries with Athena on the same tables through Glue.
+
 ### Ensuring Consistent Results
 
 BenchBox validates query results against reference answers, catching:
@@ -226,6 +232,8 @@ BenchBox validates query results against reference answers, catching:
 ```bash
 benchbox compare spark-results.json trino-results.json
 ```
+
+This compares results from different engines.
 
 ### Common Multi-Engine Issues
 

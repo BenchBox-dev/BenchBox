@@ -32,6 +32,8 @@ python basic_dry_run.py
 **Purpose:** Programmatic analysis of dry-run output
 
 **Run it:**
+First run a dry run, then analyze it.
+
 ```bash
 benchbox run --dry-run ./my_preview --platform duckdb --benchmark tpch --scale 0.01
 
@@ -112,6 +114,8 @@ done
 
 benchbox run --dry-run ./preview_tuned --platform duckdb --benchmark tpch --scale 0.1 --tuning
 ```
+
+The commands run, in order: a basic dry run, a dry run for multiple benchmarks, and a dry run with a tuning preview.
 
 ## When to Use Dry-Run
 

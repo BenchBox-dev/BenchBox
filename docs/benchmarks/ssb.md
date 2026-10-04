@@ -427,6 +427,8 @@ complete_results = performance_tester.run_complete_benchmark()
 
 ### Columnar Database Optimization
 
+SSB is particularly well suited to columnar databases. The example below creates a column-store configured copy of the fact table ordered for columnar access, adds projection indices for common query patterns, and indexes the dimension tables:
+
 ```python
 def optimize_for_columnar(ssb: SSB, connection):
 
@@ -510,6 +512,8 @@ optimize_for_columnar(ssb, conn)
 
 ### Advanced-level Configuration
 
+In the constructor, `date_range_years` sets the date range (default 7 years), `enable_compression` compresses output files, `partition_fact_table` partitions LINEORDER by date, and `generate_indices` generates the recommended indices. The `query_params` dictionary sets the year for temporal queries, the geographic focus, the product category, and the discount selectivity.
+
 ```python
 ssb = SSB(
     scale_factor=1.0,
@@ -533,6 +537,8 @@ query = ssb.get_query("Q2.1", params=query_params)
 ## Integration Examples
 
 ### Apache Spark Integration
+
+The example caches the dimension tables for better join performance.
 
 ```python
 from pyspark.sql import SparkSession
@@ -570,6 +576,8 @@ for query_id in flight_2_queries:
 ```
 
 ### ClickHouse Integration
+
+The example creates ClickHouse tables configured for analytics: the fact table is optimized for ClickHouse, partitioned by year, and followed by the dimension tables. Only the `customer` dimension table is shown; define the other dimension tables the same way. It then loads data with ClickHouse's CSV import and runs the configured SSB queries.
 
 ```python
 import clickhouse_connect
@@ -668,6 +676,8 @@ for query_id in ["Q1.1", "Q1.2", "Q1.3"]:
 ### Performance Issues
 
 **Issue: Slow fact table scans in Flight 1**
+
+Solution: ensure proper indexing and partitioning.
 ```sql
 CREATE INDEX idx_lineorder_orderdate ON lineorder(lo_orderdate);
 CREATE INDEX idx_lineorder_discount ON lineorder(lo_discount);
@@ -675,6 +685,8 @@ CREATE INDEX idx_lineorder_quantity ON lineorder(lo_quantity);
 ```
 
 **Issue: Inefficient joins in Flight 3**
+
+Solution: optimize join order by listing the smallest tables first, from small to large. The other join conditions are omitted here.
 ```sql
 SELECT c_nation, s_nation, d_year, sum(lo_revenue) as revenue
 FROM date, customer, supplier, lineorder
@@ -686,6 +698,8 @@ WHERE lo_orderdate = d_datekey
 ### Data Loading Issues
 
 **Issue: Memory issues with large scale factors**
+
+Solution: use streaming data generation. `stream_generation=True` generates data in chunks, and `chunk_size=1000000` sets 1M rows per chunk.
 ```python
 ssb = SSB(
     scale_factor=100,
@@ -696,6 +710,8 @@ ssb = SSB(
 ```
 
 **Issue: Incorrect query results**
+
+Solution: validate data generation and parameterization.
 ```python
 validation_queries = [
     "SELECT COUNT(*) FROM lineorder",

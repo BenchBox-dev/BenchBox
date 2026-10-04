@@ -200,6 +200,9 @@ For comprehensive documentation of each category:
 
 ### Prerequisites
 
+Install BenchBox. For specific platforms, install the matching extras: `databricks`, `bigquery` or `snowflake`, for the
+Databricks, BigQuery and Snowflake examples.
+
 ```bash
 uv add benchbox
 
@@ -209,6 +212,9 @@ uv add benchbox --extra snowflake
 ```
 
 ### Run a Getting Started Example
+
+The DuckDB example needs no configuration. The cloud platform example requires credentials: set the `DATABRICKS_*`
+environment variables first.
 
 ```bash
 cd examples/getting_started/local

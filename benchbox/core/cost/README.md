@@ -185,6 +185,10 @@ phase_cost = {
 }
 ```
 
+In this example, `total_cost` is the sum of all 88 queries (4 streams × 22
+queries), and the phase took 5 minutes of wall-clock time. The four streams ran
+concurrently. `effective_cost_per_hour` is $12.40 / (300/3600) = $148.80/hr.
+
 Use `effective_cost_per_hour` for:
 - Budgeting and forecasting
 - Comparing different scale factors
@@ -286,6 +290,8 @@ resource_usage = {"credits_used": 0.5}
 config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 ```
 
+Cost: 0.5 credits × $2.00 per credit = $1.00
+
 ### BigQuery
 
 **Formula**: `bytes_billed / (1024^4) × price_per_TiB`
@@ -312,6 +318,8 @@ config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 resource_usage = {"bytes_billed": 1024**4}
 config = {"location": "us"}
 ```
+
+Cost: 1 TiB × $6.25 per TiB = $6.25
 
 **No free-tier modeling**: BenchBox charges the on-demand list rate from byte
 zero and does not model the first 1 TiB per month free tier. The credit is
@@ -357,6 +365,8 @@ resource_usage = {"execution_time_seconds": 3600}
 config = {"node_type": "ra3.4xlarge", "node_count": 4, "region": "us-east-1"}
 ```
 
+Cost: 1 hour × 4 nodes × $3.26 per node-hour = $13.04
+
 ### Databricks
 
 **Formula**: `(execution_time_seconds / 3600) × cluster_size_dbu_per_hour × price_per_dbu`
@@ -399,6 +409,11 @@ config = {
     "cluster_size_dbu_per_hour": 8.0,
 }
 ```
+
+Here 1800 seconds is 30 minutes, `sql_compute` is billed at the SQL Pro rate, and
+8 DBU/hour is a Medium warehouse.
+
+Cost: 0.5 hours × 8 DBU/hour × $0.55 per DBU = $2.20
 
 ## Concurrent Query Cost Semantics
 
@@ -722,7 +737,14 @@ Cost information is included in the JSON export (schema v1.1). Each query's
 
 ### Resource Usage Validation
 
-Platform adapters must populate `resource_usage` with required fields:
+Platform adapters must populate `resource_usage` with required fields. The
+blocks below show Snowflake, BigQuery, Redshift and Databricks, in that order:
+
+- Snowflake: `credits_used` is required. `bytes_scanned` is optional.
+- BigQuery: `bytes_billed` is required (`bytes_processed` is accepted instead).
+- Redshift: `execution_time_seconds` is required.
+- Databricks: `execution_time_seconds` is required (`dbu_consumed` is accepted
+  instead).
 
 ```python
 resource_usage = {
@@ -747,7 +769,17 @@ Validation automatically logs warnings for missing required fields.
 
 ### Platform Configuration Validation
 
-Configuration is validated before cost calculation:
+Configuration is validated before cost calculation. Each block below omits a
+required field, and validation warns about it. They are, in order:
+
+- Snowflake requires `edition`, `cloud` and `region`. The block is missing
+  `region`.
+- BigQuery requires `location`. The block is empty, so `location` is missing.
+- Redshift requires `node_type`, `node_count` and `region`. The block is
+  missing `region`.
+- Databricks requires `cloud`, `tier`, `workload_type` and
+  `cluster_size_dbu_per_hour`. The block is missing `workload_type` and
+  `cluster_size_dbu_per_hour`.
 
 ```python
 config = {
@@ -834,6 +866,11 @@ the audit trail of what rate actually produced each estimate.
 ## Testing
 
 The framework has comprehensive test coverage:
+
+The first command runs all cost framework tests. The rest run one suite each:
+`test_calculator.py` covers cost calculations, `test_integration.py` covers
+integration, `test_validation.py` covers resource usage validation, and
+`test_config_validation.py` covers configuration validation.
 
 ```bash
 pytest tests/unit/core/cost/

@@ -30,6 +30,8 @@ benchbox run --platform snowflake --benchmark tpcds --compression zstd:19
 benchbox run --platform duckdb --benchmark tpch --compression none
 ```
 
+The first command uses zstd with its default level, the second sets the type and level (gzip level 9), the third uses zstd level 19 for maximum compression, and the last disables compression.
+
 ### Programmatic Usage
 
 ```python
@@ -45,6 +47,8 @@ benchmark = SSBBenchmark(
 
 data_files = benchmark.generate_data()
 ```
+
+With compression enabled, files are saved as `.zst` files with automatic compression.
 
 ## Compression Types
 
@@ -99,6 +103,8 @@ benchbox run --platform duckdb --benchmark tpch --compression gzip:1
 benchbox run --platform duckdb --benchmark tpch --compression gzip:9
 ```
 
+`gzip:1` is fast compression and `gzip:9` is maximum compression.
+
 ### Zstd Levels (1-22)
 - **Level 1**: Fastest compression
 - **Level 3**: Default, excellent balance
@@ -109,6 +115,8 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd:1
 
 benchbox run --platform duckdb --benchmark tpch --compression zstd:15
 ```
+
+`zstd:1` is fast compression and `zstd:15` is high compression.
 
 ## Supported Generators
 
@@ -156,6 +164,8 @@ class MyDataGenerator(CompressionMixin):
         return {"data": str(file_path)}
 ```
 
+The `generate_data` method gets the compressed filename, opens the file with compression if it is enabled, and prints a compression report if compression is enabled. The example does not write any rows; add your data-writing code after creating the CSV writer.
+
 ### Benchmark Integration
 
 To integrate compression into benchmark classes:
@@ -195,6 +205,8 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd:19
 
 benchbox run --platform duckdb --benchmark tpch --compression zstd
 ```
+
+Use `zstd:1` in CI/CD environments to prioritize speed, `zstd:19` in storage-constrained environments to prioritize size, and plain `zstd` for balanced production benchmarking (it uses the default level 3).
 
 ### Dry Run with Compression
 
@@ -272,6 +284,8 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd
 ### Common Issues
 
 **"zstandard library not available"**
+Install the package with either command:
+
 ```bash
 uv pip install zstandard
 pip install zstandard
@@ -341,11 +355,21 @@ class MyGenerator(CompressionMixin):
     pass
 ```
 
+The mixin provides these methods:
+
+- `get_compressed_filename(filename) -> str`
+- `open_output_file(path, mode) -> file_object`
+- `compress_existing_file(path) -> Path`
+- `should_use_compression() -> bool`
+- `print_compression_report(files) -> None`
+
 ### CLI Options
 
 ```bash
 --compression TYPE[:LEVEL]
 ```
+
+Examples: `--compression zstd`, `--compression zstd:9`, `--compression zstd:15`, `--compression gzip:6`, `--compression gzip:9` and `--compression none`.
 
 ## Examples Repository
 

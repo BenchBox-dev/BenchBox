@@ -17,6 +17,12 @@ BenchBox supports benchmarking PostgreSQL analytical extensions as first-class p
 
 Each extension has a Docker Compose file for easy setup:
 
+Start one extension at a time:
+
+- pg_duckdb: DuckDB-accelerated analytics on PostgreSQL heap tables.
+- pg_mooncake: native columnstore with DuckDB execution.
+- TimescaleDB: time-series hypertables with compression.
+
 ```bash
 cd docker/postgres-extensions/
 
@@ -43,6 +49,8 @@ benchbox run --platform postgresql --benchmark tpch --scale 0.01 \
   --platform-option host=localhost --platform-option password=benchbox
 ```
 
+The commands run, in order: pg_duckdb, pg_mooncake, TimescaleDB, and vanilla PostgreSQL for baseline comparison.
+
 ## Extension Compatibility Matrix
 
 Not all extensions can coexist in the same PostgreSQL instance:
@@ -62,6 +70,8 @@ from benchbox.core.platform_registry import PlatformRegistry
 
 conflicts = PlatformRegistry.get_platform_conflicts("pg-duckdb")
 ```
+
+For `pg-duckdb` the call returns `["pg-mooncake"]`.
 
 ## Architecture Pattern
 
@@ -99,6 +109,13 @@ benchbox run --platform pg-mooncake --benchmark tpch --scale 1.0
 
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
+
+The commands compare:
+
+- Baseline: vanilla PostgreSQL.
+- pg_duckdb: DuckDB execution on heap tables, with no storage change.
+- pg_mooncake: DuckDB execution on columnstore tables, changing both storage and execution.
+- Native DuckDB: a standalone columnar database.
 
 ### Real-World Analytics (ClickBench)
 

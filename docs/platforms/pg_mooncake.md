@@ -20,6 +20,8 @@ pg_mooncake is a PostgreSQL extension that adds native columnstore tables with D
 
 ## Quick Start
 
+The first command runs a basic TPC-H benchmark with columnstore mirrors. The second uses a custom connection, and the third uses an S3 storage backend:
+
 ```bash
 benchbox run --platform pg-mooncake --benchmark tpch --scale 0.01
 
@@ -56,6 +58,8 @@ docker run -d --name pg-mooncake \
 
 psql -h localhost -U postgres -c "CREATE EXTENSION pg_mooncake;"
 ```
+
+The `psql` command verifies that the extension can be created.
 
 See the [pg_mooncake GitHub repository](https://github.com/Mooncake-Labs/pg_mooncake) for additional installation methods.
 
@@ -96,6 +100,8 @@ PostgreSQL Instance
 | `mooncake_bucket` | (none) | S3/GCS bucket URL (required when `storage_mode=s3`) |
 
 ### S3 Storage Configuration
+
+Set the S3 bucket through an environment variable, or pass it as a platform option:
 
 ```bash
 export MOONCAKE_S3_BUCKET=s3://my-bucket/mooncake-data

@@ -78,6 +78,8 @@ benchbox visualize results.json --chart-type performance_bar
 benchbox visualize results.json --template flagship
 ```
 
+The commands, in order, display charts directly in the terminal, drop colors (for piping or plain terminals), drop Unicode (for terminals without Unicode support), select a specific chart type, and use a template.
+
 **Features:**
 - 9 chart types: bar, box, heatmap, histogram, scatter, line, comparison bar, diverging bar, summary box
 - Colorblind-friendly Okabe-Ito palette with 256-color and 16-color fallbacks

@@ -40,6 +40,8 @@ first-run download doesn't eat into `cleanup.docker_start_timeout_s`:
 make uat-prepull PLATFORM=<platform>
 ```
 
+This runs `compose pull --ignore-buildable` and then `compose build`.
+
 - `cedardb` — `localhost:5435`, compose file `docker/cedardb/docker-compose.yml`.
 - `clickhouse-server` — `localhost:9000`, compose file `docker/clickhouse/docker-compose.yml`; local password is `benchbox`.
 - `databend` — `localhost:8000`, compose file `docker/databend/docker-compose.yml`.

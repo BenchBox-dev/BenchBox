@@ -168,6 +168,8 @@ uv run -- benchbox submit --last --service
 uv run -- benchbox results --submitted
 ```
 
+In order, these commands: package the latest result for PR contribution, preview a hosted upload without credentials or network, log in and upload to the hosted service, and track hosted submissions.
+
 ### `benchbox check-deps`
 
 Checks optional platform dependencies and prints installation guidance.

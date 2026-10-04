@@ -17,9 +17,10 @@ Athena for Apache Spark is AWS's interactive Spark service with sub-second start
 
 ## Installation
 
+This installs Athena Spark support and the `boto3` dependency.
+
 ```bash
 uv add benchbox --extra athena-spark
-
 ```
 
 ## Prerequisites
@@ -35,6 +36,8 @@ uv add benchbox --extra athena-spark
 
 ### Environment Variables
 
+`ATHENA_SPARK_WORKGROUP` and `ATHENA_S3_STAGING_DIR` are required. `AWS_REGION` is optional.
+
 ```bash
 export ATHENA_SPARK_WORKGROUP=my-spark-workgroup
 export ATHENA_S3_STAGING_DIR=s3://my-bucket/benchbox
@@ -43,6 +46,9 @@ export AWS_REGION=us-east-1
 ```
 
 ### CLI Usage
+
+The commands cover, in order: basic usage, a custom region, a specific Spark engine version, a custom DPU
+configuration, and a dry run that previews queries.
 
 ```bash
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
@@ -103,6 +109,9 @@ See {ref}`driver-version-management` for the full guide, including why `uv run` 
 revert a manually-installed version and how to work around it.
 
 ## Python API
+
+The example initializes the adapter with a workgroup and staging location, starts a session, creates the schema, loads
+data to S3 and creates tables, executes a query via the session, and finally terminates the session.
 
 ```python
 from benchbox.platforms.aws import AthenaSparkAdapter

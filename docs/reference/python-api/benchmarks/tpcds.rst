@@ -142,6 +142,8 @@ Get a specific TPC-DS query.
 
     q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
 
+The examples get query 1, get it with dialect translation, and get it with custom parameters, in that order.
+
 Parameters:
 
 - **query_id** (int): Query ID (1-99)
@@ -169,6 +171,8 @@ Get all TPC-DS queries.
     print(f"Total queries: {len(queries)}")
 
     queries_bq = benchmark.get_queries(dialect="bigquery")
+
+The first call gets all queries. The second gets them with dialect translation.
 
 Parameters:
 
@@ -233,6 +237,8 @@ Get CREATE TABLE SQL for all tables.
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
 
+The three calls return standard SQL, SQL for a specific dialect, and SQL with a tuning configuration.
+
 Parameters:
 
 - **dialect** (str): Target SQL dialect. Default: "standard"
@@ -256,6 +262,8 @@ Generate query streams for throughput testing.
 
     for stream_path in streams:
         print(f"Stream: {stream_path}")
+
+This generates 4 concurrent streams.
 
 Parameters:
 
@@ -319,6 +327,8 @@ Basic Benchmark Run
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
 
+The benchmark uses scale factor 1 (about 1GB). The example generates the data, runs on DuckDB and prints the results.
+
 Query Subset Execution
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -340,6 +350,8 @@ Query Subset Execution
         query = benchmark.get_query(query_id)
         result = adapter.execute_query(conn, query, f"query{query_id}")
         print(f"Query {query_id}: {result['execution_time']:.3f}s")
+
+The example loads the data and then executes the reporting queries (1-10).
 
 Query Complexity Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -375,6 +387,8 @@ Query Complexity Analysis
     for q in sorted_queries[:5]:
         print(f"Query {q['query_id']}: {q['subqueries']} subqueries, "
               f"{q['joins']} joins, {q['window_functions']} window functions")
+
+The queries are sorted by complexity: subquery count first, then joins, then window functions.
 
 Multi-Platform Comparison
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -434,6 +448,8 @@ Variant Testing
     if q1_v1 != q1_v2:
         print("Query 1 has parametrized variants")
 
+The example generates the queries with different seeds and then compares the query variants.
+
 Stream-Based Testing
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -471,6 +487,8 @@ Stream-Based Testing
 
     for r in results:
         print(f"Stream {r['stream_id']}: {r['total_time']:.2f}s")
+
+The example generates 4 concurrent streams and runs them in parallel.
 
 See Also
 --------

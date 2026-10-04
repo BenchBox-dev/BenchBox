@@ -59,6 +59,8 @@ register_query_tolerance(
 tol = tolerance_for("tpch", "Q1")
 ```
 
+`compare_query_results` is strict by default. `register_query_tolerance` loosens the comparison for one query and needs a rationale tied to the specification.
+
 `ComparisonReport.summary()` prints up to five sample divergences with
 row/column locators; the rest are counted.
 

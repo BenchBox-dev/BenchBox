@@ -298,6 +298,10 @@ Password Authentication
 Key-Pair Authentication (Recommended for Production)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The commands below generate a key pair, extract the public key, and assign the
+public key to the user in Snowflake. Run the ``ALTER USER`` statement in
+Snowflake, not in a shell.
+
 .. code-block:: bash
 
     openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
@@ -360,6 +364,11 @@ Warehouse Sizing
         warehouse_size="4X-LARGE"
     )
 
+The three examples show a small warehouse for development, a large one for
+production, and a 4X-Large one for heavy workloads. Snowflake bills X-Small at 1
+credit per hour, Large at 8 credits per hour, and 4X-Large at 128 credits per
+hour.
+
 Multi-Cluster Warehouse
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -375,6 +384,9 @@ Multi-Cluster Warehouse
         auto_suspend=60,
         auto_resume=True
     )
+
+Multi-cluster mode lets the warehouse scale out automatically for concurrent
+workloads.
 
 Data Loading
 ------------
@@ -406,6 +418,9 @@ Snowflake uses internal stages for efficient data loading:
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
     print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
+
+The data is generated locally first. ``load_data`` then uses PUT and COPY INTO
+automatically: the files are uploaded to an internal stage and then bulk loaded.
 
 External Stage (S3/GCS/Azure)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -446,6 +461,9 @@ Compressed Data
         compression="GZIP"
     )
 
+Snowflake handles compressed files automatically, and GZIP files are
+decompressed during COPY INTO. Supported compression values include GZIP,
+BROTLI and ZSTD.
 
 Query Execution
 ---------------
@@ -506,6 +524,10 @@ Query Statistics
     print(f"Bytes scanned: {stats[5]:,}")
     print(f"Credits used: {stats[7]}")
 
+The first statements execute the query under a query tag so it can be tracked.
+The second query reads the query history for that tag to get performance
+metrics.
+
 Query Plans
 ~~~~~~~~~~~
 
@@ -549,6 +571,11 @@ Clustering
         SELECT SYSTEM$CLUSTERING_INFORMATION('orders_clustered')
     """)
 
+The table declares its clustering key in ``CREATE TABLE``, and Snowflake
+maintains clustering automatically. ``RECLUSTER`` reclusters manually if needed,
+``RESUME RECLUSTER`` enables automatic clustering, and
+``SYSTEM$CLUSTERING_INFORMATION`` reports clustering quality.
+
 Time Travel
 ~~~~~~~~~~~
 
@@ -571,6 +598,10 @@ Time Travel
         BEFORE(STATEMENT => '01a12345-6789-abcd-ef01-234567890abc')
     """)
 
+The first query reads data as of one hour ago (the offset is in seconds). The
+second reads data at a specific timestamp. The third views the table as it was
+before a given statement ran, which shows that statement's changes.
+
 Zero-Copy Cloning
 ~~~~~~~~~~~~~~~~~
 
@@ -592,6 +623,10 @@ Zero-Copy Cloning
         AT(OFFSET => -86400)
     """)
 
+The database and table clones are created instantly because no data is copied.
+The last clone uses an offset of -86400 seconds to capture the table as it was
+24 hours ago.
+
 Result Set Caching
 ~~~~~~~~~~~~~~~~~~
 
@@ -604,6 +639,9 @@ Result Set Caching
 
     cursor.execute("SELECT COUNT(*) FROM lineitem")
     result2 = cursor.fetchone()
+
+Result caching is enabled by default. The first execution computes the result.
+The second execution returns the cached result immediately and uses no credits.
 
 Best Practices
 --------------
@@ -621,6 +659,11 @@ Warehouse Management
            auto_resume=True
        )
 
+   Typical sizes are X-SMALL to SMALL for development, MEDIUM to LARGE for
+   testing, and LARGE to 4X-LARGE for production. MEDIUM balances cost and
+   performance. ``auto_suspend=300`` suspends the warehouse after 5 idle
+   minutes, and ``auto_resume=True`` resumes it when a query arrives.
+
 2. **Use separate warehouses** for different workloads:
 
    .. code-block:: python
@@ -628,6 +671,8 @@ Warehouse Management
        load_adapter = SnowflakeAdapter(warehouse="LOAD_WH", warehouse_size="LARGE")
 
        query_adapter = SnowflakeAdapter(warehouse="QUERY_WH", warehouse_size="MEDIUM")
+
+   The first adapter is the loading warehouse. The second is the query warehouse.
 
 3. **Enable multi-cluster** for concurrent workloads:
 
@@ -656,6 +701,8 @@ Cost Optimization
 
        cursor.execute("ALTER SESSION SET USE_CACHED_RESULT = TRUE")
 
+   This setting is on by default and reuses results for identical queries.
+
 3. **Start small, scale up as needed**:
 
    .. code-block:: python
@@ -663,6 +710,8 @@ Cost Optimization
        adapter = SnowflakeAdapter(warehouse_size="X-SMALL")
 
        cursor.execute(f"ALTER WAREHOUSE {warehouse} SET WAREHOUSE_SIZE = 'MEDIUM'")
+
+   Start with the smallest warehouse, then monitor and resize if needed.
 
 4. **Monitor credit usage**:
 
@@ -679,6 +728,8 @@ Cost Optimization
            GROUP BY WAREHOUSE_NAME
            ORDER BY total_credits DESC
        """)
+
+   This query reports warehouse credit usage over the last seven days.
 
 Data Organization
 ~~~~~~~~~~~~~~~~~
@@ -712,6 +763,8 @@ Data Organization
        if clustering_depth > 10:
            cursor.execute("ALTER TABLE lineitem RECLUSTER")
 
+   Recluster when clustering quality degrades.
+
 Common Issues
 -------------
 
@@ -720,7 +773,8 @@ Warehouse Not Running
 
 **Problem**: "Warehouse is suspended" error
 
-**Solutions**:
+**Solutions**: enable auto-resume so the warehouse starts automatically, resume
+it manually, and check its status:
 
 .. code-block:: python
 
@@ -741,6 +795,13 @@ Authentication Failed
 
 **Solutions**:
 
+1. Verify the account identifier format. Correct values look like
+   ``xy12345.us-east-1`` or ``xy12345.us-east-1.aws``. A full URL such as
+   ``https://xy12345.snowflakecomputing.com`` is incorrect.
+2. Check that the username exists. It is case-insensitive. In the Snowflake UI,
+   run ``SHOW USERS;``.
+3. Use key-pair authentication for better security:
+
 .. code-block:: python
 
     adapter = SnowflakeAdapter(
@@ -755,7 +816,8 @@ Insufficient Privileges
 
 **Problem**: "Insufficient privileges" error
 
-**Solutions**:
+**Solutions**: grant the required privileges in Snowflake, then specify a role
+that has them:
 
 .. code-block:: bash
 
@@ -779,7 +841,9 @@ High Costs
 
 **Problem**: Unexpected credit consumption
 
-**Solutions**:
+**Solutions**: check the query history for expensive queries, use a smaller
+warehouse, enable aggressive auto-suspend (``auto_suspend=60`` is 1 minute), and
+set resource monitors:
 
 .. code-block:: python
 
@@ -814,7 +878,10 @@ Slow Query Performance
 
 **Problem**: Queries slower than expected
 
-**Solutions**:
+**Solutions**: resize the warehouse, check clustering quality, add clustering
+keys, enable automatic clustering, and check the query profile. For the profile,
+open the Snowflake UI, choose Query History, click the query, and view its
+profile.
 
 .. code-block:: python
 

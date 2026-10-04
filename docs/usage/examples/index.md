@@ -87,6 +87,8 @@ cd ../../features
 python query_subset.py
 ```
 
+The steps clone the repository if you haven't already, install BenchBox, run a local example that needs no configuration, and run a feature example.
+
 For cloud examples, see the [Configuration Guide](../../../examples/tunings/README.md) for platform setup instructions.
 
 ## See Also

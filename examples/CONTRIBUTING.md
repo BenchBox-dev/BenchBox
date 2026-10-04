@@ -82,11 +82,12 @@ examples/
 
 ### File Template
 
-Every example should follow this structure:
-
 Describe what the example demonstrates, when to use it and its prerequisites
 in the directory README. Source files carry no explanatory comments or
 docstrings; see the [comment policy](../docs/development/comment-policy.md).
+
+Every example should follow this structure. The first line of the file is the
+shebang, `#!/usr/bin/env python3`; the block below shows everything after it:
 
 ```python
 # Copyright 2026 Joe Harris / BenchBox Project
@@ -137,6 +138,8 @@ Every example must include:
 
 ### Error Handling
 
+Catch the specific error and tell the user what to do:
+
 ```python
 try:
     result = execute_benchmark(config)
@@ -144,7 +147,11 @@ except MissingCredentialsError as e:
     print(f"❌ Credentials required: {e}")
     print("Set DATABRICKS_TOKEN environment variable")
     sys.exit(1)
+```
 
+Avoid bare exceptions that hide the cause:
+
+```python
 try:
     result = execute_benchmark(config)
 except Exception:
@@ -154,6 +161,8 @@ except Exception:
 
 ### Output Formatting
 
+Show clear status indicators and context:
+
 ```python
 print("==" * 30)
 print("Running TPC-H Power Test")
@@ -161,7 +170,11 @@ print("==" * 30)
 print(f"✅ Data generated: {data_size_mb} MB")
 print(f"✅ Schema created: {table_count} tables")
 print(f"⚠️  Running 22 queries (this may take a few minutes)...")
+```
 
+Avoid unclear output with no visual hierarchy:
+
+```python
 print("Running test")
 print("Done")
 ```

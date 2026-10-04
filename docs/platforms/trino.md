@@ -33,6 +33,8 @@ pip install trino
 pip install "trino[kerberos]"
 ```
 
+The first command installs the Trino Python driver. The second adds authentication support.
+
 ## Configuration
 
 ### Environment Variables
@@ -137,6 +139,8 @@ benchbox run --platform trino --benchmark tpch --scale 0.1 \
   --platform-option catalog=memory
 ```
 
+The first command starts Trino locally in Docker. The second runs the benchmark with the memory catalog.
+
 If you installed Trino via Homebrew, you can start the service with:
 
 ```bash
@@ -144,6 +148,8 @@ brew install trino
 brew services start trino
 trino-server run
 ```
+
+Use either `brew services start trino` or `trino-server run` to start it manually.
 
 BenchBox automatically detects when `localhost:8080` refuses connections and
 emits a friendly error explaining that Trino needs to be started (including the
@@ -220,17 +226,23 @@ Trino provides detailed EXPLAIN output including:
 curl http://trino-host:8080/v1/info
 ```
 
+This verifies that Trino is accessible.
+
 ### Catalog Not Found
 
 ```bash
 trino --server trino-host:8080 --execute "SHOW CATALOGS"
 ```
 
+This lists the available catalogs.
+
 ### Memory Errors
 
 ```sql
 SELECT * FROM system.runtime.queries WHERE state = 'RUNNING';
 ```
+
+This checks memory usage of the running queries.
 
 ## Related Documentation
 

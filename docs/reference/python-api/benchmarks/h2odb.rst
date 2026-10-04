@@ -281,6 +281,8 @@ Best Practices
 
 1. **Use Appropriate Scale Factors**
 
+   Use ``0.01`` for development and testing (about 10K rows, 1 MB), ``1.0`` for the standard benchmark (about 1M rows, 100 MB), and ``10.0`` for large-scale testing (about 10M rows, 1 GB).
+
    .. code-block:: python
 
        dev = H2ODB(scale_factor=0.01)
@@ -290,6 +292,8 @@ Best Practices
        prod = H2ODB(scale_factor=10.0)
 
 2. **Test Query Groups Separately**
+
+   Test basic aggregation (``Q1``, ``Q2``), grouping (``Q3``-``Q6``), temporal analysis (``Q7``, ``Q8``), and advanced analytics (``Q9``, ``Q10``) performance separately.
 
    .. code-block:: python
 
@@ -306,6 +310,8 @@ Best Practices
    H2O DB query SQL is static. Select a query ID such as ``Q8`` or ``Q9`` without parameters.
 
 4. **Monitor Memory for Large Grouping Operations**
+
+   Large scale factors may require memory configuration.
 
    .. code-block:: python
 

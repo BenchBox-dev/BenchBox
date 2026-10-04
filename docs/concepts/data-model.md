@@ -75,6 +75,15 @@ Top-level object containing complete benchmark execution information.
 }
 ```
 
+The fields fall into these groups:
+
+- **Identification**: `benchmark_name` (for example `"TPC-H"`, `"TPC-DS"` or `"ClickBench"`), `platform` (for example `"DuckDB"` or `"Snowflake"`), `execution_id` (a unique run identifier) and `timestamp` (an ISO 8601 timestamp).
+- **Configuration**: `scale_factor` (the data size multiplier) and `test_execution_type` (`"standard"`, `"power"` or `"throughput"`).
+- **Timing summary**: `duration_seconds` is the total execution time. `total_execution_time` covers query execution only. `average_query_time` is the mean query time. `data_loading_time` and `schema_creation_time` are the times to load data and create the schema.
+- **Query statistics**: `total_queries` counts queries attempted, `successful_queries` those that succeeded, and `failed_queries` those that failed.
+- **Validation**: `validation_status` is `"PASSED"`, `"FAILED"` or `"SKIPPED"`. `validation_details` holds the validation check results.
+- **System context**: `system_profile` holds hardware and software information, `platform_info` holds platform-specific metadata, and `tunings_applied` holds the performance tuning configuration.
+
 **Example**:
 ```json
 {
@@ -319,10 +328,14 @@ Correctness verification details.
 **Example**:
 ```bash
 cat results.json | jq '.query_results[] | {query_id, execution_time}'
+```
 
+```python
 import pandas as pd
 df = pd.read_json("results.json")
 ```
+
+The first command pretty-prints the query results with jq. The Python snippet loads the results into pandas.
 
 ### CSV (Export Format)
 
@@ -331,6 +344,8 @@ df = pd.read_json("results.json")
 ```bash
 benchbox export results.json --format csv --output-dir ./
 ```
+
+This exports the query results to CSV.
 
 **CSV Columns**:
 ```
@@ -363,6 +378,8 @@ df = pd.DataFrame(query_data)
 df.to_parquet("results.parquet", compression="snappy")
 ```
 
+This converts results to Parquet using pandas. It loads the JSON results, extracts the query results, and saves them as a DataFrame in Parquet format.
+
 **Benefits**:
 - Compressed (smaller file size)
 - Column-oriented (fast analytical queries)
@@ -388,6 +405,8 @@ for qr in results.query_results:
 results.to_json_file("results_copy.json")
 ```
 
+The example loads results from JSON, accesses their fields, iterates through the query results, and saves the results to a file.
+
 ### Command-Line Tools
 
 ```bash
@@ -397,6 +416,8 @@ jq '{benchmark: .benchmark_name, total_time: .total_execution_time, avg_time: .a
 
 benchbox compare baseline.json current.json
 ```
+
+The first command selects query results slower than 5 seconds with jq. The second extracts a timing summary. The last compares two result files.
 
 ### Analysis Examples
 
@@ -448,6 +469,8 @@ df = pd.DataFrame([
 print(df.describe())
 print(df.groupby("status").count())
 ```
+
+The code converts the results to a DataFrame, then analyzes them.
 
 ## Schema Evolution
 

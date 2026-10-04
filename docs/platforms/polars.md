@@ -35,6 +35,8 @@ pip install "polars[all]"
 
 ### CLI Options
 
+SQL mode (`polars`) executes queries via Polars `SQLContext`. DataFrame mode (`polars-df`) executes queries via the native expression API:
+
 ```bash
 benchbox run --platform polars --benchmark tpch --scale 0.1
 
@@ -76,6 +78,8 @@ revert a manually-installed version and how to work around it.
 
 ### Basic Benchmark Run
 
+Run TPC-H using SQL queries (`polars`) or using native expressions (`polars-df`):
+
 ```bash
 benchbox run --platform polars --benchmark tpch --scale 0.1
 
@@ -83,6 +87,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
 ### Compare SQL vs DataFrame Performance
+
+Run the same benchmark through both execution paradigms, then compare the results:
 
 ```bash
 benchbox run --platform polars --benchmark tpch --scale 1 --output ./polars-sql
@@ -146,6 +152,8 @@ df = (
     .collect()
 )
 ```
+
+Polars optimizes the entire query plan, and `.collect()` executes the optimized plan.
 
 Optimizations include:
 - Predicate pushdown
@@ -217,6 +225,8 @@ adapter = PolarsAdapter(streaming=True)
 
 ### Memory Errors
 
+Enable streaming for large datasets:
+
 ```python
 adapter = PolarsAdapter(streaming=True)
 ```
@@ -250,6 +260,8 @@ The `polars-df` platform executes TPC-H queries using Polars' native expression 
 
 ### Expression API Example
 
+TPC-H Q1 implemented with Polars expressions:
+
 ```python
 result = (
     lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
@@ -274,6 +286,8 @@ result = (
 | Maximum optimization control | `polars-df` (expression API) |
 
 ### Streaming Mode for Large Data
+
+Enable streaming for datasets larger than memory:
 
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 100 \

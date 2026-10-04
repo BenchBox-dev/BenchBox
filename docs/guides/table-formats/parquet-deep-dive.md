@@ -34,6 +34,8 @@ FROM lineitem
 GROUP BY l_returnflag, l_linestatus;
 ```
 
+The first query needs only the `l_extendedprice` column but reads all 6M rows. The second needs only 4 of the 16 columns.
+
 With row storage, the query reads entire rows, including columns it doesn't need. With columnar storage, it reads only the columns requested.
 
 ### Analytical Query Patterns
@@ -123,6 +125,8 @@ DataFrameWriteConfiguration(
 )
 ```
 
+`dictionary_columns` forces dictionary encoding on the listed columns, and `skip_dictionary_columns` skips it.
+
 #### Other Parquet Encodings
 
 PyArrow selects encodings automatically based on data type. Dictionary encoding is the one encoding worth controlling explicitly. The others are applied transparently:
@@ -151,6 +155,8 @@ Parquet stores statistics in the file footer:
 ```sql
 SELECT * FROM lineitem WHERE l_shipdate > '1998-01-01';
 ```
+
+This is a query with a range filter.
 
 If a row group's max l_shipdate is '1997-12-31', the query engine skips that entire row group. This predicate pushdown happens automatically based on statistics.
 
@@ -199,6 +205,13 @@ benchbox run --platform duckdb --benchmark tpch --compression snappy
 
 benchbox run --platform duckdb --benchmark tpch --compression none
 ```
+
+The commands use, in order:
+
+- The default (Zstd level 3).
+- Higher compression, which gives smaller files and slower writes.
+- Faster compression, which gives larger files and faster writes.
+- No compression, for debugging and as a baseline.
 
 ## Row Group Tuning
 
@@ -252,6 +265,8 @@ write:
   data_page_version: "2.0"
 ```
 
+Save this as `tuning-v2.yaml`.
+
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1 --tuning ./tuning-v2.yaml
 ```
@@ -269,6 +284,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 10 --compression zstd:9
 
 benchbox run --platform duckdb --benchmark tpch --scale 10 --compression none
 ```
+
+The commands are, in order, a standard benchmark (reproducible and efficient), a storage-focused comparison, and a performance baseline that measures the decompression impact.
 
 ### Common Mistakes to Avoid
 

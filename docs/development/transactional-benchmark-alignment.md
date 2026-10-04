@@ -48,7 +48,8 @@ Every other method body, signature, and logic is character-for-character
 identical (lines 30-117 in each file).
 
 **Extraction**: `OperationsRegistryBase[OperationT]` in
-`benchbox/core/transactional/operations_registry_base.py`.
+`benchbox/core/transactional/operations_registry_base.py`. The first class below
+is the shared base; the second is a subclass.
 
 ```python
 class OperationsRegistryBase(Generic[OperationT]):
@@ -84,7 +85,8 @@ class TransactionOperationsManager(OperationsRegistryBase[WriteOperation]):
 
 The first 41 lines of `execute_operation()` are identical (connection
 validation + `kwargs` extraction + `operations_manager.get_operation()` +
-auto-setup):
+auto-setup). The logic is identical in lines 823-842 of one file and lines
+968-988 of the other:
 
 ```python
 if not connection: raise ValueError(...)

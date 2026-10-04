@@ -38,6 +38,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.j
 benchbox compare sql.json polars.json
 ```
 
+The first command runs SQL execution on DuckDB. The second runs DataFrame execution on Polars. The third compares the two result files.
+
 ## How It Works
 
 BenchBox translates TPC-H queries into DataFrame operations:
@@ -82,12 +84,15 @@ benchbox tuning defaults --platform polars
 benchbox run --platform polars-df --benchmark tpch --tuning tuning.yaml
 ```
 
+The first command shows the available settings. The second runs with a custom tuning file.
+
 ## Pandas Example
 
 ```bash
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01
-
 ```
+
+Pandas is slower than Polars for large datasets. Use scale factors of 0.01 to 0.1 for Pandas benchmarks.
 
 ## Cross-Platform DataFrame Comparison
 
@@ -98,6 +103,8 @@ benchbox run --platform datafusion-df --benchmark tpch --output datafusion.json
 
 benchbox compare polars.json pandas.json datafusion.json
 ```
+
+The three runs and the final comparison cover the DataFrame platforms.
 
 ## TPC-DS Support
 
@@ -124,6 +131,8 @@ results = benchmark.run_dataframe(adapter)
 for query_result in results.query_results:
     print(f"{query_result.query_id}: {query_result.execution_time_ms:.1f}ms")
 ```
+
+`run_dataframe` runs the benchmark. The loop then reads each query result.
 
 ## Next Steps
 

@@ -114,7 +114,14 @@ validator = TPCResultValidator(config)
 
 ## Test Results Format
 
-The validation system expects test results in the following format:
+The validation system expects test results in the following format. The fields are:
+
+- Required: `benchmark_name` (TPC-H, TPC-DS, or TPC-DI), `scale_factor` (the scale factor used), and `test_start_time` and `test_end_time` (ISO format timestamps).
+- Query execution results: `query_results` maps each query ID to its `status` (`success`, `failed`, or `timeout`), `execution_time` (seconds), and `row_count` (rows returned). `results` (the actual query results) and `error` (the error message if the query failed) are optional.
+- Data generation information: `data_generation` holds `generation_time` (seconds to generate data) and `generated_tables`.
+- Calculated metrics: `metrics`.
+- Optional: `maintenance_operations` (for TPC-DS and TPC-DI) and `etl_operations` (for TPC-DI).
+- Reproducibility information: `reproducibility`. Test isolation: `test_isolation`. Documentation: `documentation`.
 
 ```python
 test_results = {
@@ -289,6 +296,8 @@ report = validator.validate(test_results, ValidationLevel.STANDARD)
 ```
 
 ### TPC-DS Integration
+
+The example validates results with a TPC-DS specific configuration:
 
 ```python
 from benchbox.tpcds import TPCDSBenchmark

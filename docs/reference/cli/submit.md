@@ -159,6 +159,19 @@ uv run -- benchbox submit --last --service https://staging.benchbox.dev/v1 --no-
 uv run -- benchbox results --submitted
 ```
 
+In order, the commands:
+
+- Package a specific result file.
+- Package the most recent result.
+- Print exact result paths (one per line, pipeable) with `benchbox results --paths`, then package one result by path. The next command instead loops over every recent result.
+- Package the most recent TPC-H result.
+- Preview what would be packaged (no files written).
+- Use a custom output directory.
+- Log in for hosted submission.
+- Upload to the hosted API and wait for publication.
+- Upload to staging without waiting for publication.
+- Show hosted submission history.
+
 ## Related
 
 - [auth](auth.md) - Manage hosted submission credentials

@@ -125,6 +125,8 @@ The scale factor controls the volume of data generated. SF=1 targets approximate
 
 ## CLI Usage
 
+The first command generates CoffeeShop data (and runs the benchmark). The second runs specific queries. The third runs the sales analysis queries by listing them, because there is no pattern option.
+
 ```bash
 benchbox run --benchmark coffeeshop --platform duckdb --scale 1.0
 
@@ -159,6 +161,8 @@ Validate performance with:
 
 ### Sales Analysis
 
+SA1: daily revenue and order volume by region.
+
 ```sql
 SELECT
     ol.order_date,
@@ -174,6 +178,8 @@ ORDER BY ol.order_date, dl.region;
 ```
 
 ### Product Analysis
+
+PR1: product mix and revenue by subcategory.
 
 ```sql
 SELECT

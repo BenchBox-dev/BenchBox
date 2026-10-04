@@ -39,7 +39,7 @@ from benchbox import (
 )
 ```
 
-Instead of reaching into internal modules:
+Instead of reaching into internal modules (this is the fragile, before-refactor form):
 
 ```python
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES

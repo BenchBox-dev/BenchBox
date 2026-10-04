@@ -138,6 +138,8 @@ If a query is unexpectedly slow:
 benchbox run --dry-run ./analysis --platform duckdb --benchmark tpch
 ```
 
+This exports the query SQL to `./analysis/queries/`.
+
 ## Next Steps
 
 - [Comparing Platforms](comparing-platforms.md) - Run on multiple databases

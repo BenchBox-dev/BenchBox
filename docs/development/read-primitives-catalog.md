@@ -18,6 +18,8 @@ queries:
       SELECT ...
 ```
 
+In the real catalog the SQL for `aggregation_distinct` is a distinct count of a high-cardinality key on a large table.
+
 * `id` - unique identifier referenced by benchmarks and tests.
 * `category` - lower-case grouping used for `get_queries_by_category`; omit to
 default to the `id` prefix.
@@ -73,6 +75,8 @@ Define alternative SQL for specific platforms using the `variants` field:
       ORDER BY p_brand
       LIMIT 100
 ```
+
+The base `sql` uses standard MySQL syntax.
 
 **When to use variants:**
 - Platform uses different function names (e.g., `JSON_ARRAYAGG` vs `JSON_GROUP_ARRAY`)
@@ -201,6 +205,8 @@ For a complete reference of all current skips, their root causes, and instructio
       FROM monthly_totals
       ORDER BY order_month
 ```
+
+The base `sql` is standard SQL with a nested aggregate inside `REGR_SLOPE`.
 
 This example shows:
 - Structural changes (base query → CTE with window function)

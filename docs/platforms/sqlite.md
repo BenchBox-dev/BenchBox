@@ -26,6 +26,8 @@ SQLite is useful in BenchBox for:
 
 ## Installation
 
+SQLite is included with Python, so no separate install is needed. Install BenchBox with uv or with pip:
+
 ```bash
 uv add benchbox
 
@@ -75,6 +77,8 @@ benchbox run --platform sqlite --benchmark tpch --scale 0.01
 ```
 
 ### With Optimizations
+
+This configuration is optimized for read performance (`cache_size=-64000` is a 64 MB cache):
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch --scale 0.1 \
@@ -126,7 +130,7 @@ benchbox run --platform sqlite --benchmark tpch \
 
 ### Cache Size
 
-Increase cache to reduce disk I/O:
+Increase cache to reduce disk I/O. A negative `cache_size` is in KiB, so `-64000` is a 64 MB cache:
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
@@ -135,7 +139,7 @@ benchbox run --platform sqlite --benchmark tpch \
 
 ### Memory-Mapped I/O
 
-For large databases:
+For large databases. `268435456` bytes is 256 MB:
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
@@ -181,6 +185,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1
 
 ### Database Locked
 
+Wait for the lock by setting a busy timeout (`30000` ms is 30 seconds):
+
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option busy_timeout=30000
@@ -188,12 +194,16 @@ benchbox run --platform sqlite --benchmark tpch \
 
 ### Out of Memory
 
+Use file-based temp storage:
+
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option temp_store=FILE
 ```
 
 ### Slow Queries
+
+Increase the cache and use WAL:
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch \

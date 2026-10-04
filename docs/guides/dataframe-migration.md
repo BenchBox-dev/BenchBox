@@ -91,7 +91,9 @@ benchbox run --platform polars-df --benchmark tpch --tuning auto
 benchbox run --platform polars-df --benchmark tpch --tuning ./tuning.yaml
 ```
 
-Example tuning file:
+The first command shows the platform defaults. The second auto-detects optimal settings. The third uses a custom configuration.
+
+Example tuning file (`tuning.yaml`):
 
 ```yaml
 platform: polars
@@ -135,6 +137,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 1 --output df_results
 
 benchbox compare sql_results.json df_results.json
 ```
+
+The first command runs SQL execution. The second runs DataFrame execution. The third compares the results.
 
 ## Limitations
 

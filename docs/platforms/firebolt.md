@@ -17,7 +17,7 @@ Firebolt is a high-performance cloud analytics database with a vectorized query 
 
 ## Deployment Modes
 
-Firebolt supports two deployment modes, selectable via the colon syntax:
+Firebolt supports two deployment modes, selectable via the colon syntax. The first command uses Firebolt Core (local Docker, the default), and the second uses Firebolt Cloud (managed service):
 
 ```bash
 benchbox run --platform firebolt:core --benchmark tpch --scale 0.1
@@ -71,6 +71,8 @@ benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
 
 ### Firebolt Cloud
 
+Set credentials through environment variables (recommended). The `SERVICE_ACCOUNT_ID` and `SERVICE_ACCOUNT_SECRET` names are also supported as alternatives. Then run with the deployment mode syntax, or pass the credentials inline as CLI options (the last command):
+
 ```bash
 export FIREBOLT_CLIENT_ID=your_client_id
 export FIREBOLT_CLIENT_SECRET=your_client_secret
@@ -105,6 +107,8 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
 ## Usage Examples
 
 ### Firebolt Core
+
+Start the Core container first, then run the benchmark:
 
 ```bash
 docker run -d -p 3473:3473 ghcr.io/firebolt-db/firebolt-core:preview-rc
@@ -225,8 +229,7 @@ curl -X POST "https://api.firebolt.io/oauth/token" \
 
 ### Engine Not Running
 
-```bash
-```
+Start the engine through the API or the Firebolt console. Engines auto-stop after inactivity.
 
 ## Related Documentation
 

@@ -18,6 +18,8 @@ Starburst Galaxy is a managed Trino service providing serverless distributed SQL
 
 ## Quick Start
 
+The commands install the Trino driver, set credentials, and run a benchmark.
+
 ```bash
 uv add trino
 
@@ -39,7 +41,10 @@ username = email/role
 
 ### Configuration Methods
 
-**Environment Variables (recommended):**
+**Environment Variables (recommended):** the first three variables are the credentials. Optionally, configure the role
+separately: set `STARBURST_USER` without the role suffix and set `STARBURST_ROLE`, which is appended automatically. In
+that case the second `STARBURST_USER` line replaces the first. `STARBURST_CATALOG` optionally sets the default
+catalog.
 
 ```bash
 export STARBURST_HOST=my-cluster.trino.galaxy.starburst.io
@@ -82,6 +87,8 @@ benchbox run --platform starburst --benchmark tpch --scale 1.0 \
 
 ### Basic Benchmark
 
+The commands run TPC-H at scale factor 1 and TPC-DS at scale factor 10.
+
 ```bash
 benchbox run --platform starburst --benchmark tpch --scale 1.0
 
@@ -97,6 +104,8 @@ benchbox run --platform starburst --benchmark tpch --scale 1.0 \
 ```
 
 ### With Table Format
+
+Iceberg tables are the default. The second command uses Delta Lake tables.
 
 ```bash
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \
@@ -135,6 +144,8 @@ Starburst inherits from Trino, which means:
 - **Connector Syntax**: Same catalog.schema.table naming convention
 - **Session Properties**: Trino session properties are supported
 
+`get_platform_family` returns `"trino"`, and `get_inherited_platform` also returns `"trino"`.
+
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
@@ -153,6 +164,8 @@ Starburst Galaxy supports multiple table formats:
 | `hive` | Hive format | Compatibility with Hive ecosystem |
 | `iceberg` | Apache Iceberg | Production analytics, ACID transactions |
 | `delta` | Delta Lake | Databricks ecosystem integration |
+
+Iceberg is recommended for analytics.
 
 ```bash
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \

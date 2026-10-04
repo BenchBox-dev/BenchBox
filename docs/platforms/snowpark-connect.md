@@ -31,8 +31,9 @@ Unlike Apache Spark, Snowpark Connect has some limitations:
 
 ```bash
 uv add benchbox --extra snowpark-connect
-
 ```
+
+This installs Snowpark Connect support, including the `snowflake-snowpark-python` dependency.
 
 ## Prerequisites
 
@@ -56,6 +57,8 @@ export SNOWFLAKE_DATABASE=BENCHBOX
 export SNOWFLAKE_ROLE=SYSADMIN
 ```
 
+The account, user and password variables are required. The warehouse, database and role variables are optional.
+
 ### CLI Usage
 
 ```bash
@@ -75,6 +78,8 @@ benchbox run --platform snowpark-connect --benchmark tpch --dry-run ./preview \
   --platform-option user=my_user \
   --platform-option password=my_password
 ```
+
+The first command is basic usage, the second uses a custom warehouse, and the third is a dry run that previews the queries.
 
 ### Platform Options
 
@@ -115,6 +120,8 @@ result = adapter.execute_dataframe(df.filter(df["l_quantity"] > 30).limit(10))
 
 adapter.close()
 ```
+
+The example initializes the adapter with credentials, then creates the session (no Spark cluster is needed). It creates a schema and executes a SQL query. It then uses the DataFrame API and closes the session.
 
 ## Execution Model
 

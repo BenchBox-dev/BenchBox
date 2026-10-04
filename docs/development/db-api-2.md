@@ -107,7 +107,7 @@ cursor = connection.execute(query)
 results = cursor.fetchall()
 ```
 
-The `DatabaseConnection` wrapper automatically detects and supports both patterns:
+The `DatabaseConnection` wrapper automatically detects and supports both patterns. It checks for a direct `execute()` method first (pattern 2, DuckDB and DataFusion), then falls back to the standard cursor pattern (pattern 1, PostgreSQL, MySQL, and SQLite):
 
 ```python
 def execute(self, query: str, parameters: Optional[...] = None) -> DBCursor:
@@ -134,7 +134,7 @@ def execute(self, query: str, parameters: Optional[...] = None) -> DBCursor:
 
 #### Parameter Style Flexibility
 
-The wrapper supports multiple parameter types as allowed by DB API 2.0:
+The wrapper supports multiple parameter types as allowed by DB API 2.0. The first example below uses a list (positional parameters), the second a dict (named parameters), and the third a tuple (positional parameters):
 
 ```python
 execute("SELECT * FROM users WHERE id = ? AND status = ?", [1, "active"])
@@ -163,7 +163,7 @@ The wrapper implements all core DB API 2.0 methods:
 
 ### Platform-Specific Parameter Placeholders
 
-Different databases use different parameter placeholder styles. BenchBox automatically detects the appropriate style:
+Different databases use different parameter placeholder styles. BenchBox automatically detects the appropriate style. SQLite and DuckDB use the `?` qmark style, which is the PEP 249 standard. PostgreSQL and MySQL use the `%s` format style, also a PEP 249 standard. Any other connection type defaults to the DB-API 2.0 qmark style:
 
 ```python
 def _get_parameter_placeholder(self, connection: Any) -> str:
@@ -256,6 +256,8 @@ def execute_query(self, connection: Any, query: str, query_id: str, **options):
 - **Pattern**: Standard cursor pattern
 - **DB API 2.0 Compliance**: Full compliance (both drivers)
 
+Both `redshift_connector` and `psycopg2` are DB-API 2.0 compliant. The excerpt below shows the two `connect()` calls as alternatives; an adapter uses one of them, not both:
+
 ```python
 def create_connection(self, **connection_config) -> Any:
     connection = redshift_connector.connect(...)
@@ -283,6 +285,8 @@ def execute_query(self, connection: Any, query: str, query_id: str, **options):
 - **Client Library**: `datafusion`
 - **Pattern**: Custom (sql() method, not standard cursor)
 - **DB API 2.0 Compliance**: Non-compliant - uses custom interface
+
+DataFusion uses a non-standard interface (`connection.sql()` is not DB-API 2.0), so it needs custom result handling:
 
 ```python
 def execute_query(self, connection: Any, query: str, query_id: str, **options):
@@ -380,6 +384,8 @@ def test_postgres_like_connection(self):
 
 ### Connection Management
 
+The first example uses a context manager (good), and the connection is closed automatically when the block ends. The second is also good: manual management with `try`/`finally`.
+
 ```python
 with adapter.managed_connection(**config) as connection:
     cursor = connection.cursor()
@@ -400,6 +406,8 @@ finally:
 ```
 
 ### Parameter Usage
+
+The first call is good: it uses parameterized queries, which prevent SQL injection. The second is bad: string formatting makes the query vulnerable to SQL injection.
 
 ```python
 cursor.execute("SELECT * FROM users WHERE id = ? AND status = ?", [user_id, status])

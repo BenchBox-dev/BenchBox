@@ -30,6 +30,8 @@ defaults and standard `COPY` for bulk loading.
 benchbox run --platform cedardb --benchmark tpch --scale 1.0
 ```
 
+This uses the self-hosted mode, which is the default.
+
 ## Installation
 
 CedarDB uses the same Python driver as PostgreSQL:

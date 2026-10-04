@@ -29,6 +29,8 @@ uv run -- python -m tests.uat._cli validate \
     --output-tsv uat-rollup.tsv
 ```
 
+The `make` target rolls up an entire sweep results directory. The direct module form is useful inside scripts.
+
 ### TSV columns
 
 | Column             | Meaning                                                                |

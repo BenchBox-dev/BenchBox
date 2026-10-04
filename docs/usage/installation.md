@@ -10,6 +10,8 @@ reaches end of life in October 2027.
 
 ## 1. Install BenchBox
 
+The options below are, in order: `uv` (recommended, modern package management), `uv pip` (pip-compatible), traditional `pip` (uses the active Python environment), and `pipx` for a dedicated CLI environment.
+
 ```bash
 uv add benchbox
 
@@ -46,7 +48,7 @@ later by running the matching install command again.
 
 Stable DuckDB releases remain the default. To test the current
 [DuckDB 2.0 preview](https://duckdb.org/install/preview), install BenchBox's
-DuckDB extra and then select the preview package explicitly:
+DuckDB extra and then select the preview package explicitly. The first two commands are for a `uv` project, and the last is for an active pip environment:
 
 ```bash
 uv add benchbox --extra duckdb
@@ -73,6 +75,8 @@ For managed Spark platforms, use provider-specific extras to install only the de
 | `[cloud-spark-databricks]` | Databricks Connect | databricks-connect, databricks-sdk |
 | `[cloud-spark]` | All cloud Spark platforms | All of the above |
 
+The first command installs only the AWS Spark dependencies. The second installs all cloud Spark dependencies for multi-cloud use. The third combines Spark extras with other extras:
+
 ```bash
 uv add benchbox --extra cloud-spark-aws
 
@@ -82,6 +86,8 @@ uv add benchbox --extra cloud-spark-aws --extra athena
 ```
 
 ### Combining Extras
+
+The first command (recommended) enables all cloud platforms and ClickHouse. The second is the pip-compatible alternative:
 
 ```bash
 uv add benchbox --extra cloud --extra clickhouse
@@ -110,7 +116,7 @@ The command prints the current BenchBox version and validates that `pyproject.to
 
 ## 4. Run Dependency Checks
 
-`benchbox check-deps` inspects optional connectors and suggests install commands.
+`benchbox check-deps` inspects optional connectors and suggests install commands. The first command gives an overview of all platforms, the second a detailed matrix with extras guidance, and the third focuses on a single platform:
 
 ```bash
 uv run -- benchbox check-deps

@@ -7,7 +7,8 @@
 
 ## Comparing DataFrame Platforms
 
-Use the unified `benchbox compare` command to compare results across DataFrame platforms:
+Use the unified `benchbox compare` command to compare results across DataFrame platforms. Run the benchmarks for each
+platform first, then compare the results:
 
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 0.01 --output polars.json
@@ -17,6 +18,8 @@ benchbox compare polars.json pandas.json
 ```
 
 ### SQL vs DataFrame Comparison
+
+Run the SQL benchmark and the DataFrame benchmark, then compare them:
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 --output duckdb.json

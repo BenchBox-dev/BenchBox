@@ -100,7 +100,7 @@ benchbox convert --input ./data --format parquet --compression zstd
 benchbox convert --input ./data --format parquet --partition l_shipdate
 ```
 
-**Reading Parquet:**
+**Reading Parquet:** the snippets below use DuckDB, PyArrow, Polars and Pandas, in that order.
 ```python
 conn.execute("SELECT * FROM read_parquet('customer.parquet')")
 
@@ -140,7 +140,7 @@ benchbox convert --input ./data --format vortex
 benchbox convert --input ./data --format vortex --compression zstd
 ```
 
-**Reading Vortex:**
+**Reading Vortex:** the first snippet uses the Python `vortex` library. The DuckDB snippet needs the `vortex` extension.
 ```python
 import vortex
 array = vortex.io.read('customer.vortex')
@@ -182,7 +182,7 @@ benchbox convert --input ./data --format delta
 benchbox convert --input ./data --format delta --compression zstd
 ```
 
-**Reading Delta Lake:**
+**Reading Delta Lake:** the snippets below use the Python `deltalake` library, DuckDB (which needs the `delta` extension) and Spark, in that order.
 ```python
 from deltalake import DeltaTable
 dt = DeltaTable('./customer')
@@ -194,7 +194,7 @@ conn.execute("SELECT * FROM delta_scan('./customer')")
 df = spark.read.format("delta").load("./customer")
 ```
 
-**Time Travel:**
+**Time Travel:** the first line queries a specific version and the second queries by timestamp.
 ```python
 dt = DeltaTable('./customer', version=0)
 
@@ -234,7 +234,7 @@ benchbox convert --input ./data --format iceberg
 benchbox convert --input ./data --format iceberg --partition l_shipdate
 ```
 
-**Reading Iceberg:**
+**Reading Iceberg:** the first snippet uses PyIceberg and the last uses Spark.
 ```python
 from pyiceberg.catalog import load_catalog
 catalog = load_catalog("local", **{"type": "sql", "uri": "sqlite:///catalog.db"})
@@ -265,13 +265,14 @@ customer/
 - **MERGE_ON_READ**: Faster writes, better for streaming workloads
 - **Time Travel**: Query historical versions via commit timeline
 
-**Installation:**
+**Installation:** Hudi requires PySpark with the `hudi-spark-bundle`. Install PySpark, then configure Spark with
+`spark.jars.packages=org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0`.
 ```bash
 pip install pyspark
 ```
 
 **Usage:**
-Hudi operations require PySpark SQL. For direct Hudi support, use the Quanton platform:
+Hudi operations require PySpark SQL. For direct Hudi support, use the Quanton platform (recommended):
 
 ```bash
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
@@ -279,7 +280,7 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option record_key=l_orderkey
 ```
 
-**Reading Hudi:**
+**Reading Hudi:** the first query is a full read. The second is an incremental query that returns changes since the given commit time.
 ```python
 spark = SparkSession.builder \
     .config("spark.jars.packages", "org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0") \
@@ -293,7 +294,7 @@ df = spark.read.format("hudi") \
     .load("./customer")
 ```
 
-**Time Travel:**
+**Time Travel:** this query reads the table as of a specific timestamp.
 ```python
 df = spark.read.format("hudi") \
     .option("as.of.instant", "20240115100000") \
@@ -319,9 +320,8 @@ customer/
 - **Native DuckDB Integration**: Optimal performance with DuckDB query engine
 - **Predicate Pushdown**: Filter data at the storage layer
 
-**Installation:**
-```bash
-```
+**Installation:** DuckLake is part of DuckDB 1.2.0 and later, so it needs no separate installation. The `ducklake`
+extension is installed automatically on first use.
 
 **Usage:**
 ```bash
@@ -346,7 +346,8 @@ conn.execute("""
 result = conn.execute("SELECT * FROM ducklake_db.main.customer").fetchdf()
 ```
 
-**Time Travel:**
+**Time Travel:** DuckLake supports querying historical snapshots. Querying a specific version works when your DuckDB
+version supports it.
 ```python
 conn.execute("""
     SELECT * FROM ducklake_db.main.customer
@@ -385,6 +386,9 @@ Delta Lake      | snappy    | 3,450     | 48s           | 0.34x
 
 ### Choosing Compression
 
+Use `snappy` for fast iteration during development. Use `zstd` for production, where storage size matters, and for
+cloud storage, where it minimizes transfer costs. The three commands below show these cases in that order.
+
 ```bash
 benchbox convert --input ./data --format parquet --compression snappy
 
@@ -415,6 +419,10 @@ Partitioning is beneficial when:
 
 ### Partitioning Examples
 
+The first command partitions by a single date column and creates `lineitem/l_shipdate=1996-01-01/part-*.parquet`.
+The second partitions by multiple columns, hierarchically, and creates
+`lineitem/l_returnflag=N/l_linestatus=O/part-*.parquet`.
+
 ```bash
 benchbox convert --input ./data --format parquet --partition l_shipdate
 
@@ -424,10 +432,12 @@ benchbox convert --input ./data --format parquet \
 
 ### Querying Partitioned Data
 
+This DuckDB query uses Hive partitioning, so it reads only the relevant partition. DuckDB pushes partition pruning
+filters down automatically.
+
 ```sql
 SELECT * FROM read_parquet('./lineitem/**/*.parquet', hive_partitioning=true)
 WHERE l_shipdate = '1996-03-15';
-
 ```
 
 ## Platform Integration
@@ -490,6 +500,8 @@ df = spark.read.format("hudi").load('./data/customer')
 
 ### Databricks
 
+Parquet files are auto-detected, and Delta Lake is the default format. The first two lines read Parquet and Delta Lake.
+
 ```python
 df = spark.read.load('/mnt/data/customer.parquet')
 
@@ -502,8 +514,8 @@ df = spark.read.format("hudi").load('/mnt/data/customer')
 
 ### Onehouse Quanton
 
-```python
-```
+Quanton supports all three table formats (Delta Lake, Iceberg and Hudi) via Spark SQL. Use the BenchBox CLI for
+streamlined access, for example `benchbox run --platform quanton --benchmark tpch --platform-option table_format=hudi`.
 
 ## Best Practices
 
@@ -526,6 +538,9 @@ df = spark.read.format("hudi").load('/mnt/data/customer')
 
 ### 2. Compression Strategy
 
+Use `snappy` for development, for fast iteration. Use `zstd` for production, to optimize storage, and for cloud
+storage, to minimize costs.
+
 ```bash
 --compression snappy
 
@@ -535,6 +550,8 @@ df = spark.read.format("hudi").load('/mnt/data/customer')
 ```
 
 ### 3. Validation
+
+Always validate for TPC compliance. Skip validation (`--no-validate`) only for exploratory work.
 
 ```bash
 benchbox convert --input ./data --format parquet --validate
@@ -600,7 +617,8 @@ If validation fails with row count mismatch:
 
 ### Large File Handling
 
-For very large scale factors (SF > 100):
+For very large scale factors (SF > 100), use Zstd for the best compression, and skip validation if conversion is
+slow:
 ```bash
 benchbox convert --input ./data --format parquet --compression zstd
 

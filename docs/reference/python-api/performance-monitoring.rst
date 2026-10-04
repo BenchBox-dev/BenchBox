@@ -244,7 +244,7 @@ Return a plain dictionary representation for serialization.
 
 **reset() -> None**
 
-Clear all recorded metrics and metadata.
+Clear all recorded metrics and metadata. Reset between benchmark runs.
 
 **Example**:
 
@@ -455,7 +455,7 @@ Persist snapshot and return any regression alerts.
 
 **Returns**: List of ``PerformanceRegressionAlert`` objects
 
-**Example**:
+**Example** (the thresholds are fractions: ``0.15`` is a 15% threshold and ``0.20`` is a 20% threshold):
 
 .. code-block:: python
 
@@ -664,6 +664,8 @@ Basic Monitoring
 Statistical Analysis
 ~~~~~~~~~~~~~~~~~~~~
 
+Run the query multiple times for stable timing:
+
 .. code-block:: python
 
     monitor = PerformanceMonitor()
@@ -685,6 +687,8 @@ Statistical Analysis
 
 Regression Detection
 ~~~~~~~~~~~~~~~~~~~~
+
+The example sets up a history, runs the benchmark, then records the snapshot and checks for regressions. The ``full_benchmark`` threshold of ``0.10`` is 10%.
 
 .. code-block:: python
 
@@ -749,6 +753,8 @@ Trend Analysis
 
 Performance Dashboard
 ~~~~~~~~~~~~~~~~~~~~~
+
+The dashboard collects every metric from the latest snapshot, analyzes each timing metric, and keeps the last 20 values of each metric's history.
 
 .. code-block:: python
 
@@ -832,6 +838,8 @@ Best Practices
 
 1. **Use Context Managers for Timing**
 
+   The first form (automatic timing) is preferred. Avoid the second form, manual timing, because it is error-prone.
+
    .. code-block:: python
 
        with monitor.time_operation("operation"):
@@ -842,6 +850,8 @@ Best Practices
        monitor.record_timing("operation", time.time() - start)
 
 2. **Record Metadata**
+
+   Always record context:
 
    .. code-block:: python
 
@@ -855,6 +865,8 @@ Best Practices
 
 3. **Use Appropriate Metric Types**
 
+   Use counters for things that accumulate, gauges for current values, and timings for operations with a duration:
+
    .. code-block:: python
 
        monitor.increment_counter("queries_executed")
@@ -866,6 +878,8 @@ Best Practices
 
 4. **Set Appropriate Regression Thresholds**
 
+   The three examples are, in order, conservative (10%), moderate (15%) and permissive (25%):
+
    .. code-block:: python
 
        thresholds = {"query_time": 0.10}
@@ -875,6 +889,8 @@ Best Practices
        thresholds = {"query_time": 0.25}
 
 5. **Maintain History Rolling Window**
+
+   Keep a manageable history of 50-100 entries. ``max_entries=100`` keeps about 100 recent runs:
 
    .. code-block:: python
 

@@ -35,6 +35,8 @@ uv add benchbox --extra duckdb
 pip install "benchbox[duckdb]"
 ```
 
+The first command installs BenchBox with the DuckDB extra using uv, and the second does the same with pip.
+
 ## Configuration
 
 ### Default Usage
@@ -115,6 +117,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
   --tuning tuned
 ```
 
+The `tuned` mode applies optimizations such as indexes.
+
 ### Python API
 
 ```python
@@ -132,6 +136,8 @@ results = adapter.run_benchmark(benchmark)
 
 print(f"Total runtime: {results.total_time:.2f}s")
 ```
+
+The first `DuckDBAdapter()` call creates an in-memory database. The second creates a persistent one at the given path. Use one or the other.
 
 ### Comparison Across Scales
 
@@ -158,12 +164,16 @@ benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=4
 ```
 
+This controls parallelism.
+
 ### Memory Limits
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option memory_limit=8GB
 ```
+
+This limits memory usage.
 
 ### Temporary Storage
 
@@ -184,12 +194,16 @@ DuckDB supports fast data loading from multiple formats:
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
 
+Data is generated as `.tbl` flat files (zstd-compressed by default) and loaded automatically.
+
 ### Pre-generated Data
 
 ```bash
 benchbox datagen --benchmark tpch --scale 1.0 --output ./data/tpch
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 --output ./data/tpch
 ```
+
+Generate the data separately, then run the benchmark with the pre-generated data.
 
 ### Direct Query (No Load)
 
@@ -203,6 +217,8 @@ result = conn.execute("""
     SELECT count(*) FROM read_parquet('lineitem/*.parquet')
 """).fetchone()
 ```
+
+The query reads the Parquet files directly.
 
 ## Best Practices
 
@@ -236,6 +252,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
   --platform-option database=./dev.duckdb
 ```
 
+The first command loads the data once. The second runs the queries as many times as you need against the persisted database.
+
 ### 4. Match Production Scale
 
 Test at similar scale to production platforms:
@@ -243,6 +261,8 @@ Test at similar scale to production platforms:
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 10.0
 ```
+
+For example, if you plan to run SF 100 on Snowflake, test at SF 1-10 on DuckDB.
 
 ## Troubleshooting
 
@@ -254,12 +274,16 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option temp_directory=/tmp/duckdb
 ```
 
+Increase the memory limit or set a temp directory so DuckDB can spill to disk.
+
 ### Slow Queries
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=$(nproc)
 ```
+
+This sets the thread count to the number of available cores.
 
 The progress bar is not a `--platform-option`; enable it through the Python API:
 
@@ -276,6 +300,8 @@ benchbox run --platform duckdb --benchmark tpch \
   --platform-option database=./new_benchmark.duckdb
 ```
 
+DuckDB allows only one connection for write operations. Close other DuckDB connections or use a new database path.
+
 ### Disk Space for Temp Files
 
 ```bash
@@ -284,6 +310,8 @@ df -h /tmp
 benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option temp_directory=/data/tmp
 ```
+
+Check the space in the temp directory first, then point `temp_directory` at a location with more room.
 
 ## Comparison with Other Platforms
 

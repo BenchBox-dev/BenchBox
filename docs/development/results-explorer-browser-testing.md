@@ -33,7 +33,9 @@ Routes and behaviours with at least one browser-functional test:
 ## Running the suite locally
 
 Prerequisites: a Python toolchain with `uv`, Node 20+, and the explorer's
-dependencies installed.
+dependencies installed. `test:e2e:install` is a one-time step that installs
+Chromium, Firefox, and WebKit. `test:e2e:chromium` is the deterministic local
+and CI entrypoint. `test:e2e:full` runs the full browser matrix locally.
 
 ```bash
 cd results-explorer

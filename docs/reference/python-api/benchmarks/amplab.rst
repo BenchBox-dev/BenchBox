@@ -231,6 +231,8 @@ Best Practices
 
 1. **Use Appropriate Scale Factors**
 
+   Use a small scale factor for development, a moderate one for testing, and the full scale for production.
+
    .. code-block:: python
 
        dev = AMPLab(scale_factor=0.01)
@@ -255,6 +257,8 @@ Best Practices
        query = benchmark.get_query("2", params=params)
 
 3. **Test Query Types Separately**
+
+   Test scan, join, and analytics performance separately.
 
    .. code-block:: python
 

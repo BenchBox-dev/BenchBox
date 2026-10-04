@@ -50,6 +50,8 @@ Cloud storage support requires the optional ``cloudstorage`` dependency:
 
     uv pip install "benchbox[cloud]"
 
+The first command installs cloud storage support only. The second installs all cloud dependencies.
+
 Supported Providers
 -------------------
 
@@ -147,6 +149,8 @@ Create appropriate path handler for local or cloud paths.
 
     local_path.mkdir(parents=True, exist_ok=True)
     cloud_path.mkdir(parents=True, exist_ok=True)
+
+The local path returns a ``pathlib.Path``. The S3 path returns a ``cloudpathlib.S3Path``. Both objects accept the same ``mkdir`` call.
 
 Local Staging Path Wrappers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -366,6 +370,7 @@ Validate cloud credentials for a given path.
         print(f"❌ Credential validation failed: {result['error']}")
         print(f"Required environment variables: {result['env_vars']}")
 
+For missing credentials the result has ``valid`` set to False, ``provider`` set to ``"s3"``, an ``error`` such as ``"Missing environment variables: AWS_ACCESS_KEY_ID"``, and ``env_vars`` listing ``AWS_ACCESS_KEY_ID`` and ``AWS_SECRET_ACCESS_KEY``.
 
 Path Information
 ~~~~~~~~~~~~~~~~
@@ -406,6 +411,8 @@ Get detailed information about a cloud path.
 
     info = get_cloud_path_info("/tmp/data")
     print(info)
+
+The S3 path reports ``is_cloud`` True, ``provider`` ``"s3"``, ``bucket`` ``"my-bucket"``, ``path`` ``"benchbox/tpch-data"`` and ``credentials_valid`` True when credentials are present. The local path reports ``is_cloud`` False, ``provider`` ``"local"``, ``bucket`` None, ``path`` ``"/tmp/data"`` and ``credentials_valid`` True.
 
 Directory Creation
 ~~~~~~~~~~~~~~~~~~
@@ -533,6 +540,8 @@ Unified interface for local and cloud paths with transparent operation handling.
     subdir = local / "results"
     print(subdir.exists())
 
+The joined path prints as ``s3://bucket/data/benchbox/tpch``. For the S3 adapter, ``name`` is ``data`` and ``parent`` is ``s3://bucket``. The same interface works for local paths.
+
 Cloud Storage Generator Mixin
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -622,6 +631,8 @@ Format setup guide for cloud storage provider.
 
     guide = format_cloud_usage_guide("s3")
     print(guide)
+
+The S3 guide is headed "AWS S3 Setup". It tells the reader to set ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY`` and ``AWS_DEFAULT_REGION``, then shows a ``benchbox run`` example that passes ``--output s3://your-bucket/benchbox/results``.
 
 Support Validation
 ~~~~~~~~~~~~~~~~~~
@@ -913,6 +924,8 @@ Use CloudPathAdapter for transparent local/cloud path handling:
 
     print(s3_dirs)
 
+Both calls return the same structure. For S3 it is ``benchmark_dir`` ``s3://my-bucket/benchbox/tpch``, ``results_dir`` ``s3://my-bucket/benchbox/tpch/results`` and ``data_dir`` ``s3://my-bucket/benchbox/tpch/data``.
+
 Custom Data Generator with Cloud Support
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1015,6 +1028,8 @@ Inspect and analyze cloud paths programmatically:
 
     analyze_storage_path("/tmp/local/data")
 
+For the S3 path the function prints the type as cloud storage, the provider ``S3``, the bucket ``my-bucket``, the path ``benchbox/tpch-data`` and a valid-credentials line. For the local path it prints only ``Type: Local filesystem``.
+
 Best Practices
 --------------
 
@@ -1072,6 +1087,8 @@ Best Practices
        from datetime import datetime
        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
        results_dir = f"s3://bucket/results/{timestamp}"
+
+   The first path organizes data by benchmark and scale factor. The second includes a timestamp for results.
 
 5. **Reuse Generated Data**
 
@@ -1142,6 +1159,8 @@ Path Format Errors
     bad_s3 = "s3:/bucket/path"
     bad_gcs = "gcs://bucket/path"
 
+The first three paths are correct for AWS S3, Google Cloud Storage and Azure. ``bad_s3`` is missing a slash. ``bad_gcs`` must use ``gs`` rather than ``gcs``.
+
 Network Timeouts
 ~~~~~~~~~~~~~~~~
 
@@ -1156,6 +1175,8 @@ Network Timeouts
 
     full_benchmark = TPCH(scale_factor=10.0, output_dir="s3://bucket/full")
     full_benchmark.generate_data(verbose=True)
+
+For large benchmarks, test cloud connectivity with a small scale factor first, then proceed with the full scale.
 
 See Also
 --------

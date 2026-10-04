@@ -49,6 +49,8 @@ uv add chdb
 uv run -- python -c "import chdb; print(chdb.chdb_version())"
 ```
 
+The second command verifies the installation.
+
 ### Install BenchBox with ClickHouse Support
 
 ```bash
@@ -71,6 +73,8 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 ```
+
+The first command runs TPC-H in ClickHouse local mode. The second runs it with a custom data path. The third runs the same benchmark in server mode for comparison.
 
 ### CLI Arguments
 
@@ -136,6 +140,8 @@ benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
 benchbox run --platform clickhouse-local --benchmark tpch --scale 1.0
 ```
+
+Scale 0.01 is a small scale for development. Scale 1.0 is a medium scale for testing.
 
 ### ClickBench Benchmark
 ```bash
@@ -223,6 +229,8 @@ benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 top -p $(pgrep -f benchbox)
 ```
 
+The `top` command monitors memory usage during execution.
+
 ### Integration with Other Tools
 
 ```bash
@@ -233,6 +241,8 @@ for benchmark in tpch tpcds ssb; do
   benchbox run --platform clickhouse-local --benchmark "$benchmark" --scale 0.01
 done
 ```
+
+The first command exports results for analysis. The loop runs multiple benchmarks.
 
 ## Technical Details
 
@@ -270,6 +280,8 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 ```
 
+The first command is the server mode command. The second is the local mode equivalent.
+
 ### From Local to Server
 
 ```bash
@@ -279,6 +291,8 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 ```
+
+The first command is the current local mode command. The second is the server mode equivalent and requires a ClickHouse server.
 
 For full migration details from the legacy `clickhouse` selector, see the [Migration Guide](clickhouse-migration.md).
 

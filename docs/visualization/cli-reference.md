@@ -29,6 +29,8 @@ benchbox visualize results/*.json
 benchbox visualize run1.json run2.json
 ```
 
+The four commands auto-detect the latest results, read a single file, expand a glob pattern, and read multiple files, in that order.
+
 ## Options
 
 ### Template Selection
@@ -106,6 +108,8 @@ benchbox visualize benchmark_runs/results/tpch_duckdb_sf1.json
 benchbox visualize duckdb.json snowflake.json bigquery.json
 ```
 
+The commands generate charts from the latest result (auto-detected), from a specific file, and from multiple files for comparison.
+
 ### Using Templates
 
 ```bash
@@ -117,6 +121,8 @@ benchbox visualize runs/2024/*.json runs/2025/*.json --template trends
 
 benchbox visualize cloud_results/*.json --template cost_optimization
 ```
+
+The templates give a flagship comparison (a four-chart set), a head-to-head comparison, performance trends over time, and a cost optimization analysis, in that order.
 
 ### Display Options
 
@@ -132,6 +138,8 @@ benchbox visualize results/*.json --no-unicode
 benchbox visualize results/*.json --theme dark --no-color --no-unicode
 ```
 
+The commands select the dark theme, limit output to specific chart types, produce pipe-friendly output with no ANSI codes, produce ASCII-only output for basic terminals, and combine options.
+
 ### Query Latency Histogram
 
 ```bash
@@ -139,6 +147,8 @@ benchbox visualize results/*.json --chart-type query_histogram
 
 benchbox visualize tpcds_results.json --chart-type query_histogram
 ```
+
+The first command draws a per-query latency histogram, which is ideal for identifying slow queries. TPC-DS results are split automatically into three charts (99 queries, 33 per chart).
 
 ## Output
 
@@ -151,6 +161,8 @@ benchbox visualize results/*.json > charts.ansi
 
 benchbox visualize results/*.json --no-color > charts.txt
 ```
+
+The first command preserves ANSI codes, so the file is viewable in terminals that support ANSI. The second writes plain text with no color codes.
 
 ## Exit Codes
 

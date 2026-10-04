@@ -75,6 +75,8 @@ print(f"Avg lazy overhead: {stats['avg_lazy_overhead_percent']:.1f}%")
 
 ### Polars
 
+Capture the plan before calling `collect()`:
+
 ```python
 from benchbox.core.dataframe.profiling import capture_polars_plan
 
@@ -112,6 +114,8 @@ print(plan.plan_text)
 
 ### Generic Capture
 
+The generic function selects the capture method for the platform automatically:
+
 ```python
 from benchbox.core.dataframe.profiling import capture_query_plan
 
@@ -124,7 +128,7 @@ if plan:
 
 ## SQL vs DataFrame Comparison
 
-Compare execution modes for platforms supporting both:
+Compare execution modes for platforms supporting both. The `sql_times` dictionary holds SQL execution times in milliseconds from a previous benchmark run:
 
 ```python
 from benchbox.core.dataframe.profiling import (
@@ -277,6 +281,8 @@ print(f"Peak memory: {peak / 1024 / 1024:.1f} MB")
 
 ### With Profiler Context
 
+The peak memory from `tracemalloc` is converted to MB before it is recorded:
+
 ```python
 import tracemalloc
 
@@ -322,7 +328,7 @@ print(plan.plan_text)
 
 ### 3. Compare Lazy vs Eager
 
-For platforms supporting both:
+For platforms supporting both. The eager run applies only where eager execution is available:
 
 ```python
 with profiler.profile_query("q1_lazy") as ctx:

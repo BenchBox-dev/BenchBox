@@ -31,6 +31,8 @@ benchbox download-answers --show-cache-dir
 benchbox download-answers --show-cache-dir --benchmark tpch
 ```
 
+The commands download both TPC-H and TPC-DS answer files, download only TPC-H, force a re-download, and show where answer files are cached.
+
 ## Cache Location
 
 Answer files are cached at `$XDG_CACHE_HOME/benchbox/answers/` (or `~/.cache/benchbox/answers/` if `XDG_CACHE_HOME` is not set).

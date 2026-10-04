@@ -28,6 +28,8 @@ uv add "duckdb>=1.3,<2.0"
 benchbox run --platform ducklake --benchmark tpch --scale 0.01
 ```
 
+The first command installs DuckDB 1.3 or later, which the `ducklake` extension requires. The second runs the benchmark. Metadata and data paths default under `benchmark_runs/databases/`.
+
 ## Requirements
 
 DuckLake requires a live **DuckDB >= 1.3** runtime — the `ducklake` extension is not available on earlier releases. This floor is enforced at connection time by the adapter itself, independent of the `duckdb` package version pinned by the global BenchBox `pyproject.toml` (which stays `<2.0` for `duckdb-wasm` on-disk-format compatibility). If the detected DuckDB version is too old, the adapter raises immediately with the detected version and a remediation hint (e.g. `uv add 'duckdb>=1.3,<2.0'` or `--driver-version 1.3.2`).
@@ -83,6 +85,8 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option pg_password=postgres
 ```
 
+The first command uses a SQLite catalog with local Parquet data. The second uses a self-hosted PostgreSQL catalog; the `ducklake_catalog` database must already exist on the target server.
+
 MySQL is deliberately not supported as a catalog backend - DuckLake's own documentation flags it as not recommended (compatibility issues).
 
 ### Cloud Storage (S3 `DATA_PATH`)
@@ -116,6 +120,8 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.01
 benchbox run --platform ducklake --benchmark tpcds --scale 1.0
 ```
 
+The first command runs TPC-H at scale factor 0.01 with the default (generated) paths. The second runs TPC-DS at scale factor 1.
+
 ### Explicit Catalog and Data Paths
 
 ```bash
@@ -131,6 +137,8 @@ Without `--force`, an existing catalog is reused: schema creation and data loadi
 ```bash
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 --force
 ```
+
+This wipes the existing catalog metadata file and Parquet data, then rebuilds them.
 
 What `--force` clears depends on where the catalog and the data live:
 
@@ -184,6 +192,8 @@ family = PlatformRegistry.get_platform_family("ducklake")
 
 parent = PlatformRegistry.get_inherited_platform("ducklake")
 ```
+
+`get_platform_family` returns `"duckdb"`, and `get_inherited_platform` also returns `"duckdb"`.
 
 ## Comparison: DuckLake vs DuckDB
 

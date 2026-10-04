@@ -22,6 +22,8 @@ uv add benchbox --extra dataproc
 
 ```
 
+This installs the Dataproc extra, which adds `google-cloud-dataproc` and `google-cloud-storage`.
+
 ## Prerequisites
 
 1. **GCP Project** with Dataproc API enabled
@@ -49,6 +51,8 @@ export DATAPROC_USE_PREEMPTIBLE=false
 export DATAPROC_EPHEMERAL=false
 ```
 
+`DATAPROC_PROJECT_ID` and `DATAPROC_GCS_STAGING_DIR` are required. The other variables are optional.
+
 ### CLI Usage
 
 ```bash
@@ -74,6 +78,8 @@ benchbox run --platform dataproc --benchmark tpch --dry-run ./preview \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://bucket/benchbox/
 ```
+
+The four commands are, in order: basic usage with an existing cluster, custom machine types, preemptible workers, and a dry run to preview queries.
 
 ### Platform Options
 
@@ -136,6 +142,8 @@ result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 adapter.close()
 ```
 
+The first adapter connects to an existing cluster. The second creates an ephemeral cluster. The calls then create the schema in Hive, load data to GCS and create the Hive tables, submit the query as a Dataproc job, and clean up on `close()` (which deletes the ephemeral cluster if one is configured).
+
 ## Cluster Modes
 
 ### Persistent Cluster
@@ -172,10 +180,14 @@ adapter = DataprocAdapter(
 
 ## Spark Configuration
 
-BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor:
+BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor. The automatic configuration covers:
 
-```python
-```
+- Adaptive Query Execution (AQE) settings
+- Shuffle partition tuning
+- Memory allocation
+- Join optimization
+
+For TPC-H at SF=10 with 4 workers, the settings include `spark.sql.shuffle.partitions = 200`, `spark.sql.adaptive.enabled = true` and `spark.sql.adaptive.skewJoin.enabled = true`.
 
 ## Cost Estimation
 
@@ -205,6 +217,8 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
   --role="roles/dataproc.worker"
 ```
+
+The first two bindings are for the service account that runs BenchBox. The third is for the Dataproc worker service account.
 
 ## Troubleshooting
 

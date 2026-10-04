@@ -48,6 +48,8 @@ print(f"Rows affected: {result.rows_affected}")
 print(f"Duration: {result.write_duration_ms:.2f}ms")
 ```
 
+Setup needs TPC-H data loaded first, so the example generates and loads it before calling `bench.setup(conn)`, which creates the staging tables.
+
 ## Operations Catalog
 
 The benchmark includes **112 write operations** across 6 categories:
@@ -226,6 +228,8 @@ INSERT INTO insert_ops_orders ...;
 DELETE FROM insert_ops_orders WHERE o_orderkey = ...;
 ```
 
+The first statement is the write operation. The second is the explicit cleanup.
+
 **Benefits**:
 - Works on databases without transaction support (ClickHouse, BigQuery)
 - Clear, predictable cleanup behavior
@@ -241,6 +245,8 @@ INSERT INTO merge_ops_target
 SELECT * FROM orders
 WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
 ```
+
+This dynamic approach works with any data size.
 
 **Benefits**:
 - Works with test data (3 rows) and production data (10M rows)
@@ -300,6 +306,8 @@ benchbox run --benchmark write_primitives --platform duckdb --scale 0.01
 benchbox run --benchmark write_primitives --platform duckdb \
     --queries insert_single_row,update_single_row_pk
 ```
+
+The first command lists available benchmarks, the second runs Write Primitives, and the third runs specific operations. There are no `--categories` or `--operations` options. Select individual operations with `--queries`.
 
 **Important Notes**:
 - Requires TPC-H data to be loaded first
@@ -438,6 +446,11 @@ print(f"Setup: {setup_result['success']}")
 print(f"Tables created: {len(setup_result['tables_created'])}")
 ```
 
+Expected output:
+
+- `Setup: True`
+- `Tables created: 16`
+
 ### Execute Single Operation
 
 ```python
@@ -448,8 +461,15 @@ print(f"Success: {result.success}")
 print(f"Rows affected: {result.rows_affected}")
 print(f"Write time: {result.write_duration_ms:.2f}ms")
 print(f"Validation passed: {result.validation_passed}")
-
 ```
+
+The operation runs with automatic validation and cleanup. Expected output:
+
+- `Operation: insert_single_row`
+- `Success: True`
+- `Rows affected: 1`
+- `Write time: 2.45ms` (the time varies by platform)
+- `Validation passed: True`
 
 ### Run Full Benchmark
 
@@ -464,6 +484,8 @@ for result in results:
     print(f"{result.operation_id}: {result.write_duration_ms:.2f}ms")
 ```
 
+This runs all operations, so `len(results)` is 112.
+
 ### Filter by Category
 
 ```python
@@ -472,6 +494,8 @@ insert_results = bench.run_benchmark(conn, categories=["insert"])
 specific_ops = ["insert_single_row", "update_single_row_pk", "delete_single_row_pk"]
 results = bench.run_benchmark(conn, operation_ids=specific_ops)
 ```
+
+The first call runs only INSERT operations. The second runs a specific list of operations.
 
 ## Platform-Specific Notes
 
@@ -601,6 +625,8 @@ if not result.validation_passed:
 bench = WritePrimitives(scale_factor=0.001)
 ```
 
+Use smaller scale factors for faster testing.
+
 ## Relationship to Transaction Primitives
 
 Write Primitives and Transaction Primitives are complementary benchmarks designed for different testing scenarios:
@@ -635,6 +661,8 @@ if platform_supports_acid:
     txn_bench = TransactionPrimitives(scale_factor=0.01)
     txn_results = txn_bench.run_benchmark(conn)
 ```
+
+Write operations work on all platforms. Transaction tests run only on ACID-capable databases.
 
 ## DataFrame Support
 
@@ -680,6 +708,8 @@ print(f"Rows written: {result.rows_affected}")
 print(f"Duration: {result.duration_ms:.2f}ms")
 ```
 
+The example creates a manager for Polars, checks which operations the platform supports, and then runs a BULK_LOAD.
+
 ### INSERT Operation (DataFrame)
 
 ```python
@@ -699,6 +729,8 @@ result = manager.execute_insert(
 )
 ```
 
+The example builds a DataFrame of new rows and inserts it.
+
 ### UPDATE Operation (DataFrame)
 
 ```python
@@ -710,6 +742,8 @@ result = manager.execute_update(
 
 print(f"Rows updated: {result.rows_affected}")
 ```
+
+Polars uses a read-modify-write pattern for UPDATE.
 
 ### DELETE Operation (DataFrame)
 
@@ -740,6 +774,8 @@ result = manager.execute_merge(
 )
 ```
 
+The source DataFrame mixes existing keys (1 and 2) with a new key (9999999), so the MERGE acts as an upsert.
+
 ### PySpark DataFrame Support
 
 For PySpark, pass the SparkSession to enable DataFrame operations:
@@ -760,6 +796,8 @@ result = manager.execute_bulk_load(
     partition_columns=["o_orderpriority"],
 )
 ```
+
+The Delta Lake target format provides ACID support, which PySpark UPDATE, DELETE, and MERGE require.
 
 ### Result Object
 

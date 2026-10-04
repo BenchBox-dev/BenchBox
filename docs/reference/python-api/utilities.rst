@@ -72,6 +72,8 @@ SQLGlot natively supports these dialects:
 
 **Dialect Mappings**:
 
+Netezza maps to PostgreSQL. Supported dialects pass through unchanged, and matching is case-insensitive.
+
 .. code-block:: python
 
     from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
@@ -86,6 +88,8 @@ SQLGlot natively supports these dialects:
     assert normalized == "snowflake"
 
 **Usage in Benchmarks**:
+
+The example gets Q1 translated for Netezza, which uses the PostgreSQL dialect.
 
 .. code-block:: python
 
@@ -319,7 +323,7 @@ Validate SQL dialect translation quality:
 Custom Dialect Handling
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Handle custom or proprietary database dialects:
+Handle custom or proprietary database dialects. The handler maps custom dialects to the closest SQLGlot-supported dialect. Exasol ships its own SQLGlot dialect, so the identity entry (a native dialect with no fallback) keeps the generic fallback branch from defaulting it to postgres. Vertica uses PostgreSQL syntax, Greenplum is PostgreSQL-based, Yellowbrick uses PostgreSQL syntax, and MonetDB has PostgreSQL compatibility. ``get_fallback_dialect`` first tries the official normalization, then checks the custom mappings when no official mapping was found. The example translates one query for Vertica and one for Greenplum:
 
 .. code-block:: python
 
@@ -375,7 +379,7 @@ Best Practices
 Dialect Translation
 ~~~~~~~~~~~~~~~~~~~
 
-1. **Always validate translations**: Test translated queries on target platform before production use
+1. **Always validate translations**: Test translated queries on target platform before production use. The example validates a translated query by running it on the target platform.
 
    .. code-block:: python
 
@@ -396,7 +400,7 @@ Dialect Translation
        target_dialect = normalize_dialect_for_sqlglot(user_input_dialect)
        query = benchmark.translate_query(1, target_dialect)
 
-3. **Handle translation failures gracefully**: Not all SQL features translate perfectly
+3. **Handle translation failures gracefully**: Not all SQL features translate perfectly. If the dialect is not supported, fall back to a compatible dialect.
 
    .. code-block:: python
 
@@ -441,7 +445,7 @@ Unsupported Dialect
 
 **Problem**: ValueError: Dialect 'xyz' not supported
 
-**Solutions**:
+**Solutions**: (1) check whether the dialect needs normalization (``normalize_dialect_for_sqlglot("netezza")`` returns ``"postgres"``); (2) fall back to PostgreSQL, the most compatible dialect; (3) check the SQLGlot documentation for supported dialects at https://sqlglot.com/sqlglot/dialects.html.
 
 .. code-block:: python
 
@@ -460,7 +464,7 @@ Translation Quality Issues
 
 **Problem**: Translated query produces incorrect results or fails to execute
 
-**Solutions**:
+**Solutions**: (1) compare the original and translated queries; (2) test with a smaller dataset first; (3) make manual adjustments for platform-specific features, such as BigQuery-specific adjustments.
 
 .. code-block:: python
 

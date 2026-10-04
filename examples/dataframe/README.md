@@ -13,6 +13,9 @@ BenchBox supports native DataFrame benchmarking alongside traditional SQL databa
 
 ## Prerequisites
 
+Install the DataFrame platforms, then generate the benchmark data. The data is
+required before any example can execute.
+
 ```bash
 pip install polars pandas
 

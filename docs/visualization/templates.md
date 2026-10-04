@@ -154,7 +154,7 @@ benchbox visualize baseline.json current.json --template comparison
 - Distribution Box Plot (if query timings available)
 - Query Variance Heatmap (if 2+ platforms)
 
-**Command:**
+**Command:** this uses the latest result automatically.
 ```bash
 benchbox visualize
 ```
@@ -243,7 +243,8 @@ benchbox visualize results/*.json --template executive_summary
 
 ## Template Customization
 
-Templates set defaults but can be overridden:
+Templates set defaults but can be overridden. The examples use the flagship template with a dark theme, the
+head_to_head template with no colors (for piping), and the trends template with ASCII-only characters.
 
 ```bash
 benchbox visualize results/*.json --template flagship --theme dark

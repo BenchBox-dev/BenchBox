@@ -99,6 +99,8 @@ benchbox profile
 benchbox check-deps --matrix
 ```
 
+The first command checks the BenchBox version. The second profiles your environment. The third checks platform dependencies.
+
 ## Running Benchmarks
 
 ### What scale factor should I use?
@@ -348,6 +350,8 @@ from benchbox.base import BaseBenchmark
 class MyCustomBenchmark(BaseBenchmark):
     pass
 ```
+
+Implement the required methods in the subclass body.
 
 See [Custom Benchmarks Guide](../advanced/custom-benchmarks.md) for complete instructions.
 

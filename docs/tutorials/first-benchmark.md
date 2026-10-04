@@ -13,6 +13,8 @@ Run a complete TPC-H benchmark in under 5 minutes with zero configuration.
 
 ## Step 1: Install BenchBox
 
+Use uv (recommended) or pip:
+
 ```bash
 uv add benchbox
 
@@ -54,6 +56,8 @@ Summary:
 
 ## Step 3: View Results
 
+The first command shows recent results. The second exports the last result to JSON for analysis.
+
 ```bash
 benchbox results --limit 1
 
@@ -71,6 +75,9 @@ benchbox export --last --format json
 4. **Validation**: Results were compared against expected row counts
 
 ## Try Different Options
+
+The first command uses a larger dataset, which takes longer and is more realistic. The second runs specific queries
+only. The third previews without running (dry run).
 
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 0.1

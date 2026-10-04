@@ -117,6 +117,8 @@ gcloud config set project your-project-id
 
 ### Workload Identity (GKE)
 
+Use Workload Identity Federation:
+
 ```bash
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option use_workload_identity=true
@@ -139,6 +141,8 @@ benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
 ```
 
 ### With Cost Controls
+
+Limit query costs. `maximum_bytes_billed=10000000000` sets a 10 GB limit:
 
 ```bash
 benchbox run --platform bigquery --benchmark tpch --scale 10.0 \
@@ -246,7 +250,7 @@ benchbox run --platform bigquery --benchmark tpch \
 
 ### Query Cost Limits
 
-Prevent runaway queries:
+Prevent runaway queries with a per-query limit. `maximum_bytes_billed=1000000000` sets a 1 GB limit:
 
 ```bash
 benchbox run --platform bigquery --benchmark tpch \
@@ -291,12 +295,15 @@ gcloud config set project your-project-id
 
 ### Quota Exceeded
 
+Check quotas, then request an increase in the Cloud Console under BigQuery > Quotas > Request Increase:
+
 ```bash
 gcloud compute project-info describe --project your-project-id
-
 ```
 
 ### Dataset Location Mismatch
+
+Datasets must be in the same location as the jobs that query them. Specify the location explicitly:
 
 ```bash
 benchbox run --platform bigquery --benchmark tpch \
@@ -305,8 +312,13 @@ benchbox run --platform bigquery --benchmark tpch \
 
 ### Permission Denied
 
-```sql
-```
+The account needs one of the following:
+
+- `roles/bigquery.admin` (full access)
+- Or the specific roles:
+  - `roles/bigquery.dataEditor`
+  - `roles/bigquery.jobUser`
+  - `roles/storage.objectAdmin` (for GCS staging)
 
 ## Related Documentation
 

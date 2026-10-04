@@ -35,6 +35,8 @@ Before configuring your AI agent, verify the MCP server works:
 uv run python -m benchbox.mcp
 ```
 
+The server starts and waits for input.
+
 The server should start without errors. Press `Ctrl+C` to stop.
 
 For interactive testing, use the MCP Inspector:
@@ -82,6 +84,13 @@ claude mcp add benchbox --scope project -- uv run python -m benchbox.mcp
 claude mcp add benchbox --scope user -- benchbox-mcp
 ```
 
+The commands, in order:
+
+- Use the `benchbox-mcp` entry point (recommended if it is in your PATH).
+- Pass custom MCP paths, here the results directory.
+- Use `uv`, which works from any directory with BenchBox installed.
+- Register the server user-scoped, so it is available in all your projects.
+
 #### Manual Configuration
 
 Create or edit `.mcp.json` in your project root:
@@ -120,6 +129,8 @@ claude mcp list
 /mcp
 ```
 
+`claude mcp list` lists the configured servers. `/mcp` checks the server status inside Claude Code.
+
 ---
 
 ### Codex CLI
@@ -138,6 +149,8 @@ codex mcp add benchbox -- benchbox-mcp --results-dir /tmp/benchbox-results
 codex mcp add benchbox -- uv run python -m benchbox.mcp
 ```
 
+The first command uses the `benchbox-mcp` entry point (recommended). The second passes custom MCP paths. The third uses `uv` if `benchbox-mcp` isn't in your PATH.
+
 #### Manual Configuration
 
 Codex stores MCP configuration in `~/.codex/config.toml`. You can edit this file directly:
@@ -155,6 +168,8 @@ codex mcp list
 
 codex mcp show benchbox
 ```
+
+The first command lists configured servers, and the second shows the configuration of one server.
 
 #### Managing Servers
 

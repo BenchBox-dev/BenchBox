@@ -48,6 +48,8 @@ benchmark = TPCH(scale_factor=0.1)
 benchmark = TPCH(scale_factor=1.0)
 ```
 
+The four scale factors give about 1MB (development and testing), 10MB (CI/CD pipelines, for fast execution), 100MB (performance testing, moderate size) and 1GB (production validation, full scale).
+
 ### Output Directory Management
 
 Control where data files are generated:
@@ -67,6 +69,8 @@ temp_dir = tempfile.mkdtemp()
 benchmark = TPCH(scale_factor=0.01, output_dir=temp_dir)
 ```
 
+The first call uses the default location, the second a custom directory, and the third a temporary directory for testing.
+
 ### Parallel Generation
 
 Speed up data generation with parallel processing:
@@ -78,6 +82,8 @@ benchmark = TPCH(
 )
 tables = benchmark.generate_data()
 ```
+
+The `parallel=4` setting uses 4 parallel processes.
 
 ## Smart Data Generation
 
@@ -107,6 +113,8 @@ benchmark2 = TPCH(scale_factor=1.0, output_dir="./data")
 tables2 = benchmark2.generate_data()
 ```
 
+The first run finds no data, so it generates it and prints `Data validation failed, generating TPC-H data...`. The second run finds valid data and skips generation, printing `Valid TPC-H data found, skipping generation`.
+
 ### Force Regeneration
 
 When you need to regenerate data regardless of existing files:
@@ -119,6 +127,8 @@ benchmark = TPCH(
 )
 tables = benchmark.generate_data()
 ```
+
+This regenerates the data even if valid data exists, and prints `Force regeneration requested, generating data...`.
 
 ### Verbose Validation Reports
 
@@ -179,6 +189,8 @@ tables_info = {
 }
 ```
 
+The `tables_info` mapping shows the expected tables and approximate row counts at SF=1.0. The `nation` and `region` tables have a fixed size.
+
 **TPC-H specific features:**
 - Minimum scale factor of 0.1 (dbgen limitation)
 - Fixed-size dimension tables (nation, region)
@@ -197,6 +209,8 @@ coffeeshop = CoffeeShop(scale_factor=0.001)
 data_files = coffeeshop.generate_data()
 print(data_files["order_lines"])
 ```
+
+This uses the reference-aligned generator at a small scale for development. `data_files["order_lines"]` is the path to the generated CSV file.
 
 Scale factors map directly to order counts using the approved formula
 `order_count = 50_000_000 * scale_factor`. The table below outlines the
@@ -231,6 +245,8 @@ tables = tpcds.generate_data()
 print(f"Generated {len(tables)} TPC-DS tables")
 ```
 
+TPC-DS generates 24 tables with complex relationships.
+
 **TPC-DS specific features:**
 - 24 interconnected tables
 - Complex dimension and fact table relationships
@@ -249,6 +265,8 @@ dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y | zstd > ship_mode.dat.zst
 dsdgen -TABLE date_dim -SCALE 1 -FILTER Y -RNGSEED 12345 | gzip > date_dim.dat.gz
 ```
 
+The first command generates a table directly to a compressed file. The second does the same with a fixed seed (`-RNGSEED`) for reproducibility.
+
 This streaming capability reduces disk I/O and memory usage for large-scale data
 generation. See [TPC-DS Streaming Data Generation](../benchmarks/tpc-ds.md#streaming-data-generation)
 for detailed examples.
@@ -263,6 +281,8 @@ from benchbox import ReadPrimitives
 read_primitives = ReadPrimitives(scale_factor=0.1)
 tables = read_primitives.generate_data()
 ```
+
+Read Primitives automatically uses TPC-H data.
 
 **How Primitives Data Sharing Works:**
 
@@ -291,6 +311,8 @@ prim_tables = read_primitives.generate_data()
 assert tpch_tables['customer'] == prim_tables['customer']
 ```
 
+The TPC-H data is generated once, into `data/tpch_sf1.0/`. Read Primitives automatically uses the same directory, so it needs no regeneration. Both benchmarks share the same table files, so the `customer` entries are the same file path.
+
 **Custom Output Paths:**
 
 You can still use custom paths for isolated Primitives data:
@@ -303,6 +325,8 @@ read_primitives = ReadPrimitives(
 tables = read_primitives.generate_data()
 ```
 
+This gives isolated Primitives data that does not share with TPC-H. The call generates fresh TPC-H data in that directory.
+
 ### Other Benchmarks
 
 ```python
@@ -310,6 +334,8 @@ from benchbox import SSB
 ssb = SSB(scale_factor=1.0)
 tables = ssb.generate_data()
 ```
+
+SSB is the Star Schema Benchmark.
 
 ## Data Validation
 
@@ -344,6 +370,8 @@ else:
 validator.print_validation_report(result, verbose=True)
 ```
 
+The example creates a validator for a specific benchmark, validates a data directory, checks the results, and prints a detailed report.
+
 ### Custom Validation Rules
 
 For advanced validation scenarios:
@@ -361,6 +389,8 @@ else:
 force_regen = len(result.row_count_mismatches) > 0
 benchmark = TPCH(scale_factor=1.0, force_regenerate=force_regen)
 ```
+
+The example first checks whether regeneration is needed, then forces regeneration programmatically when row counts do not match.
 
 ## Performance Optimization
 
@@ -385,6 +415,8 @@ benchmark = TPCH(scale_factor=10.0, parallel=cores)
 tables = benchmark.generate_data()
 ```
 
+This uses all available CPU cores.
+
 ### Caching Strategies
 
 Organize data for maximum reuse:
@@ -400,6 +432,8 @@ Organize data for maximum reuse:
       ├── sf-0.01/
       └── sf-1.0/
 ```
+
+This organizes data by benchmark and scale factor. Small datasets (`sf-0.01`) suit quick testing, medium datasets (`sf-0.1`) suit CI/CD, large datasets (`sf-1.0`) suit performance testing, and `sf-10.0` is production scale.
 
 ## Configuration Options
 
@@ -417,6 +451,8 @@ benchmark = TPCH(
 )
 ```
 
+The parameters are the data scale factor, the output directory, verbose output, `force_regenerate` (the default `False` leaves smart validation on) and the number of parallel generation processes.
+
 ### Environment Variables
 
 Control behavior globally via environment variables:
@@ -429,6 +465,8 @@ export BENCHBOX_VERBOSE=true
 export BENCHBOX_DATA_DIR=./benchmark_runs/datagen
 ```
 
+The variables force regeneration for all benchmarks, enable verbose output, and set the default output directory.
+
 ### Platform-Specific Settings
 
 Some platforms have special considerations:
@@ -438,6 +476,8 @@ benchmark = TPCH(scale_factor=100.0, platform="clickhouse-local")
 
 benchmark = TPCH(scale_factor=10.0, platform="duckdb")
 ```
+
+ClickHouse handles large scale factors efficiently. DuckDB is configured for analytical workloads.
 
 ## Advanced-level Usage
 
@@ -453,6 +493,8 @@ for table_name, file_path in tables.items():
     parquet_path = file_path.with_suffix('.parquet')
 ```
 
+The `generate_data()` call produces standard delimited files. The loop is a skeleton for converting them to Parquet, which requires `pyarrow`; add your own conversion code inside the loop.
+
 ### Custom Data Directories
 
 Implement custom directory structures:
@@ -467,6 +509,8 @@ data_dir = Path(f"./runs/{timestamp}/tpch_sf1")
 benchmark = TPCH(scale_factor=1.0, output_dir=data_dir)
 tables = benchmark.generate_data()
 ```
+
+The directory name is timestamp-based, so each run gets its own data directory.
 
 ### Integration with CI/CD
 
@@ -488,6 +532,8 @@ Cache data between runs:
     "
 ```
 
+This is a GitHub Actions example.
+
 ## Error Handling
 
 ### Common Issues and Solutions
@@ -501,6 +547,8 @@ benchmark = TPCH(scale_factor=0.5)
 benchmark = TPCH(scale_factor=1.0, force_regenerate=True)
 ```
 
+Solution 1 is to use a matching scale factor (here 0.5, to match the existing data). Solution 2 is to force regeneration with the new scale factor.
+
 #### Missing or Corrupted Files
 
 **Problem**: Some data files are missing or corrupted
@@ -509,6 +557,8 @@ benchmark = TPCH(scale_factor=1.0, verbose=True)
 tables = benchmark.generate_data()
 ```
 
+Smart generation automatically detects the problem and regenerates the data. It prints `Missing files detected, regenerating all data`.
+
 #### Permission Errors
 
 **Problem**: Cannot read/write data files
@@ -516,6 +566,8 @@ tables = benchmark.generate_data()
 chmod 755 ./data
 chown $USER:$USER ./data
 ```
+
+These commands fix the directory permissions.
 
 #### Disk Space Issues
 
@@ -532,6 +584,8 @@ required_mb = estimate_data_size('tpch', 10.0)
 print(f"Required space: ~{required_mb}MB")
 ```
 
+This checks the required space before generation. The base sizes are about 1GB for TPC-H and 2GB for TPC-DS at SF=1.0.
+
 ### Debug Mode
 
 Enable detailed debugging:
@@ -543,6 +597,8 @@ logging.basicConfig(level=logging.DEBUG)
 benchmark = TPCH(scale_factor=1.0, verbose=True)
 tables = benchmark.generate_data()
 ```
+
+This shows detailed generation and validation steps.
 
 ## Best Practices
 
@@ -561,6 +617,8 @@ def setup_benchmark(scale_factor=0.01):
 tpch = setup_benchmark()
 tables = tpch.generate_data()
 ```
+
+This is the development pattern: set up the benchmark with smart caching, and the call uses the cache if it is available.
 
 ### Production Deployment
 
@@ -590,6 +648,8 @@ def setup_production_benchmark(scale_factor=1.0):
 
     return benchmark, tables
 ```
+
+This is the production pattern: it generates or pre-validates the data, then runs an additional validation and raises an error if the data is not valid.
 
 ### Testing Strategy
 
@@ -622,6 +682,8 @@ def test_smart_generation():
 
         assert tables1.keys() == tables2.keys()
 ```
+
+The first test checks basic data generation and validates the results. The second tests the smart generation skip logic: the first generation creates the data, the second should skip generation and return the same tables.
 
 ## Supported Benchmarks
 
@@ -666,6 +728,8 @@ print(f"Generated {len(tables)} tables in {generation_time:.2f} seconds")
 print(f"Average: {generation_time/len(tables):.2f}s per table")
 ```
 
+This monitors generation performance.
+
 ### Memory Issues
 
 ```python
@@ -683,6 +747,8 @@ def monitor_generation():
     return tables
 ```
 
+For large scale factors, monitor memory usage.
+
 ### Validation Issues
 
 ```python
@@ -697,5 +763,7 @@ if not result.valid:
     print(f"Row count mismatches: {result.row_count_mismatches}")
     print(f"File size issues: {[f for f, size in result.file_size_info.items() if size == 0]}")
 ```
+
+This debugs validation problems with a detailed analysis.
 
 Data generation in BenchBox is designed to be powerful, intelligent, and developer-friendly. The smart generation features ensure appropriate performance while maintaining data integrity and standards compliance.

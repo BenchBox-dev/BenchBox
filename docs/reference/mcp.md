@@ -23,6 +23,8 @@ optional extras.
 
 ### Starting the Server
 
+The first command starts the server through the Python module. The second uses the entry point, available if BenchBox is installed globally. The third sets explicit MCP path overrides. The fourth opts in to localhost Streamable HTTP.
+
 ```bash
 uv run python -m benchbox.mcp
 
@@ -99,7 +101,7 @@ shared-service publication.
 
 ### Testing Locally
 
-To verify the server works, you can test it interactively:
+To verify the server works, you can test it interactively. This command starts the server and sends a test request:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | uv run python -m benchbox.mcp
@@ -110,7 +112,7 @@ This should return a JSON response listing all available tools.
 ### Using the MCP Inspector
 
 For interactive testing, use the pinned official
-[MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector). This command connects to an already-running localhost Streamable HTTP endpoint:
 
 ```bash
 npx --yes @modelcontextprotocol/inspector@2.0.0 --cli \
@@ -168,7 +170,7 @@ Example:
 BENCHBOX_RESULTS_DIR=/tmp/results BENCHBOX_LOG_LEVEL=DEBUG benchbox-mcp
 ```
 
-Additional localhost examples:
+Additional localhost examples: the first uses IPv4 loopback with a custom port and path, and the second uses IPv6 loopback.
 
 ```bash
 benchbox-mcp --transport streamable-http --port 8765 --streamable-http-path /benchbox-mcp

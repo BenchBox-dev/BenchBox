@@ -47,6 +47,8 @@ class ChartOptions:
     scale_factor_formatter: Callable[[float], str] | None = field(default=None, repr=False)
 ```
 
+The class has other fields as well (width, height, color, unicode and theme), which are omitted here.
+
 BenchBox injects its formatter at the call site, and the charting library falls back to `f"SF={sf}"` when no formatter is provided, so one new field eliminated the only cross-boundary import.
 
 **Golden snapshots.** Before moving any code, we captured byte-identical output for all 15 chart types as golden test fixtures and ran them at every phase boundary to catch rendering drift.
@@ -60,6 +62,8 @@ Back in BenchBox, the original `ascii/` modules became thin compatibility shims,
 ```python
 from textcharts.histogram import *
 ```
+
+Each shim is a compatibility shim that delegates to `textcharts.histogram`.
 
 The 17 shim files totaled just 60 lines, and BenchBox's 568 visualization tests passed without modification on the first run because the shims preserved every existing import path.
 
@@ -86,6 +90,8 @@ histogram_data.append(
     HistogramBar(label=query_id, value=mean_latency, platform=platform)
 )
 ```
+
+This maps BenchBox's domain data (`query_id`, `execution_time_ms`) to textcharts' generic (`label`, `value`).
 
 That mapping was always happening, but now it's visible, testable, and documented.
 

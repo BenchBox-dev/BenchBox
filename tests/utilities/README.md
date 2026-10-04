@@ -18,6 +18,9 @@ The unified test runner consolidates functionality from the individual test runn
 
 ### Using Makefile Commands (Recommended)
 
+These Makefile targets cover common scenarios. `make test` runs the default test suite (fast tests). The others run
+all tests, unit tests only, integration tests only, TPC-H tests only, and tests with coverage.
+
 ```bash
 make test
 make test-all
@@ -29,6 +32,8 @@ make coverage
 
 ### Basic Usage with Unified Test Runner
 
+The commands run all unit tests, run TPC-H tests with coverage, and run integration tests in parallel.
+
 ```bash
 uv run -- python tests/utilities/unified_test_runner.py --mode unit
 
@@ -39,6 +44,9 @@ uv run -- python tests/utilities/unified_test_runner.py --mode integration --par
 
 ### Direct pytest Usage
 
+Run tests directly with pytest and markers. The commands run unit tests only, fast TPC-H tests, DuckDB integration
+tests, and tests with coverage.
+
 ```bash
 uv run -- python -m pytest -m unit
 uv run -- python -m pytest -m "tpch and fast"
@@ -47,6 +55,9 @@ uv run -- python -m pytest --cov=benchbox
 ```
 
 ### Advanced Marker Combinations
+
+The first command runs specific benchmarks with speed filtering. The next two are database-specific testing. The last
+is feature-specific testing.
 
 ```bash
 uv run -- python -m pytest -m "tpch and fast and not slow"
@@ -107,6 +118,8 @@ uv run -- python -m pytest -m "olap or advanced_sql"
 ## Examples
 
 ### Quick Development Testing
+Each `make` target is equivalent to the `pytest` command after it. The commands run fast unit tests for active
+development, and tests for one benchmark. The last command runs unit tests with verbose output.
 ```bash
 make test-fast
 uv run -- python -m pytest -m fast
@@ -118,6 +131,10 @@ uv run -- python -m pytest -m unit -v
 ```
 
 ### CI/CD Pipeline
+`make test-ci` is comprehensive CI testing, and `make coverage-report` runs tests with coverage for CI. Each is
+equivalent to the `pytest` command after it. `make coverage-opt-in-all` includes stress and live tests, so use it only
+when their services and credentials are available. `make test-parallel` is explicit full-tree parallel testing and
+requires live services and credentials.
 ```bash
 make test-ci
 uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)"
@@ -132,6 +149,8 @@ uv run -- python -m pytest -n auto --tb=short
 ```
 
 ### Integration Validation
+The commands run DuckDB integration testing, the full integration test suite, and integration tests with coverage.
+Each `make` target is equivalent to the `pytest` command after it.
 ```bash
 make test-duckdb
 uv run -- python -m pytest -m duckdb
@@ -143,6 +162,7 @@ uv run -- python -m pytest -m integration --cov=benchbox
 ```
 
 ### Performance Testing
+The first command runs performance tests only. The second runs the fast performance tests.
 ```bash
 uv run -- python -m pytest -m performance
 
@@ -152,6 +172,7 @@ uv run -- python -m pytest -m "performance and fast"
 ## Migration from Individual Runners
 
 ### From `run_tpch_tests.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
 python tests/run_tpch_tests.py
 
@@ -160,6 +181,7 @@ uv run -- python -m pytest -m tpch
 ```
 
 ### From `run_tpcds_tests.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
 python tests/run_tpcds_tests.py minimal
 
@@ -168,6 +190,7 @@ uv run -- python -m pytest -m "tpcds and fast"
 ```
 
 ### From `run_coverage.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
 python tests/run_coverage.py --report html
 

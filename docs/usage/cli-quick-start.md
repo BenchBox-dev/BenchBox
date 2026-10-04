@@ -61,6 +61,18 @@ The `run` subcommand accepts a rich set of options. The defaults favor the inter
 
 ### Common execution patterns
 
+The commands below run, in order:
+
+1. An interactive workflow with guided prompts.
+2. A non-interactive run for CI or cron jobs.
+3. A preview of the entire plan (queries, file layout, seeds) without running it.
+4. Specific queries only, for debugging or focused testing.
+5. A single failing query with verbose output, for debugging.
+6. A listing of all CLI examples.
+7. A view of platform status and capabilities.
+8. Two runs that compare two DuckDB releases without switching environments, one for `driver_version=1.0.0` and
+   one for `1.1.0`.
+
 ```bash
 uv run -- benchbox run
 
@@ -108,6 +120,8 @@ uv run -- benchbox run \
 
 ## Results and Artefacts
 
+This shows the latest run summary: duration, validation status and failures.
+
 ```bash
 uv run -- benchbox results --limit 1
 ```
@@ -125,12 +139,16 @@ uv run -- benchbox run \
   --output dbfs:/Volumes/workspace/raw/source/
 ```
 
+The data root for this run is `dbfs:/Volumes/workspace/raw/source/tpch_sf01`.
+
 Supported remote schemes depend on the installed platform and storage extras.
 Preview a run with `--dry-run` before it writes data.
 
 ## Exporting Results
 
-Re-export existing benchmark results in different formats without re-running:
+Re-export existing benchmark results in different formats without re-running. The commands export, in order: the most
+recent result to CSV, a specific result to an HTML report, one result to several formats at once, the latest TPC-H
+result with filtering, and the latest result to a custom directory.
 
 ```bash
 uv run -- benchbox export --last --format csv
@@ -151,7 +169,9 @@ uv run -- benchbox export --last --format html --output-dir ./reports/
 
 ## Visualizing Results
 
-Generate ASCII charts from benchmark results directly in the terminal:
+Generate ASCII charts from benchmark results directly in the terminal. The commands, in order, auto-detect the latest
+result and render all applicable charts, visualize a specific result file, compare multiple result files, render a
+specific chart type, and save plain-text output to a file with ANSI colors stripped (`--no-color`).
 
 ```bash
 uv run -- benchbox visualize
@@ -169,7 +189,10 @@ See the [Visualization Guide](../visualization/overview.md) for chart types, tem
 
 ## Platform Management
 
-The `platforms` command helps you discover, enable, and configure database platforms.
+The `platforms` command helps you discover, enable, and configure database platforms. The commands, in order, list
+all available platforms with their status, show detailed information about one platform, enable a platform for use in
+benchmarks, disable a platform, give installation guidance for missing dependencies, check whether enabled platforms
+are ready, and start an interactive setup wizard.
 
 ```bash
 uv run -- benchbox platforms list
@@ -192,7 +215,8 @@ uv run -- benchbox platforms setup
 - `benchbox setup --platform <name>` manages *credentials* for cloud platforms
 - For cloud platforms, you need both: enable the platform AND configure credentials
 
-**Typical Cloud Platform Workflow:**
+**Typical Cloud Platform Workflow:** check that the platform dependencies are installed, install them if needed
+(follow the guidance shown), enable the platform, configure credentials, then verify that everything is ready.
 ```bash
 uv run -- benchbox platforms status databricks
 
@@ -225,7 +249,10 @@ for the supported keys.
 
 ## Interactive SQL Shell
 
-Open an interactive SQL shell to explore benchmark databases, debug queries, and inspect data:
+Open an interactive SQL shell to explore benchmark databases, debug queries, and inspect data. The commands, in order,
+discover and connect to available databases interactively, list all available databases, connect to the most recent
+database, connect to a specific benchmark database, filter by scale factor, connect directly to a database file, and
+use a custom output directory.
 
 ```bash
 uv run -- benchbox shell
@@ -256,6 +283,9 @@ uv run -- benchbox shell --output ./my-benchmarks
 - Compare data across different scale factors
 
 ## Dependency Checks & Tuning Templates
+
+The commands summarize optional dependencies and extras guidance, focus on a single adapter with verbose remediation,
+and generate a tuning skeleton for your project.
 
 ```bash
 uv run -- benchbox check-deps --matrix

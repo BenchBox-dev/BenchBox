@@ -59,6 +59,8 @@ benchbox metrics qphh \
   --format json --output qphh.json
 ```
 
+The first command calculates QphH from test results. The second specifies the scale factor explicitly, and the third exports to a JSON file.
+
 ## Notes
 
 - Scale factor is auto-detected from the `environment.scale_factor` field in result files. If the power and throughput results have mismatched scale factors, an error is raised.

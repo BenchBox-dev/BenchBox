@@ -404,6 +404,8 @@ Basic Benchmark Run
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
 
+Scale factor 0.1 generates about 100 MB of data.
+
 Category-Based Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -511,7 +513,6 @@ Performance Regression Testing
     with open("baseline_results.json", "w") as f:
         json.dump(baseline_results, f, indent=2)
 
-
     print("\nRunning comparison benchmark...")
     comparison_results = benchmark.run_benchmark(conn, iterations=3)
 
@@ -530,6 +531,11 @@ Performance Regression Testing
         status = "REGRESSION" if change_pct > 10 else "OK"
         print(f"{query_id:<30s} {baseline_time:>10.3f}s  {current_time:>10.3f}s  "
               f"{change_pct:>+7.1f}% {status}")
+
+Between the baseline run and the comparison run, change the database
+configuration that you want to test. The example as written runs both
+benchmarks back to back without a change, so it shows only run-to-run variation.
+A query counts as a regression when its average time rises by more than 10%.
 
 Multi-Category Analysis
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -658,6 +664,9 @@ Custom Primitive Development
     custom_query = custom_bench.get_query("custom_complex_join")
     print(f"Custom query: {custom_query}")
 
+The subclass adds custom queries and checks them first in ``get_query``. Any
+other query ID falls back to the standard primitives.
+
 DataFrame Support
 -----------------
 
@@ -692,6 +701,11 @@ Read Primitives provides full DataFrame support for both expression-family and p
     result = aggregation_distinct_pandas_impl(pandas_ctx)
 
     print(f"Skipped queries: {SKIP_FOR_DATAFRAME}")
+
+The first call uses the expression family and the second uses the pandas family.
+``create_context()`` returns an empty context, so load the generated tables into
+it before querying. ``SKIP_FOR_DATAFRAME`` lists the queries that are skipped
+for DataFrame platforms.
 
 **DataFrame Query Categories**:
 

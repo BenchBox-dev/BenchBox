@@ -31,6 +31,8 @@ def test_example(tpch_test_db):
     assert result[0] > 0
 ```
 
+The fixture `tpch_test_db` provides the TPC-H test database.
+
 Available fixtures:
 - `basic_test_db` - Connection to basic_test.duckdb
 - `tpch_test_db` - Connection to tpch_test.duckdb

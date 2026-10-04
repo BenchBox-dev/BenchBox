@@ -28,6 +28,8 @@ benchbox run --platform fabric-spark --benchmark tpch --scale 1 --phases generat
 benchbox run --platform fabric-lakehouse --benchmark tpch --scale 1 --phases power,throughput --non-interactive
 ```
 
+Step 1 loads data through Spark. Step 2 runs the query phases through the Lakehouse SQL endpoint.
+
 ## Adapter Configuration
 
 - `workspace`: Fabric workspace name or GUID

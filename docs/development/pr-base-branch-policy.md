@@ -24,6 +24,8 @@ on:
     branches: [develop]
 ```
 
+The branch list was `develop` or, for other workflows, `release` or `published-results`.
+
 A PR opened against `fix/parent` triggered **no** required checks. The GitHub
 PR page looked calm (empty check list) rather than broken, and the change could
 reach `develop` only when the parent merged — never validated on its own and

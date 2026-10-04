@@ -135,6 +135,9 @@ Custom Scale Factors
 
     large_bench = TPCH(scale_factor=100.0)
 
+The small benchmark (about 10 MB) suits development. The standard one (about 1 GB)
+suits testing. The large one (about 100 GB) suits production.
+
 Result Analysis
 ~~~~~~~~~~~~~~~
 
@@ -183,6 +186,9 @@ Query Streams
         info = benchmark.get_stream_info(stream_id)
         print(f"Stream {stream_id}: {len(info['queries'])} queries")
 
+The example generates multiple query streams for throughput testing, then reads
+the information for each stream.
+
 Custom Parameters
 ~~~~~~~~~~~~~~~~~
 
@@ -193,6 +199,9 @@ Custom Parameters
         seed=42,
         scale_factor=10.0
     )
+
+The ``seed`` argument makes the query parameters deterministic. The
+``scale_factor`` argument overrides the benchmark scale factor.
 
 Schema Access
 ~~~~~~~~~~~~~
@@ -234,6 +243,9 @@ Error Handling
     except Exception as e:
         print(f"Platform error: {e}")
 
+The three blocks handle an invalid scale factor, an invalid query ID, and a
+platform connection error.
+
 Best Practices
 --------------
 
@@ -246,17 +258,23 @@ Scale Factor Selection
 
        dev_benchmark = TPCH(scale_factor=0.01)
 
+   This is fast to iterate on and about 10 MB.
+
 2. **Testing and validation**: Use SF=1.0
 
    .. code-block:: python
 
        test_benchmark = TPCH(scale_factor=1.0)
 
+   This is the standard reference size, about 1 GB.
+
 3. **Performance benchmarking**: Use SF=10 to 100
 
    .. code-block:: python
 
        perf_benchmark = TPCH(scale_factor=10.0)
+
+   This is a production-like workload, about 10 GB.
 
 Data Management
 ~~~~~~~~~~~~~~~
@@ -269,6 +287,9 @@ Data Management
        benchmark.generate_data()
 
        benchmark2 = TPCH(scale_factor=1.0, output_dir="./data/tpch_sf1")
+
+   Generate the data once. The second benchmark reuses the same directory, so the
+   data already exists and is not regenerated.
 
 2. **Clean up after testing**:
 
@@ -302,6 +323,8 @@ Result Validation
        for qr in results.query_results:
            if qr.query_id in expected_rows:
                assert qr.row_count == expected_rows[qr.query_id]
+
+   The expected row counts are for TPC-H at SF=1.
 
 2. **Verify query results**:
 

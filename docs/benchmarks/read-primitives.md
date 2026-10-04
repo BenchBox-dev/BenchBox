@@ -331,6 +331,8 @@ else:
     print("\n✅ No regressions detected")
 ```
 
+The framework runs each query three times for stable measurements. `compare_with_baseline` flags a regression when a query is slower than the baseline by more than `threshold` (0.1 means 10%).
+
 ### Performance Profiling
 
 ```python
@@ -380,6 +382,8 @@ def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict
 profile = profile_primitive_categories(primitives, conn)
 ```
 
+The categories are sorted by total time to identify bottlenecks.
+
 ## Performance Characteristics
 
 ### Query Execution Patterns
@@ -422,6 +426,8 @@ primitives = ReadPrimitives(scale_factor=0.01, output_dir="primitives_ci")
 primitives = ReadPrimitives(scale_factor=1.0, output_dir="primitives_prod")
 ```
 
+The three settings are for development (fast iteration), CI/CD (balanced performance), and production validation (realistic scale).
+
 ### Advanced Configuration
 
 ```python
@@ -437,6 +443,8 @@ query_postgres = primitives.get_query("aggregation_sum_basic", dialect="postgres
 query_duckdb = primitives.get_query("aggregation_sum_basic", dialect="duckdb")
 query_mysql = primitives.get_query("aggregation_sum_basic", dialect="mysql")
 ```
+
+`verbose=True` enables detailed logging, `parallel=4` generates data in parallel, and `cache_data=True` caches the generated data. The `get_query` calls translate the query to each target dialect.
 
 ## Best Practices
 
@@ -466,11 +474,13 @@ query_mysql = primitives.get_query("aggregation_sum_basic", dialect="mysql")
 ```python
 primitives = ReadPrimitives(scale_factor=0.01, parallel=8)
 ```
+Solution: use a smaller scale factor or parallel generation.
 
 **Issue: Out of disk space**
 ```python
 primitives = ReadPrimitives(scale_factor=0.001)
 ```
+Solution: use the micro scale factor (about 1MB) or clean up old data.
 
 ### Query Execution Issues
 
@@ -478,6 +488,7 @@ primitives = ReadPrimitives(scale_factor=0.001)
 ```python
 primitives = ReadPrimitives(scale_factor=0.01)
 ```
+Solution: start with a smaller scale factor for fast execution.
 
 **Issue: Inconsistent performance measurements**
 ```python
@@ -489,6 +500,7 @@ for _ in range(5):
 
 median_time = sorted(times)[len(times) // 2]
 ```
+Solution: run multiple iterations and use the median.
 
 ## DataFrame Support
 
@@ -519,6 +531,8 @@ benchbox run --platform pandas-df --benchmark read-primitives --scale 0.01
 benchbox run --platform pyspark-df --benchmark read-primitives --scale 0.01
 ```
 
+The three commands run on Polars, Pandas, and PySpark DataFrames, in that order.
+
 ### Programmatic DataFrame Usage
 
 ```python
@@ -545,6 +559,8 @@ pandas_adapter.load_tables_from_data_source(pandas_ctx, primitives.output_dir)
 result = aggregation_distinct_pandas_impl(pandas_ctx)
 print(result)
 ```
+
+`create_context()` returns an empty context, and `working_dir` does not register files. Load the generated tables into the context with `load_tables_from_data_source`. The first half runs an expression-family query on Polars, and the second half does the same for a Pandas-family query.
 
 ### Expression Family Example
 
@@ -573,6 +589,8 @@ def filter_selective_pandas_impl(ctx):
     result = lineitem[lineitem["l_returnflag"] == "R"]
     return result
 ```
+
+The filter uses Pandas-style boolean indexing.
 
 ### DataFrame Query Categories
 

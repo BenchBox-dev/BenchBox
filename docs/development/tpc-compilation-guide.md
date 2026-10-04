@@ -47,6 +47,8 @@ The auto-compilation system supports the following TPC binary tools:
 ## Installation Instructions
 
 ### macOS
+Install the Xcode Command Line Tools, or install the tools through Homebrew.
+
 ```bash
 xcode-select --install
 
@@ -68,6 +70,8 @@ sudo dnf groupinstall "Development Tools"
 sudo dnf install bison flex
 ```
 
+The first two commands are for CentOS/RHEL and the last two are for Fedora.
+
 ### Windows
 ```bash
 
@@ -77,6 +81,10 @@ sudo apt install build-essential bison flex
 pacman -S make gcc bison flex
 
 ```
+
+Pre-compiled binaries are available through Docker cross-compilation, so TPC-H (`dbgen`, `qgen`) needs no manual installation. Windows binaries are compiled automatically in Docker with MinGW cross-compilation. TPC-H has full support (`dbgen.exe`, `qgen.exe`). TPC-DS has limited support because of cross-compilation constraints.
+
+For development or custom builds, the `apt` commands above are for WSL (recommended), and the `pacman` command is for MSYS2.
 
 ## Configuration
 
@@ -91,6 +99,8 @@ compiler = get_tpc_compiler(auto_compile=True)
 
 compiler = get_tpc_compiler(auto_compile=False)
 ```
+
+The first call enables auto-compilation (the default). The second disables it.
 
 ### Environment Variables
 
@@ -290,6 +300,8 @@ patch -p1 < stdout-support.patch
 cd _sources/tpc-ds
 patch -p1 < stdout-support.patch
 ```
+
+The TPC-H patch adds a `-z` flag for stdout output. The TPC-DS patch fixes the `FILTER` flag and Linux/GCC 10+ compatibility.
 
 ### Updating bundled binaries
 

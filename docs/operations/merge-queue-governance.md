@@ -75,7 +75,7 @@ PR lane.
 
 ### A. Submitting & Arming a PR
 
-Developers submit and arm PRs through repository standard Makefile targets:
+Developers submit and arm PRs through repository standard Makefile targets. `make pr-open` opens the PR against `develop` with a currency check. When the PR is ready for merge, `make pr-ready` runs the exact readiness transaction and arms it:
 
 ```bash
 make pr-open
@@ -105,7 +105,7 @@ If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbo
 
 ## 5. Rollback Procedure
 
-If the merge queue must be immediately disabled due to CI outages, deadlocks, or GitHub platform degradation, the operator executes:
+If the merge queue must be immediately disabled due to CI outages, deadlocks, or GitHub platform degradation, the operator executes the following emergency rollback to standard branch protection:
 
 ```bash
 gh api --method PUT repos/BenchBox-dev/BenchBox/rulesets/15611785 \

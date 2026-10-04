@@ -28,6 +28,8 @@ benchbox run --platform citus --benchmark tpch --scale 1.0 \
   --platform-option distribution_column=l_orderkey
 ```
 
+The first command uses coordinator-local tables, which measures single-node Postgres on a Citus server. The second runs distributed TPC-H, distributing tables on `l_orderkey`.
+
 ## Installation
 
 ### Python Dependencies
@@ -52,6 +54,8 @@ docker run -d --name citus \
 
 psql -h localhost -U postgres -c "CREATE EXTENSION citus;"
 ```
+
+The `psql` command creates the extension and verifies that it is available.
 
 See the [Citus GitHub repository](https://github.com/citusdata/citus) for worker setup and additional installation methods.
 

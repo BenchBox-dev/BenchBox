@@ -62,6 +62,8 @@ if __name__ == "__main__":
     raise SystemExit(0 if quick_test() else 1)
 ```
 
+The example uses a very small scale for speed (about 10MB of data, generated in seconds). Data generation is cached after the first run. It uses an in-memory database for maximum speed and returns success when every query succeeded.
+
 ### Key Points
 
 - **Scale Factor 0.01**: Generates ~10MB data in seconds
@@ -80,10 +82,14 @@ results = adapter.run_benchmark(
 )
 ```
 
+This runs only queries 1 and 6, for tests of about 10 seconds.
+
 **Persistent Database (for reuse):**
 ```python
 adapter = DuckDBAdapter(database_path="./test_databases/tpch_sf001.duckdb")
 ```
+
+This saves the database so later runs can reuse it.
 
 ### Common Issues
 
@@ -153,6 +159,8 @@ if __name__ == "__main__":
     preview_bigquery_benchmark()
 ```
 
+The example previews TPC-H on BigQuery at production scale (scale factor 1.0). The `${BIGQUERY_PROJECT}` placeholder shows which environment variables the platform requires. The dry run creates no cloud resources.
+
 ### Output Artifacts
 
 Dry-run creates these files for review:
@@ -183,16 +191,22 @@ dry_run_preview/bigquery_tpch_sf1/
 bq query --dry_run < dry_run_preview/bigquery_tpch_sf1/bigquery_tpch_queries_*/query_01.sql
 ```
 
+This uses the BigQuery CLI to estimate query costs.
+
 **Schema Review:**
 ```bash
 cat dry_run_preview/bigquery_tpch_sf1/bigquery_tpch_schema_*.sql
 ```
+
+This reviews the schema DDL before any tables are created.
 
 **Approval Workflow:**
 ```bash
 git add dry_run_preview/bigquery_tpch_sf1/
 git commit -m "Add BigQuery TPC-H benchmark preview for approval"
 ```
+
+This checks in the dry-run artifacts for team review.
 
 ---
 
@@ -289,6 +303,8 @@ def production_benchmark():
 if __name__ == "__main__":
     raise SystemExit(0 if production_benchmark() else 1)
 ```
+
+The example uses a production scale (SF 10, a 10GB dataset), reuses cached data when it is available, loads a tuning configuration, creates a persistent database with that tuning applied, and saves detailed results to a JSON file.
 
 ### Best Practices
 
@@ -403,7 +419,11 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 ```
 
+`run_regression_test` runs the benchmark and compares it against the baseline results file. Its `threshold` is the maximum allowed slowdown (0.10 means 10%). It returns True when no regression is detected. The current run uses a small scale for speed that is still representative.
+
 ### GitHub Actions Integration
+
+Save this workflow as `.github/workflows/performance-regression.yml`. The `THRESHOLD` value of `"0.15"` is a 15% slowdown threshold.
 
 ```yaml
 name: Performance Regression Check
@@ -539,6 +559,8 @@ echo "  - View HTML reports in each platform directory"
 echo "  - Compare JSON results for detailed analysis"
 ```
 
+The script is a Bash script. It runs the same benchmark on three platforms in turn: DuckDB (the local baseline), ClickHouse (self-hosted) and Databricks (cloud). It then generates a comparison report.
+
 ### Analysis Script
 
 ```python
@@ -598,6 +620,8 @@ if __name__ == "__main__":
     results = load_platform_results(base_dir)
     compare_platforms(results)
 ```
+
+The script loads the results from all platforms, finds the fastest platform, compares relative performance against it, and then compares the platforms query by query.
 
 ---
 
@@ -710,6 +734,8 @@ if __name__ == "__main__":
     analyze_tuning_results(results)
 ```
 
+The example runs the benchmark with each tuning configuration. It generates the data once and reuses it for all configurations, and it creates a fresh database for each one. `tuning_configs` is a list of `(name, config_file_path)` tuples. The `None` entries for `pk_only` and `pk_fk` stand for custom configuration files that you must supply; replace them with real files for your own tests. The results are sorted by performance, and the slowest run (usually `notuning`) is the baseline.
+
 ### Tuning Progression
 
 Test configurations in this order to understand impact:
@@ -808,6 +834,8 @@ if __name__ == "__main__":
 
     sys.exit(0 if success else 1)
 ```
+
+The `query_numbers` argument is a list of query numbers as strings, such as `["1", "6", "12"]`. The example uses a small scale for fast iteration. The `smoke_test`, `aggregation_test`, `join_test` and `complex_query_test` functions are common query subsets for different purposes. A custom list is passed as `--queries 1,6,12`.
 
 ### Common Query Subsets
 
@@ -918,6 +946,8 @@ if __name__ == "__main__":
     success = cost_optimized_databricks_test()
     raise SystemExit(0 if success else 1)
 ```
+
+The example runs TPC-H on Databricks at minimal cost: the smallest scale factor (0.01, about 10MB of data, so storage cost is negligible), a subset of 5 fast queries instead of 22, and auto-stop enabled (the default). It first verifies the credentials. The warehouse should be 2X-Small or serverless. The final message is a reminder to drop the schema when done.
 
 ### Cost-Saving Strategies
 

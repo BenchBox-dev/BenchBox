@@ -35,6 +35,8 @@ for query_result in results['queries']:
     print(f"Query {query_result['query_id']}: {query_result.get('row_count_validation_status', 'N/A')}")
 ```
 
+Validation is enabled by default, and it runs automatically when the benchmark runs. The loop checks the validation status of each query result.
+
 ### Validation Output
 
 Each query result includes validation metadata when validation is performed:
@@ -49,6 +51,8 @@ Each query result includes validation metadata when validation is performed:
     "row_count_validation_status": "PASSED",
 }
 ```
+
+`expected_row_count` is the expected count from the answer files, and `row_count_validation_status` is the validation result. A real result contains other fields as well.
 
 ## Validation Statuses
 
@@ -163,6 +167,8 @@ validator.validate_query_result("tpch", "15a", actual_row_count=1)
 validator.validate_query_result("tpch", "Q15b", actual_row_count=1)
 ```
 
+The first four calls all map to Query 1: an integer, a string, a `Q` prefix and a `query` prefix. The last two are query variants, which use the base query number and map to Q15.
+
 ### Manual Validation
 
 You can validate query results manually using the `QueryValidator`:
@@ -198,6 +204,8 @@ results = adapter.run_benchmark(
 )
 ```
 
+At SF=1.0 all queries are validated. `validate_row_counts=True` is the default.
+
 #### Other Scale Factors
 
 **Scale-independent queries** (e.g., TPC-H Q1) use SF=1.0 expectations:
@@ -208,6 +216,8 @@ validator.validate_query_result("tpch", "1", actual_row_count=4, scale_factor=10
 validator.validate_query_result("tpch", "2", actual_row_count=1000, scale_factor=10.0)
 ```
 
+At SF=10, Q1 still validates because it is scale-independent. It uses the SF=1.0 expectation (4 rows) and the result is PASSED. Q2 is scale-dependent and there are no SF=10.0 expectations, so its validation is SKIPPED.
+
 ### Disabling Validation
 
 If you need to disable validation:
@@ -215,6 +225,8 @@ If you need to disable validation:
 ```python
 results = adapter.run_benchmark(benchmark)
 ```
+
+There are two options. Option 1, disabling validation at the adapter level, is not yet implemented, because validation is always on. It may be added in a future version if needed. Option 2 is to ignore validation results by not checking the `row_count_validation_status` fields.
 
 ## How It Works
 
@@ -279,6 +291,8 @@ results = adapter.run_throughput_test(
 )
 ```
 
+Throughput tests with concurrent queries are safe. `num_streams=4` runs 4 concurrent query streams, and each stream can validate concurrently without conflicts.
+
 **Implementation:**
 - Registry uses `threading.Lock` to protect cache and provider registry
 - Double-check locking pattern for efficient concurrent access
@@ -330,6 +344,8 @@ benchbox download-answers --benchmark tpcds
 benchbox download-answers --force
 benchbox download-answers --show-cache-dir
 ```
+
+The commands download both TPC-H and TPC-DS answers, TPC-H only, TPC-DS only, re-download even if cached, and print the cache location and exit.
 
 ### Disabling Automatic Downloads
 
@@ -408,6 +424,8 @@ from benchbox.core.expected_results import register_all_providers
 register_all_providers()
 ```
 
+This triggers provider registration manually.
+
 ### Query ID Not Found
 
 **Symptom**: Validation skipped with "No expected row count defined"
@@ -438,6 +456,8 @@ class ExpectedQueryResult:
     notes: str | None = None
 ```
 
+`expected_row_count_min` and `expected_row_count_max` are for non-deterministic queries. `row_count_formula` holds an expression such as `"SF * 100"`.
+
 ### Validation Modes
 
 1. **EXACT**: Row count must match exactly
@@ -446,6 +466,7 @@ class ExpectedQueryResult:
    actual_row_count = 4
    actual_row_count = 5
    ```
+   An actual count of 4 passes. An actual count of 5 fails.
 
 2. **RANGE**: Row count must be within min/max range (for non-deterministic queries)
    ```python
@@ -454,10 +475,9 @@ class ExpectedQueryResult:
    actual_row_count = 125
    actual_row_count = 200
    ```
+   An actual count of 125 passes. An actual count of 200 fails.
 
-3. **SKIP**: Validation is skipped
-   ```python
-   ```
+3. **SKIP**: Validation is skipped. It is used when no expected result is available.
 
 ### Formula-Based Expectations (Future)
 
@@ -470,6 +490,8 @@ ExpectedQueryResult(
     scale_independent=False
 )
 ```
+
+The formula scales with the scale factor.
 
 Currently, only exact row counts are used. Formulas are evaluated using safe AST parsing (no `eval()`).
 
@@ -491,6 +513,8 @@ performance_results = adapter.run_benchmark(
 )
 ```
 
+The first run establishes correctness at SF=1.0, and all queries should PASS. Then scale up for performance testing. Scale-independent queries still validate at the larger scale.
+
 ### 2. Check Validation Status in CI/CD
 
 ```python
@@ -507,6 +531,8 @@ if failed_validations:
     raise AssertionError(f"{len(failed_validations)} queries failed validation")
 ```
 
+Use this pattern in automated tests.
+
 ### 3. Document Validation Skips
 
 ```python
@@ -514,6 +540,8 @@ print("Running at SF=10.0:")
 print("- Scale-independent queries: VALIDATED")
 print("- Scale-dependent queries: SKIPPED (no SF=10.0 expectations)")
 ```
+
+If you run at a scale factor other than 1.0, document that validation is limited.
 
 ### 4. Use Validation for Debugging
 
@@ -523,6 +551,8 @@ if query_result['row_count_validation_status'] != 'PASSED':
     print(f"  Expected: {query_result['expected_row_count']} rows")
     print(f"  Actual: {query_result['rows_returned']} rows")
 ```
+
+When you investigate performance issues, check correctness first.
 
 ## Future Enhancements
 

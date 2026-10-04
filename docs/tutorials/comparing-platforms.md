@@ -26,6 +26,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode native
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode external
 ```
 
+The first command uses the default mode, which materializes native tables. The second registers the files externally (views or external tables).
+
 `--table-mode external` is useful when you want direct file-based comparisons across engines. It is not compatible with `--tuning tuned`.
 
 ## Quick Comparison: DuckDB vs SQLite
@@ -37,6 +39,8 @@ benchbox run --platform sqlite --benchmark tpch --scale 0.1 --output sqlite_resu
 
 benchbox compare duckdb_results.json sqlite_results.json
 ```
+
+The SQLite run uses the same generated data as the DuckDB run.
 
 **Example output** (actual results vary based on hardware, configuration, and workload):
 ```
@@ -72,6 +76,8 @@ benchbox run --platform bigquery --benchmark tpch --scale 1 --table-mode externa
 benchbox compare local.json snowflake.json bigquery.json
 ```
 
+The first command is the local baseline. The cloud runs require credentials. The `--table-mode external` examples use file-backed registration. The last command is a multi-way comparison.
+
 ## Platform Requirements
 
 | Platform | Setup Required |
@@ -99,6 +105,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.j
 benchbox compare sql.json polars.json
 ```
 
+The first command is SQL execution, the second is DataFrame execution with Polars, and the `compare` command compares the two paradigms.
+
 ## Best Practices
 
 ### Use Same Scale Factor
@@ -110,6 +118,8 @@ benchbox run --platform snowflake --benchmark tpch --scale 1
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 benchbox run --platform snowflake --benchmark tpch --scale 10
 ```
+
+The first pair is correct because both platforms use the same scale factor. The second pair is incorrect because the scale factors differ, so the results are not comparable.
 
 ### Run Multiple Iterations
 
@@ -130,6 +140,8 @@ benchbox run --platform duckdb --benchmark tpch
 
 benchbox run --platform duckdb --benchmark tpch --output results.json
 ```
+
+The first command is a warm-up run whose results you discard. The second is the measured run.
 
 ## Comparison Script
 
@@ -159,6 +171,8 @@ for platform, data in results.items():
     total = data.get("summary", {}).get("total_time_seconds", 0)
     print(f"{platform}: {total:.1f}s")
 ```
+
+The script compares TPC-H across platforms and prints the total time for each. It is a standalone Python 3 script.
 
 ## Next Steps
 

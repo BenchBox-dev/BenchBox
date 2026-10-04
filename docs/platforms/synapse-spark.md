@@ -17,9 +17,11 @@ Azure Synapse Analytics is Microsoft's enterprise analytics platform providing i
 
 ## Installation
 
+This installs Synapse Spark support and the `azure-identity`, `azure-storage-file-datalake` and `requests`
+dependencies.
+
 ```bash
 uv add benchbox --extra synapse-spark
-
 ```
 
 ## Prerequisites
@@ -36,6 +38,9 @@ uv add benchbox --extra synapse-spark
 
 ### Environment Variables
 
+`SYNAPSE_WORKSPACE_NAME`, `SYNAPSE_SPARK_POOL`, `SYNAPSE_STORAGE_ACCOUNT` and `SYNAPSE_STORAGE_CONTAINER` are
+required. `AZURE_TENANT_ID` and `SYNAPSE_STORAGE_PATH` are optional.
+
 ```bash
 export SYNAPSE_WORKSPACE_NAME=my-synapse-workspace
 export SYNAPSE_SPARK_POOL=sparkpool1
@@ -47,6 +52,8 @@ export SYNAPSE_STORAGE_PATH=data/benchbox
 ```
 
 ### CLI Usage
+
+The commands cover basic usage, usage with a storage path, and a dry run that previews queries.
 
 ```bash
 benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
@@ -83,6 +90,9 @@ benchbox run --platform synapse-spark --benchmark tpch --dry-run ./preview \
 | `timeout_minutes` | 60 | Statement timeout in minutes |
 
 ## Python API
+
+The example initializes the adapter with a workspace and storage (`tenant_id` is optional), verifies the connection,
+creates the schema, loads data to ADLS and creates tables, executes a query via Livy, and cleans up the session.
 
 ```python
 from benchbox.platforms.azure import SynapseSparkAdapter

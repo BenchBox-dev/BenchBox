@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
 ### Advanced-level Benchmark Structure
 
-For more complex benchmarks, use a modular architecture:
+For more complex benchmarks, use a modular architecture. `QueryMetadata.complexity` is one of `'simple'`, `'medium'`, or `'complex'`. Subclasses of `AdvancedBenchmark` override `_load_benchmark_config()` to load from config files and `_load_table_schemas()` to define the actual schemas. `DefaultDataGenerator` can be overridden for specific table sizing.
 
 ```python
 from abc import ABC, abstractmethod
@@ -327,6 +327,8 @@ class DefaultQueryManager(QueryManager):
 ##  Data Generation Strategies
 
 ### Realistic Data Generation
+
+The generator below writes data in batches for memory efficiency. Foreign key columns map to the size of the table they reference (`custkey` 10,000, `orderkey` 50,000, `partkey` 5,000, `suppkey` 1,000, `nationkey` 25, `regionkey` 5), and unknown keys fall back to a default range. In the configuration, `lines_per_order` is a (minimum, maximum) pair. Order status values `F`, `O`, and `P` mean Fulfilled, Open, and Pending. `ECommerceBenchmark` extends the base class with e-commerce specific queries.
 
 ```python
 import numpy as np

@@ -11,6 +11,8 @@ uv add benchbox --extra clickhouse-server
 uv add benchbox --extra clickhouse
 ```
 
+The two extras are equivalent.
+
 ## Quick Start
 
 ```bash
@@ -20,6 +22,8 @@ docker run -d --name clickhouse-server \
 
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01
 ```
+
+The `docker run` command starts a local ClickHouse server with Docker, and the `benchbox run` command runs a TPC-H benchmark against it.
 
 ## Connection Options
 

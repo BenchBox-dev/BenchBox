@@ -32,10 +32,14 @@ The unified benchmark validator is a comprehensive tool for validating all Bench
 pip install benchbox
 ```
 
+This installs the BenchBox library.
+
 ### Optional Dependencies
 ```bash
 pip install duckdb
 ```
+
+DuckDB enables enhanced query syntax validation.
 
 ## Usage
 
@@ -50,6 +54,8 @@ python tests/utilities/benchmark_validator.py --benchmark tpch
 python tests/utilities/benchmark_validator.py --benchmark tpch,tpcds
 ```
 
+The three commands validate all benchmarks with default settings, one specific benchmark, and multiple benchmarks.
+
 #### Validation Options
 ```bash
 python tests/utilities/benchmark_validator.py --benchmark tpch --quick-check
@@ -61,6 +67,8 @@ python tests/utilities/benchmark_validator.py --benchmark tpch --validate-schema
 python tests/utilities/benchmark_validator.py --benchmark tpch --validate-queries
 ```
 
+`--quick-check` runs fast checks only. `--full-validation` also generates data. `--validate-schema` validates the schema only. `--validate-queries` validates the queries only.
+
 #### Scale Factor and Output
 ```bash
 python tests/utilities/benchmark_validator.py --benchmark tpch --scale 0.1
@@ -71,6 +79,8 @@ python tests/utilities/benchmark_validator.py --benchmark tpch --output-file val
 
 python tests/utilities/benchmark_validator.py --benchmark tpch --output-format markdown --output-file report.md
 ```
+
+`--scale` sets a custom scale factor. `--output-format json` produces JSON output, `--output-file` saves the report to a file, and `--output-format markdown` produces a Markdown report.
 
 ### Python API Usage
 
@@ -90,6 +100,8 @@ print(f"Valid: {report.is_valid}")
 print(f"Success Rate: {report.success_rate:.1f}%")
 ```
 
+The calls create a validator and validate a single benchmark.
+
 #### Comprehensive Validation
 ```python
 results = validator.validate_all_benchmarks(
@@ -101,6 +113,8 @@ results = validator.validate_all_benchmarks(
 report = validator.generate_report(results, 'markdown')
 print(report)
 ```
+
+The calls validate multiple benchmarks and then generate a report.
 
 #### Custom Validation
 ```python
@@ -115,6 +129,8 @@ import duckdb
 conn = duckdb.connect(':memory:')
 validator = BenchmarkValidator(duckdb_connection=conn)
 ```
+
+The first call runs schema validation only. The last statements validate queries with a custom DuckDB connection.
 
 ## Validation Types
 

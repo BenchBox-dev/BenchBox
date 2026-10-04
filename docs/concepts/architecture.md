@@ -79,10 +79,12 @@ Core implementations live under `benchbox/core/{benchmark}/`.
 - `{Benchmark}Generator`: Data generation logic
 - `{Benchmark}Queries`: Query templates and parameterization
 
+A benchmark class knows how to generate data (the `dbgen` invocation), how to retrieve queries (with parameter
+substitution), its schema definitions, and its validation rules.
+
 **Example**:
 ```python
 from benchbox import TPCH
-
 ```
 
 See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
@@ -98,10 +100,12 @@ See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
 - `{Platform}Connection`: Connection wrapper implementing `DatabaseConnection`
 - Platform-specific optimizations (bulk loading, query hints)
 
+An adapter handles connection management, data loading strategies (COPY, INSERT, external tables), query execution and
+error handling, and result collection and formatting.
+
 **Example**:
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
-
 ```
 
 **Supported Adapters**:
@@ -179,7 +183,7 @@ class DatabaseConnection(ABC):
         pass
 ```
 
-All platform adapters implement this interface, enabling benchmark code to remain platform-agnostic.
+`execute` runs a query and returns a cursor or result, `fetchall` fetches all results from a cursor, and `close` closes the connection. All platform adapters implement this interface, enabling benchmark code to remain platform-agnostic.
 
 ### 5. Data Generation
 
@@ -192,7 +196,8 @@ All platform adapters implement this interface, enabling benchmark code to remai
 - **Custom Benchmarks**: Python-based generation using Faker, NumPy, Pandas
 - **Output Formats**: Parquet (default), CSV, JSON
 
-**Example**:
+**Example**: TPC-H uses the official `dbgen` binary, and `generate()` returns a list of `.parquet` files. Custom
+benchmarks use Python, and the coffee shop generator generates data with Faker.
 ```python
 generator = TPCHGenerator(scale_factor=1.0, output_dir="./data")
 file_paths = generator.generate()
@@ -209,7 +214,8 @@ See: [Data Generation Guide](../usage/data-generation.md)
 
 **Responsibility**: Command-line interface and workflow orchestration
 
-**Commands**:
+**Commands**: the examples run a benchmark end-to-end, generate data only, do a dry run that previews queries, and check
+dependencies.
 ```bash
 benchbox run --benchmark tpch --platform duckdb --scale 1
 
@@ -321,7 +327,9 @@ See: [Adding New Platforms](../development/adding-new-platforms.md)
 
 ### Adding Query Parameter Variants
 
-TPC benchmarks support query variants with different parameter substitutions:
+TPC benchmarks support query variants with different parameter substitutions. The first call returns a query with
+random parameters (the default), the second returns a query with specific parameters, and the third generates multiple
+variants for a seed sweep:
 
 ```python
 query = benchmark.get_query("q1")

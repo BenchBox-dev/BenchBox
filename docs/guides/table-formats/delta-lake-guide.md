@@ -164,6 +164,8 @@ duckdb -c "INSTALL delta; LOAD delta;"
 benchbox run --platform duckdb --benchmark tpch --scale 1 --table-format delta
 ```
 
+The first command installs the Delta extension, which is a one-time step. The second runs with Delta Lake format.
+
 ## Open-Source vs Databricks Delta
 
 | Aspect | OSS Delta Lake | Databricks Delta |
@@ -213,6 +215,8 @@ benchbox run --platform databricks --benchmark tpch --table-format delta \
   --platform-option databricks_clustering_strategy=liquid_clustering \
   --platform-option liquid_clustering_columns=l_shipdate,l_orderkey
 ```
+
+The first command enables Z-ORDER clustering after the load, which is the default on Databricks. The second skips clustering, to measure raw load performance. The third uses Liquid Clustering on specific columns.
 
 ## See Also
 

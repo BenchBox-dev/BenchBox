@@ -40,6 +40,8 @@ make test-docker-clickhouse
 make test-docker-all
 ```
 
+The first command tests a single platform: it starts Docker, runs the tests, and stops Docker. The second tests all Docker platforms sequentially.
+
 ## Available Makefile Targets
 
 | Target | Description |
@@ -65,6 +67,8 @@ uv run -- python -m pytest -m "live_clickhouse" --tb=short -v
 make test-docker-down-clickhouse
 ```
 
+The steps are: start the service, run the tests with verbose output, and stop the service when done.
+
 Or using pytest markers directly:
 
 ```bash
@@ -72,6 +76,8 @@ uv run -- python -m pytest -m "docker_integration" --tb=short -v
 
 uv run -- python -m pytest -m "live_postgresql" --tb=short -v
 ```
+
+The first command runs all Docker integration tests, and the services must be running. The second runs a specific platform.
 
 ## Apple Container Without Docker Desktop
 
@@ -105,6 +111,13 @@ fi
 
 CONTAINER_ENGINE=mocker make test-docker-down-postgresql
 ```
+
+The steps are:
+
+1. Start PostgreSQL through the sanctioned pipeline.
+2. Run the CI live-integration step verbatim, including its anti-skip guard. Without `pipefail`, `tee`, and the `grep`, an all-skipped run (service unreachable after `up --wait`) exits 0 and silently renders as green.
+3. Run the CI TPC-Havoc equivalence sample verbatim, with the same guard.
+4. Stop the service when done.
 
 Result on that run: 8 live integration tests passed, 2 equivalence tests
 passed, matching the CI job's pass criteria (at least one passing test per
@@ -199,6 +212,8 @@ lsof -i :9000
 docker compose -f docker/clickhouse/docker-compose.yml logs
 ```
 
+The commands check that the Docker daemon is running, check for port conflicts (9000 is the ClickHouse port here), and view the service logs.
+
 ### Tests skip even though Docker is running
 
 The `skip_unless_docker_service()` helper probes `localhost:<port>` with a 2-second timeout. If the service is still starting, wait for the healthcheck:
@@ -213,3 +228,5 @@ docker compose -f docker/clickhouse/docker-compose.yml up --wait
 make test-docker-down-all
 docker compose -f docker/clickhouse/docker-compose.yml down -v
 ```
+
+The first command stops all Docker services. The second does the same manually for one service.

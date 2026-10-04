@@ -171,6 +171,8 @@ for table_name in tpcds.get_available_tables():
     print(f"{table_name}: {table_path} ({table_path.stat().st_size} bytes)")
 ```
 
+TPC-DS data generation requires the official C tools (`dsdgen` and `dsqgen`). The loop checks the generated files.
+
 ### Stream Generation and Testing
 
 ```python
@@ -187,6 +189,8 @@ for i, stream_info in enumerate(tpcds.get_all_streams_info()):
     print(f"  Queries: {stream_info['query_count']}")
     print(f"  File: {stream_info['output_file']}")
 ```
+
+Generate multiple concurrent streams for throughput testing. Each stream contains a random permutation of the queries.
 
 ### DuckDB Integration Example
 
@@ -264,6 +268,8 @@ query_stream = tpcds.get_query(42,
                                seed=12345,
                                stream_id=0)
 ```
+
+Use a specific seed for reproducible results. Passing `scale_factor` makes parameter generation scale-aware, and passing `stream_id` makes it stream-based.
 
 ### Scale factor and query parameters
 
@@ -435,9 +441,13 @@ query_manager = tpcds.queries
 data_generator = tpcds.generator
 ```
 
+`verbose=True` enables detailed logging, `parallel=8` generates data in parallel, and `use_c_tools=True` uses the official TPC-DS C tools. The last three attributes give direct access to the C tools, query management and data generation components.
+
 ## Integration Examples
 
 ### Distributed Database Testing
+
+This example generates data at a large scale factor for a distributed system and loads it with partition-aware tables for Spark. The `CASE` expression is abbreviated and stands for the full list of partitions.
 
 ```python
 tpcds_large = TPCDS(scale_factor=100, output_dir="/shared/tpcds_sf100")
@@ -570,10 +580,14 @@ cd _sources/tpc-ds/tools
 make
 ```
 
+Ensure the TPC-DS C tools are compiled and available.
+
 **Issue: Out of disk space during generation**
 ```python
 tpcds = TPCDS(scale_factor=0.1, output_dir="/external/storage")
 ```
+
+Use a smaller scale factor or external storage.
 
 ### Query Execution Issues
 
@@ -583,16 +597,22 @@ conn.execute("SET query_timeout='1800s'")
 tpcds = TPCDS(scale_factor=0.1)
 ```
 
+Increase the timeout (1800 seconds is 30 minutes) and use a smaller scale factor (a smaller dataset) for testing.
+
 **Issue: Out of memory on analytical queries**
 ```python
 conn.execute("SET memory_limit='8GB'")
 conn.execute("SET max_memory='8GB'")
 ```
 
+Configure memory limits and optimize queries.
+
 **Issue: Parameter substitution errors**
 ```python
 query = tpcds.get_query(42, seed=12345)
 ```
+
+Use explicit seeds and validate query IDs. The same seed gives reproducible parameters.
 
 ## Streaming Data Generation
 
@@ -610,6 +630,8 @@ dsdgen -TABLE date_dim -SCALE 1 -FILTER Y -RNGSEED 12345 | gzip > date_dim.dat.g
 dsdgen -TABLE customer -SCALE 1 -FILTER Y | \
   duckdb -c "COPY customer FROM '/dev/stdin' (DELIMITER '|')"
 ```
+
+The first command writes one table to stdout, so it can be piped to compression. The second generates with a fixed seed for reproducibility. The third loads directly into a database, here DuckDB.
 
 ### Benefits
 

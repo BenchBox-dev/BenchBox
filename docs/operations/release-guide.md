@@ -14,6 +14,9 @@ make release-cut VERSION=X.Y.Z
 make release-finalize VERSION=X.Y.Z
 ```
 
+Between `release-cut` and `release-finalize`, review the PR and wait for
+`validate-base` and `release-required-result`.
+
 Choose an unused version and resolve any existing `vX.Y.Z` branch or tag before
 starting. `release-cut` fetches `origin` and accepts a new cut only from a clean
 linked worktree whose HEAD is exactly the fetched `origin/develop` commit. An
@@ -99,7 +102,8 @@ completion remain useful campaign-quality signals, but missing, red, stale,
 non-ancestor, or dirty evidence does not fail `validate-base`. Producing the
 three-stage evidence is not a release-cut precondition.
 
-Running the optional campaign:
+Running the optional campaign (run stage 2 after stage 1 completes, and stage 3
+after stage 2 completes):
 
 ```bash
 make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
@@ -108,6 +112,7 @@ make uat-sweep CONFIG=tests/uat/configs/release-gate-03-docker-oltp.yaml
 make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir>
 ```
 
+Review the campaign report. It is historical evidence, not a release input.
 See `docs/operations/uat-framework.md` "Three-stage UAT campaign" for campaign
 ordering and its report checklist. The emergency override below applies only
 to the blocking canary check.
@@ -170,10 +175,10 @@ same command from the `vX.Y.Z` branch:
 make release-cut VERSION=X.Y.Z
 ```
 
-The branch is reused rather than recreated, the version bump and `uv lock`
+This reuses the branch and keeps the CHANGELOG section. The branch is reused rather than recreated, the version bump and `uv lock`
 re-apply to the same values, and an existing `## [X.Y.Z]` section is left
 untouched — so a section you curated between runs survives. To throw the cut
-away instead:
+away instead (this discards tracked edits and restores the creating worktree branch):
 
 ```bash
 make release-cut-abort VERSION=X.Y.Z
@@ -357,6 +362,9 @@ make release-cut VERSION=X.Y.Z
 make release-finalize VERSION=X.Y.Z
 ```
 
+As in the main flow, review the PR and wait for `validate-base` and
+`release-required-result` before `release-finalize`.
+
 See `release-recovery-v0-3-1` for the worked example of diagnosing a broken
 PyPI-latest release, confirming the fix on `develop`, and cutting the
 recovery version through this same flow.
@@ -375,6 +383,8 @@ tags. Passing the content check alone does not authorize tagging or publication.
 make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
 make release-check VERSION=X.Y.Z [BASE_REF=<immutable-predecessor-sha>]
 ```
+
+Hand-curate the `[X.Y.Z]` section of `CHANGELOG.md` between the two commands.
 
 `release-prep` runs `scripts/update_version.py` (`pyproject.toml`,
 `benchbox/__init__.py`, the documentation release markers, and the landing-page

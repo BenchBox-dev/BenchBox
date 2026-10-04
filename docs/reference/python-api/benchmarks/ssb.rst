@@ -486,6 +486,8 @@ Scale Factor Comparison
     print("\nScale Factor Performance:")
     print(df)
 
+The ``data_size_mb`` value is an approximation of 500 MB per unit of scale factor.
+
 See Also
 --------
 

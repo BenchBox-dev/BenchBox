@@ -93,6 +93,8 @@ uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --report "$REPORT"
 ```
 
+The `rm -f` command deletes only the two explicitly named temporary files.
+
 The shadow tool invokes `todo-db` only as `uv run --project
 _project/scripts --locked -- todo-db`. The package must be present in the locked
 BenchBox scripts environment; an absent or incompatible package is an error,

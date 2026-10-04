@@ -53,6 +53,15 @@ benchbox export --last --format csv --output-dir ./reports/
 benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
 ```
 
+The commands, in order, export:
+
+- the most recent result to CSV;
+- a specific result file to multiple formats;
+- the latest TPC-H result to all formats;
+- the latest DuckDB result to HTML;
+- the most recent result to a custom directory;
+- a specific file to HTML with a forced overwrite.
+
 ### Common Workflows
 
 **Share Results with Team:**
@@ -60,15 +69,21 @@ benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
 benchbox export --last --format html --output-dir ./team_reports/
 ```
 
+This exports the recent result as an HTML report. Share the HTML file by email or in documentation.
+
 **Analyze in Spreadsheet:**
 ```bash
 benchbox export --last --format csv --output-dir ~/Downloads/
 ```
 
+This exports to CSV for Excel or Sheets. Open the CSV there for charting and analysis.
+
 **Archive Benchmarks:**
 ```bash
 benchbox export --last --format json --format csv --format html --output-dir ./archive/
 ```
+
+This exports all formats for comprehensive archival.
 
 ### Notes
 
@@ -116,6 +131,8 @@ benchbox results --paths --limit 100 | xargs -n1 -I{} benchbox submit {} --outpu
 
 benchbox results --submitted
 ```
+
+The commands, in order, show recent results, show more results, show the exact result file paths accepted by `submit` and `export` (one per line, so the output is pipeable), pipe those paths into `submit` to package each result in turn, and show hosted submissions and public URLs.
 
 ---
 
@@ -167,6 +184,8 @@ benchbox compare baseline.json current.json
 benchbox compare baseline.json current.json --show-all-queries
 ```
 
+The first command compares two result files. The second also shows all queries, not just the changes.
+
 **CI/CD Integration:**
 ```bash
 benchbox compare baseline.json current.json --fail-on-regression 10%
@@ -176,6 +195,8 @@ benchbox compare baseline.json current.json --fail-on-regression 5%
 benchbox compare baseline.json current.json --fail-on-regression 0.1
 ```
 
+The first command fails the pipeline if any query regresses by more than 10%. The second uses a stricter threshold, for critical paths. The third gives the same 10% threshold in decimal notation.
+
 **Export Comparison Reports:**
 ```bash
 benchbox compare baseline.json current.json --format json --output comparison.json
@@ -184,6 +205,8 @@ benchbox compare baseline.json current.json --format html --output report.html
 
 benchbox compare baseline.json current.json --output comparison.txt
 ```
+
+The commands, in order, export the comparison as JSON for dashboards, generate an HTML report for stakeholders, and save a text report to a file.
 
 ### Comparison Output
 
@@ -237,6 +260,8 @@ benchbox compare \
   --fail-on-regression 10%
 ```
 
+The first command runs the baseline benchmark (for example, on the main branch). The second runs the current benchmark (for example, on a feature branch). The `compare` command fails if the current results regress.
+
 **Before/After Optimization Analysis:**
 ```bash
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
@@ -250,6 +275,8 @@ benchbox compare \
   optimized/results/tpch_*.json \
   --format html --output tuning-analysis.html
 ```
+
+The first command runs without tuning and the second runs with tuning. The `compare` command compares the two sets of results.
 
 **Cross-Platform Comparison:**
 ```bash
@@ -298,6 +325,8 @@ if perf['improved']:
 report_path = exporter.export_comparison_report(comparison)
 print(f"Report saved to: {report_path}")
 ```
+
+The example compares two result files, checks the overall performance change, and exports the comparison as an HTML report.
 
 See [Result Analysis API](../python-api/result-analysis.rst) for complete API documentation.
 

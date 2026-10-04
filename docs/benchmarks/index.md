@@ -357,6 +357,7 @@ queries/index
 ## Common Patterns
 
 ### Quick Performance Test
+Run a representative subset of TPC-H queries for standard analytical performance, and use Read Primitives for focused operation testing:
 ```python
 from benchbox import TPCH, ReadPrimitives
 
@@ -383,6 +384,7 @@ for name, benchmark in benchmarks.items():
 ```
 
 ### Regression Testing
+Use a small scale factor for fast execution, and allow 10% variance against the baseline:
 ```python
 from benchbox import ReadPrimitives
 

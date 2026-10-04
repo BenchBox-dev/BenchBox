@@ -67,6 +67,8 @@ benchbox run --platform duckdb --benchmark metadata_primitives \
   --benchmark-option complexity=wide_tables
 ```
 
+The first command runs the benchmark on DuckDB. The second runs only the schema and column categories. The third runs with the `wide_tables` complexity preset.
+
 ### Programmatic Usage
 
 ```python
@@ -93,6 +95,8 @@ for cat, summary in result.category_summary.items():
     print(f"{cat}: {summary['avg_time_ms']:.2f}ms avg")
 ```
 
+`get_create_tables_sql()` creates the test schema, which holds TPC-H and TPC-DS tables. The final loop prints the category summary.
+
 ## Sample Queries
 
 ### Schema Discovery
@@ -109,6 +113,8 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
 ORDER BY table_name;
 ```
 
+The first query is `schema_list_tables` (list all tables). The second is `schema_list_views` (list all views).
+
 ### Column Introspection
 
 ```sql
@@ -123,6 +129,8 @@ GROUP BY data_type
 ORDER BY count DESC;
 ```
 
+The first query is `column_for_table` (get columns for a specific table). The second is `column_types` (get the column type distribution).
+
 ### Table Statistics
 
 ```sql
@@ -132,6 +140,8 @@ FROM information_schema.tables
 WHERE table_type = 'BASE TABLE';
 ```
 
+This query is `stats_table_sizes` (get table sizes and row estimates).
+
 ### Query Introspection
 
 ```sql
@@ -139,6 +149,8 @@ EXPLAIN SELECT * FROM lineitem WHERE l_quantity > 10;
 
 EXPLAIN ANALYZE SELECT COUNT(*) FROM orders;
 ```
+
+The first statement is `query_explain_plan` (get the execution plan). The second is `query_analyze` (get execution statistics).
 
 ## Complexity Testing
 
@@ -172,6 +184,8 @@ print(f"Setup time: {result.setup_time_ms:.1f}ms")
 print(f"Teardown time: {result.teardown_time_ms:.1f}ms")
 print(f"Created: {result.generated_metadata.total_objects} objects")
 ```
+
+This runs the benchmark with the wide tables preset.
 
 ### Custom Complexity Configuration
 
@@ -229,6 +243,8 @@ print(f"GRANTs/second: {acl_result.summary['grants_per_second']:.1f}")
 print(f"Total operations: {acl_result.summary['total_operations']}")
 ```
 
+This ACL benchmark measures GRANT and REVOKE performance.
+
 ### ACL Platform Support
 
 Platforms fall into four tiers based on the depth of ACL introspection
@@ -272,12 +288,16 @@ PRAGMA table_info('lineitem');
 PRAGMA database_list;
 ```
 
+DuckDB uses `PRAGMA` statements for metadata.
+
 ### ClickHouse
 
 ```sql
 SELECT * FROM system.tables WHERE database = currentDatabase();
 SELECT * FROM system.columns WHERE table = 'lineitem';
 ```
+
+ClickHouse uses system tables.
 
 ### Snowflake
 
@@ -287,12 +307,16 @@ SHOW COLUMNS IN TABLE lineitem;
 DESCRIBE TABLE lineitem;
 ```
 
+Snowflake uses `SHOW` commands.
+
 ### BigQuery
 
 ```sql
 SELECT * FROM `project.dataset.INFORMATION_SCHEMA.TABLES`;
 SELECT * FROM `project.dataset.INFORMATION_SCHEMA.COLUMNS`;
 ```
+
+BigQuery uses `INFORMATION_SCHEMA` with a project and dataset prefix.
 
 ## Result Structure
 
@@ -334,6 +358,8 @@ result = benchmark.run_benchmark(
 assert result.total_time_ms < 5000, "Catalog scan too slow"
 ```
 
+The run simulates a catalog scan pattern. The assertion checks that the scan meets an SLA, here under 5 seconds.
+
 ### 2. IDE Performance Testing
 
 Test autocomplete responsiveness:
@@ -349,6 +375,8 @@ avg_time = column_queries.category_summary["column"]["avg_time_ms"]
 assert avg_time < 100, f"Column lookup too slow: {avg_time}ms"
 ```
 
+Column lookup should be fast for autocomplete.
+
 ### 3. Schema Migration Validation
 
 Test metadata operations after migrations:
@@ -359,6 +387,8 @@ result = benchmark.run_benchmark(conn, "duckdb")
 schema_results = [r for r in result.results if r.category == "schema"]
 assert all(r.success for r in schema_results), "Schema discovery failed"
 ```
+
+The run performs full schema discovery, and the assertion verifies that every table is discoverable.
 
 ### 4. Access Control Audit
 
@@ -371,6 +401,8 @@ acl_result = benchmark.run_benchmark(
 
 assert acl_result.successful_queries == acl_result.total_queries
 ```
+
+The run executes the ACL queries, and the assertion checks that all of them succeed.
 
 ## Best Practices
 
@@ -393,6 +425,8 @@ config = "wide_tables"
 config = "acl_dense"
 ```
 
+Use `wide_tables` for a typical OLAP warehouse with denormalized tables. Use `acl_dense` for a data-governance-heavy environment that uses fine-grained permissions.
+
 ### 3. Clean Up Test Objects
 
 Always clean up complexity test objects:
@@ -400,6 +434,8 @@ Always clean up complexity test objects:
 ```python
 benchmark.cleanup_benchmark_objects(conn, "duckdb", prefix="benchbox_")
 ```
+
+This is a manual cleanup of the objects created under the given prefix.
 
 ### 4. Monitor for Regressions
 
@@ -413,6 +449,8 @@ new_results = benchmark.run_benchmark(conn, "duckdb")
 if new_results.total_time_ms > baseline_time * 1.2:
     print("WARNING: 20%+ performance regression detected")
 ```
+
+The first run's total time is the saved baseline for comparison with later runs.
 
 ## Related Documentation
 

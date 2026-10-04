@@ -277,10 +277,10 @@ DELETE FROM LINEITEM WHERE L_ORDERKEY = ?
 DELETE FROM LINEITEM WHERE L_ORDERKEY = ?
 ... (1498 more times)
 
-DELETE FROM LINEITEM WHERE L_ORDERKEY IN (?, ?, ?, ...
+DELETE FROM LINEITEM WHERE L_ORDERKEY IN (?, ?, ?, ...)
 ```
 
-This provides ~750x performance improvement for delete operations.
+The per-key form issues 1,500 individual DELETE statements. The batched form replaces them with one statement whose IN list covers all 1,500 keys. This provides ~750x performance improvement for delete operations.
 
 **Platform-Specific Parameter Placeholders:**
 
@@ -324,6 +324,12 @@ SELECT COUNT(*) FROM orders;
 
 SELECT COUNT(*) FROM orders;
 ```
+
+The same statement run at three points returns these results at scale factor 1.0:
+
+- Before maintenance: 1,500,000 rows (the original count).
+- After RF1, which inserted 1,500 orders: 1,501,500 rows, which differs from the original.
+- After RF2, which deleted 1,500 orders: 1,500,000 rows again, but the rows are not the original ones.
 
 Even if row counts match after both RF1 and RF2, the **actual data is different** - you deleted old orders and inserted new ones!
 
@@ -452,6 +458,10 @@ benchbox run \
   --scale 1.0 \
   --phases power
 ```
+
+The first workflow is wrong because Maintenance runs between Power and Throughput, so the Throughput queries run on data that RF1 and RF2 already changed and their results are not comparable to the Power results. The second workflow is wrong because the final `--phases power` run follows Maintenance with no reload, so it runs on the modified data and is not comparable to a Power test on clean data.
+
+Maintenance modifies the database, so reload it before running Power or Throughput again.
 
 ## Troubleshooting
 

@@ -78,6 +78,8 @@ Decision rules:
    )
    ```
 
+   `optimize_table_definition()` is inherited, and transformers are dispatched automatically in registration order, so no manual wiring is needed.
+
 2. **Implement** the method in your adapter. Prefer `BaseDdlOptimizer` for new
    platforms when the transform can be expressed as ordered statement-to-
    statement functions:

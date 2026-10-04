@@ -44,6 +44,16 @@ benchbox visualize result.json --no-color --no-unicode > charts.txt
 benchbox visualize result.json --theme dark
 ```
 
+In order, the commands:
+
+- Auto-discover recent results and render all applicable charts.
+- Visualize a specific result file.
+- Compare two results side by side.
+- Render a specific chart type.
+- Use a named template.
+- Produce pipe-friendly output (no color, no unicode).
+- Use a dark theme for dark terminal backgrounds.
+
 ## Notes
 
 - Pairwise comparison charts (e.g., `speedup`) require exactly 2 result files when specified explicitly. When using `auto` or `all`, pairwise charts are skipped if the input count doesn't match.

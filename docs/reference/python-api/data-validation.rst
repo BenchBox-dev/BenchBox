@@ -180,6 +180,16 @@ Validation Methods
        result = validator.validate_data_directory("data/tpch_sf1")
        validator.print_validation_report(result, verbose=True)
 
+   **Example output** for a failed validation::
+
+       ❌ Data validation FAILED
+          Missing tables: lineitem, orders
+          Row count mismatches:
+            customer: expected 150,000, found 140,000
+          Issues:
+            - Missing data files for table lineitem
+            - Table customer: expected ~150000 rows, found 140000 rows
+
 
 DataValidationResult Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -343,6 +353,8 @@ TPC-DS Validation with Scale Factor
 Compressed Data Validation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The validator handles ``.gz`` and ``.zst`` compression automatically, and works with both compressed and uncompressed files. For example, ``customer.tbl``, ``customer.tbl.gz`` and ``customer.tbl.zst`` are all recognized.
+
 .. code-block:: python
 
     validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
@@ -356,6 +368,8 @@ Compressed Data Validation
 
 Chunked/Parallel Data Validation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The validator handles chunked files from parallel generation, such as ``lineitem_1_4.dat``, ``lineitem_2_4.dat``, ``lineitem_3_4.dat`` and ``lineitem_4_4.dat``.
 
 .. code-block:: python
 
@@ -403,6 +417,8 @@ Data Regeneration Decision
 Custom Benchmark Validation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+For custom benchmarks, validation checks for any data files: ``.tbl``, ``.dat``, ``.csv`` and ``.parquet``.
+
 .. code-block:: python
 
     validator = BenchmarkDataValidator("custom_benchmark", scale_factor=1.0)
@@ -418,6 +434,8 @@ Custom Benchmark Validation
 Manifest-Based Validation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The validator uses ``_datagen_manifest.json`` for fast validation, and data generation creates the manifest automatically. With a manifest, validation is fast: it reads the JSON and checks file sizes. Without a manifest, validation is full: it counts rows and scans the directory.
+
 .. code-block:: python
 
     validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
@@ -429,6 +447,8 @@ Manifest-Based Validation
 
 Validation Report Integration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example exits with an error code if validation fails.
 
 .. code-block:: python
 
@@ -460,6 +480,8 @@ Best Practices
 
 2. **Use Manifest for Performance**
 
+   Manifest-based validation avoids re-scanning files. Let data generation create the manifest automatically: ``generate_data()`` creates ``_datagen_manifest.json``, and future validations are then fast.
+
    .. code-block:: python
 
        benchmark.generate_data()
@@ -467,6 +489,8 @@ Best Practices
        result = validator.validate_data_directory(data_dir)
 
 3. **Handle Compressed Data**
+
+   The validator handles compression automatically. Use compression for large datasets, and validation works transparently.
 
    .. code-block:: python
 
@@ -488,6 +512,8 @@ Best Practices
        )
 
 5. **Tolerate Small Variances**
+
+   The validator allows about 5% row count variance. This is normal for some data generators.
 
    .. code-block:: python
 

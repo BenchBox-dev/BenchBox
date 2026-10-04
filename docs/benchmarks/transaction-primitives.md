@@ -38,6 +38,8 @@ This benchmark is designed for databases with robust transaction support (Postgr
 
 ## Quick Start
 
+Setup requires TPC-H data to be loaded first, then creates the transaction staging tables:
+
 ```python
 from benchbox import TransactionPrimitives
 import duckdb
@@ -184,6 +186,8 @@ Unlike Write Primitives, Transaction Primitives does not create audit log tables
 
 ## CLI Integration
 
+The commands below list the available benchmarks, run Transaction Primitives on DuckDB (which offers only limited transaction testing), and run specific operations. There are no `--categories` or `--operations` options. Select individual operations with `--queries`.
+
 ```bash
 benchbox benchmarks list
 
@@ -328,6 +332,8 @@ tpch.load_data_to_database(conn)
 
 ### Setup Staging Tables
 
+This is step 2 of the walkthrough, after loading TPC-H data:
+
 ```python
 bench = TransactionPrimitives(scale_factor=0.01)
 setup_result = bench.setup(conn, force=True)
@@ -336,7 +342,16 @@ print(f"Setup: {setup_result['success']}")
 print(f"Tables created: {setup_result['tables_created']}")
 ```
 
+Expected output:
+
+```text
+Setup: True
+Tables created: ['transaction_ops_orders', 'transaction_ops_lineitem']
+```
+
 ### Execute Single Operation
+
+`execute_operation` validates the result automatically.
 
 ```python
 result = bench.execute_operation("transaction_commit_small", conn)
@@ -346,10 +361,21 @@ print(f"Success: {result.success}")
 print(f"Rows affected: {result.rows_affected}")
 print(f"Duration: {result.write_duration_ms:.2f}ms")
 print(f"Validation passed: {result.validation_passed}")
+```
 
+Expected output (the duration varies):
+
+```text
+Operation: transaction_commit_small
+Success: True
+Rows affected: 10
+Duration: 15.34ms
+Validation passed: True
 ```
 
 ### Run Full Benchmark
+
+This runs all transaction operations and then prints the per-operation results:
 
 ```python
 results = bench.run_benchmark(conn)
@@ -484,7 +510,7 @@ results = bench.run_benchmark(conn, operation_ids=supported_ops)
 2. **Lock contention**: Concurrent transactions causing waits
 3. **Disk I/O**: Transaction durability requires disk writes
 
-**Optimization**:
+**Optimization**: Use smaller scale factors for faster testing.
 ```python
 bench = TransactionPrimitives(scale_factor=0.001)
 ```

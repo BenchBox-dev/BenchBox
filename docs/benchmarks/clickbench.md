@@ -537,6 +537,9 @@ print(f"\\nColumn Performance Analysis: {column_results}")
 
 ### ClickHouse Native Integration
 
+This example creates the ClickHouse table with settings suited to performance, loads the data with ClickHouse CSV
+import, runs all 43 ClickBench queries, and then calculates performance statistics.
+
 ```python
 import clickhouse_connect
 from benchbox import ClickBench
@@ -757,6 +760,11 @@ if successful_queries:
 
 ### Advanced-level Configuration
 
+The data generation options are `date_range_days` (the range of event dates), `user_count` (the number of unique
+users) and `enable_compression` (compress output files). The performance options are `partition_by_date` (partition
+by EventDate), `create_indices` (create performance indices) and `optimize_for_analytics` (analytics-configured
+generation).
+
 ```python
 clickbench = ClickBench(
     scale_factor=1.0,
@@ -795,6 +803,9 @@ clickbench = ClickBench(
 ### Performance Issues
 
 **Issue: Slow string operations**
+
+Solution: create appropriate indices and use configured string functions. The last statement shows a
+database-specific string optimization: `ILIKE` is a case-insensitive match.
 ```sql
 CREATE INDEX idx_hits_search_phrase ON hits(SearchPhrase);
 CREATE INDEX idx_hits_url ON hits USING hash(URL);
@@ -803,6 +814,10 @@ SELECT COUNT(*) FROM hits WHERE SearchPhrase ILIKE '%google%';
 ```
 
 **Issue: Memory exhaustion on complex queries**
+
+Solution: optimize memory usage and use incremental processing. `max_memory_usage` sets a 10GB limit, and
+`max_bytes_before_external_group_by` enables external aggregation (spilling to disk) above 5GB. You can also break
+down complex queries, as the final example does.
 ```sql
 SET max_memory_usage = 10000000000;
 SET max_bytes_before_external_group_by = 5000000000;
@@ -815,6 +830,9 @@ SELECT * FROM (
 ### Data Loading Issues
 
 **Issue: Slow data loading**
+
+Solution: use configured loading strategies. `compression='gzip'` compresses data for faster I/O, `batch_size`
+optimizes the batch size, and `parallel_loading=True` loads in parallel.
 ```python
 clickbench = ClickBench(
     scale_factor=1.0,
@@ -826,6 +844,9 @@ clickbench = ClickBench(
 ```
 
 **Issue: Schema mismatches across databases**
+
+Solution: use database-specific schema adaptations. The first statement is for PostgreSQL, the second for MySQL and
+the third for DuckDB.
 ```sql
 ALTER TABLE hits ALTER COLUMN EventTime TYPE TIMESTAMP;
 

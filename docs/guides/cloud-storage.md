@@ -29,6 +29,8 @@ uv add benchbox --extra cloud
 python -m pip install "benchbox[cloudstorage]"
 ```
 
+The first command installs cloud storage support (recommended). The second installs all cloud dependencies. The third uses pip. Keep the quotes, which most shells require.
+
 ## Authentication Setup
 
 ### AWS S3
@@ -40,6 +42,8 @@ export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
 export AWS_DEFAULT_REGION=us-west-2
 ```
+
+`AWS_DEFAULT_REGION` is optional.
 
 Alternative authentication methods:
 - AWS credentials file (`~/.aws/credentials`)
@@ -121,6 +125,8 @@ benchbox run --platform databricks --benchmark tpch --scale 1 \
              --output dbfs:/Volumes/workspace/benchbox/data
 ```
 
+The first command uses platform options, an alternative to `--output`. The second uses `--output` with the full UC Volume path.
+
 **Databricks Free Edition Workflow:**
 Free Edition workspaces are limited to UC Volumes (no external S3/Azure/GCS). BenchBox fully supports this:
 
@@ -129,6 +135,8 @@ benchbox run --platform databricks --benchmark tpch --scale 0.01 \
              --output dbfs:/Volumes/workspace/benchbox/data \
              --phases generate,load,power
 ```
+
+The volume is created automatically.
 
 Both the schema and UC Volume are automatically created if they don't exist - no manual setup required!
 
@@ -157,6 +165,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
              --output abfss://container@account.dfs.core.windows.net/benchbox/data
 ```
 
+The three commands write to AWS S3, Google Cloud Storage, and Azure Blob Storage, in that order.
+
 ### Output Path Normalization (Remote Paths)
 
 BenchBox normalizes remote output roots by appending the dataset suffix `<benchmark>_<sf>`.
@@ -171,6 +181,8 @@ benchbox run --platform databricks --benchmark tpch --scale 0.01 \
 benchbox run --platform duckdb --benchmark tpcds --scale 1.0 \
              --output s3://my-bucket/benchbox
 ```
+
+A UC Volume root auto-extends with the dataset suffix, so the first command's effective path is `dbfs:/Volumes/workspace/raw/source/tpch_sf01`. An S3 root behaves the same: the second command's effective path is `s3://my-bucket/benchbox/tpcds_sf1`.
 
 ### Python API
 
@@ -188,6 +200,8 @@ benchmark = TPCH(
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+The benchmark is created with cloud storage output, and its data is uploaded to S3 when the benchmark runs.
 
 ## Credential Validation
 
@@ -241,6 +255,8 @@ DuckDB can read directly from cloud storage:
 SELECT * FROM read_csv('s3://bucket/data/lineitem.tbl', delim='|', header=false)
 ```
 
+DuckDB handles cloud paths automatically.
+
 Configuration is handled automatically by the DuckDB adapter.
 
 ### BigQuery Integration
@@ -253,6 +269,8 @@ adapter = BigQueryAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
 
+BigQuery uses GCS for data staging automatically.
+
 ### Snowflake Integration
 
 Snowflake benchmarks use cloud storage stages:
@@ -262,6 +280,8 @@ benchmark = TPCH(output_dir="s3://my-bucket/snowflake-data")
 adapter = SnowflakeAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+Snowflake uses S3 or GCS stages for data loading.
 
 ## Best Practices
 

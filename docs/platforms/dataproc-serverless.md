@@ -19,8 +19,9 @@ Dataproc Serverless is Google Cloud's fully managed Apache Spark service that el
 
 ```bash
 uv add benchbox --extra dataproc-serverless
-
 ```
+
+The `dataproc-serverless` extra installs `google-cloud-dataproc` and `google-cloud-storage`.
 
 ## Prerequisites
 
@@ -43,6 +44,8 @@ export DATAPROC_REGION=us-central1
 export DATAPROC_RUNTIME_VERSION=2.1
 ```
 
+`GOOGLE_CLOUD_PROJECT` and `GCS_STAGING_DIR` are required. `DATAPROC_REGION` and `DATAPROC_RUNTIME_VERSION` are optional.
+
 ### CLI Usage
 
 ```bash
@@ -64,6 +67,8 @@ benchbox run --platform dataproc-serverless --benchmark tpch --dry-run ./preview
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://my-bucket/benchbox
 ```
+
+The four commands show basic usage, a custom region, a service account, and a dry run that previews queries.
 
 ### Platform Options
 
@@ -103,6 +108,8 @@ result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
 adapter.close()
 ```
+
+The example initializes the adapter with a project and staging directory, verifies the connection, creates the schema, loads data to GCS and creates tables, executes a query as a Serverless batch, and cleans up.
 
 ## Execution Model
 
@@ -151,6 +158,8 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 gcloud auth application-default login --impersonate-service-account=SA@PROJECT.iam.gserviceaccount.com
 ```
 
+The first command points to a service account key. The second uses service account impersonation instead.
+
 ### Compute Engine (GCE/GKE)
 
 No configuration needed - automatically uses instance service account.
@@ -193,6 +202,8 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="user:USER@DOMAIN.COM" \
   --role="roles/storage.objectAdmin"
 ```
+
+The first command grants Dataproc permissions. The second grants storage permissions.
 
 ## VPC Configuration
 

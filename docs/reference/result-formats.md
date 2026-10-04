@@ -17,6 +17,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1
 ls benchmark_runs/results/
 ```
 
+Results are saved automatically to `benchmark_runs/results/`, with file names such as `tpch_duckdb_sf0.01_20251212_143021.json`.
+
 ### Export to Other Formats
 
 ```bash
@@ -27,6 +29,8 @@ benchbox export --last --format csv --format html
 benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json --format csv --format html
 ```
 
+The first command exports the most recent result to CSV, the second exports to several formats, and the third exports a specific result file.
+
 ### Custom Output Directory
 
 ```bash
@@ -34,6 +38,8 @@ benchbox run --platform duckdb --benchmark tpch --output ./my_results/
 
 benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 ```
+
+The first command writes to a local directory and the second writes to cloud storage.
 
 ## JSON Format (Schema v2.2)
 
@@ -417,6 +423,8 @@ benchbox visualize benchmark_runs/results/*.json --chart-type performance_bar
 benchbox visualize benchmark_runs/results/*.json --no-color > charts.txt
 ```
 
+The first command auto-detects the latest result and renders all applicable charts. The second visualizes a specific result file, the third renders one chart type, and the last saves plain-text output to a file.
+
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.
 
 ## Loading Results in Python
@@ -477,6 +485,8 @@ benchbox visualize duckdb_result.json sqlite_result.json --template head_to_head
 
 benchbox visualize tpcds_result.json --chart-type query_histogram
 ```
+
+The first command renders all applicable charts for a result file. The second compares multiple platforms, and the third draws a per-query histogram (split automatically for large benchmarks).
 
 ### Python API Visualization
 
@@ -571,6 +581,8 @@ config = AnonymizationConfig(
 exporter = ResultExporter(anonymize=True, anonymization_config=config)
 ```
 
+`machine_id_salt` scopes pseudonyms derived from raw values to your organization, so the same machine publishes different pseudonyms under different salts. See the salt-rotation note below for what this does not cover. `custom_sanitizers` lists extra regexes stripped from free-text fields, on top of the built-in IP, email and SSN patterns.
+
 #### Default salt and residual confirmation oracle
 
 `machine_id_salt` defaults to empty. With the empty default, anyone who knows
@@ -613,6 +625,8 @@ b.anonymize_result_payload({"machine_id": raw})
 b.anonymize_result_payload({"machine_id": "machine_9ba319f754a5"})
 ```
 
+The first call returns `machine_9ba319f754a5` and the second returns `machine_ac228f1f75af`, so different salts give different pseudonyms for the same raw value. In the third call, B re-anonymizes A's already-published bundle and the result is unchanged (`machine_9ba319f754a5`), because B's salt is never applied.
+
 So changing the salt does **not** re-pseudonymize an already-anonymized corpus.
 New captures adopt the new salt while stored bundles keep the old pseudonyms,
 which splits one machine across two identities. Rotating the salt therefore
@@ -646,8 +660,9 @@ for q in results['queries']:
     })
 
 df = pd.DataFrame(queries)
-
 ```
+
+From here you can upload the DataFrame to a warehouse, for example with `df.to_sql('benchmark_queries', engine, if_exists='append')`.
 
 ### CI/CD Integration
 

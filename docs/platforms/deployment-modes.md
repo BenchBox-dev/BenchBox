@@ -37,6 +37,8 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1
 
 ### Platform-Specific Examples
 
+ClickHouse runs locally (chDB), on a self-hosted server, or in ClickHouse Cloud, each as its own platform. Firebolt has a local Docker mode (`core`) and a cloud mode (`cloud`). TimescaleDB runs self-hosted by default, or in Timescale Cloud with `timescaledb:cloud`. MotherDuck and Starburst are standalone cloud platforms that support managed mode only.
+
 ```bash
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.1
@@ -110,6 +112,8 @@ uv add benchbox --extra clickhouse-local
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 ```
 
+Installing the extra pulls in chDB.
+
 **Characteristics:**
 - No server installation required
 - In-process execution using chDB
@@ -136,6 +140,8 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0 \
     --platform-option username=benchuser \
     --platform-option password=secret
 ```
+
+The first run uses the environment variables. The second passes the same settings inline as platform options.
 
 **Connection Parameters:**
 
@@ -165,6 +171,8 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
     --platform-option host=abc123.us-east-2.aws.clickhouse.cloud \
     --platform-option password=your-password
 ```
+
+`CLICKHOUSE_CLOUD_USER` is optional and defaults to `default`. The second run passes the connection settings inline as platform options.
 
 **Connection Parameters:**
 
@@ -205,6 +213,8 @@ benchbox run --platform firebolt:core --benchmark tpch --scale 0.1 \
     --platform-option url=http://localhost:3473
 ```
 
+The `docker run` command starts Firebolt Core, `uv add` installs the SDK, and the last command runs the benchmark against it.
+
 **Configuration:**
 
 | Parameter | Default | Description |
@@ -239,6 +249,8 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
     --platform-option account_name=your-account \
     --platform-option engine_name=your-engine
 ```
+
+The `SERVICE_ACCOUNT_ID` and `SERVICE_ACCOUNT_SECRET` variables are alternative names for the client ID and secret, and are also supported. The second run passes the settings inline as platform options.
 
 **Connection Parameters:**
 
@@ -300,6 +312,8 @@ export TIMESCALE_USER=tsdbadmin
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 1.0
 ```
 
+Set either the service URL (preferred) or the individual host and password variables. `TIMESCALE_USER` is optional and defaults to `tsdbadmin`.
+
 **Connection Parameters:**
 
 | Parameter | Environment Variable | Default | Description |
@@ -337,6 +351,8 @@ benchbox run --platform motherduck --benchmark tpch --scale 1.0
 benchbox run --platform motherduck --benchmark tpch --scale 1.0 \
     --platform-option token=your-token
 ```
+
+The DuckDB package includes MotherDuck support. The first run reads the token from the environment; the second passes it inline.
 
 **Configuration:**
 
@@ -417,8 +433,9 @@ make uat-bring-up PLATFORM=lakesail
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
-
 ```
+
+The extra installs the Spark Connect-capable PySpark client, `make uat-bring-up` starts the local Docker-backed Sail server, and the two runs are the SQL and DataFrame benchmarks. Endpoint and tuning overrides need the Python adapter (see the LakeSail Platform Guide); LakeSail registers no `--platform-option` keys.
 
 ### Distributed Mode
 
@@ -475,6 +492,8 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option offheap_size=8g
 ```
 
+The Velox extra pulls in `pyspark[connect]>=3.5.0`. Provide the Gluten bundle jar yourself; see `velox_jar_setup.md` for release tarballs and verification steps.
+
 The adapter sets the mandatory Gluten configuration automatically:
 
 - `spark.plugins = org.apache.gluten.GlutenPlugin`
@@ -500,6 +519,8 @@ benchbox run --platform velox --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
+
+The `docker compose` command starts the Gluten-enabled Spark Connect server (the provided Docker image), and the `benchbox run` command drives the benchmark from the host.
 
 **Configuration Reference:**
 
@@ -566,6 +587,16 @@ cap = PlatformRegistry.get_deployment_capability("clickhouse", "server")
 needs_storage = PlatformRegistry.requires_cloud_storage_for_deployment("clickhouse", "server")
 ```
 
+For the base ClickHouse platform, these calls return:
+
+- `get_available_deployment_modes`: `['local', 'server']`
+- `get_default_deployment`: `'local'`
+- `supports_deployment_mode("clickhouse", "server")`: `True`
+- `get_deployment_capability("clickhouse", "server")`: `DeploymentCapability(mode='self-hosted', requires_credentials=True, ...)`
+- `requires_cloud_storage_for_deployment("clickhouse", "server")`: `False`
+
+ClickHouse Cloud is a separate first-class platform, not a deployment mode. Use `--platform clickhouse-cloud` (see `clickhouse-cloud.md`).
+
 ### Platform Family and Inheritance
 
 Platforms can inherit SQL dialect and configuration from parent platforms:
@@ -577,6 +608,8 @@ parent = PlatformRegistry.get_inherited_platform("motherduck")
 
 parent = PlatformRegistry.get_inherited_platform("starburst")
 ```
+
+`get_platform_family("motherduck")` returns `'duckdb'` and is used for dialect inheritance. `get_inherited_platform` is used for configuration inheritance: it returns `'duckdb'` for MotherDuck and `'trino'` for Starburst.
 
 ---
 
@@ -615,6 +648,8 @@ benchbox setup --platform snowflake
 
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
+
+`benchbox setup` saves credentials securely, and later runs load them automatically.
 
 ### Platform-Specific Notes
 
@@ -659,6 +694,8 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -v
 
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -vv
 ```
+
+`-vv` is very verbose and includes connection parameters.
 
 ---
 

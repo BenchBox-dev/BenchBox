@@ -139,6 +139,8 @@ result = benchmark.run_official_benchmark(
 
 ### Individual Phases
 
+The first call runs the Power Test only. The second runs the Throughput Test only.
+
 ```python
 result = benchmark.run_official_benchmark(
     connection_string="your_connection",
@@ -157,6 +159,8 @@ result = benchmark.run_official_benchmark(
 ```
 
 ### Custom Configuration
+
+This example uses advanced-level configuration:
 
 ```python
 result = benchmark.run_official_benchmark(
@@ -308,7 +312,11 @@ After running the Maintenance Test, **you must reload the database** before runn
 
 #### Complete Code Example
 
-Here's how to properly structure your benchmark workflow with database reload:
+Here's how to properly structure your benchmark workflow with database reload. The workflow has three steps:
+
+1. Run the Power and Throughput tests on clean data.
+2. Reload the database before the Maintenance Test, so the maintenance operations start with clean data.
+3. Run the Maintenance Test, which permanently modifies the data. The database then contains modified data.
 
 ```python
 from benchbox.tpcds import TPCDS
@@ -351,7 +359,8 @@ print("=" * 70)
 
 #### CLI Usage
 
-Run the Maintenance Test using the BenchBox CLI:
+Run the Maintenance Test using the BenchBox CLI. The first command is the complete workflow up to the Throughput
+Test. The second reloads the database before running maintenance:
 
 ```bash
 benchbox run \
@@ -579,6 +588,9 @@ class CustomDatabaseBenchmark(TPCDSBenchmark):
 
 ### Performance Tuning
 
+For large scale factors, increase the number of parallel processes (`parallel=8`). For many streams, use high
+concurrency (`num_streams=16`). Skip the Maintenance Test if you do not need it.
+
 ```python
 benchmark = TPCDSBenchmark(
     scale_factor=100.0,
@@ -596,6 +608,8 @@ result = benchmark.run_official_benchmark(
 ```
 
 ### Integration with CI/CD
+
+The example fails the job when `qphds_size` drops below a minimum threshold. The value of 100 is an example.
 
 ```python
 import sys
@@ -643,6 +657,9 @@ for sf, qphds in results:
 
 #### 1. Database Connection Issues
 
+If the connection fails, check the connection string format, verify that the database is running, and check the
+credentials.
+
 ```python
 try:
     result = benchmark.run_official_benchmark(connection_string)
@@ -651,6 +668,8 @@ except Exception as e:
 ```
 
 #### 2. Memory Issues with Large Scale Factors
+
+For large scale factors, reduce the number of parallel processes (`parallel=1`) and monitor memory usage:
 
 ```python
 benchmark = TPCDSBenchmark(
@@ -664,6 +683,8 @@ print(f"Memory usage: {psutil.virtual_memory().percent}%")
 ```
 
 #### 3. Query Timeouts
+
+Increase the timeout for slow queries. The value is in seconds, so 7200 is 2 hours:
 
 ```python
 benchmark.timeout_seconds = 7200
@@ -683,6 +704,8 @@ if result.validation_results.get('issues'):
 
 ### Debug Mode
 
+Enable debug logging and verbose benchmark execution:
+
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -692,6 +715,8 @@ result = benchmark.run_official_benchmark(connection_string)
 ```
 
 ### Error Recovery
+
+This function retries a failed run, waiting 60 seconds between attempts:
 
 ```python
 def robust_benchmark_run(connection_string, max_retries=3):
@@ -711,6 +736,9 @@ def robust_benchmark_run(connection_string, max_retries=3):
 
 ### 1. Scale Factor Selection
 
+Choose a scale factor that matches the purpose. The approximate data sizes are 10MB for `development`, 100MB for
+`testing`, 1GB for `small`, 10GB for `medium`, 100GB for `large` and 1TB for `enterprise`.
+
 ```python
 scale_factors = {
     "development": 0.01,
@@ -725,6 +753,8 @@ benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
 ```
 
 ### 2. Resource Management
+
+The context manager cleans up the temporary directory automatically, so the `finally` block has nothing to do:
 
 ```python
 with tempfile.TemporaryDirectory() as temp_dir:
@@ -779,6 +809,9 @@ def archive_results(result):
 ```
 
 ### 5. Continuous Benchmarking
+
+The loop runs every hour (`time.sleep(3600)`) against your own baseline `qphds_size`, and alerts when the result falls
+more than 5% below it:
 
 ```python
 def continuous_benchmark():

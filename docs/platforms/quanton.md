@@ -29,6 +29,8 @@ pip install requests boto3
 pip install "benchbox[quanton]"
 ```
 
+Install the required dependencies directly, or through the BenchBox extra.
+
 ## Configuration
 
 ### Environment Variables (Recommended)
@@ -88,6 +90,8 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option precombine_field=l_shipdate
 ```
 
+Hudi requires `record_key` for write operations.
+
 ### Delta Lake
 
 ```bash
@@ -124,6 +128,8 @@ for format in iceberg hudi delta; do
     --output results/quanton_${format}.json
 done
 ```
+
+The loop compares performance across table formats.
 
 ### Python API
 
@@ -168,6 +174,8 @@ The record key uniquely identifies each record for ACID operations:
 --platform-option record_key=o_orderkey
 ```
 
+For the TPC-H `lineitem` table use a composite key, and for `orders` use its primary key.
+
 ### Precombine Field
 
 The precombine field orders records during deduplication:
@@ -175,6 +183,8 @@ The precombine field orders records during deduplication:
 ```bash
 --platform-option precombine_field=l_shipdate
 ```
+
+This example uses a date field for ordering.
 
 ### Table Type
 
@@ -185,6 +195,8 @@ Choose between COPY_ON_WRITE (faster reads) or MERGE_ON_READ (faster writes):
 
 --platform-option hudi_table_type=MERGE_ON_READ
 ```
+
+`COPY_ON_WRITE` is the default and suits analytics workloads. `MERGE_ON_READ` suits write-heavy workloads.
 
 ## Cost Optimization
 
@@ -210,9 +222,13 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/data
 ```
 
+The first run uploads the data. Subsequent runs skip the upload.
+
 ## Troubleshooting
 
 ### Authentication Failed
+
+Verify that the API key is valid:
 
 ```bash
 curl -H "Authorization: Bearer $ONEHOUSE_API_KEY" \
@@ -238,7 +254,7 @@ benchbox run --platform quanton --benchmark tpch --scale 100.0 \
 
 ### Hudi Write Failures
 
-Ensure record_key is specified for Hudi format:
+Ensure record_key is specified for Hudi format. Without it, the run fails with a "No record_key configured" error. Fix it by adding the `record_key` parameter:
 
 ```bash
 --platform-option record_key=primary_key_column

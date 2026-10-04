@@ -24,6 +24,8 @@ The Write Read Primitives benchmark tests fundamental database write operations 
 Quick Start
 -----------
 
+Load the TPC-H data first; it is required. Then set up Write Primitives and execute operations.
+
 .. code-block:: python
 
     from benchbox import TPCH, WritePrimitives
@@ -278,6 +280,8 @@ Get list of available categories.
 
     categories = bench.get_operation_categories()
 
+The returned list is ``['insert', 'update', 'delete', 'ddl', 'transaction']``.
+
 **get_queries(dialect=None) -> dict[str, str]**
 
 Get all write operation SQL.
@@ -503,6 +507,8 @@ Error Handling and Recovery
         bench.reset(conn)
         result = bench.execute_operation("insert_batch_values_10", conn)
 
+Reset the staging tables to recover from an operation failure. After a validation failure, reset and retry.
+
 Best Practices
 --------------
 
@@ -521,6 +527,8 @@ Best Practices
        bench = WritePrimitives(scale_factor=1.0)
        bench.setup(conn)
 
+   The first two statements are wrong: ``setup`` fails because the TPC-H tables are not found. Load the TPC-H data first, as the remaining statements show.
+
 2. **Check Setup Status**
 
    .. code-block:: python
@@ -535,6 +543,8 @@ Best Practices
        result = bench.execute_operation("insert_single_row", conn, use_transaction=True)
 
        result = bench.execute_operation("ddl_create_table_simple", conn, use_transaction=False)
+
+   With ``use_transaction=True``, cleanup is automatic through a rollback. DDL operations cannot be rolled back, so use ``use_transaction=False`` and clean up manually.
 
 4. **Reset Between Test Runs**
 
@@ -687,6 +697,8 @@ Platform capabilities for write operations:
         supported_compressions: list[str]
         supports_partitioning: bool = False
         supports_sorting: bool = True
+
+``supported_compressions`` lists codecs such as ``["zstd", "snappy", "gzip"]``.
 
 See Also
 --------

@@ -20,6 +20,8 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 
 ## Quick Start
 
+The commands below install the Spark Connect-capable PySpark client, start a local Docker-backed Sail Spark Connect server, check client and endpoint readiness without starting a server, and then run the SQL and DataFrame benchmarks.
+
 ```bash
 uv add benchbox --extra lakesail
 
@@ -97,6 +99,8 @@ adapter = LakeSailAdapter(
 
 ### SQL Mode
 
+The examples below run TPC-H at scale factor 1, TPC-DS at scale factor 10, a subset of TPC-H queries, and a dry run that previews execution. `driver_memory` and `shuffle_partitions` are adapter parameters, not CLI options.
+
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
@@ -109,13 +113,15 @@ benchbox run --dry-run ./preview --platform lakesail --benchmark tpch
 
 ### DataFrame Mode
 
+A custom endpoint or driver memory needs the Python adapter shown below.
+
 ```bash
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
 ### Comparison with Apache Spark
 
-Run the same benchmark on both platforms to compare performance:
+Run the same benchmark on LakeSail Sail and on Apache Spark, then compare the results:
 
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
@@ -208,7 +214,7 @@ LakeSail supports the following tuning types:
 
 ### Local Mode
 
-Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks.
+Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks. `local` is the default `sail_mode`.
 
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
@@ -221,7 +227,7 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 ### Distributed Mode
 
-Multi-node cluster execution for large-scale benchmarks.
+Multi-node cluster execution for large-scale benchmarks. Distributed mode is selected through the Python adapter (`sail_mode="distributed"`, `sail_workers=4`), not through the CLI command below.
 
 ```bash
 benchbox run --platform lakesail --benchmark tpch --scale 100.0

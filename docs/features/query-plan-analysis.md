@@ -21,6 +21,8 @@ BenchBox supports capturing, analyzing, and comparing query execution plans acro
 
 ## Quick Start
 
+The commands run a benchmark with plan capture, view a specific plan, and compare plans between two runs.
+
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
@@ -270,7 +272,8 @@ benchbox show-plan \
 
 ### Visualization Options
 
-Control tree display:
+Control tree display. The first command is a compact view without operator properties. The second limits the tree
+depth for very complex plans.
 
 ```bash
 benchbox show-plan --run results.json --query-id q05 --compact --no-properties
@@ -457,7 +460,8 @@ print(f"Total scans: {num_scans}")
 
 ### Plan Fingerprints
 
-Use fingerprints for fast plan comparison:
+Use fingerprints for fast plan comparison. The example checks whether two plans are identical, groups queries by
+plan, and finds queries that share the same plan.
 
 ```python
 if plan1.plan_fingerprint == plan2.plan_fingerprint:
@@ -488,7 +492,7 @@ for fp, query_ids in plans_by_fingerprint.items():
 2. Platform doesn't support plan capture
 3. Parser error (check logs for details)
 
-**Solution**:
+**Solution**: ensure `--capture-plans` is included, and check which platforms support capture:
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
@@ -568,6 +572,9 @@ To compare costs/estimates, examine the JSON export directly.
 
 ### Cross-Platform Analysis
 
+The first two commands run the same benchmark on different platforms. The `compare` commands compare the plans, and
+the second shows only the most-changed plans.
+
 ```bash
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 benchbox run --platform datafusion --benchmark tpch --scale 1 --capture-plans
@@ -581,6 +588,8 @@ benchbox compare benchmark_runs/duckdb_*/results.json \
 ```
 
 ### Regression Testing
+
+This is an automated regression check. The `if` block checks the exit code of `benchbox compare`.
 
 ```bash
 benchbox compare baseline.json current.json \
@@ -677,6 +686,8 @@ while preserving identifiers, so structurally identical queries with different
 constants share a normalized fingerprint.
 
 The capability is also available programmatically:
+
+`plan_fingerprint` is literal-sensitive (the default). `normalized_fingerprint` is literal-normalized.
 
 ```python
 plan.plan_fingerprint

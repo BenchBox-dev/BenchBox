@@ -128,12 +128,16 @@ benchbox run --platform redshift --benchmark tpch --scale 1.0
 
 ### With S3 Staging
 
+Staging through S3 configures the COPY command. The IAM role is part of the stored Redshift credentials:
+
 ```bash
 benchbox run --platform redshift --benchmark tpch --scale 100.0 \
   --output s3://your-bucket/benchbox/
 ```
 
 ### With Tuning
+
+This applies distribution and sort keys:
 
 ```bash
 benchbox run --platform redshift --benchmark tpch --scale 10.0 \
@@ -179,6 +183,8 @@ results = adapter.run_benchmark(benchmark)
 
 ### Serverless
 
+Use serverless for variable workloads:
+
 ```bash
 benchbox run --platform redshift --benchmark tpch \
   --platform-option workgroup_name=benchbox-wg
@@ -188,7 +194,7 @@ benchbox run --platform redshift --benchmark tpch \
 
 ### Distribution Keys
 
-BenchBox applies distribution keys with `--tuning tuned`:
+BenchBox applies distribution keys with `--tuning tuned`. Large tables use key distribution, and small tables use `DISTSTYLE ALL`:
 
 ```sql
 CREATE TABLE lineitem (...)
@@ -201,6 +207,8 @@ DISTSTYLE ALL;
 
 ### Sort Keys
 
+A compound sort key suits queries that filter on the leading columns. An interleaved sort key suits queries that filter on multiple columns:
+
 ```sql
 CREATE TABLE orders (...)
 COMPOUND SORTKEY (o_orderdate, o_custkey);
@@ -211,7 +219,7 @@ INTERLEAVED SORTKEY (l_shipdate, l_receiptdate);
 
 ### WLM Configuration
 
-BenchBox uses dedicated queue for benchmark queries:
+BenchBox uses dedicated queue for benchmark queries. This command configures the WLM queue:
 
 ```bash
 benchbox run --platform redshift --benchmark tpch \
@@ -229,6 +237,8 @@ benchbox run --platform redshift --benchmark tpch --scale 10.0 \
 ```
 
 ### IAM Role Setup
+
+These commands create an IAM role for COPY, attach an S3 read policy, and associate the role with the cluster:
 
 ```bash
 aws iam create-role --role-name RedshiftS3Access \
@@ -254,12 +264,16 @@ benchbox run --platform redshift --benchmark tpch --scale 0.01
 
 ### Concurrency Scaling
 
+Enable concurrency scaling for burst capacity:
+
 ```bash
 benchbox run --platform redshift --benchmark tpch \
   --platform-option concurrency_scaling=auto
 ```
 
 ### Pause/Resume
+
+Pause the cluster when not in use, and resume it before a benchmark:
 
 ```bash
 aws redshift pause-cluster --cluster-identifier my-cluster
@@ -268,6 +282,8 @@ aws redshift resume-cluster --cluster-identifier my-cluster
 ```
 
 ### Serverless RPU
+
+Set a maximum RPU to control costs:
 
 ```bash
 benchbox run --platform redshift --benchmark tpch \
@@ -278,6 +294,8 @@ benchbox run --platform redshift --benchmark tpch \
 ## Troubleshooting
 
 ### Connection Refused
+
+Check the cluster status, verify that the security group allows your IP, and add your IP to the security group if it does not:
 
 ```bash
 aws redshift describe-clusters --cluster-identifier my-cluster
@@ -293,6 +311,8 @@ aws ec2 authorize-security-group-ingress \
 
 ### COPY Failed
 
+Check the COPY errors, verify that the IAM role is attached, and test S3 access:
+
 ```bash
 SELECT * FROM stl_load_errors ORDER BY starttime DESC LIMIT 10;
 
@@ -305,6 +325,8 @@ WHERE bucket = 'your-bucket';
 
 ### Permission Denied
 
+Grant the required permissions:
+
 ```sql
 GRANT CREATE ON DATABASE dev TO benchbox_user;
 GRANT CREATE ON SCHEMA public TO benchbox_user;
@@ -313,12 +335,16 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO benchbox_user;
 
 ### Query Timeout
 
+Increase the statement timeout. The value is in milliseconds, so `3600000` is 1 hour:
+
 ```bash
 benchbox run --platform redshift --benchmark tpch \
   --platform-option statement_timeout=3600000
 ```
 
 ### Disk Space Exceeded
+
+Check disk usage, then vacuum to reclaim space:
 
 ```bash
 SELECT owner, host, diskno, used, capacity

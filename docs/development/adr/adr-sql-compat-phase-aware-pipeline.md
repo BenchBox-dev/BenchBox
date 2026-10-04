@@ -138,6 +138,15 @@ class CompatibilityContext:
     dialect: str | None
 ```
 
+Field notes:
+
+- `platform` is a platform name such as `"starrocks"` or `"clickhouse"`.
+- `platform_version` is a version such as `"3.2.1"`, or `None` if not known.
+- `benchmark` is a benchmark name such as `"h2odb"` or `"write_primitives"`.
+- `query_id` is an ID such as `"Q9"`, or `None` for non-query phases.
+- `phase` is one of the provisional `Phase` enum values.
+- `dialect` is a sqlglot dialect string, or `None` for non-SQL paths.
+
 ### SupportLevel
 
 ```python
@@ -150,6 +159,14 @@ class SupportLevel(str, Enum):
     SKIPPED_DDL_FRAGMENT = "SKIPPED_DDL_FRAGMENT"
     BLOCKED             = "BLOCKED"
 ```
+
+- `NATIVE`: works without modification.
+- `TRANSLATED`: requires sqlglot translation.
+- `REWRITTEN`: requires an additional AST or string rewrite.
+- `INFORMATIONAL`: runs, but a platform guarantee is not enforced (renamed from `DEGRADED`).
+- `SKIPPED_QUERY`: the query is omitted from the result set.
+- `SKIPPED_DDL_FRAGMENT`: auxiliary DDL is suppressed and the workload runs.
+- `BLOCKED`: the platform and benchmark combination is unsupported.
 
 > **Addendum (2026-04-26):** `DEGRADED` was renamed to `INFORMATIONAL` and `SKIPPED` was split
 > into `SKIPPED_QUERY` / `SKIPPED_DDL_FRAGMENT`. See the Addendum section at the end of this ADR.
@@ -164,6 +181,8 @@ class FailureMode(str, Enum):
     UNSUPPORTED_FEATURE  = "UNSUPPORTED_FEATURE"
     PERFORMANCE_REGRESSION = "PERFORMANCE_REGRESSION"
 ```
+
+`NONE` means no failure is expected. `SILENT_CORRUPTION` means the query runs but returns wrong results (for example, the StarRocks PK case below).
 
 ### Typed Action Payloads
 
@@ -223,6 +242,13 @@ CompatPayload = Union[
 ]
 ```
 
+Field notes:
+
+- `SelectVariantPayload.variant_key` is a key into the benchmark's variant dict (for example `"clickhouse"`), and `variant_sql` is the SQL text already in the target dialect.
+- `transformer_id` is a registry key that resolves to a `Callable[[str], str]` at runtime.
+- `SetSessionPolicyPayload.settings` holds key-value pairs emitted before the query, and `issue_url` links to documentation of why an AST rewrite is not viable.
+- `None` is the `NATIVE` action's payload, because it carries no payload.
+
 ### CompatibilityDecision
 
 ```python
@@ -235,6 +261,8 @@ class CompatibilityDecision:
     payload: CompatPayload
     reason: str
 ```
+
+`rule_id` has the form `"{phase}.{platform}.{scope}.{slug}"`. `payload` is typed per action, and is `None` for `NATIVE`. `reason` is a human-readable rationale.
 
 ### Structured Capability Example - StarRocks PK
 
@@ -309,6 +337,12 @@ def compat_local(
 ) -> Callable:
     pass
 ```
+
+`compat_local` marks a callable as containing legitimate local platform-specific rendering. It exempts the callable from the `compat_lint` "unregistered dialect branch" rule, and it does not register a rule in the registry. The arguments are:
+
+- `kind`: category of local rendering (`type_mapping`, `storage_layout` or `rendering`).
+- `platform_specific`: `True` if the branch is specific to one platform.
+- `reason`: why this is legitimate local rendering, not unregistered policy.
 
 ### When to Use @compat_local vs Register a Rule
 
@@ -525,6 +559,8 @@ class CompilationPlan:
     def get(self, query_id: str | None, phase: Phase) -> CompatibilityDecision | None:
         return self.decisions.get((query_id, phase)) or self.decisions.get((None, phase))
 ```
+
+`PhasedDecision` is one resolved decision keyed by `(query_id | None, Phase)`. In `CompilationPlan.decisions`, the outer key is the query ID (`None` applies to all queries in the phase), the inner key is the `Phase`, and the value is the winning `CompatibilityDecision` after specificity resolution. `get` returns the decision for `(query_id, phase)`, falling back to `(None, phase)`.
 
 `CompilationPlan` is not frozen because it is populated incrementally by the resolver during plan
 construction. Once the resolver hands it to the benchmark runner it must not be mutated; the
