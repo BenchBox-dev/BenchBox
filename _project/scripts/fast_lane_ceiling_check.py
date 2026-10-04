@@ -53,19 +53,6 @@ FAST_LANE_DELTA_WARN_THRESHOLD = 75
 
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
-# Composition grace (merge queue only). Independently green PRs can compose over
-# the ceiling in one merge group; ejecting the group blames PRs that each fit,
-# and re-queueing repeats the failure until someone bumps the ceiling. The
-# repository's approved native queue permits five entries per merge group, so
-# the grace covers one delta limit for every possible queued entry rather than
-# assuming a one-PR group.
-#
-# The grace applies only to merge_group events, which no longer occur once the
-# develop ruleset has no merge queue. The value is an explicit CLI flag, not an
-# environment variable: ci.yml runs the PR's own workflow file, so an env-var
-# decision could be self-granted by editing the workflow. The pull_request lane
-# passes no grace, so a PR whose own merge ref crosses still fails there, and the
-# nightly ratchet files the bump issue once headroom is negative.
 MAX_MERGE_QUEUE_ENTRIES = 5
 MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD * MAX_MERGE_QUEUE_ENTRIES
 

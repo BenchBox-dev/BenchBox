@@ -35,9 +35,6 @@ from ruleset_review_enforcement import (  # noqa: E402
 # `tag_creation_findings`).
 WARNING_PREFIX = "WARNING (non-blocking): "
 
-# The develop-squash-only ruleset (id 15611785) requires current-base status
-# checks and code-owner review. The runbook parser and comparison below enforce
-# both policies; the explicit review override remains available for fixtures.
 DEVELOP_REVIEW_RULE_ENFORCED = True
 
 PYPI_ENVIRONMENT = "pypi"
@@ -338,9 +335,6 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
-# The approved develop policy merges with required checks and auto-merge, with
-# no merge queue, per _project/decisions/merge-queue-retirement-2026-10-03.md.
-# A merge_queue rule reappearing is drift for operator action, never repaired.
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "core",
     "explorer",
@@ -353,22 +347,14 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
 
 
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
-    """Report a merge_queue rule on a ruleset whose approved policy has none."""
     if _rule_by_type(live, "merge_queue") is None:
         return []
     return [f"{name}: a merge_queue rule is present; the approved develop policy has no merge queue"]
 
 
 def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None) -> list[str]:
-    """Return every finding that prevents queue-aware stale publication.
-
-    The local landing path needs more than the queue parameter object: required
-    checks, strict current-base enforcement, and the no-bypass/review
-    protections must still be visible on the same develop ruleset. A warning
-    or an unreadable payload is therefore never a verified queue.
-    """
     if live is None:
-        return [f"{expected.name}: live ruleset is missing; queue-aware publication is unverified"]
+        return [f"{expected.name}: live ruleset is missing; develop policy is unverified"]
     findings = compare_ruleset(
         expected,
         live,
@@ -379,7 +365,6 @@ def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None
 
 
 def queue_policy_verified(expected: ExpectedRuleset, live: dict[str, Any] | None) -> bool:
-    """Return true only for a complete, visible, approved queue configuration."""
     return not queue_policy_findings(expected, live)
 
 
@@ -417,7 +402,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--queue-policy",
         action="store_true",
-        help="Check only the develop queue and its required protections for local stale-base publication.",
+        help="Compatibility mode: check only the approved develop ruleset and its required protections.",
     )
     parser.add_argument(
         "--require-bypass-actor-visibility",
@@ -479,9 +464,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.output:
                 args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
             if verified:
-                print("# Native merge queue - VERIFIED")
+                print("# Develop ruleset policy - VERIFIED")
                 return 0
-            print("# Native merge queue - UNVERIFIED", file=sys.stderr)
+            print("# Develop ruleset policy - UNVERIFIED", file=sys.stderr)
             for finding in queue_findings:
                 print(f"- {finding}", file=sys.stderr)
             return 1
