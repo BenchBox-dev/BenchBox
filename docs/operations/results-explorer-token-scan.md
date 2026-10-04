@@ -1,8 +1,9 @@
 # Results Explorer — Token-Scan Gate
 
 The Results Explorer retheme moves public surfaces onto CSS-variable tokens
-defined in `results-explorer/src/index.css` and the shared static theme at
-`landing/shared/site-theme.css`. This gate keeps the contract durable: a PR
+defined in the single shared token file `landing/shared/site-tokens.css`
+(consumed by `website/`, the Results Explorer and the landing page) and the
+legacy static theme at `landing/shared/site-theme.css`. This gate keeps the contract durable: a PR
 that reintroduces a raw Tailwind palette literal (`text-gray-700`,
 `bg-blue-500`, `border-red-300`, …), arbitrary color literal, SVG hex color,
 or raw `rgb()` / `rgba()` value breaks CI rather than ships silently.

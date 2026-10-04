@@ -158,6 +158,7 @@ framing:
 # tracker item `parity-check-develop-ring`.
 viz:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "tests/parity/**"
   - "_project/scripts/explorer_pipeline/**"
 
@@ -166,6 +167,7 @@ viz:
 # and publication workflow changes can all invalidate Vitest expectations.
 explorer-vitest:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "_project/scripts/explorer_pipeline/**"
   - "_project/scripts/explorer_publish.py"
   - "results-data/**"
@@ -182,6 +184,7 @@ explorer-vitest:
 # surface, not e2e fixtures, read-model inputs, or publication scripts.
 explorer-tokens:
   - "results-explorer/src/**"
+  - "landing/shared/site-tokens.css"
 
 # Public site theme token contract. The scan reads these files directly, so it
 # must run when any of them changes even if no Explorer source file changed.
@@ -211,3 +214,18 @@ site:
   - "uv.lock"
   - ".github/workflows/ci.yml"
   - ".github/path-filters.yml"
+
+site-parity:
+  - "docs/**"
+  - "website/**"
+  - "landing/**"
+  - "results-explorer/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "_project/design/site-inventory/**"
+  - "scripts/site_inventory.py"
+  - "scripts/site_parity.py"
+  - "scripts/assemble_public_site.py"
+  - "scripts/publication/check_artifact_privacy.py"
+  - "make/documentation.mk"
+  - ".github/workflows/ci.yml"

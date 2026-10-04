@@ -654,11 +654,12 @@ lint-imports:
 
 # Token-scan gate for the Results Explorer retheme: fails when raw Tailwind
 # palette literals (text-/bg-/border-/...-{slate|gray|...}-{50..950}) appear
-# under results-explorer/src outside an explicit allowlist marker. Stdlib-only
-# so no dependency sync is required before the gate runs.
+# under results-explorer/src or the shared token file landing/shared/site-tokens.css
+# outside an explicit allowlist marker. Stdlib-only so no dependency sync is
+# required before the gate runs.
 .PHONY: lint-explorer-tokens
 lint-explorer-tokens:
-	python3 _project/scripts/scan_explorer_tokens.py
+	python3 _project/scripts/scan_explorer_tokens.py results-explorer/src landing/shared/site-tokens.css
 
 .PHONY: lint-site-theme-tokens
 lint-site-theme-tokens:
@@ -1039,7 +1040,7 @@ ci-test:
 .PHONY: ci-docs
 ci-docs:
 	@echo "Running CI docs checks..."
-	@$(MAKE) docs-validate
+	@$(MAKE) docs-validate docs-generate
 	@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html
 	@echo "✅ CI docs build passed"
 
@@ -1090,7 +1091,7 @@ spellcheck:
 	@echo "✅ Spellcheck passed"
 
 # Linkcheck - exact match for docs.yml linkcheck job
-ci-linkcheck:
+ci-linkcheck: docs-generate
 	@echo "Running documentation link check..."
 	@cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
 	@echo "Link check results:"

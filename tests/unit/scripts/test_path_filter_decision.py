@@ -539,6 +539,20 @@ def test_unrelated_change_skips_the_site_build_gate(rules: dict[str, list[str]])
     assert decision["site_paths"] == []
 
 
+@pytest.mark.parametrize(
+    "path", ["docs/usage/getting-started.md", "docs/conf.py", "website/src/pages/index.astro", "scripts/site_parity.py"]
+)
+def test_docs_and_website_changes_trigger_the_parity_gate(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["site_parity_needed"] is True
+    assert decision["site_parity_paths"] == [path]
+
+
+def test_unrelated_change_skips_the_parity_gate(rules: dict[str, list[str]]) -> None:
+    assert classify_paths(["tests/unit/test_x.py"], rules)["site_parity_needed"] is False
+
+
 def test_website_sources_are_explicit_product_code(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(["website/src/pages/index.astro", "website/package.json"], rules)
 
@@ -568,7 +582,7 @@ def test_site_build_job_is_gated_on_the_site_filter_and_feeds_the_landing_unit()
     assert "--expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}" in landing_run
 
 
-def test_site_build_job_runs_the_site_gates_on_node_22_only() -> None:
+def test_site_jobs_run_the_site_gates_on_node_22_only() -> None:
     jobs = _ci_jobs()
     steps = jobs["site-build"]["steps"]
     versions = {
@@ -577,8 +591,9 @@ def test_site_build_job_runs_the_site_gates_on_node_22_only() -> None:
     }
     commands = [step.get("run", "") for step in steps]
 
+    site_jobs = {"site-build", "site-parity"}
     assert versions["site-build"] == ["22"]
-    assert all(version == ["20"] for name, version in versions.items() if name != "site-build" and version)
+    assert all(version == ["20"] for name, version in versions.items() if name not in site_jobs and version)
     assert "make site-check site-build" in commands
     assert "uv run python scripts/publication/check_artifact_privacy.py website/dist" in commands
 

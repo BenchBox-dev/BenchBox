@@ -97,6 +97,14 @@ run fails closed until `bootstrap` is set.
    swapping fixed links for new ones fails, while a pure reduction passes and
    becomes the next baseline. A newer tag that adds broken links therefore fails
    until the allowance file is updated.
+
+   When a release tag has no receipt baseline yet, the gate also reads
+   `_project/design/site-inventory/release-known-broken/<tag>.json`, a reviewed
+   list of `[source, target, reason]` entries with paths as served on the routed
+   site (for example `/docs/...`), and adds it to the release-owned develop
+   entries for that tag only. Add a file when a new release tag's pages break
+   links that develop no longer lists; list exactly the release-owned broken
+   links the gate reports for that tag, never trunk-owned ones.
 3. Approve the pending deployment with the reviewer's own credentials, never with
    the workflow token:
 
@@ -127,6 +135,16 @@ A receipt holds the run and deployment ids, the link-check baseline, per-route s
 tree sha256 of the published artifact, UI and snapshot read-model versions, gate
 results, probe results, and the parent generation. A receipt is last-known-good
 only when its gates and probes both passed.
+
+Each route also records `lane_sha256`, the digest of every tree it contributes to the
+artifact, and the receipt carries an `explorer` block with the Results Explorer's
+digest (`sha256`), source SHA and corpus. The Explorer is pinned by that digest on
+its own, apart from the whole-site `artifact.sha256`, so a change to prose never
+reads as an Explorer change. The site build copies
+`results-explorer/dist` byte for byte into `/results/` and fails if the mounted tree's
+digest differs from the source's; it never rebuilds the Explorer source. Digests are
+computed with the assembler's algorithm, and a symlink in the tree is a hard error in
+the Node digest.
 
 ## Rollback
 

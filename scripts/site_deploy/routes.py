@@ -185,6 +185,7 @@ def assemble_routes(
         stages[ref] = stage
     lanes: list[tuple[LaneArtifact, Path]] = []
     lane_routes: dict[str, str] = {}
+    lane_digests: dict[str, str] = {}
     for index, route in enumerate(manifest.routes):
         if route.builder == "landing" and not (ref_roots[route.ref] / "landing").is_dir():
             raise RouteManifestError(f"route {route.path} needs landing/ in ref {route.ref}")
@@ -195,8 +196,10 @@ def assemble_routes(
                     f"route {route.path} ({route.builder}) found no {relative!r} in ref {route.ref}"
                 )
             name = f"{route.path}:{relative or '.'}"
-            lanes.append((_lane(name, prefix, extracted), extracted))
+            lane = _lane(name, prefix, extracted)
+            lanes.append((lane, extracted))
             lane_routes[name] = route.path
+            lane_digests[name] = lane.digest
     for index, filename in enumerate(manifest.root_files):
         extracted = _extract(stages[manifest.root_files_ref], filename, work_dir / "lanes" / f"root-{index}")
         if extracted is None:
@@ -218,6 +221,9 @@ def assemble_routes(
                 "source_sha": shas[route.ref],
                 "corpus": route.corpus,
                 "owned_files": len(owned),
+                "lane_sha256": {
+                    name: lane_digests[name] for name in sorted(lane_digests) if lane_routes[name] == route.path
+                },
             }
         )
     root_owned = sorted(path for path, lane in owners.items() if lane.startswith("root:"))

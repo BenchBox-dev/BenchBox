@@ -1,0 +1,45 @@
+.landing {
+  overflow-x: clip;
+}
+
+html:has(.landing) {
+  scroll-behavior: smooth;
+}
+
+.landing .results-example-card__label,
+.landing .results-example-card figcaption,
+.landing .results-chart-legend,
+.landing .benchmark-origin a,
+.landing .benchmark-meta,
+.landing .footer-bottom,
+.landing .results-example-stats dt,
+.landing .results-example-table thead th {
+  color: var(--text-secondary);
+}
+
+.landing .code-block pre {
+  font-family: monospace;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.landing .code-block pre {
+  color: var(--code-fg);
+}
+
+.landing {
+  --code-comment: var(--text-muted);
+}
+
+:root[data-bb-theme="light"] .landing {
+  --code-comment: var(--code-line-number);
+}
+
+:root[data-bb-theme="light"] .landing .code-block pre {
+  --prism-string: #60a5fa;
+  --prism-keyword: #a78bfa;
+  --prism-deleted: #f87171;
+  --prism-variable: #fb923c;
+  --prism-operator: #2dd4bf;
+  --text-secondary: #cbd5e1;
+}

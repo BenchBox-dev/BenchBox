@@ -801,6 +801,6 @@ for outlier in outliers:
 
 - [Performance Monitoring](performance.md) - Basic performance monitoring
 - [Tuning Configuration API](../reference/python-api/tuning.md) - Tuning API reference
-- [Result Analysis API](../reference/python-api/result-analysis.rst) - Analysis utilities
+- [Result Analysis API](../reference/python-api/result-analysis.md) - Analysis utilities
 - [CI/CD Integration](ci-cd-integration.md) - Automated performance testing
 - [Platform Adapters](../reference/python-api/platforms/) - Platform-specific optimizations

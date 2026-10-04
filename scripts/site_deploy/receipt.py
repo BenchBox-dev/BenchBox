@@ -71,6 +71,23 @@ def parent_summary(receipt: dict[str, Any], receipt_sha: str) -> dict[str, Any]:
     }
 
 
+def explorer_artifact(routes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for route in routes:
+        if route.get("builder") != "explorer":
+            continue
+        lanes = route.get("lane_sha256") or {}
+        if len(lanes) != 1:
+            raise ReceiptError(f"explorer route {route.get('path')} must have exactly one lane, found {len(lanes)}")
+        return {
+            "path": route["path"],
+            "source_sha": route.get("source_sha"),
+            "corpus": route.get("corpus"),
+            "sha256": next(iter(lanes.values())),
+            "lane_sha256": lanes,
+        }
+    return None
+
+
 def build_receipt(
     *,
     mode: str,
@@ -104,6 +121,7 @@ def build_receipt(
         "corpus_sha": corpus_sha,
         "certifying_run_id": certifying_run_id,
         "routes": assembly["routes"],
+        "explorer": explorer_artifact(assembly["routes"]),
         "artifact": {
             "name": artifact_name,
             "sha256": assembly["tree_sha256"],

@@ -66,11 +66,11 @@ def test_website_package_is_pinned_exactly_on_node_22() -> None:
     assert (WEBSITE / "package-lock.json").is_file()
     assert not (ROOT / "package.json").exists()
     assert {"@astrojs/check", "typescript"} <= set(package["devDependencies"])
-    assert package["scripts"]["check"] == "astro check"
+    assert package["scripts"]["check"] == "BENCHBOX_ALLOW_EMPTY_SIDEBAR=1 astro check"
 
 
-def test_only_the_site_build_job_and_website_audit_use_node_22() -> None:
-    website_jobs = {"site-build", "website-audit"}
+def test_only_the_website_jobs_use_node_22() -> None:
+    website_jobs = {"site-build", "site-parity", "website-audit"}
     for workflow in ("ci.yml", "nightly.yml"):
         for name, job in _jobs(workflow).items():
             versions = {
@@ -82,3 +82,19 @@ def test_only_the_site_build_job_and_website_audit_use_node_22() -> None:
                 assert versions == {"22"}, (workflow, name)
             else:
                 assert "22" not in versions, (workflow, name)
+
+
+def test_ci_tests_the_built_website_and_the_not_found_fallback_after_the_build() -> None:
+    steps = _jobs("ci.yml")["site-build"]["steps"]
+    runs = [step.get("run") for step in steps]
+    makefile = (ROOT / "make/documentation.mk").read_text(encoding="utf-8")
+
+    assert runs.index("make site-test-built") > runs.index("make site-check site-build")
+    assert any(
+        run == "npx playwright install --with-deps chromium" for run in runs[: runs.index("make site-test-built")]
+    )
+    target = makefile.split("site-test-built:")[1].split("\n\n")[0]
+    assert "npm --prefix website test" in target
+    assert "npm --prefix website run verify:not-found" in target
+    assert "npm --prefix website run verify:landing" in target
+    assert "BENCHBOX_SITE_UNBUILT=1" in makefile.split("site-check:")[1].split("\n\n")[0]

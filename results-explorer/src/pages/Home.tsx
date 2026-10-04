@@ -212,7 +212,15 @@ export function Home(_: RoutableProps) {
 
 function OverviewSkeleton() {
   return (
-    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8" data-testid="overview-skeleton">
+    <div
+      role="status"
+      aria-label="Loading results overview"
+      aria-live="polite"
+      aria-atomic="true"
+      class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8"
+      data-testid="overview-skeleton"
+    >
+      <p class="sr-only">Loading results overview...</p>
       <SkeletonBlock className="h-9 w-48" />
       <SkeletonBlock className="mt-3 h-5 w-full max-w-2xl" />
       <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">

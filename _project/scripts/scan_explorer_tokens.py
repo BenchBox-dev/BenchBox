@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""Fail when raw public-surface color literals appear under scanned paths.
-
-The Results Explorer retheme moves every public surface to CSS-variable
-tokens defined in results-explorer/src/index.css. This scan keeps the
-contract durable: a PR that reintroduces raw Tailwind palette classes,
-arbitrary color classes, SVG hex literals, or rgb()/rgba() literals breaks
-CI rather than ships silently.
-
-Allowlist mechanism: an inline marker on the same line as the literal,
-e.g. `// allow-explorer-token-literal: <reason>` for JS/TS/TSX or
-`/* allow-explorer-token-literal: <reason> */` for CSS. Without a
-reason, the marker does not exempt the line.
-
-Exit status:
-  0 — no unallowlisted literals found
-  1 — one or more literals found (printed to stderr)
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -78,7 +60,7 @@ PAGE_LOCAL_SCROLL_HINT_RE = re.compile(r"data-testid=[\"'][^\"']*scroll-hint[^\"
 ALLOW_MARKER_RE = re.compile(r"allow-explorer-token-literal:\s*\S")
 
 DEFAULT_EXTENSIONS = (".tsx", ".ts", ".jsx", ".js", ".css", ".html")
-TOKEN_DEFINITION_FILES = {"index.css", "site-theme.css", "site-header.css"}
+TOKEN_DEFINITION_FILES = {"index.css", "site-theme.css", "site-header.css", "site-tokens.css"}
 
 
 def is_token_definition_line(path: Path, line: str) -> bool:
@@ -120,7 +102,9 @@ def scan_file(path: Path) -> list[tuple[int, str, list[str]]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description="Fail when raw public-surface color literals appear under scanned paths."
+    )
     parser.add_argument(
         "paths",
         nargs="*",
