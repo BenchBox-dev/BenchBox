@@ -20401,6 +20401,13 @@
       "status": "done",
       "title": "TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions"
     },
+    "tpcds-qualification-q17-malformed-answer": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide how the TPC-DS qualification runner handles the malformed official Q17 answer file"
+    },
     "tpcds-qualification-q85-q93-returns-data": {
       "claim": null,
       "needs": [],

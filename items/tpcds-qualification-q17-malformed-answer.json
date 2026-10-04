@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "A documented decision: either a bounded, evidence-backed parser rule that recovers the 15 columns without altering answer bytes, or a recorded permanent exception with its rationale in the runner's classification"
+  ],
+  "context": "Shape evidence: /tmp/dfparity-official-q17-shape-evidence.json (copy under ~/.jcode/scratch/dfparity-handoff/evidence/stop-20261003T2017Z/).",
+  "description": "The pinned official 17.ans has a merged header/separator field and a wrapped continuation row, so the parser yields 14 columns where SQL returns 15. The runner records an answer error for Q17 on every engine while keeping DataFrame-to-SQL parity. Q17 therefore never contributes printed-answer evidence. Oracle values must not be invented.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:02:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f46d1ad64dce4fe581620dde78fdf3a4",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}
