@@ -11,12 +11,16 @@ Two commands:
 ``manifest``
     Generate data at a small scale and record, per table, the row count, byte size and sha256 of the
     raw ``.dat`` file; and, for every query, the substitution values dsqgen reports with ``-LOG`` for a
-    pinned seed plus the sha256 of the rendered SQL. Written as JSON, with the platform and the sha256
-    of each binary (informational: they differ by design).
+    pinned seed plus the sha256 of the rendered SQL. The same query record is repeated at each
+    parameter-only scale (SF 100 by default), where dsqgen needs no data and draws such as the Q46
+    city list are no longer degenerate. Line endings are normalized to LF before hashing, so a
+    Windows CRLF file compares by content. Written as JSON, with the platform and the sha256 of each
+    binary (informational: they differ by design).
 
 ``compare``
     Compare two or more manifests. Exit 1 if any table checksum, row count, parameter value or SQL
-    hash differs, or if the manifests were not built with the same scale factor and seed.
+    hash differs, or if the manifests were not built with the same scale factor, seed and
+    parameter-only scales.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -39,6 +43,7 @@ from typing import Any
 
 DEFAULT_SCALE_FACTOR = 0.01
 DEFAULT_SEED = 7
+DEFAULT_PARAMETER_SCALE_FACTORS = (100.0,)
 QUERY_IDS = tuple(range(1, 100))
 _CHUNK = 1 << 20
 # dbgen_version records the generation date and time, so its checksum changes on every run of the same
@@ -55,8 +60,8 @@ def sha256_file(path: Path) -> str:
 
 
 def table_entry(path: Path) -> dict[str, Any]:
-    """Row count, size and checksum of one raw dsdgen output file."""
-    data = path.read_bytes()
+    """Row count, size and checksum of one raw dsdgen output file, with CRLF read as LF."""
+    data = path.read_bytes().replace(b"\r\n", b"\n")
     return {"rows": data.count(b"\n"), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
@@ -75,7 +80,7 @@ def query_entries(dsqgen: Any, scale_factor: float, seed: int, query_ids: Iterab
         sql = dsqgen.generate(query_id, seed=seed, scale_factor=scale_factor)
         entries[str(query_id)] = {
             "values": dict(logged.substitutions),
-            "sql_sha256": hashlib.sha256(sql.encode("utf-8")).hexdigest(),
+            "sql_sha256": hashlib.sha256(sql.replace("\r\n", "\n").encode("utf-8")).hexdigest(),
         }
     return entries
 
@@ -85,6 +90,7 @@ def build_manifest(
     seed: int = DEFAULT_SEED,
     query_ids: Sequence[int] = QUERY_IDS,
     with_tables: bool = True,
+    parameter_scale_factors: Sequence[float] = DEFAULT_PARAMETER_SCALE_FACTORS,
 ) -> dict[str, Any]:
     from benchbox.core.tpcds.c_tools import DSQGenBinary
 
@@ -101,6 +107,9 @@ def build_manifest(
         },
         "tables": {},
         "queries": query_entries(dsqgen, scale_factor, seed, query_ids),
+        "parameter_scales": {
+            str(factor): query_entries(dsqgen, factor, seed, query_ids) for factor in parameter_scale_factors
+        },
     }
     if with_tables:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -140,18 +149,36 @@ def compare_manifests(manifests: dict[str, dict[str, Any]]) -> list[str]:
                 problems.append(f"{label}: table {table} only in {reference_name if table in tables_a else name}")
             else:
                 problems.extend(f"{label}: {item}" for item in _diff_table(table, tables_a[table], tables_b[table]))
-        queries_a, queries_b = reference["queries"], other["queries"]
-        for query in sorted(set(queries_a) | set(queries_b), key=int):
-            if query not in queries_a or query not in queries_b:
-                problems.append(f"{label}: query {query} only in {reference_name if query in queries_a else name}")
-                continue
-            values_a, values_b = queries_a[query]["values"], queries_b[query]["values"]
-            changed = sorted(key for key in set(values_a) | set(values_b) if values_a.get(key) != values_b.get(key))
-            if changed:
-                shown = ", ".join(f"{key}: {values_a.get(key)!r} against {values_b.get(key)!r}" for key in changed[:3])
-                problems.append(f"{label}: query {query} parameters differ ({len(changed)}): {shown}")
-            elif queries_a[query]["sql_sha256"] != queries_b[query]["sql_sha256"]:
-                problems.append(f"{label}: query {query} renders different SQL for identical parameters")
+        problems.extend(_diff_queries(label, reference_name, name, reference["queries"], other["queries"]))
+        scales_a, scales_b = reference.get("parameter_scales", {}), other.get("parameter_scales", {})
+        if set(scales_a) != set(scales_b):
+            problems.append(
+                f"{label}: parameter-only scales differ ({sorted(scales_a)} against {sorted(scales_b)}); "
+                "those parameters are not comparable"
+            )
+            continue
+        for factor in sorted(scales_a, key=float):
+            problems.extend(
+                _diff_queries(f"{label} at SF {factor}", reference_name, name, scales_a[factor], scales_b[factor])
+            )
+    return problems
+
+
+def _diff_queries(
+    label: str, reference_name: str, name: str, queries_a: dict[str, Any], queries_b: dict[str, Any]
+) -> list[str]:
+    problems: list[str] = []
+    for query in sorted(set(queries_a) | set(queries_b), key=int):
+        if query not in queries_a or query not in queries_b:
+            problems.append(f"{label}: query {query} only in {reference_name if query in queries_a else name}")
+            continue
+        values_a, values_b = queries_a[query]["values"], queries_b[query]["values"]
+        changed = sorted(key for key in set(values_a) | set(values_b) if values_a.get(key) != values_b.get(key))
+        if changed:
+            shown = ", ".join(f"{key}: {values_a.get(key)!r} against {values_b.get(key)!r}" for key in changed[:3])
+            problems.append(f"{label}: query {query} parameters differ ({len(changed)}): {shown}")
+        elif queries_a[query]["sql_sha256"] != queries_b[query]["sql_sha256"]:
+            problems.append(f"{label}: query {query} renders different SQL for identical parameters")
     return problems
 
 
@@ -172,12 +199,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     build.add_argument("--out", type=Path, required=True)
     build.add_argument("--scale-factor", type=float, default=DEFAULT_SCALE_FACTOR)
     build.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    build.add_argument(
+        "--parameter-scale-factor",
+        type=float,
+        action="append",
+        help="parameter-only scale to record (repeatable; default: SF 100)",
+    )
     compare = commands.add_parser("compare", help="compare manifests from different platforms")
     compare.add_argument("manifests", type=Path, nargs="+")
     args = parser.parse_args(argv)
 
     if args.command == "manifest":
-        manifest = build_manifest(args.scale_factor, args.seed)
+        manifest = build_manifest(
+            args.scale_factor,
+            args.seed,
+            parameter_scale_factors=args.parameter_scale_factor or DEFAULT_PARAMETER_SCALE_FACTORS,
+        )
         args.out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         print(f"wrote {args.out}: {len(manifest['tables'])} tables, {len(manifest['queries'])} queries")
         return 0
