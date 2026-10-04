@@ -1,6 +1,5 @@
 ---
 import PromptComposer from "../../components/prompts/PromptComposer.tsx";
-import ThemeToggle from "../../components/ThemeToggle.astro";
 import Shell from "../../layouts/Shell.astro";
 import { loadPromptCatalog } from "../../lib/prompt-catalog.ts";
 import "../../../../landing/prompts/prompts.css";
@@ -37,8 +36,5 @@ const catalog = loadPromptCatalog();
       <PromptComposer client:load catalog={catalog} />
     </div>
 
-    <div class="prompts-footer">
-      <ThemeToggle />
-    </div>
   </div>
 </Shell>
