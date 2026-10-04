@@ -20625,7 +20625,7 @@
       "needs": [],
       "priority": "high",
       "status": "open",
-      "title": "QphDS@Size is computed as sqrt(Power x Throughput), not the TPC-DS formula"
+      "title": "Stop exporting non-spec QphDS@Size as official and count 99 queries per stream"
     },
     "tpcds-qphds-spec-metric-implementation": {
       "claim": null,
