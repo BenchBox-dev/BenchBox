@@ -1112,6 +1112,63 @@ class TestDuckLakePostgresCatalogReuse:
         assert not any("duckdb_tables()" in sql for sql in stub.executed)
 
 
+class TestDuckLakeOncePerRunExistingDatabaseDecision:
+    def _local_adapter(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+            force_recreate=True,
+        )
+        adapter.metadata_path.write_text("catalog")
+        return adapter
+
+    def test_force_recreate_removes_the_catalog_only_on_the_first_decision(self, tmp_path):
+        adapter = self._local_adapter(tmp_path)
+
+        adapter.handle_existing_database()
+        assert not adapter.metadata_path.exists()
+
+        adapter.metadata_path.write_text("catalog rebuilt by this run")
+        adapter.handle_existing_database()
+
+        assert adapter.metadata_path.read_text() == "catalog rebuilt by this run"
+
+    def test_a_new_run_decides_again(self, tmp_path):
+        adapter = self._local_adapter(tmp_path)
+        adapter.handle_existing_database()
+        adapter.metadata_path.write_text("catalog from the previous run")
+
+        adapter._reset_run_scoped_state()
+        adapter.handle_existing_database()
+
+        assert not adapter.metadata_path.exists()
+
+    def test_a_validation_connection_never_removes_the_catalog(self, tmp_path):
+        adapter = self._local_adapter(tmp_path)
+
+        with adapter.non_destructive_connection_context():
+            adapter.handle_existing_database()
+
+        assert adapter.metadata_path.exists()
+
+    def test_postgres_catalog_drops_tables_only_on_the_first_decision(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+            catalog="postgres",
+            pg_database="benchdb",
+            force_recreate=True,
+        )
+        connection = TestDuckLakePostgresCatalogReuse._StubConn(["lineitem"])
+
+        adapter._resolve_postgres_catalog_reuse(connection)
+        adapter._resolve_postgres_catalog_reuse(connection)
+
+        assert [sql for sql in connection.executed if sql.startswith("DROP TABLE")] == [
+            'DROP TABLE IF EXISTS lake."main"."lineitem"'
+        ]
+
+
 class TestDuckLakeForceWithCloudDataPath:
     """--force must not silently leave orphaned Parquet behind (w7)."""
 
