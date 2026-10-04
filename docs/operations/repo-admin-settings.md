@@ -57,10 +57,13 @@ Required status checks:
 - docs
 - landing
 - tooling
+- oracle-review
 ```
 
-Each required context is one always-reporting result job in
-`.github/workflows/ci.yml`. The `ci-paths` job maps changed paths to units with
+Six of the required contexts are always-reporting result jobs in
+`.github/workflows/ci.yml`; `oracle-review` comes from
+`.github/workflows/oracle-review.yml` and passes at once for a change outside
+`.github/soundness-paths.txt`. The `ci-paths` job maps changed paths to units with
 `.github/ci-units.yml`; a unit no path touches reports success immediately, and
 a touched unit succeeds only when every job it requires succeeded. A required
 job that was skipped fails the unit, so a path filter or a broken `if:` can
@@ -172,23 +175,23 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 - **Queue Timeout:** `check_response_timeout_minutes: 90` allows sufficient time for merge-group checks across parallel shards to complete without premature ejection during runner contention.
 - **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** a PR that touches a path in `.github/soundness-paths.txt` is reviewed by the Codex connector, required thread resolution binds its findings, and the code owner's review is still required by the ruleset. The PR-body attestation check has been removed.
+- **Soundness Gate:** a PR that touches a path in `.github/soundness-paths.txt` needs the Codex connector's review of its head, which the required `oracle-review` check verifies, and required thread resolution binds its findings. Code-owner review and the PR-body attestation check have been removed.
+- **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without the connector's review. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)
 
-Live verification shows that `develop-squash-only` (ruleset id
-`15611785`) is `active` and its `pull_request` rule has
-`require_code_owner_review: true` and `required_review_thread_resolution: true`,
-with `required_approving_review_count: 0` and no bypass actors.
-This ensures all conversation and review threads must be resolved before merging,
-and code-owner review is required for CODEOWNERS-owned soundness paths.
+`develop-squash-only` (ruleset id `15611785`) is `active`; its `pull_request`
+rule has `require_code_owner_review: false`,
+`required_review_thread_resolution: true` and
+`required_approving_review_count: 0`, with no bypass actors, and its required
+status checks include `oracle-review`. Every review thread must be resolved
+before merging, and a soundness-path change needs the connector's review.
 
 The soundness gate, as operated:
 
-- `SOUNDNESS_PREFIXES` in `_project/scripts/auto_merge_soundness_paths.py`
-  (mirrored 1:1 into `.github/CODEOWNERS`, lockstep pinned by
-  `tests/unit/test_auto_merge_soundness_paths.py`) classifies the
+- `.github/soundness-paths.txt`, read by `_project/scripts/soundness_paths.py`
+  and pinned by `tests/unit/test_auto_merge_soundness_paths.py`, classifies the
   soundness-critical surface: comparators/parsers
   (`benchbox/core/equivalence/**`, `benchbox/core/query_plans/parsers/**`,
   `benchbox/core/**/validation.py`), the oracle-adjacent surface
@@ -213,28 +216,19 @@ The soundness gate, as operated:
   historical `ready_for_review` arm point — which never fired once, drafts
   being unused — was deleted per
   `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
-  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate revocation
-  only (soundness paths or the hold label). The soundness check unions the
-  base-ref predicate with the PR checkout copy so a gate widened mid-flight
-  still revokes and a PR cannot weaken its own gate.
+  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate the
+  `no-auto-merge` hold label only.
 - Durable holds every layer honours: **draft** (job/sweep skip) and label
   **`no-auto-merge`** (`make pr-arm-auto-merge` / `pr-ready` refuse to arm;
   workflow disables; nightly green-unmerged sweep never enables auto-merge
   and does not classify the label as stranded). See
   `docs/operations/pr-triage.md` "Durable auto-merge holds".
-- The Makefile arming path WITHHOLDS squash auto-merge for PRs touching those
-  paths, and `auto-merge-on-open.yml` revokes it on a later push that newly
-  touches them. CI cannot catch a change that redefines the oracle it
-  validates against, so these PRs must not merge hands-free.
-- The active ruleset now supplies the repo-layer control; the owner must still
-  review and merge manually because the current single-owner account cannot
-  approve its own PR. Adding a second code-owner or changing the PR identity
-  model would remove that operational deadlock; alternatively, an admin must
-  remove the live rule before it blocks a soundness-path release.
+- CI cannot catch a change that redefines the oracle it validates against, so
+  a soundness-path PR merges only after `oracle-review` passes on its head.
 
 `scripts/ruleset_drift_check.py` now imports the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`require_code_owner_review` as a **blocking** finding through
+`review_enforcement_findings` predicate and treats missing thread resolution or a missing `oracle-review` required
+check as a **blocking** finding through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`. The daily `release-canary.yml` run and
 `validate-release-pr.yml` bootstrap use the same path. The standalone check is
 available for an immediate live verification:
@@ -550,8 +544,9 @@ merge instead of waiting for the scheduled canary. The script parses this runboo
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
 target refs. For `develop-squash-only`, it also applies the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`require_code_owner_review` as a blocking finding through
+`review_enforcement_findings` predicate and treats missing thread
+resolution or a missing `oracle-review` required check as a blocking finding
+through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`. The
 Both workflows must use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
