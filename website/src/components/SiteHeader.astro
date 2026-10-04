@@ -1,5 +1,6 @@
 ---
 import { shellBrand, shellCta, shellLabels, shellLinks } from "../lib/header-links.ts";
+import Logo from "./Logo.astro";
 import SearchBox from "./SearchBox.astro";
 
 interface Props {
@@ -14,7 +15,7 @@ const cta = shellCta();
 
 <Wrapper class="site-header" data-site-header>
   <div class="site-header__inner">
-    <a class="site-header__logo" href={brand.href}>{brand.label}</a>
+    <a class="site-header__logo" href={brand.href}><Logo /><span class="site-header__logo-text">{brand.label}</span></a>
     <button
       class="site-header__toggle"
       type="button"

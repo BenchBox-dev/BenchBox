@@ -296,15 +296,14 @@ async function headerScript(route) {
   await page.waitForTimeout(200);
   out.shrinkFocusOnToggle = await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle"));
   await page.setViewportSize({ width: 1280, height: 900 });
-  const radio = (name) => page.getByRole("radio", { name });
-  await radio("Light theme").click();
-  await radio("Light theme").focus();
+  const themeButton = page.locator("[data-theme-toggle]").first();
+  await themeButton.focus();
   const choices = [];
-  for (const key of ["ArrowRight", "ArrowRight", "ArrowRight", "ArrowLeft", "Home", "End", "ArrowUp"]) {
+  for (const key of ["Enter", "Enter", "Enter", "Space"]) {
     await page.keyboard.press(key);
     choices.push(await page.evaluate(() => document.documentElement.dataset.bbThemeChoice));
   }
-  out.radioKeys = choices.join(",");
+  out.themeKeys = choices.join(",");
   out.styles = await readStyles(page);
   await context.close();
   return out;

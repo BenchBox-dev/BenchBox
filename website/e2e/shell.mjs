@@ -41,6 +41,14 @@ async function open(width, route, theme, beforeGoto) {
   return { page, context };
 }
 
+async function chooseTheme(page, choice) {
+  const button = page.locator("[data-theme-toggle]").first();
+  for (let step = 0; step < 3; step++) {
+    if ((await button.getAttribute("data-theme-choice")) === choice) return;
+    await button.click();
+  }
+}
+
 async function openNav(page) {
   const toggle = page.locator("[data-site-header-toggle]");
   if (await toggle.isVisible()) {
@@ -132,20 +140,20 @@ for (const [size, width] of Object.entries(widths).filter(([size]) => size !== "
       bodyTheme: await page.evaluate(() => document.body.getAttribute("data-theme")),
       choice: await page.evaluate(() => document.documentElement.dataset.bbThemeChoice),
     });
-  await page.getByRole("radio", { name: "Dark theme" }).click();
+  await chooseTheme(page, "dark");
   await read("dark");
   await page.reload({ waitUntil: "networkidle" });
   await read("dark after reload");
   await page.goto(base + pages.landing, { waitUntil: "networkidle" });
   await read("landing");
-  await page.getByRole("radio", { name: "Light theme" }).click();
+  await chooseTheme(page, "light");
   await read("light");
-  await page.getByRole("radio", { name: "Light theme" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await read("arrow right");
-  await page.keyboard.press("Home");
-  await read("home");
-  await page.getByRole("radio", { name: "System theme" }).click();
+  await page.locator("[data-theme-toggle]").first().focus();
+  await page.keyboard.press("Enter");
+  await read("keyboard next");
+  await page.keyboard.press("Space");
+  await read("keyboard wrap");
+  await chooseTheme(page, "system");
   await read("system");
   report.theme[size] = steps;
   const byLabel = Object.fromEntries(steps.map((s) => [s.label, s]));
@@ -159,8 +167,8 @@ for (const [size, width] of Object.entries(widths).filter(([size]) => size !== "
     byLabel.landing.dataTheme === "dark" &&
     byLabel.light.stored === "light" &&
     byLabel.light.dataBbTheme === "light" &&
-    byLabel["arrow right"].stored === "dark" &&
-    byLabel.home.choice === "system" &&
+    byLabel["keyboard next"].stored === "dark" &&
+    byLabel["keyboard wrap"].choice === "system" &&
     byLabel.system.stored === null &&
     byLabel.system.dataBbTheme === byLabel.system.dataTheme;
   if (!ok) fail(`theme behaviour ${size}: ${JSON.stringify(steps)}`);

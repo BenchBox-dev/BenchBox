@@ -79,7 +79,14 @@ export default defineConfig({
       disable404Route: true,
       lastUpdated: false,
       routeMiddleware: "./src/starlight-route.ts",
-      customCss: ["../landing/shared/site-tokens.css", "../landing/shared/site-shell.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
+      customCss: [
+        "@fontsource-variable/instrument-sans/wght.css",
+        "@fontsource-variable/martian-mono/wdth.css",
+        "../landing/shared/site-tokens.css",
+        "../landing/shared/site-shell.css",
+        "./src/styles/shell.css",
+        "./src/styles/starlight-map.css",
+      ],
       components: {
         Header: "./src/components/starlight/Header.astro",
         PageTitle: "./src/components/starlight/PageTitle.astro",

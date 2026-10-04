@@ -6,6 +6,8 @@ import {
   THEME_ICON_ATTRS,
   THEME_ICON_SHAPES,
   THEME_OPTIONS,
+  logoGrid,
+  nextThemeOption,
   shellBrand,
   shellCta,
   shellLabels,
@@ -86,7 +88,8 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
     >
       <div class="site-header__inner">
         <a class="site-header__logo" href={brand.href}>
-          {brand.label}
+          <Logo />
+          <span class="site-header__logo-text">{brand.label}</span>
         </a>
         <button
           ref={toggleRef}
@@ -163,9 +166,27 @@ export function SiteFooter({ pathname, children }: SiteFooterProps) {
   );
 }
 
+function Logo() {
+  const { width, height, cells } = logoGrid();
+  return (
+    <svg
+      class="logo"
+      viewBox={`0 0 ${width} ${height}`}
+      shape-rendering="crispEdges"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {cells.map((cell) => (
+        <rect key={`${cell.x}-${cell.y}`} x={cell.x} y={cell.y} width={cell.width} height="1" />
+      ))}
+    </svg>
+  );
+}
+
 function ThemeIcon({ option }: { option: ThemeOption }) {
   return (
-    <svg {...THEME_ICON_ATTRS} aria-hidden="true" focusable="false">
+    <svg {...THEME_ICON_ATTRS} class="theme-toggle__icon" data-theme-icon={option} aria-hidden="true" focusable="false">
       {THEME_ICON_SHAPES[option].map((shape, index) =>
         shape.tag === "circle" ? <circle key={index} {...shape.attrs} /> : <path key={index} {...shape.attrs} />,
       )}
@@ -175,69 +196,21 @@ function ThemeIcon({ option }: { option: ThemeOption }) {
 
 export function ThemeToggle() {
   const { choice, setChoice } = useThemeChoice();
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  function selectAt(index: number) {
-    const option = THEME_OPTIONS[index];
-    if (!option) return;
-    setChoice(option);
-    optionRefs.current[index]?.focus();
-  }
-
-  function handleKeyDown(event: KeyboardEvent, index: number) {
-    const count = THEME_OPTIONS.length;
-    let next: number;
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        next = (index + 1) % count;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        next = (index - 1 + count) % count;
-        break;
-      case "Home":
-        next = 0;
-        break;
-      case "End":
-        next = count - 1;
-        break;
-      case " ":
-      case "Enter":
-        next = index;
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-    selectAt(next);
-  }
-
+  const next = nextThemeOption(choice);
+  const label = shellLabels.themeOptions[choice];
   return (
-    <div class="theme-toggle" role="radiogroup" aria-label={shellLabels.theme}>
-      {THEME_OPTIONS.map((option, index) => {
-        const selected = choice === option;
-        const label = shellLabels.themeOptions[option];
-        return (
-          <button
-            key={option}
-            ref={(element) => {
-              optionRefs.current[index] = element;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={label}
-            title={label}
-            tabIndex={selected ? 0 : -1}
-            data-theme-option={option}
-            onClick={() => selectAt(index)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-          >
-            <ThemeIcon option={option} />
-          </button>
-        );
-      })}
-    </div>
+    <button
+      type="button"
+      class="theme-toggle"
+      data-theme-toggle
+      data-theme-choice={choice}
+      aria-label={`${shellLabels.theme}: ${label}`}
+      title={`${label}. Switch to ${shellLabels.themeOptions[next]}.`}
+      onClick={() => setChoice(next)}
+    >
+      {THEME_OPTIONS.map((option) => (
+        <ThemeIcon key={option} option={option} />
+      ))}
+    </button>
   );
 }

@@ -147,33 +147,32 @@ def test_astro_header_has_no_theme_toggle_component() -> None:
 
     assert "ThemeToggle" not in header, "astro header must not render the theme control"
     assert 'role="radiogroup"' not in header
-    assert "data-theme-option" not in header
+    assert "data-theme-toggle" not in header
     assert "theme-toggle" not in header
 
 
-def test_astro_footer_radiogroup_binds_the_shared_theme_labels() -> None:
+def test_astro_footer_theme_button_cycles_the_shared_options() -> None:
     toggle = _read(ASTRO_THEME_TOGGLE)
     footer = _read(ASTRO_FOOTER)
 
     assert "import ThemeToggle" in footer
-    assert "<ThemeToggle />" in footer, "astro footer must render the theme radiogroup"
-    assert toggle.count('role="radiogroup"') == 1
-    assert "aria-label={shellLabels.theme}" in toggle
-    assert "aria-label={option.label}" in toggle
+    assert "<ThemeToggle />" in footer, "astro footer must render the theme button"
+    assert toggle.count("data-theme-toggle") >= 1
+    assert "shellLabels.theme" in toggle
     assert "THEME_OPTIONS.map(" in toggle
     assert "THEME_ICON_SHAPES" in toggle
-    assert "data-theme-option" in toggle
+    assert "data-theme-icon={option}" in toggle
     assert "data-pagefind-ignore" in footer
 
 
-def test_results_footer_radiogroup_binds_the_shared_aria_label() -> None:
+def test_results_footer_theme_button_binds_the_shared_aria_label() -> None:
     shell = _read(PREACT_SHELL)
     model = _read(SHELL_MODEL)
     contract = _read("results-explorer/src/components/headerContract.ts")
 
-    assert 'role="radiogroup"' in shell, "results footer should expose a theme radiogroup"
-    assert "aria-label={shellLabels.theme}" in shell, "results radiogroup missing accessible name binding"
-    assert "THEME_OPTIONS.map(" in shell
+    assert "data-theme-toggle" in shell, "results footer should expose the theme button"
+    assert "shellLabels.theme" in shell, "results theme button missing accessible name binding"
+    assert "nextThemeOption(choice)" in shell
     assert "THEME_ICON_SHAPES" in shell
     assert 'FOOTER_THEME_ARIA_LABEL = "Color theme"' in contract, "results theme aria label contract drifted"
     assert "theme: FOOTER_THEME_ARIA_LABEL" in model
@@ -327,9 +326,9 @@ def test_astro_and_preact_shells_share_ids_and_hooks() -> None:
         "data-site-header-panel",
         "data-site-header-nav",
         "data-site-footer",
-        "data-theme-option",
-        'role="radiogroup"',
-        'role="radio"',
+        "data-theme-toggle",
+        "data-theme-icon",
+        'class="site-header__logo-text"',
     ):
         assert token in astro, f"astro shell missing {token}"
         assert token in preact, f"preact shell missing {token}"

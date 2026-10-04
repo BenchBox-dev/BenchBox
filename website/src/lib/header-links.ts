@@ -4,6 +4,8 @@ export {
   THEME_ICON_ATTRS,
   THEME_ICON_SHAPES,
   THEME_OPTIONS,
+  logoGrid,
+  nextThemeOption,
   shellBrand,
   shellCta,
   shellLabels,

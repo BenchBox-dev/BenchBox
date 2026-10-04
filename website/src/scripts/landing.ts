@@ -100,22 +100,3 @@ for (const link of sectionLinks) {
     window.setTimeout(updateCurrentSection, 500);
   });
 }
-
-const observer = new IntersectionObserver(
-  (entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      const element = entry.target as HTMLElement;
-      element.style.opacity = "1";
-      element.style.transform = "translateY(0)";
-    }
-  },
-  { threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
-);
-
-for (const element of document.querySelectorAll<HTMLElement>(".feature-card, .benchmark-card, .install-step")) {
-  element.style.opacity = "0";
-  element.style.transform = "translateY(20px)";
-  element.style.transition = "opacity 0.6s ease, transform 0.6s ease";
-  observer.observe(element);
-}
