@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The gate report counts cells whose returned order was verified versus compared unordered, per benchmark",
+    "ORDER BY ALL is checked by expanding to all output columns; qualified columns that unambiguously match one output column are resolved",
+    "DECIMAL sort keys keep exact precision in the key table",
+    "Tests cover each shape, including a mis-ordered result that must fail"
+  ],
+  "context": "Raised by the agy and muse adversarial reviews (2026-10-04). Evaluation errors now fail closed (#2621).",
+  "description": "The derived ORDER BY check in benchbox/core/equivalence/cross_surface.py (_derived_order_violation) falls back to the unordered comparison when the output has duplicate column names, a sort term uses a qualified column (t.x), a term has no column reference (DuckDB ORDER BY ALL), or a term references a non-projected column. DECIMAL keys are compared as DOUBLE, which can merge distinct keys above about 1e13. These fallbacks are silent: the gate report does not say which cells had their order verified.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:02:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "203489bd4b4248a290151bf7af00fa9b",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}
