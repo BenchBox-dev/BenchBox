@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A FAILED platform_result in a TPC-DS throughput stream marks that query failed, the stream unsuccessful, and withholds Throughput@Size/QphDS",
+    "A regression test with a real adapter connection (not a mock cursor) executes an invalid query in a TPC-DS throughput stream and asserts queries_failed=1 and success=False",
+    "TPC-DS throughput row-count validation under dsqgen stream seeds has an explicit policy (validate, range, or exclude per query) with a test, so the fix does not turn valid runs into false failures",
+    "A real TPC-DS SF0.01+ throughput run on DuckDB still completes successfully after the fix"
+  ],
+  "context": "Found in the 2026-10-04 adversarial review of the throughput work (develop 8ed0c64e1). Consensus finding from two independent reviewers, both reproduced by script.",
+  "description": "`TPCDSThroughputTest._run_single_stream_query` (benchbox/core/tpcds/throughput_test.py:515-530 at develop 8ed0c64e1) returns `cursor.platform_result` and a row count but never checks `platform_result[\"status\"]`. Adapters catch SQL errors and row-count mismatches and return `{\"status\": \"FAILED\"}` instead of raising (duckdb.py:1234-1246, sqlite.py, spark_execution_mixin.py, sql_execution.py:171-196). The caller then records `success=True` and increments `queries_successful`. The TPC-H driver raises on FAILED (tpch/throughput_test.py:480-486) and the TPC-DS power test checks it (tpcds/power_test.py:327).\n\nEffect: every TPC-DS throughput stream \"succeeds\" even when queries fail, Throughput@Size and QphDS are published, exported rows say SUCCESS, and TPC-DS throughput row-count validation has no effect.\n\nReproduced by two independent reviewers: a PlatformAdapterConnection over DuckDB running `SELECT * FROM no_such_table` gave queries_successful=1, queries_failed=0, success=True.\n\nFixing this will surface a second problem: stream 0 is validated against reference answer counts, but its parameters come from `dsqgen -RNGSEED 42`, not the reference parameters. Decide how stream-0 validation applies under non-reference seeds (mirror the TPC-H RANGE/exclusion policy) in the same change.",
+  "links": [
+    "benchbox/core/tpcds/throughput_test.py",
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/platforms/base/sql_execution.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:57:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4fff612e9e914258b78013c3c3f3495a",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

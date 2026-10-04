@@ -20514,6 +20514,13 @@
       "status": "open",
       "title": "Fix TPC-DS stream query labels that turn each query into a SQL comment line"
     },
+    "tpcds-throughput-failed-queries-counted-success": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "TPC-DS throughput records failed queries as successes and publishes Throughput@Size over them"
+    },
     "tpcds-throughput-permutation-compliance": {
       "claim": null,
       "needs": [],
