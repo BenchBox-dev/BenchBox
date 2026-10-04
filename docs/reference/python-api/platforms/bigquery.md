@@ -326,7 +326,7 @@ adapter = BigQueryAdapter(
 )
 ```
 
-This sets budget limits: `BATCH` priority costs less but runs slower, `query_cache=True` lets BigQuery serve cached results (the default is `False`), and `maximum_bytes_billed` is a 10 GB limit per query.
+This sets budget limits: `BATCH` priority queues the query and starts it when resources are available, `query_cache=True` lets BigQuery serve cached results (the default is `False`), and `maximum_bytes_billed` is a 10 GB limit per query.
 
 ### Table Optimization
 
@@ -569,7 +569,7 @@ print(f"Bytes billed (cached): {job2.total_bytes_billed:,}")
 
 ### Batch vs Interactive Priority
 
-Interactive priority (the default) executes immediately. Batch priority queues the query and gets a 50% discount, so use it for non-time-sensitive queries. `job.result()` may wait in the queue.
+Interactive priority (the default) executes immediately. Batch priority queues the query and starts it when resources are available, so use it for non-time-sensitive queries. `job.result()` may wait in the queue.
 
 ```python
 from google.cloud import bigquery
@@ -617,7 +617,7 @@ job.result()
    )
    ```
 
-4. **Use BATCH priority** for non-urgent queries. The query is queued and starts when resources are available, and it gets a 50% discount:
+4. **Use BATCH priority** for non-urgent queries. The query is queued and starts when resources are available:
 
    ```python
    adapter = BigQueryAdapter(
@@ -735,7 +735,7 @@ client.create_dataset(dataset, exists_ok=True)
 
 1. Check the current quota usage at <https://console.cloud.google.com/iam-admin/quotas>.
 2. Set a maximum bytes billed (the example uses a 100 GB limit).
-3. Use BATCH priority to reduce the quota impact.
+3. Use BATCH priority so queries queue until resources are available.
 4. Request a quota increase at the same quota page.
 
 ```python
