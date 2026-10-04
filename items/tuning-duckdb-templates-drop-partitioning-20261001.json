@@ -3,7 +3,7 @@
     "No DuckDB template (examples or packaged) contains a partitioning section; parity test passes.",
     "e2e: DuckDB tpch/ssb/tpcds tuned runs record zero partitioning dropped intents."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.5 (R-1b; plan review F9).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.5 (R-1b; plan review F9).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch fix/tuning-physical-identifiers; do not claim.",
   "description": "## Problem\nEvery DuckDB tuned template requests partitioning, which DuckDB always drops (`duckdb.py:1453-1472`). The resulting dropped intents veto verification of the curated product path.\n\n## Change (per gate D-7, option A expected)\n- Remove `partitioning` from `examples/tunings/duckdb/*_tuned.yaml` and the packaged mirrors in `benchbox/core/tuning/templates/duckdb/`.\n- Mark DuckDB partitioning `rendered_via=\"none\"` in `capability_registry.py`.\n- The validator turning this into an error depends on the D-5 amendment and the single-source validator item. Until then, the template change is the whole fix.\n\n## Guardrails (must preserve)\n- Keep `TestPackagedTemplatesParity` green.\n- Note the requested-config hash change in release notes.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "examples/tunings/duckdb",
@@ -18,6 +18,14 @@
       "op": "create",
       "op_id": "a6351696415e44dd93a97affe1a9276c",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:33:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b2a78e383b824ce183148f28da9f5877",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
