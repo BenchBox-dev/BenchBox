@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A test proves whether a hung stream blocks interpreter exit; if it does, streams run on threads that cannot block exit or are cancelled cooperatively",
+    "State used in finally is initialized before the try, with a test injecting a submit failure",
+    "Timeout-branch accounting is race-free and cancelled-before-start streams are not counted as executed, with tests"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Exit-blocking finding is unverified; verify first.",
+  "description": "Findings in benchbox/core/throughput/runner.py (develop 8ed0c64e1):\n- runner.py:435 uses shutdown(wait=False), but concurrent.futures joins its worker threads at interpreter exit, so the CLI may hang at exit until a stuck query finishes. Plausible from stdlib behavior; not reproduced.\n- The finally block (:435-450) uses tentatively_cancelled, outstanding_futures and _record_completed_future, defined after the submit loop (:262-320). An exception during submit raises UnboundLocalError, hiding the real error and losing track of submitted futures.\n- In the timeout branch (:375-411), a future that finishes between the done() and running() checks gets a \"timed out without starting\" error and is then recorded as completed (:165-166). Streams cancelled before starting are counted in streams_executed (:160).",
+  "links": [
+    "benchbox/core/throughput/runner.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:00:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bcc232c66c244f4da291d6db3d1a114e",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

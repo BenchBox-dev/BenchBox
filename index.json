@@ -19806,6 +19806,13 @@
       "status": "open",
       "title": "Throughput ignores validation_mode, query_subset and stream timeout settings, and silently raises 0 or 1 streams to 2"
     },
+    "throughput-runner-shutdown-and-accounting-edges": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Throughput runner: hung stream may block process exit; early-failure and timeout accounting edge cases"
+    },
     "throughput-stream-count-wiring-defect": {
       "claim": null,
       "needs": [],
