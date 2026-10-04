@@ -20584,6 +20584,13 @@
       "status": "done",
       "title": "TPC-H DataFrame runs must bind the SQL run's seed-derived parameters, and the reference-seed assumption must be corrected (needs owner sign-off)"
     },
+    "tpch-qphh-missing-refresh-functions": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-H Power@Size and Throughput@Size omit refresh functions yet are exported as official QphH"
+    },
     "tpch-skew-dataframe-sql-id-mapping": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Decision recorded: implement RF1/RF2 in power and throughput per spec, or label the metric non-spec and suppress qphh_at_size/official labelling",
+    "If implemented: Power@Size includes RF1/RF2 times, and the throughput test runs a concurrent refresh stream with S RF pairs inside Ts, with tests",
+    "If not implemented: official results carry no QphH@Size, and docs state the deviation"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Absence of RF verified by search.",
+  "description": "The TPC-H power test runs the 22 queries only (tpch/power_test.py:376-389) and the geometric mean uses only query times (metrics.py:121-151). The throughput test has no refresh stream (no RF code in tpch/throughput_test.py or core/throughput). Maintenance runs afterwards with `concurrent_with_queries=False` (execution.py:692-698). Verified: no refresh/RF1/RF2 references in the TPC-H power or throughput test modules.\n\nThe TPC-H spec defines Power@Size with the 24th root over the 22 query times and RF1 and RF2, and requires the throughput test to run S pairs of RF1/RF2 in a refresh stream concurrently with the query streams. Without them QphH@Size is overstated, but it is exported under the official name for `--official` runs. docs/concepts/glossary.md:168 describes the current behavior as intended.",
+  "links": [
+    "benchbox/core/tpch/power_test.py",
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/core/results/metrics.py",
+    "docs/concepts/glossary.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:58:23Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9a686ab991b24d48a108c3f3c2bf34ab",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
