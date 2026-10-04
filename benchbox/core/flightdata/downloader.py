@@ -48,6 +48,7 @@ from benchbox.utils.datagen_manifest import (
     MANIFEST_FILENAME,
     DataGenerationManifest,
     load_manifest,
+    require_manifest_files,
     resolve_compression_metadata,
 )
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
@@ -815,6 +816,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     format="csv",
                     metadata=metadata,
                 )
+        require_manifest_files(manifest.file_counts()[1], label="FlightData", output_dir=self.output_dir)
         manifest.write()
 
     def _process_month(self, writer: csv.writer, year: int, month: int, start_id: int) -> int:
