@@ -15,7 +15,7 @@ SCRIPT = ROOT / "_sources/compilation/scripts/compile-all-platforms.sh"
 def _selection_fragment() -> str:
     text = SCRIPT.read_text(encoding="utf-8")
     start = text.index('CONTAINER_ENGINE="${BENCHBOX_CONTAINER_ENGINE:-}"')
-    end = text.index("\n\n# Host architecture", start)
+    end = text.index("\n\n_host_arch() {", start)
     return text[start:end] + '\nprintf "%s\\n" "$CONTAINER_ENGINE"\n'
 
 
