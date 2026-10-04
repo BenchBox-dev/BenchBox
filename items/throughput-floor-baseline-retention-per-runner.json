@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Each nightly uploads a small JSON artifact with throughput_at_size, runner CPU model and run id",
+    "A tool computes the rolling median of the last N green runs per runner class",
+    "The floor compares against the per-class median, not a fixed variable, and docs match",
+    "Decision recorded on whether SF1 / a ~3 s window is long enough to be a stable regression signal"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). The floor-activation item throughput-floor-numeric-threshold-from-baseline depends on this.",
+  "description": "docs/operations/uat-framework.md:622-626 describes a rolling median of the last N green runs, but the workflow reads THROUGHPUT_FLOOR_MEDIAN, a fixed repository variable (nightly.yml:985). Once set, that is an absolute floor, which the doc rejects. No tool computes N or the median.\n\nuat-framework.md:629-631 says no run retains throughput_at_size. In fact the ::notice lines are kept as check-run annotations, and a reviewer pulled 10 values (09-25 to 10-04): 73583, 74389, 74835, 75285, 75789, 79385, 92632, 96272, 97537, 98141. They fall into two groups, probably two runner hardware types. The median is about 77.6k, so a 20% floor (about 62.1k) would let a fast-runner run drop about 37% unnoticed. The measured window is only about 2.4-3.2 s, so runner hardware dominates. Annotations last only as long as GitHub keeps run data.",
+  "links": [
+    ".github/workflows/nightly.yml",
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:04:20Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b0fd6ebc5aae45dc8274df3c8162ab7b",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
