@@ -12567,6 +12567,13 @@
       "status": "done",
       "title": "Create metrics command group and consolidate calculate-qphh"
     },
+    "metrics-qphh-cli-rederives-withheld-metrics": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "`benchbox metrics qphh` derives scores for suppressed or failed runs using summed query time"
+    },
     "migrate-adapters-not-listed-in-this-todo-that-already-use-da": {
       "claim": null,
       "needs": [],

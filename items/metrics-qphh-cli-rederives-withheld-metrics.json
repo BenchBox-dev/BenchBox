@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The command refuses (clear message, non-zero exit) when metrics are suppressed or any query failed",
+    "Throughput uses the throughput phase wall duration, never summed query time",
+    "Power uses only the final power iteration",
+    "The label reflects the benchmark (QphH vs QphDS)",
+    "Tests cover each refusal and the timing source"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Reproduced by reviewer probe.",
+  "description": "`benchbox/core/results/metrics.py:283-303` refuses only `unofficial_subscale` runs. A result with `tpc_metrics: {\"suppressed\": true}` or failed queries still gets a derived score. Ts comes from `summary.timing.total_ms`, which is the sum of per-query times (schema.py:1603), not wall-clock time, so with S streams Throughput@Size is understated by about S times. The power fallback uses successful rows from every iteration. The output is always labelled TPC-H, even for TPC-DS files.\n\nA reviewer's probe: a suppressed file with 5 failed queries returned Throughput@Size 1800 (correct would be 3600 if it were valid at all) plus a QphH.",
+  "links": [
+    "benchbox/core/results/metrics.py",
+    "benchbox/cli/commands/calculate_qphh.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:58:12Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6f9008ebae414218a721553e66ddce9a",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
