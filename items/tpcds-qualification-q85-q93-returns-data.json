@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The cause is demonstrated, e.g. by comparing generated returns reason_sk distributions with the reference data or by reproducing the official rows from the rendered SQL",
+    "If it is a data difference, the qualification runner classifies Q85/Q93 with that evidence; if it is a query defect, it is fixed with a regression test"
+  ],
+  "context": "Evidence: classification at ~/.jcode/scratch/dfparity-handoff/evidence/resume-20261003/sf1-94a6ab351-printed-classification.md; run output /Users/joe/Developer/benchmark_runs/dfparity-official-qualification-sf1-94a6ab351-20261003T2124Z. Raised by the agy and muse adversarial reviews (2026-10-04).",
+  "description": "In the SF1 qualification run, Q85 and Q93 (NULLS_LAST file) differ from the official answer files while SQL and all three DataFrame engines agree. Q85: three aggregate triples (e.g. 76 / 464.36 / 8.62) match the official file exactly but under different reason labels, and three rows differ. The working hypothesis is that wr_reason_sk / sr_reason_sk in the generated returns tables differ from the reference data used for the answer files; it is not proven. If the cause is instead a template or substitution defect, DataFrame-to-SQL parity cannot detect it because both surfaces share it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:00:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "67dc1be1ad6f407a9c97516e3922817d",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

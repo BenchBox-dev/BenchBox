@@ -20394,6 +20394,13 @@
       "status": "done",
       "title": "TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions"
     },
+    "tpcds-qualification-q85-q93-returns-data": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Prove the cause of the Q85 and Q93 differences from the official TPC-DS SF1 answers"
+    },
     "tpcds-stdout-fix-integrate-stdout-datagen": {
       "claim": null,
       "needs": [
