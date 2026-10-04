@@ -240,6 +240,17 @@ for (const [name, route] of Object.entries(pages)) {
 
 {
   const { page, context } = await open(widths.desktop, pages.docs);
+  await page.locator(".site-header__link", { hasText: "Blog" }).focus();
+  await page.setViewportSize({ width: widths.mobile, height: 900 });
+  await page.waitForTimeout(200);
+  const focus = await page.evaluate(() => ({ tag: document.activeElement?.tagName, toggle: document.activeElement?.hasAttribute("data-site-header-toggle") }));
+  report.layout["resize focus"] = focus;
+  if (!focus.toggle) fail(`focus was not moved to the nav toggle when resizing to phone width: ${JSON.stringify(focus)}`);
+  await context.close();
+}
+
+{
+  const { page, context } = await open(widths.desktop, pages.docs);
   const order = await page.evaluate(() => {
     const items = [...document.querySelectorAll(".site-header a, .site-header button")].filter((el) => el.getClientRects().length > 0);
     const tabOrder = items.map((el) => el.getBoundingClientRect().left);

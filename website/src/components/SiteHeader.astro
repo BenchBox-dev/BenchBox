@@ -77,6 +77,11 @@ const cta = shellCta();
     if (header && event.target instanceof Node && !header.contains(event.target)) setOpen(false);
   });
   window.matchMedia("(min-width: 56.3125rem)").addEventListener("change", (event) => {
-    if (event.matches) setOpen(false);
+    if (event.matches) {
+      setOpen(false);
+      return;
+    }
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active.closest("[data-site-header-panel]")) toggle?.focus();
   });
 </script>
