@@ -101,6 +101,8 @@ def render(base: dict[str, Any], head: dict[str, Any], paths: list[str]) -> str:
         lines += ["Make's evaluation is unchanged.", ""]
     elif not (removed or added or changed):
         lines += ["No public target or recipe changed, but Make's evaluation changed.", ""]
+    else:
+        lines += ["Make's evaluation changed.", ""]
     for target in changed[:MAX_DIFFED_TARGETS]:
         diff = list(
             difflib.unified_diff(_rule_text(base, target), _rule_text(head, target), "base", "head", lineterm="", n=1)

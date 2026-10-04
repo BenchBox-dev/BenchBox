@@ -67,10 +67,6 @@ def _workflow_files() -> list[str]:
     return sorted(p.name for p in WORKFLOW_DIR.glob("*.yml"))
 
 
-def _test_files(directory: Path) -> list[str]:
-    return sorted(p.name for p in directory.glob("test_*.py"))
-
-
 CUTOVER_FILES = REPO_ROOT / "tests" / "unit" / "ledger_cutover_files.txt"
 
 
@@ -96,7 +92,7 @@ def test_cutover_lists_every_test_with_a_ledger_row() -> None:
     cutover = set(CUTOVER_FILES.read_text(encoding="utf-8").split())
     enrolled = [
         ("### `tests/unit/workflows/`", WORKFLOWS_TEST_DIR.glob("test_*.py"), WORKFLOWS_TEST_DIR),
-        ("### `tests/unit/scripts/` (complete)", SCRIPTS_TEST_DIR.rglob("test_*.py"), SCRIPTS_TEST_DIR),
+        ("### `tests/unit/scripts/` (complete)", SCRIPTS_TEST_DIR.rglob("test_*"), SCRIPTS_TEST_DIR),
         ("### `tests/unit/release/`", RELEASE_TEST_DIR.glob("test_*.py"), RELEASE_TEST_DIR),
         ("### `tests/unit/test_auto_merge_*`", UNIT_DIR.glob("test_auto_merge_*.py"), UNIT_DIR),
         ("### `tests/unit/test_release_*`", UNIT_DIR.glob("test_release_*.py"), UNIT_DIR),
@@ -129,7 +125,7 @@ def test_ledger_lists_every_scripts_test() -> None:
     text = _ledger_text()
     sections = _section_rows(text)
     section = "### `tests/unit/scripts/` (complete)"
-    names = _cutover_files(SCRIPTS_TEST_DIR, pattern="test_*.py")
+    names = _cutover_files(SCRIPTS_TEST_DIR, pattern="test_*")
     assert any("/" in name for name in names), "expected nested suites under tests/unit/scripts/"
     missing = [name for name in names if not _covered(name, section, sections)]
     assert not missing, f"tests/unit/scripts files missing from ledger: {missing}"

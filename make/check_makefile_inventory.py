@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Fail closed when BenchBox's Make files cannot be parsed or the migration baseline drifts."""
-
 from __future__ import annotations
 
 import argparse
