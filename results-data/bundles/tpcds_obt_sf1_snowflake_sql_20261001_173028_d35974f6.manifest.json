@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpcds_obt_sf1_snowflake_sql_20261001_173028_d35974f6.json",
+  "bundle_hash": "1fd9a95b990a5f2369317bfb2704aeb6ef7055d00d8acc68d9c3554a9d7361c5",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

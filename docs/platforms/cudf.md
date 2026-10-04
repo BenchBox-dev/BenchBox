@@ -161,6 +161,19 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return result
 ```
 
+## Known Limitations
+
+### NULL and NaN in numeric columns (TPC-DS)
+
+BenchBox has not run these TPC-DS queries on a GPU. The points below come from reading the BenchBox code and the cuDF documentation, not from a run.
+
+pandas stores a missing number as `NaN`, and the SQL reference reports it as `NULL`. To match the reference, the TPC-DS pandas-family queries convert missing values to `None` by casting the column to `object` and masking the missing rows. cuDF handles missing numbers differently in two ways:
+
+- **No separate NULL and NaN in checks.** cuDF marks a missing value with a null mask. Its `isna()` reports both a null and a floating-point `NaN` as missing, so BenchBox cannot tell a true `NULL` from a `NaN` that arithmetic produced (such as `0/0`) when it checks a numeric column.
+- **`object` means text.** cuDF uses the `object` type only for strings and does not store arbitrary Python objects. Casting a numeric column to `object` is therefore not the same as in pandas, and the numbers may come back as text or as a different type.
+
+The queries that apply this conversion to numeric result columns are Q12, Q20 and Q98 (item revenue and revenue ratio), Q66 (warehouse square footage and the per-square-foot columns), Q71 (`ext_price`) and Q76 (`sales_amt`). On cuDF, expect these queries to be the most likely to differ from the other platforms in how they report NULL or NaN, and in the type of those columns. Queries that convert only text columns (Q62, Q99 and Q21) are less exposed, because `object` already means text on cuDF. Check these results against a CPU platform before you rely on them. If you run them on a GPU, please report any difference.
+
 ## Python API
 
 ```python

@@ -55,6 +55,24 @@ _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 # Unread identifier fields: omit at the public boundary rather than publish a
 # confirmable pseudonym. Compact forms; see anonymization_specs.yaml.
 _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+# ``config.platform_option_sources`` maps each option to where its value came
+# from. These labels are the closed MetadataSource vocabulary in
+# benchbox/core/results/environment.py, not identifiers, so they stay readable
+# even when the option key itself (database, default_output_location, ...)
+# would be pseudonymised. A test keeps this set equal to that Literal.
+_OPTION_SOURCE_LABELS = frozenset(
+    {
+        "registered_default",
+        "saved_config",
+        "environment_variable",
+        "cli_option",
+        "runtime_override",
+        "requested",
+        "observed",
+        "inferred",
+        "unavailable",
+    }
+)
 # Optional nested maps that collapse to `{}` after drop keys are removed.
 # Omit the empty block rather than publishing a hollow object (e.g. client_host
 # that only held machine_id). Compact forms match ``_compact_key``.
@@ -711,6 +729,14 @@ class AnonymizationManager:
 
     def _anonymize_public_scalar(self, value: Any, key_path: tuple[str, ...]) -> Any:
         if value in (None, ""):
+            return value
+
+        if (
+            isinstance(value, str)
+            and value in _OPTION_SOURCE_LABELS
+            and len(key_path) >= 2
+            and _compact_key(key_path[-2]) == "platformoptionsources"
+        ):
             return value
 
         if isinstance(value, str) and self._looks_like_connection_string(value):

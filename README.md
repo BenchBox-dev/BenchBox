@@ -185,7 +185,7 @@ submission process.
 | Choose a benchmark | [Benchmark catalog](docs/benchmarks/index.md) |
 | Choose a platform | [Platform selection guide](docs/platforms/platform-selection-guide.md) |
 | Use a DataFrame runtime | [DataFrame platforms](docs/platforms/dataframe.md) |
-| Use the Python API | [Python API reference](docs/reference/python-api/index.rst) |
+| Use the Python API | [Python API reference](docs/reference/python-api/index.md) |
 | Find examples | [Examples guide](docs/usage/examples.md) |
 | Troubleshoot a run | [Troubleshooting guide](docs/usage/troubleshooting.md) |
 | Understand the design | [Architecture overview](docs/concepts/architecture.md) |

@@ -542,7 +542,7 @@ def test_candidate_selection_cli_is_stdlib_only_and_preserves_lock(
     assert (root / "uv.lock").read_bytes() == original
 
 
-def test_candidate_check_is_required_on_both_event_types_without_changing_legacy_publisher() -> None:
+def test_candidate_check_is_required_on_pull_requests_without_changing_legacy_publisher() -> None:
     import yaml
 
     workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
@@ -550,10 +550,7 @@ def test_candidate_check_is_required_on_both_event_types_without_changing_legacy
     assert "if" not in classifier
     steps = classifier["steps"]
     selection = next(step for step in steps if step.get("id") == "release")
-    assert (
-        selection["env"]["EVENT_BASE_SHA"]
-        == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
-    )
+    assert selection["env"]["EVENT_BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     assert 'git fetch --no-tags origin "$EVENT_BASE_SHA"' in selection["run"]
     check = next(step for step in steps if step.get("name") == "Check release content")
     assert check["if"] == "steps.release.outputs.release-check-needed == 'true'"

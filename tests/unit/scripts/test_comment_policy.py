@@ -716,7 +716,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     assert 'elif [ -z "$installed" ] && git merge-base --is-ancestor' in step["run"]
     assert "git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
-    assert "merge_group.base_sha" in step["env"]["BASE_REF"]
+    assert "merge_group" not in step["env"]["BASE_REF"]
     tooling = workflow["jobs"]["tooling"]
     assert "comment-policy" in tooling["needs"]
     assert any("--always comment-policy" in step.get("run", "") for step in tooling["steps"])
@@ -1160,3 +1160,168 @@ def test_consumer_digest_has_stable_python_version_encoding() -> None:
 
     tree = ast.parse("def consume(value):\n    return value + 1\n")
     assert python_consumer_digest(tree) == "sha256:c6aaea25c78f8f6fdbf83d97c11fe1be21e859156b678d34cfbcc79f8c261c69"
+
+
+ASTRO_SOURCE = """---
+// frontmatter explanation
+const title = "x";
+---
+<!-- template explanation -->
+<div>{/* expression explanation */}{title}</div>
+<style>
+  /* style explanation */
+  div { color: red; }
+</style>
+<script>
+  // script explanation
+  console.log("<!-- data -->");
+</script>
+"""
+
+
+def test_astro_sources_are_a_registered_maintained_language() -> None:
+    from comment_syntax import language
+
+    assert language("website/src/pages/index.astro") == "astro"
+    assert language("website/src/data.unregistered") == "unsupported"
+    assert "website/" in json.loads((ROOT / "quality/comment-policy.json").read_text(encoding="utf-8"))["completed"]
+
+
+def test_astro_template_comments_are_found_without_flagging_embedded_blocks() -> None:
+    source = "<div>{/* expression */}</div>\n<!-- html -->\n<style>a::after { content: '<!-- data -->'; }</style>\n"
+    findings = scan("a.astro", source, "astro", {})
+    assert [(f.line, f.kind, f.text) for f in findings if f.kind == "comment" and f.text.startswith("<!--")] == [
+        (2, "comment", "<!-- html -->")
+    ]
+
+
+ASTRO_STRING_MARKER_SOURCES = [
+    '<a title="<!-- data -->">x</a>\n',
+    "<a title='<!-- data -->'>x</a>\n",
+    '<p>{"<!-- data -->"}</p>\n',
+    "<p>{`<!-- ${x} -->`}</p>\n",
+    "---\nconst s = '<!-- data -->';\n---\n<p>x</p>\n",
+]
+
+
+def test_astro_html_comment_markers_inside_strings_are_data() -> None:
+    for source in ASTRO_STRING_MARKER_SOURCES:
+        assert not [f for f in scan("a.astro", source, "astro", {}) if f.text.startswith("<!--")]
+
+
+@pytest.mark.parametrize(
+    "source,expressions",
+    [
+        ("<p>{x /* c */}</p>\n", ["x /* c */"]),
+        ("<ul>{items.map((i) => /* c */ i)}</ul>\n", ["items.map((i) => /* c */ i)"]),
+        ("<p>{\n// c\nx}</p>\n", ["\n// c\nx"]),
+        ('<a href={u /* c */} class="b">x</a>\n', ["u /* c */"]),
+        ("<p>{cond && <b>{y /* c */}</b>}</p>\n", ["cond && <b>{y /* c */}</b>"]),
+        ("<p>{cond && <b>don't {y}</b> /* c */}</p>\n", ["cond && <b>don't {y}</b> /* c */"]),
+        ("<p>{`a ${b /* c */} d`}</p>\n", ["`a ${b /* c */} d`"]),
+    ],
+)
+def test_astro_template_expressions_are_scanned_as_typescript(source: str, expressions: list[str]) -> None:
+    requests = javascript_requests("a.astro", source, "astro")
+    assert list(requests.values()) == [f"[\n{text}\n];" for text in expressions]
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["<p>{x}</p>\n", '<a href="http://example.com">x</a>\n', '<p>{"http://example.com"}</p>\n'],
+)
+def test_astro_expressions_without_comment_tokens_need_no_parse(source: str) -> None:
+    requests = javascript_requests("a.astro", source, "astro")
+    assert all("//" in value or "/*" in value for value in requests.values())
+
+
+def test_astro_expression_comment_lines_map_to_source_lines() -> None:
+    source = "<div>\n  <p>\n    {\n      // c\n      x\n    }\n  </p>\n</div>\n"
+    requests = javascript_requests("a.astro", source, "astro")
+    rows = {key: [{"kind": "comment", "line": 3, "text": "// c", "symbol": ""}] for key in requests}
+    findings = scan("a.astro", source, "astro", rows)
+    assert [(f.line, f.text) for f in findings] == [(4, "// c")]
+
+
+@pytest.mark.parametrize(
+    "source,expressions",
+    [
+        ('<p>{/"/.test(s) /* c */}</p>\n', ['/"/.test(s) /* c */']),
+        ("<p>{/{/.test(s) /* c */}</p>\n", ["/{/.test(s) /* c */"]),
+        ('<p>{s.replace(/https?:\\/\\//, "") /* c */}</p>\n', ['s.replace(/https?:\\/\\//, "") /* c */']),
+        ("<p>{/a\\/*b/.test(s) /* c */}</p>\n", ["/a\\/*b/.test(s) /* c */"]),
+        ("<p>{/[/}]/.test(s) /* c */}</p>\n", ["/[/}]/.test(s) /* c */"]),
+        ("<p>{a / b /* c */}</p>\n", ["a / b /* c */"]),
+        ("<p>{x/2 /* c */}</p>\n", ["x/2 /* c */"]),
+        ("<p>{(a) / (b) // c\n}</p>\n", ["(a) / (b) // c\n"]),
+    ],
+)
+def test_astro_regex_literals_and_division_in_expressions(source: str, expressions: list[str]) -> None:
+    requests = javascript_requests("a.astro", source, "astro")
+    assert list(requests.values()) == [f"[\n{text}\n];" for text in expressions]
+    rows = {key: [{"kind": "comment", "line": 2, "text": "/* c */", "symbol": ""}] for key in requests}
+    findings = scan("a.astro", source, "astro", rows)
+    assert [f.kind for f in findings] == ["comment"]
+
+
+@pytest.mark.parametrize("source", ['<p>{/"/.test(s)}</p>\n', "<p>{/{/.test(s)}</p>\n", "<p>{a / b}</p>\n"])
+def test_astro_regex_literal_without_comment_tokens_is_not_a_coverage_error(source: str) -> None:
+    assert scan("a.astro", source, "astro", {}) == []
+
+
+def test_astro_frontmatter_regex_literal_with_backtick_does_not_open_a_template() -> None:
+    source = "---\nconst r = /`/;\nconst d = a / b;\n// c\n---\n<p>x</p>\n"
+    requests = javascript_requests("a.astro", source, "astro")
+    assert list(requests.values()) == ["const r = /`/;\nconst d = a / b;\n// c\n"]
+
+
+def test_astro_html_comment_inside_jsx_in_an_expression_is_found() -> None:
+    source = "<ul>{xs.map((x) => <li><!-- in jsx --></li>)}</ul>\n<p>{'<!-- data -->'}</p>\n"
+    findings = scan("a.astro", source, "astro", {})
+    assert [(f.line, f.text) for f in findings] == [(1, "<!-- in jsx -->")]
+
+
+def test_astro_frontmatter_ends_at_the_first_top_level_fence() -> None:
+    source = "---\nconst text = `\n---\nstill code\n`;\nconst other = '---';\n---\n<p>{text}</p>\n"
+    requests = javascript_requests("a.astro", source, "astro")
+    assert list(requests.values()) == ["const text = `\n---\nstill code\n`;\nconst other = '---';\n"]
+    assert not scan("a.astro", source, "astro", {k: [] for k in requests})
+
+
+def test_astro_frontmatter_fence_after_comment_and_interpolation() -> None:
+    source = "---\n// ---\nconst a = `${'}'}`;\n/*\n---\n*/\n---\n<p>x</p>\n"
+    requests = javascript_requests("a.astro", source, "astro")
+    assert list(requests.values()) == ["// ---\nconst a = `${'}'}`;\n/*\n---\n*/\n"]
+
+
+def test_astro_unterminated_frontmatter_is_a_coverage_error() -> None:
+    findings = scan("a.astro", "---\nconst a = 1;\n<p>x</p>\n", "astro", {})
+    assert [f.kind for f in findings] == ["coverage-error"]
+
+
+def test_astro_frontmatter_script_and_style_are_scanned_as_their_own_languages() -> None:
+    requests = javascript_requests("a.astro", ASTRO_SOURCE, "astro")
+    assert len(requests) == 3
+    comments = ["// frontmatter explanation", "// script explanation", "/* expression explanation */"]
+    lines = [1, 1, 2]
+    rows = {
+        key: [{"kind": "comment", "line": line, "text": text, "symbol": ""}]
+        for key, text, line in zip(requests, comments, lines, strict=True)
+    }
+    assert list(requests.values()) == [
+        '// frontmatter explanation\nconst title = "x";\n',
+        '\n  // script explanation\n  console.log("<!-- data -->");\n',
+        "[\n/* expression explanation */\n];",
+    ]
+    findings = scan("a.astro", ASTRO_SOURCE, "astro", rows)
+    assert sorted((f.line, f.text) for f in findings) == [
+        (2, "// frontmatter explanation"),
+        (5, "<!-- template explanation -->"),
+        (6, "/* expression explanation */"),
+        (8, "/* style explanation */"),
+        (11, "// script explanation"),
+    ]
+
+
+def test_astro_without_frontmatter_has_no_javascript_requests() -> None:
+    assert javascript_requests("a.astro", "<p>text</p>\n", "astro") == {}

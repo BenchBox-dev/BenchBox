@@ -68,17 +68,35 @@ def _none_for_null(frame: Any, columns: list[str]) -> Any:
     """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does.
 
     Only a column that actually holds a NULL is converted, so a result without NULLs keeps its native
-    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame is
-    returned unchanged: finding out whether a column holds a NULL would compute it.
+    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame cannot
+    be asked whether a column holds a NULL without computing it, so every named column is converted
+    lazily (``notna`` is missing on a Dask Series, hence ``~isna()``).
     """
     if hasattr(frame, "npartitions"):
-        return frame
+        return frame.assign(
+            **{column: frame[column].astype(object).where(~frame[column].isna(), None) for column in columns}
+        )
     frame = frame.copy()
     for column in columns:
         nulls = frame[column].isna()
         if nulls.any():
             frame[column] = frame[column].astype(object).where(~nulls, None)
     return frame
+
+
+def _round_half_up_expression(expr: Any, decimals: int) -> Any:
+    """SQL ``ROUND`` for a non-negative value: halves round up, where Polars rounds them to even.
+
+    ``0.625`` is exact in binary, so ``round(0.625, 2)`` is 0.63 in SQL and 0.62 on Polars.
+    """
+    scale = 10**decimals
+    return (expr * scale + 0.5).floor() / scale
+
+
+def _round_half_up_pandas(values: Any, decimals: int) -> Any:
+    """pandas counterpart of ``_round_half_up_expression`` (``Series.round`` rounds halves to even)."""
+    scale = 10**decimals
+    return ((values * scale + 0.5) // 1) / scale
 
 
 def _filter_value(params: Any, param_name: str | None, default: Any) -> Any:
@@ -112,8 +130,11 @@ def _date_item_sales_expression(
     alias: str,
     sort_by: tuple[str, ...],
     descending: tuple[bool, ...],
+    value_param: str | None = None,
 ) -> Any:
+    """``value_param`` names the parameter that picks the summed column, for a template that draws it."""
     params = get_parameters(query_id)
+    value_col = _filter_value(params, value_param, value_col)
     date_dim, store_sales, item = _tables(ctx, "date_dim", "store_sales", "item")
     filtered = (
         date_dim.join(store_sales, left_on="d_date_sk", right_on="ss_sold_date_sk")
@@ -137,8 +158,10 @@ def _date_item_sales_pandas(
     alias: str,
     sort_by: tuple[str, ...],
     descending: tuple[bool, ...],
+    value_param: str | None = None,
 ) -> Any:
     params = get_parameters(query_id)
+    value_col = _filter_value(params, value_param, value_col)
     merged = ctx.get_table("date_dim").merge(
         ctx.get_table("store_sales"), left_on="d_date_sk", right_on="ss_sold_date_sk"
     )
@@ -194,8 +217,10 @@ def _manufacturer_month_expression(
     )
     with_avg = grouped.with_columns(ctx.window_avg(alias, partition_by=[id_col]).alias(avg_alias))
     # SQL keeps rows where ABS(sum-avg)/avg > 0.1 with avg > 0 (else NULL, filtered out).
+    # The period column only separates the groups; the SQL does not select it.
     return (
         with_avg.filter((col(avg_alias) > lit(0)) & ((col(alias) - col(avg_alias)).abs() / col(avg_alias) > lit(0.1)))
+        .select([id_col, alias, avg_alias])
         .sort(list(sort_by))
         .limit(100)
     )
@@ -237,7 +262,8 @@ def _manufacturer_month_pandas(
     grouped = filtered.groupby([id_col, period_col], as_index=False).agg(**{alias: (value_col, "sum")})
     grouped[avg_alias] = grouped.groupby(id_col)[alias].transform("mean")
     kept = grouped[(grouped[avg_alias] > 0) & ((grouped[alias] - grouped[avg_alias]).abs() / grouped[avg_alias] > 0.1)]
-    return kept.sort_values(list(sort_by)).head(100)
+    # The period column only separates the groups; the SQL does not select it.
+    return kept[[id_col, alias, avg_alias]].sort_values(list(sort_by)).head(100)
 
 
 def _item_category_sales_expression(
@@ -275,9 +301,11 @@ def _item_category_sales_expression(
             .alias("itemrevenue")
         )
     )
-    ranked = grouped.with_columns(
+    with_ratio = grouped.with_columns(
         (col("itemrevenue") * 100 / ctx.window_sum("itemrevenue", partition_by=["i_class"])).alias("revenueratio")
-    ).sort(list(sort_by))
+    )
+    # Every key ascends, so the reference puts NULLs last; Polars puts them first.
+    ranked = _sort_null_largest_expression(ctx, with_ratio, list(sort_by), [False] * len(sort_by))
     return ranked if limit is None else ranked.limit(limit)
 
 
@@ -303,13 +331,19 @@ def _item_category_sales_pandas(
     filtered = merged[
         (merged["i_category"].isin(categories)) & (merged["d_date"] >= start_date) & (merged["d_date"] <= end_date)
     ]
-    # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it.
-    grouped = filtered.groupby(list(group_by), as_index=False).agg(
-        itemrevenue=(value_col, lambda values: values.sum(min_count=1))
+    # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it. Dask has no lambda
+    # aggregation, so the sum is masked where no input was non-NULL. A NULL key is its own group in SQL.
+    grouped = filtered.groupby(list(group_by), as_index=False, dropna=False).agg(
+        itemrevenue=(value_col, "sum"), priced=(value_col, "count")
     )
-    grouped["revenueratio"] = grouped["itemrevenue"] * 100 / grouped.groupby("i_class")["itemrevenue"].transform("sum")
-    ordered = grouped.sort_values(list(sort_by))
-    result = ordered if limit is None else ordered.head(limit)
+    grouped["itemrevenue"] = grouped["itemrevenue"].where(grouped["priced"] > 0)
+    grouped = grouped.drop(columns=["priced"])
+    grouped["revenueratio"] = (
+        grouped["itemrevenue"] * 100 / grouped.groupby("i_class", dropna=False)["itemrevenue"].transform("sum")
+    )
+    ordered = grouped.sort_values(list(sort_by), na_position="last")
+    # A NULL group key is NULL in SQL, not NaN.
+    result = _none_for_null(ordered if limit is None else ordered.head(limit), list(group_by))
     # Only a group with no non-NULL input is NULL; a zero-total class gives NaN (0/0) in SQL too.
     null_groups = result["itemrevenue"].isna()
     for column in ("itemrevenue", "revenueratio"):
@@ -327,20 +361,25 @@ def _excess_discount_expression(
     manufact_id: int,
     sales_date_default: str = "1998-03-18",
 ) -> Any:
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
     col = ctx.col
     lit = ctx.lit
+    # The SQL's subquery is correlated on the item (``cs_item_sk = i_item_sk``): each sale is compared with
+    # the average discount of its own item over the window, not the average over every item.
     avg_discount = (
         sales.join(date_dim, left_on=date_key, right_on="d_date_sk")
         .filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
-        .select(col(discount_col).mean().alias("avg_discount"))
+        .group_by(item_key)
+        .agg(col(discount_col).mean().alias("avg_discount"))
+        .select(col(item_key).alias("avg_item_sk"), col("avg_discount"))
     )
     return (
         sales.join(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
         .join(date_dim, left_on=date_key, right_on="d_date_sk")
-        .join(avg_discount, how="cross")
+        .join(avg_discount, left_on=item_key, right_on="avg_item_sk")
         .filter(
             (col("i_manufact_id") == lit(manufact_id))
             & (col("d_date") >= lit(start_date))
@@ -375,22 +414,24 @@ def _excess_discount_pandas(
 ) -> Any:
     import pandas as pd
 
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim").copy()
     if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
         date_dim["d_date"] = pd.to_datetime(date_dim["d_date"]).dt.date
+    # The SQL's subquery is correlated on the item: compare each sale with its own item's average discount.
     merged_for_avg = sales.merge(date_dim, left_on=date_key, right_on="d_date_sk")
-    avg_discount = merged_for_avg[(merged_for_avg["d_date"] >= start_date) & (merged_for_avg["d_date"] <= end_date)][
-        discount_col
-    ].mean()
+    in_window = merged_for_avg[(merged_for_avg["d_date"] >= start_date) & (merged_for_avg["d_date"] <= end_date)]
+    avg_discount = in_window.groupby(item_key)[discount_col].mean().rename("avg_discount").reset_index()
     merged = sales.merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
     merged = merged.merge(date_dim, left_on=date_key, right_on="d_date_sk")
+    merged = merged.merge(avg_discount, on=item_key)
     filtered = merged[
         (merged["i_manufact_id"] == manufact_id)
         & (merged["d_date"] >= start_date)
         & (merged["d_date"] <= end_date)
-        & (merged[discount_col] > 1.3 * avg_discount)
+        & (merged[discount_col] > 1.3 * merged["avg_discount"])
     ]
     # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
     if len(filtered) == 0:
@@ -1084,7 +1125,7 @@ def _promotion_sales_pandas(
         & ((merged["p_channel_email"] == "N") | (merged["p_channel_event"] == "N"))
         & (merged["d_year"] == year)
     ]
-    return (
+    result = (
         filtered.groupby(["i_item_id"], as_index=False)
         .agg(
             agg1=(quantity_col, "mean"),
@@ -1095,6 +1136,8 @@ def _promotion_sales_pandas(
         .sort_values(["i_item_id"])
         .head(100)
     )
+    # AVG over only NULLs is NULL; pandas reports NaN.
+    return _none_for_null(result, ["agg1", "agg2", "agg3", "agg4"])
 
 
 def _web_multi_warehouse_orders_expression(ctx: DataFrameContext, web_sales: Any, optimized: bool) -> Any:
@@ -1473,21 +1516,22 @@ def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: li
 
 
 def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
-    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort).
-
-    When every key points the same way one ``na_position`` is enough (last when ascending, first when
-    descending). A mix needs the ``is_null`` flag columns, which Dask cannot sort on (its optimizer
-    drops them), so on Dask a mixed sort keeps NULLs last for every key.
-    """
     if all(descending):
         return frame.sort_values(columns, ascending=[False] * len(columns), na_position="first")
-    if not any(descending) or hasattr(frame, "npartitions"):
-        return frame.sort_values(columns, ascending=[not value for value in descending], na_position="last")
+    if not any(descending):
+        return frame.sort_values(columns, ascending=[True] * len(columns), na_position="last")
     flags = [f"_null_{index}" for index in range(len(columns))]
     keyed = frame.assign(**{flag: frame[name].isna() for name, flag in zip(columns, flags)})
     by = [name for pair in zip(flags, columns) for name in pair]
     ascending = [not value for value in descending for _ in range(2)]
-    return keyed.sort_values(by, ascending=ascending, na_position="last").drop(columns=flags)
+    ordered = keyed.sort_values(by, ascending=ascending, na_position="last")
+    if hasattr(frame, "npartitions"):
+        return ordered.map_partitions(_drop_columns, flags, meta=frame._meta)
+    return ordered.drop(columns=flags)
+
+
+def _drop_columns(partition: Any, columns: list[str]) -> Any:
+    return partition.drop(columns=columns)
 
 
 def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
@@ -1513,7 +1557,9 @@ def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> 
         list(spec.get("descending", (False,) * len(spec["sort_by"]))),
     )
     limit = spec.get("limit", 100)
-    return result if limit is None else result.limit(limit)
+    result = result if limit is None else result.limit(limit)
+    # Group keys the SQL groups by but does not return (Q91's marital and education status).
+    return result.select(*spec["select"]) if "select" in spec else result
 
 
 def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
@@ -1538,7 +1584,9 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     descending = spec.get("descending", (False,) * len(spec["sort_by"]))
     result = _sort_null_largest_pandas(result, list(spec["sort_by"]), list(descending))
     limit = spec.get("limit", 100)
-    return result if limit is None else result.head(limit)
+    result = result if limit is None else result.head(limit)
+    # Group keys the SQL groups by but does not return (Q91's marital and education status).
+    return result[list(spec["select"])] if "select" in spec else result
 
 
 def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
@@ -1718,6 +1766,20 @@ def q96_pandas_impl(ctx: DataFrameContext) -> Any:
     return pd.DataFrame({"count": [count]})
 
 
+# The template fixes the base month (``d1.d_moy = 4``) and the return and re-purchase window
+# (``d_moy between 4 and 10``); it draws the year and the aggregate applied to all three measures.
+_Q25_FIRST_MONTH = 4
+_Q25_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+
+
+def _q25_aggregate(name: str) -> str:
+    """The column-aggregate method (Polars-style and pandas share these names) for a template ``AGG`` value."""
+    try:
+        return _Q25_AGGREGATES[name]
+    except KeyError:
+        raise ValueError(f"Q25 AGG must be one of {sorted(_Q25_AGGREGATES)}, got {name!r}") from None
+
+
 def q25_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q25: Store/Catalog Sales Item Analysis (Expression Family).
 
@@ -1728,7 +1790,8 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
     """
     params = get_parameters(25)
     year = params.get("year", 2000)
-    month = params.get("month", 4)
+    agg = _q25_aggregate(params.get("agg", "sum"))
+    month = _Q25_FIRST_MONTH
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
@@ -1765,9 +1828,9 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
         .join(d3.select("d_date_sk"), left_on="cs_sold_date_sk", right_on="d_date_sk")
         .group_by("i_item_id", "i_item_desc", "s_store_id", "s_store_name")
         .agg(
-            col("ss_net_profit").sum().alias("store_sales_profit"),
-            col("sr_net_loss").sum().alias("store_returns_loss"),
-            col("cs_net_profit").sum().alias("catalog_sales_profit"),
+            getattr(col("ss_net_profit"), agg)().alias("store_sales_profit"),
+            getattr(col("sr_net_loss"), agg)().alias("store_returns_loss"),
+            getattr(col("cs_net_profit"), agg)().alias("catalog_sales_profit"),
         )
         .sort("i_item_id", "i_item_desc", "s_store_id", "s_store_name")
         .limit(100)
@@ -1778,7 +1841,8 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q25: Store/Catalog Sales Item Analysis (Pandas Family)."""
     params = get_parameters(25)
     year = params.get("year", 2000)
-    month = params.get("month", 4)
+    agg = _q25_aggregate(params.get("agg", "sum"))
+    month = _Q25_FIRST_MONTH
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
@@ -1812,9 +1876,9 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     return (
         merged.groupby(["i_item_id", "i_item_desc", "s_store_id", "s_store_name"], as_index=False)
         .agg(
-            store_sales_profit=("ss_net_profit", "sum"),
-            store_returns_loss=("sr_net_loss", "sum"),
-            catalog_sales_profit=("cs_net_profit", "sum"),
+            store_sales_profit=("ss_net_profit", agg),
+            store_returns_loss=("sr_net_loss", agg),
+            catalog_sales_profit=("cs_net_profit", agg),
         )
         .sort_values(["i_item_id", "i_item_desc", "s_store_id", "s_store_name"])
         .head(100)
@@ -2122,11 +2186,9 @@ def q79_expression_impl(ctx: DataFrameContext) -> Any:
     """
     params = get_parameters(79)
     year = params.get("year", 1998)
-    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
-    dow = params.get("dow", 1)
+    years = [year, year + 1, year + 2]
     dep_count = params.get("dep_count", 8)
-    emp_min = params.get("emp_min", 200)
-    emp_max = params.get("emp_max", 295)
+    vehicle_count = params.get("vehicle_count", 0)
     col = ctx.col
     lit = ctx.lit
     inner = (
@@ -2136,9 +2198,9 @@ def q79_expression_impl(ctx: DataFrameContext) -> Any:
         .join(ctx.get_table("household_demographics"), left_on="ss_hdemo_sk", right_on="hd_demo_sk")
         .filter(
             col("d_year").is_in(years)
-            & (col("d_dow") == lit(dow))
-            & ((col("hd_dep_count") == lit(dep_count)) | (col("hd_vehicle_count") > lit(0)))
-            & col("s_number_employees").is_between(emp_min, emp_max)
+            & (col("d_dow") == lit(1))
+            & ((col("hd_dep_count") == lit(dep_count)) | (col("hd_vehicle_count") > lit(vehicle_count)))
+            & col("s_number_employees").is_between(200, 295)
         )
         .group_by("ss_ticket_number", "ss_customer_sk", "ss_addr_sk", col("s_city").alias("s_city"))
         # SQL SUM() over all-NULL inputs is NULL (not 0.0): carry non-null
@@ -2170,11 +2232,9 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q79: Store Sales Customer/Store Profit (Pandas Family)."""
     params = get_parameters(79)
     year = params.get("year", 1998)
-    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
-    dow = params.get("dow", 1)
+    years = [year, year + 1, year + 2]
     dep_count = params.get("dep_count", 8)
-    emp_min = params.get("emp_min", 200)
-    emp_max = params.get("emp_max", 295)
+    vehicle_count = params.get("vehicle_count", 0)
 
     store_sales, date_dim, store, household_demographics, customer = _tables(
         ctx, "store_sales", "date_dim", "store", "household_demographics", "customer"
@@ -2184,10 +2244,10 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
     filtered = merged[
         (merged["d_year"].isin(years))
-        & (merged["d_dow"] == dow)
-        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] > 0))
-        & (merged["s_number_employees"] >= emp_min)
-        & (merged["s_number_employees"] <= emp_max)
+        & (merged["d_dow"] == 1)
+        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] > vehicle_count))
+        & (merged["s_number_employees"] >= 200)
+        & (merged["s_number_employees"] <= 295)
     ]
     inner = filtered.groupby(
         ["ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "s_city"], as_index=False, dropna=False
@@ -2467,17 +2527,23 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(1)
     year = params.get("year", 2000)
     state = params.get("state", "TN")
+    agg_field = params.get("agg_field")
 
     store_returns, date_dim, store, customer = _tables(ctx, "store_returns", "date_dim", "store", "customer")
     col = ctx.col
     lit = ctx.lit
 
-    # CTE: returns per customer and store (SQL sums SR_FEE, not the return amount).
+    # CTE: returns per customer and store (the template draws which return column is summed).
     customer_total = (
         store_returns.join(date_dim, left_on="sr_returned_date_sk", right_on="d_date_sk")
         .filter(col("d_year") == lit(year))
         .group_by(col("sr_customer_sk").alias("ctr_customer_sk"), col("sr_store_sk").alias("ctr_store_sk"))
-        .agg(col("sr_fee").sum().alias("ctr_total_return"))
+        .agg(
+            ctx.when(col(agg_field).count() > lit(0))
+            .then(col(agg_field).sum())
+            .otherwise(lit(None))
+            .alias("ctr_total_return")
+        )
     )
 
     # Correlated per-store average: average over the same store only.
@@ -2500,15 +2566,19 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(1)
     year = params.get("year", 2000)
     state = params.get("state", "TN")
+    agg_field = params.get("agg_field")
 
     store_returns, date_dim, store, customer = _tables(ctx, "store_returns", "date_dim", "store", "customer")
 
-    # CTE: returns per customer and store (SQL sums SR_FEE, not the return amount).
+    # CTE: returns per customer and store (the template draws which return column is summed).
     merged = store_returns.merge(date_dim[["d_date_sk", "d_year"]], left_on="sr_returned_date_sk", right_on="d_date_sk")
     merged = merged[merged["d_year"] == year]
     customer_total = merged.groupby(["sr_customer_sk", "sr_store_sk"], as_index=False, dropna=False).agg(
-        ctr_total_return=("sr_fee", "sum")
+        ctr_total_return=(agg_field, "sum"), priced=(agg_field, "count")
     )
+    # SQL SUM over only NULLs is NULL; pandas sums them to 0 (a lambda aggregation is not available on Dask).
+    customer_total["ctr_total_return"] = customer_total["ctr_total_return"].where(customer_total["priced"] > 0)
+    customer_total = customer_total.drop(columns=["priced"])
     customer_total = customer_total.rename(columns={"sr_customer_sk": "ctr_customer_sk", "sr_store_sk": "ctr_store_sk"})
 
     # Correlated per-store average: average over the same store only.
@@ -3502,6 +3572,11 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+# The template fixes these lists; only the year, quarter and group-by column are drawn.
+_Q45_ZIP_CODES = ["85669", "86197", "88274", "83405", "86475", "85392", "85460", "80348", "81792"]
+_Q45_ITEM_SKS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+
+
 def q45_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q45: Web Sales Customer Zip Analysis (Expression Family).
 
@@ -3514,8 +3589,9 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(45)
     year = params.get("year", 2000)
     qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["85669", "86197", "88274", "83405", "86475"])
-    item_sks = params.get("item_sks", [2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+    group_column = params.get("gbobc", "ca_county")
+    zip_codes = _Q45_ZIP_CODES
+    item_sks = _Q45_ITEM_SKS
 
     web_sales, customer, customer_address, date_dim, item = _tables(
         ctx, "web_sales", "customer", "customer_address", "date_dim", "item"
@@ -3529,7 +3605,7 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Join tables and filter
-    return (
+    grouped = (
         web_sales.join(customer, left_on="ws_bill_customer_sk", right_on="c_customer_sk")
         .join(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
         .join(item, left_on="ws_item_sk", right_on="i_item_sk")
@@ -3539,11 +3615,11 @@ def q45_expression_impl(ctx: DataFrameContext) -> Any:
             & (col("d_year") == lit(year))
             & (col("ca_zip").cast_string().str.slice(0, 5).is_in(zip_codes) | col("i_item_id").is_in(item_ids_list))
         )
-        .group_by(col("ca_zip"), col("ca_county"))
+        .group_by(col("ca_zip"), col(group_column))
         .agg(col("ws_sales_price").sum().alias("sum_ws_sales_price"))
-        .sort("ca_zip", "ca_county")
-        .limit(100)
     )
+    # The grouping columns can be NULL (ca_city, ca_state, ca_zip); NULL sorts last in the SQL.
+    return _sort_null_largest_expression(ctx, grouped, ["ca_zip", group_column], [False, False]).limit(100)
 
 
 def q45_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3551,8 +3627,9 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(45)
     year = params.get("year", 2000)
     qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["85669", "86197", "88274", "83405", "86475"])
-    item_sks = params.get("item_sks", [2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+    group_column = params.get("gbobc", "ca_county")
+    zip_codes = _Q45_ZIP_CODES
+    item_sks = _Q45_ITEM_SKS
 
     web_sales, customer, customer_address, date_dim, item = _tables(
         ctx, "web_sales", "customer", "customer_address", "date_dim", "item"
@@ -3574,24 +3651,23 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["ca_zip"].str[:5].isin(zip_codes) | merged["i_item_id"].isin(item_ids))
     ]
 
-    # Group and aggregate
-    return (
-        filtered.groupby(["ca_zip", "ca_county"], as_index=False)
-        .agg(sum_ws_sales_price=("ws_sales_price", "sum"))
-        .sort_values(["ca_zip", "ca_county"])
-        .head(100)
+    # Group and aggregate. SQL GROUP BY keeps a NULL key as its own group, which pandas drops by default.
+    grouped = filtered.groupby(["ca_zip", group_column], as_index=False, dropna=False).agg(
+        sum_ws_sales_price=("ws_sales_price", "sum")
     )
+    ordered = _sort_null_largest_pandas(grouped, ["ca_zip", group_column], [False, False]).head(100)
+    return _none_for_null(ordered, ["ca_zip", group_column])
 
 
 def _q90_params() -> tuple[int, int, int, int, int]:
     params = get_parameters(90)
-    hours = params.get("hours", [(8, 9), (19, 20)])
+    # The template fixes the web page character-count range; only the hours and dependent count are drawn.
     return (
-        params.get("hour_am", hours[0][0]),
-        params.get("hour_pm", hours[1][0]),
+        params.get("hour_am", 8),
+        params.get("hour_pm", 19),
         params.get("dep_count", 8),
-        params.get("char_count_min", 5000),
-        params.get("char_count_max", 5200),
+        5000,
+        5200,
     )
 
 
@@ -3638,7 +3714,7 @@ def q83_expression_impl(ctx: DataFrameContext) -> Any:
     for items returned during specific date ranges.
     """
     params = get_parameters(83)
-    return_dates = params.get("dates", params.get("return_dates", ["2000-06-30", "2000-09-27", "2000-11-17"]))
+    return_dates = params.get("dates", ["1998-01-02", "1998-10-15", "1998-11-10"])
 
     col = ctx.col
     lit = ctx.lit
@@ -3714,7 +3790,7 @@ def q83_expression_impl(ctx: DataFrameContext) -> Any:
 def q83_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q83: Cross-Channel Returns Analysis (Pandas Family)."""
     params = get_parameters(83)
-    return_dates = params.get("dates", params.get("return_dates", ["2000-06-30", "2000-09-27", "2000-11-17"]))
+    return_dates = params.get("dates", ["1998-01-02", "1998-10-15", "1998-11-10"])
 
     # Get tables
     store_returns, catalog_returns, web_returns, item, date_dim = _tables(
@@ -4126,6 +4202,17 @@ def q36_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+def _q51_running_total(ctx: DataFrameContext, item_key: str) -> Any:
+    """SQL's running SUM over the day sums of one item: a day whose sum is NULL repeats the total so far.
+
+    The total stays NULL until the item has had a day with a value, which is what the SQL window gives.
+    """
+    col, lit = ctx.col, ctx.lit
+    seen = ctx.when(col("daily_sales").is_not_null()).then(1).otherwise(0).cum_sum().over([item_key])
+    total = col("daily_sales").fill_null(0).cum_sum().over([item_key])
+    return ctx.when(seen > lit(0)).then(total).otherwise(lit(None))
+
+
 def q51_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q51: Cumulative Web/Store Sales (Expression Family).
 
@@ -4149,13 +4236,18 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
         web_sales.filter(col("ws_item_sk").is_not_null())
         .join(dates, left_on="ws_sold_date_sk", right_on="d_date_sk")
         .group_by(["ws_item_sk", "d_date"])
-        .agg(col("ws_sales_price").sum().alias("daily_sales"))
+        .agg(
+            ctx.when(col("ws_sales_price").count() > lit(0))
+            .then(col("ws_sales_price").sum())
+            .otherwise(lit(None))
+            .alias("daily_sales")
+        )
     )
 
     # Add cumulative sum
     web_v1 = (
         web_base.sort(["ws_item_sk", "d_date"])
-        .with_columns(col("daily_sales").cum_sum().over(["ws_item_sk"]).alias("cume_sales"))
+        .with_columns(_q51_running_total(ctx, "ws_item_sk").alias("cume_sales"))
         .select(
             col("ws_item_sk").alias("item_sk"),
             col("d_date"),
@@ -4168,12 +4260,17 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
         store_sales.filter(col("ss_item_sk").is_not_null())
         .join(dates, left_on="ss_sold_date_sk", right_on="d_date_sk")
         .group_by(["ss_item_sk", "d_date"])
-        .agg(col("ss_sales_price").sum().alias("daily_sales"))
+        .agg(
+            ctx.when(col("ss_sales_price").count() > lit(0))
+            .then(col("ss_sales_price").sum())
+            .otherwise(lit(None))
+            .alias("daily_sales")
+        )
     )
 
     store_v1 = (
         store_base.sort(["ss_item_sk", "d_date"])
-        .with_columns(col("daily_sales").cum_sum().over(["ss_item_sk"]).alias("cume_sales"))
+        .with_columns(_q51_running_total(ctx, "ss_item_sk").alias("cume_sales"))
         .select(
             col("ss_item_sk").alias("item_sk"),
             col("d_date"),
@@ -4227,6 +4324,11 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def _q51_running_total_pandas(base: Any, item_key: str) -> Any:
+    """SQL's running SUM over the day sums of one item (see ``_q51_running_total``)."""
+    return base.groupby(item_key)["daily_sales"].cumsum().groupby(base[item_key], sort=False).ffill()
+
+
 def q51_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q51: Cumulative Web/Store Sales (Pandas Family)."""
     params = get_parameters(51)
@@ -4242,9 +4344,11 @@ def q51_pandas_impl(ctx: DataFrameContext) -> Any:
     web_merged = web_sales[web_sales["ws_item_sk"].notna()].merge(
         dates[["d_date_sk", "d_date"]], left_on="ws_sold_date_sk", right_on="d_date_sk"
     )
-    web_base = web_merged.groupby(["ws_item_sk", "d_date"], as_index=False).agg(daily_sales=("ws_sales_price", "sum"))
+    web_base = web_merged.groupby(["ws_item_sk", "d_date"], as_index=False).agg(
+        daily_sales=("ws_sales_price", lambda values: values.sum(min_count=1))
+    )
     web_base = web_base.sort_values(["ws_item_sk", "d_date"])
-    web_base["cume_sales"] = web_base.groupby("ws_item_sk")["daily_sales"].cumsum()
+    web_base["cume_sales"] = _q51_running_total_pandas(web_base, "ws_item_sk")
     web_v1 = web_base[["ws_item_sk", "d_date", "cume_sales"]].rename(columns={"ws_item_sk": "item_sk"})
 
     # Store CTE
@@ -4252,10 +4356,10 @@ def q51_pandas_impl(ctx: DataFrameContext) -> Any:
         dates[["d_date_sk", "d_date"]], left_on="ss_sold_date_sk", right_on="d_date_sk"
     )
     store_base = store_merged.groupby(["ss_item_sk", "d_date"], as_index=False).agg(
-        daily_sales=("ss_sales_price", "sum")
+        daily_sales=("ss_sales_price", lambda values: values.sum(min_count=1))
     )
     store_base = store_base.sort_values(["ss_item_sk", "d_date"])
-    store_base["cume_sales"] = store_base.groupby("ss_item_sk")["daily_sales"].cumsum()
+    store_base["cume_sales"] = _q51_running_total_pandas(store_base, "ss_item_sk")
     store_v1 = store_base[["ss_item_sk", "d_date", "cume_sales"]].rename(columns={"ss_item_sk": "item_sk"})
 
     # Full outer join
@@ -5068,6 +5172,24 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+_Q31_ORDER_COLUMNS = (
+    "ca_county",
+    "d_year",
+    "web_q1_q2_increase",
+    "store_q1_q2_increase",
+    "web_q2_q3_increase",
+    "store_q2_q3_increase",
+)
+
+
+def _q31_order_column(order_by: str) -> str:
+    """The output column for the template's ``ORDER BY [AGG]`` (a column, optionally qualified as ``ss1.``)."""
+    column = order_by.rpartition(".")[2]
+    if column not in _Q31_ORDER_COLUMNS:
+        raise ValueError(f"Q31 ORDER BY must be one of {list(_Q31_ORDER_COLUMNS)}, got {order_by!r}")
+    return column
+
+
 def q31_expression_impl(ctx: DataFrameContext) -> Any:
     """Q31: Store/Web quarterly sales growth by county (Polars).
 
@@ -5080,6 +5202,7 @@ def q31_expression_impl(ctx: DataFrameContext) -> Any:
     # Parameters
     params = get_parameters(31)
     year = params.get("year", 2000)
+    order_by = _q31_order_column(params.get("order_by", "ss1.ca_county"))
 
     # Get tables
     store_sales, web_sales, date_dim, customer_address = _tables(
@@ -5173,7 +5296,7 @@ def q31_expression_impl(ctx: DataFrameContext) -> Any:
             col("web_q2_q3_increase"),
             col("store_q2_q3_increase"),
         ]
-    ).sort("ca_county")
+    ).sort(order_by)
 
 
 def q31_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5181,6 +5304,7 @@ def q31_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q31: Store/Web quarterly sales growth by county (Pandas)."""
     params = get_parameters(31)
     year = params.get("year", 2000)
+    order_by = _q31_order_column(params.get("order_by", "ss1.ca_county"))
 
     # Get tables
     store_sales, web_sales, date_dim, customer_address = _tables(
@@ -5266,7 +5390,7 @@ def q31_pandas_impl(ctx: DataFrameContext) -> Any:
             "web_q2_q3_increase",
             "store_q2_q3_increase",
         ]
-    ].sort_values("ca_county")
+    ].sort_values(order_by)
 
 
 # =============================================================================
@@ -6146,9 +6270,15 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
     ) -> Any:
         return (
             ctx.get_table(sales_table)
-            .join(ctx.get_table(returns_table), left_on=left_on, right_on=right_on, how="left")
+            # SQL tests the returns key for NULL. A join drops that key from the result, so keep a copy.
+            .join(
+                ctx.get_table(returns_table).with_columns(col(return_null_col).alias("_returned")),
+                left_on=left_on,
+                right_on=right_on,
+                how="left",
+            )
             .join(date_dim, left_on=date_key, right_on="d_date_sk")
-            .filter(col(return_null_col).is_null())
+            .filter(col("_returned").is_null())
             .group_by(group_cols)
             .agg(
                 [
@@ -6175,7 +6305,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["ss_ticket_number", "ss_item_sk"],
         ["sr_ticket_number", "sr_item_sk"],
         "ss_sold_date_sk",
-        "sr_returned_date_sk",
+        "sr_ticket_number",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         "ss_quantity",
         "ss_wholesale_cost",
@@ -6188,7 +6318,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["cs_order_number", "cs_item_sk"],
         ["cr_order_number", "cr_item_sk"],
         "cs_sold_date_sk",
-        "cr_returned_date_sk",
+        "cr_order_number",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         "cs_quantity",
         "cs_wholesale_cost",
@@ -6207,7 +6337,7 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         ["ws_order_number", "ws_item_sk"],
         ["wr_order_number", "wr_item_sk"],
         "ws_sold_date_sk",
-        "wr_returned_date_sk",
+        "wr_order_number",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         "ws_quantity",
         "ws_wholesale_cost",
@@ -6240,12 +6370,11 @@ def q78_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .with_columns(
             [
-                (
+                _round_half_up_expression(
                     col("ss_qty").cast_float64()
-                    / (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).cast_float64()
-                )
-                .round(2)
-                .alias("ratio"),
+                    / (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).cast_float64(),
+                    2,
+                ).alias("ratio"),
                 (col("ws_qty").fill_null(0) + col("cs_qty").fill_null(0)).alias("other_chan_qty"),
                 (col("ws_wc").fill_null(0) + col("cs_wc").fill_null(0)).alias("other_chan_wholesale_cost"),
                 (col("ws_sp").fill_null(0) + col("cs_sp").fill_null(0)).alias("other_chan_sales_price"),
@@ -6325,7 +6454,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["ss_ticket_number", "ss_item_sk"],
         ["sr_ticket_number", "sr_item_sk"],
         "ss_sold_date_sk",
-        "sr_returned_date_sk",
+        "sr_ticket_number",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         {
             "ss_qty": "ss_quantity",
@@ -6340,7 +6469,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["cs_order_number", "cs_item_sk"],
         ["cr_order_number", "cr_item_sk"],
         "cs_sold_date_sk",
-        "cr_returned_date_sk",
+        "cr_order_number",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         {
             "cs_qty": "cs_quantity",
@@ -6355,7 +6484,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         ["ws_order_number", "ws_item_sk"],
         ["wr_order_number", "wr_item_sk"],
         "ws_sold_date_sk",
-        "wr_returned_date_sk",
+        "wr_order_number",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         {
             "ws_qty": "ws_quantity",
@@ -6389,7 +6518,7 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
     result["other_chan_qty"] = result["ws_qty"].fillna(0) + result["cs_qty"].fillna(0)
     result["other_chan_wholesale_cost"] = result["ws_wc"].fillna(0) + result["cs_wc"].fillna(0)
     result["other_chan_sales_price"] = result["ws_sp"].fillna(0) + result["cs_sp"].fillna(0)
-    result["ratio"] = (result["ss_qty"] / result["other_chan_qty"]).round(2)
+    result["ratio"] = _round_half_up_pandas(result["ss_qty"] / result["other_chan_qty"], 2)
 
     result = result.rename(
         columns={
@@ -6882,9 +7011,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(10)
     year = params.get("year", 2002)
     month = params.get("month", 2)
-    counties = params.get(
-        "counties", ["Walker County", "Richland County", "Gaines County", "Douglas County", "Dona Ana County"]
-    )
+    counties = params.get("counties")
     col = ctx.col
     lit = ctx.lit
     date_filtered = ctx.get_table("date_dim").filter(
@@ -6938,9 +7065,7 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(10)
     year = params.get("year", 2002)
     month = params.get("month", 2)
-    counties = params.get(
-        "counties", ["Walker County", "Richland County", "Gaines County", "Douglas County", "Dona Ana County"]
-    )
+    counties = params.get("counties")
     date_filtered = ctx.get_table("date_dim")
     date_filtered = date_filtered[
         (date_filtered["d_year"] == year) & (date_filtered["d_moy"] >= month) & (date_filtered["d_moy"] <= month + 3)
@@ -6999,9 +7124,19 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+# The aggregate functions Q35's template can draw, as the expression method and pandas aggregation for each.
+_Q35_EXPRESSION_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+_Q35_PANDAS_AGGREGATES = {"sum": "sum", "min": "min", "max": "max", "avg": "mean", "stddev_samp": "std"}
+
+
+def _q35_aggregates(params: Any) -> tuple[str, str, str]:
+    return params.get("aggone", "avg"), params.get("aggtwo", "max"), params.get("aggthree", "sum")
+
+
 def q35_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(35)
     year = params.get("year", 2002)
+    aggone, aggtwo, aggthree = (_Q35_EXPRESSION_AGGREGATES[name] for name in _q35_aggregates(params))
     col = ctx.col
     lit = ctx.lit
     date_filtered = ctx.get_table("date_dim").filter((col("d_year") == lit(year)) & (col("d_qoy") < lit(4)))
@@ -7025,15 +7160,15 @@ def q35_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(
             [
                 ctx.count().alias("cnt1"),
-                col("cd_dep_count").mean().alias("aggone1"),
-                col("cd_dep_count").max().alias("aggtwo1"),
-                col("cd_dep_count").sum().alias("aggthree1"),
-                col("cd_dep_employed_count").mean().alias("aggone2"),
-                col("cd_dep_employed_count").max().alias("aggtwo2"),
-                col("cd_dep_employed_count").sum().alias("aggthree2"),
-                col("cd_dep_college_count").mean().alias("aggone3"),
-                col("cd_dep_college_count").max().alias("aggtwo3"),
-                col("cd_dep_college_count").sum().alias("aggthree3"),
+                getattr(col("cd_dep_count"), aggone)().alias("aggone1"),
+                getattr(col("cd_dep_count"), aggtwo)().alias("aggtwo1"),
+                getattr(col("cd_dep_count"), aggthree)().alias("aggthree1"),
+                getattr(col("cd_dep_employed_count"), aggone)().alias("aggone2"),
+                getattr(col("cd_dep_employed_count"), aggtwo)().alias("aggtwo2"),
+                getattr(col("cd_dep_employed_count"), aggthree)().alias("aggthree2"),
+                getattr(col("cd_dep_college_count"), aggone)().alias("aggone3"),
+                getattr(col("cd_dep_college_count"), aggtwo)().alias("aggtwo3"),
+                getattr(col("cd_dep_college_count"), aggthree)().alias("aggthree3"),
             ]
         )
         .with_columns([col("cnt1").alias("cnt2"), col("cnt1").alias("cnt3")])
@@ -7067,6 +7202,7 @@ def q35_expression_impl(ctx: DataFrameContext) -> Any:
 def q35_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(35)
     year = params.get("year", 2002)
+    aggone, aggtwo, aggthree = (_Q35_PANDAS_AGGREGATES[name] for name in _q35_aggregates(params))
     date_filtered = ctx.get_table("date_dim")
     date_filtered = date_filtered[(date_filtered["d_year"] == year) & (date_filtered["d_qoy"] < 4)][["d_date_sk"]]
     customers = _store_and_other_channel_customers_pandas(ctx, date_filtered)
@@ -7085,20 +7221,24 @@ def q35_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     agg_spec = {
         "cnt1": ("c_customer_sk", "count"),
-        "aggone1": ("cd_dep_count", "mean"),
-        "aggtwo1": ("cd_dep_count", "max"),
-        "aggthree1": ("cd_dep_count", "sum"),
-        "aggone2": ("cd_dep_employed_count", "mean"),
-        "aggtwo2": ("cd_dep_employed_count", "max"),
-        "aggthree2": ("cd_dep_employed_count", "sum"),
-        "aggone3": ("cd_dep_college_count", "mean"),
-        "aggtwo3": ("cd_dep_college_count", "max"),
-        "aggthree3": ("cd_dep_college_count", "sum"),
+        "aggone1": ("cd_dep_count", aggone),
+        "aggtwo1": ("cd_dep_count", aggtwo),
+        "aggthree1": ("cd_dep_count", aggthree),
+        "aggone2": ("cd_dep_employed_count", aggone),
+        "aggtwo2": ("cd_dep_employed_count", aggtwo),
+        "aggthree2": ("cd_dep_employed_count", aggthree),
+        "aggone3": ("cd_dep_college_count", aggone),
+        "aggtwo3": ("cd_dep_college_count", aggtwo),
+        "aggthree3": ("cd_dep_college_count", aggthree),
     }
     result = base.groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
     result["ca_state"] = result["ca_state"].astype(object).where(result["ca_state"].notna(), None)
     result["cnt2"] = result["cnt1"]
     result["cnt3"] = result["cnt1"]
+    # stddev_samp of a one-row group is NULL in SQL and NaN in pandas.
+    result = _none_for_null(
+        result, [f"agg{position}{number}" for position in ("one", "two", "three") for number in "123"]
+    )
     return (
         result[
             [
@@ -7337,14 +7477,11 @@ def q40_pandas_impl(ctx: DataFrameContext) -> Any:
     result["cr_refunded_cash"] = result["cr_refunded_cash"].fillna(0)
 
     # Compute sales_before and sales_after
-    result["sales_before_val"] = result.apply(
-        lambda row: row["cs_sales_price"] - row["cr_refunded_cash"] if row["d_date"] < sales_date else 0,
-        axis=1,
-    )
-    result["sales_after_val"] = result.apply(
-        lambda row: row["cs_sales_price"] - row["cr_refunded_cash"] if row["d_date"] >= sales_date else 0,
-        axis=1,
-    )
+    # Column-wise rather than row-wise: a row-wise apply on an empty frame returns a frame, not a column.
+    net_sales = result["cs_sales_price"] - result["cr_refunded_cash"]
+    before = result["d_date"] < sales_date
+    result["sales_before_val"] = net_sales.where(before, 0)
+    result["sales_after_val"] = net_sales.where(~before, 0)
 
     # Aggregate by warehouse state and item
     result = result.groupby(["w_state", "i_item_id"], as_index=False).agg(
@@ -9529,8 +9666,8 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     """Q8: Store sales net profit analysis with zip code filtering (Polars)."""
     params = get_parameters(8)
     year = params.get("year", 1998)
-    qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["24128", "76232", "65084", "87816", "83926"])
+    qoy = params.get("qoy")
+    zip_codes = params.get("zip_codes")
 
     # Get tables
     store_sales, date_dim, store, customer_address, customer = _tables(
@@ -9590,8 +9727,8 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q8: Store sales net profit analysis with zip code filtering (Pandas)."""
     params = get_parameters(8)
     year = params.get("year", 1998)
-    qoy = params.get("qoy", 2)
-    zip_codes = params.get("zip_codes", ["24128", "76232", "65084", "87816", "83926"])
+    qoy = params.get("qoy")
+    zip_codes = params.get("zip_codes")
 
     # Get tables
     store_sales, date_dim, store, customer_address, customer = _tables(
@@ -10438,8 +10575,8 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     from datetime import timedelta
 
     params = get_parameters(21)
-    price_min = params.get("price_min", 0.99)
-    price_max = params.get("price_max", 1.49)
+    # The template fixes the price band (``i_current_price between 0.99 and 1.49``); only the date is drawn.
+    price_min, price_max = 0.99, 1.49
     sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
@@ -10509,8 +10646,8 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     from datetime import timedelta
 
     params = get_parameters(21)
-    price_min = params.get("price_min", 0.99)
-    price_max = params.get("price_max", 1.49)
+    # The template fixes the price band (``i_current_price between 0.99 and 1.49``); only the date is drawn.
+    price_min, price_max = 0.99, 1.49
     sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
@@ -11192,8 +11329,9 @@ def q84_expression_impl(ctx: DataFrameContext) -> Any:
     """Q84: Customer lookup filtered by city and income band (Polars)."""
     params = get_parameters(84)
     city = params.get("city", "Edgewood")
-    income_min = params.get("income_band", params.get("income_min", 38128))
-    income_max = params.get("income_max", income_min + 50000)
+    income_min = params.get("income_band", 38128)
+    # The template bounds the band at [INCOME] + 50000.
+    income_max = income_min + 50000
 
     # Get tables
     customer, customer_address, customer_demographics, household_demographics, income_band, store_returns = _tables(
@@ -11223,7 +11361,9 @@ def q84_expression_impl(ctx: DataFrameContext) -> Any:
         .join(customer_demographics, left_on="c_current_cdemo_sk", right_on="cd_demo_sk")
         .join(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
         .join(ib_filtered, left_on="hd_income_band_sk", right_on="ib_income_band_sk")
-        .join(store_returns, left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk", how="semi")
+        # An inner join, not a semi join: the SQL repeats a customer once for each return on the same
+        # demographic row.
+        .join(store_returns.select("sr_cdemo_sk"), left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk")
     )
 
     # Select and format output
@@ -11248,8 +11388,9 @@ def q84_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q84: Customer lookup filtered by city and income band (Pandas)."""
     params = get_parameters(84)
     city = params.get("city", "Edgewood")
-    income_min = params.get("income_band", params.get("income_min", 38128))
-    income_max = params.get("income_max", income_min + 50000)
+    income_min = params.get("income_band", 38128)
+    # The template bounds the band at [INCOME] + 50000.
+    income_max = income_min + 50000
 
     # Get tables
     customer, customer_address, customer_demographics, household_demographics, income_band, store_returns = _tables(
@@ -11276,9 +11417,9 @@ def q84_pandas_impl(ctx: DataFrameContext) -> Any:
     result = result.merge(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
     result = result.merge(ib_filtered, left_on="hd_income_band_sk", right_on="ib_income_band_sk")
 
-    # Filter to customers with store returns (semi-join)
-    sr_cdemo_sks = set(store_returns["sr_cdemo_sk"].dropna())
-    result = result[result["c_current_cdemo_sk"].isin(sr_cdemo_sks)]
+    # An inner join, not a semi join: the SQL repeats a customer once for each return on the same
+    # demographic row.
+    result = result.merge(store_returns[["sr_cdemo_sk"]], left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk")
 
     # Format output
     result["customername"] = result["c_last_name"].fillna("") + ", " + result["c_first_name"].fillna("")

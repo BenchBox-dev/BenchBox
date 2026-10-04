@@ -36,7 +36,12 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
+import sys
+import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -101,6 +106,32 @@ DATAFRAME_CACHE_VERSION = "v8"
 # Used by clear_cache() to selectively remove cached conversions without
 # destroying raw datagen output (e.g. .tbl files) in the same directory.
 _KNOWN_FORMAT_DIRS = frozenset(f.value for f in DataFormat)  # {"csv", "parquet", "arrow"}
+
+_CACHE_TEMP_FILE_PATTERN = re.compile(r"\.\d+\.[0-9a-f]{32}\.tmp$")
+
+
+def _is_cache_temp_file(name: str) -> bool:
+    return _CACHE_TEMP_FILE_PATTERN.search(name) is not None
+
+
+def _fsync_path(path: Path) -> None:
+    fd = os.open(path, os.O_RDWR if sys.platform == "win32" else os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def _atomic_cache_write(target_path: Path) -> Iterator[Path]:
+    tmp_path = target_path.with_name(f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        yield tmp_path
+        _fsync_path(tmp_path)
+        os.replace(tmp_path, target_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 class ConversionStatus(Enum):
@@ -484,7 +515,8 @@ class FormatConverter:
 
             # Write Parquet
             logger.debug(f"Writing {target_path}")
-            pq.write_table(table, target_path, **write_kwargs)
+            with _atomic_cache_write(target_path) as tmp_path:
+                pq.write_table(table, tmp_path, **write_kwargs)
 
             row_count = table.num_rows
             logger.info(f"Converted {source_path.name} → {target_path.name}: {row_count:,} rows")
@@ -829,7 +861,7 @@ class DataCache:
         manifest_path = self.get_manifest_path(benchmark, scale_factor, format)
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        with _atomic_cache_write(manifest_path) as tmp_path, open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(manifest.to_dict(), f, indent=2)
 
     def clear_cache(
@@ -1464,10 +1496,6 @@ class DataFrameDataLoader:
         return converted_list, table_entries
 
     def _prune_cache_leaf_files(self, cache_path: Path, tracked_files: set[str]) -> int:
-        """Prune untracked leaf files from a cache directory.
-
-        Keeps `_manifest.json` and the tracked file names for the current run.
-        """
         if not cache_path.exists():
             return 0
 
@@ -1475,7 +1503,7 @@ class DataFrameDataLoader:
         preserved.add("_manifest.json")
         removed = 0
         for child in cache_path.iterdir():
-            if child.is_dir() or child.name in preserved:
+            if child.is_dir() or child.name in preserved or _is_cache_temp_file(child.name):
                 continue
             child.unlink(missing_ok=True)
             removed += 1

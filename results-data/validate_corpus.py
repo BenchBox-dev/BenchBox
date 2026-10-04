@@ -32,7 +32,7 @@ import sys
 from typing import NamedTuple
 
 #: Companion suffixes that are not primary result bundles.
-COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json", ".override.json")
 LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
 #: A cohort below this many distinct comparison identities is not a comparison.

@@ -317,6 +317,9 @@ Allowed differences:
   dialect translation was attempted. DataFrame bundles are not expected to emit
   matching translation metadata.
 - Exact timing values must not be compared across modes.
+- `config.query_parameters` is DataFrame-only for now: a TPC-H DataFrame run
+  records which substitution parameters it bound (`qgen -d` defaults, or the
+  values qgen draws for `seed + 1000 * stream_id`). SQL bundles do not record it.
 
 ## Result Model Extension Policy
 
