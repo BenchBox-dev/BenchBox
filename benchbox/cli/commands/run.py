@@ -44,7 +44,12 @@ from benchbox.cli.help import BenchBoxCommand, advanced_option
 from benchbox.cli.logo import rich_logo
 from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
-from benchbox.cli.platform import get_platform_alias_mode, get_platform_manager, normalize_platform_name
+from benchbox.cli.platform import (
+    get_platform_alias_mode,
+    get_platform_manager,
+    normalize_platform_name,
+    resolve_platform_selector,
+)
 from benchbox.cli.platform_checks import check_and_setup_platform_credentials
 from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionError
 from benchbox.cli.presentation.system import display_system_recommendations
@@ -1065,37 +1070,46 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     if not s.platform_key:
         return
 
-    caps = PlatformRegistry.get_platform_capabilities(s.platform_key)
+    try:
+        platform_key = resolve_platform_selector(s.platform_key)
+    except ValueError as exc:
+        console.print(f"[red]❌ {escape(str(exc))}[/red]")
+        if s.logger:
+            s.logger.error(str(exc))
+        s.ctx.exit(1)
+        return
+
+    caps = PlatformRegistry.get_platform_capabilities(platform_key)
     if caps is None:
-        is_df_platform_legacy = is_dataframe_platform(s.platform_key)
-        is_df_available = is_df_platform_legacy and list_available_dataframe_platforms().get(s.platform_key, False)
+        is_df_platform_legacy = is_dataframe_platform(platform_key)
+        is_df_available = is_df_platform_legacy and list_available_dataframe_platforms().get(platform_key, False)
         if not is_df_available and not s.dry_run:
             from benchbox.utils.dependencies import get_install_command
 
-            console.print(f"[red]❌ Platform '{s.platform_key}' is not available (missing dependencies)[/red]")
-            install_cmd = get_install_command(s.platform_key)
+            console.print(f"[red]❌ Platform '{platform_key}' is not available (missing dependencies)[/red]")
+            install_cmd = get_install_command(platform_key)
             console.print(f"Run [cyan]{escape(install_cmd)}[/cyan] to install dependencies.")
             s.ctx.exit(1)
         s.resolved_mode = "dataframe"
     else:
         if s.mode is not None:
-            if not PlatformRegistry.supports_mode(s.platform_key, s.mode):
+            if not PlatformRegistry.supports_mode(platform_key, s.mode):
                 supported_modes = []
                 if caps.supports_sql:
                     supported_modes.append("sql")
                 if caps.supports_dataframe:
                     supported_modes.append("dataframe")
-                console.print(f"[red]❌ Platform '{s.platform_key}' does not support {s.mode} mode[/red]")
+                console.print(f"[red]❌ Platform '{platform_key}' does not support {s.mode} mode[/red]")
                 console.print(f"[yellow]Supported modes: {', '.join(supported_modes)}[/yellow]")
                 if s.logger:
-                    s.logger.error(f"Platform {s.platform_key} does not support mode: {s.mode}")
+                    s.logger.error(f"Platform {platform_key} does not support mode: {s.mode}")
                 s.ctx.exit(1)
             s.resolved_mode = s.mode
         else:
             s.resolved_mode = caps.default_mode
 
         if s.resolved_mode == "sql":
-            if s.platform_key == "polars":
+            if platform_key == "polars":
                 try:
                     import polars  # noqa: F401
 
@@ -1103,24 +1117,24 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
                 except ImportError:
                     is_available = False
             else:
-                is_available = s.platform_manager.is_platform_available(s.platform_key)
+                is_available = s.platform_manager.is_platform_available(platform_key)
         else:
             is_available = caps.supports_dataframe
-            if is_available and s.platform_key in ["polars", "pandas", "cudf", "dask"]:
+            if is_available and platform_key in ["polars", "pandas", "cudf", "dask"]:
                 df_platforms = list_available_dataframe_platforms()
-                legacy_key = f"{s.platform_key}-df"
-                is_available = df_platforms.get(legacy_key, df_platforms.get(s.platform_key, False))
+                legacy_key = f"{platform_key}-df"
+                is_available = df_platforms.get(legacy_key, df_platforms.get(platform_key, False))
 
         if not is_available and not s.dry_run:
             from benchbox.utils.dependencies import get_install_command
 
-            console.print(f"[red]❌ Platform '{s.platform_key}' is not available (missing dependencies)[/red]")
-            install_cmd = get_install_command(s.platform_key)
+            console.print(f"[red]❌ Platform '{platform_key}' is not available (missing dependencies)[/red]")
+            install_cmd = get_install_command(platform_key)
             console.print(f"Run [cyan]{escape(install_cmd)}[/cyan] to install dependencies.")
             s.ctx.exit(1)
 
     if s.logger and s.resolved_mode:
-        s.logger.debug(f"Resolved execution mode for {s.platform_key}: {s.resolved_mode}")
+        s.logger.debug(f"Resolved execution mode for {platform_key}: {s.resolved_mode}")
 
 
 def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:

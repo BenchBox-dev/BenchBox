@@ -28,6 +28,7 @@ from benchbox.core.platform_manifest import DefaultMode, get_platform_alias_mode
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.platforms.adapter_factory import _reject_removed_platform
+from benchbox.platforms.clickhouse.deployment_mode import CLICKHOUSE_LEGACY_SELECTOR_MAP
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console
@@ -52,6 +53,34 @@ def normalize_platform_name(name: str) -> str:
     """Normalize platform name: lowercase and resolve aliases."""
     normalized = name.lower()
     return PLATFORM_ALIASES.get(normalized, normalized)
+
+
+def resolve_platform_selector(selector: str) -> str:
+    """Return the platform key that availability and dependency checks apply to.
+
+    A ``<platform>:<deployment>`` selector resolves to the first-class platform
+    for ClickHouse and otherwise to the base platform, after confirming the base
+    platform offers that deployment. A selector without a deployment suffix is
+    returned unchanged.
+
+    Raises:
+        ValueError: If the deployment is not offered by the base platform.
+    """
+    key = selector.lower()
+    if key in CLICKHOUSE_LEGACY_SELECTOR_MAP:
+        return CLICKHOUSE_LEGACY_SELECTOR_MAP[key]
+    base, separator, deployment = key.partition(":")
+    if not separator:
+        return key
+    base = normalize_platform_name(base)
+    available = PlatformRegistry.get_available_deployment_modes(base)
+    if deployment in available:
+        return base
+    if available:
+        raise ValueError(
+            f"Platform '{base}' does not support deployment mode '{deployment}'. Available: {', '.join(available)}"
+        )
+    raise ValueError(f"Platform '{base}' does not support deployment modes. Remove the ':{deployment}' suffix.")
 
 
 def get_platform_alias_mode(name: str) -> DefaultMode | None:

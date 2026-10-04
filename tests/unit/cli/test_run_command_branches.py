@@ -1072,3 +1072,81 @@ class TestDataFrameSuffixModeResolution:
         s = SimpleNamespace(platform=None, mode=None)
         _apply_dataframe_suffix_mode(s)
         assert s.mode is None
+
+
+class TestPlatformDeploymentSelectorAvailability:
+    """`--platform <name>:<mode>` must be checked against the platform it resolves to."""
+
+    @staticmethod
+    def _resolve(platform: str, available: dict[str, bool], *, dry_run: bool = False):
+        from benchbox.cli.platform import PlatformManager, normalize_platform_name
+
+        manager = PlatformManager()
+        s = SimpleNamespace(
+            platform=platform,
+            platform_key=normalize_platform_name(platform),
+            mode=None,
+            dry_run=dry_run,
+            ctx=MagicMock(),
+            logger=None,
+            platform_manager=manager,
+        )
+        s.ctx.exit.side_effect = SystemExit
+        printed = MagicMock()
+        with (
+            patch.object(_run_module, "console", printed),
+            patch(
+                "benchbox.core.platform_registry.PlatformRegistry.get_platform_availability",
+                return_value=available,
+            ),
+        ):
+            try:
+                _run_module._resolve_platform_mode(s)
+                exited = False
+            except SystemExit:
+                exited = True
+        output = "\n".join(str(call.args[0]) for call in printed.print.call_args_list)
+        return s, exited, output
+
+    @pytest.mark.parametrize(
+        ("selector", "resolved_platform"),
+        [
+            ("clickhouse:local", "clickhouse-local"),
+            ("clickhouse:server", "clickhouse-server"),
+            ("clickhouse:cloud", "clickhouse-cloud"),
+            ("firebolt:core", "firebolt"),
+            ("firebolt:cloud", "firebolt"),
+            ("timescaledb:cloud", "timescaledb"),
+            ("CLICKHOUSE:LOCAL", "clickhouse-local"),
+        ],
+    )
+    def test_selector_passes_when_resolved_platform_is_available(self, selector: str, resolved_platform: str):
+        s, exited, output = self._resolve(selector, {resolved_platform: True})
+        assert not exited, output
+        assert s.resolved_mode == "sql"
+
+    @pytest.mark.parametrize(
+        ("selector", "resolved_platform"),
+        [("clickhouse:local", "clickhouse-local"), ("firebolt:core", "firebolt")],
+    )
+    def test_unavailable_selector_reports_install_hint_for_a_valid_extra(self, selector: str, resolved_platform: str):
+        _s, exited, output = self._resolve(selector, {resolved_platform: False})
+        assert exited
+        assert f"Platform '{resolved_platform}' is not available" in output
+        assert f"--extra {resolved_platform}" in output or f"benchbox[{resolved_platform}]" in output
+        assert selector not in output
+
+    def test_unavailable_selector_is_tolerated_in_dry_run(self):
+        s, exited, _output = self._resolve("clickhouse:local", {"clickhouse-local": False}, dry_run=True)
+        assert not exited
+        assert s.resolved_mode == "sql"
+
+    @pytest.mark.parametrize("selector", ["clickhouse:bogus", "firebolt:bogus", "duckdb:bogus", "polars:local"])
+    def test_unknown_deployment_mode_is_rejected_even_in_dry_run(self, selector: str):
+        _s, exited, output = self._resolve(selector, {}, dry_run=True)
+        assert exited
+        assert "does not support deployment mode" in output
+
+    def test_unknown_deployment_mode_lists_available_modes(self):
+        _s, _exited, output = self._resolve("firebolt:bogus", {})
+        assert "core, cloud" in output
