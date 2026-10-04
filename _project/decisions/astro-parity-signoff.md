@@ -37,11 +37,12 @@ the owner edits it.
 ## Report summary
 
 The numbers below come from the last local `make site-parity` run, made on
-top of parent commit `49fceef0678b65d004d0682b68a6b302822a154e` with the
-changes that finished this harness. They are a record of that run only. The
-SHA the owner approves is the one named in the `site-parity` CI report, which
-records the pull request head, so the report SHA below stays pending until the
-owner copies it from that run. Verdict of the local run: PASS.
+commit `ab44cd56a338eb82a462a8e257fedd061c5a280e`, which carries the stricter
+canonical and objects inventory checks and the Astro visual capture. They are a
+record of that run only. The SHA the owner approves is the one named in the
+`site-parity` CI report, which records the pull request head, so the report SHA
+below stays pending until the owner copies it from that run. Verdict of the
+local run: PASS.
 
 | Measure | Value |
 | --- | --- |
@@ -55,6 +56,10 @@ owner copies it from that run. Verdict of the local run: PASS.
 | Missing tag, archive and query pages | 0 |
 | Missing API URL map pages and anchors | 0 |
 | Sphinx objects inventory entries lost (2104 compared) | 0 beyond 2 allowed |
+| Objects inventory entries whose address differs or does not resolve | 0 |
+| Objects inventory entries checked for validity only (blog posts moved out of docs) | 34 |
+| Pages with a wrong canonical URL | 0 |
+| Allowances that matched nothing | 0 |
 | Redirect pages | 4 |
 | Page templates under `website/src/pages` plus content templates checked by axe | 21, light and dark |
 | Axe failures | 0 |
@@ -76,10 +81,14 @@ docs edits made since the baseline and affect both renderers.
 - Approve each redirect page in `redirect-pages.json`: the not-found
   fallback and the retired `/docs/genindex.html`, `/docs/search.html` and
   `/docs/blog.html`.
-- Approve the expected removals in `expected-removals-sphinx-assets.json`: the
-  Sphinx and Furo assets under `/_static/` and `/docs/_static/` (including a
-  published Python module and its bytecode), `.buildinfo`, `searchindex.js`
-  and the old landing page assets.
+- Approved on 2026-10-04: the Sphinx build files in
+  `expected-removals-sphinx-assets.json` (`/_static/`, `/docs/_static/`,
+  `/docs/_sphinx_design_static/`, `/docs/.buildinfo`, `/docs/searchindex.js`)
+  and the `sphinx-page-sources` and `sphinx-doctrees` rules in
+  `allowed-differences.json`.
+- Approve the old landing page assets in
+  `expected-removals-sphinx-assets.json`: `/style.css`, `/script.js` and
+  `/shared/`.
 - Approve the two module index labels that the objects inventory omits, in
   `allowed-inventory-losses.json`.
 - Approve the differences added beyond the earlier allowlist: the docs index
