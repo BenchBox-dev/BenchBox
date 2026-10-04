@@ -1049,7 +1049,7 @@
       "state": "blocked",
       "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
       "priority": 10,
-      "selectors": [{"prefix": "landing/"}, {"prefix": "docker/"}, {"path": "index.html"}]
+      "selectors": [{"prefix": "landing/"}, {"prefix": "website/"}, {"prefix": "deploy/"}, {"prefix": "docker/"}, {"path": "index.html"}]
     },
     {
       "id": "shared-infrastructure-config",
@@ -1499,14 +1499,6 @@
       "owner": "comment-cleanup-expected-wrapper",
       "state": "blocked",
       "blocking_disposition": "Edit only the private wrapper before the validation cleanup task owns the rest of the file."
-    },
-    {
-      "id": "make-inventory-receipt",
-      "path": "make/inventory.json",
-      "carrier": "generated Make inventory",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Regenerate through the supported helper; preserve the historical monolith baseline."
     },
     {
       "id": "joinorder-synthetic-generated-docstring-writer",

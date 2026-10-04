@@ -8,10 +8,12 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+_TPCH_VALUE_DIGEST_REFERENCE_PATH = Path(__file__).with_name("reference_digests") / "tpch_value_digests_sf1.json"
 
 
 def parse_tpch_answer_file(answer_file_path: Path) -> int:
@@ -221,6 +223,21 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     return expected_results
 
 
+def load_tpch_value_digest_seed() -> int:
+    payload = json.loads(_TPCH_VALUE_DIGEST_REFERENCE_PATH.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or payload.get("benchmark") != "tpch"
+        or type(payload.get("scale_factor")) not in (int, float)
+        or payload["scale_factor"] != 1.0
+    ):
+        raise ValueError("TPC-H value-digest reference must describe the SF=1 TPC-H snapshot")
+    seed = payload.get("reference_seed")
+    if type(seed) is not int:
+        raise ValueError("TPC-H value-digest reference_seed must be an integer")
+    return seed
+
+
 def load_tpch_value_digests(scale_factor: float = 1.0) -> dict[str, str]:
     """Load stored reference VALUE digests for TPC-H queries at a given scale.
 
@@ -239,12 +256,10 @@ def load_tpch_value_digests(scale_factor: float = 1.0) -> dict[str, str]:
     if scale_factor != 1.0:
         return {}
 
-    digest_file = Path(__file__).with_name("reference_digests") / "tpch_value_digests_sf1.json"
+    digest_file = _TPCH_VALUE_DIGEST_REFERENCE_PATH
     if not digest_file.exists():
         logger.warning("TPC-H value-digest reference file not found: %s", digest_file)
         return {}
-
-    import json
 
     try:
         payload = json.loads(digest_file.read_text(encoding="utf-8"))

@@ -1,4 +1,4 @@
-export const PUBLIC_SITE_CAPTURE_PROFILE = "landing-settled-v2";
+export const PUBLIC_SITE_CAPTURE_PROFILE = "landing-settled-v3";
 
 export type VisualCapture = {
   digest: string;

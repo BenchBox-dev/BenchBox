@@ -91,7 +91,7 @@ def validate_dataframe_query_results(
         reason = (
             "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
             if benchmark_id == "tpcds"
-            else "TPC-H row-count evidence requires SF1 reference-equivalent parameters"
+            else "TPC-H answer-file row counts apply only to SF 1 runs with qgen default parameters (no seed)"
         )
         for row in successful_rows:
             _attach_skipped_validation(row, reason)
@@ -207,12 +207,9 @@ def _apply_expected_row_counts(
 
 
 def _tpch_reference_context(scale_factor: float, seed: int | None) -> bool:
-    if float(scale_factor) != 1.0:
-        return False
-    from benchbox.core.tpch.benchmark import get_reference_seed
+    from benchbox.core.tpch.benchmark import binds_answer_set_parameters, has_answer_set
 
-    reference_seed = get_reference_seed(float(scale_factor))
-    return seed is None or seed == reference_seed
+    return has_answer_set(scale_factor) and binds_answer_set_parameters(seed)
 
 
 def _bounded_message(value: str) -> str:

@@ -197,13 +197,10 @@ lock; CI runs that lane on every PR and is the authoritative check.
 - `make pr-status` is a short operator view. Use its separate bounded
   `make pr-status ALL_OPEN=1` inventory when reconciling every open develop PR;
   neither an empty PR list nor an empty review queue is a completion signal.
-- Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
-  `make pr-open` probes the current base/head merge, then asks
-  `scripts/ruleset_drift_check.py --queue-policy` for a live, complete queue
-  verdict. A verified queue means publish without an ancestry-only refresh;
-  a conflict means resolve first; absent, unreadable, unknown, or drifted
-  queue state leaves the conservative ancestry gate in force. The old
-  `STALE=1` bypass is not accepted for this path.
+- Stale-base publication: `make pr-open` probes the current base/head merge.
+  A conflict means resolve first; a conflict-free branch that is behind
+  `origin/develop` is published without a refresh. The old `STALE=1` bypass is
+  not accepted for this path.
 - Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
   (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
   explicit owner, session, scope, attempts, due date, claim expiry, and next

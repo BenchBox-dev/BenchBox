@@ -143,6 +143,7 @@ MEDIUM_PRODUCT_ROOTS = (
     "results-data/",
     "examples/",
     "landing/",
+    "website/",
     "docker/",
     "_binaries/",
     "_sources/",

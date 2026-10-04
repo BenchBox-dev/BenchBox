@@ -71,6 +71,41 @@ prompt-quickstarts-check:
 query-docs:
 	uv run -- python scripts/generate_query_docs.py
 
+SITE_DIR ?= site
+SITE_INVENTORY ?= $(SITE_DIR)-inventory
+.PHONY: site-inventory
+site-inventory:
+	@uv run -- python scripts/site_inventory.py build --site-dir "$(SITE_DIR)" --output-dir "$(SITE_INVENTORY)" --source-sha "$$(git rev-parse HEAD)"
+
+SITE_INVENTORY_BASELINE ?= _project/design/site-inventory/baseline-develop
+.PHONY: site-inventory-diff
+site-inventory-diff: site-inventory
+	@uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_INVENTORY)"
+
+SITE_INVENTORY_KNOWN_BROKEN ?= _project/design/site-inventory/known-broken-links.json
+.PHONY: site-inventory-check
+site-inventory-check: site-inventory
+	@uv run -- python scripts/site_inventory.py check --inventory "$(SITE_INVENTORY)" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)"
+
+.PHONY: site-deps
+site-deps:
+	@if [ ! -f website/node_modules/.package-lock.json ] || [ website/package-lock.json -nt website/node_modules/.package-lock.json ]; then npm --prefix website ci; fi
+
+.PHONY: site-build
+site-build: query-docs site-deps
+	@npm --prefix website run build
+	@test -s website/dist/index.html
+	@echo "Site built: website/dist/index.html"
+
+.PHONY: site-dev
+site-dev: site-deps
+	@npm --prefix website run dev
+
+.PHONY: site-check
+site-check: query-docs site-deps
+	@npm --prefix website run check
+	@npm --prefix website run audit:high
+
 # Run all documentation checks (build, linkcheck, validate)
 .PHONY: docs-check
 docs-check: docs-validate docs-linkcheck docs-build

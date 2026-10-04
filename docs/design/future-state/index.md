@@ -18,7 +18,7 @@ treated as actionable. The support-tier freeze is
 evidence is
 `_project/decisions/future-state-extraction-evidence-2026-08-13.md`. The latest
 bounded CI-burden measurement, collected 2026-08-31, is recorded in
-[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../../_project/analysis/ci-waste-remeasure-2026-08-31.md);
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/ci-waste-remeasure-2026-08-31.md);
 it does not authorize extraction and the candidates below remain blocked on
 their stated evidence gates.
 

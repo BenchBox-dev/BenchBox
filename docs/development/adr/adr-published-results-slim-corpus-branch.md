@@ -179,7 +179,7 @@ host the same mix of `maintainer-run` (seed corpus, no sidecar) and
 
 The complete six-file runtime listed below exists on `develop` (the canonical
 home) and is vendored to `published-results` for self-contained CI. Sync is automated by
-[`.github/workflows/sync-results-data-to-published.yml`](../../../.github/workflows/sync-results-data-to-published.yml):
+[`.github/workflows/sync-results-data-to-published.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/sync-results-data-to-published.yml):
 when develop's copy of any runtime file changes, the workflow opens a
 draft mirror PR vs `published-results` carrying the change. Maintainers
 review and flip ready when the develop change is intended to surface on

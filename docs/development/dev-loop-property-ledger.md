@@ -1,5 +1,9 @@
 # Development Loop Safety Property Ledger
 
+Test enrollment is frozen at 2026-10-03: new tests need no row, but every
+workflow and script still needs one, and a row is removed only when its file
+is deleted.
+
 Safety properties keep their guards until a replacement guard proves
 coverage. No workflow, script, test, or hook listed here may be deleted by
 a modernization change unless its row shows the property still covered or
@@ -87,6 +91,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `release.yml` | product-safety | Release publishing |
 | `release-canary.yml` | product-safety | Release canary protection |
 | `seed-corpus.yml` | product-safety | Corpus seeding |
+| `site-deploy.yml` | product-safety | Single-writer site deployment |
 | `soundness-merge-digest.yml` | product-safety | Post-merge soundness review digest |
 | `submission-validator-drift-check.yml` | product-safety | Submission validator sync |
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
@@ -104,7 +109,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
-| `test_binary_manifest_workflow.py` | product-safety | Queue artifact verifies source-bound bundled generator hashes before upload |
 | `test_corpus_cutover.py` | product-safety | Corpus cutover |
 | `test_corpus_event_bridge.py` | product-safety | Corpus event integrity |
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
@@ -126,8 +130,10 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_release_isolation.py` | product-safety | Release isolation |
 | `test_release_uat_charter_guard.py` | product-safety | Release charter guard |
 | `test_results_explorer_dependency_audit.py` | product-safety | Explorer dependency audit |
+| `test_website_dependency_audit.py` | product-safety | Website dependency audit |
 | `test_results_explorer_publication.py` | product-safety | Explorer publication |
 | `test_seed_corpus_pr_base.py` | product-safety | Corpus seeding |
+| `test_site_deploy.py` | product-safety | Site-deploy workflow contract |
 | `test_stacked_pr_base_guard.py` | pure-process | Stacked-PR base mechanics |
 | `test_validate_submission_changed_bundles.py` | product-safety | Submission validation |
 | `test_validate_submission_comment_security.py` | product-safety | Submission comment security |
@@ -145,6 +151,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | File | Classification |
 | --- | --- |
 | `test_agent_instruction_audit.py` | tooling |
+| `test_api_reference_url_map.py` | product-safety |
 | `test_assemble_public_site.py` | product-safety |
 | `test_audit_sha_check.py` | product-safety |
 | `test_batch_integration.py` | product-safety |
@@ -153,6 +160,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_branch_prune_merged.py` | pure-process |
 | `test_browser_gate_aggregate.py` | product-safety |
 | `test_build_joinorder_data.py` | product-safety |
+| `test_check_api_contract_symbols.py` | product-safety |
 | `test_check_complexity.py` | tooling |
 | `test_check_dependency_bounds.py` | product-safety |
 | `test_check_doc_relative_links.py` | tooling |
@@ -202,6 +210,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_arm.py` | pure-process |
 | `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
+| `test_trunk_revert.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_required_case_evidence.py` | product-safety | A required local-engine case that skips, is deselected, fails or is expected to fail fails the required-case check |
 | `test_pr_refresh_certification.py` | pure-process |
@@ -220,6 +229,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_scan_explorer_stale_theme.py` | product-safety |
 | `test_scan_explorer_tokens.py` | product-safety |
 | `test_shrink_rollup.py` | pure-process |
+| `test_site_inventory.py` | product-safety |
 | `test_skill_sync_ci_policy.py` | tooling |
 | `test_soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
 | `test_sqlglot_generator.py` | product-safety |
@@ -279,6 +289,16 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `site_deploy/test_site_deploy_candidate.py` | product-safety |
+| `site_deploy/test_site_deploy_cli.py` | product-safety |
+| `site_deploy/test_site_deploy_cli_flow.py` | product-safety |
+| `site_deploy/test_site_deploy_gates.py` | product-safety |
+| `site_deploy/test_site_deploy_generation.py` | product-safety |
+| `site_deploy/test_site_deploy_githubapi.py` | product-safety |
+| `site_deploy/test_site_deploy_mixed_version.py` | product-safety |
+| `site_deploy/test_site_deploy_publish.py` | product-safety |
+| `site_deploy/test_site_deploy_receipt.py` | product-safety |
+| `site_deploy/test_site_deploy_routes.py` | product-safety |
 | `test_tpcds_divergence_report.py` | tooling |
 | `test_tpcds_platform_identity.py` | product-safety |
 
@@ -321,6 +341,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `path_filter_decision.py` | tooling | Path classifier shared with ci.yml units |
 | `pytest_shard_evidence.py` | product-safety | Exact assigned, collected, and executed medium test evidence |
 | `pr_landing.py` | pure-process | PR-loop mechanics |
+| `trunk_revert.py` | pure-process | Revert of a merged PR and the red-trunk gate on `make pr-open` |
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |
 | `post_merge_signature.py` | pure-process | Post-merge mechanics |

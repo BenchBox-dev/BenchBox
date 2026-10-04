@@ -311,6 +311,19 @@ def test_table_exists_check_treats_missing_managed_table_as_fresh_database(monke
     assert manager.last_load_error is None
 
 
+def test_table_exists_check_recognizes_databricks_missing_table_sqlstate(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("databricks"))
+    message = "[TABLE_OR_VIEW_NOT_FOUND] The table or view `benchbox_tuning_metadata` cannot be found. SQLSTATE: 42P01"
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(RuntimeError(message)),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error is None
+
+
 def test_table_exists_check_preserves_unrelated_probe_failure(monkeypatch):
     manager = TuningMetadataManager(_Adapter("duckdb"))
     monkeypatch.setattr(
