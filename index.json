@@ -5445,6 +5445,13 @@
       "status": "done",
       "title": "DatabricksPath lacks joinpath, so runner silently skips datagen manifest validation for Databricks runs"
     },
+    "databricks-table-quota-headroom-tooling": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Track and reclaim Databricks Unity Catalog table quota used by benchmark runs"
+    },
     "databricks-tpc-liquid-clustering-profile-rendering": {
       "claim": null,
       "needs": [
