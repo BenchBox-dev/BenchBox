@@ -106,6 +106,8 @@ export function normaliseState(catalog: Catalog, raw: RawState): State {
   for (const key of ["goal", "surface", "interface", "deployment", "benchmark"] as const) {
     state[key] = raw[key] || defaults[key];
   }
+  if (!catalog.goals.some((goal) => goal.id === state.goal)) state.goal = defaults.goal;
+  if (!catalog.surfaces.some((surface) => surface.id === state.surface)) state.surface = defaults.surface;
   const scaleStr = String(raw.scale || defaults.scale);
   const scaleIds = catalog.scales.map(String);
   let scaleIdx = scaleIds.indexOf(scaleStr);

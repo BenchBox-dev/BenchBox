@@ -22,3 +22,15 @@ html:has(.landing) {
   font-size: inherit;
   line-height: inherit;
 }
+
+.landing .code-block pre {
+  color: var(--code-fg);
+}
+
+.landing {
+  --code-comment: var(--text-muted);
+}
+
+:root[data-bb-theme="light"] .landing {
+  --code-comment: var(--code-line-number);
+}

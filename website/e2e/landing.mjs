@@ -6,28 +6,30 @@ import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
 
-const siteDir = path.resolve(process.env.SITE_DIR ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist"));
+const here = path.dirname(fileURLToPath(import.meta.url));
 const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 
-function resolveFile(urlPath) {
+function resolveFile(root, urlPath) {
   const clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
   const candidates = urlPath.endsWith("/") ? [path.join(clean, "index.html")] : [clean, `${clean}.html`, path.join(clean, "index.html")];
-  return candidates.map((candidate) => path.join(siteDir, candidate)).find((full) => full.startsWith(siteDir) && existsSync(full) && statSync(full).isFile());
+  return candidates.map((candidate) => path.join(root, candidate)).find((full) => full.startsWith(root) && existsSync(full) && statSync(full).isFile());
 }
 
-let server;
-let base = process.env.BASE_URL;
-if (!base) {
-  server = createServer((request, response) => {
-    const file = resolveFile(new URL(request.url ?? "/", "http://localhost").pathname);
+const servers = [];
+async function serve(root) {
+  const server = createServer((request, response) => {
+    const file = resolveFile(root, new URL(request.url ?? "/", "http://localhost").pathname);
     response.writeHead(file ? 200 : 404, { "content-type": types[path.extname(file ?? "")] ?? "application/octet-stream" });
     if (file) createReadStream(file).pipe(response);
     else response.end();
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  base = `http://127.0.0.1:${server.address().port}`;
+  servers.push(server);
+  return `http://127.0.0.1:${server.address().port}`;
 }
-const oldBase = process.env.OLD_BASE_URL;
+
+const base = process.env.BASE_URL ?? (await serve(path.resolve(process.env.SITE_DIR ?? path.join(here, "..", "dist"))));
+const oldBase = process.env.OLD_BASE_URL ?? (await serve(path.resolve(process.env.LANDING_DIR ?? path.join(here, "..", "..", "landing"))));
 const outDir = process.env.OUT_DIR ?? path.join(os.tmpdir(), "benchbox-website-landing");
 mkdirSync(outDir, { recursive: true });
 
@@ -39,11 +41,12 @@ const check = (condition, message) => {
   if (!condition) fail(message);
 };
 
-async function open(route, { width = 1280, theme, javaScriptEnabled = true, origin = base, init } = {}) {
+async function open(route, { width = 1280, theme, javaScriptEnabled = true, origin = base, init, before } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: "light", javaScriptEnabled, permissions: ["clipboard-read", "clipboard-write"] });
   if (theme) await context.addInitScript((value) => localStorage.setItem("benchbox:theme", value), theme);
   if (init) await context.addInitScript(init);
   const page = await context.newPage();
+  if (before) before(page);
   await page.goto(origin + route, { waitUntil: "networkidle" });
   return { page, context };
 }
@@ -63,8 +66,10 @@ async function settled(page) {
 async function revealAll(page) {
   const height = await page.evaluate(() => document.body.scrollHeight);
   for (let y = 0; y < height; y += 400) {
-    await page.evaluate((top) => window.scrollTo(0, top), y);
-    await page.waitForTimeout(40);
+    await page.evaluate(async (top) => {
+      window.scrollTo(0, top);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, y);
   }
   await page.evaluate(() => window.scrollTo(0, 0));
   await until(page, () => [...document.querySelectorAll(".feature-card, .benchmark-card, .install-step")].every((el) => getComputedStyle(el).opacity === "1"));
@@ -96,10 +101,8 @@ function contrast(a, b) {
 }
 
 {
-  const { page, context } = await open("/", { init: undefined });
   const requests = [];
-  page.on("request", (request) => requests.push(request.url()));
-  await page.reload({ waitUntil: "networkidle" });
+  const { page, context } = await open("/", { before: (target) => target.on("request", (request) => requests.push(request.url())) });
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForLoadState("networkidle");
   await settled(page);
@@ -127,11 +130,14 @@ function contrast(a, b) {
 
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const heroCopy = page.locator('[data-target="hero-code"]');
-  for (let attempt = 0; attempt < 10 && (await heroCopy.textContent()) !== "Copied!"; attempt++) {
-    await heroCopy.click();
-    await until(page, () => document.querySelector('[data-target="hero-code"]')?.textContent === "Copied!");
-  }
-  const label = await heroCopy.textContent();
+  await page.evaluate(() => {
+    const button = document.querySelector('[data-target="hero-code"]');
+    window.__heroLabels = [];
+    new MutationObserver(() => window.__heroLabels.push(button.textContent)).observe(button, { childList: true, characterData: true, subtree: true });
+  });
+  await heroCopy.click();
+  await until(page, () => window.__heroLabels.includes("Copied!"));
+  const label = (await page.evaluate(() => window.__heroLabels)).includes("Copied!") ? "Copied!" : await heroCopy.textContent();
   const clip = await page.evaluate(() => navigator.clipboard.readText());
   report.landing.copy = { label, clip: clip.slice(0, 40) };
   check(label === "Copied!", `landing copy label is ${label}`);
@@ -148,6 +154,36 @@ function contrast(a, b) {
   const skip = await page.evaluate(() => document.activeElement?.className);
   report.landing.skipLinkReachable = skip;
   await context.close();
+}
+
+for (const theme of ["light", "dark"]) {
+  const old = await open("/", { theme, origin: oldBase });
+  const expected = await old.page.evaluate(() => {
+    const probe = (variable) => {
+      const el = document.createElement("span");
+      el.style.color = `var(${variable})`;
+      document.body.appendChild(el);
+      const color = getComputedStyle(el).color;
+      el.remove();
+      return color;
+    };
+    return { comment: probe(document.documentElement.dataset.bbTheme === "light" ? "--code-line-number" : "--text-muted"), string: probe("--prism-string"), keyword: probe("--prism-keyword") };
+  });
+  await old.context.close();
+  const current = await open("/", { theme });
+  const actual = await current.page.evaluate(() => {
+    const colorOf = (root, test) => {
+      const span = [...document.querySelectorAll(`${root} span`)].find((el) => el.children.length === 0 && test(el.textContent));
+      return span ? getComputedStyle(span).color : null;
+    };
+    return {
+      comment: colorOf("#hero-code", (text) => text.startsWith("# CLI")),
+      keyword: colorOf("#install .install-step:nth-child(3) pre", (text) => text.trim() === "from"),
+    };
+  });
+  report.landing[`tokens ${theme}`] = { expected, actual };
+  for (const kind of ["comment", "keyword"]) check(actual[kind] === expected[kind], `${kind} token colour in ${theme} is ${actual[kind]}, old page uses ${expected[kind]}`);
+  await current.context.close();
 }
 
 for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
@@ -391,7 +427,7 @@ for (const theme of ["light", "dark"]) {
   await context.close();
 }
 
-if (oldBase) {
+{
   const catalogRaw = await (await fetch(`${oldBase}/prompts/catalog.generated.js`)).text();
   const catalog = JSON.parse(catalogRaw.slice(catalogRaw.indexOf("{"), catalogRaw.lastIndexOf("}") + 1));
   const combos = [];
@@ -401,6 +437,9 @@ if (oldBase) {
         for (const deployment of catalog.deployments.map((d) => d.id))
           for (const scale of ["0.01", "1.0"]) combos.push({ goal, surface, interface: iface, deployment, scale });
   for (const platform of catalog.platforms) combos.push({ platform: platform.id, surface: "mcp", scale: "1.0", deployment: platform.deployments[0], interface: platform.interfaces[0] }, { platform: platform.id, deployment: platform.deployments[0], interface: platform.interfaces[0], scale: "0.1" });
+  for (const [key, value] of [["goal", "bogus"], ["surface", "bogus"], ["interface", "bogus"], ["deployment", "bogus"], ["benchmark", "bogus"], ["scale", "bogus"], ["platform", "bogus"]])
+    combos.push({ [key]: value }, { [key]: value, surface: "mcp", scale: "1.0" });
+  combos.push({ goal: "compare", platformA: "bogus", platformB: "bogus" }, { goal: "compare", platformA: "bogus", platformB: "bogus", surface: "mcp" });
   for (const benchmark of catalog.benchmarks) combos.push({ benchmark: benchmark.id, scale: "0.1" }, { benchmark: benchmark.id, scale: "0.01", surface: "mcp" });
   const a = await open("/prompts/", { origin: oldBase });
   const b = await open("/prompts/");
@@ -414,13 +453,18 @@ if (oldBase) {
       selects: [...document.querySelectorAll("select")].map((s) => [s.id, s.value, [...s.options].map((o) => o.value + "=" + o.textContent), s.closest("label").hidden]),
       search: location.search,
     }));
+  const canonical = (snap) => {
+    const params = new URLSearchParams(snap.search);
+    for (const [key, list] of [["goal", catalog.goals], ["surface", catalog.surfaces]]) if (params.has(key) && !list.some((item) => item.id === params.get(key))) params.set(key, catalog.defaults[key]);
+    return { ...snap, search: params.toString() };
+  };
   let mismatches = 0;
   for (const combo of combos) {
     const query = new URLSearchParams(combo).toString();
     await a.page.goto(`${oldBase}/prompts/?${query}`);
     await b.page.goto(`${base}/prompts/?${query}`);
     await hydrated(b.page);
-    const [x, y] = [await snapshot(a.page), await snapshot(b.page)];
+    const [x, y] = [canonical(await snapshot(a.page)), canonical(await snapshot(b.page))];
     if (JSON.stringify(x) !== JSON.stringify(y)) {
       mismatches += 1;
       if (mismatches <= 5) fail(`prompt parity mismatch for ?${query}: ${Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k]))}`);
@@ -433,7 +477,7 @@ if (oldBase) {
 }
 
 await browser.close();
-server?.close();
+for (const server of servers) server.close();
 report.failures = failures;
 writeFileSync(path.join(outDir, "landing.json"), JSON.stringify(report, null, 2));
 console.log(`wrote ${path.join(outDir, "landing.json")}`);

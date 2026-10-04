@@ -1,6 +1,6 @@
 ---
 import { codeToHtml } from "shiki";
-import cobalt2 from "../lib/cobalt2-theme.json";
+import { landingCodeTheme } from "../lib/code-theme.ts";
 
 interface Props {
   code: string;
@@ -12,7 +12,7 @@ const { code, lang, id } = Astro.props;
 
 const html = await codeToHtml(code, {
   lang,
-  theme: cobalt2 as never,
+  theme: landingCodeTheme,
   transformers: [
     {
       pre(node) {
