@@ -299,7 +299,7 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 
 3. **Live cloud platform testing in PR or merge queue:**
    Rejected due to network flakiness, credential exposure risks, high API costs, and
-   long runtimes that would violate the merge queue's 30-minute target. Live cloud testing
+   long runtimes that would violate the 30-minute pre-merge target. Live cloud testing
    is isolated to scheduled nightly T3 execution.
 
 4. **CODEOWNERS-only hold for soundness paths:**
