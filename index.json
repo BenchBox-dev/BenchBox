@@ -20489,6 +20489,13 @@
       "status": "done",
       "title": "TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions"
     },
+    "tpcds-qphds-nonspec-formula": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "QphDS@Size is computed as sqrt(Power x Throughput), not the TPC-DS formula"
+    },
     "tpcds-qualification-actionable-signal": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Decision recorded: implement the spec metric (two throughput tests, two maintenance runs, load time) or rename and suppress the official QphDS label",
+    "Throughput@Size for TPC-DS uses Q = 99 x S, with a test",
+    "Docs match the implemented behavior"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Formula verified in code; 103-statement count confirmed by a reviewer running dsqgen.",
+  "description": "`tpcds/official_benchmark.py:249-250`, `tpcds/benchmark/runner.py:1259` and the shared `TPCMetricsCalculator.calculate_qph` (metrics.py:188-204) all compute QphDS as the geometric mean of Power and Throughput. TPC-DS has no Power@Size metric. The spec formula is SF x Q / (T_PT x T_TT x T_DM x T_LD)^(1/4), with Q = 99 x S, T_TT = TT1 + TT2, T_DM = DM1 + DM2, and T_LD = 0.01 x S x T_load. Only one TPC-DS throughput test runs, with no data maintenance between throughput tests.\n\nEvery exported qphds_at_size is not comparable to the spec, but docs/guides/tpc/tpc-ds-official-guide.md:79-82 calls it official.\n\nAlso: Throughput@Size counts executed statements per stream (103, because templates 14, 23, 24 and 39 split into a/b variants) instead of 99 (runner.py:496-502), overstating it by about 4%.",
+  "links": [
+    "benchbox/core/tpcds/official_benchmark.py",
+    "benchbox/core/tpcds/benchmark/runner.py",
+    "benchbox/core/results/metrics.py",
+    "docs/guides/tpc/tpc-ds-official-guide.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:58:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bc9301c437f749c785b2514932ad3b33",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
