@@ -86,42 +86,42 @@
  {
   "id": "canonical-link-added",
   "kind": "changed metadata",
-  "match": "(?P<p>/\\S+) \\[canonical\\]: '' -> '(?P=p)'",
+  "match": "(?P<p>/\\S*(?<!/index\\.html)) \\[canonical\\]: '' -> 'https://benchbox\\.dev(?P=p)'",
   "reason": "Sphinx wrote no canonical link; the Astro build writes one on every page, and it must be the page's own URL",
   "owner_approval": "pending"
  },
  {
   "id": "canonical-link-added-root",
   "kind": "changed metadata",
-  "match": "/index\\.html \\[canonical\\]: '' -> '/'",
+  "match": "/index\\.html \\[canonical\\]: '' -> 'https://benchbox\\.dev/'",
   "reason": "Sphinx wrote no canonical link; the landing page's canonical URL is the site root",
   "owner_approval": "pending"
  },
  {
-  "id": "canonical-link-added-directory-index",
+  "id": "canonical-link-added-index",
   "kind": "changed metadata",
-  "match": "(?P<d>/\\S*/)index\\.html \\[canonical\\]: '' -> '(?P=d)'",
-  "reason": "Sphinx wrote no canonical link; a directory index page's canonical URL is its directory",
+  "match": "(?P<d>/\\S+/)index\\.html \\[canonical\\]: '' -> 'https://benchbox\\.dev(?P=d)index\\.html'",
+  "reason": "Sphinx wrote no canonical link; a directory index page's canonical URL is its own index.html path",
   "owner_approval": "pending"
  },
  {
   "id": "canonical-link-redirect-blog",
   "kind": "changed metadata",
-  "match": "/docs/blog\\.html \\[canonical\\]: '' -> '/blog/'",
+  "match": "/docs/blog\\.html \\[canonical\\]: '' -> 'https://benchbox\\.dev/blog/'",
   "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
   "owner_approval": "pending"
  },
  {
   "id": "canonical-link-redirect-genindex",
   "kind": "changed metadata",
-  "match": "/docs/genindex\\.html \\[canonical\\]: '' -> '/docs/api.html'",
+  "match": "/docs/genindex\\.html \\[canonical\\]: '' -> 'https://benchbox\\.dev/docs/api\\.html'",
   "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
   "owner_approval": "pending"
  },
  {
   "id": "canonical-link-redirect-search",
   "kind": "changed metadata",
-  "match": "/docs/search\\.html \\[canonical\\]: '' -> '/docs/'",
+  "match": "/docs/search\\.html \\[canonical\\]: '' -> 'https://benchbox\\.dev/docs/'",
   "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
   "owner_approval": "pending"
  },
