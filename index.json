@@ -20681,6 +20681,13 @@
       "status": "done",
       "title": "Fix exported Throughput@Size: driver formula omits the queries-per-stream factor (22x/99x understated)"
     },
+    "tpch-tpcds-throughput-stream-numbering": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput stream 0 repeats the power stream's ordering; TPC-DS power uses home-grown ordering"
+    },
     "tpch-variant-dataframe-seed-binding": {
       "claim": null,
       "needs": [],
