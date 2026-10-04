@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "When a throughput phase object exists, the exported Throughput@Size equals phase.throughput_at_size and is absent when phase.success is false",
+    "Power@Size uses only power-test rows (filter by test type), with a test for a combined run with iterations=1",
+    "QphH/QphDS is absent whenever either input is withheld",
+    "Regression tests cover a phase with success=False and no FAILED rows"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Builder code read directly; both defects reproduced by reviewer probes.",
+  "description": "`benchbox/core/results/builder.py:800-814` recomputes Throughput@Size from `phase.total_queries_executed` and `phase.duration_ms` but never reads `phase.success` or `phase.throughput_at_size`. The adapter correctly withholds the metric when a stream fails (adapter.py:1126-1131, result_capture.py:1742, throughput/runner.py:488-494), but `result_factory.build_enhanced_benchmark_result` rebuilds metrics from scratch.\n\nEffect: if a stream times out or is cancelled before starting, it leaves no FAILED rows, so the failed-query gate does not fire and a score from partial work is exported. A reviewer's probe produced 7920 for a phase with success=False.\n\nRelated, same file: `_calculate_power_at_size` (builder.py:826-842) takes the latest iteration of all `run_type == \"measurement\"` rows. Throughput rows have no iteration and default to 1, so a combined power+throughput run with iterations=1 mixes S x 22 concurrent query times into the power geometric mean (probe: 7756 instead of 36000), and QphH is wrong. The default of 3 iterations hides it.",
+  "links": [
+    "benchbox/core/results/builder.py",
+    "benchbox/platforms/base/result_capture.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:58:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e2b57a39d1e54c88adaa05172dc7f407",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

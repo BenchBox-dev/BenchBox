@@ -16573,6 +16573,13 @@
       "status": "done",
       "title": "Anonymize tuning constraint identifiers"
     },
+    "results-builder-throughput-metric-ignores-phase-success": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Result builder re-derives Throughput@Size for failed throughput phases, undoing the driver's withholding"
+    },
     "results-complete-execution-environment-capture": {
       "claim": null,
       "needs": [],
