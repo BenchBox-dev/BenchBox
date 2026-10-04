@@ -6771,18 +6771,13 @@
       "title": "Commit TPC-DS qualification values and parse official answer sets by value"
     },
     "dfparity-t18-sf1-oracle-lane": {
-      "claim": {
-        "expires_at": "2026-10-05T17:29:58Z",
-        "generation": "dea81ed60a1a4c3ab500e22fe3924910",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t17-qualification-values-and-ans",
         "dfparity-t13-pandas-q78-perf"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add a scheduled, non-blocking SF=1 qualification oracle lane for both families"
     },
     "dfparity-t19-emptiness-rebaseline": {
