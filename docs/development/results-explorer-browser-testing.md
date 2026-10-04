@@ -78,24 +78,19 @@ artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
 artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
 and Pages-shaped server are reusable building blocks. `.github/workflows/docs.yml`
 uploads the protected baseline from `develop` and retrieves the exact
-base-SHA artifact for pull requests and merge groups. A changed public-site
+base-SHA artifact for pull requests. A changed public-site
 tree cannot pass without that comparison. `Public-site visual acceptance`
-reports on every develop PR and merge group; it skips the build only when
+reports on every develop PR; it skips the build only when
 the former documentation input paths are unaffected.
 
-No workflow currently publishes a baseline for a merge group's
-`merge_group.head_sha`: `ci.yml` has no `merge_group` trigger, and
-`test_no_workflow_publishes_a_merge_queue_candidate_baseline` asserts that no
-workflow uploads a queue candidate and that the baseline lookup does not read
-`merge_group` runs. A queue follower therefore has an exact-base baseline only
-after the group ahead of it merges and the protected `develop` push uploads it.
-Publishing candidates would need a `merge_group` trigger on `ci.yml`, an upload
-step in its visual job, and a lookup that trusts that producer; none of these
-exist. Pull requests keep a short retry when downloading the baseline.
+Develop has no merge queue and no `merge_group` runs
+(`_project/decisions/merge-queue-retirement-2026-10-03.md`): a pull request
+merges by squash through auto-merge once the required checks are green on its
+exact head. Pull requests keep a short retry when downloading the baseline.
 
 If a protected `develop` push was dropped or its baseline expired, dispatch
 Documentation on `develop` with `baseline_source_sha` set to the exact base
-SHA shown by the failing PR or merge group:
+SHA shown by the failing PR:
 
 ```bash
 gh workflow run docs.yml --ref develop -f baseline_source_sha=<full-protected-develop-base-sha>
@@ -117,17 +112,13 @@ digests and unexpected new captures, but it never accepts a capture missing
 from the current matrix. Clear both variables after the approved run so only
 one reviewed head occupies the repository-wide approval slot.
 
-The PR-head slot is the only approval wired today. `ci.yml` triggers only on
+The PR-head slot is the only approval slot. `ci.yml` triggers only on
 `pull_request`, and its compare step reads only `APPROVED_HEAD_SHA`,
-`APPROVAL_REASON` and the PR head SHA. No workflow or code reads a merge-group
-approval variable, so a merge group cannot be approved, and the PR approval
-never applies to one. Wiring that slot is described under
-[Renderer-switch pull request](#renderer-switch-pull-request).
+`APPROVAL_REASON` and the PR head SHA.
 
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
-reviewed PR merges. No merge-group candidate is published. PR
-diagnostic artifacts remain short-lived and non-promotable.
+reviewed PR merges. PR diagnostic artifacts remain short-lived and non-promotable.
 
 ### Intentional visual changes while the site moves to Astro
 
@@ -150,8 +141,6 @@ reviewed. The procedure has two phases.
    on the page moved.
 3. Record the review in the PR: the run id, each changed capture as
    route and width, and one line per capture saying why the change is expected.
-4. Repeat for the merge-group run, because the group tree can differ from the
-   PR head. Record that run id too.
 
 A change nobody intended is a defect. Fix it in the PR; do not record it as
 expected.
@@ -159,23 +148,7 @@ expected.
 **Gating phase (after the check is required again).** Review the PR run's
 diagnostics, set `APPROVED_HEAD_SHA` to the PR head SHA and `APPROVAL_REASON` to
 the review note, then re-run the failed job. Clear both variables afterwards.
-This is the only approval slot that exists today. A PR approval never applies
-to a merge group; the merge-group slot is not wired (see
-[Renderer-switch pull request](#renderer-switch-pull-request)).
-
-**When the merge group is re-formed.** A group re-forms when a PR ahead of it
-fails or leaves the queue. The re-formed group has a new `merge_group.head_sha`.
-In the advisory phase, review the new run. A merge-group approval, once that
-slot is wired, would be bound to one `merge_group.head_sha`, so a re-formed
-group would need a fresh one.
-
-**Stacked groups.** A follower group's base is the head of the group ahead of
-it. That head has a baseline only once the leader has merged and the protected
-`develop` push has uploaded it, or when a site-equivalent ancestor exists; no
-candidate is published for an unmerged leader. If the follower fails at the
-baseline download step, wait for the leader to merge.
-Confirm `public-site-visual-baseline-<develop head>` exists, then re-queue the
-follower. Site-changing PRs should land one at a time.
+This is the only approval slot.
 
 **Missing exact-SHA baseline.** Dispatch Documentation on `develop` with
 `baseline_source_sha`, as shown above. Wait for its visual job, then re-run the
@@ -216,26 +189,19 @@ comparison is never skipped, disabled or loosened.
    or compare run with `PUBLIC_SITE_VISUAL_RENDERER=astro`; lift it only for
    that local use, after the renderer cutover.
 
-**Approval slots.** The decision records two separate exact-head approvals, one
-for the PR head and one for the synthetic `merge_group.head_sha`, with queue
-position never substituting for either.
+**Approval and baseline.** The decision record requires an exact-head approval
+for the PR head, with queue position never substituting for it. Develop has no
+merge queue, so there is no second slot.
 
-1. PR head, wired today. Review the PR run's `public-site-visual-diagnostics-*`
-   artifact against the Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head
-   SHA and `APPROVAL_REASON` to the review note, then re-run the failed job.
-2. Merge group head, not wired. `ci.yml` has no `merge_group` trigger and no
-   workflow reads a merge-group approval variable. Before the switch pull
-   request enters a merge queue, a separate change must add the `merge_group`
-   trigger and a second approval pair, read only for the group event and
-   compared with `merge_group.head_sha`, that the PR approval cannot satisfy.
-   Until that exists the switch pull request cannot pass a merge group, and
-   queue position or the PR approval must not be treated as approval.
-3. After the merge, the `Documentation` push run on `develop` must capture the
+1. PR head. Review the PR run's `public-site-visual-diagnostics-*` artifact
+   against the Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head SHA and
+   `APPROVAL_REASON` to the review note, then re-run the failed job.
+2. After the merge, the `Documentation` push run on `develop` must capture the
    Astro build and upload `public-site-visual-baseline-<merge commit>`. Confirm
    the artifact exists and that its `manifest.json` has `"renderer": "astro"`.
    If the push was dropped, dispatch Documentation with `baseline_source_sha`
    set to the merge commit.
-4. Clear the approval variables. Hold other site-changing PRs until step 3
+3. Clear the approval variables. Hold other site-changing PRs until step 2
    is confirmed, because they need the Astro baseline for their exact base.
 
 ### Site-deploy comparison
@@ -254,7 +220,7 @@ approval never applies to a PR.
 ## What CI gates
 
 The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)
-(Chromium full suite, blocking) runs on **pull requests** and **merge groups**
+(Chromium full suite, blocking) runs on **pull requests**
 when the change touches the explorer unit (with the `explorer` unit result
 always reporting; the job is skipped when no relevant files change).
 
