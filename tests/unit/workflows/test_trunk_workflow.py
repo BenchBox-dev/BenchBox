@@ -101,3 +101,8 @@ def test_distribution_job_verifies_exact_distributions_before_binding_and_upload
     path = steps[upload]["with"]["path"]
     for entry in ("dist/producer-receipt.json", "dist/SHA256SUMS", "dist/*.whl", "dist/*.tar.gz"):
         assert entry in path
+
+
+def test_tpcds_repeat_and_draw_checks_run_after_each_merge() -> None:
+    commands = [step.get("run", "") for step in _workflow()["jobs"]["tpcds-parity-draws"]["steps"]]
+    assert "make tpcds-cross-surface-draws-report" in commands

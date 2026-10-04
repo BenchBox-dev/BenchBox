@@ -61,10 +61,11 @@ DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
 flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
 ``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
 .. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
-``"Q1"`` .. ``"Q22"``). Staged (registered in :data:`STAGED_GATES`, runnable
-in report mode, not CI-enforced): ``tpch``, ``tpcds``, ``nyctaxi``,
-``tpch_skew``, and ``tsbs_devops``. TPC-DS runs the full 99-query matrix at
-``SF=0.01`` with bounded empty cells explicitly classified.
+``"Q1"`` .. ``"Q22"``). ``tpch``, ``tpch_skew``, ``nyctaxi``, ``tsbs_devops``
+and ``tpcds`` are enforced too; TPC-DS compares all 103 statements on the
+default Power draw at ``SF=0.01`` on Polars, pandas and DataFusion, with each
+empty cell classified. :data:`STAGED_GATES` holds gates that run in report
+mode only; it is currently empty.
 Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
@@ -373,7 +374,9 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
     unchanged, so rows that tie on every key may appear in any order. Returns a
     description of the first out-of-order row, or ``None`` when the order holds or
     cannot be checked: no ``ORDER BY``, an unparseable query, duplicate output
-    names, or a term that references a qualified or missing column.
+    names, or a term that references a qualified or missing column. An error
+    while evaluating the sort keys over the returned rows is reported as a
+    violation, so the check fails closed instead of passing unverified.
     """
     import duckdb
     import sqlglot
@@ -400,7 +403,12 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
                 return None
             target = exp.column(f"__c{ordinal - 1}")
         else:
-            for column in list(target.find_all(exp.Column)):
+            references = list(target.find_all(exp.Column))
+            if not references:
+                # A term with no column reference, such as DuckDB's ORDER BY ALL,
+                # cannot be evaluated over the returned columns.
+                return None
+            for column in references:
                 # A qualified reference names an input column, which SQL resolves
                 # before output names, so it cannot be read from the result.
                 position = None if column.table else positions.get(column.name.lower())
@@ -436,8 +444,8 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
         required = connection.execute(
             f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in terms)}, __pos"
         ).fetchall()
-    except duckdb.Error:
-        return None
+    except duckdb.Error as exc:
+        return f"the ORDER BY check could not evaluate the sort keys over the returned rows: {exc}"
     finally:
         connection.close()
     for position, (actual, expected) in enumerate(zip(returned, required, strict=True)):
@@ -1925,6 +1933,21 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_DATAVAULT_SCALE,
     ),
+    # TPC-DS: 103 statements (99 templates plus the B statements of Q14, Q23,
+    # Q24 and Q39) on the default Power draw at SF=0.01. Polars, pandas and native
+    # DataFusion are all enforced; CI runs pandas as its own step for the budget.
+    # Repeats and other seeds and streams run after each merge (trunk.yml).
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
+        backends=("expression", "pandas", "datafusion"),
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
+    ),
     "tpch": CrossSurfaceGate(
         name="tpch",
         build=build_tpch_duckdb,
@@ -2005,21 +2028,7 @@ GATES: dict[str, CrossSurfaceGate] = {
 # The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
 
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
-    # are classified explicitly. Registration remains distinct from CI enforcement.
-    "tpcds": CrossSurfaceGate(
-        name="tpcds",
-        build=build_tpcds_duckdb,
-        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCDS_SCALE,
-    ),
-}
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
@@ -2153,10 +2162,6 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
     """
     import tempfile
 
-    from rich.text import Text
-
-    from benchbox.utils.printing import emit
-
     with tempfile.TemporaryDirectory() as tmp:
         data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
@@ -2243,10 +2248,6 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
         _report_flaky(gate.name, flaky, repeats, enforced=enforced)
         if enforced:
             return exit_code or 1
-    if gate.name == "tpcds" and gate.name in STAGED_GATES:
-        outcome = "clean" if exit_code == 0 and not flaky else "not clean"
-        emit(Text(f"STAGED REPORT ONLY - tpcds comparison {outcome}; no CI enforcement"), quiet=False)
-        return 0
     return exit_code
 
 

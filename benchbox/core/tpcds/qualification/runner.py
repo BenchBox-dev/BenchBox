@@ -524,10 +524,13 @@ def supervise(
 
 
 def _kill_worker(process: subprocess.Popen[Any]) -> None:
-    if hasattr(signal, "SIGKILL"):
-        os.killpg(process.pid, signal.SIGKILL)
-    else:
-        process.kill()
+    try:
+        if hasattr(signal, "SIGKILL"):
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+    except ProcessLookupError:
+        pass
     process.wait()
 
 

@@ -1167,6 +1167,14 @@ jobs:
         if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
 
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (Polars and DataFusion)
+        if: matrix.partition == 'b'
+        run: make tpcds-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas)
+        if: matrix.partition == 'a'
+        run: make tpcds-pandas-cross-surface-equivalence-report
+
   required-local-cases:
     name: required-local-cases
     needs: ci-paths
