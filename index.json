@@ -5444,7 +5444,11 @@
     },
     "databricks-liquid-clustering-tuning-review-20260526": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "tuning-no-midrun-destructive-db-handling-20261001",
+        "tuning-layout-op-skip-vs-fail-20261001",
+        "tuning-post-load-seam-20261001"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Databricks liquid clustering review follow-up: runtime compatibility, validation gaps, and live certification"
