@@ -3193,6 +3193,13 @@
       "status": "done",
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
+    "comment-checker-review-followups": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Close the comment-policy checker's Medium and Low review follow-ups"
+    },
     "comment-cleanup-ai-primitives": {
       "claim": null,
       "needs": [

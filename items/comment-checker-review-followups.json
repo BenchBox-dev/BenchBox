@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Each item is fixed with a regression test in tests/unit/scripts/test_comment_policy.py, or explicitly listed as a known gap in docs/development/comment-policy.md",
+    "The strict comment-policy scan still reports 0 violations"
+  ],
+  "description": "The independent soundness review of PR #2614 (commits 614a05fec..4ee3601f2) found no Critical or High issue and left these follow-ups:\n\n1. Medium: tests/unit/scripts/test_comment_policy.py::test_reviewed_javascript_flows_still_occur skips when TypeScript is not installed, and the CI medium tier does not install it, so a stale REVIEWED_JAVASCRIPT_FLOWS entry goes unnoticed in CI. Run the check in the comment-policy job (which provisions TypeScript via scripts/run_comment_policy.py) or fail when CI is set.\n2. Medium (pre-existing): a program piped to an unmodeled interpreter on stdin (`printf '...' | perl`, `echo '...' | ruby`) is not scanned. Report a bare interpreter reading stdin as needing an adapter, or list it under Known gaps in docs/development/comment-policy.md.\n3. Low: PHP inline source with an HTML comment after `?>` is not flagged; add `<!--` to the php entry in UNMODELED_MARKERS (scripts/comment_payloads.py).\n4. Low: bashlex AttributeError/TypeError now take the chunk fallback, which could hide an incompatible bashlex upgrade. Pin bashlex, or fail when chunk-fallback use jumps.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2614"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:72be6b07390c920c896b0830",
+      "at": "2026-10-04T14:11:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f4c0595d6cb944349d0632d73b98a209",
+      "session_id": "72fc14732fe344b4aa75947453e916a8"
+    }
+  ]
+}
