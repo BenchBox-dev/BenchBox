@@ -132,6 +132,17 @@ class TuningHooksMixin:
                     entry["total_ms"] = max(0.0, entry["total_ms"] - spent * 1000)
         return max(loading_time - getattr(self, "_post_load_maintenance_seconds", 0.0), 0.0), per_table_timings
 
+    def build_post_load_maintenance_phase(self) -> Any:
+        from benchbox.core.results.models import PostLoadMaintenancePhase
+
+        tables = set(getattr(self, "_post_load_maintenance_tables", None) or [])
+        if not tables:
+            return None
+        return PostLoadMaintenancePhase(
+            duration_ms=int(getattr(self, "_post_load_maintenance_seconds", 0.0) * 1000),
+            tables_processed=len(tables),
+        )
+
     def get_post_load_maintenance_metadata(self) -> dict[str, Any]:
         return {
             "total_apply_seconds": getattr(self, "_post_load_maintenance_seconds", 0.0),

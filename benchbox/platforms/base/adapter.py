@@ -1100,6 +1100,7 @@ class PlatformAdapter(
                 data_loading=data_loading_phase,
                 validation=validation_phase,
                 statistics_gathering=statistics_phase,
+                post_load_maintenance=self.build_post_load_maintenance_phase(),
             )
 
             execution_phases, total_exec_time, power_test_phase, throughput_test_phase = self._build_execution_phases(

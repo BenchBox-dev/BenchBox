@@ -1579,6 +1579,7 @@ class ResultCaptureMixin:
             data_loading=data_loading_phase,
             schema_creation=schema_creation_phase,
             validation=validation_phase,
+            post_load_maintenance=self.build_post_load_maintenance_phase(),
         )
 
         # Create failed power test phase
