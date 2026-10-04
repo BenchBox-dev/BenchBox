@@ -455,6 +455,56 @@ def test_marker_text_inside_escaped_code_is_not_a_renderer_page(tmp_path: Path) 
     assert mixed_version.require_single_renderer(tmp_path, renderer.SPHINX) == {renderer.SPHINX: 1}
 
 
+UNMARKED_PAGE = "<!doctype html><html><head><style>body{margin:0}</style></head><body>{label}</body></html>"
+REDIRECT_PAGE = '<html><head><meta http-equiv="refresh" content="0; url=../usage/index.html"></head></html>'
+
+
+def _sphinx_tree_shape(root: Path) -> None:
+    _write(root / "index.html", UNMARKED_PAGE.replace("{label}", "landing"))
+    _write(root / "prompts" / "index.html", UNMARKED_PAGE.replace("{label}", "prompts"))
+    _write(root / "404.html", UNMARKED_PAGE.replace("{label}", "results fallback"))
+    _write(root / "docs" / "index.html", SPHINX_PAGE)
+    _write(root / "docs" / "dev" / "index.html", SPHINX_PAGE)
+    _write(root / "docs" / "old" / "page.html", REDIRECT_PAGE)
+    _write(root / "docs" / "_downloads" / "abc" / "report.html", UNMARKED_PAGE.replace("{label}", "download"))
+    _write(root / "blog" / "post.html", SPHINX_PAGE)
+    _write(root / "_static" / "documentation_options.js", "options")
+    _write(root / "results" / "index.html", ASTRO_PAGE.format(label="explorer"))
+    _write(root / "results" / "_astro" / "app.js", "explorer")
+
+
+def test_the_sphinx_tree_shape_has_no_foreign_renderer(tmp_path: Path) -> None:
+    _sphinx_tree_shape(tmp_path)
+    counts = mixed_version.require_single_renderer(tmp_path, renderer.SPHINX)
+    assert counts == {renderer.SPHINX: 4, mixed_version.UNATTRIBUTED: 5}
+
+
+def test_an_astro_asset_directory_at_any_depth_marks_a_sphinx_tree_as_mixed(tmp_path: Path) -> None:
+    _sphinx_tree_shape(tmp_path)
+    _write(tmp_path / "docs" / "dev" / "guide.html", UNMARKED_PAGE.replace("{label}", "astro"))
+    _write(tmp_path / "docs" / "dev" / "_astro" / "guide.css", "css")
+    with pytest.raises(mixed_version.RendererMixError, match=r"astro: 1 \(first: docs/dev/_astro/\)"):
+        mixed_version.require_single_renderer(tmp_path, renderer.SPHINX)
+
+
+def test_an_astro_tree_refuses_a_page_no_renderer_marker_attributes(tmp_path: Path) -> None:
+    _write(tmp_path / "index.html", ASTRO_PAGE.format(label="x"))
+    _write(tmp_path / "_astro" / "site.css", "css")
+    _write(tmp_path / "results" / "index.html", "explorer")
+    assert mixed_version.require_single_renderer(tmp_path, renderer.ASTRO) == {renderer.ASTRO: 2}
+    _write(tmp_path / "docs" / "guide.html", UNMARKED_PAGE.replace("{label}", "inline"))
+    with pytest.raises(mixed_version.RendererMixError, match=r"unattributed: 1 \(first: docs/guide.html\)"):
+        mixed_version.require_single_renderer(tmp_path, renderer.ASTRO)
+
+
+def test_an_astro_tree_refuses_sphinx_static_options_without_a_marked_page(tmp_path: Path) -> None:
+    _write(tmp_path / "index.html", ASTRO_PAGE.format(label="x"))
+    _write(tmp_path / "_astro" / "site.css", "css")
+    _write(tmp_path / "docs" / "dev" / "_static" / "documentation_options.js", "options")
+    with pytest.raises(mixed_version.RendererMixError, match=r"sphinx: 1 \(first: docs/dev/_static/documentation"):
+        mixed_version.require_single_renderer(tmp_path, renderer.ASTRO)
+
+
 def test_cli_refuses_a_renderer_that_differs_from_the_release_selection(tmp_path: Path) -> None:
     release = _sphinx_checkout(tmp_path / "release", "release")
     trunk = _sphinx_checkout(tmp_path / "trunk", "trunk")

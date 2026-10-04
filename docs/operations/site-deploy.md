@@ -94,10 +94,17 @@ scripts are not rewritten. The search box on every page loads the release
 tag's `/pagefind/` index, so search results always point to the release pages.
 
 Assembly refuses a mixed-renderer artifact. Each ref's stage must be the
-selected renderer's output (an Astro stage must contain `_astro/`), and every
-HTML page outside `/results/` is classified by its markers: a Sphinx page loads
+selected renderer's output (an Astro stage must contain `_astro/`). Outside
+`/results/`, a tree carries Astro output when any directory at any depth is
+named `_astro`, and Sphinx output when any `_static/documentation_options.js`
+exists. Every HTML page is classified by its markers: a Sphinx page loads
 `_static/documentation_options.js`, an Astro page loads `/_astro/` assets or
-carries Astro's generator meta. A page or asset of the other renderer fails the
+carries Astro's generator meta. A page with neither marker is unattributed. A
+Sphinx artifact accepts unattributed pages, because its landing pages, redirect
+stubs, downloads and root `404.html` carry no Sphinx marker. An Astro artifact
+refuses them, because every page of the Astro build carries one of its markers,
+so an unmarked page is output the build did not produce. A page or asset of the
+other renderer, or an unattributed page in an Astro artifact, fails the
 assembly and removes the partial tree; the `mixed_version` gate repeats the
 check on the final tree in deploy, preview and rollback runs. `assemble_public_site.py
 --renderer` must equal the selection it recomputes from the release checkout.
