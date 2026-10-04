@@ -22281,6 +22281,13 @@
       "status": "done",
       "title": "✅ Validation Presentation vs Engines"
     },
+    "validator-override-required-output-when-satisfied": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Submission validator prints OVERRIDE-REQUIRED even when a committed override satisfies the rule"
+    },
     "validator-report-all-row-mismatches": {
       "claim": null,
       "needs": [],

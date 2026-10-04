@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Output distinguishes satisfied overrides (for example `OVERRIDE-SATISFIED: <rule> by <file>`) from unsatisfied ones",
+    "The summary line counts satisfied and unsatisfied overrides separately",
+    "Existing tests are updated and the exit-code contract is unchanged"
+  ],
+  "context": "Observed while validating the SSB, ClickBench and TPC-DS overrides for PRs #2602 and #2615 on 2026-10-03 and 2026-10-04.",
+  "description": "`scripts/validate_submission.py --require-manifest` prints `OVERRIDE-REQUIRED: <rule>` lines and a summary such as `4 override(s) required` even when matching `.override.json` artifacts are present and satisfy every rule. Only the absence of a separate `ERROR: <bundle> requires overrides: <rule>` line shows that the override was accepted. Reviewers confirming override coverage have to remove an override to prove the gate works.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:56:20Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9d7354ffa4b84abeb0bc6ae5ea247228",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}
