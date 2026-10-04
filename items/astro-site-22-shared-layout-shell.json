@@ -6,6 +6,7 @@
     "Pagefind returns a docs term and a blog title; results section is absent or empty until astro-site-61",
     "Starlight overrides used are listed; none patch Starlight internals"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as a2e0150a (2026-10-04). Overrides: PageTitle + Footer (wrap built-ins), routeMiddleware src/starlight-route.ts for edit links (develop). Evidence: e2e/shell.mjs axe 0 serious/critical at 1280/390/320 both themes, 44px targets, theme persistence, Pagefind docs+blog with empty Results section; header parity test extended. Independent review running.",
   "description": "Build the shell in the layout variant chosen at G1 (default: Starlight docs inside a custom shell).\n\nComponents:\n- header: Docs, Blog, Results, GitHub, search, theme toggle\n- footer\n- docs layout: sidebar, breadcrumbs, on-page TOC, edit link\n- blog layout\n\nThe header must match the current header contract (results-explorer/src headerContract.ts and tests/unit/test_site_header_parity.py), and is extracted as a shared component so the Explorer renders the same shell (see astro-site-40).\n\nThe sidebar comes from config that the converter derives from toctrees.\n\nSearch: Pagefind indexes docs and blog HTML only. The search UI reserves a separate \"Results\" section. It stays empty until astro-site-61 supplies generated result summaries; Pagefind never indexes DuckDB-WASM content.\n\nUse real <a>/<button> elements, keep 44px touch targets, and make the layout work at phone width.",
   "links": [
     "tests/unit/test_site_header_parity.py",
@@ -28,6 +29,14 @@
       "op": "update",
       "op_id": "2623342103cc418aaa85d0c1e318d193",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T03:52:41Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7f0bfbfd03bd43d38384fdcc9da928c9",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
