@@ -18,12 +18,12 @@ Practical code examples for common BenchBox usage patterns, database integration
 > **For *complete, tested, runnable code*, use the Examples Directory:**
 >
 > - **[Examples Directory Guide](examples-directory.md)** - 40+ runnable examples organized by difficulty
-> - **[Getting Started Examples](../../examples/getting_started/README.md)** - Zero to working in 5 minutes
-> - **[Feature Examples](../../examples/features/README.md)** - Learn specific capabilities
-> - **[Use Case Patterns](../../examples/use_cases/README.md)** - Real-world solutions
-> - **[Notebook Examples](../../examples/notebooks/README.md)** - Interactive platform guides
-> - **[Configuration Templates](../../examples/tunings/README.md)** - Platform setup and tuning
-> - **[Workflow Patterns](../../examples/programmatic/README.md)** - 8 proven patterns
+> - **[Getting Started Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/getting_started/README.md)** - Zero to working in 5 minutes
+> - **[Feature Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/features/README.md)** - Learn specific capabilities
+> - **[Use Case Patterns](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/use_cases/README.md)** - Real-world solutions
+> - **[Notebook Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/notebooks/README.md)** - Interactive platform guides
+> - **[Configuration Templates](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/tunings/README.md)** - Platform setup and tuning
+> - **[Workflow Patterns](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/programmatic/README.md)** - 8 proven patterns
 >
 > **Quick Decision:**
 >
@@ -928,12 +928,12 @@ if __name__ == "__main__":
     results = benchmark_duckdb_tpch()
 ```
 
-> **📁 Complete, tested example:** See [`examples/getting_started/local/duckdb_tpch_power.py`](../../examples/getting_started/local/duckdb_tpch_power.py) for a production-ready DuckDB example with CLI support and error handling.
+> **📁 Complete, tested example:** See [`examples/getting_started/local/duckdb_tpch_power.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/getting_started/local/duckdb_tpch_power.py) for a production-ready DuckDB example with CLI support and error handling.
 >
 > **📁 Additional benchmark examples:**
 >
-> - [`examples/getting_started/local/duckdb_nyctaxi.py`](../../examples/getting_started/local/duckdb_nyctaxi.py) - NYC Taxi trip analytics (real-world data patterns)
-> - [`examples/getting_started/local/duckdb_tsbs_devops.py`](../../examples/getting_started/local/duckdb_tsbs_devops.py) - TSBS DevOps time-series benchmark
+> - [`examples/getting_started/local/duckdb_nyctaxi.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/getting_started/local/duckdb_nyctaxi.py) - NYC Taxi trip analytics (real-world data patterns)
+> - [`examples/getting_started/local/duckdb_tsbs_devops.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/getting_started/local/duckdb_tsbs_devops.py) - TSBS DevOps time-series benchmark
 
 ### ClickHouse Integration Example
 
@@ -1009,7 +1009,7 @@ if __name__ == "__main__":
     setup_clickhouse_tpch(host='localhost', port=9000)
 ```
 
-> **📁 Complete, tested example:** For database-specific integration patterns, see platform examples in [`examples/getting_started/cloud/`](../../examples/getting_started/cloud/) (Databricks and BigQuery with credential handling) and platform configuration templates in [`examples/tunings/`](../../examples/tunings/) (production-ready YAML configs).
+> **📁 Complete, tested example:** For database-specific integration patterns, see platform examples in [`examples/getting_started/cloud/`](https://github.com/BenchBox-dev/BenchBox/tree/develop/examples/getting_started/cloud) (Databricks and BigQuery with credential handling) and platform configuration templates in [`examples/tunings/`](https://github.com/BenchBox-dev/BenchBox/tree/develop/examples/tunings) (production-ready YAML configs).
 
 ### SQLite Example with Performance Measurement
 
@@ -1115,7 +1115,7 @@ if __name__ == "__main__":
     results = benchmark_sqlite_tpch()
 ```
 
-> **📁 Complete, tested example:** For platform-specific examples with CLI support and error handling, see files in [`examples/getting_started/`](../../examples/getting_started/) (beginner-friendly walkthroughs) and [`examples/features/`](../../examples/features/) (focused feature demonstrations).
+> **📁 Complete, tested example:** For platform-specific examples with CLI support and error handling, see files in [`examples/getting_started/`](https://github.com/BenchBox-dev/BenchBox/tree/develop/examples/getting_started) (beginner-friendly walkthroughs) and [`examples/features/`](https://github.com/BenchBox-dev/BenchBox/tree/develop/examples/features) (focused feature demonstrations).
 
 ---
 
@@ -1269,7 +1269,7 @@ if __name__ == "__main__":
     run_systematic_analysis()
 ```
 
-> **📁 Complete, tested example:** See [`examples/features/result_analysis.py`](../../examples/features/result_analysis.py) for programmatic result analysis with metrics aggregation, statistical comparisons, and automated reporting.
+> **📁 Complete, tested example:** See [`examples/features/result_analysis.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/features/result_analysis.py) for programmatic result analysis with metrics aggregation, statistical comparisons, and automated reporting.
 
 ### Regression Testing Example
 
@@ -1472,7 +1472,7 @@ if __name__ == "__main__":
     run_regression_testing()
 ```
 
-> **📁 Complete, tested example:** See [`examples/use_cases/ci_regression_test.py`](../../examples/use_cases/ci_regression_test.py) for a production-ready CI/CD testing script with error handling, logging, and CLI support.
+> **📁 Complete, tested example:** See [`examples/use_cases/ci_regression_test.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/use_cases/ci_regression_test.py) for a production-ready CI/CD testing script with error handling, logging, and CLI support.
 
 ---
 
@@ -1687,7 +1687,7 @@ if __name__ == "__main__":
     compare_databases()
 ```
 
-> **📁 Complete, tested example:** See [`examples/features/multi_platform.py`](../../examples/features/multi_platform.py) for multi-platform benchmarking and [`examples/use_cases/platform_evaluation.py`](../../examples/use_cases/platform_evaluation.py) for comprehensive platform evaluation.
+> **📁 Complete, tested example:** See [`examples/features/multi_platform.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/features/multi_platform.py) for multi-platform benchmarking and [`examples/use_cases/platform_evaluation.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/use_cases/platform_evaluation.py) for comprehensive platform evaluation.
 
 ---
 
@@ -1897,7 +1897,7 @@ if __name__ == "__main__":
     run_performance_tests()
 ```
 
-> **📁 Complete, tested example:** See [`examples/use_cases/ci_regression_test.py`](../../examples/use_cases/ci_regression_test.py) for a production-ready CI/CD performance testing script with baseline comparison, threshold detection, and exit code reporting.
+> **📁 Complete, tested example:** See [`examples/use_cases/ci_regression_test.py`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/use_cases/ci_regression_test.py) for a production-ready CI/CD performance testing script with baseline comparison, threshold detection, and exit code reporting.
 
 ---
 

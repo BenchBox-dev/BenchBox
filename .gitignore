@@ -250,4 +250,5 @@ node_modules/
 /.claude/skills/blog/
 /site-inventory/
 /website/.astro/
+/website/.generated/
 /website/e2e-output/

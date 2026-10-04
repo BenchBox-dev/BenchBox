@@ -11,42 +11,48 @@ The BenchBox examples are organized into six categories to help you learn progre
 
 ## Example Categories
 
-### 1. [Getting Started Examples](../../../examples/getting_started/README.md)
+### 1. [Getting Started Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/getting_started/README.md)
+
 **5 examples** | **Beginner-friendly** | **5-10 minutes each**
 
 Zero to working benchmark in minutes. Includes local (DuckDB) and cloud (Databricks, BigQuery) examples with clear progression.
 
 **Start here if:** You're new to BenchBox
 
-### 2. [Feature Examples](../../../examples/features/README.md)
+### 2. [Feature Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/features/README.md)
+
 **8 examples** | **Intermediate** | **10-15 minutes each**
 
 Learn specific BenchBox capabilities in isolation: test types, query subsetting, tuning, multi-platform execution, and more.
 
 **Start here if:** You know the basics and want to learn specific features
 
-### 3. [Use Case Patterns](../../../examples/use_cases/README.md)
+### 3. [Use Case Patterns](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/use_cases/README.md)
+
 **4 examples** | **Advanced** | **20-30 minutes each**
 
 Real-world solutions for common problems: CI/CD testing, platform evaluation, incremental tuning, and cost optimization.
 
 **Start here if:** You're building production workflows
 
-### 4. [Notebook Examples](../../../examples/notebooks/README.md)
+### 4. [Notebook Examples](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/notebooks/README.md)
+
 **11 notebooks** | **All levels** | **Interactive**
 
 Interactive Jupyter notebooks for each platform plus analysis patterns. Perfect for exploration and presentation.
 
 **Start here if:** You prefer interactive development
 
-### 5. [Configuration Templates](../../../examples/tunings/README.md)
+### 5. [Configuration Templates](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/tunings/README.md)
+
 **49 files** | **Reference** | **Copy-paste ready**
 
 Platform configurations (15 files) and benchmark tuning configs (34 files) for all supported platforms.
 
 **Start here if:** You need platform setup or tuning references
 
-### 6. [Workflow Patterns](../../../examples/programmatic/README.md)
+### 6. [Workflow Patterns](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/programmatic/README.md)
+
 **8 patterns** | **All levels** | **Production-ready**
 
 Complete, tested workflow patterns for common scenarios. Each pattern includes context, code, and usage guidance.
@@ -57,8 +63,8 @@ Complete, tested workflow patterns for common scenarios. Each pattern includes c
 
 - **Complete directory structure:** [Examples Directory Guide](../examples-directory.md)
 - **Examples repository location:** `examples/` in the BenchBox repository
-- **Detailed navigation:** [`examples/INDEX.md`](../../../examples/INDEX.md)
-- **Pattern reference:** [`examples/PATTERNS.md`](../../../examples/PATTERNS.md)
+- **Detailed navigation:** [`examples/INDEX.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/INDEX.md)
+- **Pattern reference:** [`examples/PATTERNS.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/PATTERNS.md)
 
 ## How to Use These Guides
 
@@ -91,7 +97,7 @@ cd ../../features
 python query_subset.py
 ```
 
-For cloud examples, see the [Configuration Guide](../../../examples/tunings/README.md) for platform setup instructions.
+For cloud examples, see the [Configuration Guide](https://github.com/BenchBox-dev/BenchBox/blob/develop/examples/tunings/README.md) for platform setup instructions.
 
 ## See Also
 

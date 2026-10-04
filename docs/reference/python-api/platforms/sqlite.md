@@ -26,9 +26,9 @@ Common use cases:
 - Proof-of-concept work
 - Educational and learning purposes
 
-:::{note}
+```{note}
 SQLite is not designed for production-scale OLAP workloads. Use ClickHouse, DuckDB, or cloud platforms for large-scale benchmarking.
-:::
+```
 
 ## Quick Start
 
@@ -444,9 +444,9 @@ Recommended scale factors for SQLite:
 - **Local benchmarking**: SF = 0.1 to 1.0 (~100MB to 1GB)
 - **Maximum practical**: SF = 10 (~10GB, slow queries)
 
-:::{warning}
+```{warning}
 SQLite is not designed for large-scale OLAP workloads. Scale factors above 1.0 will result in slow query performance.
-:::
+```
 
 ## Best Practices
 
