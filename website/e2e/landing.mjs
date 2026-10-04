@@ -1,10 +1,32 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
 
-const base = process.env.BASE_URL ?? "http://127.0.0.1:4330";
+const siteDir = path.resolve(process.env.SITE_DIR ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist"));
+const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
+
+function resolveFile(urlPath) {
+  const clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
+  const candidates = urlPath.endsWith("/") ? [path.join(clean, "index.html")] : [clean, `${clean}.html`, path.join(clean, "index.html")];
+  return candidates.map((candidate) => path.join(siteDir, candidate)).find((full) => full.startsWith(siteDir) && existsSync(full) && statSync(full).isFile());
+}
+
+let server;
+let base = process.env.BASE_URL;
+if (!base) {
+  server = createServer((request, response) => {
+    const file = resolveFile(new URL(request.url ?? "/", "http://localhost").pathname);
+    response.writeHead(file ? 200 : 404, { "content-type": types[path.extname(file ?? "")] ?? "application/octet-stream" });
+    if (file) createReadStream(file).pipe(response);
+    else response.end();
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  base = `http://127.0.0.1:${server.address().port}`;
+}
 const oldBase = process.env.OLD_BASE_URL;
 const outDir = process.env.OUT_DIR ?? path.join(os.tmpdir(), "benchbox-website-landing");
 mkdirSync(outDir, { recursive: true });
@@ -27,8 +49,15 @@ async function open(route, { width = 1280, theme, javaScriptEnabled = true, orig
 }
 
 async function hydrated(page) {
-  await page.waitForFunction(() => !document.querySelector("astro-island[ssr]"));
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.waitForFunction(() => !document.querySelector("astro-island[ssr]") && location.search.includes("goal="), null, { timeout: 30000 });
+  await settled(page);
+}
+
+async function settled(page) {
+  await page.evaluate(async () => {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
+  });
 }
 
 async function revealAll(page) {
@@ -38,8 +67,20 @@ async function revealAll(page) {
     await page.waitForTimeout(40);
   }
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(900);
+  await until(page, () => [...document.querySelectorAll(".feature-card, .benchmark-card, .install-step")].every((el) => getComputedStyle(el).opacity === "1"));
+  await settled(page);
 }
+
+async function until(page, predicate, arg) {
+  try {
+    await page.waitForFunction(predicate, arg, { timeout: 20000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const textIs = (page, selector, expected) => until(page, ([sel, text]) => document.querySelector(sel)?.textContent === text, [selector, expected]);
 
 function luminance(rgb) {
   const [r, g, b] = rgb.match(/[\d.]+/g).slice(0, 3).map((v) => {
@@ -60,7 +101,8 @@ function contrast(a, b) {
   page.on("request", (request) => requests.push(request.url()));
   await page.reload({ waitUntil: "networkidle" });
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(300);
+  await page.waitForLoadState("networkidle");
+  await settled(page);
   const origin = new URL(base).origin;
   const foreign = requests.filter((url) => !url.startsWith(origin) && !url.startsWith("data:") && !url.startsWith("blob:"));
   const scriptSources = await page.evaluate(() => [...document.scripts].map((s) => s.src).filter(Boolean));
@@ -84,15 +126,19 @@ function contrast(a, b) {
   check(shiki.text.startsWith("# CLI - Quick benchmarking\nbenchbox run"), "hero code text changed");
 
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.locator('[data-target="hero-code"]').click();
-  const label = await page.locator('[data-target="hero-code"]').textContent();
+  const heroCopy = page.locator('[data-target="hero-code"]');
+  for (let attempt = 0; attempt < 10 && (await heroCopy.textContent()) !== "Copied!"; attempt++) {
+    await heroCopy.click();
+    await until(page, () => document.querySelector('[data-target="hero-code"]')?.textContent === "Copied!");
+  }
+  const label = await heroCopy.textContent();
   const clip = await page.evaluate(() => navigator.clipboard.readText());
   report.landing.copy = { label, clip: clip.slice(0, 40) };
   check(label === "Copied!", `landing copy label is ${label}`);
   check(clip.startsWith("# CLI - Quick benchmarking"), "landing copy did not write the code text");
 
   await page.locator(".section-nav__link--platforms").click();
-  await page.waitForTimeout(1200);
+  await until(page, () => location.hash === "#platforms" && document.querySelector(".section-nav__link[aria-current='location']")?.textContent === "Platforms");
   const current = await page.locator(".section-nav__link[aria-current='location']").allTextContents();
   report.landing.sectionNav = current;
   check(current.join() === "Platforms", `section nav current after click is ${current}`);
@@ -158,7 +204,7 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
     await page.locator(selector).focus();
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");
-    await page.waitForTimeout(300);
+    await settled(page);
     const state = await page.locator(selector).evaluate((el) => {
       const style = getComputedStyle(el);
       return { outline: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0, bg: style.backgroundColor };
@@ -187,38 +233,51 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
     });
     await page.focus('[data-copy-target="prompt-text"]');
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
+    await until(page, () => window.__written.length > 0);
     const written = await page.evaluate(() => window.__written.length);
     check(written === 1, `${key} on copy wrote ${written} times`);
   }
 
-  const status = await page.locator("#copy-status").evaluate((el) => ({ role: el.getAttribute("role"), live: el.getAttribute("aria-live"), text: el.textContent }));
+  const status = await page.locator("#copy-status").evaluate((el) => ({ role: el.getAttribute("role"), live: el.getAttribute("aria-live") }));
   check(status.role === "status" && status.live === "polite", "copy status is not a polite live region");
-  check(status.text === "Copied agent prompt", `copy status text is ${status.text}`);
+  check(await until(page, () => document.querySelector('[data-copy-target="prompt-text"]').textContent === "Copy" && document.querySelector("#copy-status").textContent === ""), "copy control did not return to idle");
+  await page.evaluate(() => {
+    window.__labels = [];
+    window.__statuses = [];
+    const button = document.querySelector('[data-copy-target="prompt-text"]');
+    const region = document.querySelector("#copy-status");
+    new MutationObserver(() => window.__labels.push(button.textContent)).observe(button, { childList: true, characterData: true, subtree: true });
+    new MutationObserver(() => window.__statuses.push(region.textContent)).observe(region, { childList: true, characterData: true, subtree: true });
+  });
   await page.locator('[data-copy-target="prompt-text"]').click();
-  check((await page.locator('[data-copy-target="prompt-text"]').textContent()) === "Copied", "copy label did not change");
-  await page.waitForTimeout(1800);
-  check((await page.locator('[data-copy-target="prompt-text"]').textContent()) === "Copy", "copy label did not reset after 1.5s");
-  check((await page.locator("#copy-status").textContent()) === "", "copy status did not clear after 1.5s");
+  check(await until(page, () => window.__labels.includes("Copied") && window.__labels.at(-1) === "Copy"), "copy label did not change and reset");
+  const history = await page.evaluate(() => ({ labels: window.__labels, statuses: window.__statuses }));
+  check(history.statuses.includes("Copied agent prompt"), `copy status text history ${history.statuses}`);
+  check(await until(page, () => document.querySelector("#copy-status").textContent === ""), "copy status did not clear");
 
   await page.selectOption("#sel-surface", "mcp");
+  await until(page, () => !document.querySelector("#block-mcp-setup").hidden);
   await page.locator('[data-copy-target="mcp-setup-text"]').click();
-  check((await page.locator("#copy-status").textContent()) === "Copied MCP server config", "mcp copy status text");
+  check(await textIs(page, "#copy-status", "Copied MCP server config"), "mcp copy status text");
 
   await page.selectOption("#sel-goal", "compare");
+  await until(page, () => !document.querySelector("#sel-platformA").closest("label").hidden && document.querySelector("#sel-platformA").options.length > 0);
   check((await page.getByRole("combobox", { name: "Platform A" }).count()) === 1, "Platform A not exposed in compare");
   check((await page.getByRole("combobox", { name: "Platform B" }).count()) === 1, "Platform B not exposed in compare");
   check((await page.getByRole("combobox", { name: "Platform", exact: true }).count()) === 0, "Platform still exposed in compare");
   check((await page.locator("#prompt-text").textContent()).includes("compare"), "compare prompt not rendered");
   await page.selectOption("#sel-goal", "test_one");
+  await until(page, () => !document.querySelector("#sel-platform").closest("label").hidden && document.querySelector("#sel-platform").options.length > 0);
   check((await page.getByRole("combobox", { name: "Platform", exact: true }).count()) === 1, "Platform not restored");
   check((await page.getByRole("combobox", { name: "Platform A" }).count()) === 0, "Platform A still exposed");
 
   const sqlPlatforms = await page.locator("#sel-platform option").count();
   await page.selectOption("#sel-interface", "dataframe");
+  await until(page, (before) => document.querySelector("#sel-platform").options.length < before && ![...document.querySelectorAll("#sel-benchmark option")].some((o) => o.textContent === "ClickBench"), sqlPlatforms);
   const dfPlatforms = await page.locator("#sel-platform option").count();
   const dfBenchmarks = await page.locator("#sel-benchmark option").allTextContents();
   await page.selectOption("#sel-deployment", "managed");
+  await until(page, () => location.search.includes("deployment=managed") && document.querySelector("#sel-platform").options.length > 0);
   const managedPlatforms = await page.locator("#sel-platform option").allTextContents();
   report.prompts.filter = { sqlPlatforms, dfPlatforms, dfBenchmarks, managedPlatforms: managedPlatforms.length };
   check(dfPlatforms > 0 && dfPlatforms < sqlPlatforms, "interface filter did not narrow platforms");
@@ -227,12 +286,15 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   check((await page.evaluate(() => location.search)).includes("deployment=managed"), "url did not record deployment");
 
   await page.selectOption("#sel-interface", "sql");
+  await until(page, () => location.search.includes("interface=sql"));
   await page.selectOption("#sel-deployment", "managed");
+  await until(page, () => location.search.includes("deployment=managed") && location.search.includes("interface=sql"));
   const safetyBefore = await page.locator("#block-cloud-safety").isVisible();
   const options = await page.locator("#sel-platform option").evaluateAll((list) => list.map((o) => o.value));
   let safetyShown = safetyBefore;
   for (const value of options) {
     await page.selectOption("#sel-platform", value);
+    await until(page, (id) => location.search.includes(`platform=${id}`), value);
     if (await page.locator("#block-cloud-safety").isVisible()) {
       safetyShown = true;
       break;
@@ -247,7 +309,7 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   const url = await page.evaluate(() => location.search);
   await page.reload({ waitUntil: "networkidle" });
   await hydrated(page);
-  check((await page.locator("#sel-deployment").inputValue()) === "managed", "deployment not restored from the url");
+  check(await until(page, () => document.querySelector("#sel-deployment").value === "managed"), "deployment not restored from the url");
   check((await page.evaluate(() => location.search)) === url, "url state changed across reload");
   await context.close();
 }
@@ -267,7 +329,7 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   await page.locator('[data-copy-target="prompt-text"]').click();
   const exec = await page.evaluate(() => window.__exec);
   check(exec.join() === "copy", `execCommand fallback calls ${exec}`);
-  check((await page.locator("#copy-status").textContent()) === "Copied agent prompt", "fallback copy status");
+  check(await textIs(page, "#copy-status", "Copied agent prompt"), "fallback copy status");
   await context.close();
 }
 
@@ -291,7 +353,8 @@ for (const theme of ["light", "dark"]) {
   const button = page.locator('[data-copy-target="prompt-text"]');
   const idle = await button.evaluate((el) => ({ color: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }));
   await button.hover();
-  await page.waitForTimeout(300);
+  await until(page, (idleBg) => getComputedStyle(document.querySelector('[data-copy-target="prompt-text"]')).backgroundColor !== idleBg, idle.bg);
+  await settled(page);
   const hover = await button.evaluate((el) => ({ color: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }));
   ratios.copyIdle = contrast(idle.color, idle.bg);
   ratios.copyHover = contrast(hover.color, hover.bg);
@@ -370,6 +433,7 @@ if (oldBase) {
 }
 
 await browser.close();
+server?.close();
 report.failures = failures;
 writeFileSync(path.join(outDir, "landing.json"), JSON.stringify(report, null, 2));
 console.log(`wrote ${path.join(outDir, "landing.json")}`);

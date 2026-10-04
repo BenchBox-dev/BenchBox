@@ -84,6 +84,7 @@ function CopyButton(props: { target: string; text: string; onStatus: (message: s
 export default function PromptComposer({ catalog }: Props) {
   const [raw, setRaw] = useState<RawState>({});
   const [status, setStatus] = useState("");
+  const [ready, setReady] = useState(false);
   const state: State = normaliseState(catalog, raw);
   const output = buildOutput(catalog, state);
   const isCompare = state.goal === "compare";
@@ -99,9 +100,11 @@ export default function PromptComposer({ catalog }: Props) {
 
   useEffect(() => {
     apply(stateFromSearch(window.location.search));
+    setReady(true);
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     const search = searchFromState(state);
     window.history.replaceState({}, "", window.location.pathname + (search ? `?${search}` : ""));
   });

@@ -114,6 +114,7 @@ site-check: docs-generate site-deps
 site-test-built:
 	@npm --prefix website test
 	@npm --prefix website run verify:not-found
+	@npm --prefix website run verify:landing
 
 # Run all documentation checks (build, linkcheck, validate)
 .PHONY: docs-check
