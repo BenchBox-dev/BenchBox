@@ -5771,15 +5771,10 @@
       "title": "Fix DataFusion adapter ingest of trailing-delimiter TPC .tbl/.dat files"
     },
     "datagen-empty-manifest-vacuous-validation-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T13:56:46Z",
-        "generation": "b464c64a409547a6896fff898f8e00b9",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Fail datagen when the manifest records zero tables, and fail validation when zero rows load"
     },
     "dataproc-serverless-platform": {
