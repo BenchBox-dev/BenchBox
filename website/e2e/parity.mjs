@@ -39,6 +39,9 @@ async function open(route, theme, stripRefresh = false) {
   const page = await context.newPage();
   const response = await page.goto(base + route, { waitUntil: "load" });
   await page.waitForLoadState("networkidle").catch(() => null);
+  await page
+    .waitForFunction(() => [...document.querySelectorAll(".expressive-code pre")].every((pre) => pre.scrollWidth <= pre.clientWidth || pre.hasAttribute("tabindex")), null, { timeout: 10000 })
+    .catch(() => null);
   return { page, context, response };
 }
 
