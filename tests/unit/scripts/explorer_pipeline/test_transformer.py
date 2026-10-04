@@ -642,9 +642,6 @@ class TestExtendedManifestFields:
         assert transformer.to_detail_result(bundle, result_id="v").tuning_validation_status == "applied_verified"
 
     def test_untuned_bundle_not_applicable_status_ingested_verbatim(self, tmp_path: Path) -> None:
-        """An untuned run states ``not_applicable`` in ``platform.tuning`` with no
-        other tuning fields; it is ingested as-is and is not mistaken for a run
-        that carries a requested-tuning block."""
         import copy
 
         data = copy.deepcopy(MINIMAL_BUNDLE)
