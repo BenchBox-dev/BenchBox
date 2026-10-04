@@ -152,7 +152,6 @@ tests/unit/scripts/test_validate_submission_resource_heavy.py
 tests/unit/scripts/test_validate_submission_slim_fallback.py
 tests/unit/scripts/test_verify_mcp_conformance.py
 tests/unit/scripts/test_worktree_audit.py
-tests/unit/test_auto_merge_soundness_paths.py
 tests/unit/test_release_canary_incident.py
 tests/unit/test_release_canary_sharding.py
 tests/unit/test_release_infrastructure.py

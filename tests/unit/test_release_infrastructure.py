@@ -617,17 +617,6 @@ class TestReleaseInfrastructure:
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 
     def test_validate_main_pr_restores_ruleset_helper_before_drift_check(self):
-        """scripts/ruleset_drift_check.py imports its enforcement helper from
-        _project/scripts, which release-cut curation strips from both the
-        release head and (once a release has been cut) the trusted release
-        base. The restore-from-develop step must run, and must run before
-        the ruleset drift check, or bootstrap evidence would ModuleNotFoundError
-        on every real release PR.
-
-        The helper itself imports auto_merge_soundness_paths from the same
-        curated-out directory, so restoring only the helper still fails
-        (v0.3.1 release PR #1072). Both modules must be restored.
-        """
         job = _workflow("validate-release-pr.yml")["jobs"]["validate-base"]
         step_names = [step.get("name") for step in job["steps"]]
         restore_index = step_names.index("Restore ruleset review enforcement helper for bootstrap")
@@ -637,7 +626,6 @@ class TestReleaseInfrastructure:
         restore_step = job["steps"][restore_index]
         assert restore_step["if"] == "steps.release-readiness.outputs.bootstrap_required == 'true'"
         assert "_project/scripts/ruleset_review_enforcement.py" in restore_step["run"]
-        assert "_project/scripts/auto_merge_soundness_paths.py" in restore_step["run"]
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):

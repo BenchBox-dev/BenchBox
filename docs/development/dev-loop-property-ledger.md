@@ -39,8 +39,8 @@ Classification values:
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
 | Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml`, `scripts/release_flow.py`, `tests/unit/scripts/test_release_flow.py` | ci.yml always-required `ci-paths` selects release identity changes and checks them against the immutable event base; release workflow | pending | open |
 | Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | Advisory nightly and manual verification; enforced release-canary and release-PR bootstrap; thread-resolution and tag-protection predicates retained | pending | open |
-| Soundness-path review | `.github/soundness-paths.txt`, `_project/scripts/soundness_paths.py`, `tests/unit/test_auto_merge_soundness_paths.py` | Required oracle-review on the exact head, required thread resolution and post-merge soundness digest; auto-merge-on-open revokes only on the hold label | pending | open |
-| Durable auto-merge hold | `no-auto-merge` label and draft status | Exact-head arming refuses holds; auto-merge-on-open retains hold-label revocation | pending | open |
+| Soundness-path review | `.github/soundness-paths.txt`, `_project/scripts/soundness_paths.py`, `tests/unit/scripts/test_soundness_paths.py` | Required oracle-review on the exact head, required thread resolution and post-merge soundness digest | pending | open |
+| Durable auto-merge hold | `no-auto-merge` label and draft status | Exact-head arming refuses holds; the label is not enforced after arming | pending | open |
 | Workflow context validity | `tests/unit/workflows/test_workflow_expression_contexts.py` | ci.yml `tooling` | pending | open |
 | Combined-tree validation before merge (retired) | Former merge-group required checks | Required PR checks, then exact-commit trunk validation; composition failures are detected after merge and handled by revert | pending | open |
 | read_primitives cross-surface check | `_project/scripts/rp_scoped_check.py` | nightly T3 per-domain suites | pending | open |
@@ -64,7 +64,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
-| `auto-merge-on-open.yml` | pure-process | Retained hold-label revocation; soundness-path revocation replaced by required oracle-review |
 | `corpus-drift-check.yml` | product-safety | Corpus drift detection |
 | `corpus-event-bridge.yml` | product-safety | Corpus event integrity |
 | `corpus-reconciler.yml` | product-safety | Corpus reconciliation |
@@ -311,12 +310,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_ruleset_drift_review_coverage.py` | product-safety | Ruleset drift |
 | `test_ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 
-### `tests/unit/test_auto_merge_*`
-
-| File | Classification | Property or reason |
-| --- | --- | --- |
-| `test_auto_merge_soundness_paths.py` | product-safety | Soundness path classification and compatibility entry point |
-
 ### `tests/unit/test_release_*`
 
 | File | Classification | Property or reason |
@@ -363,7 +356,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing_audit.py` | product-safety | Timing audit (KEEP trap) |
 | `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
 | `fast_lane_ceiling_check.py` | pure-process | Fast-lane marker and path guards; retires with the fast lane |
-| `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
+| `soundness_paths.py` | product-safety | Soundness path manifest |
 | `oracle_review_check.py` | product-safety | Connector review check for soundness-path changes |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |

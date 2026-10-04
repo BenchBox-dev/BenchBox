@@ -18,7 +18,6 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 from required_lane import (  # noqa: E402
     REQUIRED_CHECK_NAMES,
     _parse_iso,
@@ -26,6 +25,7 @@ from required_lane import (  # noqa: E402
     is_required_lane_green,
     latest_check_run,
 )
+from soundness_paths import any_soundness_path  # noqa: E402
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 
@@ -351,13 +351,6 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
                 "updated_at": raw.get("updated_at"),
                 "auto_merge": raw.get("auto_merge"),
                 "requested_reviewers": [r.get("login") for r in (raw.get("requested_reviewers") or [])],
-                # GitHub reports a rename as the *new* `filename` plus a
-                # `previous_filename`. The live auto-merge gate deliberately uses
-                # `git diff --name-only --no-renames` (both sides of a rename) and
-                # tests/unit/test_auto_merge_soundness_paths.py pins that, so a PR
-                # that moves a protected soundness file OUT to an unprotected path
-                # still disables auto-merge. Keep both names here or this report
-                # would miss exactly those parked soundness-gated PRs.
                 "changed_files": [
                     name for f in files for name in (f.get("filename", ""), f.get("previous_filename", "")) if name
                 ],

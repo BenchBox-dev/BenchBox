@@ -73,7 +73,6 @@ file	.github/workflows/publication-recover.yml
 file	.github/workflows/publication-canaries.yml
 file	.github/workflows/site-deploy.yml
 file	scripts/publication/verify_lane_isolation.py
-file	_project/scripts/auto_merge_soundness_paths.py
 file	_project/scripts/soundness_paths.py
 file	_project/scripts/oracle_review_check.py
 file	.github/workflows/oracle-review.yml

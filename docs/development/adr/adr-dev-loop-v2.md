@@ -81,7 +81,9 @@ Soundness paths are classified by `.github/soundness-paths.txt`. The required
 the current head, required thread resolution binds disposition of findings, and the
 scheduled digest checks the merged evidence. Code-owner review and PR-body attestation
 are retired. The soundness-path revocation is removed and the replacement check
-is required in the live ruleset; explicit hold-label revocation remains.
+is required in the live ruleset. The `auto-merge-on-open.yml` workflow is deleted:
+the `no-auto-merge` label is enforced only when arming, and nothing disarms a PR
+that is already armed.
 
 Amended 2026-10-02, updated 2026-10-03: the external review stays, but a PR-body
 attestation checked by CI no longer binds it. The author writes its own attestation, so the check

@@ -1184,15 +1184,6 @@ jobs:
           make test-pyspark
 
   green-unmerged-sweep:
-    # External read-only observer for true auto-merge stranding (arm intent
-    # then lost): green + auto-merge OFF alone is an intentional hold after
-    # the post-#1592 policy and is NOT alerted. The script requires timeline
-    # evidence of prior arm (ready_for_review / auto_squash_enabled /
-    # auto_merge_disabled) and excludes durable holds (draft or the
-    # `no-auto-merge` label). It does NOT modify auto-merge-on-open.yml and
-    # does NOT enable auto-merge itself -- --apply only upserts one
-    # marker-tagged tracking issue and must never re-arm a hold it did not
-    # set. See docs/operations/pr-triage.md.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
