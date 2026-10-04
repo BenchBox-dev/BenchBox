@@ -4754,6 +4754,13 @@
       "status": "done",
       "title": "Nothing surfaces result age: 130 bundles aged four months in the public corpus unnoticed"
     },
+    "corpus-identity-and-phase-rule-parity": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Corpus inventory, validator and explorer disagree on engine identity and phase, and ignore stream count"
+    },
     "corpus-invariant-validator-runs-in-no-ci-lane": {
       "claim": null,
       "needs": [],

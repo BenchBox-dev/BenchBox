@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "One shared resolver (or a parity test across all three) for identity and phase",
+    "Throughput cohort identity includes or enforces a matching stream count",
+    "Phase names are normalized (case; standard maps to power)",
+    "SEED_CORPUS_SPEC.md documents which engines count as distinct identities"
+  ],
+  "context": "2026-10-04 throughput adversarial review (#2382 branch 938150a4f and develop 8ed0c64e1).",
+  "description": "Three components define cohorts differently:\n- Identity: scripts/generate_corpus_inventory.py:278-280 uses platform plus version for every cohort. The validator uses platform only, except under duckdb-version-matrix/. If the inventory were used for admission, three DuckDB versions would make a \"3-identity\" cohort (tpch@sf10.0 already lists 7 DuckDB versions).\n- Phase: the explorer's _test_type (transformer.py:806-820) treats {\"status\":\"NOT_RUN\"} as executed, lowercases phases, and keeps unknown as its own cohort. The inventory and validator ignore NOT_RUN, don't lowercase, and merge unknown into power. Latent today: all bundles declare test_type.\n- Uncommon test_type values (standard, combined, Throughput) each form their own cohort; standard is power-like (builder.py:779). This fails closed.\n- Stream count is not part of throughput cohort identity, so 2-stream and 3-stream runs share a cohort.\n- Same-engine padding: Spark SQL and PySpark both use pyspark; DuckLake and MotherDuck are DuckDB-based. No cohort currently relies on this to reach the floor.",
+  "links": [
+    "scripts/generate_corpus_inventory.py",
+    "results-data/validate_corpus.py",
+    "_project/scripts/explorer_pipeline/transformer.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:03:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e8e5af8059134c5aa6e51b5fcd7a4d6f",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
