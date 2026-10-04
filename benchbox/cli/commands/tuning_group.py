@@ -24,6 +24,7 @@ from benchbox.cli.tuning_resolver import (
     display_tuning_show,
     resolve_tuning,
 )
+from benchbox.core.config_utils import load_config_file
 from benchbox.core.dataframe.tuning import (
     DataFrameTuningConfiguration,
     detect_system_profile,
@@ -40,6 +41,13 @@ from benchbox.core.dataframe.tuning.profiles import (
     DATAFRAME_PLATFORMS,
 )
 from benchbox.core.platform_manifest import get_platform_aliases
+from benchbox.core.tuning.capability_registry import (
+    PLATFORM_ALIASES,
+    get_capability,
+    known_registry_platforms,
+    resolve_platform_key,
+)
+from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 from benchbox.platforms.adapter_factory import is_dataframe_mode
 
 
@@ -231,22 +239,35 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
 @click.argument("config_file", type=click.Path(exists=True))
 @click.option(
     "--platform",
-    type=click.Choice(["datafusion", "polars", "pandas", "dask", "cudf"], case_sensitive=False),
+    type=str,
     required=True,
-    help="Target DataFrame platform",
+    help="Target platform: a DataFrame platform or a SQL platform in the tuning capability registry",
 )
 def validate_config(config_file: str, platform: str) -> None:
     """Validate a tuning configuration file.
 
     Checks the configuration for errors and warnings specific to the target platform.
-    Currently supports DataFrame platform configurations.
+    DataFrame platforms (datafusion, polars, pandas, dask, cudf) validate a DataFrame
+    tuning file. Any other platform validates a SQL tuning file against the platform
+    capability registry.
 
     \b
     Examples:
-      benchbox tuning validate datafusion_tuning.yaml --platform datafusion
       benchbox tuning validate polars_tuning.yaml --platform polars
       benchbox tuning validate my_config.yaml --platform dask
+      benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
     """
+    platform_name = platform.lower()
+    if (
+        platform_name not in DATAFRAME_PLATFORMS
+        and resolve_platform_key(platform_name) not in known_registry_platforms()
+    ):
+        choices = sorted(DATAFRAME_PLATFORMS | known_registry_platforms() | set(PLATFORM_ALIASES))
+        raise click.BadParameter(
+            f"unknown platform '{platform}'. Choose from: {', '.join(choices)}",
+            param_hint="--platform",
+        )
+
     console.print(
         Panel.fit(
             Text("Validating Tuning Configuration", style="bold cyan"),
@@ -254,6 +275,13 @@ def validate_config(config_file: str, platform: str) -> None:
         )
     )
 
+    if platform_name in DATAFRAME_PLATFORMS:
+        _validate_dataframe_config(config_file, platform_name)
+    else:
+        _validate_sql_config(config_file, platform_name)
+
+
+def _validate_dataframe_config(config_file: str, platform: str) -> None:
     try:
         config = load_dataframe_tuning(config_file)
         console.print(f"Loaded: [cyan]{config_file}[/cyan]")
@@ -282,6 +310,53 @@ def validate_config(config_file: str, platform: str) -> None:
     except Exception as e:
         console.print(f"[red]Failed to validate configuration: {e}[/red]")
         raise click.Abort() from e
+
+
+def _validate_sql_config(config_file: str, platform: str) -> None:
+    platform_key = resolve_platform_key(platform)
+    try:
+        data = load_config_file(config_file)
+        if not data:
+            raise ValueError("Configuration file is empty")
+        metadata = data.get("_metadata")
+        if isinstance(metadata, dict) and metadata.get("format") == "dataframe_tuning":
+            raise ValueError(
+                f"'{config_file}' is a DataFrame tuning file; validate it with a DataFrame platform "
+                f"({', '.join(sorted(DATAFRAME_PLATFORMS))})"
+            )
+        config = UnifiedTuningConfiguration.from_dict(data)
+    except Exception as e:
+        console.print(f"[red]Failed to validate configuration: {e}[/red]")
+        raise click.Abort() from e
+
+    console.print(f"Loaded: [cyan]{config_file}[/cyan]")
+
+    errors, warnings = config.validate_for_platform_detailed(platform_key)
+    enabled = sorted(config.get_enabled_tuning_types(), key=lambda tuning_type: tuning_type.value)
+    for tuning_type in enabled:
+        capability = get_capability(platform_key, tuning_type)
+        if capability is not None and capability.rendered_via == "none":
+            warnings.append(
+                f"Tuning type '{tuning_type.value}' is accepted by platform '{platform_key}' "
+                f"but not rendered yet ({capability.mechanism_id})"
+            )
+
+    for message in errors:
+        console.print(f"[red]Error: {message}[/red]")
+    for message in warnings:
+        console.print(f"[yellow]Warning: {message}[/yellow]")
+
+    if errors:
+        console.print("\n[red]Configuration has errors that must be fixed[/red]")
+        raise click.Abort()
+    if warnings:
+        console.print("\n[yellow]Configuration is valid but has warnings[/yellow]")
+    else:
+        console.print(f"\n[green]Configuration is valid for {platform_key}[/green]")
+
+    console.print("\n[bold]Configuration Summary:[/bold]")
+    console.print(f"  Enabled tuning types: {len(enabled)}")
+    console.print(f"  Table tunings: {len(config.table_tunings)}")
 
 
 @tuning_group.command("defaults")
