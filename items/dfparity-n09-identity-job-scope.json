@@ -3,7 +3,7 @@
     "The first scheduled or dispatched run's Linux against macOS result is recorded",
     "The trigger scope and the Windows decision are recorded"
   ],
-  "context": "2026-10-03 (evidence/rev3/n09_identity_job.md): the first scheduled run (37114886941, develop, 09:59 UTC) compared darwin-arm64 with linux-x86_64 and found 0 differences in 25 table checksums, 99 queries' -LOG values and the rendered-SQL hashes. This was re-compared independently from the downloaded manifests. Caveat: at SF 0.01 Q46's city draw is degenerate (every city is Midway), so 'identical' says little about Q46; parameter-only passes at larger SF are cheap. Gaps: the PR path filter misses streams.py, queries.py, compliance.py and constants.py; -STREAMS is never exercised; only 2 of 6 bundled binaries ever run. Recommendation awaiting the owner: add windows-latest as an advisory continue-on-error cell with line-ending normalisation, widen the path filter to those four files, and add an SF 100 parameter-only pass. Defer runners for the other binaries.",
+  "context": "2026-10-03 (evidence/rev3/n09_identity_job.md): the first scheduled run (37114886941, develop, 09:59 UTC) compared darwin-arm64 with linux-x86_64 and found 0 differences in 25 table checksums, 99 queries' -LOG values and the rendered-SQL hashes. This was re-compared independently from the downloaded manifests. Caveat: at SF 0.01 Q46's city draw is degenerate (every city is Midway), so 'identical' says little about Q46; parameter-only passes at larger SF are cheap. Gaps: the PR path filter misses streams.py, queries.py, compliance.py and constants.py; -STREAMS is never exercised; only 2 of 6 bundled binaries ever run. Recommendation awaiting the owner: add windows-latest as an advisory continue-on-error cell with line-ending normalisation, widen the path filter to those four files, and add an SF 100 parameter-only pass. Defer runners for the other binaries.\n\n2026-10-04 closeout: Delivered in #2605 per owner decision: widened path filter, SF 100 parameter pass, advisory Windows cell. The Windows cell exposed the dsdgen option-prefix bug, fixed in #2623 (now 0 differences). Follow-ups: tpcds-identity-windows-required, tpcds-identity-unexercised-binaries.",
   "description": "The workflow from #2523 runs on a schedule, on demand, and on pull requests that touch the bundled binaries or the code that runs them, on Linux and macOS. Decide whether that scope is right and whether to add Windows (streams.py carries a Windows-only retry for a transient Q46 cities distribution error). D3 depends on its first cross-platform result.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "op": "update",
       "op_id": "10d88ca551474c08b9c97c02096e013b",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:33:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a81032377cdb4de1b43ad95c273e60b5",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
