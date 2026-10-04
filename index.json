@@ -21126,15 +21126,10 @@
       "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
     },
     "tuning-gate-dataframe-tuned-resolution-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T16:27:18Z",
-        "generation": "6d196ae98faf44b9a079c4926cac5bc0",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "DECISION GATE (D-8): should --tuning tuned on DataFrame platforms resolve the curated <platform>_optimized.yaml profiles?"
     },
     "tuning-gate-duckdb-partitioning-20261001": {
