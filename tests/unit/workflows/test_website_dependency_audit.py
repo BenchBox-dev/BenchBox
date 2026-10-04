@@ -47,7 +47,6 @@ def test_audit_script_reuses_the_explorer_gate_against_the_website_package() -> 
 def test_audit_allowlist_entries_are_documented_and_expire() -> None:
     allowlist = json.loads((WEBSITE / "scripts/audit-high-allowlist.json").read_text(encoding="utf-8"))
 
-    # GHSA-ch52-4w7c-c8xp was cleared by http-cache-semantics 4.3.0; no finding is allowlisted.
     assert allowlist == []
     for entry in allowlist:
         assert set(entry) == {"id", "package", "reason", "review_by", "link"}

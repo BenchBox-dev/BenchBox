@@ -170,3 +170,5 @@ Known gaps, each a place where a comment can pass unreported:
 - Unknown programs that take `-c` or `-e` as data are listed in
   `DATA_FLAG_PROGRAMS` in `scripts/comment_execution.py`; any other program
   given such a flag is reported.
+- Commands passed to a runner such as `ssh` or `watch` as one string are not
+  split, so an interpreter inside that string is not followed.

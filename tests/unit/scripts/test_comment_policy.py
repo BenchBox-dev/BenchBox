@@ -3081,3 +3081,39 @@ def test_unparseable_shell_chunks_fail_closed_only_when_they_can_hold_a_comment(
 def test_heredoc_inside_command_substitution_is_skipped_as_data() -> None:
     source = "BODY=$(cat <<EOF | awk '{print}'\nIt's data\nEOF\n)\necho \"$BODY\"\n"
     assert scan("a.sh", source, "bash") == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kinds"),
+    [
+        ("a.sh", "ruby -I lib -e '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "ruby -r set -e '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "osascript -l JavaScript -e '// hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "php -B '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "php -R '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "node -p'// hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -exec sh -c '# hi' +\n", "bash", ["comment"]),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", ".", "-exec", "sh", "-c", "# hi", ";"])\n',
+            "python",
+            ["comment"],
+        ),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", ".", "-exec", "rm", "{}", ";"])\n',
+            "python",
+            ["payload-error"],
+        ),
+        ("a.sh", 'perl script.pl "$x" --verbose\n', "bash", []),
+        ("a.sh", "ruby -I lib -e 'puts 1'\n", "bash", []),
+        ("a.py", 'import subprocess\nsubprocess.run(["find", ".", "-name", "*.py"])\n', "python", []),
+    ],
+)
+def test_interpreter_options_before_inline_source_and_find_exec(path: str, source: str, lang: str, kinds: list) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == kinds
+
+
+@pytest.mark.parametrize("source", ["node -p '// hi'\n", "node --print '// hi'\n"])
+def test_shell_node_print_source_is_sent_to_the_typescript_scanner(source: str) -> None:
+    assert list(javascript_requests("a.sh", source, "bash").values()) == ["// hi"]

@@ -116,6 +116,7 @@ UNMODELED_INTERPRETERS = {
 }
 INLINE_SHAPED_FLAG = re.compile(r"-[ceErp]|--(?:eval|command|exec|execute|print)(?:=.*)?|-[ceErp]\S+", re.S)
 COMMAND_RUNNERS = {
+    "find",
     "docker",
     "podman",
     "kubectl",
@@ -149,7 +150,6 @@ DATA_FLAG_PROGRAMS = {
     "wget",
     "grep",
     "rg",
-    "find",
     "xargs",
     "make",
     "uv",

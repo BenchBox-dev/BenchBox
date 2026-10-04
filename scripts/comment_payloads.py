@@ -957,7 +957,7 @@ def unwrap_static_command(words: list) -> list:
 
 
 SHELL_INLINE_INTERPRETER = re.compile(
-    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)"
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceEp]|--eval|--command|--print)"
     r"|(?<![\w.-])(?:ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
     r"|psql|duckdb|sqlite3)(?=[\s;|&)]|$)"
 )
@@ -970,14 +970,14 @@ UNMODELED_MARKERS = {
     "deno": re.compile(r"//|/\*"),
     "bun": re.compile(r"//|/\*"),
     "php": re.compile(r"#|//|/\*"),
-    "osascript": re.compile(r"--|#|\(\*"),
+    "osascript": re.compile(r"--|#|\(\*|//|/\*"),
     "pwsh": re.compile(r"#|<#"),
     "powershell": re.compile(r"#|<#"),
 }
 AWK_VALUE_OPTIONS = {"-v", "-F", "-f"}
 
 
-def unmodeled_program_word(words: list, command: str):
+def unmodeled_program_words(words: list, command: str) -> list:
     if command in {"awk", "gawk", "mawk"}:
         index = 1
         while index < len(words):
@@ -988,37 +988,39 @@ def unmodeled_program_word(words: list, command: str):
                     continue
                 raise ValueError("inline source for an unmodeled interpreter requires an adapter")
             if word.word == "-f":
-                return None
+                return []
             if word.word in AWK_VALUE_OPTIONS:
                 index += 2
                 continue
             if word.word.startswith("-") and word.word != "-":
                 index += 1
                 continue
-            return word
-        return None
+            return [word]
+        return []
+    programs = []
+    positional = False
     for index, word in enumerate(words[1:], start=1):
         if word.parts:
-            raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            if not positional:
+                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            continue
         text = word.word
-        if command == "deno" and text == "eval" or INLINE_OPTION.fullmatch(text):
+        if (command == "deno" and text == "eval") or INLINE_OPTION.fullmatch(text):
             if index + 1 >= len(words):
                 raise ValueError("inline source for an unmodeled interpreter requires an adapter")
-            return words[index + 1]
-        if text.startswith("-") and not PLAIN_OPTION.fullmatch(text) and re.match(r"-[A-Za-z]*[ceEr]", text):
-            return word
-        if not text.startswith("-"):
-            return None
-    return None
+            programs.append(words[index + 1])
+        elif text.startswith("-") and not PLAIN_OPTION.fullmatch(text) and re.match(r"-[A-Za-z]*[ceErBR]", text):
+            programs.append(word)
+        elif not text.startswith("-"):
+            positional = True
+    return programs
 
 
 def check_unmodeled_inline(words: list, command: str) -> None:
-    program = unmodeled_program_word(words, command)
-    if program is None:
-        return
     markers = UNMODELED_MARKERS.get(command, re.compile(r"#"))
-    if program.parts or markers.search(program.word):
-        raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+    for program in unmodeled_program_words(words, command):
+        if program.parts or markers.search(program.word):
+            raise ValueError("inline source for an unmodeled interpreter requires an adapter")
 
 
 SHELL_UNMODELED = {
@@ -1041,6 +1043,7 @@ SHELL_UNMODELED = {
     "dash",
 }
 SHELL_COMMAND_RUNNERS = {
+    "find",
     "docker",
     "podman",
     "kubectl",
@@ -1057,7 +1060,7 @@ SHELL_COMMAND_RUNNERS = {
 SHELL_NESTED_TARGETS = {"node", "sh", "bash", "zsh", "eval"} | SQL_CLIENTS | SHELL_UNMODELED
 COMMENT_MARKERS = re.compile(r"#|//|/\*|--|<#")
 PLAIN_OPTION = re.compile(r"--?[A-Za-z][A-Za-z0-9_-]*|--")
-INLINE_OPTION = re.compile(r"-[A-Za-z]*[ceEr]|--(?:eval|command)")
+INLINE_OPTION = re.compile(r"-[A-Za-z]*[ceErBR]|--(?:eval|command)")
 
 
 def logical_line_end(
@@ -1141,7 +1144,7 @@ def neutral_list_operators(text: str) -> str:
 
 
 SHELL_MODELED_INLINE = re.compile(
-    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)"
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceEp]|--eval|--command|--print)"
 )
 SHELL_UNMODELED_NAME = re.compile(
     r"(?<![\w.-])(ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
