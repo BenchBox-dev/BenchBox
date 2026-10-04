@@ -46,10 +46,7 @@ Slow-marked reproducer jobs remain required PR CI through the `core` unit, becau
 Developers submit and arm PRs through repository standard Makefile targets:
 
 ```bash
-# Open PR against develop
 make pr-open
-
-# When PR is ready for merge, run the exact readiness transaction and arm
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
@@ -76,7 +73,6 @@ Runs use `concurrency.queue: max` with running work retained, so later pushes do
 When a trunk run fails, the culprit is reverted first and fixed afterwards:
 
 ```bash
-# Open the revert of a merged pull request
 make trunk-revert PR=<number>
 ```
 
