@@ -176,6 +176,14 @@ def test_no_workflow_publishes_a_merge_queue_candidate_baseline() -> None:
     assert "MERGE_QUEUE" not in lookup
 
 
+def test_capture_spec_keeps_the_astro_capture_only_guard() -> None:
+    source = CAPTURE_SPEC.read_text(encoding="utf-8")
+    assert 'if (RENDERER === "astro" && PHASE !== "capture") {' in source
+    guard = source.split('if (RENDERER === "astro" && PHASE !== "capture") {', 1)[1].split("}", 1)[0]
+    assert "throw new Error(" in guard
+    assert "PUBLIC_SITE_VISUAL_RENDERER=astro supports only PUBLIC_SITE_VISUAL_PHASE=capture" in guard
+
+
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     script = REPO_ROOT / "results-explorer" / "scripts" / "download-public-site-visual-baseline.mjs"
     package = __import__("json").loads((REPO_ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8"))

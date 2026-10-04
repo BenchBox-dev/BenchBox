@@ -159,6 +159,33 @@ describe("renderer-aware visual comparison", () => {
     });
   });
 
+  it("fails an unexpected capture under a renderer change without approval", () => {
+    const extra: VisualManifest = {
+      ...astroSame,
+      captures: [...captures, { route: "/results/", viewport_width: 390, digest: "results" }],
+    };
+    const result = compareVisualManifestsAcrossRenderers(sphinx, extra);
+    expect(result.rendererChanged).toBe(true);
+    expect(result.unexpected).toEqual(["/results/@390"]);
+    expect(result.approvedUnexpected).toEqual([]);
+  });
+
+  it("moves an unexpected capture to approvedUnexpected under exact-head approval", () => {
+    const extra: VisualManifest = {
+      ...astroSame,
+      captures: [...captures, { route: "/results/", viewport_width: 390, digest: "results" }],
+    };
+    const result = compareVisualManifestsAcrossRenderers(sphinx, extra, exact);
+    expect(result).toMatchObject({
+      rendererChanged: true,
+      approvalApplied: true,
+      unexpected: [],
+      approvedUnexpected: ["/results/@390"],
+      missing: [],
+      changed: [],
+    });
+  });
+
   it("never lets a renderer approval hide a missing capture", () => {
     const partial: VisualManifest = { ...astroSame, captures: [captures[0]!] };
     expect(compareVisualManifestsAcrossRenderers(sphinx, partial, exact).missing).toEqual(["/docs/@390"]);

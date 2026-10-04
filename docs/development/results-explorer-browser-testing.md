@@ -83,14 +83,15 @@ tree cannot pass without that comparison. `Public-site visual acceptance`
 reports on every develop PR and merge group; it skips the build only when
 the former documentation input paths are unaffected.
 
-A merge group that passes its comparison also uploads a candidate baseline for
-its own `merge_group.head_sha`. The next queue group uses that head as its base,
-so the candidate is the capture of the exact tree that group merges onto. The
-download script accepts a candidate only from a `merge_group` CI run
-on this repository's `gh-readonly-queue/develop/*` branch at that SHA, and it
-prefers a protected `develop` artifact when both exist. Merge groups capture
-their own tree first, then wait up to 10 minutes for the exact-base artifact
-before failing closed. Pull requests keep a short retry.
+No workflow currently publishes a baseline for a merge group's
+`merge_group.head_sha`: `ci.yml` has no `merge_group` trigger, and
+`test_no_workflow_publishes_a_merge_queue_candidate_baseline` asserts that no
+workflow uploads a queue candidate and that the baseline lookup does not read
+`merge_group` runs. A queue follower therefore has an exact-base baseline only
+after the group ahead of it merges and the protected `develop` push uploads it.
+Publishing candidates would need a `merge_group` trigger on `ci.yml`, an upload
+step in its visual job, and a lookup that trusts that producer; none of these
+exist. Pull requests keep a short retry when downloading the baseline.
 
 If a protected `develop` push was dropped or its baseline expired, dispatch
 Documentation on `develop` with `baseline_source_sha` set to the exact base
@@ -125,8 +126,7 @@ never applies to one. Wiring that slot is described under
 
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
-reviewed PR merges. An approved merge group also uploads a candidate for its own
-head, which only the queue group stacked on that exact head consumes. PR
+reviewed PR merges. No merge-group candidate is published. PR
 diagnostic artifacts remain short-lived and non-promotable.
 
 ### Intentional visual changes while the site moves to Astro
@@ -170,9 +170,10 @@ slot is wired, would be bound to one `merge_group.head_sha`, so a re-formed
 group would need a fresh one.
 
 **Stacked groups.** A follower group's base is the head of the group ahead of
-it. That head has a baseline only once the leader's comparison has passed and
-uploaded a candidate, or when a site-equivalent ancestor exists. If the
-follower fails at the baseline download step, wait for the leader to merge.
+it. That head has a baseline only once the leader has merged and the protected
+`develop` push has uploaded it, or when a site-equivalent ancestor exists; no
+candidate is published for an unmerged leader. If the follower fails at the
+baseline download step, wait for the leader to merge.
 Confirm `public-site-visual-baseline-<develop head>` exists, then re-queue the
 follower. Site-changing PRs should land one at a time.
 
@@ -207,8 +208,13 @@ comparison is never skipped, disabled or loosened.
    `Public-site visual regression` job make the same change, so the pull
    request captures the Astro build against the Sphinx baseline of its exact
    base.
-3. `public-site-pages.spec.ts`: lift the guard that restricts
-   `PUBLIC_SITE_VISUAL_RENDERER=astro` to the capture phase.
+3. `public-site-pages.spec.ts`: the guard that restricts
+   `PUBLIC_SITE_VISUAL_RENDERER=astro` to the capture phase stays in place. The
+   workflows' compare step leaves `PUBLIC_SITE_VISUAL_RENDERER` unset, so it
+   defaults to `sphinx` and the astro renderer reaches the comparison through
+   the captured manifest. The guard therefore blocks only a local single-pass
+   or compare run with `PUBLIC_SITE_VISUAL_RENDERER=astro`; lift it only for
+   that local use, after the renderer cutover.
 
 **Approval slots.** The decision records two separate exact-head approvals, one
 for the PR head and one for the synthetic `merge_group.head_sha`, with queue
