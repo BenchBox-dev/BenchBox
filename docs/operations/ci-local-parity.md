@@ -104,35 +104,27 @@ trailing `; \` continuation marker before comparing it against the `ci.yml`
 command text -- see `_normalize_recipe_lines` in
 `tests/system/test_ci_lint_parity.py`.
 
-If a guard genuinely cannot run locally (see the cache exception below
-for the only current example), add it to the `EXCLUDED_STEPS` dict in the
+If a guard genuinely cannot run locally, add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
 
 ## Documented exceptions
 
-### Fast lane delta guard vs. develop
+### Historical fast-lane delta exception
 
-The `lint` job's "Fast lane ceiling delta vs develop" step
-(`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
-develop fast-lane baseline count, populated by `fast-lane-baseline.yml`
-after every push to develop) and diffs this PR's own fast-lane collect
-count against it. The hosted pull-request command passes
-`--require-develop-baseline`, so a missing or invalid cache fails closed with
-`DELTA_CHECK_BASELINE_ERROR` rather than allowing a PR to enter a composition
-without proving its per-PR delta.
-There is no local equivalent for the cache restore, so `ci-lint` does not run
-this cache-dependent guard. Direct script callers that omit the strict flag
-retain the compatibility `DELTA_CHECK_SKIPPED` behavior. See
-`docs/operations/fast-lane-budget.md` for the full model.
+The test-count ceiling, per-PR growth guard and develop-count cache producer
+are retired. Their cache-restore exception no longer applies. The retained
+`_project/scripts/fast_lane_ceiling_check.py --strict` command checks forbidden
+markers and paths; its hosted and local equivalents must remain in parity.
+See `docs/operations/fast-lane-budget.md` for the retained guard contract.
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
 Everything above is about the direction "a `ci.yml` guard must also run
 locally." There is a second, separate direction: `make ci-lint` may itself
-run on a real, ephemeral GitHub-hosted runner. No workflow does so today (the
-post-merge workflow that used to was retired with the six-unit CI), but the
-gate below stays in place so the recipe is safe on any runner. Most `ci-lint`
+run on a real, ephemeral GitHub-hosted runner. The trunk workflow invokes its
+own test and artifact jobs rather than `make ci-lint`; the guard below keeps
+the recipe safe when another hosted workflow invokes it. Most `ci-lint`
 guards are equally meaningful there, because they inspect the checked-out
 tree, the installed venv, or a registry the repo ships -- none of which
 differ between a laptop and a runner. A couple of guards instead read state

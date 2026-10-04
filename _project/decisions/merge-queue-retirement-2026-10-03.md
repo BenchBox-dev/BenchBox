@@ -1,9 +1,10 @@
 # Retire the merge queue, the strict up-to-date rule and the soundness attestation
 
 Date: 2026-10-03
-Status: Decided. The ruleset change that removes the merge queue and the strict
-up-to-date rule from `develop-squash-only` is a repository settings change and
-lands separately; until it is made, the queue and the strict rule still apply.
+Status: Decided. The merge queue and strict up-to-date rule were removed from
+`develop-squash-only` on 2026-10-03. The required `oracle-review` context is a
+separate settings activation: verify it live before removing the soundness-path
+revocation that it replaces.
 Related: `docs/operations/merge-queue-governance.md` (now "Merge and trunk
 governance"); `docs/development/adr/adr-dev-loop-v2.md` (D4 and the 2026-10-03
 amendment); `.github/workflows/trunk.yml`.
@@ -12,11 +13,17 @@ amendment); `.github/workflows/trunk.yml`.
 
 `develop` stops using GitHub's merge queue and its strict up-to-date rule.
 A pull request merges through auto-merge once its required checks pass on its
-own head. A new workflow, `.github/workflows/trunk.yml`, tests `develop` after
-each merge, and a revert-first policy handles a red trunk. The PR-body
+own head. A new workflow, `.github/workflows/trunk.yml`, tests pushes to
+`develop`, and a revert-first policy handles a red trunk. The PR-body
 `Soundness review:` attestation check (the `soundness-flag` job) is deleted. A
 required `oracle-review` check takes its place for result-affecting changes. The
 public-site visual comparison is advisory until the site is in production.
+
+For this retirement, the owner authorized the implementation and settings
+changes to precede the documentation and drift-expectation updates, overriding
+the ADR's document-first sequencing rule. This exception covers the queue,
+strict-rule and soundness-review transition only; it does not waive backups,
+replacement coverage, review or other administrative approval requirements.
 
 ## Evidence
 
@@ -36,33 +43,51 @@ catch. On 2026-10-02 the queue ran 94 times for 37 merges.
 
 The medium shard kills had one cause: a single test,
 `tests/unit/core/tpcds/test_parameter_consumption_inventory.py`, grew one worker
-to 14 GB. That is fixed in #2560. In the visual comparison, the one render in 58
-that differed between runs was a smooth scroll still in flight at capture; the
-capture spec now waits for it.
+to 14 GB. Its parameter-consumption checks now bound their allocations rather
+than retain that full workload in the worker.
+
+In the visual comparison, the one render in 58 that differed between runs was
+a smooth scroll still in flight at capture; the capture spec now waits for it.
 
 ## What replaces each control
 
 | Control removed | Replacement |
-|---|---|
-| Merge queue testing the combined tree before merge | Required PR checks on the pull request head, then auto-merge. `.github/workflows/trunk.yml` tests `develop` after each merge: the fast lane (with an ungraced fast-lane ceiling), a four-shard medium tier and the correctness gate. |
+| --- | --- |
+| Merge queue testing the combined tree before merge | Required PR checks on the pull request head, then auto-merge. `.github/workflows/trunk.yml` tests `develop`: the fast lane, a four-shard medium tier, the correctness gate and required-local-cases. It also builds the verified release distribution artifact. |
 | Strict up-to-date rule (race lock) | The post-merge trunk run. A change that passed on an older base and breaks the merged tree shows up there, not in a queue. |
 | Ejection of a bad group | Revert first. `make trunk-revert PR=<n>` opens the revert of a merged pull request, and `make pr-open` refuses non-revert PRs while trunk has been red for more than 30 minutes. |
 | PR-body `Soundness review:` attestation (`soundness-flag`) | A required `oracle-review` check that passes only when the Codex connector app has reviewed the current head of a result-affecting PR. Required review-thread resolution and the scheduled post-merge digest are unchanged. |
 | Visual comparison as a merge gate in queue groups | Advisory. The job still runs and uploads its report. It becomes a gate again when the public site is in production. |
-| Heavy tier run only in the queue | The four-shard medium tier and correctness gate run in `trunk.yml` on every merge. |
+| Heavy tier run only in the queue | The four-shard medium tier, correctness gate and required-local-cases run in `trunk.yml` on pushes to `develop`; soundness and packaging carve-outs retain required PR coverage. |
+
+Trunk runs use `concurrency.queue: max` and do not cancel running work, so a
+later merge does not replace an earlier pending run. They can still wait for
+runner capacity. This preserves runs for delivered events; it cannot prove
+that GitHub delivered every push event. The fast-lane test-count ceiling and
+growth baseline are retired; marker and forbidden-path checks remain.
+
+Release admission requires the latest exact-commit `trunk.yml` `push` run on
+`develop` to succeed, with a successful `dist-artifact` job and its matching
+attempt-qualified artifact. It verifies the tagged commit's ancestry, receipt
+and distribution hashes rather than rebuilding the wheel and sdist. A
+successful run for a later commit is not evidence for the tagged commit, and
+admission never falls back to an older successful run or attempt.
 
 ## Risks and the signal for each
 
 - A change that is green on an older base breaks the merged tree. Signal: a
   trunk failure whose culprit PR was green on an older base, more than about
-  once a week. Response: turn the strict up-to-date rule back on for
-  result-affecting paths only, not for the whole branch.
+  once a week. Response: the owner considers reinstating the strict up-to-date
+  rule, with its cost of refreshing open PRs.
 - Trunk stays red and nobody reverts. Signal: trunk red for more than two hours
   with no revert PR open. Response: the owner reverts the culprit with
   `make trunk-revert PR=<n>`.
 - The Codex connector is down, so `oracle-review` never reports. Signal: the
-  check pending for more than four hours. Response: treat the connector as
-  down and the owner reviews the change.
+  check waiting for more than four hours. Response: the owner reviews the
+  change in their own session. If approved, they re-request the connector
+  review, or temporarily remove `oracle-review`, merge through the GitHub UI
+  themselves and restore the required context. Agents cannot satisfy the
+  check by posting an owner comment.
 - Medium-tier shards are killed again. Signal: more than one shard kill a day.
   Response: read the shard's memory sampler output to find the test that is
   growing a worker.
@@ -85,7 +110,8 @@ capture spec now waits for it.
   longer holds, and so the refresh program it governs is closed.
 - `strict-base-refresh-ci-profile-2026-08-14.md`: the profile measured the
   merge-unblock wall under strict checks, where every `develop` advance forced a
-  refresh run; no refresh run exists now.
+  refresh run; a base advance alone no longer requires a refresh. Conflict
+  resolution and other head changes still need fresh CI and review.
 - `heavy-tier-queue-only-2026-09-16.md`: running the heavy tier only in the
   merge-queue run no longer holds, because there is no merge-group run to carry
   it.
@@ -99,7 +125,8 @@ capture spec now waits for it.
 - `visual-baseline-site-equivalent-ancestor-2026-09-27.md`: the
   site-equivalent ancestor lookup and the 10-minute follower wait serve merge
   groups, which no longer exist.
-- `auto-merge-policy-consolidation-2026-08-06.md` (in part): D7, which kept
+- `auto-merge-policy-consolidation-2026-08-06.md` (in part): D5's soundness-path
+  revocation is replaced by the required connector check; D7, which kept
   review gates advisory and out of the merge path; the required `oracle-review`
   check is now a merge-blocking review signal for result-affecting changes, and
   the PR-body attestation is gone.

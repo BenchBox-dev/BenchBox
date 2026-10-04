@@ -7,9 +7,10 @@
 
 Companion to [`develop-post-merge-gaps.md`](develop-post-merge-gaps.md).
 That doc explains the **class**: GitHub can drop `push` delivery for
-consecutive develop merges. Required checks no longer depend on develop push
-events, because the merge queue runs the six units on the exact tree that
-lands. This inventory answers the remaining question: **which workflows still
+consecutive develop merges. Required PR checks run on the pull request head;
+post-merge `trunk.yml` validation depends on delivery of the develop push event.
+Keeping pending trunk runs prevents replacement after delivery, but does not
+guarantee delivery. This inventory answers the remaining question: **which workflows still
 fire only on a develop push**, and for each, is the residual risk accepted or
 does it need a follow-up?
 
@@ -37,7 +38,7 @@ Re-run the method when adding a new develop-push workflow.
 | Workflow | Push scope | Schedule | Dispatch | Role | Push-drop residual | Disposition |
 | --- | --- | --- | --- | --- | --- | --- |
 | `fast-lane-baseline.yml` | `develop`, all paths | **none** | yes | Safety-critical input — records the fast-lane test count that the `guard-fast-lane-delta` step in `ci.yml` restores by exact base SHA | A dropped push leaves that commit without a baseline, so PRs cut from it fail the delta guard closed | **Accepted risk** — the failure is loud and self-describing (`DELTA_CHECK_BASELINE_ERROR`); recover with `gh workflow run fast-lane-baseline.yml --ref develop`, then re-run the PR |
-| `docs.yml` | `develop` and `release`, all paths | **none** | yes | Safety-critical input — captures the SHA-bound public-site visual baseline and, on `release` pushes, runs the Pages deploy | A dropped develop push leaves the exact base SHA without a baseline; an affected PR or merge-group visual comparison fails closed | Dispatch on `develop` with `baseline_source_sha=<exact-protected-base-sha>` to rebuild that ancestor's baseline, then re-run the failed check; see `docs/development/results-explorer-browser-testing.md` |
+| `docs.yml` | `develop` and `release`, all paths | **none** | yes | Captures the SHA-bound public-site visual baseline and, on `release` pushes, runs the Pages deploy | A dropped develop push leaves the exact base SHA without a baseline; an affected visual comparison reports failure, which is advisory until the public site is in production | Dispatch on `develop` with `baseline_source_sha=<exact-protected-base-sha>` to rebuild that ancestor's baseline, then re-run the comparison; see `docs/development/results-explorer-browser-testing.md` |
 | `pricing-data-drift-check.yml` | `develop` + pricing generator/inputs path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — regenerated pricing tables vs vendor APIs | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `sync-results-data-to-published.yml` | `develop` + `results-data/**` (and related validator paths) | **none** | yes | Safety-critical — only automated mirror of the develop corpus to `published-results` | A dropped path-matched push leaves the public corpus stale until human recovery | **Accepted risk** — the daily `corpus-drift-check.yml` canary detects develop-ahead drift and recommends `gh workflow run sync-results-data-to-published.yml`; the workflow keeps the write-heavy mirror on push and dispatch only (no scheduled mutation of a public branch) |
@@ -58,8 +59,9 @@ inventory's risk class:
 The previous snapshot also listed `develop-post-merge.yml`,
 `orphaned-commit-detector.yml`, `results-explorer-browser.yml`, and
 `publication-lane-explorer.yml`. They were retired with the six-unit CI. The
-Chromium suite now runs before merge in the `explorer` unit and again on the
-composed tree in the merge queue, so a dropped develop push no longer skips it.
+Chromium suite now runs before merge in the `explorer` unit. It does not depend
+on develop push delivery; the retired queue no longer repeats it on the composed
+tree.
 
 ### Related scheduled canaries (no develop push)
 

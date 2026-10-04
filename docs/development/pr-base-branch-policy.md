@@ -18,7 +18,7 @@ Any other base is out of policy, except the parent branch of a stacked PR (see S
 
 A stack is allowed when all of these hold:
 
-- One author owns every PR in the stack, and the stack serves one tracker item.
+- One agent owns every PR in the stack, and the stack serves one tracker item.
 - The stack is at most three PRs deep.
 - Only the bottom PR targets `develop`. Each upper PR is a draft that targets its
   parent's branch.
@@ -34,7 +34,9 @@ git push --force-with-lease
 ```
 
 `<old parent tip>` is the last commit of the parent branch before it was
-squash-merged. Do not arm a child before it is retargeted and rebased.
+squash-merged. Retarget and rebase before marking the child ready, then obtain
+fresh CI and the connector's review or thumbs-up on that exact head before
+arming. Parent-base CI and review do not certify the rebased child.
 
 ## Why stacked bases used to get zero CI
 
@@ -64,14 +66,17 @@ required `tooling` check red. It always reports:
 
 - Base is `develop` / `release` / `published-results` → pass in seconds; the
   normal CI lanes apply.
-- Base is anything else → fail with an explicit message to retarget or fold
-  into the parent.
+- Base is a parent feature branch and the PR is a draft → pass; the stack
+  must satisfy the ownership, tracker-item and depth conditions above.
+- Base is anything else and the PR is ready → fail with an explicit message
+  to retarget or fold into the parent. A ready child must target `develop`.
 
 `ci.yml` also listens for `edited` so retargeting an open PR re-evaluates (a
 PR opened on `develop` and later pointed at a feature branch must not keep a
-stale green result). On a PR against a non-integration base, `tooling` is red
-by design and the other five units still report, which is expected, not a
-separate defect.
+stale green result). Becoming ready also re-evaluates the guard. A draft
+parent-based PR runs CI and consumes runners; draft status does not reduce
+the workflow fan-out. The base guard checks draft status and base, not stack
+ownership or depth; the author must enforce the remaining policy conditions.
 
 Unit pins live in `tests/unit/workflows/test_stacked_pr_base_guard.py`.
 
@@ -119,4 +124,4 @@ conflicts, or a filter bug, from an empty or partial check list alone.
 - If `pr-base-guard` fails, fix the base; do not try to "add CI" to the
   stacked base by editing branch filters.
 - Short agent-facing summary: `AGENTS.md` → section **Verification and
-  close-out** (stacked/feature-base PRs are unsupported).
+  close-out** (parent-based drafts, then retarget, rebase, CI and review before arming).

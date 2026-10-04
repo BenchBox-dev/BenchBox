@@ -5,6 +5,7 @@
 Accepted (2026-09-28).
 
 Supersedes:
+
 - [`docs/operations/merge-queue-governance.md`](../../operations/merge-queue-governance.md)
 - [`docs/development/pr-base-branch-policy.md`](../pr-base-branch-policy.md)
 - [`docs/development/adr/adr-independent-publication-authorities.md`](adr-independent-publication-authorities.md) (per decision D2)
@@ -18,6 +19,7 @@ safety net with complex reconciliation, numerous PR-loop Make targets and script
 a multi-workflow publication control plane.
 
 This design accumulated significant operational drag:
+
 - CI runs often took 40–60 minutes across duplicate workflow fanouts.
 - PR-loop checks and post-merge jobs drifted from each other.
 - The `release` branch required continuous cherry-picks, version-branch maintenance,
@@ -26,15 +28,17 @@ This design accumulated significant operational drag:
   transactions that could stall or disconnect from trunk state.
 
 This ADR establishes the architectural decisions, operational contracts, and migration
-guardrails for a consolidated trunk-based development loop behind the GitHub merge queue.
+guardrails for a consolidated trunk-based development loop. Its original
+pre-merge integration mechanism was the GitHub merge queue.
 
 Amended 2026-10-03: the merge queue and the strict up-to-date rule on `develop` are
 retired, and a pull request merges by auto-merge once its required checks pass on its
 own head. The queue's failures were mostly its own machinery: 38 of the 40 most recent
 failed merge-group runs, with no confirmed cross-PR integration failure. A post-merge
-workflow, `.github/workflows/trunk.yml`, tests `develop` after each merge, and a red
-trunk is reverted first. Where this ADR names the merge queue, read the history of the
-design, not the current gate. See
+workflow, `.github/workflows/trunk.yml`, tests pushes to `develop`, retains pending
+runs with `concurrency.queue: max`, and produces verified release distributions.
+A red trunk is reverted first. The sections below describe the replacement;
+dated queue decisions remain historical. See
 `_project/decisions/merge-queue-retirement-2026-10-03.md`.
 
 ## Decisions
@@ -49,6 +53,7 @@ clones, documentation, tooling, and repository configurations.
 
 The multi-workflow publication control plane is replaced with a single unified
 `site-deploy` workflow for `benchbox.dev`. Entry criteria for the replacement:
+
 - Pinned source and corpus SHAs.
 - Retained artifact identity across stages.
 - Post-deploy route and digest health probes.
@@ -65,25 +70,21 @@ publication transaction branch, and publication GitHub App are retired.
 ### D3: Results corpus layout unchanged
 
 The results corpus homes remain unchanged:
+
 - `results-data/` on `develop` for active working runs and staged data.
 - `published-results` as the slim corpus-only branch for public submissions.
 
-### D4: Soundness hold via CI flag and adversarial review
+### D4: Soundness hold via connector review and thread resolution
 
-Soundness path protection moves from the legacy auto-merge predicate to an explicit
-two-layer safety contract:
-1. CI detection: the `tooling` check in `ci.yml` inspects changed paths against the
-   soundness path manifest and flags any pull request modifying soundness-critical files.
-2. Mandatory external review: agents and maintainers may enqueue pull requests touching
-   soundness paths only after a dedicated external adversarial review (using an
-   independent model such as Codex, Muse, or AGY) produces zero unresolved Critical or
-   High findings, with review evidence and findings recorded in the PR body.
+Soundness paths are classified by `.github/soundness-paths.txt`. The required
+`oracle-review` check binds the Codex connector's review to the current head,
+required thread resolution binds disposition of findings, and the scheduled
+digest checks the merged evidence. Code-owner review and PR-body attestation
+are retired. The soundness-path revocation is removed only after the replacement
+check is required in the live ruleset; explicit hold-label revocation remains.
 
-The repository's code-owner review setting remains configured but is not solely relied
-upon as the authorization mechanism.
-
-Amended 2026-10-02: the external review stays, but a PR-body attestation checked by CI
-will no longer bind it. The author of a change writes its own attestation, so the check
+Amended 2026-10-02, updated 2026-10-03: the external review stays, but a PR-body
+attestation checked by CI no longer binds it. The author writes its own attestation, so the check
 can only test that the text is present; it never tests the review. The review is bound
 by three controls:
 
@@ -116,55 +117,74 @@ because a batch of failing Codex reviews exhausted the usage limit and deadlocke
 queue. The `codex` CLI, `muse` and `agy` remain available as optional extra depth, each
 with its own quota, but only the Codex connector's review satisfies the check.
 
-When the connector has not reviewed the head within four hours, the owner, not an agent,
-reviews the change in their own session. If the owner approves, they either re-request the
-connector review, or merge the pull request themselves through the GitHub UI after
-temporarily removing `oracle-review` from the required checks, and restore it afterwards.
-Every human and agent posts as the owner account, so an owner comment cannot be told apart
-from an agent's; for that reason `oracle-review` does not accept one, and agents never post
-a review on the owner's behalf. All four reviewers were exhausted at once on 2026-10-02,
-which blocked every workflow change for three days under the fail-closed rule alone.
+The owner's review replaces the connector's only when no reviewer can run. Every one of
+the Codex connector, `codex`, `muse` and `agy` must have been tried on the current head,
+with each attempt's time and its quota error or other unavailability evidence recorded in
+the pull request body, and the connector must have left no signal on that unchanged head
+for at least four hours. The owner then reviews the exact head in their own session, with
+the six CI checks green and every thread resolved. If the owner approves, they first try
+to recover the ordinary check (re-request the connector, or rerun or dispatch
+`oracle-review`). If no reviewer can still run, the owner, not an agent, pauses other
+armed pull requests, removes only `oracle-review` from the required checks, merges that
+one head with `gh pr merge --squash --match-head-commit`, and restores the check at once,
+whether or not the merge succeeded. Removing the check weakens it for every pull request
+on `develop`, so the window is used only when the owner can keep other merges out of it.
+A new push voids the owner's approval and restarts the four hours. Every human and agent
+posts as the owner account, so an owner comment cannot be told apart from an agent's; for
+that reason `oracle-review` does not accept one, and agents never post a review on the
+owner's behalf or run this window. All four reviewers were exhausted at once on
+2026-10-02, which blocked every workflow change for three days under the fail-closed rule
+alone.
 
-The soundness path list is narrowed to code that produces, normalizes, compares or
-validates results, every workflow, the release and binary paths, and `AGENTS.md`.
-Documentation, decision records, runbooks and threat models leave the list, because a
-review of prose gives no protection against a wrong result. The CI detection layer is
-unchanged, and the external review requirement is unchanged except for the quota
-fallback above. `AGENTS.md` still states the requirement without the fallback; the change
-that removes the attestation check from `ci.yml` rewrites that sentence, because
-`AGENTS.md` is itself a soundness path and must carry the attestation until then. The
-`oracle-review` check, the digest and the narrowed list land in separate changes; until the
-attestation check is removed from `ci.yml`, a PR on a soundness path must still carry a
-valid `Soundness review:` section.
+The soundness path list covers expected and reference results, digests,
+result-validation and equivalence comparators, result capture, corpus overrides,
+publication scripts, every workflow, and the arming helper. Release and binary
+protections remain. Documentation, ordinary decision records, runbooks, threat
+models, and `AGENTS.md` leave the list. The `single-repo-migration.md` decision
+remains protected because release curation parses it as configuration. The manifest-based
+`oracle-review` check replaces the former `tooling` attestation flag. The external
+review requirement is unchanged except for the owner-operated recovery above.
+A new push or refresh changes the head and needs fresh CI and connector review
+before re-arming. No PR-body attestation satisfies or is required by the check.
 
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
 Agent workspace safety tooling is retained:
+
 - Worktree creation and lifecycle management (`make worktree-create`, `worktree-remove`).
 - Git identity pinning and author verification (`agent-write-preflight`, `agent-git-identity`).
 - Attribution trailer verification (`check_agent_trailers`).
 - Issue tracker state branch operations (`todo-state`).
 
-Legacy agent PR-loop scripts (`pr_landing.py`, `pr_followups.py`, `soundness_drain.py`,
-`local_validation.py`) and their corresponding Make targets are retired.
+Legacy PR-loop mechanics may retire only with their callers and safety contracts
+accounted for. `pr_landing.py` still supplies the exact-head revision/readiness
+transaction, `local_validation.py` supplies shared test-lock coordination, and the
+soundness-drain report still diagnoses reviewed but unarmed PRs. These retained
+contracts are not removed by queue retirement.
 
 ### D6: Codecov retained as informational
 
-Codecov code coverage tracking is retained. Coverage reports upload during the merge-queue
-T2 tier. Coverage results remain informational and do not block the queue.
+Codecov code coverage tracking is retained. The fast-test job in `ci.yml` produces
+the coverage report and uploads it to Codecov. Upload failures remain informational;
+the required test command's coverage threshold still applies.
 
 ### D7: Ruleset drift detection retained
 
 Ruleset drift verification (`ruleset_drift_check.py`) is retained. It executes as a
-required check within the `tooling` unit of `ci.yml` and within the release workflow.
-The `RULESET_DRIFT_TOKEN` secret is maintained.
+advisory check in `nightly.yml`, by hand after a settings change, and as enforced
+release-canary/bootstrap validation. It no longer runs inside the required
+`tooling` unit. The `RULESET_DRIFT_TOKEN` secret is maintained; required thread
+resolution and tag-creation protection remain checked.
 
 ### Tag signatures and release verification
 
 Explicit cryptographic tag signatures are dropped. Release integrity relies on:
+
 1. The `v-tag-restricted` ruleset preventing unauthorized tag creation or mutation.
-2. Verification that the tagged commit exists on `develop` and passed the merge queue.
-3. Matching artifact SHA-256 hashes between the queue build and release upload.
+2. Verification that the tagged commit exists on `develop` and its latest exact-commit
+   `trunk.yml` push run on that branch succeeded, without falling back to older success.
+3. Admission of the exact wheel and sdist from that run's successful `dist-artifact`
+   job, with matching producer-attempt evidence and SHA-256 hashes for release upload.
 4. GitHub Actions build provenance attestations.
 
 ## Standing Administrative Approvals
@@ -172,11 +192,11 @@ Explicit cryptographic tag signatures are dropped. Release integrity relies on:
 The maintainer has granted standing approvals for the following operational changes
 once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 
-1. **Rulesets and merge queue:**
+1. **Rulesets:**
    - Add new required checks (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`).
    - Remove legacy checks after the transition window.
-   - Adjust merge queue parameters: `max_entries_to_build` 5 -> 2, `max_entries_to_merge` 5 -> 3;
-     the check timeout stays at 60 minutes.
+   - Historical queue-parameter adjustments are retired with the queue. The dated
+     retirement decision records the specific queue, strict-rule and review changes.
    - Delete the obsolete `release-only` ruleset.
 
 2. **Branches:**
@@ -210,27 +230,29 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 8. **Live cloud benchmarks (`t3:cloud`):**
    - Wired behind configuration defaulting to disabled; live cloud runs remain off.
 
-9. **Merge-queue test budget:**
+9. **Medium-tier test budget:**
    - If T2 exceeds the 15-minute target, standard runner sharding may increase up to 10.
      If still exceeding 15 minutes, accept up to 20 minutes with durable rationale.
      Paid larger runners are not authorized.
 
 10. **Waiting windows:**
-    - Active observation windows (5 business days shadow, 7 nightly runs, 20 queue runs)
-      are non-blocking for independent tasks.
+    - Active observation windows (5 business days shadow and 7 nightly runs)
+      are non-blocking for independent tasks. Queue-run windows are historical.
 
 ## Guardrails
 
 - **G1 Replacement before removal:** A required check is removed only after its replacement
   has passed a canary set of throwaway pull requests (one change per unit, one cross-unit
   change, one soundness-path change, and one deliberately broken change per unit) AND the
-  property ledger (G3) maps every protected property to the replacement. Three real queue
+  property ledger (G3) maps every protected property to the replacement. Three real
   merges must then pass under the new checks before the flip is considered complete.
+  With the queue retired, merged-tree evidence comes from exact-commit trunk runs;
+  this amendment does not assert that the canary or observation evidence is complete.
   (Amended 2026-09-29: the earlier 20-run window assumed the old and new workflows could
   run side by side; the merge groups already saturated the organization's runners, so
   side-by-side operation is not possible and the cutover is a single flip.)
-- **G2 Shadow parity:** Superseded by the canary set in G1 for the pull-request and merge
-  queue workflow. Scheduled workflows (nightly) still validate with dispatched runs
+- **G2 Shadow parity:** Superseded by the canary set in G1 for the pull-request workflow.
+  Post-merge evidence names exact commits. Scheduled workflows (nightly) still validate with dispatched runs
   before their predecessors retire.
 - **G3 Property ledger (`docs/development/dev-loop-property-ledger.md`):** Every safety
   property -> current guard -> new guard -> proof. Properties include: correctness oracle
@@ -238,7 +260,9 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
   policy, submission validation, corpus trust boundary, artifact privacy, publication
   rollback, explorer snapshot compatibility, public-site visual acceptance, binary integrity,
   wheel installability, dependency bounds, release curation, ruleset/settings drift,
-  soundness-path owner hold, workflow context validity, merge_group triggers. A test or workflow
+  soundness-path connector review, workflow context validity and exact-commit trunk
+  coverage. The retired combined-tree queue property maps to PR checks and post-merge
+  validation, which detect composition failures after merge. A test or workflow
   is deleted only if the ledger shows coverage or classifies it pure-process.
 - **G4 Reference sweep:** Each deletion PR proves zero references to deleted names in
   workflows, Makefile, make/, scripts/, _project/scripts/, tests/, docs/, AGENTS.md,
@@ -262,7 +286,10 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
   those (skill-sync source, then re-sync) in the same PR.
 - **G11 Settings-doc first:** Before any ruleset change, merge the PR that updates the drift
   checker's expected settings so the live change does not fail `ruleset-drift` closed and
-  deadlock the queue.
+  block the protected workflow. For the 2026-10-03 queue, strict-rule and soundness-review
+  retirement only, the owner approved implementation/settings changes before the docs
+  and drift expectations; see the dated retirement decision. Backup, replacement,
+  review and other administrative approval requirements remain.
 
 ## Rejected Alternatives
 
