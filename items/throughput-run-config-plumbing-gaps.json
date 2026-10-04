@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "validation_mode and query_subset are honored by TPC-H and TPC-DS throughput, or the combination is rejected with a clear error",
+    "Stream timeout and cooperative cancellation are configurable from run config, or the dead settings and their docs are removed",
+    "Stream counts below 2 are rejected with a clear message, not silently raised",
+    "Tests cover each option"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Timeout and dead-settings findings reported by two reviewers.",
+  "description": "Several run options do not reach the throughput drivers (develop 8ed0c64e1):\n- validation_mode: execution.py:468 does not pass it to TPC-H throughput, so `--validation-mode disabled` still fails streams on row-count mismatch. Power honors it (power_test.py:177-180); TPC-DS passes it (execution.py:326).\n- query_subset: neither execution.py:441-492 (TPC-H) nor :281-358 (TPC-DS) reads it, so `--queries 1,6 --phases power,throughput` runs the subset in power but all queries in throughput.\n- Stream timeout and cancellation: `execution.concurrent_queries.stream_timeout_seconds` is read in utils/config_helpers.py:79 but never reaches the throughput configs, and no product path sets cancel_on_timeout. The timeout is always 3600 s, and a timed-out stream keeps running its permutation. Related dead settings: ConcurrentQueriesSettings / execution.concurrent_queries.* (timeouts, retry_failed_queries) are exported from benchbox/utils/__init__.py, validated in cli/config.py:51-64 and documented in docs/advanced/power-run-concurrent-queries.md:180-190 and docs/usage/examples.md:381, but nothing reads them.\n- Stream count: `benchbox run --streams 1` is accepted (run.py:3107) and floored to 2 (execution.py:118-119); run_service.py:65 accepts 0.",
+  "links": [
+    "benchbox/platforms/base/execution.py",
+    "benchbox/utils/config_helpers.py",
+    "benchbox/cli/config.py",
+    "benchbox/core/run_service.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:00:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2b4399862ea648f6bb3067c1b2622e7f",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

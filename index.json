@@ -19799,6 +19799,13 @@
       "status": "done",
       "title": "Standardize throughput result handling: avoid GIL-serialized fetchall, fix TPC-DS row counts"
     },
+    "throughput-run-config-plumbing-gaps": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput ignores validation_mode, query_subset and stream timeout settings, and silently raises 0 or 1 streams to 2"
+    },
     "throughput-stream-count-wiring-defect": {
       "claim": null,
       "needs": [],
