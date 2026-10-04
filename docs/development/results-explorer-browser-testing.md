@@ -240,13 +240,15 @@ position never substituting for either.
 
 ### Site-deploy comparison
 
-A site-deploy run whose candidate is Astro, or whose renderer differs from the
-deployed one, captures the last production artifact and the assembled candidate
-with the same spec and compares them before the deploy job may start (see
+A site-deploy run whose release commit or renderer differs from the deployed
+one captures the release-sourced pages of the last production artifact and of
+the assembled candidate with the same spec and compares them before the deploy
+job may start (see
 [the site deploy runbook](../operations/site-deploy.md#visual-comparison-before-deploy)).
 The approval rule is the one above, in a separate pair of repository variables
-named in that runbook: the approved SHA must equal the candidate trunk SHA and
-the reason must be nonempty. The PR slot never applies to a deploy, and a deploy
+named in that runbook: the approved value must equal the binding of the release
+commit, the candidate artifact and the production baseline, and the reason must
+be nonempty. The PR slot never applies to a deploy, and a deploy
 approval never applies to a PR.
 
 ## What CI gates
