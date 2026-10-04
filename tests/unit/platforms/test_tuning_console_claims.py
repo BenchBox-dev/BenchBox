@@ -91,6 +91,24 @@ def test_apply_step_summary_counts_only_what_the_apply_step_recorded(postgres_ad
     assert "Tuning apply step complete (1 statement; 1 intents not rendered at apply time)" in printed(console)
 
 
+def test_apply_step_summary_reports_failed_statements_only_when_there_are_some(postgres_adapter, console, tmp_path):
+    adapter, config = postgres_adapter
+    adapter.save_tuning_metadata = Mock(return_value=True)
+
+    def apply(_config, _connection):
+        adapter._applied_tuning_ledger.record("CREATE INDEX i1 ON t (c)", PHASE_DDL)
+        adapter._applied_tuning_ledger.record("CREATE INDEX i2 ON t (d)", PHASE_DDL, status="failed", error="boom")
+        adapter._applied_tuning_ledger.record("CREATE INDEX i3 ON t (e)", PHASE_DDL, status="failed", error="boom")
+
+    adapter.apply_unified_tuning = apply
+
+    run_fresh_setup(adapter, config, tmp_path)
+
+    assert "Tuning apply step complete (1 statement, 2 failed; 0 intents not rendered at apply time)" in printed(
+        console
+    )
+
+
 def test_marker_save_failure_does_not_print_metadata_saved(postgres_adapter, console, monkeypatch, tmp_path):
     adapter, config = postgres_adapter
 
@@ -153,6 +171,51 @@ def test_outcome_summary_reports_executed_failed_and_dropped_counts():
 
 def test_outcome_summary_for_an_empty_ledger_reports_zero_everywhere():
     assert AppliedTuningLedger().describe_outcome() == "Tuning outcome after load: 0 executed, 0 failed, 0 dropped"
+
+
+class _StopAfterOutcome(Exception):
+    pass
+
+
+def run_until_session_configuration(adapter, config, tmp_path, *, reused: bool):
+    benchmark = Mock()
+    benchmark.output_dir = tmp_path
+
+    def connect(**_kwargs):
+        adapter.database_was_reused = reused
+        return Mock()
+
+    adapter.get_effective_tuning_configuration = Mock(return_value=config)
+    adapter.create_connection = connect
+    adapter._setup_reused_database_phases = Mock(return_value=(0.0, Mock(), 0.0, {"t": 1}, Mock(), True))
+    adapter._create_enhanced_validation_phase = Mock()
+    adapter._check_validation_failure = Mock(return_value=False)
+    adapter.configure_for_benchmark = Mock(side_effect=_StopAfterOutcome)
+    adapter.save_tuning_metadata = Mock(return_value=True)
+    adapter._create_enhanced_data_generation_phase = Mock()
+    config.validate_for_platform_detailed = Mock(return_value=([], []))
+    adapter._fold_layout_operations_into_ledger = Mock()
+    try:
+        adapter.run_enhanced_benchmark(benchmark)
+    except _StopAfterOutcome:
+        return
+    raise AssertionError("run did not reach session configuration")
+
+
+def test_post_load_outcome_is_printed_for_a_freshly_loaded_database(postgres_adapter, console, tmp_path):
+    adapter, config = postgres_adapter
+
+    run_until_session_configuration(adapter, config, tmp_path, reused=False)
+
+    assert "Tuning outcome after load: 0 executed, 0 failed, 0 dropped" in printed(console)
+
+
+def test_post_load_outcome_is_not_printed_for_a_reused_database(postgres_adapter, console, tmp_path):
+    adapter, config = postgres_adapter
+
+    run_until_session_configuration(adapter, config, tmp_path, reused=True)
+
+    assert not any("Tuning outcome after load" in line for line in printed(console))
 
 
 class _LifecycleAdapter(PlatformAdapter):

@@ -379,7 +379,7 @@ describe("RunReceipt", () => {
     render(<RunReceipt detail={makeDetail({ tuning_validation_status: "applied_unverified" })} />);
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    expect(within(receipt).getByText("Applied; no check available on this platform")).toBeTruthy();
+    expect(within(receipt).getByText("Applied; no live-database check recorded")).toBeTruthy();
     expect(within(receipt).queryByText("Verified")).toBeNull();
   });
 
@@ -395,7 +395,7 @@ describe("RunReceipt", () => {
 
     const region = screen.getByRole("region", { name: "Run receipt" });
     expect(within(region).getByText("Checked; not corroborated (2 mismatches, 1 unverifiable)")).toBeTruthy();
-    expect(within(region).queryByText("Applied; no check available on this platform")).toBeNull();
+    expect(within(region).queryByText("Applied; no live-database check recorded")).toBeNull();
   });
 
   it("marks an unrecorded tuning verification state as not-recorded, not verified", () => {
@@ -532,9 +532,10 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
   });
 
   it("leaves a self-attested run's badge untouched when a receipt is present", () => {
+    const uncorroborated = JSON.stringify({ ...JSON.parse(APPLIED_RECEIPT), corroborated: false });
     render(
       <RunReceipt
-        detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: APPLIED_RECEIPT })}
+        detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: uncorroborated })}
       />,
     );
 

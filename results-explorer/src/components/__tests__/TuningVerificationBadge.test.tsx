@@ -8,7 +8,7 @@ import {
 describe("TuningVerificationBadge", () => {
   it("maps each ADR-1 verified-state to a distinct label", () => {
     expect(tuningVerificationLabel("applied_verified")).toBe("Verified");
-    expect(tuningVerificationLabel("applied_unverified")).toBe("Applied; no check available on this platform");
+    expect(tuningVerificationLabel("applied_unverified")).toBe("Applied; no live-database check recorded");
     expect(tuningVerificationLabel("noop")).toBe("Nothing applied");
     expect(tuningVerificationLabel("not_applicable")).toBe("Not applicable");
     expect(tuningVerificationLabel("failed")).toBe("Failed");
@@ -28,7 +28,7 @@ describe("TuningVerificationBadge", () => {
     expect(badge.getAttribute("title") ?? "").toContain("checked the live database");
   });
 
-  it("labels applied_unverified with a receipt as checked but not corroborated, with counts", () => {
+  it("labels applied_unverified with a failed check as checked but not corroborated, with counts", () => {
     const receipt = JSON.stringify({
       corroborated: false,
       summary: { corroborated: 1, mismatch: 2, unverifiable: 3, gate_relevant_total: 6 },
@@ -43,45 +43,103 @@ describe("TuningVerificationBadge", () => {
     expect(badge.getAttribute("title") ?? "").not.toContain("did not check");
   });
 
-  it("uses the singular for one mismatch", () => {
-    const receipt = JSON.stringify({ summary: { mismatch: 1, unverifiable: 0 }, entries: [] });
+  it("counts absent tuning first, since a setting missing from the catalog is the most serious verdict", () => {
+    const receipt = JSON.stringify({
+      corroborated: false,
+      summary: { absent: 2, corroborated: 1, mismatch: 1, unverifiable: 4, gate_relevant_total: 8 },
+      entries: [],
+    });
     expect(tuningVerificationLabel("applied_unverified", receipt)).toBe(
-      "Checked; not corroborated (1 mismatch, 0 unverifiable)",
+      "Checked; not corroborated (2 absent, 1 mismatch, 4 unverifiable)",
     );
   });
 
-  it("tallies recorded verdicts from complete entries when the receipt has no summary", () => {
+  it("reports only absent tuning when the summary omits every other failing verdict", () => {
     const receipt = JSON.stringify({
-      entries: [{ verdict: "mismatch" }, { verdict: "corroborated" }, { verdict: "unverifiable" }],
+      corroborated: false,
+      summary: { absent: 3, corroborated: 2, gate_relevant_total: 5 },
+      entries: [],
+    });
+    expect(tuningVerificationLabel("applied_unverified", receipt)).toBe("Checked; not corroborated (3 absent)");
+  });
+
+  it("treats verdicts missing from a real summary as zero", () => {
+    const receipt = JSON.stringify({
+      corroborated: false,
+      summary: { corroborated: 4, mismatch: 1, gate_relevant_total: 5 },
+      entries: [],
+    });
+    expect(tuningVerificationLabel("applied_unverified", receipt)).toBe("Checked; not corroborated (1 mismatch)");
+  });
+
+  it("tallies absent, mismatch and unverifiable verdicts from complete entries when the receipt has no summary", () => {
+    const receipt = JSON.stringify({
+      corroborated: false,
+      entries: [
+        { verdict: "mismatch" },
+        { verdict: "corroborated" },
+        { verdict: "unverifiable" },
+        { verdict: "absent" },
+        { verdict: "absent" },
+      ],
     });
     expect(tuningVerificationLabel("applied_unverified", receipt)).toBe(
-      "Checked; not corroborated (1 mismatch, 1 unverifiable)",
+      "Checked; not corroborated (2 absent, 1 mismatch, 1 unverifiable)",
     );
   });
 
   it("omits counts instead of guessing when a truncated receipt has no summary", () => {
-    const receipt = JSON.stringify({ entries: [{ verdict: "mismatch" }], truncated: true });
+    const receipt = JSON.stringify({ corroborated: false, entries: [{ verdict: "mismatch" }], truncated: true });
     expect(tuningVerificationLabel("applied_unverified", receipt)).toBe("Checked; not corroborated");
   });
 
-  it("omits the counts when the receipt records neither mismatches nor unverifiable statements", () => {
-    const receipt = JSON.stringify({ summary: { absent: 2, mismatch: 0, unverifiable: 0 }, entries: [] });
+  it("keeps the summary counts and says so when a real receipt was truncated", () => {
+    const receipt = JSON.stringify({
+      corroborated: false,
+      summary: { absent: 1, mismatch: 2 },
+      entries: [{ verdict: "mismatch" }],
+      truncated: true,
+      truncation_reason: "entry_limit",
+      original_entry_count: 10500,
+    });
+    render(<TuningVerificationBadge status="applied_unverified" receipt={receipt} />);
+    const badge = screen.getByText("Checked; not corroborated (1 absent, 2 mismatches)");
+    expect(badge.getAttribute("title") ?? "").toContain("truncated");
+  });
+
+  it("omits the counts when the checked receipt records no failing verdicts", () => {
+    const receipt = JSON.stringify({ corroborated: false, summary: { transient: 2 }, entries: [] });
     expect(tuningVerificationLabel("applied_unverified", receipt)).toBe("Checked; not corroborated");
+  });
+
+  it.each([
+    ["the byte-limit truncation marker", { entries: [], original_byte_count: 9000000, truncated: true, truncation_reason: "byte_limit" }],
+    ["the redaction marker", { redacted: true, reason: "unexpected_shape" }],
+    ["an object without a recorded verdict", { summary: { mismatch: 2 }, entries: [] }],
+    ["a receipt whose verdict is not boolean", { corroborated: "false", summary: { mismatch: 2 }, entries: [] }],
+    ["a corroborated receipt on an unverified status", { corroborated: true, entries: [] }],
+  ])("does not claim a failed check for %s", (_label, placeholder) => {
+    expect(tuningVerificationLabel("applied_unverified", JSON.stringify(placeholder))).toBe(
+      "Applied; no live-database check recorded",
+    );
   });
 
   it.each([null, undefined, "", "not json", "[]", "null"])(
-    "reports no check available for applied_unverified when the receipt is %j",
+    "reports no recorded check for applied_unverified when the receipt is %j",
     (receipt) => {
       expect(tuningVerificationLabel("applied_unverified", receipt as string | null | undefined)).toBe(
-        "Applied; no check available on this platform",
+        "Applied; no live-database check recorded",
       );
     },
   );
 
-  it("never claims the database was not checked when no check is available", () => {
+  it("says no check result was recorded without claiming the platform cannot check", () => {
     render(<TuningVerificationBadge status="applied_unverified" />);
-    const badge = screen.getByText("Applied; no check available on this platform");
-    expect(badge.getAttribute("title") ?? "").not.toContain("did not check");
+    const badge = screen.getByText("Applied; no live-database check recorded");
+    const title = badge.getAttribute("title") ?? "";
+    expect(title).toContain("no check result was recorded");
+    expect(title).not.toContain("did not check");
+    expect(title).not.toContain("platform");
   });
 
   it("ignores the receipt for statuses other than applied_unverified", () => {

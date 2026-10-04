@@ -26,10 +26,10 @@ export const TUNING_VERIFICATION_CONFIG: Record<string, VerificationEntry> = {
     title: "BenchBox checked the live database after loading the data and confirmed the applied tuning settings.",
   },
   applied_unverified: {
-    label: "Applied; no check available on this platform",
+    label: "Applied; no live-database check recorded",
     tone: "info",
     title:
-      "The run recorded at least one applied tuning setting, but the result carries no post-load check of the live database.",
+      "The run recorded at least one applied tuning setting, but no check result was recorded in this result. A check may not have run, or its outcome was not kept.",
   },
   noop: {
     label: "Nothing applied",
@@ -49,8 +49,14 @@ export const TUNING_VERIFICATION_CONFIG: Record<string, VerificationEntry> = {
 };
 
 interface ReceiptCounts {
-  mismatches: number | null;
-  unverifiable: number | null;
+  absent: number;
+  mismatches: number;
+  unverifiable: number;
+}
+
+interface CheckedReceipt {
+  counts: ReceiptCounts | null;
+  truncated: boolean;
 }
 
 function countFrom(value: unknown): number | null {
@@ -63,7 +69,26 @@ function tallyVerdict(entries: unknown[], verdict: string): number {
   ).length;
 }
 
-function readReceiptCounts(raw: string | null | undefined): ReceiptCounts | null {
+function countsFromReceipt(receipt: { summary?: unknown; entries?: unknown; truncated?: unknown }): ReceiptCounts | null {
+  if (receipt.summary !== null && typeof receipt.summary === "object" && !Array.isArray(receipt.summary)) {
+    const summary = receipt.summary as Record<string, unknown>;
+    return {
+      absent: countFrom(summary.absent) ?? 0,
+      mismatches: countFrom(summary.mismatch) ?? 0,
+      unverifiable: countFrom(summary.unverifiable) ?? 0,
+    };
+  }
+  if (Array.isArray(receipt.entries) && receipt.truncated !== true) {
+    return {
+      absent: tallyVerdict(receipt.entries, "absent"),
+      mismatches: tallyVerdict(receipt.entries, "mismatch"),
+      unverifiable: tallyVerdict(receipt.entries, "unverifiable"),
+    };
+  }
+  return null;
+}
+
+function readFailedCheck(raw: string | null | undefined): CheckedReceipt | null {
   if (typeof raw !== "string" || raw.trim() === "") return null;
   let parsed: unknown;
   try {
@@ -72,45 +97,38 @@ function readReceiptCounts(raw: string | null | undefined): ReceiptCounts | null
     return null;
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-  const receipt = parsed as { summary?: unknown; entries?: unknown; truncated?: unknown };
-  const summary =
-    receipt.summary !== null && typeof receipt.summary === "object" && !Array.isArray(receipt.summary)
-      ? (receipt.summary as { mismatch?: unknown; unverifiable?: unknown })
-      : null;
-  const summaryMismatches = summary ? countFrom(summary.mismatch) : null;
-  const summaryUnverifiable = summary ? countFrom(summary.unverifiable) : null;
-  const entriesComplete = Array.isArray(receipt.entries) && receipt.truncated !== true;
-  const entries = entriesComplete ? (receipt.entries as unknown[]) : [];
-  return {
-    mismatches: summaryMismatches ?? (entriesComplete ? tallyVerdict(entries, "mismatch") : null),
-    unverifiable: summaryUnverifiable ?? (entriesComplete ? tallyVerdict(entries, "unverifiable") : null),
-  };
+  const receipt = parsed as { corroborated?: unknown; summary?: unknown; entries?: unknown; truncated?: unknown };
+  if (receipt.corroborated !== false) return null;
+  return { counts: countsFromReceipt(receipt), truncated: receipt.truncated === true };
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function checkedNotCorroborated(counts: ReceiptCounts): VerificationEntry {
+function checkedNotCorroborated(check: CheckedReceipt): VerificationEntry {
   const parts: string[] = [];
-  if (counts.mismatches !== null && counts.unverifiable !== null && counts.mismatches + counts.unverifiable > 0) {
-    parts.push(pluralize(counts.mismatches, "mismatch", "mismatches"));
-    parts.push(`${counts.unverifiable} unverifiable`);
+  if (check.counts !== null) {
+    if (check.counts.absent > 0) parts.push(`${check.counts.absent} absent`);
+    if (check.counts.mismatches > 0) parts.push(pluralize(check.counts.mismatches, "mismatch", "mismatches"));
+    if (check.counts.unverifiable > 0) parts.push(`${check.counts.unverifiable} unverifiable`);
   }
   const detail = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+  const truncation = check.truncated
+    ? " The stored receipt was truncated, so it lists only some of the statements."
+    : "";
   return {
     label: `Checked; not corroborated${detail}`,
     tone: "warning",
-    title:
-      "BenchBox checked the live database after loading the data and could not confirm every applied tuning setting. See the receipt entries for each statement's result.",
+    title: `BenchBox checked the live database after loading the data and could not confirm every applied tuning setting. See the receipt entries for each statement's result.${truncation}`,
   };
 }
 
 function resolveConfig(status: string | null | undefined, receipt?: string | null): VerificationEntry {
   if (status === null || status === undefined || status === "") return UNKNOWN_CONFIG;
   if (status === "applied_unverified") {
-    const counts = readReceiptCounts(receipt);
-    if (counts !== null) return checkedNotCorroborated(counts);
+    const check = readFailedCheck(receipt);
+    if (check !== null) return checkedNotCorroborated(check);
   }
   return TUNING_VERIFICATION_CONFIG[status] ?? UNKNOWN_CONFIG;
 }
