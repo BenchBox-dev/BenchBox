@@ -476,15 +476,21 @@ class MaintenanceOperations:
         sales_table: str,
         returns_table: str,
         sales_select_columns: str,
+        sales_key_columns: tuple[str, str],
+        sales_quantity_column: str,
         returns_columns: str,
+        returns_key_columns: tuple[str, str],
         num_returns_columns: int,
         row_generator: Callable[[tuple], tuple],
     ) -> int:
         """Generic helper for inserting returns data that references valid sales.
 
-        Per TPC-DS spec, returns must reference parent sales transactions.
-        This method encapsulates the shared algorithm used by all three return
-        channel insert operations (store, catalog, web).
+        Per TPC-DS spec, returns must reference parent sales transactions, and
+        each sold line is returned at most once. Only sales without an existing
+        return on the returns table's (item, ticket/order number) primary key
+        are candidates, so an insert never duplicates that key. Sales with a
+        NULL quantity are skipped because a return quantity cannot be drawn
+        from them.
 
         Args:
             connection: Database connection
@@ -492,7 +498,10 @@ class MaintenanceOperations:
             sales_table: Source sales table name (e.g. "STORE_SALES")
             returns_table: Target returns table name (e.g. "STORE_RETURNS")
             sales_select_columns: Comma-separated SELECT columns for the sales query
+            sales_key_columns: Sales (item, ticket/order number) columns that form the returns key
+            sales_quantity_column: Sales quantity column that must be non-NULL
             returns_columns: Comma-separated column names for the INSERT
+            returns_key_columns: Returns (item, ticket/order number) primary key columns
             num_returns_columns: Number of columns in a returns row
             row_generator: Callback that converts a sales record tuple into a returns row tuple
 
@@ -504,10 +513,18 @@ class MaintenanceOperations:
         # Get platform-specific parameter placeholder
         placeholder = self._get_parameter_placeholder(connection)
 
-        # Query existing sales to get valid parent records
+        sales_item, sales_number = sales_key_columns
+        returns_item, returns_number = returns_key_columns
         query_sql = f"""
         SELECT {sales_select_columns}
         FROM {sales_table}
+        WHERE {sales_quantity_column} IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM {returns_table}
+            WHERE {returns_table}.{returns_item} = {sales_table}.{sales_item}
+              AND {returns_table}.{returns_number} = {sales_table}.{sales_number}
+          )
         ORDER BY RANDOM()
         LIMIT {placeholder}
         """
@@ -520,8 +537,14 @@ class MaintenanceOperations:
             raise
 
         if not sales_records:
-            self.logger.warning(f"No {sales_table.lower()} records found to generate returns from")
+            self.logger.warning(f"No {sales_table.lower()} records without a return found to generate returns from")
             return 0
+
+        if len(sales_records) < estimated_rows:
+            self.logger.warning(
+                f"Only {len(sales_records)} {sales_table.lower()} records without a return available "
+                f"for {estimated_rows} requested {returns_table.lower()} rows"
+            )
 
         # Generate returns based on actual sales
         rows_to_insert = []
@@ -546,11 +569,14 @@ class MaintenanceOperations:
             returns_table="STORE_RETURNS",
             sales_select_columns="""SS_TICKET_NUMBER, SS_ITEM_SK, SS_CUSTOMER_SK, SS_CDEMO_SK,
                SS_HDEMO_SK, SS_ADDR_SK, SS_STORE_SK, SS_QUANTITY""",
+            sales_key_columns=("SS_ITEM_SK", "SS_TICKET_NUMBER"),
+            sales_quantity_column="SS_QUANTITY",
             returns_columns="""SR_RETURNED_DATE_SK, SR_RETURN_TIME_SK, SR_ITEM_SK, SR_CUSTOMER_SK,
             SR_CDEMO_SK, SR_HDEMO_SK, SR_ADDR_SK, SR_STORE_SK, SR_REASON_SK,
             SR_TICKET_NUMBER, SR_RETURN_QUANTITY, SR_RETURN_AMT, SR_RETURN_TAX,
             SR_RETURN_AMT_INC_TAX, SR_FEE, SR_RETURN_SHIP_COST, SR_REFUNDED_CASH,
             SR_REVERSED_CHARGE, SR_STORE_CREDIT, SR_NET_LOSS""",
+            returns_key_columns=("SR_ITEM_SK", "SR_TICKET_NUMBER"),
             num_returns_columns=20,
             row_generator=self._generate_store_returns_from_sale,
         )
@@ -568,6 +594,8 @@ class MaintenanceOperations:
             sales_select_columns="""CS_ORDER_NUMBER, CS_ITEM_SK, CS_BILL_CUSTOMER_SK, CS_BILL_CDEMO_SK,
                CS_BILL_HDEMO_SK, CS_BILL_ADDR_SK, CS_CALL_CENTER_SK, CS_CATALOG_PAGE_SK,
                CS_SHIP_MODE_SK, CS_WAREHOUSE_SK, CS_QUANTITY""",
+            sales_key_columns=("CS_ITEM_SK", "CS_ORDER_NUMBER"),
+            sales_quantity_column="CS_QUANTITY",
             returns_columns="""CR_RETURNED_DATE_SK, CR_RETURNED_TIME_SK, CR_ITEM_SK, CR_REFUNDED_CUSTOMER_SK,
             CR_REFUNDED_CDEMO_SK, CR_REFUNDED_HDEMO_SK, CR_REFUNDED_ADDR_SK,
             CR_RETURNING_CUSTOMER_SK, CR_RETURNING_CDEMO_SK, CR_RETURNING_HDEMO_SK,
@@ -576,6 +604,7 @@ class MaintenanceOperations:
             CR_RETURN_QUANTITY, CR_RETURN_AMOUNT, CR_RETURN_TAX, CR_RETURN_AMT_INC_TAX,
             CR_FEE, CR_RETURN_SHIP_COST, CR_REFUNDED_CASH, CR_REVERSED_CHARGE,
             CR_STORE_CREDIT, CR_NET_LOSS""",
+            returns_key_columns=("CR_ITEM_SK", "CR_ORDER_NUMBER"),
             num_returns_columns=27,
             row_generator=self._generate_catalog_returns_from_sale,
         )
@@ -592,6 +621,8 @@ class MaintenanceOperations:
             returns_table="WEB_RETURNS",
             sales_select_columns="""WS_ORDER_NUMBER, WS_ITEM_SK, WS_BILL_CUSTOMER_SK, WS_BILL_CDEMO_SK,
                WS_BILL_HDEMO_SK, WS_BILL_ADDR_SK, WS_WEB_PAGE_SK, WS_QUANTITY""",
+            sales_key_columns=("WS_ITEM_SK", "WS_ORDER_NUMBER"),
+            sales_quantity_column="WS_QUANTITY",
             returns_columns="""WR_RETURNED_DATE_SK, WR_RETURNED_TIME_SK, WR_ITEM_SK, WR_REFUNDED_CUSTOMER_SK,
             WR_REFUNDED_CDEMO_SK, WR_REFUNDED_HDEMO_SK, WR_REFUNDED_ADDR_SK,
             WR_RETURNING_CUSTOMER_SK, WR_RETURNING_CDEMO_SK, WR_RETURNING_HDEMO_SK,
@@ -599,6 +630,7 @@ class MaintenanceOperations:
             WR_RETURN_QUANTITY, WR_RETURN_AMT, WR_RETURN_TAX, WR_RETURN_AMT_INC_TAX,
             WR_FEE, WR_RETURN_SHIP_COST, WR_REFUNDED_CASH, WR_REVERSED_CHARGE,
             WR_ACCOUNT_CREDIT, WR_NET_LOSS""",
+            returns_key_columns=("WR_ITEM_SK", "WR_ORDER_NUMBER"),
             num_returns_columns=24,
             row_generator=self._generate_web_returns_from_sale,
         )
