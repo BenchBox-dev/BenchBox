@@ -5,6 +5,8 @@ import json
 import re
 from typing import Any
 
+from scripts.site_deploy.renderer import SPHINX
+
 SCHEMA = "site-deploy-receipt/v1"
 STATUS_PREFIX = "site-deploy receipt"
 STATUS_PATTERN = re.compile(rf"^{STATUS_PREFIX} sha256:(?P<sha>[0-9a-f]{{64}}) run:(?P<run>\d+)$")
@@ -71,6 +73,30 @@ def parent_summary(receipt: dict[str, Any], receipt_sha: str) -> dict[str, Any]:
     }
 
 
+def explorer_artifact(routes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for route in routes:
+        if route.get("builder") != "explorer":
+            continue
+        lanes = route.get("lane_sha256") or {}
+        if len(lanes) != 1:
+            raise ReceiptError(f"explorer route {route.get('path')} must have exactly one lane, found {len(lanes)}")
+        found = {
+            "path": route["path"],
+            "source_sha": route.get("source_sha"),
+            "corpus": route.get("corpus"),
+            "sha256": next(iter(lanes.values())),
+            "lane_sha256": lanes,
+        }
+        if route.get("pins"):
+            found["pins"] = route["pins"]
+        return found
+    return None
+
+
+def renderer_of(record: dict[str, Any]) -> str:
+    return str(record.get("renderer") or SPHINX)
+
+
 def build_receipt(
     *,
     mode: str,
@@ -91,6 +117,10 @@ def build_receipt(
     rollback: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     generation = (int(parent["generation"]) + 1) if parent else 1
+    explorer = explorer_artifact(assembly["routes"])
+    if explorer and explorer.get("pins"):
+        pins = explorer["pins"]
+        explorer["pins"] = {**pins, "snapshot": {**pins["snapshot"], "corpus_sha": corpus_sha}}
     return {
         "schema": SCHEMA,
         "generation": generation,
@@ -103,7 +133,9 @@ def build_receipt(
         "release_sha": release_sha,
         "corpus_sha": corpus_sha,
         "certifying_run_id": certifying_run_id,
+        "renderer": renderer_of(assembly),
         "routes": assembly["routes"],
+        "explorer": explorer,
         "artifact": {
             "name": artifact_name,
             "sha256": assembly["tree_sha256"],

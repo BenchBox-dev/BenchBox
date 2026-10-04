@@ -1451,8 +1451,9 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     payload["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
     # Validation status
-    if result.tuning_validation_status:
-        payload["validation_status"] = result.tuning_validation_status.lower()
+    validation_status = _derived_validation_status(result)
+    if validation_status:
+        payload["validation_status"] = validation_status
 
     tuning_profile = _extract_tuning_profile_metadata(result)
     if tuning_profile:
@@ -1519,10 +1520,9 @@ def inline_tuning_artifacts(
 
     tuning_block = platform_block.get("tuning")
     if not isinstance(tuning_block, dict):
-        # A run can apply tuning without `tunings_applied` being set (an adapter
-        # that executes layout operations off a platform option, for instance),
-        # in which case `_build_tuning_summary` emitted nothing. The applied
-        # ledger still has to reach the bundle, so open the block here.
+        # `_build_tuning_summary` emits nothing for a loaded result that recorded
+        # no tuning facts. The applied ledger still has to reach the bundle, so
+        # open the block here.
         tuning_block = {}
         platform_block["tuning"] = tuning_block
 
@@ -1586,7 +1586,12 @@ def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | N
     # no reused-DB drift_check) -> no companion, mirroring build_tuning_payload's
     # "nothing to record" None. A reused DB re-applies no tuning DDL (empty
     # statements/dropped) but its drift_check must still ship (ADR-001 addendum).
-    if not payload.get("statements") and not payload.get("dropped") and not payload.get("drift_check"):
+    if (
+        not payload.get("statements")
+        and not payload.get("dropped")
+        and not payload.get("satisfied")
+        and not payload.get("drift_check")
+    ):
         return None
     return payload
 
@@ -1664,10 +1669,46 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
     return metrics if metrics else None
 
 
-def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
+def _derived_validation_status(result: BenchmarkResults) -> str | None:
+    from benchbox.core.tuning.applied_ledger import NOT_VALIDATED
+
+    status = (getattr(result, "tuning_validation_status", None) or "").lower()
+    if status and status != NOT_VALIDATED:
+        return status
+    ledger = getattr(result, "applied_tuning_ledger", None)
+    ledger_status = ledger.get("status") if isinstance(ledger, dict) else None
+    if isinstance(ledger_status, str) and ledger_status and ledger_status.lower() != NOT_VALIDATED:
+        return ledger_status.lower()
+    return None
+
+
+def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
+    from benchbox.core.tuning.applied_ledger import NOT_APPLICABLE
+
+    status = _derived_validation_status(result)
+    if status:
+        return {"validation_status": status}
+    if getattr(result, "tuning_validation_status", None) is not None:
+        return {"validation_status": NOT_APPLICABLE}
+
+    summary: dict[str, Any] = {}
+    tuning_source = getattr(result, "tuning_source", None)
+    if tuning_source:
+        summary["tuning_source"] = tuning_source
+    source_file = getattr(result, "tuning_source_file", None)
+    config_hash = getattr(result, "tuning_config_hash", None)
+    if tuning_source or source_file or config_hash:
+        summary["source"] = _legacy_tuning_source_bridge(tuning_source, source_file)
+    if config_hash:
+        summary["requested_config_hash"] = config_hash
+        summary["hash"] = config_hash
+    return summary
+
+
+def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     """Build tuning summary for platform block."""
     if not result.tunings_applied:
-        return None
+        return _untuned_tuning_summary(result)
 
     tuning_applied = result.tunings_applied or {}
     summary: dict[str, Any] = {}
@@ -1697,8 +1738,9 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     # the .tuning.json companion's field -- so the explorer, which reads only the
     # main bundle, can display the verification state. Absent for legacy bundles
     # predating the applied ledger; the explorer treats absence as "unknown".
-    if result.tuning_validation_status:
-        summary["validation_status"] = result.tuning_validation_status.lower()
+    validation_status = _derived_validation_status(result)
+    if validation_status:
+        summary["validation_status"] = validation_status
 
     # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
     # the tuning policy this run was produced under. Emitted only when tuning is
@@ -1733,7 +1775,7 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
             logical_profile["coverage"] = coverage
         summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
 
-    return summary if summary else None
+    return summary
 
 
 def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:

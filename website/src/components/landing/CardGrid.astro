@@ -1,0 +1,33 @@
+---
+import type { CardGroup } from "../../lib/landing-data.ts";
+
+interface Props {
+  group: CardGroup;
+}
+
+const { group } = Astro.props;
+---
+
+<h3 class="section-heading">{group.title}</h3>
+<p class="section-subheading">{group.subtitle}</p>
+<div class="benchmarks-grid">
+  {
+    group.cards.map((card) => (
+      <div class="benchmark-card-wrapper">
+        <a href={card.href} class="benchmark-card">
+          <h3>{card.title}</h3>
+          <p>{card.description}</p>
+          <div class="benchmark-meta">{card.meta}</div>
+          {card.linkLabel && <div class="benchmark-link">{card.linkLabel}</div>}
+        </a>
+        {card.origin && (
+          <div class="benchmark-origin">
+            <a href={card.origin.href} target="_blank" rel="noopener">
+              {card.origin.label}
+            </a>
+          </div>
+        )}
+      </div>
+    ))
+  }
+</div>

@@ -276,8 +276,14 @@ class ConnectionLifecycleMixin:
                 self.logger.warning(f"⚠️ {warning}")
 
         if validation_result.issues:
+            from benchbox.core.tuning.metadata import NO_TUNING_METADATA_ERROR
+
+            fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                self.logger.error(f"❌ {issue}")
+                if issue == fresh_database_issue and validation_result.database_empty:
+                    self.log_verbose(issue)
+                else:
+                    self.logger.error(f"❌ {issue}")
 
         if validation_result.is_valid:
             self.log_verbose("Database is configured for this run")

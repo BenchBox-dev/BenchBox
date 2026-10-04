@@ -16,12 +16,15 @@ waits for that review.
 When the Codex connector cannot review (for example at its usage limit), a
 listed attester in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`)
 can substitute an independent stand-in review. After that review of the
-current head, the attester posts a PR comment containing the line
-`Stand-in oracle review: APPROVE <full head SHA>`. The check accepts it only for
+current head, the attester posts a PR comment whose whole text is the line
+`Stand-in oracle review: APPROVE <full head SHA>`; the review itself goes in a
+separate comment. The check accepts it only for
 that exact head, only if posted after the head commit and any retarget, and
-never while a Codex connector review thread is unresolved, and an edited
-comment does not count. Posting the comment does not rerun the check: rerun
-the latest oracle-review run (`gh run rerun <run-id>`) or dispatch it with
+never while a Codex connector review thread is unresolved. An edited comment
+does not count, and neither does one with any other text, because Markdown
+around the line can hide or quote it.
+Posting the comment does not rerun the check: rerun the latest oracle-review
+run (`gh run rerun <run-id>`) or dispatch it with
 `gh workflow run oracle-review.yml --ref <feature-branch> -f pr=<number>`.
 The attester account is also the one local automation uses, so the
 attestation records who vouched for the review, not that a human read it.

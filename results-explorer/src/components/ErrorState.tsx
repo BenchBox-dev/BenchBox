@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useId } from "preact/hooks";
 
 interface ErrorStateProps {
   title: ComponentChildren;
@@ -11,10 +12,15 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({ title, description, detail, action, class: extraClass = "" }: ErrorStateProps) {
+  const titleId = useId();
   return (
-    <div role="alert" class={`flex flex-col gap-3 rounded-lg p-6 tone-danger ${extraClass}`}>
+    <div
+      role="alert"
+      aria-labelledby={titleId}
+      class={`flex flex-col gap-3 rounded-lg p-6 tone-danger ${extraClass}`}
+    >
       <div class="flex flex-col gap-1">
-        <h3 class="text-base font-semibold">{title}</h3>
+        <h3 id={titleId} class="text-base font-semibold">{title}</h3>
         {description ? <p class="text-sm">{description}</p> : null}
       </div>
       {detail ? (

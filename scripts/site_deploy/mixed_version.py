@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+
+from scripts.site_deploy.renderer import ASTRO, RENDERERS, SPHINX
 
 EXPECTED_VERSION_PATTERN = re.compile(r"^const EXPECTED_READ_MODEL_VERSION\s*=\s*(\d+);", re.MULTILINE)
 SNAPSHOT_QUERY = "SELECT read_model_version FROM metadata LIMIT 1"
@@ -121,3 +124,55 @@ def evaluate(candidate: Versions, current: Versions | None, kind: str, phase: st
     if phase == PHASE_UI_FIRST and not ui_first_possible:
         return Evaluation(False, pairs, plan, "restored UI is newer than the current snapshot")
     return Evaluation(True, pairs, plan, f"rollback phase {phase} is safe")
+
+
+RENDERER_MARKERS: dict[str, tuple[re.Pattern[bytes], ...]] = {
+    SPHINX: (re.compile(rb"""(?:src|href)=["'][^"']*_static/documentation_options\.js"""),),
+    ASTRO: (
+        re.compile(rb"""(?:src|href)=["']/_astro/"""),
+        re.compile(rb"""<meta[^>]+name=["']generator["'][^>]+content=["']Astro"""),
+    ),
+}
+RENDERER_EXEMPT_PREFIXES = ("results/",)
+ASTRO_ASSET_DIR = "_astro"
+EXAMPLE_LIMIT = 3
+
+
+class RendererMixError(VersionError):
+    pass
+
+
+def page_renderer(content: bytes) -> str | None:
+    found = {name for name, markers in RENDERER_MARKERS.items() if any(marker.search(content) for marker in markers)}
+    if len(found) > 1:
+        return "mixed"
+    return next(iter(found), None)
+
+
+def tree_renderers(tree: Path, exempt: Iterable[str] = RENDERER_EXEMPT_PREFIXES) -> dict[str, list[str]]:
+    exempt = tuple(exempt)
+    pages: dict[str, list[str]] = {}
+    for path in sorted(tree.rglob("*.html")):
+        relative = path.relative_to(tree).as_posix()
+        if not path.is_file() or relative.startswith(exempt):
+            continue
+        kind = page_renderer(path.read_bytes())
+        if kind is not None:
+            pages.setdefault(kind, []).append(relative)
+    if (tree / ASTRO_ASSET_DIR).is_dir():
+        pages.setdefault(ASTRO, []).append(f"{ASTRO_ASSET_DIR}/")
+    return pages
+
+
+def require_single_renderer(tree: Path, expected: str) -> dict[str, int]:
+    if expected not in RENDERERS:
+        raise RendererMixError(f"unknown renderer {expected!r}; expected one of {RENDERERS}")
+    pages = tree_renderers(tree)
+    foreign = {kind: names for kind, names in pages.items() if kind != expected}
+    if foreign:
+        detail = "; ".join(
+            f"{kind}: {len(names)} (first: {', '.join(names[:EXAMPLE_LIMIT])})"
+            for kind, names in sorted(foreign.items())
+        )
+        raise RendererMixError(f"artifact selected for {expected} also carries other renderer output: {detail}")
+    return {kind: len(names) for kind, names in pages.items()}

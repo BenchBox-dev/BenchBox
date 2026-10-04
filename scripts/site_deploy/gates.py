@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from scripts.site_deploy import mixed_version, routes as routes_module
+from scripts.site_deploy.candidate import SEMVER_TAG
+from scripts.site_deploy.renderer import SPHINX
+from scripts.site_inventory import INFO_KINDS
 
 PASS = "pass"
 FAIL = "fail"
@@ -34,6 +37,8 @@ class GateInputs:
     ui_version: int | None = None
     release_tag: str | None = None
     routes_manifest: Path | None = None
+    renderer: str = SPHINX
+    file_owners: dict[str, str] | None = None
 
 
 Runner = Callable[[list[str], Path], tuple[int, str]]
@@ -80,6 +85,12 @@ def explorer_compat_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
 def mixed_version_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     del runner
     try:
+        renderer_pages = mixed_version.require_single_renderer(inputs.site_dir, inputs.renderer)
+    except mixed_version.RendererMixError as exc:
+        result = _result(FAIL, str(exc))
+        result["renderer"] = inputs.renderer
+        return result
+    try:
         candidate = mixed_version.Versions(
             ui=inputs.ui_version
             if inputs.ui_version is not None
@@ -98,6 +109,8 @@ def mixed_version_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     result = _result(PASS if evaluation.ok else FAIL, evaluation.reason)
     result["evaluation"] = evaluation.to_dict()
     result["versions"] = {"ui_expected": candidate.ui, "snapshot": candidate.snapshot}
+    result["renderer"] = inputs.renderer
+    result["renderer_pages"] = renderer_pages
     return result
 
 
@@ -186,7 +199,11 @@ def _only_broken_links(summary: str) -> bool:
         if not number.isdigit():
             return False
         counts[kind] = int(number)
-    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in LINK_KINDS)
+    tolerated = LINK_KINDS + INFO_KINDS
+    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in tolerated)
+
+
+RELEASE_ALLOWANCE_RELATIVE = Path("_project/design/site-inventory/release-known-broken")
 
 
 def _release_baseline(
@@ -195,7 +212,13 @@ def _release_baseline(
     recorded = (inputs.deployed or {}).get("link_baseline") or {}
     if inputs.release_tag is not None and inputs.release_tag in recorded:
         return {tuple(entry) for entry in recorded[inputs.release_tag]}, "last deployed receipt"
-    return set(release_owned_known), "allowance file"
+    baseline = set(release_owned_known)
+    if inputs.release_tag is not None and SEMVER_TAG.match(inputs.release_tag):
+        tag_file = inputs.repo_root / RELEASE_ALLOWANCE_RELATIVE / f"{inputs.release_tag}.json"
+        if tag_file.is_file():
+            baseline |= {tuple(entry) for entry in json.loads(tag_file.read_text(encoding="utf-8"))}
+            return baseline, f"allowance files (develop and {tag_file.name})"
+    return baseline, "allowance file"
 
 
 def link_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
@@ -228,7 +251,10 @@ def link_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     allowed = {tuple(entry) for entry in known}
 
     def trunk_involved(entry: tuple[str, ...]) -> bool:
-        return any(routes_module.is_trunk_owned(manifest, endpoint) for endpoint in entry[:2])
+        return any(
+            routes_module.is_trunk_owned(manifest, endpoint, inputs.renderer, inputs.file_owners)
+            for endpoint in entry[:2]
+        )
 
     fresh_trunk = [entry for entry in listing if entry not in allowed and trunk_involved(entry)]
     if fresh_trunk:

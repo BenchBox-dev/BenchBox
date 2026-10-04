@@ -295,6 +295,68 @@ def test_link_gate_without_a_receipt_pins_release_breakage_to_the_allowance_file
     assert g.link_gate(inputs, _link_runner(worse))["status"] == g.FAIL
 
 
+def _write_tag_allowance(inputs: g.GateInputs, tag: str, entries: list[list[str]]) -> None:
+    tag_file = inputs.repo_root / "_project" / "design" / "site-inventory" / "release-known-broken" / f"{tag}.json"
+    tag_file.parent.mkdir(parents=True)
+    tag_file.write_text(json.dumps(entries), encoding="utf-8")
+
+
+def test_link_gate_adds_the_tag_allowance_file_only_without_a_receipt_baseline(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN]))
+    assert result["status"] == g.PASS
+    assert result["link_baseline"]["links"] == [RELEASE_BROKEN]
+    receipt = _deployed_with_baseline([])
+    result = g.link_gate(_inputs(tmp_path, deployed=receipt), _link_runner([RELEASE_BROKEN]))
+    assert result["status"] == g.FAIL
+    assert "last deployed receipt baseline of 0" in result["detail"]
+
+
+def test_link_gate_ignores_the_allowance_file_of_another_tag(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None, release_tag="v0.4.2")
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN]))
+    assert result["status"] == g.FAIL
+    assert "outside the allowance file baseline of 0" in result["detail"]
+
+
+def test_link_gate_fails_an_entry_outside_the_develop_and_tag_allowances(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    stray = ["/docs/x.html", "/docs/y.html", "missing path"]
+    result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN, stray]))
+    assert result["status"] == g.FAIL
+    assert "allowance files (develop and v0.4.1.json) baseline of 1" in result["detail"]
+    assert "/docs/x.html" in result["detail"]
+
+
+def test_link_gate_tag_allowance_cannot_allow_trunk_breakage(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    trunk = ["/blog/p.html", "/x.html", "missing path"]
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN, trunk])
+    result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN, trunk]))
+    assert result["status"] == g.FAIL
+    assert "touching trunk routes" in result["detail"]
+
+
+def test_link_gate_passes_real_inventory_output_with_stale_allowances(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    (inputs.site_dir / "docs").mkdir(parents=True)
+    (inputs.site_dir / "docs" / "old.html").write_text(
+        '<!doctype html><html><head><title>Old</title></head><body><h1>Old</h1><a href="gone.html">gone</a></body></html>',
+        encoding="utf-8",
+    )
+    stale = ["/docs/old.html", "/docs/fixed.html", "missing path"]
+    allowance = inputs.repo_root / "_project" / "design" / "site-inventory" / "known-broken-links.json"
+    allowance.parent.mkdir(parents=True)
+    allowance.write_text(json.dumps([stale]), encoding="utf-8")
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    result = g.link_gate(inputs, g.run_subprocess)
+    assert result["status"] == g.PASS, result["detail"]
+    assert result["link_baseline"]["links"] == [RELEASE_BROKEN]
+
+
 def test_link_gate_fails_new_breakage_whose_source_is_a_trunk_route(tmp_path: Path) -> None:
     runner = _link_runner([RELEASE_BROKEN, ["/blog/p.html", "/x.html", "missing path"]])
     result = g.link_gate(_inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), runner)

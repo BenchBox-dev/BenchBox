@@ -1,0 +1,133 @@
+---
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import { blogTrail } from "../lib/breadcrumbs.ts";
+import Shell from "./Shell.astro";
+
+export interface BlogLink {
+  label: string;
+  href: string;
+}
+
+export interface BlogSeries {
+  title: string;
+  currentHref: string;
+  posts: BlogLink[];
+}
+
+interface Props {
+  title: string;
+  titleId?: string;
+  description?: string;
+  author?: string;
+  date?: string;
+  dateIso?: string;
+  searchable?: boolean;
+  authorHref?: string;
+  tags?: BlogLink[];
+  series?: BlogSeries;
+  previous?: BlogLink;
+  next?: BlogLink;
+  isIndex: boolean;
+}
+
+const { title, titleId, description, author, date, dateIso, searchable = true, authorHref, tags = [], series, previous, next, isIndex } = Astro.props;
+const hasMeta = Boolean(author || date || tags.length > 0);
+---
+
+<Shell title={`${title} - BenchBox Blog`} description={description ?? (isIndex ? "BenchBox blog: release notes, benchmark deep dives and platform comparisons." : `${title} - BenchBox blog post.`)} type={isIndex ? "website" : "article"} searchable={searchable}>
+  <article class="prose blog-post" data-pagefind-ignore={searchable ? undefined : ""}>
+    <Breadcrumbs crumbs={blogTrail(title, isIndex)} />
+    <h1 id={titleId}>{title}</h1>
+    {
+      hasMeta && (
+        <p class="post-meta">
+          {date && <span class="post-meta__date">{dateIso ? <time datetime={dateIso}>{date}</time> : date}</span>}
+          {author && (
+            <span class="post-meta__author">
+              {date && " · "}
+              {authorHref ? <a href={authorHref}>{author}</a> : author}
+            </span>
+          )}
+          {tags.length > 0 && (
+            <span class="post-meta__tags">
+              {(date || author) && " · "}
+              {tags.map((tag, position) => (
+                <>
+                  {position > 0 && " "}
+                  <a class="post-tag" href={tag.href}>
+                    {tag.label}
+                  </a>
+                </>
+              ))}
+            </span>
+          )}
+        </p>
+      )
+    }
+    <slot />
+    {
+      series && (
+        <nav class="blog-series" aria-label={`Series: ${series.title}`} data-pagefind-ignore>
+          <p class="blog-series__title">Series: {series.title}</p>
+          <ol>
+            {series.posts.map((entry) => (
+              <li>{entry.href === series.currentHref ? <span aria-current="page">{entry.label}</span> : <a href={entry.href}>{entry.label}</a>}</li>
+            ))}
+          </ol>
+        </nav>
+      )
+    }
+    {
+      (previous || next) && (
+        <nav class="blog-pager" aria-label="Post navigation" data-pagefind-ignore>
+          {previous && (
+            <a class="blog-pager__previous" rel="prev" href={previous.href}>
+              <span aria-hidden="true">&larr;</span> {previous.label}
+            </a>
+          )}
+          {next && (
+            <a class="blog-pager__next" rel="next" href={next.href}>
+              {next.label} <span aria-hidden="true">&rarr;</span>
+            </a>
+          )}
+        </nav>
+      )
+    }
+    {
+      !isIndex && (
+        <p class="blog-post__back" data-pagefind-ignore>
+          <a href="/blog/">All posts</a>
+        </p>
+      )
+    }
+  </article>
+</Shell>
+
+<style>
+  .blog-series,
+  .blog-pager {
+    margin-top: 2rem;
+  }
+  .blog-series ol {
+    margin: 0.25rem 0 0;
+  }
+  .blog-series__title {
+    margin: 0;
+    font-weight: 600;
+  }
+  .blog-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .blog-pager a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+  .blog-pager__next {
+    margin-left: auto;
+    text-align: right;
+  }
+</style>

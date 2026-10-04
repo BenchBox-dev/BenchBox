@@ -83,7 +83,7 @@ jobs:
           # rendered output as much as any source file. uv.lock and
           # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
-            benchbox/ docs/ examples/ landing/
+            benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -141,6 +141,9 @@ jobs:
           key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-sphinx-
+
+      - name: Generate documentation inputs
+        run: make docs-generate
 
       - name: Build documentation
         run: |
@@ -602,6 +605,9 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --group dev
+
+      - name: Generate documentation inputs
+        run: make query-docs
 
       - name: Check documentation links
         run: |

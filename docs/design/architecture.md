@@ -115,8 +115,8 @@ views are shareable as URLs.
 Tuning claims follow fail-closed rules end to end. The applied-tuning ledger
 records only statements that actually executed, using a shared vocabulary
 (`PHASE_SESSION` and friends); benchmarking hygiene applied to every run is
-never recorded as tuning, and a run with no tuning-derived statements
-reports `noop`, never a false `applied`. A platform with no
+never recorded as tuning, and a run that requested tuning but executed no
+tuning-derived statements reports `noop`, never a false `applied`. A platform with no
 tuning-derived session surface (Snowpark today) declares that explicitly
 rather than inheriting another platform's capture story. Post-load
 introspection corroborates the ledger before any `applied_verified` state

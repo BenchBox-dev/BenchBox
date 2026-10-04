@@ -18,7 +18,7 @@ unique_constraints:
   ignore_nulls: false
 
 check_constraints:
-  enabled: true
+  enabled: false
   enforce_on_insert: true
   enforce_on_update: true
 
@@ -41,10 +41,6 @@ table_tunings:
 
   uservisits:
     table_name: uservisits
-    partitioning:
-    - name: visitdate
-      type: VARCHAR
-      order: 1
     sorting:
     - name: sourceip
       type: VARCHAR

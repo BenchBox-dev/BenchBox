@@ -1,3 +1,7 @@
+:root {
+  --header-height: 4rem;
+}
+
 *,
 *::before,
 *::after {
@@ -16,99 +20,46 @@ body.shell {
   color: var(--accent-primary);
 }
 
-.site-header {
-  position: sticky;
+.skip-link {
+  position: absolute;
   top: 0;
-  z-index: 1000;
-  height: var(--header-height);
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border-primary);
-  backdrop-filter: blur(10px);
-}
-
-.site-header__inner {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  max-width: 1200px;
-  height: 100%;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.site-header__logo {
-  color: var(--accent-primary);
-  font-family: var(--font-mono);
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.site-header__nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  margin-right: auto;
-}
-
-.site-header__link {
-  color: var(--text-secondary);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.site-header__link:hover,
-.site-header__link[aria-current="page"] {
+  left: 0;
+  z-index: 2000;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
   color: var(--text-primary);
+  transform: translateY(-100%);
 }
 
-.site-header__tools {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.skip-link:focus {
+  transform: none;
 }
 
 .search-button,
-.theme-toggle button,
 .search-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border: 1px solid var(--border-primary);
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8125rem;
-  padding: 0.3rem 0.6rem;
+  font-size: 0.875rem;
+  padding: 0 0.6rem;
+}
+
+.search-button {
+  order: 3;
 }
 
 .search-button:hover,
-.theme-toggle button:hover {
+.search-close:hover {
   color: var(--text-primary);
-}
-
-.theme-toggle {
-  display: inline-flex;
-}
-
-.theme-toggle button {
-  border-radius: 0;
-  margin-left: -1px;
-}
-
-.theme-toggle button:first-child {
-  border-radius: 6px 0 0 6px;
-  margin-left: 0;
-}
-
-.theme-toggle button:last-child {
-  border-radius: 0 6px 6px 0;
-}
-
-.theme-toggle button[aria-checked="true"] {
-  background: var(--accent-secondary);
-  border-color: var(--accent-secondary);
-  color: #ffffff;
 }
 
 :focus-visible {
@@ -136,18 +87,63 @@ body.shell {
   background: rgba(0, 0, 0, 0.5);
 }
 
-.search-dialog form {
+.search-dialog__bar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 0 0 0.5rem;
 }
 
-.site-footer {
-  border-top: 1px solid var(--border-primary);
-  color: var(--text-secondary);
+.search-dialog__bar h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.search-dialog__bar form {
+  margin: 0;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 0.875rem;
-  padding: 2rem 1rem;
-  text-align: center;
+}
+
+.breadcrumbs li {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--text-secondary);
+}
+
+.breadcrumbs li + li::before {
+  content: "/" / "";
+  padding: 0 0.5rem;
+  color: var(--text-muted);
+}
+
+.breadcrumbs a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.breadcrumbs [aria-current="page"] {
+  color: var(--text-primary);
+}
+
+.blog-post__back a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }
 
 .hero {
@@ -302,59 +298,12 @@ body.shell {
   font-size: 0.875rem;
 }
 
-@media (max-width: 50rem) {
+@media (max-width: 56.25rem) {
   .hero__layout {
-    grid-template-columns: 1fr;
-  }
+      grid-template-columns: 1fr;
+    }
 
-  .theme-toggle button {
-    padding: 0.3rem 0.4rem;
-  }
-
-  .site-header__inner {
-    gap: 0.75rem;
-  }
-
-  .site-header__nav {
-    gap: 0.75rem;
-  }
-}
-
-@media (max-width: 40rem) {
-  :root {
-    --header-height: 6rem;
-  }
-
-  .site-header__inner {
-    flex-wrap: wrap;
-    align-content: center;
-    gap: 0.25rem 0.75rem;
-  }
-
-  .site-header__logo {
-    font-size: 1rem;
-  }
-
-  .site-header__nav {
-    gap: 0.625rem;
-    margin-right: 0;
-  }
-
-  .site-header__link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.75rem;
-    font-size: 0.875rem;
-  }
-
-  .site-header__tools {
-    flex: 1 0 100%;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .search-button,
-  .theme-toggle button {
-    min-height: 1.75rem;
-  }
+  .search-button__label {
+      display: none;
+    }
 }

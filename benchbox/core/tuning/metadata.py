@@ -23,6 +23,8 @@ from .interface import BenchmarkTunings, TableTuning, TuningColumn, TuningType, 
 
 logger = logging.getLogger(__name__)
 
+NO_TUNING_METADATA_ERROR = "No tuning metadata found in database"
+
 # The subset of TuningType values that _rebuild_tunings_from_records knows how
 # to place into a TableTuning (column-based, per-table tunings). Any other
 # tuning_type value found in the metadata table -- including the sentinel
@@ -951,7 +953,7 @@ class TuningMetadataManager:
                 if self.last_load_error:
                     result.add_error(f"Failed to load tuning metadata: {self.last_load_error}")
                 else:
-                    result.add_error("No tuning metadata found in database")
+                    result.add_error(NO_TUNING_METADATA_ERROR)
                 return result
 
             # Compare configurations

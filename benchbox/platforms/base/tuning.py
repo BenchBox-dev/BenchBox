@@ -65,6 +65,13 @@ def make_informational_constraint_applier(
     return apply_constraint_configuration
 
 
+_PHYSICAL_IDENTIFIER_FOLDERS: dict[str, Callable[[str], str]] = {
+    "lower": str.lower,
+    "upper": str.upper,
+    "preserve": str,
+}
+
+
 class TuningHooksMixin:
     """Mixin providing the per-table tuning DDL/clause hooks.
 
@@ -74,6 +81,13 @@ class TuningHooksMixin:
 
     platform_name: str
     _supported_tuning_type_names: Iterable[str] | None = None
+    physical_identifier_case: str = "preserve"
+
+    def resolve_physical_table(self, logical_name: str, connection: Any = None) -> str:
+        return _PHYSICAL_IDENTIFIER_FOLDERS[self.physical_identifier_case](logical_name)
+
+    def resolve_physical_column(self, table_name: str, logical_column: str, connection: Any = None) -> str:
+        return _PHYSICAL_IDENTIFIER_FOLDERS[self.physical_identifier_case](logical_column)
 
     def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
         """Apply tuning configurations to a database table.

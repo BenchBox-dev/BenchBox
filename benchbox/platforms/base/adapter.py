@@ -257,6 +257,7 @@ class PlatformAdapter(
         # construction for the honest status, the physical-identity hash, and the
         # .applied.json companion. Reset per run; None-safe on non-tuned paths.
         self._applied_tuning_ledger: AppliedTuningLedger | None = None
+        self._tuning_marker_save_failed = False
 
         # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
@@ -1032,6 +1033,8 @@ class PlatformAdapter(
             # applied_ledger_hash - in true execution chronology (ddl -> post_load
             # -> session). Internally guarded; a no-op when the attribute is empty.
             self._fold_layout_operations_into_ledger()
+            if self.tuning_enabled and effective_tuning_config and not self.database_was_reused:
+                quiet_console.print(self._applied_tuning_ledger.describe_outcome())
 
             benchmark_type = run_config.get("benchmark_type", "olap")
             # Wrap the connection so session-configuration SETs are captured into
@@ -1569,15 +1572,21 @@ class PlatformAdapter(
         tuning_metadata_saved = False
         if self.tuning_enabled and effective_tuning_config:
             quiet_console.print("Applying unified tuning configuration...")
+            apply_ledger = self._applied_tuning_ledger or AppliedTuningLedger()
+            ledger_before_apply = apply_ledger.snapshot()
             self.apply_unified_tuning(effective_tuning_config, connection)
-            quiet_console.print("✅ Unified tuning configuration applied")
+            quiet_console.print(apply_ledger.describe_apply_step(ledger_before_apply))
 
             quiet_console.print("Saving tuning metadata...")
             tuning_metadata_saved = self.save_tuning_metadata(connection)
-            if tuning_metadata_saved:
-                quiet_console.print("✅ Tuning metadata saved")
-            else:
+            if not tuning_metadata_saved:
                 quiet_console.print("⚠️ Failed to save tuning metadata")
+            elif self._tuning_marker_save_failed:
+                quiet_console.print(
+                    "⚠️ Tuning metadata saved without section markers; drift checks have reduced coverage"
+                )
+            else:
+                quiet_console.print("✅ Tuning metadata saved")
 
         if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
             quiet_console.print("Benchmark uses schema only; skipping data loading")

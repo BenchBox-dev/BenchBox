@@ -1047,7 +1047,7 @@ class TestDatabricksAdapter:
 
             # Should execute clustering optimization via Z-ORDER
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-            assert any("OPTIMIZE TEST_TABLE ZORDER BY" in call for call in execute_calls)
+            assert any("OPTIMIZE test_table ZORDER BY" in call for call in execute_calls)
 
         mock_cursor.close.assert_called()
 

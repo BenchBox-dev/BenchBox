@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from benchbox.core.exceptions import ConfigurationError
 from benchbox.platforms.base.tuning import make_informational_constraint_applier, supports_named_tuning_type
+from benchbox.utils.input_validation import validate_sql_identifier
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
@@ -16,6 +17,47 @@ if TYPE_CHECKING:
 
 class ClickHouseTuningMixin:
     """Implement tuning primitives for ClickHouse."""
+
+    physical_identifier_case = "lower"
+
+    def _catalog_names(self, connection: Any, sql: str) -> list[str] | None:
+        target = connection if connection is not None else getattr(self, "connection", None)
+        if target is None:
+            return None
+        try:
+            result = target.execute(sql)
+            return [row[0] for row in list(result)] if result is not None else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _match_catalog_name(names: list[str] | None, logical: str) -> str | None:
+        if not names:
+            return None
+        if logical in names:
+            return logical
+        matches = sorted(name for name in names if name.lower() == logical.lower())
+        return matches[0] if matches else None
+
+    def resolve_physical_table(self, logical_name: str, connection: Any = None) -> str:
+        names = self._catalog_names(connection, "SELECT name FROM system.tables WHERE database = currentDatabase()")
+        found = self._match_catalog_name(names, logical_name)
+        return found if found is not None else super().resolve_physical_table(logical_name, connection)
+
+    def resolve_physical_column(self, table_name: str, logical_column: str, connection: Any = None) -> str:
+        try:
+            table = validate_sql_identifier(table_name, "table name")
+        except Exception:
+            table = None
+        if table is not None:
+            names = self._catalog_names(
+                connection,
+                f"SELECT name FROM system.columns WHERE database = currentDatabase() AND table = '{table}'",
+            )
+            found = self._match_catalog_name(names, logical_column)
+            if found is not None:
+                return found
+        return super().resolve_physical_column(table_name, logical_column, connection)
 
     def get_effective_tuning_configuration(
         self,
@@ -317,6 +359,7 @@ class ClickHouseTuningMixin:
             return
 
         table_name = table_tuning.table_name
+        physical_table = self.resolve_physical_table(table_name, connection)
         self.logger.info(f"Applying ClickHouse tunings for table: {table_name}")
 
         try:
@@ -332,7 +375,7 @@ class ClickHouseTuningMixin:
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
                 self.logger.info(f"Optimizing table {table_name} for sorting on columns: {', '.join(column_names)}")
-                self.optimize_table(connection, table_name)
+                self.optimize_table(connection, physical_table)
 
             # Apply clustering optimization via OPTIMIZE TABLE FINAL
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -342,7 +385,7 @@ class ClickHouseTuningMixin:
                 self.logger.info(
                     f"Applying clustering optimization to table {table_name} on columns: {', '.join(column_names)}"
                 )
-                connection.execute(f"OPTIMIZE TABLE {table_name} FINAL")
+                connection.execute(f"OPTIMIZE TABLE {physical_table} FINAL")
 
             # Log partitioning strategy (must be defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)

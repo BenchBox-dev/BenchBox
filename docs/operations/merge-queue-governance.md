@@ -29,6 +29,8 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
+The pull request that switches the public-site renderer from Sphinx to Astro needs an exact-head approval for its PR head, and the baseline producer must publish an Astro-rendered baseline for its merge commit. The steps are in the Renderer-switch pull request section of [Results Explorer browser testing](../development/results-explorer-browser-testing.md).
+
 ---
 
 ## 3. Merge Path

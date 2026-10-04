@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD024 -->
+
 # Results Commands
 
 ```{tags} reference, cli, validation
@@ -6,6 +8,7 @@
 Commands for exporting, viewing, and comparing benchmark results.
 
 (cli-export)=
+
 ## `export` - Export Results
 
 Re-export existing benchmark results in different formats without re-running benchmarks. Useful for sharing results, generating reports, or converting to spreadsheet-friendly formats.
@@ -23,16 +26,19 @@ Re-export existing benchmark results in different formats without re-running ben
 ### Supported Export Formats
 
 **JSON**, Complete benchmark results in canonical schema format
+
 - Full metadata, metrics, and query results
 - Suitable for programmatic analysis and archival
 - Default format during benchmark runs
 
 **CSV**, Flattened query results for spreadsheet analysis
+
 - Query-level details: execution times, status, rows returned
 - Compatible with Excel, Google Sheets, data analysis tools
 - Ideal for performance analysis and charting
 
 **HTML**, Standalone report with formatted tables
+
 - Summary metrics and system information
 - Color-coded query results table
 - Ready to share with stakeholders
@@ -62,6 +68,7 @@ benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
 ### Common Workflows
 
 **Share Results with Team:**
+
 ```bash
 # Export recent result as HTML report
 benchbox export --last --format html --output-dir ./team_reports/
@@ -69,6 +76,7 @@ benchbox export --last --format html --output-dir ./team_reports/
 ```
 
 **Analyze in Spreadsheet:**
+
 ```bash
 # Export to CSV for Excel/Sheets analysis
 benchbox export --last --format csv --output-dir ~/Downloads/
@@ -76,6 +84,7 @@ benchbox export --last --format csv --output-dir ~/Downloads/
 ```
 
 **Archive Benchmarks:**
+
 ```bash
 # Export all formats for comprehensive archival
 benchbox export --last --format json --format csv --format html --output-dir ./archive/
@@ -93,6 +102,7 @@ benchbox export --last --format json --format csv --format html --output-dir ./a
 ---
 
 (cli-results)=
+
 ## `results` - Show Benchmark Results
 
 Display exported benchmark results and execution history.
@@ -136,6 +146,7 @@ benchbox results --submitted
 ---
 
 (cli-compare)=
+
 ## `compare` - Compare Benchmark Results
 
 Compare two or more benchmark result files to analyze performance changes. Displays side-by-side query timing comparisons, geometric means, and regression detection suitable for CI/CD workflows.
@@ -159,17 +170,20 @@ benchbox compare BASELINE.json CURRENT.json [OPTIONS]
 ### Output Formats
 
 **Text** (default), Human-readable comparison report
+
 - Color-coded indicators for performance changes
 - Geometric mean calculation across all queries
 - Per-query breakdown sorted by severity
 - Suitable for terminal viewing and logs
 
 **JSON**, Machine-readable comparison data
+
 - Full comparison metrics and query-level details
 - Suitable for programmatic analysis and dashboards
 - Includes `performance_changes`, `query_comparisons`, and `summary` sections
 
 **HTML**, Standalone comparison report
+
 - Formatted tables with color-coded severity
 - Summary statistics and per-query breakdown
 - Ready to share with stakeholders or archive
@@ -177,6 +191,7 @@ benchbox compare BASELINE.json CURRENT.json [OPTIONS]
 ### Usage Examples
 
 **Basic Comparison:**
+
 ```bash
 # Compare two result files
 benchbox compare baseline.json current.json
@@ -186,6 +201,7 @@ benchbox compare baseline.json current.json --show-all-queries
 ```
 
 **CI/CD Integration:**
+
 ```bash
 # Fail pipeline if any query regresses more than 10%
 benchbox compare baseline.json current.json --fail-on-regression 10%
@@ -198,6 +214,7 @@ benchbox compare baseline.json current.json --fail-on-regression 0.1
 ```
 
 **Export Comparison Reports:**
+
 ```bash
 # Export as JSON for dashboards
 benchbox compare baseline.json current.json --format json --output comparison.json
@@ -214,20 +231,24 @@ benchbox compare baseline.json current.json --output comparison.txt
 The comparison report includes:
 
 **Summary Section:**
+
 - Total queries compared
 - Count of improved, regressed, and unchanged queries
 - Overall assessment (improved/regressed/mixed)
 
 **Performance Metrics:**
+
 - Average query time change
 - Total execution time change
 - Per-metric improvement indicators
 
 **Geometric Mean:**
+
 - Baseline and current geometric means (standard benchmark metric)
 - Percentage change with severity indicator
 
 **Per-Query Breakdown:**
+
 - Query ID, baseline time, current time, percentage change
 - Severity classification:
   - `CRITICAL`: >50% regression
@@ -239,7 +260,7 @@ The comparison report includes:
 ### Severity Indicators
 
 | Indicator | Meaning | Threshold |
-|-----------|---------|-----------|
+| ----------- | --------- | ----------- |
 | `🟢` | Improved (faster) | Any negative change |
 | `⚪` | Unchanged | <1% change |
 | `🟡` | Minor regression | 1-10% slower |
@@ -248,6 +269,7 @@ The comparison report includes:
 ### Common Workflows
 
 **Regression Testing in CI/CD:**
+
 ```bash
 # 1. Run baseline benchmark (e.g., main branch)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
@@ -265,6 +287,7 @@ benchbox compare \
 ```
 
 **Before/After Optimization Analysis:**
+
 ```bash
 # Run without tuning
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
@@ -282,6 +305,7 @@ benchbox compare \
 ```
 
 **Cross-Platform Comparison:**
+
 ```bash
 # Compare DuckDB vs ClickHouse performance
 benchbox compare \
@@ -292,10 +316,10 @@ benchbox compare \
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| `0` | Comparison completed successfully (no regression above threshold) |
-| `1` | Regression detected above `--fail-on-regression` threshold, or error occurred |
+| Code | Meaning                                                                       |
+| ---- | ----------------------------------------------------------------------------- |
+| `0`  | Comparison completed successfully (no regression above threshold)             |
+| `1`  | Regression detected above `--fail-on-regression` threshold, or error occurred |
 
 ### Notes
 
@@ -333,7 +357,7 @@ report_path = exporter.export_comparison_report(comparison)
 print(f"Report saved to: {report_path}")
 ```
 
-See [Result Analysis API](../python-api/result-analysis.rst) for complete API documentation.
+See [Result Analysis API](../python-api/result-analysis.md) for complete API documentation.
 
 ## Related
 

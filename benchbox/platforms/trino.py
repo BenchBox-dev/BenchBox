@@ -62,6 +62,8 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
     - AWS Athena: Use AthenaAdapter instead (managed Presto/Trino service)
     """
 
+    physical_identifier_case = "lower"
+
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -243,7 +245,7 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Trino tunings for table: {table_name}")
 
         # Trino tuning is primarily handled at table creation time

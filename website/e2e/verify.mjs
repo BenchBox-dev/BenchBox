@@ -14,7 +14,7 @@ const samplePages = [
   "/docs/usage/getting-started.html",
   "/docs/benchmarks/industry-benchmarks.html",
   "/docs/benchmarks/queries/tpch/q1.html",
-  "/docs/reference/python-api/additional-utilities.html",
+  "/docs/reference/api-reference.html",
   "/blog/2026-05-18-v0-3-0-release-overview.html",
 ];
 
@@ -94,7 +94,7 @@ for (const route of samplePages) {
   await context.close();
 }
 
-const widths = [320, 375, 1280];
+const widths = [320, 375, 390, 1280];
 const headerSelector = ".site-header a, .site-header button, button.sl-menu-button";
 
 function intersects(a, b) {
@@ -148,6 +148,8 @@ for (const width of widths) {
       axeSeriousCritical: seriousOrCritical,
     };
     if (width === 375) {
+      const navToggle = page.locator("[data-site-header-toggle]");
+      if (await navToggle.isVisible()) await navToggle.click();
       const toggle = page.locator('.theme-toggle [data-theme-option="dark"]').first();
       try {
         await toggle.click({ timeout: 3000 });
@@ -218,10 +220,18 @@ for (const theme of ["light", "dark"]) {
   await page.evaluate(() => window.scrollTo(0, 1200));
   await page.waitForTimeout(200);
   await mark("start (scrolled 1200)");
-  await page.getByRole("link", { name: "Industry Benchmarks" }).first().click();
+  const sidebarLink = async (suffix) => {
+    const link = page.locator(`a[href$="${suffix}"]`).first();
+    await link.evaluate((el) => {
+      for (let node = el.parentElement; node; node = node.parentElement) if (node.tagName === "DETAILS") node.open = true;
+    });
+    await link.click();
+  };
+  await sidebarLink("/industry-benchmarks.html");
   await page.waitForURL("**/industry-benchmarks.html");
   await mark("clicked sidebar: industry");
-  await page.getByRole("link", { name: "TPC-H Q1" }).first().click();
+  if ((await page.locator('a[href$="/tpch/q1.html"]').count()) > 0) await sidebarLink("/tpch/q1.html");
+  else await page.goto(base + "/docs/benchmarks/queries/tpch/q1.html", { waitUntil: "load" });
   await page.waitForURL("**/tpch/q1.html");
   await mark("clicked sidebar: q1");
   await page.goBack({ waitUntil: "load" });
@@ -301,14 +311,14 @@ for (const theme of ["light", "dark"]) {
       choice: await page.evaluate(() => document.documentElement.dataset.bbThemeChoice),
     });
   await read("initial");
-  await page.getByRole("radio", { name: "Dark" }).click();
+  await page.getByRole("radio", { name: "Dark theme" }).click();
   await read("clicked Dark");
   await page.goto(base + "/results/", { waitUntil: "load" });
   await page.waitForSelector("#app *");
   await read("explorer after Dark on docs");
   await page.goto(base + "/", { waitUntil: "load" });
   await read("landing");
-  await page.getByRole("radio", { name: "System" }).click();
+  await page.getByRole("radio", { name: "System theme" }).click();
   await read("clicked System");
   report.theme = states;
   await context.close();

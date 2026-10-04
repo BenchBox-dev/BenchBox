@@ -5,7 +5,7 @@ and derives an honest ``tuning_validation_status`` from it. These tests assert t
 DataFrame runtime path reaches the same parity: runtime settings (threads/memory/
 write-layout) the DF path actually applies are recorded into the SAME shared
 ledger (``benchbox.core.tuning.applied_ledger``), a default/untuned run derives
-``noop``, and a tuned run derives ``applied_unverified`` and carries the ledger
+``not_applicable``, and a tuned run derives ``applied_unverified`` and carries the ledger
 companion + physical-identity hash on the built ``BenchmarkResults``.
 """
 
@@ -24,6 +24,7 @@ from benchbox.core.schemas import BenchmarkConfig
 from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     NOOP,
+    NOT_APPLICABLE,
     PHASE_POST_LOAD,
     PHASE_SESSION,
 )
@@ -97,10 +98,10 @@ def _dask_memory_config(
 # Construction-time runtime settings -> SESSION ledger statements
 # ---------------------------------------------------------------------------
 class TestRuntimeSettingsRecorded:
-    def test_default_polars_run_is_noop_with_empty_ledger(self):
+    def test_default_polars_run_is_not_applicable_with_empty_ledger(self):
         adapter = PolarsDataFrameAdapter()
         assert adapter._applied_tuning_ledger.is_empty()
-        assert adapter._derive_applied_tuning_status() == NOOP
+        assert adapter._derive_applied_tuning_status() == NOT_APPLICABLE
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is None
 
     def test_tuned_polars_records_applied_runtime_settings(self):
@@ -121,10 +122,10 @@ class TestRuntimeSettingsRecorded:
         assert adapter._derive_applied_tuning_status() == APPLIED_UNVERIFIED
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is not None
 
-    def test_default_pandas_run_is_noop(self):
+    def test_default_pandas_run_is_not_applicable(self):
         adapter = PandasDataFrameAdapter()
         assert adapter._applied_tuning_ledger.is_empty()
-        assert adapter._derive_applied_tuning_status() == NOOP
+        assert adapter._derive_applied_tuning_status() == NOT_APPLICABLE
 
     def test_tuned_pandas_records_dtype_backend(self):
         cfg = DataFrameTuningConfiguration()
@@ -143,10 +144,10 @@ class TestRuntimeSettingsRecorded:
         assert hash_a == hash_b
 
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
-    def test_default_datafusion_run_is_noop_with_empty_ledger(self):
+    def test_default_datafusion_run_is_not_applicable_with_empty_ledger(self):
         adapter = DataFusionDataFrameAdapter()
         assert adapter._applied_tuning_ledger.is_empty()
-        assert adapter._derive_applied_tuning_status() == NOOP
+        assert adapter._derive_applied_tuning_status() == NOT_APPLICABLE
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is None
 
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
@@ -169,11 +170,11 @@ class TestRuntimeSettingsRecorded:
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is not None
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
-    def test_default_dask_run_is_noop_with_empty_ledger(self):
+    def test_default_dask_run_is_not_applicable_with_empty_ledger(self):
         # use_distributed=False avoids starting a LocalCluster for this unit proof.
         adapter = DaskDataFrameAdapter(use_distributed=False)
         assert adapter._applied_tuning_ledger.is_empty()
-        assert adapter._derive_applied_tuning_status() == NOOP
+        assert adapter._derive_applied_tuning_status() == NOT_APPLICABLE
         assert adapter._applied_tuning_ledger.applied_ledger_hash() is None
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
@@ -391,11 +392,11 @@ class TestRuntimeSettingsRecorded:
         assert adapter._derive_applied_tuning_status() == NOOP
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
-    def test_constructor_spill_directory_without_tuning_config_stays_noop(self, monkeypatch, tmp_path):
+    def test_constructor_spill_directory_without_tuning_config_stays_not_applicable(self, monkeypatch, tmp_path):
         """A bare constructor spill directory is infrastructure, not tuning.
 
         With no tuning configuration, a platform-option spill directory that
-        reaches the cluster must not flip the run from noop to
+        reaches the cluster must not flip the run from not_applicable to
         applied_unverified: every other ledger entry gates on the tuning
         config, and spill_directory must be no different.
         """
@@ -424,7 +425,7 @@ class TestRuntimeSettingsRecorded:
 
         assert captured["local_directory"] == str(spill_dir)
         assert adapter._applied_tuning_ledger.is_empty()
-        assert adapter._derive_applied_tuning_status() == NOOP
+        assert adapter._derive_applied_tuning_status() == NOT_APPLICABLE
 
 
 # ---------------------------------------------------------------------------
@@ -508,19 +509,19 @@ class TestRunBenchmarkCarriesLedger:
         recorded = {s["statement"] for s in payload["statements"]}
         assert "POLARS_MAX_THREADS=6" in recorded
 
-    def test_default_run_result_is_noop_without_companion(self):
+    def test_default_run_result_is_not_applicable_without_companion(self):
         adapter = PolarsDataFrameAdapter()
         result = _run_no_phases(adapter)
 
-        assert result.tuning_validation_status == NOOP
-        # Empty ledger writes no companion payload/hash (a default run is a no-op).
+        assert result.tuning_validation_status == NOT_APPLICABLE
+        # Empty ledger writes no companion payload/hash (a default run requested no tuning).
         assert result.applied_tuning_ledger is None
         assert result.applied_ledger_hash is None
 
-    def test_default_pandas_run_result_is_noop(self):
+    def test_default_pandas_run_result_is_not_applicable(self):
         adapter = PandasDataFrameAdapter()
         result = _run_no_phases(adapter)
-        assert result.tuning_validation_status == NOOP
+        assert result.tuning_validation_status == NOT_APPLICABLE
 
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
     def test_tuned_datafusion_run_result_carries_ledger_and_applied_unverified(self):
@@ -558,10 +559,10 @@ class TestRunBenchmarkCarriesLedger:
         assert adapter._derive_applied_tuning_status() == NOOP
 
     @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")
-    def test_default_datafusion_run_result_is_noop(self):
+    def test_default_datafusion_run_result_is_not_applicable(self):
         adapter = DataFusionDataFrameAdapter()
         result = _run_no_phases(adapter)
-        assert result.tuning_validation_status == NOOP
+        assert result.tuning_validation_status == NOT_APPLICABLE
         assert result.applied_tuning_ledger is None
         assert result.applied_ledger_hash is None
 
@@ -624,9 +625,9 @@ class TestRunBenchmarkCarriesLedger:
         assert f"spill_directory={tmp_path / 'spill'}" in recorded
 
     @pytest.mark.skipif(not DASK_AVAILABLE, reason="Dask not installed")
-    def test_default_dask_run_result_is_noop(self):
+    def test_default_dask_run_result_is_not_applicable(self):
         adapter = DaskDataFrameAdapter(use_distributed=False)
         result = _run_no_phases(adapter)
-        assert result.tuning_validation_status == NOOP
+        assert result.tuning_validation_status == NOT_APPLICABLE
         assert result.applied_tuning_ledger is None
         assert result.applied_ledger_hash is None

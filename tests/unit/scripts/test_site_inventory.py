@@ -64,7 +64,7 @@ def test_inventory_extracts_page_fields(tmp_path: Path) -> None:
     page = inventory["pages"]["/index.html"]
     assert page["title"] == "Home Page"
     assert page["description"] == "The home"
-    assert page["canonical"] == "/"
+    assert page["canonical"] == "https://benchbox.dev/"
     assert page["h1"] == ["Home"]
     assert page["headings"] == [["h2", "Intro"], ["h3", "Detail"], ["h2", "Outro"]]
     assert page["links"] == [
@@ -205,6 +205,30 @@ def test_check_reports_broken_links_within_one_inventory(tmp_path: Path, capsys:
     assert "/docs/guide.html#setup (missing fragment)" in capsys.readouterr().out
 
 
+def test_check_reports_allowances_that_no_longer_match(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    site = _fixture(tmp_path / "site")
+    _write(site, "docs/guide.html", GUIDE.replace('id="setup"', 'id="other"'))
+    inventory_path = tmp_path / "inv.json"
+    site_inventory.main(["build", "--site-dir", str(site), "--output", str(inventory_path)])
+    known = tmp_path / "known.json"
+    known.write_text(
+        json.dumps(
+            [
+                ["/index.html", "/docs/guide.html#setup", "missing fragment"],
+                ["/index.html", "/index.html#x", "missing fragment"],
+                ["/index.html", "/gone.html", "missing path"],
+            ]
+        ),
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    assert site_inventory.main(["check", "--inventory", str(inventory_path), "--known-broken", str(known)]) == 0
+    out = capsys.readouterr().out
+    assert "stale allowance: /index.html: /gone.html (missing path) (no longer broken)" in out
+    assert "broken internal link" not in out.split("summary:")[0]
+
+
 def test_missing_site_dir_is_a_usage_error(tmp_path: Path) -> None:
     code = site_inventory.main(["build", "--site-dir", str(tmp_path / "none"), "--output", str(tmp_path / "o.json")])
 
@@ -310,6 +334,39 @@ def test_expected_removals_file_requires_reason(tmp_path: Path, capsys: pytest.C
     assert "1 stale allowance" in capsys.readouterr().out
 
 
+def test_repeated_expected_removals_files_merge_and_report_stale_entries_from_either(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    baseline_site, candidate_site = _fixture(tmp_path / "base"), _fixture(tmp_path / "cand")
+    (candidate_site / "blog" / "a.html").unlink()
+    (candidate_site / "blog" / "b.html").unlink()
+    baseline_path, candidate_path = tmp_path / "base.json", tmp_path / "cand.json"
+    site_inventory.main(["build", "--site-dir", str(baseline_site), "--output", str(baseline_path)])
+    site_inventory.main(["build", "--site-dir", str(candidate_site), "--output", str(candidate_path)])
+    first, second = tmp_path / "first.json", tmp_path / "second.json"
+    first.write_text(json.dumps([_removal("/blog/a.html")]), encoding="utf-8")
+    second.write_text(json.dumps([_removal("/blog/b.html")]), encoding="utf-8")
+    args = ["diff", "--baseline", str(baseline_path), "--candidate", str(candidate_path)]
+
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--expected-removals", str(first)]) == 1
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--expected-removals", str(first), "--expected-removals", str(second)]) == 0
+    assert "(matched nothing)" not in capsys.readouterr().out
+
+    first.write_text(json.dumps([_removal("/blog/a.html"), _removal("/gone-first/")]), encoding="utf-8")
+    second.write_text(json.dumps([_removal("/blog/b.html"), _removal("/gone-second/")]), encoding="utf-8")
+    capsys.readouterr()
+    code = site_inventory.main(
+        [*args, "--expected-removals", str(first), "--expected-removals", str(second), "--strict"]
+    )
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "/gone-first/ (matched nothing)" in out
+    assert "/gone-second/ (matched nothing)" in out
+    assert "/blog/a.html (matched nothing)" not in out
+
+
 def test_feed_links_are_link_sources(tmp_path: Path) -> None:
     site = _fixture(tmp_path / "site")
     _write(site, "blog/atom.xml", ATOM.replace('href="a.html"', 'href="blog/a.html"'))
@@ -352,7 +409,7 @@ def test_canonical_loss_fails_but_description_change_is_informational(tmp_path: 
 
     _write(candidate_site, "index.html", INDEX.replace('<link rel="canonical" href="https://benchbox.dev/">', ""))
     report = site_inventory.diff_inventories(baseline, _build(candidate_site))
-    assert report["canonical loss"] == ["/index.html [canonical]: '/' -> ''"]
+    assert report["canonical loss"] == ["/index.html [canonical]: 'https://benchbox.dev/' -> ''"]
     assert site_inventory.exit_code(report, strict=False) == 1
 
 
@@ -481,3 +538,114 @@ def test_known_broken_allows_listed_links_only(tmp_path: Path, capsys: pytest.Ca
     capsys.readouterr()
     assert site_inventory.main(check) == 1
     assert "/docs/guide.html#setup (missing fragment)" in capsys.readouterr().out
+
+
+def _rule(**overrides: str) -> dict[str, str]:
+    return {
+        "id": "theme",
+        "kind": "missing fragment",
+        "match": r".*#(__toc|svg-[a-z]+)",
+        "reason": "theme ids belong to the retired theme",
+        "owner_approval": "pending",
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"kind": "no such kind"},
+        {"match": "("},
+        {"reason": " "},
+        {"owner_approval": "maybe"},
+    ],
+)
+def test_allowed_differences_reject_malformed_rules(tmp_path: Path, broken: dict[str, str]) -> None:
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps([_rule(**broken)]), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        site_inventory.load_allowed_differences(path)
+
+
+def test_allowed_differences_reject_repeated_ids(tmp_path: Path) -> None:
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps([_rule(), _rule()]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="repeats the id"):
+        site_inventory.load_allowed_differences(path)
+
+
+def test_cli_diff_applies_allowed_differences(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    base_site = _fixture(tmp_path / "base")
+    _write(base_site, "docs/guide.html", GUIDE.replace("</body>", '<div id="__toc"></div></body>'))
+    cand_site = _fixture(tmp_path / "cand")
+    base_json, cand_json = tmp_path / "base.json", tmp_path / "cand.json"
+    site_inventory.main(["build", "--site-dir", str(base_site), "--output", str(base_json)])
+    site_inventory.main(["build", "--site-dir", str(cand_site), "--output", str(cand_json)])
+    args = ["diff", "--baseline", str(base_json), "--candidate", str(cand_json)]
+    rules = tmp_path / "rules.json"
+    rules.write_text(json.dumps([_rule(), _rule(id="unused", match="nothing")]), encoding="utf-8")
+
+    assert site_inventory.main(args) == 1
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--allowed-differences", str(rules)]) == 0
+    out = capsys.readouterr().out
+    assert "missing fragment" not in out.splitlines()[0]
+    assert "stale allowance: unused (matched nothing)" in out
+
+
+def test_admonition_asides_keep_their_links_on_the_page_but_nav_asides_stay_chrome() -> None:
+    markup = (
+        '<aside class="starlight-aside"><a href="/docs/x.html">note</a></aside>'
+        '<aside class="sidebar"><a href="/docs/y.html">menu</a></aside><a href="/docs/z.html">after</a>'
+    )
+
+    page, chrome, _ = site_inventory.parse_page("/docs/p.html", markup)
+
+    assert page["links"] == ["/docs/x.html", "/docs/z.html"]
+    assert chrome == {"/docs/y.html"}
+
+
+def test_heading_changes_are_reported_one_heading_at_a_time(tmp_path: Path) -> None:
+    baseline = _build(_fixture(tmp_path / "base"))
+    candidate_site = _fixture(tmp_path / "cand")
+    _write(
+        candidate_site,
+        "docs/guide.html",
+        GUIDE.replace("</body>", "<h2>On this page</h2></body>").replace("Setup", "Setup steps"),
+    )
+
+    report = site_inventory.diff_inventories(baseline, _build(candidate_site))
+
+    assert report["changed heading"] == [
+        '/docs/guide.html [headings]: added ["h2", "On this page"]',
+        '/docs/guide.html [headings]: added ["h2", "Setup steps"]',
+        '/docs/guide.html [headings]: removed ["h2", "Setup"]',
+    ]
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "http://benchbox.dev/docs/a.html",
+        "https://www.benchbox.dev/docs/a.html",
+        "https://benchbox.dev/docs/a.html?x=1",
+        "/docs/a.html",
+    ],
+)
+def test_canonical_is_recorded_exactly_as_written(href: str) -> None:
+    page, _, _ = site_inventory.parse_page("/docs/a.html", f'<link rel="canonical" href="{href}">')
+
+    assert page["canonical"] == href
+
+
+def test_links_still_resolve_every_site_host_and_scheme() -> None:
+    markup = (
+        '<a href="http://www.benchbox.dev/docs/a.html?x=1#top">a</a><a href="/docs/b.html">b</a>'
+        '<a href="https://example.com/c.html">c</a>'
+    )
+
+    page, _, _ = site_inventory.parse_page("/docs/p.html", markup)
+
+    assert page["links"] == ["/docs/a.html#top", "/docs/b.html"]

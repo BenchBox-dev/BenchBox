@@ -32,7 +32,7 @@ Classification values:
 | Artifact privacy (no private paths in published site) | `assemble_public_site.py` privacy scan step in `.github/workflows/docs.yml` build job, `tests/unit/scripts/test_corpus_privacy_invariant.py` | site-deploy pre-deploy gates | pending | open |
 | Publication rollback and transactions | `.github/workflows/publication-transaction.yml`, `.github/workflows/publication-recover.yml`, `.github/workflows/publication-soak-monitor.yml`, `tests/unit/workflows/test_publication_transaction.py`, `tests/unit/workflows/test_publication_recover.py`, `tests/unit/workflows/test_publication_rollback.py` | site-deploy rollback with last-known-good validation | pending | open |
 | Explorer snapshot and UI compatibility | `results-explorer/src/db.ts` read-model version gate, `tests/unit/scripts/test_results_explorer_snapshot_invariants.py` | ci.yml `explorer` | pending | open |
-| Public-site visual acceptance | Advisory comparison in `ci.yml` and protected baselines from `docs.yml` | Required visual acceptance returns when the site is in production; deployment route and digest probes remain separate | pending | open |
+| Public-site visual acceptance | Advisory comparison in `ci.yml` and protected baselines from `docs.yml` | Trunk renders: the `Public-site visual regression` job in `ci.yml`, compared against the exact protected base and reported under the `docs`, `landing` and `explorer` contexts (advisory until the public site is in production, `docs/operations/merge-queue-governance.md`). Deploys: the `Pre-deploy visual comparison` job in `.github/workflows/site-deploy.yml`, which captures the assembled release-sourced candidate and the last production artifact with `public-site-pages.spec.ts` and compares them with `compareVisualManifestsAcrossRenderers` for the release-sourced routes whenever the release commit or the renderer changes; `deploy` waits for it. Site-deploy route and digest probes prove availability and identity, not layout | pending | open |
 | Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` hash checks and required macOS/Windows dbgen framing; nightly-v2.yml matrix dbgen framing on all three OS at Python 3.12 | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
 | Shipped bundled generator integrity | `benchbox/_binaries/SHA256MANIFEST.json`, `tests/unit/utils/test_binary_manifest.py` | trunk.yml `dist-artifact` verifies source, wheel, and sdist membership and hashes on each push to develop; installed-package verifier for release checks | pending | open |
@@ -76,7 +76,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
-| `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal |
+| `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal, or a stand-in approval comment from an attester account when the connector cannot review; that account is also the one local automation uses, so the stand-in records who vouched, not that a human read it |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -201,7 +201,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_local_validation.py` | pure-process |
 | `test_migrate_clickhouse_labels.py` | product-safety |
 | `test_mirror_partial_validation_policy.py` | pure-process |
-| `test_oracle_review_check.py` | product-safety | Connector review decision for soundness-path changes |
+| `test_oracle_review_check.py` | product-safety | Connector review or stand-in approval decision for soundness-path changes |
 | `test_path_filter_decision.py` | tooling |
 | `test_preflight_targets.py` | pure-process |
 | `test_phase2_metrics.py` | pure-process |
@@ -357,7 +357,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
 | `fast_lane_ceiling_check.py` | pure-process | Fast-lane marker and path guards; retires with the fast lane |
 | `soundness_paths.py` | product-safety | Soundness path manifest |
-| `oracle_review_check.py` | product-safety | Connector review check for soundness-path changes |
+| `oracle_review_check.py` | product-safety | Connector review or stand-in approval check for soundness-path changes; the attester account is the one local automation also uses |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
 | `soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |

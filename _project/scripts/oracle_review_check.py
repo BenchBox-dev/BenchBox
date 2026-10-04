@@ -19,13 +19,12 @@ CONNECTOR_LOGIN = "chatgpt-codex-connector"
 # cannot review (for example at its usage limit). The attestation must name the
 # exact head commit, so it records who vouched for which reviewed code.
 STANDIN_ATTESTERS = frozenset({"joeharris76"})
-_STANDIN_MARKER = re.compile(r"^Stand-in oracle review: APPROVE ([0-9a-f]{40})\s*$", re.MULTILINE)
-_FENCED_BLOCK = re.compile(r"^(```|~~~).*?^\1", re.MULTILINE | re.DOTALL)
+_STANDIN_MARKER = re.compile(r"Stand-in oracle review: APPROVE ([0-9a-f]{40})")
 
 
 def _attested_shas(comment: dict[str, Any]) -> list[str]:
-    """SHAs a comment attests, ignoring any marker quoted inside a fenced code block."""
-    return _STANDIN_MARKER.findall(_FENCED_BLOCK.sub("", comment.get("body") or ""))
+    match = _STANDIN_MARKER.fullmatch((comment.get("body") or "").strip())
+    return [match.group(1)] if match else []
 
 
 def _is_standin(comment: dict[str, Any], head_sha: str, head_time: datetime) -> bool:

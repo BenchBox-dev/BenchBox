@@ -561,6 +561,7 @@ class ResultExporter:
                 entry.pop("table", None)
                 entry["statement_redacted"] = True
         self._sanitize_applied_dropped(sanitized)
+        self._sanitize_applied_satisfied(sanitized)
         # The post-load introspection receipt (tuning-introspection-receipts)
         # rides inside this companion and echoes the same free-text statement /
         # identifier fields (plus catalog evidence), so it is scrubbed by the
@@ -583,6 +584,14 @@ class ResultExporter:
             return
         count = len(dropped) if isinstance(dropped, list) else 1
         payload["dropped"] = [{"redacted": True} for _ in range(count)]
+
+    @staticmethod
+    def _sanitize_applied_satisfied(payload: Any) -> None:
+        if not isinstance(payload, dict) or not payload.get("satisfied"):
+            return
+        satisfied = payload["satisfied"]
+        count = len(satisfied) if isinstance(satisfied, list) else 1
+        payload["satisfied"] = [{"redacted": True} for _ in range(count)]
 
     @staticmethod
     def _sanitize_applied_drift_check(drift_check: Any) -> None:

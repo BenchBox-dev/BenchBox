@@ -230,6 +230,16 @@ class DroppedIntent:
 
 
 @dataclass
+class SatisfiedIntent:
+    intent: str
+    satisfied_by: int
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"intent": self.intent, "satisfied_by": self.satisfied_by, "reason": self.reason}
+
+
+@dataclass
 class AppliedTuningLedger:
     """Ordered record of executed tuning statements + dropped intents.
 
@@ -240,6 +250,7 @@ class AppliedTuningLedger:
 
     statements: list[AppliedStatement] = field(default_factory=list)
     dropped: list[DroppedIntent] = field(default_factory=list)
+    satisfied: list[SatisfiedIntent] = field(default_factory=list)
 
     # -- population (execution path) ---------------------------------------
     def record(
@@ -274,6 +285,20 @@ class AppliedTuningLedger:
         except Exception as exc:
             logger.debug("applied-ledger dropped-record degraded: %s", exc)
 
+    def record_satisfied(self, intent: str, satisfied_by: int, reason: str) -> None:
+        try:
+            self.satisfied.append(
+                SatisfiedIntent(intent=str(intent), satisfied_by=int(satisfied_by), reason=str(reason))
+            )
+        except Exception as exc:
+            logger.debug("applied-ledger satisfied-record degraded: %s", exc)
+
+    def executed_statement_index(self, predicate: Callable[[AppliedStatement], bool]) -> int | None:
+        for index, statement in enumerate(self.statements):
+            if statement.status == EXECUTED and predicate(statement):
+                return index
+        return None
+
     # -- read back (result construction) -----------------------------------
     @property
     def executed_statements(self) -> list[AppliedStatement]:
@@ -296,6 +321,30 @@ class AppliedTuningLedger:
         if self.statements:  # statements attempted, all failed
             return FAILED
         return NOOP
+
+    def snapshot(self) -> tuple[int, int, int]:
+        return len(self.executed_statements), self._failed_count(), len(self.dropped)
+
+    def _failed_count(self) -> int:
+        return sum(1 for s in self.statements if s.status == STATEMENT_FAILED)
+
+    def describe_apply_step(self, since: tuple[int, int, int]) -> str:
+        executed_before, failed_before, dropped_before = since
+        executed, failed, dropped = self.snapshot()
+        statements = executed - executed_before
+        noun = "statement" if statements == 1 else "statements"
+        failures = failed - failed_before
+        failed_note = f", {failures} failed" if failures else ""
+        return (
+            f"Tuning apply step complete ({statements} {noun}{failed_note}; "
+            f"{dropped - dropped_before} intents not rendered at apply time)"
+        )
+
+    def describe_outcome(self) -> str:
+        return (
+            f"Tuning outcome after load: {len(self.executed_statements)} executed, "
+            f"{self._failed_count()} failed, {len(self.dropped)} dropped"
+        )
 
     def applied_ledger_hash(self) -> str | None:
         """SHA-256 over the ORDERED executed statements (physical identity).
@@ -342,6 +391,8 @@ class AppliedTuningLedger:
             "statements": [s.to_dict() for s in self.statements],
             "dropped": [d.to_dict() for d in self.dropped],
         }
+        if self.satisfied:
+            payload["satisfied"] = [item.to_dict() for item in self.satisfied]
         if receipt is not None:
             payload["receipt"] = receipt
         if drift_check is not None:
@@ -349,7 +400,7 @@ class AppliedTuningLedger:
         return payload
 
     def is_empty(self) -> bool:
-        return not self.statements and not self.dropped
+        return not self.statements and not self.dropped and not self.satisfied
 
 
 class _RecordingProxy:
