@@ -21168,10 +21168,15 @@
       "title": "DECISION GATE (D-1): evidence model for a physical sort order that has no catalog footprint"
     },
     "tuning-gate-verification-reach-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T16:28:02Z",
+        "generation": "d273f68dd7aa4e7fa1170f7157e3d9f7",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "DECISION GATE (D-9): verification reach beyond DuckDB/ClickHouse: per-platform introspectors vs facts-only catalog presentation"
     },
     "tuning-generator-registry-completeness-20260712": {
