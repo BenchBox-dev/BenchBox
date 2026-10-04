@@ -116,6 +116,7 @@ tests/unit/scripts/test_pr_review_followups.py
 tests/unit/scripts/test_preflight_targets.py
 tests/unit/scripts/test_pytest_shard_evidence.py
 tests/unit/scripts/test_reference_usage_audit.py
+tests/unit/scripts/test_regenerate_correctness_gate_digests.py
 tests/unit/scripts/test_release_admitted_dist.py
 tests/unit/scripts/test_release_artifact_consumer.py
 tests/unit/scripts/test_release_artifact_execution.py
