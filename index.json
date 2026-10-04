@@ -18893,7 +18893,9 @@
         "spark-session-config-runtime",
         "spark-baseline-no-default-overrides",
         "spark-effective-config-preflight-capture",
-        "spark-tuning-discovery-cli"
+        "spark-tuning-discovery-cli",
+        "tuning-ledger-capture-non-dbapi-drivers-20261001",
+        "tuning-requested-vs-rendered-reconciliation-20261001"
       ],
       "priority": "medium",
       "status": "open",
