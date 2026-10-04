@@ -90,6 +90,51 @@ REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
 }
 
 
+PROCESS_WRAPPERS = {"sudo", "nice", "nohup", "timeout", "time", "command", "exec", "stdbuf", "ionice", "uvx"}
+UNMODELED_INTERPRETERS = {
+    "perl",
+    "ruby",
+    "php",
+    "lua",
+    "Rscript",
+    "osascript",
+    "pwsh",
+    "powershell",
+    "deno",
+    "bun",
+    "tclsh",
+    "awk",
+    "gawk",
+    "mawk",
+    "fish",
+    "ksh",
+    "dash",
+}
+OS_EXEC_ACTORS = {
+    f"os.{name}"
+    for name in (
+        "execl",
+        "execle",
+        "execlp",
+        "execlpe",
+        "execv",
+        "execve",
+        "execvp",
+        "execvpe",
+        "spawnl",
+        "spawnle",
+        "spawnlp",
+        "spawnlpe",
+        "spawnv",
+        "spawnve",
+        "spawnvp",
+        "spawnvpe",
+        "posix_spawn",
+        "posix_spawnp",
+    )
+} | {"pty.spawn"}
+
+
 class PythonBindings:
     def __init__(self, tree: ast.AST) -> None:
         self.parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
@@ -155,7 +200,7 @@ class PythonBindings:
             return None
         if isinstance(node, ast.Name):
             bound, value = self.lookup(node)
-            if not bound and node.id in {"exec", "eval", "compile", "str"}:
+            if not bound and node.id in {"exec", "eval", "compile", "str", "open"}:
                 return "builtins." + node.id
             if isinstance(value, str):
                 return value
@@ -178,6 +223,14 @@ class PythonBindings:
             if isinstance(value, ast.Call) and self.actor(value.func) == "builtins.compile":
                 return None
             return node.args[0], "python", self.literal(node.args[0])
+        if actor in {"os.system", "os.popen", "asyncio.create_subprocess_shell"} and node.args:
+            return node.args[0], "bash", self.literal(node.args[0])
+        if actor in OS_EXEC_ACTORS and node.args:
+            return node.args[0], "unsupported", None
+        if actor == "asyncio.create_subprocess_exec" and node.args:
+            if any(isinstance(arg, ast.Starred) for arg in node.args):
+                return node.args[0], "unsupported", None
+            return self.process_payload(list(node.args))
         if actor in {
             "subprocess.run",
             "subprocess.call",
@@ -188,13 +241,18 @@ class PythonBindings:
             command = node.args[0] if node.args else next((kw.value for kw in node.keywords if kw.arg == "args"), None)
             if command is None:
                 return None
-            value = self.dereference(command)
-            if isinstance(value, (ast.List, ast.Tuple)):
-                return self.process_payload(value.elts)
-            if any(
+            if any(keyword.arg == "executable" for keyword in node.keywords):
+                return command, "unsupported", None
+            shell = any(
                 keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
                 for keyword in node.keywords
-            ):
+            )
+            value = self.dereference(command)
+            if isinstance(value, (ast.List, ast.Tuple)):
+                if shell and value.elts:
+                    return value.elts[0], "bash", self.literal(value.elts[0])
+                return self.process_payload(value.elts)
+            if shell:
                 return command, "bash", self.literal(command)
         return None
 
@@ -286,8 +344,41 @@ class PythonBindings:
             for definition in self.parents
         )
 
+    def html_with_target(self, node: ast.AST) -> bool:
+        if not isinstance(node, ast.Name):
+            return False
+        for parent in self.parents.values():
+            if isinstance(parent, (ast.With, ast.AsyncWith)):
+                for item in parent.items:
+                    if (
+                        isinstance(item.optional_vars, ast.Name)
+                        and item.optional_vars.id == node.id
+                        and self.html_open_target(item.context_expr)
+                        and any(node is child for child in ast.walk(parent))
+                    ):
+                        return True
+        return False
+
+    def html_open_target(self, node: ast.AST) -> bool:
+        node = self.dereference(node)
+        if not (isinstance(node, ast.Call) and self.actor(node.func) == "builtins.open" and node.args):
+            return False
+        leaf = self.literal(node.args[0])
+        mode = (
+            self.literal(node.args[1])
+            if len(node.args) > 1
+            else next((self.literal(kw.value) for kw in node.keywords if kw.arg == "mode"), "r")
+        )
+        return bool(leaf and leaf.lower().endswith((".html", ".htm")) and mode and set(mode) & {"w", "a", "x"})
+
     def html_payload(self, node: ast.Call) -> ast.AST | None:
-        if not isinstance(node.func, ast.Attribute) or node.func.attr != "write_text":
+        if not isinstance(node.func, ast.Attribute):
+            return None
+        if node.func.attr == "write" and (
+            self.html_open_target(node.func.value) or self.html_with_target(node.func.value)
+        ):
+            return node.args[0] if len(node.args) == 1 and not node.keywords else node
+        if node.func.attr not in {"write_text", "write_bytes"}:
             return None
         target = self.dereference(node.func.value)
         leaf = None
@@ -295,6 +386,15 @@ class PythonBindings:
             leaf = self.literal(target.right)
         elif isinstance(target, ast.Call) and self.actor(target.func) == "pathlib.Path" and len(target.args) == 1:
             leaf = self.literal(target.args[0])
+        elif (
+            isinstance(target, ast.Call)
+            and isinstance(target.func, ast.Attribute)
+            and target.func.attr == "with_suffix"
+            and len(target.args) == 1
+        ):
+            leaf = self.literal(target.args[0])
+            if leaf and leaf.lower() in {".html", ".htm"}:
+                return node.args[0] if node.args and self.html_path(target.func.value) else node
         if leaf is None or not leaf.lower().endswith((".html", ".htm")):
             return None
         if not self.html_path(node.func.value):
@@ -441,6 +541,13 @@ class PythonBindings:
                 "duckdb": "sql",
             }.get(name or "")
         )
+        if name in PROCESS_WRAPPERS or (name == "uv" and words[1:3] == ["tool", "run"]):
+            skip = 3 if name == "uv" else 2 if name == "timeout" else 1
+            if any(word is None or word.startswith("-") for word in words[1 : skip + 1]) or len(args) <= skip:
+                return args[0], "unsupported", None
+            return self.process_payload(args[skip:])
+        if name in UNMODELED_INTERPRETERS:
+            return args[0], "unsupported", None
         if language is None and program is not None:
             return None
         return self.inline_process_payload(args, words, language)
@@ -467,15 +574,14 @@ def python_html_sources(source: str, tree: ast.AST | None = None) -> list[tuple[
             continue
         origin = bindings.dereference(expression)
         segment = ast.get_source_segment(source, origin) or ""
-        quoted = re.fullmatch(r"""[rRuU]*(?P<quote>["']{3}|["'])(?P<body>.*)(?P=quote)""", segment, re.S)
-        text = (
-            origin.value
-            if isinstance(origin, ast.Constant)
-            and isinstance(origin.value, str)
-            and quoted is not None
-            and quoted.group("body") == origin.value
-            else None
-        )
+        quoted = re.fullmatch(r"""[rRuUbB]*(?P<quote>["']{3}|["'])(?P<body>.*)(?P=quote)""", segment, re.S)
+        value = origin.value if isinstance(origin, ast.Constant) else None
+        if isinstance(value, bytes):
+            try:
+                value = value.decode("utf-8")
+            except UnicodeDecodeError:
+                value = None
+        text = value if isinstance(value, str) and quoted is not None and quoted.group("body") == value else None
         result.append(
             (origin.lineno if text is not None else node.lineno, text, "html-output:" + ast.unparse(node.func.value))
         )

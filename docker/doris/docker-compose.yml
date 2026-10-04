@@ -28,10 +28,6 @@ services:
           dirname "$$(dirname "$$java_bin")"
         }
 
-        # Doris BE 4.x requires vm.max_map_count > 2000000 for memory-mapped files.
-        # Docker Desktop on macOS doesn't support vm.* via container sysctls (not
-        # namespaced), so this wrapper checks the current value first and only
-        # needs DORIS_PRIVILEGED=true when the Docker VM still needs help.
         current_map_count="$$(cat /proc/sys/vm/max_map_count 2>/dev/null || echo 0)"
         if [ "$$current_map_count" -lt 2000000 ]; then
           if ! sysctl -w vm.max_map_count=2000000 >/dev/null 2>&1; then

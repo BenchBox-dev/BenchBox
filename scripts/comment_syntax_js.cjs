@@ -20,6 +20,7 @@ function scan(name, source) {
   const namespaces = new Set();
   const pathModules = new Map();
   const sqlProperties = [];
+  const assignments = [];
   const pathImports = new Map();
   const bindings = [];
   const childProcess = value => ['node:child_process', 'child_process'].includes(value);
@@ -66,6 +67,7 @@ function scan(name, source) {
       }
     }
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) calls.push(node);
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) assignments.push(node);
     if (ts.isPropertyAssignment(node) && node.name.getText(tree) === 'sql') sqlProperties.push(node.initializer);
     if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node)
         || node.kind === ts.SyntaxKind.TemplateHead || node.kind === ts.SyntaxKind.TemplateMiddle
@@ -231,13 +233,20 @@ function scan(name, source) {
       payload(args.at(-1), 'javascript', text);
     }
     if (processImport && ['exec', 'execSync'].includes(method) && args[0]) payload(args[0], 'bash');
-    if (['query', 'prepare', 'execute', 'executemany', 'sql'].includes(method) && call.arguments[0]
-        && !ts.isSpreadElement(call.arguments[0])) {
-      payload(call.arguments[0], 'sql', undefined, method);
+    if (['query', 'prepare', 'execute', 'executemany', 'sql'].includes(method) && call.arguments[0]) {
+      if (!ts.isSpreadElement(call.arguments[0])) payload(call.arguments[0], 'sql', undefined, method);
+      else if (!preparedReceiver(target)) {
+        findings.push({kind: 'coverage-error', line: line(call.getStart(tree)), symbol: symbolAt(call.getStart(tree)),
+          text: `unresolved executable sql payload: ${call.arguments[0].getText(tree)}`});
+      }
     }
-    if (ts.isIdentifier(target) && Object.hasOwn(REVIEWED_SQL_WRAPPERS, target.text)
-        && call.arguments[REVIEWED_SQL_WRAPPERS[target.text]]) {
-      payload(call.arguments[REVIEWED_SQL_WRAPPERS[target.text]], 'sql', undefined, target.text);
+    const wrapperName = ts.isIdentifier(target) ? target.text : ts.isPropertyAccessExpression(target) ? target.name.text : null;
+    if (wrapperName && Object.hasOwn(REVIEWED_SQL_WRAPPERS, wrapperName)) {
+      const argument = call.arguments[REVIEWED_SQL_WRAPPERS[wrapperName]];
+      if (argument && ts.isSpreadElement(argument)) {
+        findings.push({kind: 'coverage-error', line: line(call.getStart(tree)), symbol: symbolAt(call.getStart(tree)),
+          text: `unresolved executable sql payload: ${argument.getText(tree)}`});
+      } else if (argument) payload(argument, 'sql', undefined, wrapperName);
     }
     if (['spawn', 'spawnSync', 'execFile', 'execFileSync'].includes(method) && call.arguments[0]) {
       const executable = resolve(call.arguments[0]);
@@ -250,6 +259,15 @@ function scan(name, source) {
       }
       for (const args of argumentLists) processPayload(call, executable, [...args.elements]);
     }
+  }
+  function preparedReceiver(target) {
+    if (!ts.isPropertyAccessExpression(target) || !ts.isIdentifier(target.expression)) return false;
+    const name = target.expression.text;
+    const sources = [];
+    for (const node of declarations) if (node.name.text === name && node.initializer) sources.push(node.initializer);
+    for (const call of assignments) if (call.left.getText(tree) === name) sources.push(call.right);
+    const meaningful = sources.filter(source => source.kind !== ts.SyntaxKind.NullKeyword && source.getText(tree) !== 'undefined');
+    return meaningful.length > 0 && meaningful.every(source => /\.prepare\(/.test(source.getText(tree)));
   }
   function processPayload(call, executable, elements) {
     const words = elements.map(element => ts.isSpreadElement(element) ? null : resolve(element));

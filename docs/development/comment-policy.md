@@ -13,8 +13,9 @@ assignments. A help string or protocol record needs an actual reader.
   native parser regressions. While enforcement is advisory it lists new
   violations without failing; once enforcement is blocking it rejects them. Set `BASE_REF` to an immutable
   commit SHA to reproduce a CI comparison.
-- `make comment-policy-strict` checks the whole inventory. It fails until
-  cleanup is complete.
+- `make comment-policy-strict` checks the whole inventory. It applies the
+  candidate's own exceptions, so it is a diagnostic, not a gate; CI runs the
+  comparison mode, which honours only exceptions already on the base.
 - `make comment-policy-report` lists remaining violations without rejecting
   legacy debt. Configuration and parser setup failures still fail.
 - The pre-commit hook checks staged content, with the same advisory or blocking
@@ -59,7 +60,9 @@ never left starting with `::`.
 
 Moving from `advisory` to `blocking` is a one-line change to the policy. It is
 checked against the base policy, so that change is not blocked by itself, and
-the next pull request is. A policy cannot be moved back from `blocking` to
+the next pull request is. The pull request that flips the mode is therefore
+exempt by construction: its findings are reported but cannot fail it, so check
+it with `make comment-policy-strict` before merging. A policy cannot be moved back from `blocking` to
 `advisory`. Flip it after the open pull requests have merged or been cleaned,
 so that no one meets the new rule on a branch that was started before it
 existed.

@@ -95,8 +95,8 @@ test('reviewed SQL wrappers scan call sites and accept pass-through bodies', () 
   assert.deepEqual(scan('a.ts', body), []);
   const mock = 'conn.query = async (sql) => { return query(sql); };';
   assert.deepEqual(scan('a.ts', mock), []);
-  const spread = 'statement.query(...params);';
-  assert.deepEqual(scan('a.ts', spread), []);
+  const spread = 'const statement = await conn.prepare(sql); statement.query(...params);';
+  assert.deepEqual(scan('a.ts', spread).filter(f => f.text.includes('params')), []);
 });
 test('path.join on an absolute root is an absolute script operand', () => {
   const source = 'import {join, resolve} from "node:path"; const root = resolve(here, ".."); const gen = join(root, "scripts", "gen.mjs"); spawnSync(process.execPath, [gen]);';
@@ -107,4 +107,10 @@ test('path.join on an absolute root is an absolute script operand', () => {
 test('required path module resolves script operands', () => {
   const source = 'const path = require("node:path"); const adapter = path.resolve(__dirname, "x.cjs"); spawnSync("node", [adapter]);';
   assert.deepEqual(scan('a.cjs', source), []);
+});
+test('method-form reviewed wrappers and spread SQL arguments stay visible', () => {
+  assert.equal(scan('a.ts', 'db.queryRows("SELECT 1 -- hi");')[0].text, 'SELECT 1 -- hi');
+  assert.equal(scan('a.ts', 'db.queryRows(dynamicSql);')[0].kind, 'coverage-error');
+  assert.equal(scan('a.ts', 'query(...["SELECT 1 -- hi"]);')[0].kind, 'coverage-error');
+  assert.deepEqual(scan('a.ts', 'let statement; statement = await conn.prepare("SELECT ?"); statement.query(...params);').filter(f => f.kind !== 'payload'), []);
 });

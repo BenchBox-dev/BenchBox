@@ -4,6 +4,7 @@ import json
 import re
 import shlex
 import textwrap
+from pathlib import PurePosixPath
 from typing import Any
 
 import bashlex
@@ -185,7 +186,7 @@ def _wrapper_tail(
 def inline_source_index(words: list[str | None], language: str | None) -> int | None:
     inline_flags = {
         "python": {"-c"},
-        "bash": {"-c", "-lc"},
+        "bash": {"-c", "-lc", "--command"},
         "javascript": {"-e", "--eval"},
         "sql": {"-c", "--command"},
     }.get(language or "", {"-c", "-e", "--eval", "--command", "-lc"})
@@ -535,6 +536,16 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
 
 def unwrap_static_command(words: list) -> list:
     command = words[0].word.rsplit("/", 1)[-1]
+    if command in SHELL_WRAPPERS or (command == "uv" and [word.word for word in words[1:3]] == ["tool", "run"]):
+        skip = 3 if command == "uv" else 2 if command == "timeout" else 1
+        if command == "time":
+            while skip < len(words) and not words[skip].parts and words[skip].word in TIME_FLAGS:
+                skip += 1
+            if skip > 1:
+                return unwrap_static_command(words[skip:])
+        if len(words) <= skip or any(word.parts or word.word.startswith("-") for word in words[1 : skip + 1]):
+            raise ValueError("shell command wrapper options require an adapter")
+        return unwrap_static_command(words[skip:])
     if not any(word.parts for word in words):
         return words
     if command == "uv" and [word.word for word in words[1:2]] == ["run"]:
@@ -556,8 +567,31 @@ def unwrap_static_command(words: list) -> list:
 
 
 SHELL_INLINE_INTERPRETER = re.compile(
-    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ce]|--eval)\b"
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh|ksh|dash|fish|perl|ruby|php|lua|pwsh|deno|bun|tclsh|osascript)\b"
+    r"[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)\b"
 )
+SHELL_WRAPPERS = {"sudo", "nice", "nohup", "timeout", "time", "command", "exec", "stdbuf", "ionice", "uvx"}
+TIME_FLAGS = {"-l", "-p"}
+UNMODELED_INLINE_FLAG = re.compile(r"-[A-Za-z]*[ceE]|--eval|--command")
+
+
+def check_unmodeled_inline(words: list) -> None:
+    for index, word in enumerate(words[1:], start=1):
+        if word.parts:
+            if word.word.startswith("-"):
+                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            continue
+        if UNMODELED_INLINE_FLAG.fullmatch(word.word):
+            program = words[index + 1] if index + 1 < len(words) else None
+        elif re.match(r"-[A-Za-z]", word.word) and re.search(r"[ceE]", word.word[1:]):
+            program = word
+        else:
+            continue
+        if program is None or program.parts or "#" in program.word:
+            raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+
+
+SHELL_UNMODELED = {"perl", "ruby", "php", "lua", "pwsh", "deno", "bun", "tclsh", "osascript", "fish", "ksh", "dash"}
 
 
 def shell_logical_chunks(source: str) -> list[tuple[int, str]]:
@@ -669,6 +703,8 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                 command = words[0].word.rsplit("/", 1)[-1]
                 words = unwrap_static_command(words)
                 command = words[0].word.rsplit("/", 1)[-1]
+                if command in SHELL_UNMODELED:
+                    check_unmodeled_inline(words)
                 inert = command == "uv" and len(words) > 1 and words[1].word not in {"run", "tool", "--"}
                 if command in {"env", "uv"} and not inert:
                     if any(word.parts for word in words):
@@ -822,6 +858,80 @@ def notebook_sources(path: str, source: str) -> list[tuple[int, str, str, str, s
     return result
 
 
+def structured_sources(path: str, source: str, lang: str) -> list[tuple[int, str, str, str, str]]:
+    trees = list(yaml.compose_all(source)) if lang == "yaml" else [yaml.compose(source)]
+    result = []
+
+    active: set[int] = set()
+
+    def visit(node: yaml.Node | None, symbol: str = "", github_script: bool = False, sql_mapping: bool = False) -> None:
+        if node is not None and id(node) in active:
+            raise ValueError("recursive YAML alias requires an adapter")
+        active.add(id(node))
+        if isinstance(node, yaml.MappingNode):
+            github_script = github_script or any(
+                isinstance(k, yaml.ScalarNode)
+                and k.value == "uses"
+                and isinstance(v, yaml.ScalarNode)
+                and v.value.startswith("actions/github-script@")
+                for k, v in node.value
+            )
+            for key, value in node.value:
+                if (
+                    isinstance(key, yaml.ScalarNode)
+                    and isinstance(value, yaml.ScalarNode)
+                    and (
+                        key.value in {"run", "sql", "query"}
+                        or key.value.endswith("_sql")
+                        or (github_script and key.value == "script")
+                        or sql_mapping
+                    )
+                ):
+                    nested_lang = (
+                        "bash"
+                        if key.value == "run"
+                        else "javascript"
+                        if github_script and key.value == "script"
+                        else "sql"
+                    )
+                    text = value.value
+                    if path.startswith(".github/") and nested_lang in {"bash", "javascript"}:
+                        text = github_expression_placeholders(text)
+                    result.append(
+                        (
+                            value.start_mark.line + 1,
+                            path + "." + nested_lang,
+                            text,
+                            nested_lang,
+                            f"{symbol}.{key.value}",
+                        )
+                    )
+                if isinstance(key, yaml.ScalarNode):
+                    result.extend(command_key_sources(path, symbol, key, value, github_script))
+                visit(
+                    value,
+                    f"{symbol}.{key.value}" if isinstance(key, yaml.ScalarNode) else symbol,
+                    github_script,
+                    isinstance(key, yaml.ScalarNode) and key.value == "platform_overrides",
+                )
+        elif isinstance(node, yaml.SequenceNode):
+            for index, item in enumerate(node.value):
+                identity = str(index)
+                if isinstance(item, yaml.MappingNode):
+                    identities = {
+                        key.value: value.value
+                        for key, value in item.value
+                        if isinstance(key, yaml.ScalarNode) and isinstance(value, yaml.ScalarNode)
+                    }
+                    identity = identities.get("id", identities.get("name", identity))
+                visit(item, f"{symbol}[{identity}]")
+        active.remove(id(node))
+
+    for index, tree in enumerate(trees):
+        visit(tree, f"document:{index}" if len(trees) > 1 else "")
+    return result
+
+
 def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, str, str, str]]:
     if lang == "groovy":
         return groovy_payloads(path, source)
@@ -837,77 +947,7 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
     if lang == "notebook":
         return notebook_sources(path, source)
     if lang in {"yaml", "json"}:
-        trees = list(yaml.compose_all(source)) if lang == "yaml" else [yaml.compose(source)]
-        result = []
-
-        active: set[int] = set()
-
-        def visit(
-            node: yaml.Node | None, symbol: str = "", github_script: bool = False, sql_mapping: bool = False
-        ) -> None:
-            if node is not None and id(node) in active:
-                raise ValueError("recursive YAML alias requires an adapter")
-            active.add(id(node))
-            if isinstance(node, yaml.MappingNode):
-                github_script = github_script or any(
-                    isinstance(k, yaml.ScalarNode)
-                    and k.value == "uses"
-                    and isinstance(v, yaml.ScalarNode)
-                    and v.value.startswith("actions/github-script@")
-                    for k, v in node.value
-                )
-                for key, value in node.value:
-                    if (
-                        isinstance(key, yaml.ScalarNode)
-                        and isinstance(value, yaml.ScalarNode)
-                        and (
-                            key.value in {"run", "sql", "query"}
-                            or key.value.endswith("_sql")
-                            or (github_script and key.value == "script")
-                            or sql_mapping
-                        )
-                    ):
-                        nested_lang = (
-                            "bash"
-                            if key.value == "run"
-                            else "javascript"
-                            if github_script and key.value == "script"
-                            else "sql"
-                        )
-                        text = value.value
-                        if path.startswith(".github/") and nested_lang in {"bash", "javascript"}:
-                            text = github_expression_placeholders(text)
-                        result.append(
-                            (
-                                value.start_mark.line + 1,
-                                path + "." + nested_lang,
-                                text,
-                                nested_lang,
-                                f"{symbol}.{key.value}",
-                            )
-                        )
-                    visit(
-                        value,
-                        f"{symbol}.{key.value}" if isinstance(key, yaml.ScalarNode) else symbol,
-                        github_script,
-                        isinstance(key, yaml.ScalarNode) and key.value == "platform_overrides",
-                    )
-            elif isinstance(node, yaml.SequenceNode):
-                for index, item in enumerate(node.value):
-                    identity = str(index)
-                    if isinstance(item, yaml.MappingNode):
-                        identities = {
-                            key.value: value.value
-                            for key, value in item.value
-                            if isinstance(key, yaml.ScalarNode) and isinstance(value, yaml.ScalarNode)
-                        }
-                        identity = identities.get("id", identities.get("name", identity))
-                    visit(item, f"{symbol}[{identity}]")
-            active.remove(id(node))
-
-        for index, tree in enumerate(trees):
-            visit(tree, f"document:{index}" if len(trees) > 1 else "")
-        return result
+        return structured_sources(path, source, lang)
     if lang in {"html", "html+jinja"}:
         spans = template_data_spans(source) if lang == "html+jinja" else [(0, len(source))]
         return [
@@ -926,6 +966,47 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
             )
             for index, match in enumerate(re.finditer(r"<(script|style)\b[^>]*>(.*?)</\1\s*>", source, re.I | re.S))
             if any(start <= match.start() and match.end() <= end for start, end in spans)
+        ]
+    return []
+
+
+def command_key_sources(
+    path: str, symbol: str, key: yaml.ScalarNode, value: yaml.Node, github_script: bool
+) -> list[tuple[int, str, str, str, str]]:
+    name = key.value
+    line = value.start_mark.line + 1
+    if name in {"command", "entrypoint"}:
+        if isinstance(value, yaml.ScalarNode):
+            return [(line, path + ".bash", value.value, "bash", f"{symbol}.{name}")]
+        if isinstance(value, yaml.SequenceNode):
+            if not all(isinstance(item, yaml.ScalarNode) for item in value.value):
+                raise ValueError(f"non-scalar {name} argument requires an adapter")
+            text = shlex.join(item.value for item in value.value)
+            return [(line, path + ".bash", text, "bash", f"{symbol}.{name}")]
+    if name == "script" and not github_script:
+        if isinstance(value, yaml.ScalarNode):
+            text = value.value
+        elif isinstance(value, yaml.SequenceNode) and all(isinstance(item, yaml.ScalarNode) for item in value.value):
+            text = "\n".join(item.value for item in value.value)
+        else:
+            raise ValueError("script value outside actions/github-script requires an adapter")
+        try:
+            tokens = shlex.split(text, comments=False)
+        except ValueError as exc:
+            raise ValueError("script value outside actions/github-script requires an adapter") from exc
+        if any(token.startswith(("//", "/*")) for token in tokens):
+            raise ValueError("script value outside actions/github-script requires an adapter")
+        return [(line, path + ".bash", text, "bash", f"{symbol}.{name}")]
+    if (
+        PurePosixPath(path).name == "package.json"
+        and symbol == ""
+        and name == "scripts"
+        and isinstance(value, yaml.MappingNode)
+    ):
+        return [
+            (item.start_mark.line + 1, path + ".bash", item.value, "bash", f".scripts.{entry.value}")
+            for entry, item in value.value
+            if isinstance(entry, yaml.ScalarNode) and isinstance(item, yaml.ScalarNode)
         ]
     return []
 

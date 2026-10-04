@@ -2694,3 +2694,121 @@ def test_reviewed_javascript_flows_still_occur() -> None:
     )
     observed = {(path, row["text"]) for path, rows in json.loads(result.stdout).items() for row in rows}
     assert set(REVIEWED_JAVASCRIPT_FLOWS) <= observed
+
+
+@pytest.mark.parametrize(
+    ("source", "kind"),
+    [
+        ('import subprocess\nsubprocess.run(["perl", "-e", "# hello"])\n', "payload-error"),
+        ('import subprocess\nsubprocess.run(["sudo", "python3", "-c", "# hello"])\n', "comment"),
+        ('import subprocess\nsubprocess.run(["-c", "# hi"], executable="python3")\n', "payload-error"),
+        ('import os\nos.system("echo hi # there")\n', "comment"),
+        ('import os\nos.popen("echo hi # there")\n', "comment"),
+        ('import asyncio\nasyncio.create_subprocess_shell("echo hi # there")\n', "comment"),
+        ('import subprocess\nsubprocess.run(["echo hi # there"], shell=True)\n', "comment"),
+        ('import subprocess\nsubprocess.run(["uv", "tool", "run", "python", "-c", "# hello"])\n', "comment"),
+        ('import subprocess\nsubprocess.run(["timeout", "5", "python3", "-c", "x = 1  # n"])\n', "comment"),
+        ('import os\nos.execvp("python3", ["python3", "-c", code])\n', "payload-error"),
+        ('from pathlib import Path\nPath("o.html").write_bytes(b"<!-- hi -->")\n', "comment"),
+        ('open("o.html", "w").write("<!-- hi -->")\n', "comment"),
+        ('with open("o.html", "w") as f:\n    f.write("<!-- hi -->")\n', "comment"),
+        ('from pathlib import Path\np = Path("/tmp/o")\np.with_suffix(".html").write_text("<!-- hi -->")\n', "comment"),
+    ],
+)
+def test_python_process_and_html_sinks_fail_closed(source: str, kind: str) -> None:
+    assert [f.kind for f in scan("a.py", source, "python", {})] == [kind]
+
+
+@pytest.mark.parametrize(
+    "source",
+    ['import subprocess\nsubprocess.run(["git", "-c", "user.name=x", "status"])\n', 'open("o.html").read()\n'],
+)
+def test_data_process_and_html_reads_stay_clean(source: str) -> None:
+    assert scan("a.py", source, "python", {}) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "kind"),
+    [
+        ("bash --command '# hello'\n", "comment"),
+        ("uvx python -c '# hello'\n", "comment"),
+        ("uv tool run python -c '# hello'\n", "comment"),
+        ("command python -c '# hello'\n", "comment"),
+        ("sudo bash -c '# hello'\n", "comment"),
+        ("nice -n 5 python -c 'x'\n", "coverage-error"),
+        ("perl -e 'print 1 # x'\n", "coverage-error"),
+        ("perl -ne 'print # x'\n", "coverage-error"),
+        ("perl -e\n", "coverage-error"),
+        ('perl -e "$CODE"\n', "coverage-error"),
+        ("/usr/bin/time -l bash -c '# hello'\n", "comment"),
+        ("/usr/bin/time -v bash -c 'x'\n", "coverage-error"),
+        ("time bash -c 'x'\n", "coverage-error"),
+    ],
+)
+def test_shell_wrappers_and_unmodeled_interpreters_fail_closed(source: str, kind: str) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == [kind]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "/usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 uv run -- benchbox run\n",
+        "/usr/bin/time -p ruby -e 'puts 1'\n",
+    ],
+)
+def test_unmodeled_inline_source_without_a_comment_marker_is_accepted(source: str) -> None:
+    assert scan("a.sh", source, "bash") == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        (
+            "azure-pipelines.yml",
+            "steps:\n  - script: |\n      curl -LsSf https://astral.sh/uv/install.sh | sh\n      benchbox run --platform duckdb\n",
+            "yaml",
+        ),
+        ("audit.json", '{"script": "_project/audits/replay.py"}\n', "json"),
+    ],
+)
+def test_shell_script_keys_without_comments_are_clean(path: str, source: str, lang: str) -> None:
+    assert scan(path, source, lang, {}) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kind"),
+    [
+        ("docker-compose.yml", "services:\n  a:\n    command: bash -c '# hello'\n", "yaml", "comment"),
+        ("docker-compose.yml", 'services:\n  a:\n    entrypoint: ["bash", "-c", "# hello"]\n', "yaml", "comment"),
+        ("ci.yml", "jobs:\n  a:\n    script: doStuff(); // explain\n", "yaml", "coverage-error"),
+        ("ci.yml", "jobs:\n  a:\n    script: run // explain\n", "yaml", "coverage-error"),
+        ("ci.yml", "jobs:\n  a:\n    script: |\n      make test # explain\n", "yaml", "comment"),
+        (".gitlab-ci.yml", "test:\n  script:\n    - make lint\n    - make test # explain\n", "yaml", "comment"),
+        ("package.json", '{"scripts": {"x": "echo hi # there"}}\n', "json", "comment"),
+    ],
+)
+def test_structured_command_keys_are_scanned(path: str, source: str, lang: str, kind: str) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == [kind]
+
+
+def test_reviewed_joinorder_copy_where_clause_is_an_integer_id_list() -> None:
+    tree = ast.parse((ROOT / "_project/scripts/build_joinorder_data.py").read_text(encoding="utf-8"))
+    assignments = {
+        node.targets[0].id: node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    }
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "copy_table_to_csv"
+    ]
+    assert calls
+    for call in calls:
+        for keyword in call.keywords:
+            if keyword.arg == "sql_where":
+                assert isinstance(keyword.value, ast.Name)
+                value = assignments[keyword.value.id]
+                assert isinstance(value, ast.JoinedStr)
+                text = ast.unparse(value)
+                assert "id IN (" in text and "str(value) for value in table_ids" in text
