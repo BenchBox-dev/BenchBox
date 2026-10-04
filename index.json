@@ -21525,10 +21525,15 @@
       "title": "Ship discoverable tuning templates with the installed package"
     },
     "tuning-tracker-hygiene-reopen-and-edges-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T15:25:11Z",
+        "generation": "8a4177e880f745a8b0436701149c7a23",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Tracker hygiene: gate live-cloud tuned runs on the safety fix, reopen prematurely closed items, add dependency edges"
     },
     "tuning-trust-paths-soundness-manifest-20261001": {
