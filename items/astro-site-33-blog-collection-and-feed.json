@@ -5,6 +5,7 @@
     "Feed validates as Atom 1.0",
     "_blog/ drafts are not built or published"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as d2ac2e58 (2026-10-04). Review PASS (88 /blog files identical to ablog; feed ids/links/fields equal ablog for all 10 entries). Medium follow-ups in progress: strip Expressive Code assets from feed content, date-based drafts (date >= tomorrow UTC), real-route feed test that runs in CI.",
   "description": "Map the 16 posts in docs/blog/*.md (ablog frontmatter: blogpost, date, tags, meta_description, series) to a blog collection. Post URLs stay at /blog/YYYY-MM-DD-slug.html.\n\nBuild the blog index, tag pages, series navigation and author line.\n\nGenerate /blog/atom.xml as Atom, not RSS. Entry <id> and <link> values must be byte-identical to the current ablog feed, so feed readers do not re-show old posts. Keep full-text content in the feed.\n\nKeep any ablog redirect pages (post_redirect) that exist today. Images in docs/blog/images (7.9 MB) keep their current URLs.",
   "links": [
     "docs/blog",
@@ -19,6 +20,14 @@
       "op": "create",
       "op_id": "74e6d7095a7f4ebe8aa25228ec2f6cd7",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T04:31:26Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ba885baf8df649c384e2ffcff67345da",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
