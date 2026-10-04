@@ -19843,6 +19843,13 @@
       "status": "open",
       "title": "Throughput stream timing includes connection setup, and per-stream timestamps export as 1970 dates"
     },
+    "throughput-strict-engine-integration-tests": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Real-database throughput tests use only DuckDB, which hides failed-query and dialect defects"
+    },
     "throughput-timeout-leak-and-success-gates": {
       "claim": null,
       "needs": [],

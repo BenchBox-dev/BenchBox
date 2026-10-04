@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "An integration test injects a failing query into TPC-H and TPC-DS throughput on a real engine and asserts the failure propagates",
+    "An integration test proves throughput SQL is dialect-translated on a non-DuckDB engine",
+    "An integration test covers deferred close with a hung stream",
+    "Each test fails on develop 8ed0c64e1 before the corresponding fix"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1).",
+  "description": "tests/integration/test_throughput_real_duckdb.py is the only real-database throughput test. DuckDB accepts the untranslated SQL and never returns FAILED for these queries, so it cannot catch the TPC-DS false-success defect or the TPC-H dialect gap. The capability sweep test checks declarations only. No test covers the deferred close end to end. No real-server tests were found for the independent-connection overrides (not exhaustively checked).\n\nTPC-DS throughput success, dialect translation, deferred close and per-stream session isolation each need at least one test against a real engine that rejects bad SQL or uses independent sessions (for example a file-backed SQLite once fixed, or the Docker PostgreSQL used by UAT).",
+  "links": [
+    "tests/integration/test_throughput_real_duckdb.py",
+    "tests/integration/test_throughput_session_isolation.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:01:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5ab37c8fcdfa48e8bfe27f42eb4962ac",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
