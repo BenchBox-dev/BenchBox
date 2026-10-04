@@ -3,9 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { describe, expect, it } from "vitest";
+import { builtSite } from "./built-site.ts";
 
 const websiteRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const feedPath = path.join(websiteRoot, "dist", "blog", "atom.xml");
+const dist = builtSite();
+const feedPath = path.join(dist ?? path.join(websiteRoot, "dist"), "blog", "atom.xml");
 
 type Link = { href: string; rel?: string };
 type Node = Record<string, unknown>;
@@ -15,7 +17,7 @@ const reference = JSON.parse(readFileSync(path.join(websiteRoot, "tests", "fixtu
 const links = (node: Node): Link[] =>
   (Array.isArray(node.link) ? (node.link as Node[]) : []).map((link) => ({ href: String(link["@_href"]), ...(link["@_rel"] ? { rel: String(link["@_rel"]) } : {}) }));
 
-describe.skipIf(!existsSync(feedPath))("built dist/blog/atom.xml", () => {
+describe.skipIf(dist === undefined)("built dist/blog/atom.xml", () => {
   it("exists", () => {
     expect(existsSync(feedPath)).toBe(true);
   });
