@@ -4,7 +4,7 @@
     "PENDING_ADAPTER is empty; the literal-fallback lint and completeness test pass",
     "Each bound query matches DuckDB on both families at SF 0.01 and 0.1 for the default draw and several other seeds/streams, or the divergence is fixed at its cause"
   ],
-  "context": "2026-10-03 progress.\nBatch 1 done (feat/tpcds-adapters-remaining-1, bed9c6b25): Q2, Q5, Q6, Q15, Q28, Q29, Q30, Q42, Q43 bound; 0 divergences over 6 draws. Fixes: Q29 drawn AGG; Q5 NULL sums; Q28 6-value check; Q15 template literals.\nBatch 2 done (feat/tpcds-adapters-remaining-2, 9233ae6e9): Q47, Q48, Q52, Q55, Q56, Q57, Q61, Q64, Q69 bound; 0 divergences over 4 draws plus data-returning crafted draws. Fixes: Q47/Q57 read the drawn select list and ORDER BY tie-break; Q64 pandas dropped NULL group keys, matched NaN join keys, returned 24 columns instead of 21, and returned NaN for NULL. Q61 and Q64 template draws are empty at SF 0.01 (GMT -6/-7 vs the store's -5).\nTest change to review in the PR: test_binding_supplies_every_key_the_implementation_reads accepts runs already pinned in INCOMPLETE_RUNS (5/77/80 pandas).\nBatch 3 (Q72 75 77 78 80 81 94 95 96) in progress.",
+  "context": "2026-10-03 progress.\nBatch 1 done (feat/tpcds-adapters-remaining-1, bed9c6b25): Q2, Q5, Q6, Q15, Q28, Q29, Q30, Q42, Q43 bound; 0 divergences over 6 draws. Fixes: Q29 drawn AGG; Q5 NULL sums; Q28 6-value check; Q15 template literals.\nBatch 2 done (feat/tpcds-adapters-remaining-2, 9233ae6e9): Q47, Q48, Q52, Q55, Q56, Q57, Q61, Q64, Q69 bound; 0 divergences over 4 draws plus data-returning crafted draws. Fixes: Q47/Q57 read the drawn select list and ORDER BY tie-break; Q64 pandas dropped NULL group keys, matched NaN join keys, returned 24 columns instead of 21, and returned NaN for NULL. Q61 and Q64 template draws are empty at SF 0.01 (GMT -6/-7 vs the store's -5).\nTest change to review in the PR: test_binding_supplies_every_key_the_implementation_reads accepts runs already pinned in INCOMPLETE_RUNS (5/77/80 pandas).\nBatch 3 (Q72 75 77 78 80 81 94 95 96) in progress.\n\n2026-10-04 closeout: Delivered in #2605 (merged): parameter adapters for all 99 templates; production binding requires every adapter and SQL hash.",
   "description": "The t06 lint (branch feat/tpcds-literal-fallback-lint, e82f89910) found 33 queries with no adapter whose dsqgen draws reach the SQL. The inventory classified them as 'a' only because its name heuristic matched defaults-file keys. Q4, Q9, Q11, Q19, Q46 and Q68 already have adapters on local fix branches. Remaining 27: 2, 5, 6, 15, 28, 29, 30, 42, 43, 47, 48, 52, 55, 56, 57, 61, 64, 69, 72, 75, 77, 78, 80, 81, 94, 95, 96. Q5, Q47, Q57, Q77, Q80, Q94 and Q95 read no parameters at all, so their drawn values are hard-coded in the implementations. The lint pins these in PENDING_ADAPTER, which may only shrink.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "op": "update",
       "op_id": "4e8085daa9754ab493ea8e7a102100f6",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T16:59:57Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9ceb3e1679f642b0b15d35c3e1c0dcb4",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
