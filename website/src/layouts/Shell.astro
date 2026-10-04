@@ -2,6 +2,7 @@
 import "../../../landing/shared/site-tokens.css";
 import "../styles/shell.css";
 import "../styles/starlight-map.css";
+import PageMeta from "../components/PageMeta.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import ThemeScript from "../components/ThemeScript.astro";
@@ -10,9 +11,11 @@ interface Props {
   title: string;
   description?: string;
   searchable?: boolean;
+  type?: "website" | "article";
+  robots?: string;
 }
 
-const { title, description, searchable = false } = Astro.props;
+const { title, description, searchable = false, type = "website", robots } = Astro.props;
 ---
 
 <!doctype html>
@@ -21,7 +24,8 @@ const { title, description, searchable = false } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    {description && <meta name="description" content={description} />}
+    <PageMeta title={title} description={description} type={type} />
+    {robots && <meta name="robots" content={robots} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <ThemeScript />
     <slot name="head" />

@@ -32,7 +32,7 @@ const { title, titleId, description, author, date, authorHref, tags = [], series
 const hasMeta = Boolean(author || date || tags.length > 0);
 ---
 
-<Shell title={`${title} - BenchBox Blog`} description={description} searchable>
+<Shell title={`${title} - BenchBox Blog`} description={description ?? `${title} - BenchBox blog post.`} type={isIndex ? "website" : "article"} searchable>
   <article class="prose blog-post">
     <Breadcrumbs crumbs={blogTrail(title, isIndex)} />
     <h1 id={titleId}>{title}</h1>
