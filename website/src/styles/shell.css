@@ -156,7 +156,6 @@ body.shell {
 
 .theme-toggle {
   display: inline-flex;
-  order: 4;
 }
 
 .theme-toggle button {
@@ -183,7 +182,7 @@ body.shell {
 
 .site-header__toggle {
   display: none;
-  order: 5;
+  order: 2;
   padding: 0;
 }
 
@@ -271,16 +270,6 @@ body.shell {
 
 .search-dialog__bar form {
   margin: 0;
-}
-
-.search-section h3 {
-  margin: 1rem 0 0.5rem;
-  font-size: 1rem;
-}
-
-.search-section ul {
-  margin: 0;
-  padding-left: 1.25rem;
 }
 
 .site-footer {
@@ -559,10 +548,6 @@ body.shell {
 
   .site-header__cta {
     align-self: flex-start;
-  }
-
-  .theme-toggle {
-    order: 0;
   }
 
   .search-button__label {

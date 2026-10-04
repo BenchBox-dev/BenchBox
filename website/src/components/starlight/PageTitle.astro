@@ -1,10 +1,14 @@
 ---
+import { getCollection } from "astro:content";
 import StarlightPageTitle from "@astrojs/starlight/components/PageTitle.astro";
 import { docsTrail, type TrailEntry } from "../../lib/breadcrumbs.ts";
 import Breadcrumbs from "../Breadcrumbs.astro";
 
 const { sidebar, entry } = Astro.locals.starlightRoute;
-const crumbs = docsTrail(sidebar as TrailEntry[], entry.data.title, Astro.url.pathname);
+const indexTitles = new Map(
+  (await getCollection("docsIndex")).map((page) => [page.id.replace(/^docs\//, "").replace(/\/?index$/, ""), page.data.title] as const),
+);
+const crumbs = docsTrail(sidebar as TrailEntry[], entry.data.title, Astro.url.pathname, indexTitles);
 ---
 
 <Breadcrumbs crumbs={crumbs} />

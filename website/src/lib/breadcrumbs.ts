@@ -24,10 +24,32 @@ function selfLink(group: TrailGroup): TrailLink | undefined {
   return first?.type === "link" && first.label === group.label ? first : undefined;
 }
 
-export function docsTrail(sidebar: readonly TrailEntry[], title: string, pathname: string): Crumb[] {
+export function pathAncestors(pathname: string, indexTitles: ReadonlyMap<string, string>): Crumb[] {
+  const segments = pathname.replace(/^\/docs\//, "").split("/").slice(0, -1);
+  const crumbs: Crumb[] = [];
+  for (let depth = 1; depth <= segments.length; depth += 1) {
+    const directory = segments.slice(0, depth).join("/");
+    const label = indexTitles.get(directory);
+    if (label !== undefined) crumbs.push({ label, href: `/docs/${directory}/index.html` });
+  }
+  return crumbs;
+}
+
+export function docsTrail(
+  sidebar: readonly TrailEntry[],
+  title: string,
+  pathname: string,
+  indexTitles: ReadonlyMap<string, string> = new Map(),
+): Crumb[] {
   if (pathname === "/docs" || pathname === "/docs/" || pathname === "/docs/index.html") return [];
-  const groups = ancestorsOf(sidebar) ?? [];
+  const groups = ancestorsOf(sidebar);
   const crumbs: Crumb[] = [DOCS_ROOT];
+  if (groups === undefined) {
+    const own = pathname.endsWith("/index.html") ? pathname : undefined;
+    crumbs.push(...pathAncestors(pathname, indexTitles).filter((crumb) => crumb.href !== own));
+    crumbs.push({ label: title });
+    return crumbs;
+  }
   for (const group of groups) {
     const link = selfLink(group);
     if (link?.isCurrent) continue;

@@ -32,10 +32,11 @@ function fail(message) {
   failures.push(message);
 }
 
-async function open(width, route, theme) {
+async function open(width, route, theme, beforeGoto) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: "light" });
   if (theme) await context.addInitScript((value) => localStorage.setItem("benchbox:theme", value), theme);
   const page = await context.newPage();
+  if (beforeGoto) beforeGoto(page);
   await page.goto(base + route, { waitUntil: "networkidle" });
   return { page, context };
 }
@@ -131,14 +132,12 @@ for (const [size, width] of Object.entries(widths).filter(([size]) => size !== "
       bodyTheme: await page.evaluate(() => document.body.getAttribute("data-theme")),
       choice: await page.evaluate(() => document.documentElement.dataset.bbThemeChoice),
     });
-  await openNav(page);
   await page.getByRole("radio", { name: "Dark theme" }).click();
   await read("dark");
   await page.reload({ waitUntil: "networkidle" });
   await read("dark after reload");
   await page.goto(base + pages.landing, { waitUntil: "networkidle" });
   await read("landing");
-  await openNav(page);
   await page.getByRole("radio", { name: "Light theme" }).click();
   await read("light");
   await page.getByRole("radio", { name: "Light theme" }).focus();
@@ -172,34 +171,82 @@ for (const [name, query, expectedFirst, size] of [
   ["docs term", "installation environment setup", "/docs/usage/installation.html", "desktop"],
   ["blog title", "BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer", "/blog/2026-05-18-v0-3-0-release-overview.html", "desktop"],
   ["docs term mobile", "installation environment setup", "/docs/usage/installation.html", "mobile"],
+  ["shell chrome", "open source under the MIT License", undefined, "desktop"],
 ]) {
   const { page, context } = await open(widths[size], pages.landing);
   await page.getByRole("button", { name: "Search" }).click();
   await page.locator(".pagefind-ui__search-input").fill(query);
-  await page.waitForSelector(".pagefind-ui__result", { timeout: 15000 }).catch(() => null);
+  await page.waitForSelector(".pagefind-ui__result, .pagefind-ui__message", { timeout: 15000 }).catch(() => null);
+  await page.waitForTimeout(800);
   const hrefs = await page.locator(".pagefind-ui__result-link").evaluateAll((links) => links.map((a) => new URL(a.href).pathname));
-  const resultsSection = await page.evaluate(() => {
-    const section = document.querySelector('[data-search-section="results"]');
-    if (!section) return { present: false };
-    return { present: true, hidden: section.hidden, items: section.querySelectorAll("li").length, visible: section.getClientRects().length > 0 };
-  });
-  report.search[name] = { query, hrefs: hrefs.slice(0, 5), resultsSection };
-  if (hrefs[0] !== expectedFirst) fail(`search ${name} returned ${hrefs.slice(0, 5)}`);
-  if (resultsSection.present && (resultsSection.items !== 0 || resultsSection.visible)) fail(`results section not empty for ${name}`);
+  const message = (await page.locator(".pagefind-ui__message").first().innerText().catch(() => "")).trim();
+  const count = Number((message.match(/^([\d,]+)\s+result/) ?? [])[1]?.replace(/,/g, "") ?? hrefs.length);
+  report.search[name] = { query, hrefs: hrefs.slice(0, 5), message, count };
+  if (expectedFirst && hrefs[0] !== expectedFirst) fail(`search ${name} returned ${hrefs.slice(0, 5)}`);
+  if (hrefs.some((href) => href.startsWith("/results/"))) fail(`search ${name} returned a /results/ page`);
+  if (name === "shell chrome" && count > 100) fail(`footer text is indexed: "${query}" matched ${count} results`);
   if (size === "desktop") await page.screenshot({ path: path.join(outDir, `search-${name.replace(/\W+/g, "_")}.png`) });
   await context.close();
 }
 
 {
-  const { page, context } = await open(1280, pages.docs);
   const requests = [];
-  page.on("request", (request) => requests.push(request.url()));
+  const { page, context } = await open(1280, pages.docs, undefined, (opened) => opened.on("request", (request) => requests.push(request.url())));
   await page.getByRole("button", { name: "Search" }).click();
   await page.locator(".pagefind-ui__search-input").fill("scale factor");
   await page.waitForSelector(".pagefind-ui__result", { timeout: 15000 }).catch(() => null);
   const touched = requests.filter((url) => /duckdb|\.wasm|\/results\//i.test(url));
   report.search.explorerRequests = touched;
   if (touched.length) fail(`search touched explorer assets: ${touched}`);
+  await context.close();
+}
+
+for (const [name, route] of Object.entries(pages)) {
+  const { page, context } = await open(widths.mobile, route);
+  const toggle = page.locator("[data-site-header-toggle]");
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  const inPanel = () => page.evaluate(() => !!document.activeElement?.closest("[data-site-header-panel]"));
+  const expanded = () => toggle.getAttribute("aria-expanded");
+  const visited = [];
+  await page.keyboard.press("Tab");
+  for (let step = 0; step < 6 && (await expanded()) === "true"; step += 1) {
+    if (!(await inPanel())) break;
+    visited.push(await page.evaluate(() => document.activeElement.textContent.trim()));
+    await page.keyboard.press("Tab");
+  }
+  const afterPanel = await page.evaluate(() => document.activeElement?.closest("[data-site-header]") ? "header" : "page");
+  report.layout[`${name} keyboard`] = { visited, afterPanel, expandedAfter: await expanded() };
+  if (visited.join("|") !== "Home|Docs|Blog|Results|GitHub|Run benchmark") fail(`keyboard order in open panel on ${name}: ${visited}`);
+  if (afterPanel !== "header") fail(`focus left the header while the panel was open on ${name}`);
+  await page.keyboard.press("Shift+Tab");
+  await toggle.focus();
+  if ((await expanded()) !== "true") await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Escape");
+  const escaped = { expanded: await expanded(), focusOnToggle: await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle")) };
+  report.layout[`${name} escape`] = escaped;
+  if (escaped.expanded !== "false" || !escaped.focusOnToggle) fail(`Escape did not close the panel and refocus the toggle on ${name}`);
+  await toggle.click();
+  await page.locator(".site-header__cta").focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  const closedOnLeave = await expanded();
+  report.layout[`${name} focusout`] = { expanded: closedOnLeave };
+  if (closedOnLeave !== "false") fail(`panel stayed open after focus left the header on ${name}`);
+  await context.close();
+}
+
+{
+  const { page, context } = await open(widths.desktop, pages.docs);
+  const order = await page.evaluate(() => {
+    const items = [...document.querySelectorAll(".site-header a, .site-header button")].filter((el) => el.getClientRects().length > 0);
+    const tabOrder = items.map((el) => el.getBoundingClientRect().left);
+    return { tabOrder, sorted: tabOrder.every((left, index) => index === 0 || left >= tabOrder[index - 1]) };
+  });
+  report.layout["desktop tab order"] = order;
+  if (!order.sorted) fail(`desktop header tab order differs from visual order: ${order.tabOrder}`);
   await context.close();
 }
 

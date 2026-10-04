@@ -1,7 +1,6 @@
 ---
 import { shellBrand, shellCta, shellLabels, shellLinks } from "../lib/header-links.ts";
 import SearchBox from "./SearchBox.astro";
-import ThemeToggle from "./ThemeToggle.astro";
 
 interface Props {
   wrapper?: "header" | "div";
@@ -16,7 +15,17 @@ const cta = shellCta();
 <Wrapper class="site-header" data-site-header>
   <div class="site-header__inner">
     <a class="site-header__logo" href={brand.href}>{brand.label}</a>
-    <div class="site-header__panel">
+    <button
+      class="site-header__toggle"
+      type="button"
+      aria-label={shellLabels.toggle}
+      aria-controls="site-header-panel"
+      aria-expanded="false"
+      data-site-header-toggle
+    >
+      <span class="site-header__toggle-lines" aria-hidden="true"></span>
+    </button>
+    <div id="site-header-panel" class="site-header__panel" data-site-header-panel>
       <nav id="benchbox-site-header-nav" class="site-header__nav" aria-label={shellLabels.nav} data-site-header-nav>
         {
           links.map((link) => (
@@ -33,19 +42,8 @@ const cta = shellCta();
         }
         <a class="site-header__cta" href={cta.href}>{cta.label}</a>
       </nav>
-      <ThemeToggle />
     </div>
     <SearchBox />
-    <button
-      class="site-header__toggle"
-      type="button"
-      aria-label={shellLabels.toggle}
-      aria-controls="benchbox-site-header-nav"
-      aria-expanded="false"
-      data-site-header-toggle
-    >
-      <span class="site-header__toggle-lines" aria-hidden="true"></span>
-    </button>
   </div>
 </Wrapper>
 
@@ -53,19 +51,26 @@ const cta = shellCta();
   const header = document.querySelector<HTMLElement>("[data-site-header]");
   const toggle = header?.querySelector<HTMLButtonElement>("[data-site-header-toggle]");
 
+  function isOpen() {
+    return toggle?.getAttribute("aria-expanded") === "true";
+  }
+
   function setOpen(open: boolean) {
     toggle?.setAttribute("aria-expanded", open ? "true" : "false");
     if (header) header.dataset.open = open ? "true" : "false";
   }
 
-  toggle?.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+  toggle?.addEventListener("click", () => setOpen(!isOpen()));
   header?.addEventListener("click", (event) => {
     if (event.target instanceof Element && event.target.closest("[data-site-header-nav] a")) setOpen(false);
   });
+  header?.addEventListener("focusout", (event) => {
+    if (isOpen() && event.relatedTarget instanceof Node && !header.contains(event.relatedTarget)) setOpen(false);
+  });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && toggle?.getAttribute("aria-expanded") === "true") {
+    if (event.key === "Escape" && isOpen() && !document.querySelector("dialog[open]")) {
       setOpen(false);
-      toggle.focus();
+      toggle?.focus();
     }
   });
   document.addEventListener("click", (event) => {

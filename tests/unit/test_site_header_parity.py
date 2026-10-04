@@ -119,7 +119,7 @@ def test_astro_header_renders_the_explorer_header_contract() -> None:
     assert "aria-label={shellLabels.nav}" in header
     assert "aria-label={shellLabels.toggle}" in header
     assert 'id="benchbox-site-header-nav"' in header
-    assert 'aria-controls="benchbox-site-header-nav"' in header
+    assert 'aria-controls="site-header-panel"' in header
     assert "data-site-header-toggle" in header
 
 
@@ -136,17 +136,28 @@ def test_astro_header_links_resolve_to_site_paths_in_contract_order() -> None:
     assert "activeOnSurface" in links
 
 
+def test_astro_header_has_no_theme_toggle_component() -> None:
+    header = _read(ASTRO_HEADER)
+
+    assert "ThemeToggle" not in header, "astro header must not render the theme control"
+    assert 'role="radiogroup"' not in header
+    assert "data-theme-option" not in header
+    assert "theme-toggle" not in header
+
+
 def test_astro_footer_radiogroup_binds_the_shared_theme_labels() -> None:
     toggle = _read(ASTRO_THEME_TOGGLE)
     footer = _read(ASTRO_FOOTER)
 
+    assert "import ThemeToggle" in footer
+    assert "<ThemeToggle />" in footer, "astro footer must render the theme radiogroup"
     assert toggle.count('role="radiogroup"') == 1
     assert "aria-label={shellLabels.theme}" in toggle
     assert "aria-label={option.label}" in toggle
     for option in ("system", "light", "dark"):
         assert f"shellLabels.themeOptions.{option}" in toggle
     assert "data-theme-option" in toggle
-    assert 'role="radiogroup"' not in footer
+    assert "data-pagefind-ignore" in footer
 
 
 def test_results_footer_radiogroup_binds_the_shared_aria_label() -> None:
