@@ -336,9 +336,23 @@ def load_inventory_losses(path: Path) -> list[dict[str, str]]:
     return _check_entries(path, _read_json(path), ("id", "reason"))
 
 
+OFF_SITE = "\0off-site"
+
+
 def _resolved(uri: str, name: str) -> tuple[str, str]:
     parts = urlsplit(urljoin(f"{SITE_ORIGIN}/docs/", uri.replace("$", name)))
+    if f"{parts.scheme}://{parts.netloc}" != SITE_ORIGIN:
+        return OFF_SITE, ""
     return parts.path, parts.fragment
+
+
+def _blog_mapping(before: tuple[str, str], target: tuple[str, str], name: str) -> bool:
+    path, _ = before
+    return (
+        path.startswith("/docs/blog/")
+        and target[0] == path.replace("/docs/blog/", "/blog/", 1)
+        and target[1] in ("", name)
+    )
 
 
 def _dangling(path: str, fragment: str, inventory: dict[str, Any]) -> bool:
@@ -347,7 +361,9 @@ def _dangling(path: str, fragment: str, inventory: dict[str, Any]) -> bool:
     if resolved is None:
         return True
     page = inventory["pages"].get(resolved)
-    return bool(fragment) and page is not None and fragment not in page["ids"]
+    if not fragment:
+        return False
+    return page is None or fragment not in page["ids"]
 
 
 def inventory_check(
@@ -358,12 +374,21 @@ def inventory_check(
     allowed: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     if baseline_site is None or baseline is None or candidate is None:
-        return {"baseline": 0, "candidate": 0, "lost": [], "allowed": [], "added": 0, "uri_problems": []}
+        return {
+            "baseline": 0,
+            "candidate": 0,
+            "lost": [],
+            "allowed": [],
+            "added": 0,
+            "uri_problems": [],
+            "validity_only": 0,
+        }
     old = parse_inventory(baseline_site / "docs" / "objects.inv")
     new = parse_inventory(candidate_site / "docs" / "objects.inv")
     lost = [f"{role} {name}" for role, name in sorted(set(old) - set(new))]
     permitted = {entry["id"] for entry in allowed or []}
     problems = []
+    validity_only = 0
     for (role, name), uri in sorted(new.items()):
         target = _resolved(uri, name)
         if _dangling(*target, candidate):
@@ -371,7 +396,9 @@ def inventory_check(
             continue
         if (role, name) in old:
             before = _resolved(old[(role, name)], name)
-            if not _dangling(*before, baseline) and before != target:
+            if _dangling(*before, baseline) and _blog_mapping(before, target, name):
+                validity_only += 1
+            elif before != target:
                 problems.append(f"{role} {name}: {old[(role, name)]} in Sphinx, {uri} in Astro")
     return {
         "baseline": len(old),
@@ -380,15 +407,16 @@ def inventory_check(
         "allowed": [entry for entry in lost if entry in permitted],
         "added": len(set(new) - set(old)),
         "uri_problems": problems,
+        "validity_only": validity_only,
     }
 
 
 def canonical_check(candidate: dict[str, Any], redirects: dict[str, str]) -> list[str]:
     problems = []
     for path, page in sorted(candidate["pages"].items()):
-        if path.startswith("/results/"):
-            continue
-        if path in redirects:
+        if path == "/results/index.html":
+            expected = f"{SITE_ORIGIN}/results/"
+        elif path in redirects:
             expected = f"{SITE_ORIGIN}{redirects[path]}"
         elif path == "/index.html":
             expected = f"{SITE_ORIGIN}/"
@@ -677,6 +705,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             ["Astro entries", inventory["candidate"]],
             ["Sphinx entries lost", len(inventory["lost"])],
             ["Entries whose address does not resolve or differs from Sphinx", len(inventory["uri_problems"])],
+            ["Entries checked for validity only (blog pages moved out of docs)", inventory["validity_only"]],
         ],
     )
     if report["steps"]:

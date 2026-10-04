@@ -68,7 +68,11 @@ def _site(
     _write(root, "blog/atom.xml", ATOM.format(link=feed_link))
     if tag:
         _page(root, "blog/tag/duckdb.html", "<h1>duckdb</h1>")
-    _write(root, "results/index.html", "<title>Results</title><h1>Results</h1>")
+    _write(
+        root,
+        "results/index.html",
+        '<title>Results</title><link rel="canonical" href="https://benchbox.dev/results/"><h1>Results</h1>',
+    )
     _write(
         root,
         "404.html",
@@ -376,6 +380,87 @@ def test_inventory_address_that_differs_from_a_valid_sphinx_one_fails(tmp_path: 
 
     assert code == 1
     assert report["real_breakage"]["objects_inventory"] == ["std:doc a: api.html in Sphinx, other.html in Astro"]
+
+
+HEADER = (
+    "# Sphinx inventory version 2\n# Project: B\n# Version: 1\n# The remainder of this file is compressed using zlib.\n"
+)
+
+
+def _inventory_run(tmp_path: Path, before: bytes, after: bytes) -> tuple[int, dict]:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    (baseline / "docs" / "objects.inv").write_bytes(HEADER.encode() + zlib.compress(before))
+    (candidate / "docs" / "objects.inv").write_bytes(HEADER.encode() + zlib.compress(after))
+    return _run(tmp_path, baseline, candidate)
+
+
+def test_a_dangling_sphinx_blog_label_may_move_to_the_matching_blog_page(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 blog/a.html#$ T\n", b"p std:label -1 ../blog/a.html T\n")
+
+    assert code == 0
+    assert report["objects_inventory"]["validity_only"] == 1
+
+
+def test_a_dangling_sphinx_blog_label_mapped_elsewhere_fails(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 blog/a.html#$ T\n", b"p std:label -1 ../index.html T\n")
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [
+        "std:label p: blog/a.html#$ in Sphinx, ../index.html in Astro"
+    ]
+
+
+def test_a_dangling_sphinx_address_outside_the_blog_still_compares(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 gone.html T\n", b"p std:label -1 api.html T\n")
+
+    assert code == 1
+    assert report["objects_inventory"]["validity_only"] == 0
+
+
+@pytest.mark.parametrize("uri", ["https://example.com/docs/api.html", "http://benchbox.dev/docs/api.html"])
+def test_an_inventory_address_off_the_site_fails(tmp_path: Path, uri: str) -> None:
+    code, report = _inventory_run(tmp_path, b"a std:doc -1 api.html T\n", f"a std:doc -1 {uri} T\n".encode())
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [f"std:doc a: {uri} does not resolve in the Astro site"]
+
+
+def test_a_fragment_on_a_file_that_is_not_a_page_fails(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"a std:doc -1 api.html T\n", b"a std:doc -1 objects.inv#x T\n")
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [
+        "std:doc a: objects.inv#x does not resolve in the Astro site"
+    ]
+
+
+def test_the_results_page_canonical_is_checked(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 0
+    assert report["real_breakage"]["canonical_links"] == []
+
+
+def test_a_wrong_results_page_canonical_fails(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    wrong = "https://benchbox.dev/results/index.html"
+    _write(
+        candidate,
+        "results/index.html",
+        f'<title>Results</title><link rel="canonical" href="{wrong}"><h1>Results</h1>',
+    )
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 1
+    assert report["real_breakage"]["canonical_links"] == [
+        f"/results/index.html: canonical '{wrong}', expected 'https://benchbox.dev/results/'"
+    ]
 
 
 def test_lost_inventory_entries_fail_unless_allowed(tmp_path: Path) -> None:
