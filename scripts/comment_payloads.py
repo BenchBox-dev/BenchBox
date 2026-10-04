@@ -960,6 +960,7 @@ SHELL_INLINE_INTERPRETER = re.compile(
     r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceEp]|--eval|--command|--print)"
     r"|(?<![\w.-])(?:ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
     r"|psql|duckdb|sqlite3)(?=[\s;|&)]|$)"
+    r"|(?<![\w.-])find\b[^\n]*\s-(?:exec|execdir|ok|okdir)\b"
 )
 SHELL_WRAPPERS = {"sudo", "nice", "nohup", "timeout", "time", "command", "exec", "stdbuf", "ionice", "uvx"}
 TIME_FLAGS = {"-l", "-p"}
@@ -1005,7 +1006,12 @@ def unmodeled_program_words(words: list, command: str) -> list:
                 raise ValueError("inline source for an unmodeled interpreter requires an adapter")
             continue
         text = word.word
-        if (command == "deno" and text == "eval") or INLINE_OPTION.fullmatch(text):
+        if command == "deno" and text == "eval":
+            operands = [later for later in words[index + 1 :] if later.parts or not later.word.startswith("-")]
+            if not operands:
+                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            programs.append(operands[0])
+        elif INLINE_OPTION.fullmatch(text):
             if index + 1 >= len(words):
                 raise ValueError("inline source for an unmodeled interpreter requires an adapter")
             programs.append(words[index + 1])
@@ -1042,6 +1048,20 @@ SHELL_UNMODELED = {
     "ksh",
     "dash",
 }
+FIND_EXEC_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
+
+
+def runner_command_start(words: list[str | None], command: str) -> int:
+    if command != "find":
+        return 1
+    for index, word in enumerate(words[1:], start=1):
+        if word in FIND_EXEC_ACTIONS:
+            if index + 1 >= len(words) or words[index + 1] is None:
+                raise ValueError("dynamic find command requires an adapter")
+            return index + 1
+    return len(words)
+
+
 SHELL_COMMAND_RUNNERS = {
     "find",
     "docker",
@@ -1149,6 +1169,7 @@ SHELL_MODELED_INLINE = re.compile(
 SHELL_UNMODELED_NAME = re.compile(
     r"(?<![\w.-])(ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
     r"|psql|duckdb|sqlite3)(?=[\s;|&)]|$)"
+    r"|(?<![\w.-])find\b[^\n]*\s-(?:exec|execdir|ok|okdir)\b"
 )
 
 
@@ -1201,7 +1222,8 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                 words = unwrap_static_command(words)
                 command = words[0].word.rsplit("/", 1)[-1]
                 if command in SHELL_COMMAND_RUNNERS:
-                    for index, word in enumerate(words[1:], start=1):
+                    first = runner_command_start([None if word.parts else word.word for word in words], command)
+                    for index, word in enumerate(words[first:], start=first):
                         nested = word.word.rsplit("/", 1)[-1]
                         if not word.parts and (
                             re.fullmatch(r"python[0-9.]*", nested) or nested in SHELL_NESTED_TARGETS

@@ -4,7 +4,13 @@ import ast
 import re
 from collections import defaultdict
 
-from comment_payloads import SQL_CLIENTS, command_words, inline_source_index, sql_client_source_index
+from comment_payloads import (
+    SQL_CLIENTS,
+    command_words,
+    inline_source_index,
+    runner_command_start,
+    sql_client_source_index,
+)
 
 REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
     (
@@ -628,19 +634,33 @@ class PythonBindings:
             return (args[index], "sql", self.literal(args[index])) if index is not None else None
         if language is None and program is not None:
             if name in COMMAND_RUNNERS:
-                for index, word in enumerate(words[1:], start=1):
-                    nested = word.rsplit("/", 1)[-1] if word else None
-                    if nested and (
-                        nested.startswith("python")
-                        or nested in {"node", "sh", "bash", "zsh"} | SQL_CLIENTS | UNMODELED_INTERPRETERS
-                    ):
-                        return self.process_payload(args[index:])
+                return self.runner_payload(args, words, name)
             if name not in DATA_FLAG_PROGRAMS and any(
                 word is not None and INLINE_SHAPED_FLAG.fullmatch(word) for word in words[1:]
             ):
                 return args[0], "unsupported", None
             return None
         return self.inline_process_payload(args, words, language)
+
+    def runner_payload(
+        self, args: list[ast.expr], words: list[str | None], name: str
+    ) -> tuple[ast.AST, str, str | None] | None:
+        try:
+            first = runner_command_start(words, name)
+        except ValueError:
+            return args[0], "unsupported", None
+        for index, word in enumerate(words[first:], start=first):
+            nested = word.rsplit("/", 1)[-1] if word else None
+            if nested and (
+                nested.startswith("python")
+                or nested in {"node", "sh", "bash", "zsh"} | SQL_CLIENTS | UNMODELED_INTERPRETERS
+            ):
+                return self.process_payload(args[index:])
+        if name not in DATA_FLAG_PROGRAMS and any(
+            word is not None and INLINE_SHAPED_FLAG.fullmatch(word) for word in words[1:]
+        ):
+            return args[0], "unsupported", None
+        return None
 
     def inline_process_payload(
         self, args: list[ast.expr], words: list[str | None], language: str | None

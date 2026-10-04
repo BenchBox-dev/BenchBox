@@ -3117,3 +3117,25 @@ def test_interpreter_options_before_inline_source_and_find_exec(path: str, sourc
 @pytest.mark.parametrize("source", ["node -p '// hi'\n", "node --print '// hi'\n"])
 def test_shell_node_print_source_is_sent_to_the_typescript_scanner(source: str) -> None:
     assert list(javascript_requests("a.sh", source, "bash").values()) == ["// hi"]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kinds"),
+    [
+        ("a.sh", "find sh -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -name sh -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find psql -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -exec $DYN -c '# hi' \\;\n", "bash", ["coverage-error"]),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", "sh", "-exec", "perl", "-e", "# hi", ";"])\n',
+            "python",
+            ["payload-error"],
+        ),
+        ("a.sh", "deno eval --ext=ts 'console.log(1) // hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -name sh -print\n", "bash", []),
+        ("a.sh", "deno eval --ext=ts 'console.log(1)'\n", "bash", []),
+    ],
+)
+def test_find_exec_and_deno_eval_options_are_read_in_order(path: str, source: str, lang: str, kinds: list) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == kinds
