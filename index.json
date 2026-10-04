@@ -4744,6 +4744,13 @@
       "status": "done",
       "title": "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
     },
+    "corpus-migrate-reads-non-bundle-json": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Corpus anonymiser crashes on non-bundle JSON in its bundles directory"
+    },
     "corpus-mislabelling-leaves-the-leaderboard-with-15-rows": {
       "claim": null,
       "needs": [],

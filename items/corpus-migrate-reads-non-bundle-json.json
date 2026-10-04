@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The migration skips its own manifest and other non-bundle companions (.manifest.json, .override.json and the like), or refuses a manifest path inside --bundles-dir",
+    "Running the documented command twice on the same directory succeeds and reports no changes the second time",
+    "A test covers the rerun case"
+  ],
+  "context": "Found while staging Databricks bundles for publication on 2026-10-04. The workaround was to anonymise each batch in a fresh directory (`~/Developer/benchmark_runs/tools/stage_pr_b_databricks_20261004.py`).",
+  "description": "`_project/scripts/results_explorer_corpus_migrate.py --bundles-dir <dir> --manifest <dir>/migration-manifest.json --write` treats every `.json` file in the directory as a result bundle. When the directory already holds the migration manifest from an earlier run, a rerun fails in `transformer.result_id_from_bundle` with `ValueError: Unsupported schema version for explorer input schema policy: '1'`. The documented publishing step writes that manifest into the same directory it scans, so the step is not safely repeatable.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:54:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "178049b50aea449f9da3e904fcd8baf3",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}
