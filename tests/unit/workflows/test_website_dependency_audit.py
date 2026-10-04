@@ -66,7 +66,7 @@ def test_website_package_is_pinned_exactly_on_node_22() -> None:
     assert (WEBSITE / "package-lock.json").is_file()
     assert not (ROOT / "package.json").exists()
     assert {"@astrojs/check", "typescript"} <= set(package["devDependencies"])
-    assert package["scripts"]["check"] == "astro check"
+    assert package["scripts"]["check"] == "BENCHBOX_ALLOW_EMPTY_SIDEBAR=1 astro check"
 
 
 def test_only_the_site_build_job_and_website_audit_use_node_22() -> None:

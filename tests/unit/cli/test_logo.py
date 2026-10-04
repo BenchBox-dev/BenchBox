@@ -27,7 +27,7 @@ LOGO_FIRST_ROW = LOGO.splitlines()[1]
 
 
 def test_logo_matches_readme() -> None:
-    match = re.search(r"```\n(.*?)\n```", README.read_text(encoding="utf-8"), re.DOTALL)
+    match = re.search(r"```(?:text)?\n(.*?)\n```", README.read_text(encoding="utf-8"), re.DOTALL)
     assert match is not None
     assert match.group(1) == LOGO
 
