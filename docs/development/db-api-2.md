@@ -187,7 +187,7 @@ def _get_parameter_placeholder(self, connection: Any) -> str:
 
 The following excerpts focus on connection and cursor operations. `**options`
 stands for omitted platform-specific adapter options. See the
-[platform API reference](../reference/python-api/platforms.rst) for complete
+[platform API reference](../reference/python-api/platforms.md) for complete
 method signatures.
 
 ### Fully Compliant Platforms

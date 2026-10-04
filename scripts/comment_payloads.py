@@ -52,6 +52,9 @@ EXPRESSION_PREFIX = "[\n"
 EXPRESSION_SUFFIX = "\n];"
 
 
+BASHLEX_FAILURES = (bashlex.errors.ParsingError, NotImplementedError, AttributeError, IndexError, TypeError)
+
+
 def blank_text(text: str) -> str:
     return re.sub(r"[^\n]", " ", text)
 
@@ -779,7 +782,7 @@ def herestring_data_only(header: str) -> None:
     text = re.sub(r"\s*;?\s*(?:then|do)\s*$", "\n", text)
     try:
         trees = bashlex.parse(text, strictmode=False)
-    except (bashlex.errors.ParsingError, NotImplementedError) as exc:
+    except BASHLEX_FAILURES as exc:
         raise ValueError("shell here-string requires an executable-payload adapter") from exc
     consumers: list[str] = []
 
@@ -834,7 +837,7 @@ def heredoc_redirects(header: str) -> list[tuple[str, str, list[str], bool]]:
     raw_markers = None
     try:
         trees = bashlex.parse(header, strictmode=False)
-    except (bashlex.errors.ParsingError, NotImplementedError) as exc:
+    except BASHLEX_FAILURES as exc:
         tokens = re.findall(r"(?<!<)<<-?\s*(['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?)", header)
         markers = [token.strip("'\"") for token in tokens]
         unquoted = re.sub(
@@ -1189,17 +1192,17 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
         return []
     try:
         units = [(0, source, bashlex.parse(source))]
-    except (bashlex.errors.ParsingError, NotImplementedError) as exc:
+    except BASHLEX_FAILURES as exc:
         units = []
         for offset, chunk in shell_logical_chunks(source):
             if not SHELL_INLINE_INTERPRETER.search(chunk):
                 continue
             try:
                 units.append((offset, chunk, bashlex.parse(chunk)))
-            except (bashlex.errors.ParsingError, NotImplementedError):
+            except BASHLEX_FAILURES:
                 try:
                     units.append((offset, chunk, bashlex.parse(neutral_list_operators(chunk))))
-                except (bashlex.errors.ParsingError, NotImplementedError):
+                except BASHLEX_FAILURES:
                     if not chunk_can_hold_comment(chunk):
                         continue
                     raise ValueError("shell command source requires an executable-payload adapter") from exc

@@ -2747,10 +2747,15 @@ def test_reviewed_javascript_flows_are_exact_and_current() -> None:
 
 def test_reviewed_javascript_flows_still_occur() -> None:
     import json
+    import os
+    import shutil
     import subprocess
 
     from comment_syntax import REVIEWED_JAVASCRIPT_FLOWS
 
+    typescript = os.environ.get("COMMENT_POLICY_TYPESCRIPT", str(ROOT / "results-explorer/node_modules/typescript"))
+    if shutil.which("node") is None or not Path(typescript).exists():
+        pytest.skip("the TypeScript package for scripts/comment_syntax_js.cjs is not installed")
     paths = sorted({path for path, _ in REVIEWED_JAVASCRIPT_FLOWS})
     requests = {path: (ROOT / path).read_text(encoding="utf-8") for path in paths}
     result = subprocess.run(
