@@ -655,3 +655,10 @@ def _moved_fabric_rows(service, region):
         if service == "Microsoft Fabric" and region == "eastus":
             row["retailPrice"] = 0.19
     return rows
+
+
+def test_splice_rejects_inline_value_for_body_section():
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(generator, "SECTION_PATHS", {"fabric_cu_prices": (("fabric_cu_prices",), False)})
+        with pytest.raises(generator.PricingGeneratorError):
+            generator.splice_sections("fabric_cu_prices: {us: 0.1}\nb: 1\n", {"fabric_cu_prices": ["us: 0.18"]})

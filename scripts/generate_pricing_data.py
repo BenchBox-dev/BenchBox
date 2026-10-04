@@ -406,10 +406,16 @@ def splice_sections(original_text: str, rendered: dict[str, list[str]]) -> str:
         path, whole = SECTION_PATHS[section]
         key = _key_line(lines, path)
         end = _block_end(lines, key)
+        if not whole and lines[key].split(":", 1)[1].split("#", 1)[0].strip():
+            raise PricingGeneratorError(f"{section} key has an inline value, so its body cannot be replaced")
         first = key if whole else key + 1
         indent = " " * (_indent(lines[key]) if whole else _indent(lines[key]) + 2)
         lines[first:end] = [(indent + text) if text else "" for text in block]
-    return "\n".join(lines)
+    spliced = "\n".join(lines)
+    before, after = yaml.safe_load(original_text), yaml.safe_load(spliced)
+    if not isinstance(after, dict) or list(after) != list(before or {}):
+        raise PricingGeneratorError("splicing changed the top-level keys of pricing_data.yaml")
+    return spliced
 
 
 def validate_manual_sections(pricing_text: str) -> None:
