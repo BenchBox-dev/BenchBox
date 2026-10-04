@@ -182,6 +182,7 @@ class RunConfigInput:
     table_format: str | None = None
     table_format_compression: str | None = None
     table_format_partition_cols: list[str] | None = None
+    query_parameters: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
@@ -213,6 +214,8 @@ class RunConfigInput:
                 data["table_format_compression"] = self.table_format_compression
             if self.table_format_partition_cols:
                 data["table_format_partition_cols"] = self.table_format_partition_cols
+        if self.query_parameters:
+            data["query_parameters"] = self.query_parameters
         return data
 
 

@@ -119,6 +119,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
     ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
+    ("ci.yml", "site-build", "Typecheck, audit and build website"): "site-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
@@ -349,6 +350,9 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "docs-build", "Validate explorer snapshot invariants"): (
         "Hosted snapshot check; covered locally by the explorer-pipeline contract tests."
     ),
+    ("ci.yml", "site-build", "Scan website output for privacy leaks"): (
+        "Hosted build-output scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
+    ),
     ("ci.yml", "docs-build", "Scan assembled site for privacy leaks"): (
         "Hosted site-assembly scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
     ),
@@ -562,7 +566,9 @@ def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemptio
 def test_merge_gate_local_equivalents_and_exemptions_are_documented() -> None:
     """Keep the parity inventory fail-closed and its exceptions reviewable."""
     docs = (REPO_ROOT / "docs" / "operations" / "ci-local-parity.md").read_text(encoding="utf-8")
-    makefile = MAKEFILE.read_text(encoding="utf-8")
+    makefile = "\n".join(
+        path.read_text(encoding="utf-8") for path in [MAKEFILE, *sorted((REPO_ROOT / "make").glob("*.mk"))]
+    )
     assert "Hosted-only guard inventory" in docs
 
     for key, target in MERGE_GATE_LOCAL_EQUIVALENTS.items():
@@ -682,6 +688,7 @@ def test_lint_guard_summary_accepts_only_success() -> None:
     run = aggregator["run"]
 
     assert 'if [ "$outcome" = "success" ]; then' in run
+    assert "merge_group" not in run
     assert "skipped" not in run
     assert 'echo "FAILED: $id ($outcome)"' in run
     assert "All lint guards passed." in run

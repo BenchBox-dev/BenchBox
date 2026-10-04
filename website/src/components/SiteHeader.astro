@@ -1,0 +1,35 @@
+---
+import SearchBox from "./SearchBox.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+interface Props {
+  wrapper?: "header" | "div";
+}
+
+const { wrapper: Wrapper = "header" } = Astro.props;
+const path = Astro.url.pathname;
+const links = [
+  { href: "/docs/", label: "Docs", prefix: "/docs" },
+  { href: "/blog/", label: "Blog", prefix: "/blog" },
+  { href: "/results/", label: "Results", prefix: "/results" },
+];
+---
+
+<Wrapper class="site-header" data-site-header>
+  <div class="site-header__inner">
+    <a class="site-header__logo" href="/">BenchBox</a>
+    <nav class="site-header__nav" aria-label="BenchBox">
+      {
+        links.map((link) => (
+          <a class="site-header__link" href={link.href} aria-current={path.startsWith(link.prefix) ? "page" : undefined}>
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+    <div class="site-header__tools">
+      <SearchBox />
+      <ThemeToggle />
+    </div>
+  </div>
+</Wrapper>

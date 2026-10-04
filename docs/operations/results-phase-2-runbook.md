@@ -41,7 +41,7 @@ schedule and on-demand (`workflow_dispatch`) refresh (see
 [`corpus-refresh.md`](corpus-refresh.md)), ad-hoc UAT integrations like PR #164, validator updates — land on
 `develop` first because that is where the project's tooling and tests live.
 The
-[`sync-results-data-to-published.yml`](../../.github/workflows/sync-results-data-to-published.yml)
+[`sync-results-data-to-published.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/sync-results-data-to-published.yml)
 workflow watches `develop` for changes under the slim-branch allowlist
 paths (`results-data/bundles/`, the corpus docs, the two vendored
 validators, plus `corpus-inventory.json`) and opens a **draft** PR against
@@ -72,7 +72,7 @@ still exists only on published-results becomes published-only and is kept).
 After overlay, the workflow regenerates `corpus-inventory.json` from the
 unioned tree so community-only paths remain inventory-listed. Other allowlist
 files (docs, validators) still use per-path checkout / removal. The scheduled
-[`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
+[`corpus-drift-check.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/corpus-drift-check.yml)
 canary classifies develop-ahead vs published-only and never recommends a
 wipe-based full mirror while published-only paths exist.
 

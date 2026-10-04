@@ -24,10 +24,13 @@ def test_runs_after_each_push_to_develop_and_on_demand() -> None:
     assert "pull_request" not in triggers and "merge_group" not in triggers
 
 
-def test_runs_queue_per_ref_without_cancelling() -> None:
+def test_every_push_gets_its_own_queued_run() -> None:
     concurrency = _workflow()["concurrency"]
     assert "github.ref" in concurrency["group"], "a manual run on another ref would replace the pending run for develop"
     assert concurrency["cancel-in-progress"] is False
+    assert concurrency["queue"] == "max", (
+        "without a queue a newer push replaces the pending run, so intermediate commits get no result"
+    )
 
 
 def test_is_read_only() -> None:

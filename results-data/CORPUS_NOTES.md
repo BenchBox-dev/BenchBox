@@ -198,6 +198,113 @@ What these results are and are not:
   tpch_skew SF 10) predate the `provenance.source` field; their manifests
   record `result_source: internal`.
 
+## Live cloud corpus, second batch (2026-10-03)
+
+19 maintainer-run bundles from live BigQuery and Snowflake runs (2026-09-19 to
+2026-09-20) were added with `result_source: internal` submission manifests.
+Each joins an existing cohort, so the cohort count is unchanged:
+SSB at SF 0.1, 1 and 10 on Snowflake; AMPLab at SF 0.1 and 1 and JoinOrder at
+SF 1 on BigQuery and Snowflake; ClickBench at SF 1 on BigQuery and Snowflake;
+and CoffeeShop and H2ODB at SF 0.1 and 1 on BigQuery and Snowflake.
+
+The runs had no submission manifests. Each manifest was written from the
+original run output, and every bundle was re-run through the public anonymiser
+(`_project/scripts/results_explorer_corpus_migrate.py`), so no raw bucket,
+dataset or warehouse name remains.
+
+What these results are and are not:
+
+- Every bundle passes `scripts/validate_submission.py --require-manifest` with
+  no error, warning or override.
+- BigQuery jobs ran with the query cache disabled in configuration. Snowflake
+  runs declare the result cache off in configuration. Neither bundle records a
+  cache-control receipt, so both claims rest on the declared setting.
+- ClickBench timings move little across scale: from SF 0.1 to SF 10 the
+  geometric mean grows 1.45x on BigQuery and 1.33x on Snowflake. BenchBox's
+  generator creates 1,000,000 rows per scale factor, so fixed per-query
+  overhead dominates. Only the SF 1 cells are included.
+- Not included: Databricks cells (the runs enabled the result cache and have
+  no receipt), BigQuery SSB (needs validator overrides), ClickBench SF 0.1 and
+  SF 10 (scale-invariant), TPC-DS and TPC-DI. TPC-H is covered in the next
+  section.
+
+## Live cloud TPC-H, fresh runs (2026-10-03)
+
+Nine maintainer-run TPC-H bundles from live runs on 2026-10-03 were added with
+`result_source: internal` submission manifests: SF 0.1, 1 and 10 on BigQuery,
+Snowflake and Databricks. They replace the cloud coverage withdrawn on
+2026-09-25 and were run on code that includes the cloud fixes made since:
+Snowflake and Databricks session cache receipts, load hardening, region
+capture and the Snowflake query-history fix.
+
+What these results are and are not:
+
+- The SF 1 and SF 10 runs used `--official` with `--seed 42` and are stamped
+  `compliance_class: official`. The SF 0.1 runs are
+  `compliance_class: unofficial_subscale`, as every sub-SF-1 TPC-H run is; they
+  are carried like the other unofficial cohorts and no official TPC-H metrics
+  are computed for them.
+- Four bundles pass `scripts/validate_submission.py --require-manifest` with
+  no error, warning or override: SF 1 on all three platforms and SF 10 on
+  BigQuery. Snowflake SF 10 and Databricks SF 10 pass with the overrides
+  described below. The three SF 0.1 bundles fail the submission class gate for
+  the reason above and are admitted through the lenient mirror lane.
+- Snowflake and Databricks runs disabled the result cache per session and
+  record a validated cache receipt with the cache disabled. BigQuery jobs ran
+  with the query cache disabled in configuration.
+- Row counts match the TPC-H scale factor (LINEITEM 600,572 at SF 0.1,
+  6,001,215 at SF 1 and 59,986,052 at SF 10) and all 22 queries ran in every
+  bundle.
+- Two bundles carry reviewed validator overrides (`<bundle>.override.json`):
+  `scale-invariant` for Snowflake SF 10 and for Databricks SF 10. On both
+  platforms the geometric mean grows about 1.35x from SF 0.1 to SF 10 while
+  LINEITEM grows 100x. The result cache is confirmed off and measurement runs
+  at 0.8 to 0.9 of warmup, so per-query overhead explains the flat timings.
+- The BigQuery SF 0.1 bundle also shows a `timing-plateau` finding (per-query
+  means span 824 to 1173 ms, a fixed per-job latency floor); it is carried in
+  the lenient lane without an override because the class gate already applies.
+
+## TPC-DI cloud data comparison (2026-10-03)
+
+Four TPC-DI SQL bundles cover SF 0.1 and SF 1 on BigQuery and Snowflake. The
+BigQuery measurements were retained from 2026-09-20. Snowflake loaded fresh
+data generated with seed 42 and generation algorithm version 1 on 2026-10-03.
+All four bundles execute the complete 38-query set without failures and pass
+strict submission validation with their manifests without overrides. SF 10
+bundles are held until the cohort has a third comparison identity.
+
+At each scale, all sixteen table row counts agree across the two platforms.
+Total rows are 299,864 at SF 0.1 and 1,442,264 at SF 1.
+QVQ12 and QAQ7 result row counts also agree. The Snowflake runs record validated
+cache-off receipts; the retained BigQuery configuration records its query cache
+as disabled.
+
+These checks establish agreement in recorded table counts and the two named
+query counts. They do not establish full result-value or dataset-content
+equivalence. The retained BigQuery bundles have no generation-version or
+generation-hash fields. At SF 1, existing local TPC-DI bundles report QVQ12=9
+and QAQ7=1, while these cloud bundles report QVQ12=32 and QAQ7=2. Their timings
+must be assessed with that result difference in mind.
+
+The public anonymization pass preserves query results, timings, table counts
+and phase evidence. Submission manifests record the hashes of the public
+bundles. Original measurements remain in the operator output archive.
+
+## BigQuery SSB timing (2026-10-03)
+
+Three BigQuery SSB SQL bundles from 2026-09-19 cover SF 0.1, SF 1 and SF 10.
+Query caching is recorded off, and measurement runs at 0.95 to 0.97 of warmup.
+Loaded rows grow from 625,757 to 62,322,557 and scanned bytes from 0.846 GB to
+84.476 GB, while the geometric mean grows only 1.37x (894 to 1,228 ms) and the
+median per-query mean 1.34x. At SF 0.1 and SF 1, per-query means span 758 to
+1,142 ms and 765 to 1,070 ms.
+
+These results are consistent with fixed per-job and client latency dominating
+light queries. Provider queue and execution timings were not recorded, so that
+explanation is an inference. The SF 0.1 and SF 1 bundles carry approved
+timing-plateau overrides, and the SF 0.1 and SF 10 bundles carry approved
+scale-invariant overrides.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.

@@ -1,0 +1,60 @@
+---
+import Shell from "../layouts/Shell.astro";
+---
+
+<Shell
+  title="BenchBox - Run Your Own Benchmarks"
+  description="BenchBox makes database benchmarking easy: CLI, Python library, or MCP for AI assistants."
+>
+  <section id="overview" class="hero">
+    <div class="hero__inner">
+      <h1 class="hero__title">Run Your Own Benchmarks</h1>
+      <p class="hero__subtitle">
+        Everyone says you should. BenchBox makes it easy to do. Use as CLI, Python library, or MCP for AI assistants. No
+        Docker. No compilers. Just pip install.
+      </p>
+      <div class="hero__layout">
+        <div>
+          <div class="code-block">
+            <div class="code-block__header">
+              <span>CLI, Library, or MCP</span>
+              <button class="copy-btn" type="button" data-copy-target="hero-code">Copy</button>
+            </div>
+            <pre><code id="hero-code" class="language-bash"># CLI - Quick benchmarking
+benchbox run --platform duckdb --benchmark tpch
+
+# MCP - AI assistant integration
+"Run TPC-H on DuckDB" # Claude executes via MCP
+
+# Library - Deep Python integration
+from benchbox import TPCH</code></pre>
+          </div>
+          <div class="hero__badges">
+            <a class="badge" href="https://github.com/BenchBox-dev/benchbox">Star on GitHub</a>
+            <a class="badge" href="https://github.com/BenchBox-dev/benchbox/releases">v0.4.1</a>
+            <a class="badge" href="/docs/usage/installation.html">Python 3.11+</a>
+            <a class="badge" href="/docs/usage/installation.html#no-docker-required">No Docker Required</a>
+          </div>
+        </div>
+        <div>
+          <img class="hero__image" src="/hero.png" width="300" height="300" alt="BenchBox - Database Benchmarking Toolkit" />
+        </div>
+      </div>
+    </div>
+  </section>
+</Shell>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyTarget ?? "");
+      if (!target?.textContent) return;
+      try {
+        await navigator.clipboard.writeText(target.textContent);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Copy failed";
+      }
+    });
+  });
+</script>

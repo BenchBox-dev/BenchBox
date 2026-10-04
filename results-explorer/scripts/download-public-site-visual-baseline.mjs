@@ -17,7 +17,7 @@ const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
 // are byte-identical to it, nearest first. The workflow classifier computes
 // them; they render the same site as the base.
 const candidateShas = (process.env.PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES ?? "").split(/\s+/).filter(Boolean);
-// Optional bounded wait for a leader group or develop push to publish the base.
+// Optional bounded wait for a develop push to publish the base.
 const waitSeconds = Number(process.env.PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS ?? "0");
 
 if (!/^[0-9a-f]{40}$/.test(baseSha ?? "")) {

@@ -1,0 +1,29 @@
+version: 1
+refs:
+  release:
+    kind: release-tag
+  trunk:
+    kind: trunk
+routes:
+  - path: /
+    ref: release
+    builder: landing
+  - path: /docs/
+    ref: release
+    builder: docs
+  - path: /docs/dev/
+    ref: trunk
+    builder: docs
+  - path: /blog/
+    ref: trunk
+    builder: blog
+  - path: /results/
+    ref: trunk
+    builder: explorer
+    corpus: results-data
+root_files:
+  ref: trunk
+  files:
+    - CNAME
+    - .nojekyll
+    - 404.html

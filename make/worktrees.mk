@@ -17,6 +17,7 @@ override CONTROLLER_ID := $(value CONTROLLER_ID)
 override EXPECTED_HEAD_OID := $(value EXPECTED_HEAD_OID)
 override FORMAT := $(value FORMAT)
 
+.PHONY: worktree-create
 worktree-create: export BRANCH := $(BRANCH)
 worktree-create: export WORKTREE_PATH := $(WORKTREE_PATH)
 worktree-create: export CONTROLLER_KIND := $(CONTROLLER_KIND)
@@ -24,6 +25,7 @@ worktree-create: export CONTROLLER_ID := $(CONTROLLER_ID)
 worktree-create:
 	@$(BENCHBOX_MAKEFILE_ROOT)scripts/worktree_lifecycle.sh create
 
+.PHONY: worktree-remove
 worktree-remove: export WORKTREE_PATH := $(WORKTREE_PATH)
 worktree-remove:
 	@$(BENCHBOX_MAKEFILE_ROOT)scripts/worktree_lifecycle.sh remove
@@ -38,5 +40,6 @@ worktree-finish: export FORMAT := $(FORMAT)
 worktree-finish:
 	@$(BENCHBOX_MAKEFILE_ROOT)scripts/worktree_lifecycle.sh finish
 
+.PHONY: worktree-list
 worktree-list:
 	@git worktree list --porcelain
