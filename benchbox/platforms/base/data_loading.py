@@ -837,9 +837,18 @@ class ZstdHandler(CompressionHandler):
             File object for reading decompressed content
 
         Raises:
+            DataLoadingError: If the ``zstd`` command is not installed. Raised
+                when the first file is opened, before any table loads, instead
+                of surfacing later as an empty load.
             subprocess.CalledProcessError: If zstd decompression fails
-            FileNotFoundError: If zstd command not found
         """
+        if shutil.which("zstd") is None:
+            raise DataLoadingError(
+                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
+                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
+                "uncompressed data."
+            )
+
         # Log decompression start if adapter supports verbosity
         if self.adapter and hasattr(self.adapter, "log_verbose"):
             self.adapter.log_verbose(f"Decompressing {file_path.name} using system zstd command...")
@@ -2589,19 +2598,8 @@ class FileFormatRegistry:
 
         Returns:
             CompressionHandler instance (NoCompressionHandler if not compressed)
-
-        Raises:
-            DataLoadingError: If the file needs the ``zstd`` CLI and it is not
-                installed. Reported here -- before any table loads -- instead
-                of surfacing later as an empty load that validates vacuously.
         """
         suffix = file_path.suffix
-        if suffix == ".zst" and shutil.which("zstd") is None:
-            raise DataLoadingError(
-                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
-                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
-                "uncompressed data."
-            )
         handler_class = cls._compression_handlers.get(suffix, NoCompressionHandler)
         return handler_class()
 

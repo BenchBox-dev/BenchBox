@@ -1816,19 +1816,21 @@ class TestManifestMissingFiles:
 
 
 class TestZstdToolProbe:
-    """A .zst load plan without the zstd CLI fails up front with an
-    actionable error instead of loading nothing."""
+    """Opening a .zst file through the system-command handler without the zstd
+    CLI fails with an actionable error instead of loading nothing, while choosing
+    the handler needs no CLI (adapters that decompress in-process rely on that)."""
 
-    def test_missing_zstd_cli_raises_actionable_error(self, tmp_path: Path, monkeypatch) -> None:
+    def test_missing_zstd_cli_raises_actionable_error_on_open(self, tmp_path: Path, monkeypatch) -> None:
         from benchbox.platforms.base import data_loading
 
         monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
-        with pytest.raises(DataLoadingError, match="zstd.*command was not found"):
-            FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        with pytest.raises(DataLoadingError, match="zstd.*command was not found"), handler.open(tmp_path / "x.dat.zst"):
+            pass
 
-    def test_present_zstd_cli_selects_handler(self, tmp_path: Path, monkeypatch) -> None:
+    def test_handler_selection_does_not_require_the_zstd_cli(self, tmp_path: Path, monkeypatch) -> None:
         from benchbox.platforms.base import data_loading
 
-        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: "/usr/bin/zstd")
+        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
         handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
         assert isinstance(handler, ZstdHandler)

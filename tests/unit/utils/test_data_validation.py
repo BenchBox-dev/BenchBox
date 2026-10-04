@@ -438,4 +438,4 @@ class TestEmptyManifestIsNotReusable:
         result = BenchmarkDataValidator(benchmark_name, scale_factor=1.0).validate_data_directory(tmp_path)
 
         assert result.valid is False
-        assert result.issues
+        assert any("manifest" in issue.lower() for issue in result.issues), result.issues
