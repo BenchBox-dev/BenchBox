@@ -2,7 +2,7 @@
   "acceptance": [
     "Decision recorded naming the default and flag surface, confirming publish/export anonymization is unchanged."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-3 / task P5.3 (re-review R-7).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda; do not claim.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-3 / task P5.3 (re-review R-7).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda (PR #2634); do not claim.\n\nDECISION (option A, owner choice; ADR-003 addendum \"the local result file is not anonymized\"):\n- The CLI writes the local result file unanonymized by default; the local file's receipt/ledger text is unscrubbed.\n- Every publish, public export and submission path keeps full anonymization, including scrubbing of receipt statements, reasons and errors.\n- The bundle states truthfully whether it was anonymized via the existing export.anonymized field (no new field needed).\n- scripts/publication/check_artifact_privacy.py and submission validation must still reject an unanonymized bundle; add a test.\n- The exporter's separate connection-identity (username) redaction on non-anonymized exports stays on for local files.\n- Change only exporter defaults and CLI wiring. Do not edit benchbox/core/results/anonymization.py or anonymization_specs.yaml (owner-reviewed); stop and report if a change there seems unavoidable.",
   "description": "## Problem\n`ResultExporter(anonymize=True)` is the default (`benchbox/core/results/exporter.py:105`). The CLI exports the user's *local* result anonymized, so receipt statements and reasons are redacted in the user's own file and there is no flag to disable it. The user cannot diagnose why tuning did not verify.\n\n## Options\n- **(A) Recommended.** Unanonymized local file; anonymize on publish / public export.\n- **(B)** Add `--no-anonymize`.\n- **(C)** Keep the default and print an unredacted console verification summary.\n\n## Guardrails\n- Publish and public export must keep full anonymization, including receipt statement/reason/error scrubbing.\n- Decide together with the public-anonymizer owners; AGENTS.md makes the anonymizer owner-reviewed.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "benchbox/core/results/exporter.py",
@@ -23,6 +23,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "b83b8521dfa041a8a8806b86986d297e",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:06:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "830ad61adf82455ba6470d1b0af4e25b",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
