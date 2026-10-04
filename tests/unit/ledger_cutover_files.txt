@@ -42,6 +42,16 @@ tests/unit/scripts/publication/test_transaction.py
 tests/unit/scripts/publication/test_transaction_executor.py
 tests/unit/scripts/publication/test_verify_corpus_promotion.py
 tests/unit/scripts/publication/test_verify_live.py
+tests/unit/scripts/site_deploy/test_site_deploy_candidate.py
+tests/unit/scripts/site_deploy/test_site_deploy_cli.py
+tests/unit/scripts/site_deploy/test_site_deploy_cli_flow.py
+tests/unit/scripts/site_deploy/test_site_deploy_gates.py
+tests/unit/scripts/site_deploy/test_site_deploy_generation.py
+tests/unit/scripts/site_deploy/test_site_deploy_githubapi.py
+tests/unit/scripts/site_deploy/test_site_deploy_mixed_version.py
+tests/unit/scripts/site_deploy/test_site_deploy_publish.py
+tests/unit/scripts/site_deploy/test_site_deploy_receipt.py
+tests/unit/scripts/site_deploy/test_site_deploy_routes.py
 tests/unit/scripts/test_agent_instruction_audit.py
 tests/unit/scripts/test_api_reference_url_map.py
 tests/unit/scripts/test_assemble_public_site.py
@@ -168,6 +178,7 @@ tests/unit/workflows/test_release_uat_charter_guard.py
 tests/unit/workflows/test_results_explorer_dependency_audit.py
 tests/unit/workflows/test_results_explorer_publication.py
 tests/unit/workflows/test_seed_corpus_pr_base.py
+tests/unit/workflows/test_site_deploy.py
 tests/unit/workflows/test_stacked_pr_base_guard.py
 tests/unit/workflows/test_t2_partition_workflow.py
 tests/unit/workflows/test_trunk_workflow.py
@@ -179,5 +190,6 @@ tests/unit/workflows/test_validate_submission_override_approval.py
 tests/unit/workflows/test_validate_submission_trusted_checkout.py
 tests/unit/workflows/test_validate_submission_vendor_gate.py
 tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py
+tests/unit/workflows/test_website_dependency_audit.py
 tests/unit/workflows/test_workflow_context_availability.py
 tests/unit/workflows/test_workflow_expression_contexts.py
