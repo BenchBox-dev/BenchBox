@@ -5,6 +5,7 @@
     "sitemap.xml lists exactly the inventory HTML pages; robots.txt references it",
     "CNAME and .nojekyll present in dist"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as 6e274b4e (2026-10-04). e2e/not-found.mjs passes for 4 /results/ deep links against the Astro 404 and the assembler RESULTS_FALLBACK. Open: scripts/assemble_public_site.py still writes its own 404.html over the Astro one; switching to the Astro 404 belongs with the site-deploy Astro renderer (item 52). Review running.",
   "description": "Generate sitemap.xml and robots.txt for benchbox.dev. Neither exists today, so these are additive.\n\nEvery page gets a canonical URL (on the .html path), a meta description (from frontmatter or meta_description) and Open Graph and Twitter tags.\n\nThe 404 page must reproduce the assemble_public_site.py RESULTS_FALLBACK behaviour exactly: an unknown /results/* path stores the target in sessionStorage key benchbox.results.redirect and returns to the Explorer, which restores it. Every other path gets a styled not-found page with search.\n\nKeep CNAME and .nojekyll in the output.",
   "links": [
     "scripts/assemble_public_site.py",
@@ -18,6 +19,14 @@
       "op": "create",
       "op_id": "728134f510ca45fdbf9ea9fe57379752",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T04:31:48Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "e7e7ccdb43ab49918f91e3ac5f2886da",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
