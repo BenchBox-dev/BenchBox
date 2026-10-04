@@ -93,7 +93,10 @@ The job fetches the deployed generation's artifact through `fetch-run
 --verify-tree` (digest checked against its receipt), captures it and the
 candidate with `results-explorer/e2e/captures/public-site-pages.spec.ts`, and
 compares the manifests with `compareVisualManifestsAcrossRenderers`. A renderer
-change reports every capture as changed. The deploy job waits for this job and
+change reports every capture as changed. With the same renderer, any changed
+capture fails until approved, including the Results pages after a corpus
+change, so an Astro deploy whose captured pages moved always needs a reviewed
+approval. The deploy job waits for this job and
 publishes only when it passed, or when it was skipped because it was not
 required. A deploy with no receipted production generation cannot pass it.
 
