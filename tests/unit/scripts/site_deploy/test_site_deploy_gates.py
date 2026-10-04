@@ -340,6 +340,23 @@ def test_link_gate_tag_allowance_cannot_allow_trunk_breakage(tmp_path: Path) -> 
     assert "touching trunk routes" in result["detail"]
 
 
+def test_link_gate_passes_real_inventory_output_with_stale_allowances(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    (inputs.site_dir / "docs").mkdir(parents=True)
+    (inputs.site_dir / "docs" / "old.html").write_text(
+        '<!doctype html><html><head><title>Old</title></head><body><h1>Old</h1><a href="gone.html">gone</a></body></html>',
+        encoding="utf-8",
+    )
+    stale = ["/docs/old.html", "/docs/fixed.html", "missing path"]
+    allowance = inputs.repo_root / "_project" / "design" / "site-inventory" / "known-broken-links.json"
+    allowance.parent.mkdir(parents=True)
+    allowance.write_text(json.dumps([stale]), encoding="utf-8")
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    result = g.link_gate(inputs, g.run_subprocess)
+    assert result["status"] == g.PASS, result["detail"]
+    assert result["link_baseline"]["links"] == [RELEASE_BROKEN]
+
+
 def test_link_gate_fails_new_breakage_whose_source_is_a_trunk_route(tmp_path: Path) -> None:
     runner = _link_runner([RELEASE_BROKEN, ["/blog/p.html", "/x.html", "missing path"]])
     result = g.link_gate(_inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), runner)

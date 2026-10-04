@@ -11,6 +11,7 @@ from typing import Any
 
 from scripts.site_deploy import mixed_version, routes as routes_module
 from scripts.site_deploy.candidate import SEMVER_TAG
+from scripts.site_inventory import INFO_KINDS
 
 PASS = "pass"
 FAIL = "fail"
@@ -187,7 +188,8 @@ def _only_broken_links(summary: str) -> bool:
         if not number.isdigit():
             return False
         counts[kind] = int(number)
-    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in LINK_KINDS)
+    tolerated = LINK_KINDS + INFO_KINDS
+    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in tolerated)
 
 
 RELEASE_ALLOWANCE_RELATIVE = Path("_project/design/site-inventory/release-known-broken")
