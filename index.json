@@ -6691,17 +6691,12 @@
       "title": "Round Q70 expression total_sum to DECIMAL scale to match SQL ordering"
     },
     "dfparity-t08b-q70-top5-latent": {
-      "claim": {
-        "expires_at": "2026-10-05T17:34:50Z",
-        "generation": "c38d91d781684668a3ee6ef4dcdb8b49",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t08-q70-expression-rounding"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Resolve the latent Q70 top-5 state filter in both DataFrame families"
     },
     "dfparity-t09-q98-limit": {
