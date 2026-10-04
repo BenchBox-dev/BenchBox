@@ -5,7 +5,11 @@ name: TPC-DS Platform Identity
 # at scale factor 0.01 and records per-table row counts and checksums, the dsqgen -LOG values for
 # every query at a pinned seed, and a hash of the rendered SQL. A final job compares the manifests and
 # fails on any difference, so a DataFrame-versus-SQL divergence that appears on one platform and not
-# another can be traced to the data or the parameters.
+# another can be traced to the data or the parameters. The parameters are also recorded at SF 100,
+# where dsqgen needs no data and draws such as the Q46 city list are not degenerate.
+#
+# Linux and macOS must agree. Windows runs as an advisory cell: its manifest and comparison never fail
+# the workflow. The other bundled binaries (darwin-x86_64, linux-arm64, windows-arm64) are not run.
 #
 # Not a required check: it runs on a schedule, on demand, and on pull requests that touch the bundled
 # TPC-DS binaries, the code that selects and runs them, or this check.
@@ -19,6 +23,8 @@ on:
       - "benchbox/_binaries/tpc-ds/**"
       - "benchbox/core/tpcds/c_tools.py"
       - "benchbox/core/tpcds/parameter_log.py"
+      - "benchbox/core/tpcds/queries.py"
+      - "benchbox/core/tpcds/streams.py"
       - "benchbox/core/tpcds/benchmark/**"
       - "benchbox/core/tpcds/generator/**"
       - "benchbox/utils/tpc_compilation.py"
@@ -37,10 +43,11 @@ jobs:
     name: TPC-DS manifest (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -88,5 +95,14 @@ jobs:
           path: manifests
           merge-multiple: true
 
-      - name: Compare
-        run: python scripts/tpcds_platform_identity.py compare manifests/manifest-*.json
+      - name: Compare Linux and macOS
+        run: python scripts/tpcds_platform_identity.py compare manifests/manifest-Linux-*.json manifests/manifest-macOS-*.json
+
+      - name: Compare with Windows (advisory)
+        continue-on-error: true
+        run: |
+          if ls manifests/manifest-Windows-*.json >/dev/null 2>&1; then
+            python scripts/tpcds_platform_identity.py compare manifests/manifest-*.json
+          else
+            echo "No Windows manifest was produced; see the Windows manifest job."
+          fi

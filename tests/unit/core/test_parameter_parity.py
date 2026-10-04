@@ -134,7 +134,7 @@ class TestTPCDSParameterOverrides:
         assert params.get("year") == 2001
         assert params.get("state") == "CA"
         # Non-overridden key preserved
-        assert params.get("agg_field") == "sr_return_amt"
+        assert params.get("agg_field") == TPCDS_DEFAULT_PARAMS[1]["agg_field"]
 
     def test_override_does_not_affect_other_queries(self):
         """Overriding Q1 does not affect Q2."""
@@ -267,14 +267,13 @@ class TestQueryFunctionsCentralized:
         assert params["target_nation"] == "BRAZIL"
 
     def test_tpcds_q96_override_propagates(self):
-        """Overriding Q96 hours flows through get_parameters."""
-        tpcds_set_overrides({96: {"hours": [(10, 11)]}})
+        tpcds_set_overrides({96: {"hour": 10}})
         params = get_parameters(96)
-        assert params.get("hours") == [(10, 11)]
+        assert params.get("hour") == 10
 
         tpcds_set_overrides(None)
         params = get_parameters(96)
-        assert params.get("hours") == [(8, 9)]
+        assert params.get("hour") == 8
 
 
 # =============================================================================

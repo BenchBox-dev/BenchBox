@@ -1,0 +1,21 @@
+---
+import { getCollection, render } from "astro:content";
+import Shell from "../../layouts/Shell.astro";
+import { docutilsSlug } from "../../lib/docutils-slug.ts";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog");
+  return posts.map((post) => ({ params: { slug: post.id.replace(/^blog\//, "") }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<Shell title={`${post.data.title} - BenchBox Blog`} description={post.data.description} searchable>
+  <article class="prose">
+    <h1 id={docutilsSlug(post.data.title)}>{post.data.title}</h1>
+    <p class="post-meta">{post.data.author} · {post.data.date}</p>
+    <Content />
+  </article>
+</Shell>

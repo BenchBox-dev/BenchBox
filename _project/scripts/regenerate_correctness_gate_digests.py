@@ -1,43 +1,6 @@
 #!/usr/bin/env python3
-"""Regenerate the bounded correctness-gate TPC-H value-digest reference.
-
-This WRITES
-``benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json``
-from a live gate run, replacing the historical hand-copy (the old provenance note
-asked a human to run the gate and paste the stream-0 digests). It is the auditable,
-one-command regeneration path required by
-``correctness-gate-value-digest-fidelity-followups`` w3.
-
-It deliberately REUSES the same configuration as ``make test-correctness-gate``
-rather than re-hardcoding it:
-
-  * query-id set: read from ``BENCHBOX_CORRECTNESS_GATE_QUERY_IDS`` -- the SAME env
-    var the gate target exports (the Makefile defines it once in
-    ``CORRECTNESS_GATE_QUERY_IDS`` and passes it to both targets);
-  * scale: SF=1 (the only scale with stored TPC-H answers / a pinned seed);
-  * seed: ``benchbox.core.tpch.benchmark.get_reference_seed(1.0)`` (the reference
-    qgen seed the answer files were generated with);
-  * digest emission: ``BENCHBOX_EMIT_RESULT_DIGEST=1`` (gate-only flag).
-
-The output is deterministic on a clean tree: a regenerate -> no-diff round trip is
-the idempotency check (``make correctness-gate-digests-regen && git diff --exit-code``).
-The digests are tied to the DuckDB build pinned in ``uv.lock``; the DuckDB version
-that produced them is stamped into the provenance block.
-
-NOTE: the value oracle this feeds is a REGRESSION SNAPSHOT vs a DuckDB-pinned
-baseline (it detects change from the frozen benchbox-on-DuckDB answer), NOT an
-independent correctness oracle -- a conceptual value bug present at freeze time is
-enshrined, not caught. See
-``_project/analysis/value-digest-cross-engine-independence-decision.md``.
-
-Usage (always via the make target, which exports the shared query-id env var):
-
-    make correctness-gate-digests-regen
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -62,7 +25,7 @@ REFERENCE_PATH = (
 
 _PROVENANCE_NOTE = (
     "Reference VALUE digests for the bounded correctness-gate TPC-H queries at SF=1 with the "
-    "pinned reference qgen seed. REGENERATE with `make correctness-gate-digests-regen` "
+    "{parameters}. REGENERATE with `make correctness-gate-digests-regen` "
     "(_project/scripts/regenerate_correctness_gate_digests.py), which runs the same gate "
     "configuration with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes this file -- do NOT hand-copy. "
     "This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the "
@@ -86,7 +49,7 @@ def _query_ids() -> list[str]:
     return [qid.strip() for qid in raw.split(",") if qid.strip()]
 
 
-def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
+def _run_gate(work_dir: Path, query_ids: list[str], seed: int | None) -> dict:
     """Run the DuckDB TPC-H SF=1 gate slice with digest emission and return the payload."""
     from benchbox.core.results.loader import find_latest_result
 
@@ -105,10 +68,10 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
         "generate,load,power",
         "--queries",
         ",".join(query_ids),
-        "--seed",
-        str(seed),
         "--non-interactive",
     ]
+    if seed is not None:
+        command.extend(["--seed", str(seed)])
 
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
@@ -174,7 +137,7 @@ def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, s
     return digests
 
 
-def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> dict:
+def build_reference(digests: dict[str, str], seed: int | None, duckdb_version: str) -> dict:
     """Assemble the reference JSON payload in the committed key order (deterministic)."""
     return {
         "benchmark": "tpch",
@@ -190,7 +153,9 @@ def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> 
             "generated_with_duckdb": duckdb_version,
             "generated_with_platform": "duckdb",
             "phases": "generate,load,power",
-            "note": _PROVENANCE_NOTE,
+            "note": _PROVENANCE_NOTE.format(
+                parameters="qgen -d default substitution parameters" if seed is None else f"qgen seed {seed}"
+            ),
         },
         "digests": digests,
     }
@@ -204,12 +169,10 @@ def render(reference: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     import duckdb
 
-    from benchbox.core.tpch.benchmark import get_reference_seed
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
 
     query_ids = _query_ids()
-    seed = get_reference_seed(1.0)
-    if seed is None:
-        raise SystemExit("no reference seed for SF=1 (get_reference_seed(1.0) returned None)")
+    seed = load_tpch_value_digest_seed()
 
     with tempfile.TemporaryDirectory(prefix="benchbox-digest-regen-") as tmp:
         payload = _run_gate(Path(tmp), query_ids, seed)

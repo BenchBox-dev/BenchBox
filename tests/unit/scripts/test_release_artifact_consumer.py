@@ -11,13 +11,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-import yaml
 
 from scripts import release_artifact_consumer as consumer
 
-# Medium tier: these 81 nodes would take the fast-lane count past its ceiling, and this module is
-# imported by the medium execution tests. The medium tier runs on every merge group and on pull
-# requests that change soundness paths, which this change does.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
 SHA = "a" * 40
@@ -32,7 +28,8 @@ def metadata():
         "id": 7,
         "run_attempt": 2,
         "head_sha": SHA,
-        "event": "merge_group",
+        "event": "push",
+        "head_branch": "develop",
         "path": consumer.WORKFLOW,
         "status": "completed",
         "conclusion": "success",
@@ -81,7 +78,7 @@ def metadata():
         if not path:
             return copy.deepcopy(state["repository"])
         groups = {
-            "actions/workflows/ci.yml/runs": ("runs", "workflow_runs"),
+            "actions/workflows/trunk.yml/runs": ("runs", "workflow_runs"),
             "actions/runs/7/attempts/2/jobs": ("jobs", "jobs"),
             "actions/runs/7/artifacts": ("artifacts", "artifacts"),
         }
@@ -134,10 +131,46 @@ def test_selects_exact_latest_successful_attempt(metadata):
     assert "actions/runs/7/attempts/2/jobs?per_page=100&page=1" in metadata["calls"]
 
 
+def test_lists_only_trunk_push_runs_on_develop(metadata):
+    consumer.select_producer(SHA, metadata["api"])
+    listing = [path for path in metadata["calls"] if path.startswith("actions/workflows/")]
+    assert listing
+    for path in listing:
+        parsed = urlsplit(path)
+        assert parsed.path == "actions/workflows/trunk.yml/runs"
+        query = parse_qs(parsed.query)
+        assert query["head_sha"] == [SHA]
+        assert query["event"] == ["push"]
+        assert query["branch"] == ["develop"]
+
+
+def test_refuses_commit_without_any_trunk_run(metadata):
+    metadata["runs"] = []
+    with pytest.raises(ValueError, match="no trunk producer"):
+        consumer.select_producer(SHA, metadata["api"])
+
+
+def test_refuses_run_without_distribution_artifact(metadata):
+    metadata["artifacts"] = []
+    with pytest.raises(ValueError, match="missing or ambiguous"):
+        consumer.select_producer(SHA, metadata["api"])
+
+
+def test_refuses_run_without_distribution_job(metadata):
+    metadata["jobs"] = []
+    with pytest.raises(ValueError, match="distribution producer job"):
+        consumer.select_producer(SHA, metadata["api"])
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
         ("event", "pull_request"),
+        ("event", "merge_group"),
+        ("event", "workflow_dispatch"),
+        ("head_branch", "feature"),
+        ("head_branch", None),
+        ("path", ".github/workflows/ci.yml"),
         ("path", ".github/workflows/release.yml"),
         ("head_sha", "c" * 40),
         ("status", "in_progress"),
@@ -394,24 +427,6 @@ def test_duplicate_json_key_refused(distributions, metadata):
     path.write_text('{"schema":1,"schema":1}')
     with pytest.raises(ValueError, match="duplicate JSON key"):
         consumer.verify_producer_receipt(distributions, metadata["run"], metadata["job"])
-
-
-def test_producer_workflow_uploads_attempt_evidence_without_new_release_trigger():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
-    producer = jobs["dist-artifact"]
-    assert producer["permissions"] == {"contents": "read", "actions": "read"}
-    assert producer["if"] == "${{ github.event_name == 'merge_group' }}"
-    runs = "\n".join(step.get("run", "") for step in producer["steps"])
-    assert "release_artifact_consumer.py producer --dist dist" in runs
-    upload = next(step for step in producer["steps"] if step["name"] == "Upload dist artifact")
-    assert upload["with"]["name"] == "dist-${{ github.sha }}-attempt-${{ github.run_attempt }}"
-    assert set(upload["with"]["path"].splitlines()) == {
-        "dist/*.whl",
-        "dist/*.tar.gz",
-        "dist/SHA256SUMS",
-        "dist/producer-receipt.json",
-    }
-    assert not (ROOT / ".github/workflows/release-v2.yml").exists()
 
 
 def test_admission_has_no_build_publish_or_attestation_command():

@@ -1166,17 +1166,6 @@ class DatabricksAdapter(PlatformAdapter):
                 connection.close()
 
     def reset_database_in_place(self, **connection_config) -> bool:
-        """Truncate the schema's tables instead of dropping the schema.
-
-        Unity Catalog keeps dropped tables recoverable for about seven days,
-        and they count against the metastore table quota until then, so a
-        drop-and-recreate on every reload exhausts small quotas. Schema
-        creation replaces tables with ``CREATE OR REPLACE``, which does not add
-        to the quota. Tables created with ``IF NOT EXISTS`` keep their
-        structure and start empty. Returns False, and the caller drops the
-        schema as before, when the schema is absent or any table cannot be
-        truncated.
-        """
         catalog = connection_config.get("catalog", self.catalog)
         schema = connection_config.get("schema", self.schema)
         connection = None
@@ -1191,8 +1180,8 @@ class DatabricksAdapter(PlatformAdapter):
             self._schema_reset_in_place = True
             return True
         except Exception as e:
-            self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
-            return False
+            self.log_verbose(f"In-place reset of {catalog}.{schema} failed: {e}")
+            raise
         finally:
             if connection is not None:
                 connection.close()
@@ -1251,7 +1240,7 @@ class DatabricksAdapter(PlatformAdapter):
             # create_schema() keeps owning table creation.
             if not (getattr(self, "create_catalog", False) and not getattr(self, "database_was_reused", False)):
                 cursor.execute(f"USE CATALOG {self.catalog}")
-                if not getattr(self, "database_was_reused", False):
+                if not getattr(self, "database_was_reused", False) and not getattr(self, "_validating_database", False):
                     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")

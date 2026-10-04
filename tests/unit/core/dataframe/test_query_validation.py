@@ -99,6 +99,7 @@ def test_tpcds_is_uncertain_until_its_parameters_are_seed_aligned() -> None:
         ("ssb", 1.0, None, "NOT_RUN"),
         ("tpch", 0.01, None, "UNCERTAIN"),
         ("tpch", 1.0, 123, "UNCERTAIN"),
+        ("tpch", 1.0, 17039360, "UNCERTAIN"),
     ],
 )
 def test_unsupported_or_unaligned_oracles_never_claim_passed(
@@ -242,3 +243,12 @@ def test_selected_dataframe_skip_prevents_a_clean_pass() -> None:
     assert summary.status == "UNCERTAIN"
     assert summary.details["checked"] == 1
     assert summary.details["skipped"] == 1
+
+
+@pytest.mark.parametrize("seed", [0, 1, 42, 17039360, 101000000])
+def test_tpch_answer_set_context_is_false_for_any_seed(seed: int) -> None:
+    from benchbox.core.dataframe.query_validation import _tpch_reference_context
+
+    assert _tpch_reference_context(1.0, seed) is False
+    assert _tpch_reference_context(1.0, None) is True
+    assert _tpch_reference_context(0.01, None) is False

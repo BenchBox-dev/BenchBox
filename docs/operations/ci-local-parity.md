@@ -1,7 +1,7 @@
 # CI / local lint parity
 
-`make ci-lint` (and the product lane selected by `make pr-preflight`) exists
-so that every lint guard CI enforces on a develop PR also runs locally, before
+`make ci-lint` exists
+so that every lint guard CI enforces on a develop PR can also run locally, before
 you push. A guard that only exists in `.github/workflows/ci.yml` fires for the
 first time on a pushed PR -- that costs a full remote CI round trip for a
 failure you could have caught in seconds locally.
@@ -107,16 +107,6 @@ command text -- see `_normalize_recipe_lines` in
 If a guard genuinely cannot run locally, add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
-
-## Documented exceptions
-
-### Historical fast-lane delta exception
-
-The test-count ceiling, per-PR growth guard and develop-count cache producer
-are retired. Their cache-restore exception no longer applies. The retained
-`_project/scripts/fast_lane_ceiling_check.py --strict` command checks forbidden
-markers and paths; its hosted and local equivalents must remain in parity.
-See `docs/operations/fast-lane-budget.md` for the retained guard contract.
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
@@ -224,52 +214,36 @@ binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
 `develop` advances during the run, the run still certifies the base it started
 from; the strict up-to-date rule is off, so the PR does not need a refresh.
 
-### Local preflight routing
+### Local preflight
 
-`make pr-preflight` creates one path-classifier JSON artifact and one generated
-path-list directory, then passes both to its selected targets. The Makefile has
-no skill path globs of its own. Its lane output is explicit:
+`make pr-preflight` lints the changed Python files with ruff and runs the tests
+mapped from the changed paths (`_project/scripts/preflight_targets.py`), failed
+tests first. The pre-push hook runs it. Checks that now run only in CI, with
+the command to run each locally: `ty` (`uv run ty check`), import-linter
+(`make lint-imports`), comment policy (`make comment-policy-check`), the
+content guard (`make pr-preflight-fast-tests`), skill integrity
+(`make skill-integrity-check`), UAT hygiene (`make uat-artifact-hygiene`); the
+full fast lane is `make pr-preflight-fast-tests` and every `ci-lint` guard is
+`make ci-lint`.
 
-- `Selected preflight lanes: skill-integrity` means an approved pure skill diff
-  runs `skill-integrity-check` without the product `ci-lint` or fast pytest
-  selection.
-- `Selected preflight lanes: skill-integrity content` means an approved skill
-  diff plus safe content runs the focused integrity lane and `pr-content-guard`,
-  still without product `ci-lint` or fast pytest.
-- `Selected preflight lanes: product ...` preserves the historical full local
-  lint, content-guard, and fast-test contract. Content-only, unknown, empty,
-  structural-manifest, and ordinary product diffs remain here.
-- A mixed skill/product diff prints both `product` and `skill-integrity` and
-  runs both lanes.
-
-The focused local target validates config/receipt/tool-pin policy and runs
-the vendored wrapper's offline `verify` directly -- no network, no Node, no
-build. It then enforces tracked/untracked mirror integrity, instruction
-authority, resolved and commit-range identity, wrapper budgets, and
-tracked-artifact hygiene. A missing wrapper fails the preflight.
-
-Routing does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
-or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` refuses a branch
-that conflicts with `origin/develop` and `make pr-refresh` remains the
-one-at-a-time absorb for resolving that conflict.
+The preflight does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
+or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole
+currency refusal point and `make pr-refresh` remains the one-at-a-time absorb.
 
 `GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
 every GitHub Actions job already has, so local runs (including
-`pr-preflight`) are unaffected -- both listed guards keep running locally
+`pr-preflight-fast-tests`) are unaffected -- both listed guards keep running locally
 exactly as before this table existed.
 
-## `pr-preflight` and the content guard
+## `pr-preflight-fast-tests` and the content guard
 
-On the full product path, `make pr-preflight-fast-tests` always runs
+`make pr-preflight-fast-tests` is the full local fast lane. It always runs
 `pr-content-guard` (YAML/markdown/docs hygiene + artifact hygiene), regardless
 of whether the branch's `needs-code-ci` path-filter decision is true. This
 preserves the fix for docs-plus-code PRs that previously hit those guards for
 the first time in CI. The `needs-code-ci` decision still gates only the
-fast-test pytest run. Direct invocation, including the opt-in `BENCHBOX_PREPUSH=1`
-hook, creates the classifier JSON and path lists when the parent preflight did
-not already supply them. An approved pure skill diff does not enter this generic
-content target; its focused lane carries the integrity and artifact controls
-listed above. A skill-plus-safe-content diff uses the two narrow lanes instead.
+fast-test pytest run. Direct invocation creates the classifier JSON and path lists when the caller did not
+supply them. It runs under the shared test lock.
 
 ## Hosted merge-gate guard inventory
 

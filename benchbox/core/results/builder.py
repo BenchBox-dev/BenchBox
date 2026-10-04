@@ -64,6 +64,7 @@ from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
 )
+from benchbox.core.results.query_status import has_failed_query_validation
 
 if TYPE_CHECKING:
     pass
@@ -182,6 +183,7 @@ class RunConfigInput:
     table_format: str | None = None
     table_format_compression: str | None = None
     table_format_partition_cols: list[str] | None = None
+    query_parameters: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
@@ -213,6 +215,8 @@ class RunConfigInput:
                 data["table_format_compression"] = self.table_format_compression
             if self.table_format_partition_cols:
                 data["table_format_partition_cols"] = self.table_format_partition_cols
+        if self.query_parameters:
+            data["query_parameters"] = self.query_parameters
         return data
 
 
@@ -645,7 +649,9 @@ class ResultBuilder:
 
         # Determine validation status based on failures
         validation_status = self._validation_status
-        if failed_queries and validation_status == "PASSED":
+        if has_failed_query_validation(query_results_list):
+            validation_status = "FAILED"
+        elif failed_queries and validation_status == "PASSED":
             validation_status = "PARTIAL"
 
         return BenchmarkResults(
