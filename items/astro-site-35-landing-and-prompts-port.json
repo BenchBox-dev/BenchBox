@@ -5,6 +5,7 @@
     "No cdnjs or other third-party script requests on / (network assertion in e2e)",
     "landing/prompts/a11y-checklist.md items pass"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (35062d97, c558dd40, 7b585697, 5b21daa7, cd6c875a), 2026-10-04. Reviews: round 1 FAIL (quickstart tests on static composer) fixed; round 2 PASS; Mediums (Prism colour parity vs real Prism 1.29, light-mode code contrast >=4.5:1, prompt-content invariants mutation-checked) fixed in cd6c875a. CI: make site-test-built runs verify:landing with 176-state old-vs-new parity.",
   "description": "Port landing/index.html, style.css and script.js to an Astro page using the shared shell and tokens. Keep the section structure and copy unless the owner approves changes. Replace Prism (cdnjs) with build-time Shiki, so there are no CDN scripts (G-g).\n\nPort landing/prompts/ (index.html, prompts.js, prompts.css, catalog.generated.js from catalog.yaml) as a page with a Preact island for the interactive composer, at its current URL. Keep the generated quickstarts from generate_landing_quickstarts.py.\n\nDo not add the analytics placeholder in landing/script.js:188.",
   "links": [
     "landing/index.html",
@@ -20,6 +21,14 @@
       "op": "create",
       "op_id": "dc949592dac141f6a52ba925204e2595",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T08:36:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "0075ced0e5014caf96761d50b6e6ac8e",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
