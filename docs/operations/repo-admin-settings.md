@@ -156,7 +156,7 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
 ### No merge queue
 
 `develop-squash-only` (ruleset id `15611785`) has no `merge_queue` rule since
-2026-10-03; see `_project/decisions/merge-queue-retirement-2026-10-03.md`.
+2026-10-03.
 Agents arm a PR with `make pr-arm`, which enables auto-merge; it squash-merges
 when the required checks pass and every review thread is resolved. The drift
 check reports a `merge_queue` rule that reappears.
