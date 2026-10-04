@@ -316,6 +316,11 @@ Allowed differences:
 - `execution.translation` is SQL-only additive metadata and may appear when SQL
   dialect translation was attempted. DataFrame bundles are not expected to emit
   matching translation metadata.
+- `config.query_parameters` is DataFrame-only for now: a TPC-DS DataFrame run
+  lists, query by query, which queries it bound to the `dsqgen -LOG` values of
+  the SQL power test's `-RNGSEED` for each stream (queries with a parameter
+  adapter) and which ran on `default_parameters.yaml`. SQL bundles do not
+  record it.
 - Exact timing values must not be compared across modes.
 - `config.query_parameters` is DataFrame-only for now: a TPC-H DataFrame run
   records which substitution parameters it bound (`qgen -d` defaults, or the

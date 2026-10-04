@@ -647,7 +647,7 @@ class DryRunExecutor:
                 family = "pandas" if platform_info.family == DataFrameFamily.PANDAS else "expression"
 
         try:
-            queries = get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance)
+            queries = get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance, bind_parameters=False)
             result = {}
 
             for query in queries:

@@ -230,12 +230,22 @@ class DataLoadingError(RuntimeError):
         self.per_table_stats = per_table_stats or {}
 
 
-def _describe_query_parameters(benchmark_name: str, seed: Any) -> str | None:
-    if normalize_benchmark_id(benchmark_name) != "tpch":
-        return None
-    from benchbox.core.tpch.benchmark import describe_query_parameters
+def _describe_query_parameters(benchmark_config: Any) -> str | None:
+    benchmark_id = normalize_benchmark_id(benchmark_config.name)
+    if benchmark_id == "tpch":
+        from benchbox.core.tpch.benchmark import describe_query_parameters
 
-    return describe_query_parameters(None if seed is None else int(seed))
+        seed = (getattr(benchmark_config, "options", {}) or {}).get("seed")
+        return describe_query_parameters(None if seed is None else int(seed))
+    if benchmark_id != "tpcds":
+        return None
+    from benchbox.core.tpcds.dataframe_queries.production_binding import (
+        describe_query_parameters,
+        run_seed,
+        selected_query_numbers,
+    )
+
+    return describe_query_parameters(run_seed(benchmark_config), selected_query_numbers(benchmark_config))
 
 
 def _client_host_profile(system_profile: Any) -> dict[str, Any]:
@@ -452,7 +462,7 @@ class BenchmarkExecutionMixin:
                 query_subset=getattr(benchmark_config, "queries", None),
                 tuning_mode=options_map.get("tuning_mode"),
                 tuning_config=options_map.get("df_tuning_config"),
-                query_parameters=_describe_query_parameters(benchmark_config.name, options_map.get("seed")),
+                query_parameters=_describe_query_parameters(benchmark_config),
             )
         )
 
