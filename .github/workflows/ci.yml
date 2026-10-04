@@ -1308,6 +1308,10 @@ jobs:
           # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
+          # Wheel-truth gate for TPC-DS-OBT templates: the 0.4.1 wheel shipped
+          # without top-level _sources/, so the OBT template dir resolved into
+          # site-packages/_sources and get_queries() raised FileNotFoundError.
+          uv run --isolated --no-project --with "$wheel" -- python -c "from benchbox import TPCDSOBT; benchmark = TPCDSOBT(scale_factor=1.0); queries = benchmark.get_queries(); assert queries, 'expected OBT queries from wheel install'; assert benchmark.get_query(next(iter(queries))); print(f'TPC-DS-OBT wheel smoke: {len(queries)} queries')"
 
   dependency-audit:
     name: dependency-audit
