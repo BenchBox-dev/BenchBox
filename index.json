@@ -19753,6 +19753,13 @@
       "status": "done",
       "title": "Let the throughput executor return without blocking on a hung/leaked stream at shutdown"
     },
+    "throughput-explorer-smoke-vacuous-pass": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput explorer smoke sweep can pass without checking anything and accepts dropped streams"
+    },
     "throughput-floor-numeric-threshold-from-baseline": {
       "claim": null,
       "needs": [],

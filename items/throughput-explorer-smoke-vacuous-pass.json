@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Skips fail in the throughput explorer config",
+    "The spec asserts the requested stream count exactly",
+    "The sweep runs on a schedule, or the decision not to is recorded"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1).",
+  "description": "The explorer throughput sweep added in #2380:\n- is not run on any schedule; only tests/uat/test_config.py refers to its config;\n- returns 0 when its smoke phase is skipped, for example when node is missing (tests/uat/phases/explorer_smoke.py:55);\n- calls test.skip in the spec when no throughput bundle is present (results-explorer/e2e/smoke/external-corpus.spec.ts:78);\n- asserts streamValues.length >= 2 (:100) although 3 streams were requested, accepting the silently-dropped-stream defect it should catch.",
+  "links": [
+    "tests/uat/configs/uat-throughput-explorer-smoke.yaml",
+    "tests/uat/phases/explorer_smoke.py",
+    "results-explorer/e2e/smoke/external-corpus.spec.ts"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:01:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2e68924c736c483588d8c0d532a29513",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
