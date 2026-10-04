@@ -6762,12 +6762,17 @@
       "title": "Spike a qualification-value SQL renderer and retire the generate_with_parameters stub"
     },
     "dfparity-t17-qualification-values-and-ans": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:28:34Z",
+        "generation": "259153258a2a444991f728c8a4a1ef67",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t16-qualification-renderer-spike"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Commit TPC-DS qualification values and parse official answer sets by value"
     },
     "dfparity-t18-sf1-oracle-lane": {
