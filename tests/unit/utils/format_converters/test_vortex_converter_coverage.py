@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,8 +18,12 @@ pytestmark = [
 def test_get_vortex_module_raises_helpful_error(monkeypatch):
     converter = VortexConverter()
 
-    def _raise(*_args, **_kwargs):
-        raise ImportError("missing vortex")
+    real_import = builtins.__import__
+
+    def _raise(name, *args, **kwargs):
+        if name == "vortex":
+            raise ImportError("missing vortex")
+        return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", _raise)
 

@@ -591,7 +591,7 @@ DataFusion has some limitations compared to full database systems:
 
 ### API Reference
 - [DataFusion Adapter API](../reference/python-api/platforms/datafusion.rst) - Complete API documentation
-- [Platform Base API](../reference/python-api/platforms.rst) - Platform adapter interface
+- [Platform Base API](../reference/python-api/platforms.md) - Platform adapter interface
 
 ### Benchmark Guides
 - [TPC-H Benchmark](../benchmarks/tpc-h.md) - TPC-H on DataFusion

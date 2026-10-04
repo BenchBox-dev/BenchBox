@@ -25,6 +25,7 @@ REQUIRED_RELEASE_PATHS = frozenset(
     {
         "results-data",
         "results-explorer",
+        "website",
         "_project/scripts/explorer_pipeline",
         "_project/scripts/explorer_publish.py",
         "_project/scripts/results_explorer_snapshot_invariants.py",

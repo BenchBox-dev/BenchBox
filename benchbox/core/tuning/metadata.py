@@ -147,6 +147,8 @@ class TuningMetadataManager:
                 errno = getattr(current, "errno", None) or getattr(current, "code", None)
                 if code == "42P01" or errno in {60, 1146}:
                     return True
+                if "sqlstate: 42p01" in message:
+                    return True
                 if any(
                     phrase in message
                     for phrase in (

@@ -94,8 +94,8 @@ back under 24h on a fresh push, etc.). Do not hand-manage it — the next
 ## The digest issue
 
 No workflow runs the report on a schedule any more: the daily
-`soundness-drain.yml` was retired with the six-unit CI, whose `soundness-flag`
-job now fails a soundness-path PR that lacks its review evidence. Run
+`soundness-drain.yml` was retired with the six-unit CI; the Codex connector
+now reviews soundness-path PRs. Run
 `make soundness-drain-report` for the read-only view, or the script with
 `--apply` when you want the label and issue updated. The digest is posted to a single pinned issue titled
 **"Soundness-PR drain queue"** — found by exact title plus a body marker

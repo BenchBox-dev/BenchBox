@@ -115,7 +115,7 @@ BenchBox enforces single-commit squash integration into `develop` with strict cu
 - **`make pr-open`**: Pushes the current branch, verifies it is current with `origin/develop`, and creates or reuses the pull request. Arm it with `make pr-arm` (see `CONTRIBUTING.md`) and monitor until it merges.
 - **`make pr-open READY=1`**: Opens or reuses the PR and arms it with `make pr-arm` in one step.
 - **`make pr-ready PR=<n> HEAD=<sha>`**: Arms an open PR for an exact head through `make pr-arm`. With `EVIDENCE` or `BATCH` it instead runs the exact readiness transaction from caller-supplied evidence, used for a prepared batch, and arms auto-merge only after local/remote head, review, required-check, hold, and (for batch mode) final-tree checks pass. When a merge queue is active on `develop`, arming automatically enqueues the PR for speculative combined-tree testing.
-- **Soundness Gate**: PRs modifying soundness-critical paths (`benchbox/core/equivalence/`, `benchbox/core/expected_results/`, etc.) carry a PR-body review attestation that `soundness-flag` checks, and `auto-merge-on-open.yml` disarms them on every push, so arm them with `make pr-arm` after the last push.
+- **Soundness Gate**: PRs modifying soundness-critical paths (`benchbox/core/equivalence/`, `benchbox/core/expected_results/`, etc.) are reviewed by the Codex connector (required thread resolution binds its findings), and `auto-merge-on-open.yml` disarms them on every push, so arm them with `make pr-arm` after the last push.
 - **`make pr-refresh`**: Refreshes a stale PR branch onto `origin/develop` when resolving merge conflicts locally. Run one branch at a time.
 
 ## Release Preparation Workflow

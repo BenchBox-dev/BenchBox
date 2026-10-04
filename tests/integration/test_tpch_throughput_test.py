@@ -226,9 +226,8 @@ class TestThroughputExecution:
 
 
 class TestThroughputReferenceSeedContext:
-    def test_reference_seed_context_true_only_for_stream0_position0(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
+    @pytest.mark.parametrize("seed", [42, 17039360])
+    def test_reference_seed_context_false_at_every_position(self, seed: int) -> None:
         benchmark = _make_benchmark_mock()
         connections: list[Mock] = []
         factory = _make_connection_factory(connections)
@@ -240,25 +239,7 @@ class TestThroughputReferenceSeedContext:
             "benchbox.core.tpch.throughput_test.set_reference_seed_context",
             side_effect=lambda v: calls.append(v),
         ):
-            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
-
-        assert len(calls) == 22
-        assert calls[0] is True
-        assert all(v is False for v in calls[1:])
-
-    def test_reference_seed_context_false_for_default_base_seed(self) -> None:
-        benchmark = _make_benchmark_mock()
-        connections: list[Mock] = []
-        factory = _make_connection_factory(connections)
-
-        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=1)
-
-        calls: list[bool] = []
-        with patch(
-            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
-            side_effect=lambda v: calls.append(v),
-        ):
-            test._execute_stream(stream_id=0, seed=test.config.base_seed, config=test.config)
+            test._execute_stream(stream_id=0, seed=seed, config=test.config)
 
         assert len(calls) == 22
         assert all(v is False for v in calls)
@@ -274,25 +255,6 @@ class TestThroughputReferenceSeedContext:
             test._execute_stream(stream_id=0, seed=42, config=test.config)
 
         assert mock_clear.call_count == 22
-
-    def test_no_reference_seed_at_non_sf1_scale_factor(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
-        benchmark = _make_benchmark_mock()
-        connections: list[Mock] = []
-        factory = _make_connection_factory(connections)
-
-        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=0.01, num_streams=1)
-
-        calls: list[bool] = []
-        with patch(
-            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
-            side_effect=lambda v: calls.append(v),
-        ):
-            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
-
-        assert len(calls) == 22
-        assert all(v is False for v in calls)
 
     def test_boundary_query_not_failed_on_stream1_with_default_seed_at_sf1(self) -> None:
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection

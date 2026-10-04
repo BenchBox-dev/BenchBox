@@ -167,10 +167,8 @@ class TestPowerTestReferenceSeedContext:
         assert len(calls) == 22
         assert all(v is True for v in calls)
 
-    def test_reference_seed_context_true_when_seed_matches_reference(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
-        power_test = _make_power_test(scale_factor=1.0, seed=TPCH_SF1_REFERENCE_SEED)
+    def test_reference_seed_context_false_for_former_reference_seed(self) -> None:
+        power_test = _make_power_test(scale_factor=1.0, seed=17039360)
 
         calls: list[bool] = []
         with patch(
@@ -180,7 +178,7 @@ class TestPowerTestReferenceSeedContext:
             power_test.run()
 
         assert len(calls) == 22
-        assert all(v is True for v in calls)
+        assert all(v is False for v in calls)
 
     def test_reference_seed_context_false_for_custom_seed(self) -> None:
         power_test = _make_power_test(scale_factor=1.0, seed=12345)
@@ -246,7 +244,6 @@ class TestPowerTestReferenceSeedContext:
             assert qr.get("error") is None
 
     def test_boundary_query_rejects_out_of_range_count_at_sf1(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 
@@ -271,7 +268,7 @@ class TestPowerTestReferenceSeedContext:
             benchmark=bench,
             connection=connection,
             scale_factor=1.0,
-            seed=TPCH_SF1_REFERENCE_SEED,
+            seed=None,
             stream_id=0,
             validation=True,
             validation_mode="exact",

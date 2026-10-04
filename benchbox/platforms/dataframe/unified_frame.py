@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
 if TYPE_CHECKING:
     import polars as pl
@@ -85,7 +86,108 @@ def _unwrap_unified_expr(value: Any) -> Any:
     return value
 
 
-class UnifiedStrExpr:
+def _resolve_datafusion_value(value: Any, frame: Any) -> Any:
+    while (
+        frame is not None
+        and isinstance(value, _DataFusionDeferredOperations)
+        and value._datafusion_resolver is not None
+    ):
+        value = value._datafusion_resolver(frame)
+    if isinstance(value, tuple):
+        return tuple(_resolve_datafusion_value(item, frame) for item in value)
+    if isinstance(value, list):
+        return [_resolve_datafusion_value(item, frame) for item in value]
+    if isinstance(value, dict):
+        return {key: _resolve_datafusion_value(item, frame) for key, item in value.items()}
+    return value
+
+
+def _has_datafusion_resolver(value: Any) -> bool:
+    if isinstance(value, _DataFusionDeferredOperations):
+        return value._datafusion_resolver is not None
+    if isinstance(value, (tuple, list)):
+        return any(_has_datafusion_resolver(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_datafusion_resolver(item) for item in value.values())
+    return False
+
+
+def _defer_datafusion_operation(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(*args: Any, **kwargs: Any) -> Any:
+        result = operation(*args, **kwargs)
+        if (
+            isinstance(result, _DataFusionDeferredOperations)
+            and all(result is not argument for argument in args)
+            and (_has_datafusion_resolver(args) or _has_datafusion_resolver(kwargs))
+        ):
+            captured_args = _resolve_datafusion_value(args, None)
+            captured_kwargs = _resolve_datafusion_value(kwargs, None)
+            result._datafusion_resolver = lambda frame: operation(
+                *_resolve_datafusion_value(captured_args, frame), **_resolve_datafusion_value(captured_kwargs, frame)
+            )
+        return result
+
+    return apply
+
+
+class _DataFusionDeferredOperations:
+    _datafusion_resolver: Callable[[Any], Any] | None = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for name, member in tuple(vars(cls).items()):
+            if name in {"__init__", "__repr__", "native"} or (name.startswith("_") and not name.endswith("__")):
+                continue
+            if isinstance(member, property) and member.fget is not None:
+                setattr(
+                    cls,
+                    name,
+                    property(_defer_datafusion_operation(member.fget), member.fset, member.fdel, member.__doc__),
+                )
+            elif callable(member):
+                setattr(cls, name, _defer_datafusion_operation(member))
+
+
+def _bind_datafusion_arguments(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(self: Any, *args: Any, **kwargs: Any) -> Any:
+        frame = self._source_df if isinstance(self, UnifiedGroupBy) else self._df
+        if _is_datafusion_df(frame):
+            args = _resolve_datafusion_value(args, frame)
+            kwargs = _resolve_datafusion_value(kwargs, frame)
+        return operation(self, *args, **kwargs)
+
+    return apply
+
+
+def _datafusion_division(numerator: Any, denominator: Any) -> UnifiedExpr:
+    from datafusion import lit as df_lit
+
+    def native(value: Any) -> Any:
+        value = value.native if isinstance(value, UnifiedExpr) else value
+        return value if _is_datafusion_expr(value) else df_lit(value)
+
+    def build(frame: Any = None) -> UnifiedExpr:
+        import pyarrow as pa
+        from datafusion import functions as df_f
+
+        left = native(numerator if frame is None else _resolve_datafusion_value(numerator, frame))
+        right = native(denominator if frame is None else _resolve_datafusion_value(denominator, frame))
+        divisor = df_f.nullif(right, df_f.cast_to_type(df_lit(0), right))
+        quotient = left / divisor
+        if frame is not None and pa.types.is_integer(
+            frame.select(quotient.alias("__division_type__")).schema()[0].type
+        ):
+            quotient = left.cast(pa.float64()) / divisor
+        return UnifiedExpr(quotient)
+
+    result = build()
+    result._datafusion_resolver = build
+    return result
+
+
+class UnifiedStrExpr(_DataFusionDeferredOperations):
     def __init__(self, expr: Any, is_pyspark: bool, is_datafusion: bool = False) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark
@@ -197,7 +299,7 @@ class UnifiedStrExpr:
         return UnifiedExpr(self._expr.str.len_chars())
 
 
-class UnifiedListExpr:
+class UnifiedListExpr(_DataFusionDeferredOperations):
     def __init__(
         self,
         expr: Any,
@@ -362,7 +464,7 @@ class UnifiedListExpr:
         return UnifiedExpr(self._expr.alias(name))
 
 
-class UnifiedMapExpr:
+class UnifiedMapExpr(_DataFusionDeferredOperations):
     def __init__(self, expr: Any, is_pyspark: bool, is_datafusion: bool) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark
@@ -402,7 +504,7 @@ class UnifiedMapExpr:
         raise NotImplementedError("Map operations not supported on Polars (no native Map dtype)")
 
 
-class UnifiedDtExpr:
+class UnifiedDtExpr(_DataFusionDeferredOperations):
     def __init__(self, expr: Any, is_pyspark: bool, is_datafusion: bool = False) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark
@@ -481,7 +583,7 @@ class UnifiedDtExpr:
         return UnifiedExpr(self._expr.dt.total_days())
 
 
-class UnifiedStructExpr:
+class UnifiedStructExpr(_DataFusionDeferredOperations):
     def __init__(self, expr: Any, is_pyspark: bool = False, is_datafusion: bool = False) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark
@@ -495,7 +597,7 @@ class UnifiedStructExpr:
         return UnifiedExpr(self._expr.struct.field(name))
 
 
-class UnifiedExpr:
+class UnifiedExpr(_DataFusionDeferredOperations):
     def __init__(
         self,
         expr: Any,
@@ -616,24 +718,14 @@ class UnifiedExpr:
         return UnifiedExpr(self._unwrap(other) * self._expr)
 
     def __truediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            if isinstance(other_expr, (int, float)):
-                if other_expr == 0:
-                    return UnifiedExpr(self._expr / df_f.nullif(df_lit(other_expr), df_lit(0)))
-                return UnifiedExpr(self._expr / other_expr)
-            return UnifiedExpr(self._expr / df_f.nullif(other_expr, df_lit(0)))
-        return UnifiedExpr(self._expr / other_expr)
+            return _datafusion_division(self, other)
+        return UnifiedExpr(self._expr / self._unwrap(other))
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
-        return UnifiedExpr(other_expr / self._expr)
+            return _datafusion_division(other, self)
+        return UnifiedExpr(self._unwrap(other) / self._expr)
 
     def __eq__(self, other: Any) -> UnifiedExpr:
         other_expr = other._expr if isinstance(other, UnifiedExpr) else other
@@ -1128,9 +1220,35 @@ class _PySparkDeferredRank(UnifiedExpr):
         return UnifiedExpr(rank_expr)
 
 
+_DATAFUSION_RANK_METHODS = frozenset({"min", "max", "dense", "ordinal", "average"})
+
+
+def _datafusion_whole_frame_rank(expr: DataFusionExpr, method: str, descending: bool) -> DataFusionExpr:
+    from datafusion import functions as df_f, lit as df_lit
+    from datafusion.expr import Window
+
+    nulls_last_window = Window(order_by=[expr.sort(ascending=not descending, nulls_first=False)])
+    rows_sharing_value = df_f.count(expr).over(Window(partition_by=[expr]))
+    min_rank = df_f.rank().over(nulls_last_window)
+    if method == "min":
+        ranked = min_rank
+    elif method == "dense":
+        ranked = df_f.dense_rank().over(nulls_last_window)
+    elif method == "ordinal":
+        ranked = df_f.row_number().over(nulls_last_window)
+    elif method == "max":
+        ranked = min_rank + rows_sharing_value - df_lit(1)
+    elif method == "average":
+        ranked = min_rank + (rows_sharing_value - df_lit(1)) / df_lit(2.0)
+    else:
+        raise ValueError(f"Unsupported rank method: {method!r}. Expected one of {sorted(_DATAFUSION_RANK_METHODS)}.")
+    return df_f.when(expr.is_null(), df_lit(None)).otherwise(ranked)
+
+
 class _DataFusionDeferredRank(UnifiedExpr):
     def __init__(self, expr: DataFusionExpr, method: str, descending: bool) -> None:
-        super().__init__(expr)
+        super().__init__(_datafusion_whole_frame_rank(expr, method, descending))
+        self._rank_source = expr
         self._rank_method = method
         self._rank_descending = descending
 
@@ -1145,7 +1263,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_cols = [partition_by] if isinstance(partition_by, str) else list(partition_by)
         partition_exprs = [df_col(c) if isinstance(c, str) else c for c in partition_cols]
 
-        order_expr = self._expr.sort(ascending=not self._rank_descending)
+        order_expr = self._rank_source.sort(ascending=not self._rank_descending)
 
         window = Window(partition_by=partition_exprs, order_by=[order_expr])
 
@@ -1203,7 +1321,7 @@ class _DataFusionDeferredFilter(UnifiedExpr):
         return self._apply_filtered_agg(df_f.max)
 
 
-class UnifiedWhenThen:
+class UnifiedWhenThen(_DataFusionDeferredOperations):
     def __init__(self, when_builder: Any, platform: str, when_pairs: list | None = None) -> None:
         self._when_builder = when_builder
         self._platform = platform
@@ -1245,7 +1363,7 @@ class UnifiedWhenThen:
         return UnifiedExpr(self._when_builder.otherwise(val))
 
 
-class UnifiedWhen:
+class UnifiedWhen(_DataFusionDeferredOperations):
     def __init__(self, when_builder: Any, platform: str, when_pairs: list | None = None) -> None:
         self._when_builder = when_builder
         self._platform = platform
@@ -1303,278 +1421,6 @@ def _is_datafusion_expr(expr: Any) -> bool:
     return "datafusion" in type_name
 
 
-class DataFusionASTFormatError(RuntimeError):
-    pass
-
-
-_DATAFUSION_AST_ERROR_PREFIX = "Catch all triggered in get_operator_name"
-
-_DATAFUSION_AST_SANITY_KEYWORDS = ("Alias", "BinaryExpr", "AggregateFunction")
-
-
-def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
-    if not hasattr(expr, "rex_call_operator"):
-        return None
-
-    try:
-        expr.rex_call_operator()
-        return None
-    except Exception as e:
-        error_str = str(e)
-
-        if _DATAFUSION_AST_ERROR_PREFIX not in error_str:
-            import datafusion
-
-            installed_version = getattr(datafusion, "__version__", "unknown")
-            raise DataFusionASTFormatError(
-                "DataFusion's rex_call_operator() error format has changed and no "
-                f"longer contains the expected '{_DATAFUSION_AST_ERROR_PREFIX}' "
-                "wrapper text that benchbox's aggregate-arithmetic AST extraction "
-                f"depends on. Installed DataFusion version: {installed_version}. "
-                f"Unrecognized error text: {error_str!r}"
-            ) from e
-
-        if any(keyword in error_str for keyword in _DATAFUSION_AST_SANITY_KEYWORDS):
-            return error_str
-
-        return None
-
-
-def _extract_datafusion_alias_name(expr_str: str) -> str | None:
-    import re
-
-    matches = list(re.finditer(r'name:\s*\\"([^\\]+)\\"', expr_str))
-    if matches:
-        return matches[-1].group(1)
-    return None
-
-
-def _extract_datafusion_multiplier(expr_str: str) -> tuple[float | None, str | None]:
-    import re
-
-    match = re.search(r"Literal\((Float64|Int64)\(([0-9.]+)\)", expr_str)
-    if match:
-        multiplier = float(match.group(2))
-        if "op: Multiply" in expr_str:
-            return multiplier, "multiply"
-        elif "op: Divide" in expr_str:
-            return multiplier, "divide"
-    return None, None
-
-
-def _rebuild_datafusion_pure_aggregate(expr_str: str) -> DataFusionExpr | None:
-    import re
-
-    from datafusion import col as df_col, functions as df_f
-
-    func_match = re.search(r"inner:\s*(\w+)\s*\{", expr_str)
-    if not func_match:
-        return None
-    func_name = func_match.group(1).lower()
-
-    col_match = re.search(r'Column \{[^}]*name:\s*\\"([^\\]+)\\"', expr_str)
-    if not col_match:
-        return None
-    col_name = col_match.group(1)
-
-    col_expr = df_col(col_name)
-    if func_name == "avg":
-        return df_f.avg(col_expr)
-    elif func_name == "sum":
-        return df_f.sum(col_expr)
-    elif func_name == "count":
-        return df_f.count(col_expr)
-    elif func_name == "min":
-        return df_f.min(col_expr)
-    elif func_name == "max":
-        return df_f.max(col_expr)
-
-    return None
-
-
-def _extract_datafusion_agg_arithmetic(
-    exprs: list[DataFusionExpr],
-) -> tuple[list[DataFusionExpr], list[tuple]]:
-    processed = []
-    post_ops: list[tuple] = []
-
-    for expr in exprs:
-        ast_str = _get_datafusion_ast_string(expr)
-
-        if ast_str and "BinaryExpr" in ast_str and "AggregateFunction" in ast_str:
-            alias_name = _extract_datafusion_alias_name(ast_str)
-            if alias_name:
-                agg_count = ast_str.count("AggregateFunction(")
-
-                if agg_count >= 2:
-                    multi_result = _extract_multi_agg_arithmetic(ast_str, alias_name)
-                    if multi_result is not None:
-                        temp_exprs, post_op = multi_result
-                        processed.extend(temp_exprs)
-                        post_ops.append(post_op)
-                        continue
-                else:
-                    value, operation = _extract_datafusion_multiplier(ast_str)
-                    if value is not None and operation is not None:
-                        pure_agg = _rebuild_datafusion_pure_aggregate(ast_str)
-                        if pure_agg is not None:
-                            temp_alias = f"__temp_{alias_name}__"
-                            processed.append(pure_agg.alias(temp_alias))
-                            post_ops.append(("literal", temp_alias, alias_name, value, operation))
-                            continue
-
-        processed.append(expr)
-
-    return processed, post_ops
-
-
-_AGG_FUNCS = ("sum", "avg", "mean", "count", "min", "max")
-_OP_MAP = {"Multiply": "multiply", "Plus": "add", "Divide": "divide", "Minus": "subtract"}
-
-
-def _parse_multi_agg_pairs(ast_str: str, agg_funcs: list[str], col_matches: list[str], has_nvl: bool):
-    import re
-
-    if not has_nvl:
-        return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
-
-    agg_pattern = (
-        r"AggregateFunction\s*\{[^}]*inner:\s*(\w+)[^}]*args:\s*\[ScalarFunction[^]]+name:\s*\\?\"([^\"\\]+)\\?\""
-    )
-    nvl_matches = re.findall(agg_pattern, ast_str, re.DOTALL)
-    aggregates = [(f.lower(), c) for f, c in nvl_matches if f.lower() in _AGG_FUNCS]
-    if aggregates:
-        return aggregates
-    return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
-
-
-def _pick_primary_op(ops: list[str]) -> str:
-    for op in ops:
-        if op in ("Multiply", "Plus", "Divide", "Minus"):
-            return op
-    return ops[0]
-
-
-def _build_pure_agg_expr(func_name: str, col_name: str):
-    from datafusion import col as df_col, functions as df_f
-
-    dispatch = {
-        "avg": df_f.avg,
-        "mean": df_f.avg,
-        "sum": df_f.sum,
-        "count": df_f.count,
-        "min": df_f.min,
-        "max": df_f.max,
-    }
-    builder = dispatch.get(func_name)
-    if builder is None:
-        return None
-    return builder(df_col(col_name))
-
-
-def _extract_multi_agg_arithmetic(ast_str: str, alias_name: str) -> tuple[list[Any], tuple] | None:
-    import re
-
-    func_matches = re.findall(r"inner:\s*(\w+)\s*\{", ast_str)
-    has_nvl = "NVLFunc" in ast_str or "nvl" in ast_str.lower()
-    has_cast = "Cast(" in ast_str and "Float64" in ast_str
-
-    col_matches = re.findall(r'name:\s*\\?"([^"\\]+)\\?"', ast_str)
-    col_matches = [c for c in col_matches if c and c[0].isalpha() and c not in ("?table?",)]
-    agg_funcs = [f for f in func_matches if f.lower() in _AGG_FUNCS]
-
-    if len(agg_funcs) < 2:
-        return None
-
-    aggregates = _parse_multi_agg_pairs(ast_str, agg_funcs, col_matches, has_nvl)
-    if len(aggregates) < 2:
-        return None
-
-    ops = re.findall(r"op:\s*(\w+)", ast_str)
-    if not ops:
-        return None
-    primary_op = _pick_primary_op(ops)
-
-    temp_exprs = []
-    temp_aliases = []
-    for i, (func_name, col_name) in enumerate(aggregates):
-        agg_expr = _build_pure_agg_expr(func_name, col_name)
-        if agg_expr is None:
-            return None
-        temp_alias = f"__temp_{alias_name}_{i}__"
-        temp_aliases.append(temp_alias)
-        temp_exprs.append(agg_expr.alias(temp_alias))
-
-    operation = _OP_MAP.get(primary_op, "multiply")
-    return temp_exprs, ("multi", temp_aliases, alias_name, operation, has_nvl, has_cast)
-
-
-def _apply_datafusion_post_ops(result: DataFusionDataFrame, post_ops: list[tuple]) -> DataFusionDataFrame:
-    from datafusion import col as df_col
-
-    for post_op in post_ops:
-        op_type = post_op[0]
-        if op_type == "literal":
-            result = _apply_literal_post_op(result, post_op, df_col)
-        elif op_type == "multi":
-            result = _apply_multi_post_op(result, post_op, df_col)
-        else:
-            raise ValueError(f"Unsupported DataFusion post-op format: {post_op}")
-
-    return result
-
-
-def _apply_literal_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
-    _, temp_alias, final_alias, value, operation = post_op
-    if operation == "multiply":
-        result = result.with_column(final_alias, df_col(temp_alias) * value)
-    elif operation == "divide":
-        result = result.with_column(final_alias, df_col(temp_alias) / value)
-    if temp_alias != final_alias:
-        result = result.drop(temp_alias)
-    return result
-
-
-def _apply_multi_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
-    if len(post_op) == 6:
-        _, temp_aliases, final_alias, operation, has_nvl, has_cast = post_op
-    else:
-        _, temp_aliases, final_alias, operation = post_op
-        has_nvl = False
-        has_cast = False
-
-    if len(temp_aliases) < 2:
-        return result
-
-    import pyarrow as pa
-    from datafusion import functions as df_f, lit as df_lit
-
-    def _prep(alias: str):
-        expr = df_col(alias)
-        if has_nvl:
-            expr = df_f.coalesce(expr, df_lit(0))
-        if has_cast:
-            expr = expr.cast(pa.float64())
-        return expr
-
-    combined = _prep(temp_aliases[0])
-    for temp_alias in temp_aliases[1:]:
-        next_col = _prep(temp_alias)
-        if operation == "multiply":
-            combined = combined * next_col
-        elif operation == "add":
-            combined = combined + next_col
-        elif operation == "divide":
-            combined = combined / df_f.nullif(next_col, df_lit(0.0))
-        elif operation == "subtract":
-            combined = combined - next_col
-
-    result = result.with_column(final_alias, combined)
-    for temp_alias in temp_aliases:
-        result = result.drop(temp_alias)
-    return result
-
-
 class UnifiedGroupBy(Generic[DF, Expr]):
     def __init__(
         self,
@@ -1588,6 +1434,7 @@ class UnifiedGroupBy(Generic[DF, Expr]):
         self._adapter = adapter
         self._source_df = source_df
 
+    @_bind_datafusion_arguments
     def agg(self, *exprs: Expr) -> UnifiedLazyFrame:
         if len(exprs) == 1 and isinstance(exprs[0], list):
             exprs = tuple(exprs[0])
@@ -1597,11 +1444,7 @@ class UnifiedGroupBy(Generic[DF, Expr]):
         if _is_pyspark_df(self._source_df) or _is_polars_df(self._source_df):
             result = self._grouped.agg(*unwrapped)
         elif _is_datafusion_df(self._source_df):
-            processed_exprs, post_ops = _extract_datafusion_agg_arithmetic(unwrapped)
-            result = self._source_df.aggregate(self._columns, processed_exprs)
-
-            if post_ops:
-                result = _apply_datafusion_post_ops(result, post_ops)
+            result = self._source_df.aggregate(self._columns, unwrapped)
         else:
             result = self._grouped.agg(*unwrapped)
 
@@ -1773,6 +1616,7 @@ def _prepare_join_items(df, items: list, side: str) -> tuple[Any, list[str], lis
     join_cols: list[str] = []
     temp_cols: list[str] = []
     for i, item in enumerate(items):
+        item = _resolve_datafusion_value(item, df)
         if isinstance(item, UnifiedExpr):
             temp_col = f"__{side}_join_key_{i}__"
             df = df.with_column(temp_col, item.native)
@@ -2009,7 +1853,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
         renamed_other = other
         for col_name in duplicate_cols:
-            if (is_outer_join and same_join_cols) or col_name not in right_cols:
+            if is_outer_join and same_join_cols or col_name not in right_cols:
                 new_name = f"{col_name}{suffix}"
                 renamed_other = renamed_other.withColumnRenamed(col_name, new_name)
 
@@ -2251,6 +2095,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             result, temp_cols_left, temp_cols_right, right_join_key_renames, is_outer_join, suffix
         )
 
+    @_bind_datafusion_arguments
     def group_by(self, *columns: str | Expr | list) -> UnifiedGroupBy:
         if len(columns) == 1 and isinstance(columns[0], list):
             columns = tuple(columns[0])
@@ -2272,11 +2117,13 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
         return UnifiedGroupBy(grouped, col_list, self._adapter, self._df)
 
+    @_bind_datafusion_arguments
     def filter(self, condition: Expr) -> UnifiedLazyFrame:
         native_condition = condition.native if isinstance(condition, UnifiedExpr) else condition
         result = self._df.filter(native_condition)
         return UnifiedLazyFrame(result, self._adapter)
 
+    @_bind_datafusion_arguments
     def select(self, *columns: str | Expr | list) -> UnifiedLazyFrame:
         if len(columns) == 1 and isinstance(columns[0], list):
             columns = tuple(columns[0])
@@ -2286,10 +2133,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if _is_datafusion_df(self._df):
             has_aggregate = self._has_aggregate_expr(unwrapped)
             if has_aggregate:
-                processed_exprs, post_ops = _extract_datafusion_agg_arithmetic(unwrapped)
-                result = self._df.aggregate([], processed_exprs)
-                if post_ops:
-                    result = _apply_datafusion_post_ops(result, post_ops)
+                result = self._df.aggregate([], unwrapped)
             else:
                 result = self._df.select(*unwrapped)
         else:
@@ -2325,6 +2169,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
                     return True
         return False
 
+    @_bind_datafusion_arguments
     def with_columns(self, *exprs: Expr | list) -> UnifiedLazyFrame:
         if len(exprs) == 1 and isinstance(exprs[0], list):
             exprs = tuple(exprs[0])
@@ -2429,6 +2274,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     def distinct(self) -> UnifiedLazyFrame:
         return self.unique()
 
+    @_bind_datafusion_arguments
     def sort(
         self,
         by: str | list[str] | list[tuple[str, str]],

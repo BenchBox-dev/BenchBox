@@ -266,10 +266,6 @@ class TPCHThroughputTest:
 
             cancel_event = self._resolve_cancel_event(config, stream_id)
 
-            from benchbox.core.tpch.benchmark import get_reference_seed
-
-            reference_seed = get_reference_seed(config.scale_factor)
-
             cancelled = False
             for position, query_id in enumerate(query_permutation):
                 if self._cooperative_cancel_requested(
@@ -297,8 +293,7 @@ class TPCHThroughputTest:
                         if hasattr(connection, "set_query_context"):
                             connection.set_query_context(query_id)
 
-                        stream_seed = _derive_query_seed(seed, stream_id, position)
-                        set_reference_seed_context(stream_seed == reference_seed)
+                        set_reference_seed_context(False)
 
                         cursor = connection.execute(query_text)
 

@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
-import contextlib
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 
 def expand_rollup_expression(
@@ -27,7 +29,7 @@ def expand_rollup_expression(
     results = []
     n = len(group_cols)
 
-    def get_output_name(expr: Any) -> str:
+    def get_output_name(expr: Any) -> str | None:
         native = expr.native if isinstance(expr, UnifiedExpr) else expr
         if hasattr(native, "meta") and hasattr(native.meta, "output_name"):
             try:
@@ -42,9 +44,23 @@ def expand_rollup_expression(
                 return name.strip("`")
             except Exception:
                 pass
-        return f"agg_{id(expr)}"
+        if hasattr(native, "schema_name"):
+            try:
+                return native.schema_name()
+            except Exception:
+                pass
+        return None
 
-    agg_col_names = [get_output_name(e) for e in agg_exprs]
+    resolved_names = [get_output_name(e) for e in agg_exprs]
+    names_resolved = all(name is not None for name in resolved_names)
+    agg_col_names = [name if name is not None else f"agg_{id(e)}" for name, e in zip(resolved_names, agg_exprs)]
+    if not names_resolved:
+        unresolved = next(e for name, e in zip(resolved_names, agg_exprs) if name is None)
+        logger.warning(
+            "ROLLUP: cannot read the output name of a %s aggregation expression; "
+            "skipping the column reorder, so levels are unioned in their own column order",
+            type(unresolved.native if isinstance(unresolved, UnifiedExpr) else unresolved).__name__,
+        )
 
     for i in range(n + 1):
         current_group = group_cols[: n - i]
@@ -69,8 +85,8 @@ def expand_rollup_expression(
         grouping_id = sum(2**j for j in range(i))
         grouped = grouped.with_columns(lit(grouping_id).alias("grouping_id"))
 
-        all_cols = group_cols + agg_col_names + ["grouping_id"]
-        with contextlib.suppress(Exception):
+        if names_resolved:
+            all_cols = group_cols + agg_col_names + ["grouping_id"]
             grouped = grouped.select(*all_cols) if isinstance(grouped, UnifiedLazyFrame) else grouped.select(all_cols)
 
         results.append(grouped)

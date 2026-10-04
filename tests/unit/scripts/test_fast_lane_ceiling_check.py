@@ -420,14 +420,14 @@ def test_ceiling_grace_flag_rejected_on_other_events(
     assert mod._ceiling_grace_from_event(None) == 0
 
 
-def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
+def test_workflow_never_passes_a_ceiling_grace() -> None:
     import yaml
 
     pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
     lint_steps = pr["jobs"]["code-lint"]["steps"]
     ceiling = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-ceiling")
     assert "FAST_LANE_CEILING_GRACE" not in (ceiling.get("env") or {})
-    assert "--ceiling-grace 750" in ceiling["run"]
+    assert "--ceiling-grace" not in ceiling["run"]
     wall_clock = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")
     assert "--ceiling-grace" not in wall_clock["run"]
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")

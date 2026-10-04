@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 import yaml
 from comment_execution import PythonBindings, python_html_sources
 from comment_payloads import (
+    astro_template_comments,
     bounded_html_template,
     nested_sources,
     shell_payloads,
@@ -50,6 +51,7 @@ LANGUAGES = {
     ".ini": "ini",
     ".cfg": "ini",
     ".css": "css",
+    ".astro": "astro",
     ".html": "html",
     ".htm": "html",
     ".jinja": "html+jinja",
@@ -96,6 +98,7 @@ OWNED_ROOTS = (
     "tools/",
     "_project/scripts/",
     "results-explorer/",
+    "website/",
     "docker/",
     "make/",
     ".github/",
@@ -469,6 +472,10 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
 
 REVIEWED_JAVASCRIPT_FLOWS: dict[tuple[str, str], str] = {
     (
+        "website/src/loaders/docs-loader.ts",
+        "unresolved process arguments require an executable-payload adapter",
+    ): "the only process call runs uv run python on the tracked scripts/rst_to_html.py file, scanned as Python, with a documentation file path as data",
+    (
         "results-explorer/src/db.ts",
         "unresolved executable sql payload: scan.sql",
     ): "SNAPSHOT_READY_SCANS entries are object literals whose sql values are scanned as SQL",
@@ -586,6 +593,12 @@ def validate_json_lines(source: str) -> None:
                 raise ValueError(f"invalid JSON line {index}") from exc
 
 
+def astro_findings(path: str, source: str, lang: str) -> list[Finding]:
+    if lang != "astro":
+        return []
+    return [Finding(path, line, "comment", text) for line, text in astro_template_comments(source)]
+
+
 def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     try:
         if source.startswith("#!"):
@@ -602,8 +615,8 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             for f in scan(child_path, text, child_lang, js_results)
         ]
         nested.extend(template_coverage(path, source, lang))
-        if lang in {"notebook", "examples"}:
-            return nested
+        if lang in {"notebook", "examples", "astro"}:
+            return nested + astro_findings(path, source, lang)
         source = mask_embedded_sources(path, source, lang)
         if lang == "unsupported":
             raise ValueError("source language has no registered adapter")

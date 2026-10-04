@@ -113,7 +113,7 @@ merged in sequence. The tradeoff is deliberate: when `develop` advances, an
 otherwise-green PR must refresh its required checks before it can merge.
 
 The latest bounded, read-only wall and runner-minute remeasure is recorded in
-[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/ci-waste-remeasure-2026-08-31.md).
 It keeps `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 
@@ -172,7 +172,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 - **Queue Timeout:** `check_response_timeout_minutes: 90` allows sufficient time for merge-group checks across parallel shards to complete without premature ejection during runner contention.
 - **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
+- **Soundness Gate:** a PR that touches a path in `.github/soundness-paths.txt` is reviewed by the Codex connector, required thread resolution binds its findings, and the code owner's review is still required by the ruleset. The PR-body attestation check has been removed.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)
@@ -202,13 +202,11 @@ The soundness gate, as operated:
   cannot merge while a follow-up commit is still being written. Arming at
   creation stranded three commits in one session, two of them the fixes for
   their own review findings.
-- `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
-  live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
-  conflict-free native queue permits publication without an author-side
-  refresh; absent, unknown, or misconfigured queue state keeps the current-base
-  gate and requires `make pr-refresh` (one PR at a time). There is no stale
-  override. `pr-open` must not merge `develop` itself; that would turn
-  `pr-fanout` into a refresh storm. See
+- `make pr-open` checks a non-ancestor branch with `git merge-tree` and
+  refuses only a genuine conflict; a conflict-free branch that is behind
+  `develop` is published without an author-side refresh and without a live
+  queue check. There is no stale override. `pr-open` must not merge `develop`
+  itself; that would turn `pr-fanout` into a refresh storm. See
   `_project/decisions/behind-pr-occurrence-2026-08-16.md`.
 - `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
   arms on any event (bare `gh pr create` does not auto-arm, and the

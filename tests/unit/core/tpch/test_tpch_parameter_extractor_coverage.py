@@ -38,32 +38,29 @@ def test_extractors_parse_expected_values(query_id: int, sql: str, expected: dic
         assert params[key] == value
 
 
-def test_extract_query_params_unknown_query_returns_none() -> None:
-    assert pe._extract_query_params(999, "select 1") is None
+def test_extract_query_params_unknown_query_raises() -> None:
+    with pytest.raises(pe.ParameterExtractionError):
+        pe._extract_query_params(999, "select 1")
 
 
-def test_extract_query_params_handles_extractor_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_extractor(_: str) -> dict[str, object]:
-        raise RuntimeError("boom")
-
-    monkeypatch.setitem(pe._EXTRACTORS, 99, failing_extractor)
-
-    assert pe._extract_query_params(99, "select 1") is None
+@pytest.mark.parametrize(("query_id", "sql"), [(7, "no nation filters"), (18, "no threshold"), (20, "no match")])
+def test_extractors_raise_when_patterns_missing(query_id: int, sql: str) -> None:
+    with pytest.raises(pe.ParameterExtractionError, match=f"Q{query_id}"):
+        pe._extract_query_params(query_id, sql)
 
 
-def test_extractors_use_defaults_when_patterns_missing() -> None:
-    q7 = pe._extract_query_params(7, "no nation filters")
-    q18 = pe._extract_query_params(18, "no threshold")
-    q20 = pe._extract_query_params(20, "no match")
+def test_extractor_rejects_dialect_translated_sql() -> None:
+    translated = "WHERE c_mktsegment = 'HOUSEHOLD' AND o_orderdate < CAST('1995-03-03' AS DATE)"
+    with pytest.raises(pe.ParameterExtractionError):
+        pe._extract_query_params(3, translated)
 
-    assert q7 == {"nation1": "FRANCE", "nation2": "GERMANY"}
-    assert q18 == {"quantity_threshold": 300}
-    assert q20 == {
-        "color_prefix": "forest",
-        "nation_name": "CANADA",
-        "start_date": date(1994, 1, 1),
-        "end_date": date(1995, 1, 1),
-    }
+
+def test_q6_discount_bounds_are_exact_decimals() -> None:
+    params = pe._extract_query_params(
+        6, "l_shipdate >= date '1994-01-01' and l_discount between .06 - 0.01 and .06 + 0.01 and l_quantity < 24"
+    )
+    assert params["discount_low"] == 0.05
+    assert params["discount_high"] == 0.07
 
 
 def test_date_helpers() -> None:
@@ -72,22 +69,21 @@ def test_date_helpers() -> None:
     assert pe._add_years(date(1995, 3, 17), 1) == date(1996, 3, 17)
 
 
-def test_extract_tpch_parameters_collects_successes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_extract_tpch_parameters_raises_on_any_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeQGen:
         def generate(self, query_id: int, seed: int, scale_factor: float) -> str:
             assert seed == 11
             assert scale_factor == 0.01
             if query_id == 1:
                 return "interval '7' day"
-            raise RuntimeError("missing")
+            return "unparseable"
 
     import benchbox.core.tpch.queries as queries
 
     monkeypatch.setattr(queries, "QGenBinary", FakeQGen)
 
-    params = pe.extract_tpch_parameters(seed=11, scale_factor=0.01)
-
-    assert params == {1: {"delta": 7, "cutoff_date": date(1998, 11, 24)}}
+    with pytest.raises(pe.ParameterExtractionError, match="Q2"):
+        pe.extract_tpch_parameters(seed=11, scale_factor=0.01)
 
 
 def test_get_tpch_extracted_parameters_cache(monkeypatch: pytest.MonkeyPatch) -> None:

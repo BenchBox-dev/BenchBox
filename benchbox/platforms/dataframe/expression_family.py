@@ -29,7 +29,12 @@ from benchbox.platforms.dataframe.shared_loading import (
     resolve_dataframe_csv_dialect,
 )
 from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
-from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame, UnifiedWhen
+from benchbox.platforms.dataframe.unified_frame import (
+    UnifiedExpr,
+    UnifiedLazyFrame,
+    UnifiedWhen,
+    _defer_datafusion_operation,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import detect_data_format
 
@@ -173,6 +178,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
     def rename_columns(self, df: LazyDF, mapping: dict[str, str]) -> LazyDF:
         return cast(LazyDF, self._adapter.rename_columns(df, mapping))
 
+    @_defer_datafusion_operation
     def when(self, condition: Any) -> UnifiedWhen:
         cond = condition._expr if isinstance(condition, UnifiedExpr) else condition
 
@@ -194,6 +200,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
         result = self._adapter.concat_dataframes(native_dfs)
         return UnifiedLazyFrame(result, self._adapter)
 
+    @_defer_datafusion_operation
     def struct(self, *columns: Any) -> UnifiedExpr:
         platform = self._adapter.platform_name
 
@@ -228,6 +235,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
 
         return UnifiedExpr(pl.struct(*native_cols))
 
+    @_defer_datafusion_operation
     def map_from_entries(self, column: Any) -> UnifiedExpr:
         platform = self._adapter.platform_name
 
@@ -366,6 +374,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
 
         return UnifiedExpr(pl.max(column))
 
+    @_defer_datafusion_operation
     def coalesce(self, *exprs: Any) -> UnifiedExpr:
         platform = self._adapter.platform_name
 

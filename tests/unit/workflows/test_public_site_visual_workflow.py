@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -48,7 +47,7 @@ def test_develop_pushes_produce_a_public_site_visual_baseline() -> None:
     assert baseline_upload["with"]["retention-days"] == 30
 
 
-def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
+def test_pull_requests_require_exact_base_comparison() -> None:
     visual = _workflow()["jobs"]["public-site-visual-regression"]
     steps = visual["steps"]
     names = [step.get("name") for step in steps]
@@ -67,34 +66,22 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     assert capture["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "capture"
     assert "if" not in capture
     assert run["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "compare"
-    assert "merge_group" in run["if"] and "pull_request" in run["if"]
+    assert run["if"] == "github.event_name == 'pull_request'"
     assert run["env"]["PUBLIC_SITE_VISUAL_REQUIRE_BASELINE"] == "1"
     assert run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"] == capture["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
     assert download["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ needs.visual-inputs.outputs.base_sha }}"
-    assert "merge_group" in download["if"]
+    assert download["if"] == "github.event_name == 'pull_request'"
+    assert "PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS" not in download["env"]
     assert "continue-on-error" not in download
     assert "download-public-site-visual-baseline.mjs" in download["run"]
     assert run["env"]["PUBLIC_SITE_VISUAL_BASELINE"] == download["env"]["PUBLIC_SITE_VISUAL_BASELINE"]
-    assert "merge_group.head_sha" in run["env"]["PR_HEAD_SHA"]
-    assert "APPROVED_MERGE_GROUP_SHA" in run["env"]["APPROVED_HEAD_SHA"]
-    assert "MERGE_GROUP_APPROVAL_REASON" in run["env"]["APPROVAL_REASON"]
+    assert "merge_group" not in str(run["env"])
+    assert "MERGE_GROUP" not in str(run["env"])
     assert run["env"]["E2E_PAGES_SHAPED"] == "1"
     assert "public-site-visual" in run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
     assert not any(step.get("name") == "Determine baseline mode" for step in steps)
-
-
-def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
-    visual = _workflow()["jobs"]["public-site-visual-regression"]
-    download = next(
-        step
-        for step in visual["steps"]
-        if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
-    )
-    wait = download["env"]["PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS"]
-    assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
-    assert 600 / 60 + 10 <= visual["timeout-minutes"] <= 30
 
 
 def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_sha() -> None:
@@ -134,18 +121,17 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
     site_change = _commit(tmp_path, "docs/index.md", "v2\n", "site change")
     quiet_one = _commit(tmp_path, "tests/a.py", "a\n", "non-site change")
     base = _commit(tmp_path, "tests/b.py", "b\n", "another non-site change")
-    head = _commit(tmp_path, "tests/c.py", "c\n", "group head")
+    head = _commit(tmp_path, "tests/c.py", "c\n", "pull request head")
 
     classifier = _workflow()["jobs"]["visual-inputs"]["steps"][1]["run"]
     output = tmp_path / "github-output"
     env = dict(os.environ)
     env.update(
-        EVENT_NAME="merge_group",
-        PR_BASE_SHA="",
-        GROUP_BASE_SHA=base,
+        EVENT_NAME="pull_request",
+        PR_BASE_SHA=base,
         RECOVERY_SOURCE_SHA="",
         CURRENT_SHA=head,
-        CURRENT_REF="refs/heads/gh-readonly-queue/develop/pr-1",
+        CURRENT_REF="refs/pull/1/merge",
         GITHUB_OUTPUT=str(output),
     )
     result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
@@ -154,51 +140,15 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
     assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
 
 
-def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> None:
-    steps = _workflow()["jobs"]["public-site-visual-regression"]["steps"]
-    names = [step.get("name") for step in steps]
-    upload = next(step for step in steps if step.get("name") == "Upload merge-queue candidate visual baseline")
-    assert upload["if"] == "github.event_name == 'merge_group'"
-    assert upload["with"]["name"] == "public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}"
-    assert "always()" not in upload["if"] and "failure()" not in upload["if"]
-    assert names.index("Compare public site with exact base") < names.index(
-        "Upload merge-queue candidate visual baseline"
-    )
-
-
-def _candidate_producers() -> list[tuple[Path, str]]:
-    producers = []
+def test_no_workflow_publishes_a_merge_queue_candidate_baseline() -> None:
     for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
-        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        triggers = workflow.get(True, workflow.get("on", {})) or {}
-        if "merge_group" not in triggers:
-            continue
-        for job in workflow["jobs"].values():
-            steps = job.get("steps", [])
-            if any(step.get("name") == "Upload merge-queue candidate visual baseline" for step in steps):
-                producers.append((path, job.get("name", "")))
-    return producers
-
-
-def _lookup_constants_and_trusted_paths() -> tuple[dict[str, str], set[str]]:
+        text = path.read_text(encoding="utf-8")
+        assert "Upload merge-queue candidate visual baseline" not in text, path.name
     lookup = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
         encoding="utf-8"
     )
-    constants = dict(re.findall(r'^export const (\w+) = "([^"]*)";', lookup, flags=re.MULTILINE))
-    listed = re.search(r"^export const MERGE_QUEUE_WORKFLOW_PATHS = \[([^\]]*)\];", lookup, flags=re.MULTILINE)
-    assert listed, "the lookup no longer exports MERGE_QUEUE_WORKFLOW_PATHS as a list of constants"
-    names = [name.strip() for name in listed.group(1).split(",") if name.strip()]
-    return constants, {constants[name] for name in names}
-
-
-def test_the_lookup_trusts_every_workflow_that_publishes_a_merge_queue_candidate() -> None:
-    constants, trusted = _lookup_constants_and_trusted_paths()
-    producers = _candidate_producers()
-    assert producers, "no merge_group workflow uploads a candidate baseline"
-    for path, job_name in producers:
-        relative = path.relative_to(REPO_ROOT).as_posix()
-        assert relative in trusted, f"{relative} uploads candidates but the lookup's trusted list is {sorted(trusted)}"
-        assert constants["VISUAL_JOB_NAME"] == job_name, f"{relative} job {job_name!r} differs from the lookup"
+    assert "merge_group" not in lookup
+    assert "MERGE_QUEUE" not in lookup
 
 
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
@@ -245,22 +195,19 @@ def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
     ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     ci_triggers = ci.get("on", ci.get(True))
     assert "paths" not in ci_triggers["pull_request"]
-    assert "merge_group" in ci_triggers
+    assert "merge_group" not in ci_triggers
     visual = ci["jobs"]["public-site-visual-regression"]
     assert visual["name"] == "Public-site visual regression"
     assert "render_changed" in visual["if"]
-    assert "merge_group" in visual["if"]
+    assert "merge_group" not in visual["if"]
 
 
 @pytest.mark.parametrize(
     ("event", "base_ref", "changed", "build", "visual", "expected"),
     [
         ("pull_request", "develop", "false", "skipped", "skipped", 0),
-        ("merge_group", "", "false", "skipped", "skipped", 0),
         ("pull_request", "develop", "true", "success", "success", 0),
-        ("merge_group", "", "true", "success", "success", 0),
         ("pull_request", "develop", "true", "success", "failure", 1),
-        ("merge_group", "", "true", "skipped", "skipped", 1),
         ("pull_request", "develop", "", "success", "success", 1),
     ],
 )
@@ -327,7 +274,7 @@ def test_classification_retains_every_prior_public_site_input() -> None:
     ("event", "changed_path", "expected"),
     [
         ("pull_request", "docs/changed.md", "true"),
-        ("merge_group", "results-explorer/changed.ts", "true"),
+        ("pull_request", "results-explorer/changed.ts", "true"),
         ("pull_request", "tests/changed.py", "false"),
     ],
 )
@@ -353,8 +300,7 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
     env = dict(os.environ)
     env.update(
         EVENT_NAME=event,
-        PR_BASE_SHA=base_sha if event == "pull_request" else "",
-        GROUP_BASE_SHA=base_sha if event == "merge_group" else "",
+        PR_BASE_SHA=base_sha,
         RECOVERY_SOURCE_SHA="",
         CURRENT_SHA=head_sha,
         CURRENT_REF="refs/heads/develop",

@@ -51,11 +51,12 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-      - id: pr-preflight-fast-tests
-        name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make local-validation GATE=local-focused-check CMD="make pr-preflight-focused-tests"; else exec uv run -- python scripts/local_validation.py skip --gate local-focused-check; fi'
+      - id: pr-preflight
+        name: pr-preflight (changed-file lint and tests)
+        entry: make pr-preflight
         language: system
         pass_filenames: false
+        always_run: true
         stages: [pre-push]
 
       - id: blind-spot-validate

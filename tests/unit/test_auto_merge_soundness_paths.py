@@ -35,6 +35,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
+        "_project/scripts/oracle_review_check.py",
+        ".github/workflows/oracle-review.yml",
         "benchbox/core/results/anonymization.py",
         "benchbox/core/results/anonymization_specs.yaml",
         "benchbox/core/results/provenance.py",
@@ -56,6 +58,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
         ".github/CODEOWNERS",
+        "_project/scripts/soundness_merge_digest.py",
+        ".github/workflows/soundness-merge-digest.yml",
         "results-data/bundles/tpch/duckdb/sf1.override.json",
         "results-data/bundles/sf1.override.json",
         ".github/workflows/validate-submission.yml",
@@ -222,6 +226,8 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert ".github/soundness-paths.txt @joeharris76" in codeowners
     assert "_project/scripts/soundness_paths.py @joeharris76" in codeowners
     assert "_project/scripts/check_soundness_review.py @joeharris76" in codeowners
+    assert "_project/scripts/soundness_merge_digest.py @joeharris76" in codeowners
+    assert ".github/workflows/soundness-merge-digest.yml @joeharris76" in codeowners
     assert ".github/workflows/ci.yml @joeharris76" in codeowners
     assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners

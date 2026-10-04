@@ -50,6 +50,7 @@ def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]
             table_format=run_cfg.get("table_format"),
             table_format_compression=run_cfg.get("table_format_compression"),
             table_format_partition_cols=run_cfg.get("table_format_partition_cols"),
+            query_parameters=run_cfg.get("query_parameters"),
         )
     )
 

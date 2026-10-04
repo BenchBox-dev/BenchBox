@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
+import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -114,13 +116,62 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="assemble prose, docs, and blog only without requiring or embedding Results Explorer",
     )
-    parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help=argparse.SUPPRESS)
+    parser.add_argument("--repo-root", type=Path, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--routes", type=Path, help="assemble per-route trees from this routes.yml")
+    parser.add_argument(
+        "--ref-root",
+        action="append",
+        default=[],
+        metavar="NAME=DIR",
+        help="checkout providing the named ref of the routes manifest",
+    )
+    parser.add_argument("--receipt-out", type=Path, help="write the route assembly receipt here")
+    parser.add_argument("--work-dir", type=Path, help="scratch directory for per-ref stages")
     return parser
+
+
+def _parse_ref_roots(values: Sequence[str]) -> dict[str, Path]:
+    roots: dict[str, Path] = {}
+    for value in values:
+        name, separator, directory = value.partition("=")
+        if not separator or not name or not directory:
+            raise SystemExit(f"--ref-root expects NAME=DIR, got {value!r}")
+        roots[name] = Path(directory)
+    return roots
+
+
+def _assemble_from_routes(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(REPO_ROOT))
+    from scripts.site_deploy.routes import RouteManifestError, assemble_routes, load_manifest, write_assembly_receipt
+
+    site_dir = args.site_dir.resolve()
+    if site_dir == (REPO_ROOT / "site").resolve():
+        raise SystemExit("routes mode refuses --site-dir site, the legacy assembly output")
+    _validate_destination(REPO_ROOT, site_dir)
+    work_dir = args.work_dir or Path(tempfile.mkdtemp(prefix="site-routes-"))
+    try:
+        receipt = assemble_routes(
+            manifest=load_manifest(args.routes),
+            ref_roots=_parse_ref_roots(args.ref_root),
+            site_dir=site_dir,
+            work_dir=work_dir.resolve(),
+            stage_builder=assemble_public_site,
+        )
+    except RouteManifestError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.receipt_out:
+        write_assembly_receipt(args.receipt_out, receipt)
+    print(f"assembled {receipt['total_files']} files, tree sha256 {receipt['tree_sha256']}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    assemble_public_site(repo_root=args.repo_root, site_dir=args.site_dir, prose_only=args.prose_only)
+    if args.routes:
+        if args.prose_only or args.repo_root is not None:
+            raise SystemExit("routes mode rejects --prose-only and --repo-root; each ref names its own root")
+        return _assemble_from_routes(args)
+    assemble_public_site(repo_root=args.repo_root or REPO_ROOT, site_dir=args.site_dir, prose_only=args.prose_only)
     return 0
 
 

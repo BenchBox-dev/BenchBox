@@ -13,6 +13,7 @@ from typing import Any, Optional
 from benchbox.core.plan_capture_phase import (
     propagate_query_execution_metadata,
 )
+from benchbox.core.tpch.benchmark import binds_answer_set_parameters, has_answer_set, power_stream_seed
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
     set_reference_seed_context,
@@ -107,31 +108,28 @@ class TPCHPowerTest:
         if verbose:
             self.logger.setLevel(logging.INFO)
 
-        from benchbox.core.tpch.benchmark import get_reference_seed
-
-        reference_seed = get_reference_seed(scale_factor)
-        self.reference_seed = reference_seed
         user_provided_seed = seed is not None
         actual_seed = seed
         actual_validation_mode = validation_mode or "exact"
 
         if user_provided_seed:
             actual_seed = seed
-            if validation and reference_seed and seed != reference_seed:
+            if validation and has_answer_set(scale_factor):
                 if validation_mode is None:
                     actual_validation_mode = "loose"
                     if verbose:
                         self.logger.warning(
-                            f"⚠️  Custom seed {seed} with validation enabled.\n"
-                            f"   Reference seed for SF={scale_factor} is {reference_seed}.\n"
-                            f"   Switching to LOOSE validation (±50% tolerance)."
+                            f"⚠️  Seed {seed} with validation enabled.\n"
+                            "   The answer files hold results for qgen's default parameters (no seed).\n"
+                            "   Switching to LOOSE validation (±50% tolerance)."
                         )
                 elif validation_mode == "exact":
                     if verbose:
                         self.logger.warning(
-                            f"⚠️  Custom seed {seed} with EXACT validation mode.\n"
-                            f"   Reference seed for SF={scale_factor} is {reference_seed}.\n"
-                            f"   Validation will likely FAIL due to parameter mismatch."
+                            f"⚠️  Seed {seed} with EXACT validation mode.\n"
+                            "   The answer files hold results for qgen's default parameters (no seed).\n"
+                            "   Queries whose row count depends on the parameters are checked against\n"
+                            "   their allowed range instead of the answer-file count."
                         )
         else:
             actual_seed = None
@@ -229,7 +227,7 @@ class TPCHPowerTest:
                             f"Executing Query {query_id} (position {position + 1}/{len(query_permutation)})"
                         )
 
-                    stream_seed = None if self.config.seed is None else self.config.seed + self.config.stream_id * 1000
+                    stream_seed = power_stream_seed(self.config.seed, self.config.stream_id)
                     query_text = self.benchmark.get_query(
                         query_id,
                         seed=stream_seed,
@@ -243,7 +241,7 @@ class TPCHPowerTest:
                         if hasattr(self.connection, "set_query_context"):
                             self.connection.set_query_context(query_id, stream_id=self.config.stream_id)
 
-                        set_reference_seed_context(stream_seed is None or stream_seed == self.reference_seed)
+                        set_reference_seed_context(binds_answer_set_parameters(stream_seed))
 
                         cursor = self.connection.execute(query_text)
 
@@ -359,7 +357,7 @@ class TPCHPowerTest:
         query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
 
         queries = {}
-        stream_seed = None if self.config.seed is None else self.config.seed + self.config.stream_id * 1000
+        stream_seed = power_stream_seed(self.config.seed, self.config.stream_id)
         for position, query_id in enumerate(query_permutation):
             try:
                 query_text = self.benchmark.get_query(
@@ -376,7 +374,7 @@ class TPCHPowerTest:
 
     def _preflight_validate_generation(self, query_permutation: list[int]) -> None:
         failures = []
-        stream_seed = None if self.config.seed is None else self.config.seed + self.config.stream_id * 1000
+        stream_seed = power_stream_seed(self.config.seed, self.config.stream_id)
         for position, query_id in enumerate(query_permutation):
             try:
                 _ = self.benchmark.get_query(

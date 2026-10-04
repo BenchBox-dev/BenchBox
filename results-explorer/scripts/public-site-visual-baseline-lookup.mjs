@@ -1,8 +1,5 @@
 export const DOCS_WORKFLOW_PATH = ".github/workflows/docs.yml";
-export const CI_WORKFLOW_PATH = ".github/workflows/ci.yml";
-export const MERGE_QUEUE_WORKFLOW_PATHS = [DOCS_WORKFLOW_PATH, CI_WORKFLOW_PATH];
 export const VISUAL_JOB_NAME = "Public-site visual regression";
-export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
 export const JOBS_PAGE_SIZE = 100;
 export const MAX_JOB_PAGES = 5;
@@ -10,7 +7,7 @@ export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
 export const MAX_BASELINE_SHAS = 26;
 export const MAX_ARTIFACT_PAGES = 5;
 
-export function trustedBaselineSource(run, { repository, baseSha }) {
+export function trustedBaselineSource(run, { repository }) {
   if (!run) return undefined;
   if (run.status !== "completed" || run.conclusion !== "success") return undefined;
   if (
@@ -21,21 +18,7 @@ export function trustedBaselineSource(run, { repository, baseSha }) {
   ) {
     return "develop";
   }
-  if (isQueueLeaderRun(run, { repository, baseSha })) return "merge-queue";
   return undefined;
-}
-
-export function isQueueLeaderRun(run, { repository, baseSha }) {
-  return Boolean(
-    run &&
-      MERGE_QUEUE_WORKFLOW_PATHS.includes(run.path) &&
-      run.event === "merge_group" &&
-      run.head_sha === baseSha &&
-      typeof run.head_branch === "string" &&
-      run.head_branch.startsWith(MERGE_QUEUE_BRANCH_PREFIX) &&
-      run.head_repository?.full_name === repository &&
-      run.repository?.full_name === repository,
-  );
 }
 
 async function listRunJobs(github, repository, runId) {
@@ -95,13 +78,12 @@ async function listValidArtifacts(github, repository, name) {
 }
 
 async function trustedFromCandidates(github, repository, sha, candidates) {
-  let queueCandidate;
   for (const candidate of candidates) {
     const runId = candidate.workflow_run?.id;
     if (!Number.isInteger(runId)) continue;
     if (candidate.name === LEGACY_BASELINE_NAME && candidate.workflow_run.head_sha !== sha) continue;
     const run = await github(`/repos/${repository}/actions/runs/${runId}`);
-    let source = trustedBaselineSource(run, { repository, baseSha: sha });
+    let source = trustedBaselineSource(run, { repository });
     if (
       !source &&
       run &&
@@ -113,13 +95,9 @@ async function trustedFromCandidates(github, repository, sha, candidates) {
     ) {
       if (await visualJobSucceeded(github, repository, runId)) source = "develop";
     }
-    if (!source && isQueueLeaderRun(run, { repository, baseSha: sha }) && run.status !== "completed") {
-      if (await visualJobSucceeded(github, repository, runId)) source = "merge-queue";
-    }
     if (source === "develop") return { artifact: candidate, source, baselineSha: sha };
-    if (source === "merge-queue" && !queueCandidate) queueCandidate = { artifact: candidate, source, baselineSha: sha };
   }
-  return queueCandidate;
+  return undefined;
 }
 
 export async function findTrustedBaseline({ github, repository, baseSha, candidateShas = [] }) {
@@ -128,14 +106,11 @@ export async function findTrustedBaseline({ github, repository, baseSha, candida
   const namedBySha = await Promise.all(
     shas.map((sha) => listValidArtifacts(github, repository, `public-site-visual-baseline-${sha}`)),
   );
-  let queueCandidate;
   for (const [index, sha] of shas.entries()) {
     const found = await trustedFromCandidates(github, repository, sha, [...namedBySha[index], ...legacy]);
-    if (!found) continue;
-    if (found.source === "develop" || sha === baseSha) return found;
-    if (!queueCandidate) queueCandidate = found;
+    if (found) return found;
   }
-  return queueCandidate;
+  return undefined;
 }
 
 export async function waitForTrustedBaseline({

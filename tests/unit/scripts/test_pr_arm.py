@@ -86,11 +86,11 @@ def _arm(gh: FakeGh, pr: str | None = "7", head: str | None = None, *, unpublish
     )
 
 
-def test_arms_the_exact_head_with_squash_and_match_head_commit() -> None:
+def test_arms_the_exact_head_with_squash_auto_and_match_head_commit() -> None:
     gh = FakeGh()
     assert _arm(gh) == 0
     assert gh.merged() == [
-        ["gh", "pr", "merge", "7", "--repo", pr_arm.REPOSITORY, "--squash", "--match-head-commit", HEAD]
+        ["gh", "pr", "merge", "7", "--repo", pr_arm.REPOSITORY, "--squash", "--auto", "--match-head-commit", HEAD]
     ]
 
 

@@ -12,6 +12,7 @@ eggs/
 lib/
 lib64/
 !results-explorer/src/lib/
+!/website/src/lib/
 parts/
 sdist/
 var/
@@ -194,3 +195,6 @@ node_modules/
 /.agents/skills/
 /.claude/skills/.system/
 /.claude/skills/blog/
+/site-inventory/
+/website/.astro/
+/website/e2e-output/

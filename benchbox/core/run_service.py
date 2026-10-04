@@ -32,6 +32,19 @@ def validate_stream_count(streams: int | None, phases: str | None = None) -> Non
         raise ValueError("--streams must be >= 2 (TPC throughput minimum); got: 1")
 
 
+_DATAFRAME_THROUGHPUT_UNSUPPORTED = (
+    "The throughput phase is not supported in DataFrame mode. DataFrame platforms run no "
+    "concurrent query streams, so a throughput request would only repeat the power-test "
+    "iterations under a throughput label and ignore --streams. Use --phases power for "
+    "DataFrame platforms, or run the throughput phase on a SQL platform."
+)
+
+
+def reject_unsupported_dataframe_phases(execution_mode: str | None, phases_to_run: list[str] | None) -> None:
+    if execution_mode == "dataframe" and phases_to_run and "throughput" in phases_to_run:
+        raise ValueError(_DATAFRAME_THROUGHPUT_UNSUPPORTED)
+
+
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.runner.runner import (
@@ -215,6 +228,7 @@ def execute_run(
     phases = resolve_lifecycle_phases(phases_to_run)
     validation = resolve_validation_options(getattr(config, "options", None))
     execution_mode = resolve_execution_mode(database_config)
+    reject_unsupported_dataframe_phases(execution_mode, phases_to_run)
 
     adapter = adapter_factory(execution_mode=execution_mode, output_root=output_root, phases=phases)
 
@@ -338,6 +352,7 @@ __all__ = [
     "get_execution_mode",
     "is_dataframe_execution",
     "map_phases_to_execution_type",
+    "reject_unsupported_dataframe_phases",
     "resolve_execution_mode",
     "resolve_lifecycle_phases",
     "resolve_mode_with_registry",

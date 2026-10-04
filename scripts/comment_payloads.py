@@ -45,9 +45,286 @@ FENCE_LANGUAGES = {
 DISPLAY_FENCES = {"", "text", "plaintext", "none", "output", "mermaid", "diff", "csv", "md", "markdown"}
 
 
+ASTRO_FENCE_OPEN = re.compile(r"---[ \t]*\r?\n")
+ASTRO_FENCE_CLOSE = re.compile(r"---[ \t]*(?:\r?\n|\Z)")
+ASTRO_EMBEDDED_BLOCK = re.compile(r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)", re.I | re.S)
+EXPRESSION_PREFIX = "[\n"
+EXPRESSION_SUFFIX = "\n];"
+
+
+def blank_text(text: str) -> str:
+    return re.sub(r"[^\n]", " ", text)
+
+
+def js_string_end(text: str, pos: int, multiline: bool) -> int:
+    quote = text[pos]
+    pos += 1
+    while pos < len(text):
+        if text[pos] == "\\":
+            pos += 2
+        elif text[pos] == quote or (text[pos] == "\n" and not multiline):
+            return pos + 1
+        else:
+            pos += 1
+    raise ValueError("unterminated string in Astro source")
+
+
+def js_template_end(text: str, pos: int, sink: list[tuple[int, str]] | None = None) -> int:
+    pos += 1
+    while pos < len(text):
+        if text[pos] == "\\":
+            pos += 2
+        elif text[pos] == "`":
+            return pos + 1
+        elif text.startswith("${", pos):
+            pos = expression_end(text, pos + 2, sink) + 1
+        else:
+            pos += 1
+    raise ValueError("unterminated template literal in Astro source")
+
+
+def jsx_starts(text: str, pos: int) -> bool:
+    following = text[pos + 1 : pos + 2]
+    previous = text[max(0, pos - 64) : pos].rstrip()[-1:]
+    return (following.isalpha() or following == ">") and not (previous.isalnum() or previous in {"_", "$", ")", "]"})
+
+
+def tag_end(
+    text: str, pos: int, found: list[tuple[int, int]] | None = None, sink: list[tuple[int, str]] | None = None
+) -> int:
+    pos += 1
+    while pos < len(text):
+        char = text[pos]
+        if char in "'\"":
+            pos = js_string_end(text, pos, True)
+        elif char == "{":
+            end = expression_end(text, pos + 1, sink)
+            if found is not None:
+                found.append((pos + 1, end))
+            pos = end + 1
+        elif char == ">":
+            return pos + 1
+        else:
+            pos += 1
+    raise ValueError("unterminated tag in Astro source")
+
+
+def jsx_end(text: str, pos: int, sink: list[tuple[int, str]] | None = None) -> int:
+    pos = tag_end(text, pos, None, sink)
+    if text[pos - 2 : pos] == "/>":
+        return pos
+    depth = 1
+    while pos < len(text):
+        if text[pos] == "{":
+            pos = expression_end(text, pos + 1, sink) + 1
+        elif text.startswith("<!--", pos):
+            end = text.find("-->", pos + 4)
+            if end < 0:
+                raise ValueError("unterminated HTML comment in Astro source")
+            if sink is not None:
+                sink.append((pos, text[pos : end + 3]))
+            pos = end + 3
+        elif text.startswith("</", pos):
+            pos = text.index(">", pos) + 1
+            depth -= 1
+            if depth == 0:
+                return pos
+        elif text[pos] == "<" and jsx_starts(text, pos):
+            pos = tag_end(text, pos, None, sink)
+            depth += text[pos - 2 : pos] != "/>"
+        else:
+            pos += 1
+    raise ValueError("unterminated JSX element in Astro source")
+
+
+REGEX_PRECEDERS = set("(,=:[!&|?{};+-*%<>~^")
+REGEX_KEYWORDS = {"return", "typeof", "case", "in", "of", "void", "delete", "throw", "new", "yield", "await"}
+
+
+def regex_allowed(text: str, pos: int, floor: int) -> bool:
+    before = text[floor:pos].rstrip()
+    if not before:
+        return True
+    if before[-2:] in {"++", "--"}:
+        return False
+    if before[-1] in REGEX_PRECEDERS:
+        return True
+    word = re.search(r"[A-Za-z_$][\w$]*\Z", before)
+    return bool(word) and word.group() in REGEX_KEYWORDS
+
+
+def regex_end(text: str, pos: int) -> int:
+    pos += 1
+    in_class = False
+    while pos < len(text) and text[pos] != "\n":
+        char = text[pos]
+        if char == "\\":
+            pos += 2
+            continue
+        if char == "[":
+            in_class = True
+        elif char == "]":
+            in_class = False
+        elif char == "/" and not in_class:
+            pos += 1
+            while pos < len(text) and (text[pos].isalnum() or text[pos] in "_$"):
+                pos += 1
+            return pos
+        pos += 1
+    raise ValueError("unterminated regular expression in Astro source")
+
+
+def skip_js_comment(text: str, pos: int) -> int:
+    if text.startswith("//", pos):
+        end = text.find("\n", pos)
+        return len(text) if end < 0 else end
+    end = text.find("*/", pos + 2)
+    if end < 0:
+        raise ValueError("unterminated comment in Astro source")
+    return end + 2
+
+
+def expression_end(text: str, pos: int, sink: list[tuple[int, str]] | None = None) -> int:
+    depth = 0
+    floor = pos
+    while pos < len(text):
+        char = text[pos]
+        if char in "'\"":
+            pos = js_string_end(text, pos, False)
+        elif char == "`":
+            pos = js_template_end(text, pos, sink)
+        elif text.startswith(("//", "/*"), pos):
+            pos = skip_js_comment(text, pos)
+        elif char == "/" and regex_allowed(text, pos, floor):
+            pos = regex_end(text, pos)
+        elif char == "<" and jsx_starts(text, pos):
+            pos = jsx_end(text, pos, sink)
+        elif char == "}" and depth == 0:
+            return pos
+        else:
+            depth += (char == "{") - (char == "}")
+            pos += 1
+    raise ValueError("unterminated expression in Astro source")
+
+
+def next_frontmatter_state(text: str, pos: int, state: str, nesting: list[int], floor: int) -> tuple[int, str]:
+    char = text[pos]
+    if state == "block":
+        return (pos + 2, "code") if text.startswith("*/", pos) else (pos + 1, state)
+    if state == "line":
+        return pos + 1, "code" if char == "\n" else state
+    if state in {"'", '"'}:
+        if char == "\\":
+            return pos + 2, state
+        return pos + 1, "code" if char in {state, "\n"} else state
+    if state == "`":
+        if char == "\\":
+            return pos + 2, state
+        if text.startswith("${", pos):
+            nesting.append(0)
+            return pos + 2, "code"
+        return pos + 1, "code" if char == "`" else state
+    if text.startswith("//", pos):
+        return pos + 2, "line"
+    if text.startswith("/*", pos):
+        return pos + 2, "block"
+    if char in "'\"`":
+        return pos + 1, char
+    if char == "/" and regex_allowed(text, pos, floor):
+        return regex_end(text, pos), state
+    if nesting and char == "}" and nesting[-1] == 0:
+        nesting.pop()
+        return pos + 1, "`"
+    if nesting and char in "{}":
+        nesting[-1] += 1 if char == "{" else -1
+    return pos + 1, state
+
+
+def astro_frontmatter_span(source: str) -> tuple[int, int, int] | None:
+    opening = ASTRO_FENCE_OPEN.match(source)
+    if not opening:
+        return None
+    pos, state, nesting, line_start = opening.end(), "code", [], True
+    while pos < len(source):
+        if line_start and state == "code" and not nesting:
+            closing = ASTRO_FENCE_CLOSE.match(source, pos)
+            if closing:
+                return opening.end(), pos, closing.end()
+        line_start = source[pos] == "\n"
+        pos, state = next_frontmatter_state(source, pos, state, nesting, opening.end())
+    raise ValueError("unterminated Astro frontmatter")
+
+
+def blank_astro_frontmatter(source: str) -> str:
+    span = astro_frontmatter_span(source)
+    return source if span is None else blank_text(source[: span[2]]) + source[span[2] :]
+
+
+def astro_template(source: str) -> str:
+    return ASTRO_EMBEDDED_BLOCK.sub(
+        lambda m: m.group(1) + blank_text(m.group(2)) + m.group(3), blank_astro_frontmatter(source)
+    )
+
+
+def astro_template_parts(source: str) -> tuple[list[tuple[int, str]], list[tuple[int, int]]]:
+    template = astro_template(source)
+    comments: list[tuple[int, str]] = []
+    nested: list[tuple[int, str]] = []
+    expressions: list[tuple[int, int]] = []
+    pos = 0
+    while pos < len(template):
+        if template.startswith("<!--", pos):
+            end = template.find("-->", pos + 4)
+            if end < 0:
+                raise ValueError("unterminated HTML comment in Astro source")
+            comments.append((template[:pos].count("\n") + 1, template[pos : end + 3]))
+            pos = end + 3
+        elif template[pos] == "<" and (
+            template[pos + 1 : pos + 2].isalpha() or template[pos + 1 : pos + 2] in {"/", ">"}
+        ):
+            pos = tag_end(template, pos, expressions, nested)
+        elif template[pos] == "{":
+            end = expression_end(template, pos + 1, nested)
+            expressions.append((pos + 1, end))
+            pos = end + 1
+        else:
+            pos += 1
+    comments.extend((template[:start].count("\n") + 1, text) for start, text in nested)
+    return sorted(comments, key=lambda item: item[0]), expressions
+
+
+def astro_template_comments(source: str) -> list[tuple[int, str]]:
+    return astro_template_parts(source)[0]
+
+
+def astro_expression_sources(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
+    template = astro_template(source)
+    return [
+        (
+            template[:start].count("\n"),
+            path + ".tsx",
+            EXPRESSION_PREFIX + template[start:end] + EXPRESSION_SUFFIX,
+            "javascript",
+            f"expression:{index}",
+        )
+        for index, (start, end) in enumerate(astro_template_parts(source)[1])
+        if re.search(r"//|/\*", template[start:end])
+    ]
+
+
 def example_blocks(source: str) -> list[tuple[int, str, str, str]]:
     blocks: list[tuple[int, str, str, str]] = []
-    display_directives = {"tags", "toctree", "mermaid", "image", "figure", "include", "literalinclude"}
+    display_directives = {
+        "tags",
+        "toctree",
+        "mermaid",
+        "image",
+        "figure",
+        "include",
+        "literalinclude",
+        "postlist",
+        "eval-rst",
+    }
     containers = {
         "note",
         "tip",
@@ -69,6 +346,7 @@ def example_blocks(source: str) -> list[tuple[int, str, str, str]]:
         "grid",
         "grid-item",
         "grid-item-card",
+        "list-table",
     }
     for token in MarkdownIt("commonmark").parse(source):
         if token.type != "fence" or token.map is None:
@@ -948,6 +1226,18 @@ def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, st
         return notebook_sources(path, source)
     if lang in {"yaml", "json"}:
         return structured_sources(path, source, lang)
+    if lang == "astro":
+        span = astro_frontmatter_span(source)
+        frontmatter = (
+            [(1 + source[: span[0]].count("\n"), path + ".ts", source[span[0] : span[1]], "javascript", "frontmatter")]
+            if span
+            else []
+        )
+        return (
+            frontmatter
+            + nested_sources(path, blank_astro_frontmatter(source), "html")
+            + astro_expression_sources(path, source)
+        )
     if lang in {"html", "html+jinja"}:
         spans = template_data_spans(source) if lang == "html+jinja" else [(0, len(source))]
         return [

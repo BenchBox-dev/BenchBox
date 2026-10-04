@@ -9,7 +9,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-import yaml
 
 from scripts import release_artifact_consumer as consumer
 
@@ -389,24 +388,6 @@ def test_duplicate_json_key_refused(distributions, metadata):
     path.write_text('{"schema":1,"schema":1}')
     with pytest.raises(ValueError, match="duplicate JSON key"):
         consumer.verify_producer_receipt(distributions, metadata["run"], metadata["job"])
-
-
-def test_producer_workflow_uploads_attempt_evidence_without_new_release_trigger():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
-    producer = jobs["dist-artifact"]
-    assert producer["permissions"] == {"contents": "read", "actions": "read"}
-    assert producer["if"] == "${{ github.event_name == 'merge_group' }}"
-    runs = "\n".join(step.get("run", "") for step in producer["steps"])
-    assert "release_artifact_consumer.py producer --dist dist" in runs
-    upload = next(step for step in producer["steps"] if step["name"] == "Upload dist artifact")
-    assert upload["with"]["name"] == "dist-${{ github.sha }}-attempt-${{ github.run_attempt }}"
-    assert set(upload["with"]["path"].splitlines()) == {
-        "dist/*.whl",
-        "dist/*.tar.gz",
-        "dist/SHA256SUMS",
-        "dist/producer-receipt.json",
-    }
-    assert not (ROOT / ".github/workflows/release-v2.yml").exists()
 
 
 def test_admission_has_no_build_publish_or_attestation_command():

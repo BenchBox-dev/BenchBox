@@ -1,5 +1,5 @@
 1:
-  agg_field: sr_return_amt
+  agg_field: sr_fee
   state: TN
   year: 2000
 2:
@@ -17,12 +17,12 @@
   month: 2
   year: 2000
 7:
-  channel_promo: channel_demo
   education: Primary
   gender: F
   marital_status: W
   year: 1998
 8:
+  qoy: 2
   year: 1998
   zip_codes:
   - '24128'
@@ -49,7 +49,12 @@
   - 10098
   - 18213
 10:
-  gender: F
+  counties:
+  - Walker County
+  - Richland County
+  - Gaines County
+  - Douglas County
+  - Dona Ana County
   month: 2
   year: 2002
 11:
@@ -59,9 +64,7 @@
   - Jewelry
   - Sports
   - Books
-  month: 2
   sales_date: '2001-01-12'
-  year: 1999
 13:
   demo1_education: 2 yr Degree
   demo1_marital: D
@@ -69,8 +72,6 @@
   demo2_marital: S
   demo3_education: Advanced Degree
   demo3_marital: W
-  education: Advanced Degree
-  marital_status: M
   states1:
   - CO
   - IL
@@ -85,7 +86,6 @@
   - MI
   year: 2001
 14:
-  day: 11
   year: 1998
 15:
   min_price: 500
@@ -114,7 +114,6 @@
   year: 1999
 17:
   quarter: 1
-  state: OK
   year: 1998
 18:
   birth_months:
@@ -126,7 +125,6 @@
   - 10
   cd_education_status: College
   cd_gender: M
-  cd_marital_status: S
   states:
   - ND
   - WI
@@ -145,42 +143,36 @@
   - Jewelry
   - Sports
   - Books
-  month: 2
   sales_date: '2001-01-12'
-  year: 1999
 21:
-  month: 1
   sales_date: '1998-04-08'
-  warehouse_id: 2
-  year: 2000
 22:
   dms: 1212
-  year: 2001
 23:
   month: 1
+  top_percent: 95
   year: 1999
 24:
   color: chiffon
   market_id: 8
 25:
-  month: 4
-  quarters:
-  - 1
-  - 2
-  - 3
+  agg: sum
   year: 2000
 26:
   education: Primary
   gender: F
   marital_status: W
-  promo_channel: channel_demo
   year: 1998
 27:
   education: Primary
   gender: F
   marital_status: W
-  state: TN
   states:
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
   - TN
   year: 1998
 28:
@@ -228,35 +220,43 @@
   state: IL
   year: 2002
 31:
-  gmt_offset: -5.0
+  order_by: ss1.ca_county
   year: 2000
 32:
-  days: 90
+  manufact_id: 269
   sales_date: '1998-03-18'
-  year: 2000
 33:
-  categories:
-  - Books
+  category: Books
   gmt_offset: -5.0
-  manufacturer_id: 88
   month: 3
   year: 1999
 34:
   buy_potential_1: '>10000'
   buy_potential_2: Unknown
-  county: Williamson County
-  state: TN
+  counties:
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
   year: 1998
 35:
+  aggone: avg
+  aggthree: sum
+  aggtwo: max
   year: 1999
-  years:
-  - 1999
-  - 2000
-  - 2001
-  - 2002
 36:
-  state: TN
   states:
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
   - TN
   year: 2000
 37:
@@ -267,13 +267,9 @@
   - 964
   - 918
   - 849
-  month_end: 6
-  month_start: 1
   sales_date: '2001-06-02'
-  year: 2000
 38:
   dms: 1212
-  year: 2002
 39:
   months:
   - 1
@@ -281,7 +277,6 @@
   year: 2001
 40:
   sales_date: '1998-04-08'
-  year: 2000
 41:
   manufact_ids:
   - 738
@@ -297,24 +292,10 @@
 44:
   null_col: ss_addr_sk
   store_sk: 4
-  year: 2001
 45:
+  gbobc: ca_county
   qoy: 2
-  quarters:
-  - 1
-  - 2
-  - 3
   year: 2000
-  zip_codes:
-  - '85669'
-  - '86197'
-  - '88274'
-  - '83405'
-  - '86475'
-  - '85392'
-  - '85460'
-  - '80348'
-  - '81792'
 46:
   cities:
   - Midway
@@ -355,27 +336,21 @@
   - WV
   year: 1998
 49:
+  month: 12
   year: 2001
 50:
-  channel: store channel
-  days: 30
   month: 9
   year: 2000
 51:
   dms: 1212
-  months:
-  - 1
-  - 2
-  - 3
-  - 4
-  year: 2001
 52:
   month: 12
   year: 1998
 53:
   dms: 1212
-  month: 11
 54:
+  category: Women
+  class: maternity
   month: 4
   year: 2000
 55:
@@ -393,15 +368,10 @@
 57:
   year: 2000
 58:
-  day: 1
   sales_date: '1998-02-19'
-  year: 2000
 59:
   d_month_seq: 1185
-  year: 1999
 60:
-  categories:
-  - Children
   category: Children
   gmt_offset: -6.0
   month: 9
@@ -413,13 +383,8 @@
   year: 1999
 62:
   dms: 1212
-  months:
-  - 11
-  - 12
-  year: 1999
 63:
   dms: 1212
-  month: 11
 64:
   colors:
   - maroon
@@ -432,24 +397,18 @@
   year: 2000
 65:
   dms: 1212
-  year: 2000
 66:
   catalog_net_col: cs_net_paid_inc_ship_tax
   catalog_sales_col: cs_sales_price
-  month_end: 4
-  month_start: 1
   ship_carriers:
   - DIAMOND
   - AIRBORNE
   time_start: 49530
-  web_names:
-  - pri
   web_net_col: ws_net_paid_inc_tax
   web_sales_col: ws_sales_price
   year: 2002
 67:
   dms: 1212
-  year: 2001
 68:
   cities:
   - Midway
@@ -470,10 +429,7 @@
   year: 1999
 70:
   dms: 1212
-  year: 2001
 71:
-  brand: 'amalgexporti #1'
-  manager_id: 1
   month: 12
   year: 2000
 72:
@@ -494,11 +450,9 @@
   category: Sports
   year: 2002
 76:
-  channel: store
   null_col_cs: cs_warehouse_sk
   null_col_ss: ss_addr_sk
   null_col_ws: ws_web_page_sk
-  year: 2001
 77:
   channel_type: store channel
   sales_date: '1998-08-04'
@@ -507,15 +461,8 @@
   year: 2000
 79:
   dep_count: 8
-  dow: 1
-  emp_max: 295
-  emp_min: 200
-  household_dep_count: 6
+  vehicle_count: 0
   year: 1998
-  year_offsets:
-  - 0
-  - 1
-  - 2
 80:
   sales_date: '1998-08-04'
   year: 2000
@@ -528,18 +475,14 @@
   - 129
   - 727
   - 663
-  month_end: 6
-  month_start: 1
   price_max: 60
   price_min: 30
   sales_date: '2002-05-30'
-  year: 2000
 83:
   dates:
   - '1998-01-02'
   - '1998-10-15'
   - '1998-11-10'
-  year: 1998
 84:
   city: Hopewell
   income_band: 32287
@@ -547,11 +490,8 @@
   year: 1998
 86:
   dms: 1212
-  year: 2001
 87:
   dms: 1212
-  month: 4
-  year: 2001
 88:
   year: 1998
 89:
@@ -559,21 +499,17 @@
   class_id: 1
   year: 2000
 90:
-  hours:
-  - - 6
-    - 7
-  - - 14
-    - 15
   dep_count: 8
-  year: 2001
+  hour_am: 6
+  hour_pm: 14
 91:
   buy_potential: 0-500
+  gmt_offset: -7
   month: 11
   year: 1999
 92:
-  days: 90
+  manufact_id: 269
   sales_date: '1998-03-18'
-  year: 2000
 93:
   reason: reason 28
 94:
@@ -594,16 +530,11 @@
   store_name: ese
 97:
   dms: 1212
-  month: 4
-  year: 2002
 98:
   categories:
   - Jewelry
   - Sports
   - Books
   sales_date: '2001-01-12'
-  year: 1999
 99:
   dms: 1212
-  month: 2
-  year: 1999

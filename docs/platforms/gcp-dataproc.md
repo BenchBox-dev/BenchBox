@@ -259,4 +259,4 @@ The first two bindings are for the service account that runs BenchBox. The third
 
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
 - [AWS Glue Platform](aws-glue.md) - Serverless Spark on AWS
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

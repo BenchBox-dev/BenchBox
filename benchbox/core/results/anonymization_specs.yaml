@@ -40,6 +40,7 @@ identifier_keys:
   workspacename: workspace
   warehouse: warehouse
   warehousename: warehouse
+  warehouseid: warehouse
   workgroup: workgroup
   workgroupname: workgroup
   cluster: cluster
@@ -47,6 +48,11 @@ identifier_keys:
   clustername: cluster
   database: database
   databasename: database
+  dataset: dataset
+  datasetid: dataset
+  uccatalog: catalog
+  ucschema: schema
+  ucvolume: volume
   db: database
   dbname: database
   schema: schema
@@ -96,6 +102,7 @@ path_keys:
 - httppath
 - outputdirectory
 - outputlocation
+- defaultoutputlocation
 - outputpath
 - path
 - s3stagingurl

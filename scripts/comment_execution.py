@@ -8,6 +8,10 @@ from comment_payloads import command_words, inline_source_index
 
 REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
     (
+        "scripts/check_api_contract_symbols.py",
+        "[python, str(PROBE), json.dumps(entry)]",
+    ): "PROBE is the tracked scripts/api_contract_probe.py file, scanned as Python; python is a resolved interpreter path and json.dumps(entry) is a data argument",
+    (
         "_project/scripts/build_joinorder_data.py",
         "[container_cli(), 'exec', container_name, 'psql', '-U', user, '-d', database, '-v', 'ON_ERROR_STOP=1', '-c', copy_sql]",
     ): "psql runs inside the database container; copy_sql is a COPY statement built from quote_ident identifiers and an integer id list, with no comment text",

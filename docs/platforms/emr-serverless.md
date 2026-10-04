@@ -277,4 +277,4 @@ Also add a trust relationship for EMR Serverless:
 
 - [AWS Glue Platform](aws-glue.md) - Serverless ETL with Glue
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

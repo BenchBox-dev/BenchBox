@@ -222,4 +222,4 @@ Get-FabricLakehouse -WorkspaceId $workspaceId
 
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
 - [Databricks Platform](databricks.md) - Databricks SQL and Spark
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

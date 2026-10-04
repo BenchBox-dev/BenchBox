@@ -6,6 +6,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from csv import reader
 from datetime import date
 from typing import Any
@@ -68,19 +71,39 @@ TPCH_DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
     22: {"country_codes": ["13", "31", "23", "29", "30", "18", "17"]},
 }
 
-_parameter_overrides: dict[int, dict[str, Any]] | None = None
+_parameter_overrides: ContextVar[dict[int, dict[str, Any]] | None] = ContextVar(
+    "tpch_parameter_overrides", default=None
+)
 
-_scale_factor: float = 1.0
+_scale_factor: ContextVar[float] = ContextVar("tpch_scale_factor", default=1.0)
 
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
-    global _parameter_overrides
-    _parameter_overrides = overrides
+    _parameter_overrides.set(overrides)
+
+
+@contextmanager
+def seeded_parameter_overrides(seed: int | None, scale_factor: float, stream_id: int) -> Iterator[None]:
+    scale_factor = float(scale_factor)
+    overrides = None
+    if seed is not None:
+        from benchbox.core.tpch.benchmark import power_stream_seed
+        from benchbox.core.tpch.parameter_extractor import get_tpch_extracted_parameters
+
+        stream_seed = power_stream_seed(seed, stream_id)
+        assert stream_seed is not None
+        overrides = get_tpch_extracted_parameters(stream_seed, float(scale_factor))
+    parameter_token = _parameter_overrides.set(overrides)
+    scale_token = _scale_factor.set(scale_factor)
+    try:
+        yield
+    finally:
+        _scale_factor.reset(scale_token)
+        _parameter_overrides.reset(parameter_token)
 
 
 def set_scale_factor(scale_factor: float | None) -> None:
-    global _scale_factor
-    _scale_factor = 1.0 if scale_factor is None else float(scale_factor)
+    _scale_factor.set(1.0 if scale_factor is None else float(scale_factor))
 
 
 TPCH_FAMILY_DATAFRAME_IDS = frozenset({"tpch", "tpch_skew", "tpchavoc"})
@@ -93,10 +116,12 @@ def set_scale_factor_for_benchmark(benchmark_id: str, scale_factor: float | None
 
 def get_tpch_parameters(query_id: int) -> dict[str, Any]:
     params = dict(TPCH_DEFAULT_PARAMS.get(query_id, {}))
-    if query_id == 11 and "fraction" in params and _scale_factor > 0:
-        params["fraction"] = float(f"{params['fraction'] / _scale_factor:.10f}")
-    if _parameter_overrides is not None and query_id in _parameter_overrides:
-        params.update(_parameter_overrides[query_id])
+    scale_factor = _scale_factor.get()
+    overrides = _parameter_overrides.get()
+    if query_id == 11 and "fraction" in params and scale_factor > 0:
+        params["fraction"] = float(f"{params['fraction'] / scale_factor:.10f}")
+    if overrides is not None and query_id in overrides:
+        params.update(overrides[query_id])
     return params
 
 

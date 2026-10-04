@@ -687,7 +687,7 @@ If you encounter issues not covered here:
 
 ### API Reference
 
-- **[Python API Overview](../reference/python-api/index.rst)** - Complete Python API documentation
+- **[Python API Overview](../reference/python-api/index.md)** - Complete Python API documentation
 - **[DuckDB Adapter API](../reference/python-api/platforms/duckdb.rst)** - DuckDB adapter reference
 - **[Base Benchmark API](../reference/python-api/base.rst)** - Core benchmark interface
 

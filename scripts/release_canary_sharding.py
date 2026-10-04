@@ -13,6 +13,7 @@ CLI_DESCRIPTION = "Collect and deterministically partition release-canary pytest
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
+MEDIUM_SHARD_COUNT = 4
 
 
 def _canonical_node_ids(node_ids: Iterable[str]) -> list[str]:
@@ -192,6 +193,39 @@ def _validate_node_outcomes(outcomes: object, assigned: list[str]) -> None:
                 raise ValueError("medium outcome xfail reason is malformed")
 
 
+def _validate_required_outcomes(outcomes: object, required: list[str]) -> None:
+    by_node = {item["node_id"]: item["reports"] for item in outcomes if isinstance(item, dict)}
+    for node_id in required:
+        reports = by_node.get(node_id)
+        if not reports:
+            raise ValueError(f"required case produced no report: {node_id}")
+        if [report.get("phase") for report in reports] != ["setup", "call", "teardown"]:
+            raise ValueError(f"required case did not run setup, call and teardown: {node_id}")
+        if any(report.get("outcome") != "passed" for report in reports):
+            raise ValueError(f"required case did not pass: {node_id}")
+        if any(report.get("skip_reason") is not None or report.get("xfail_reason") is not None for report in reports):
+            raise ValueError(f"required case was skipped or expected to fail: {node_id}")
+
+
+def verify_required_cases(evidence_path: Path, checked_sha: str, nodeids_path: Path) -> None:
+    required = read_node_ids(nodeids_path)
+    if not required:
+        raise ValueError("required case list is empty")
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    if not isinstance(evidence, dict) or (
+        evidence.get("commit_sha") != checked_sha
+        or evidence.get("complete") is not True
+        or evidence.get("pytest_exit_status") != 0
+        or evidence.get("assigned_node_ids") != required
+        or evidence.get("executed_node_ids") != required
+        or not evidence.get("collected_node_ids")
+        or any(ids != required for ids in evidence["collected_node_ids"])
+    ):
+        raise ValueError("required cases were not all collected and executed successfully for the checked SHA")
+    _validate_node_outcomes(evidence.get("node_outcomes"), required)
+    _validate_required_outcomes(evidence["node_outcomes"], required)
+
+
 def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
     collection_root = artifact_root / f"t2-medium-nodeids-{checked_sha}"
     node_ids = read_node_ids(collection_root / "medium-nodeids.txt")
@@ -201,16 +235,18 @@ def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
         "job": "medium-collect",
         "commit_sha": checked_sha,
         "marker_expression": MEDIUM_MARKER_EXPRESSION,
-        "shard_count": 2,
+        "shard_count": MEDIUM_SHARD_COUNT,
         "total_count": len(node_ids),
         "node_ids_sha256": _node_ids_sha256(node_ids),
-        "shard_counts": [len(partition_node_ids(node_ids, index, 2)) for index in range(2)],
+        "shard_counts": [
+            len(partition_node_ids(node_ids, index, MEDIUM_SHARD_COUNT)) for index in range(MEDIUM_SHARD_COUNT)
+        ],
     }
     if not isinstance(collection, dict) or any(collection.get(key) != value for key, value in expected.items()):
         raise ValueError("medium collection does not match the checked SHA or selected node IDs")
     executed = []
-    for index in range(2):
-        assigned = partition_node_ids(node_ids, index, 2)
+    for index in range(MEDIUM_SHARD_COUNT):
+        assigned = partition_node_ids(node_ids, index, MEDIUM_SHARD_COUNT)
         if not assigned:
             raise ValueError("medium shard assignment is empty")
         shard_root = artifact_root / f"t2-medium-shard-{index}-{checked_sha}"
@@ -262,6 +298,12 @@ def _build_parser() -> argparse.ArgumentParser:
     verify_parser = subparsers.add_parser("verify-medium", help="verify exact medium shard coverage")
     verify_parser.add_argument("--artifacts", type=Path, required=True)
     verify_parser.add_argument("--checked-sha", required=True)
+    required_parser = subparsers.add_parser(
+        "verify-required", help="verify a run executed exactly the required cases and passed all of them"
+    )
+    required_parser.add_argument("--evidence", type=Path, required=True)
+    required_parser.add_argument("--nodeids", type=Path, required=True)
+    required_parser.add_argument("--checked-sha", required=True)
     return parser
 
 
@@ -295,6 +337,8 @@ def main(argv: list[str] | None = None) -> int:
                 collection_summary=args.collection_summary,
                 checked_sha=args.checked_sha,
             )
+        elif args.command == "verify-required":
+            verify_required_cases(args.evidence, args.checked_sha, args.nodeids)
         else:
             verify_medium_shards(args.artifacts, args.checked_sha)
     except (OSError, ValueError, json.JSONDecodeError) as exc:

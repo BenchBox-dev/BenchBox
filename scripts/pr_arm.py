@@ -107,7 +107,18 @@ def arm(
                 print(f"pr-arm: refusing to arm PR #{view['number']}: {reason}", file=sys.stderr)
             return 2
         code, out = run(
-            ["gh", "pr", "merge", str(view["number"]), "--repo", repo, "--squash", "--match-head-commit", local_head]
+            [
+                "gh",
+                "pr",
+                "merge",
+                str(view["number"]),
+                "--repo",
+                repo,
+                "--squash",
+                "--auto",
+                "--match-head-commit",
+                local_head,
+            ]
         )
         print(out.strip())
         return code

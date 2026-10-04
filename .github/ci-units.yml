@@ -20,6 +20,7 @@ core:
   - "pytest-ci.ini"
   - ".importlinter"
   - "codecov.yml"
+  - "deploy/**"
   - "docs/conf.py"
   - "docs/Makefile"
   - "docs/_extensions/**"
@@ -35,6 +36,7 @@ core:
   - "docs/development/dependency-audit-raw.md"
   - "docs/operations/agent-instruction*.md"
   - "landing/**.py"
+  - "website/**.py"
 
 explorer:
   - "results-explorer/**"
@@ -55,6 +57,7 @@ results-data:
 
 docs:
   - "docs/**"
+  - "website/**"
   - "_project/scripts/generate_oracle_coverage_map.py"
   - "scripts/generate_query_docs.py"
   - "scripts/generate_compat_docs.py"
@@ -65,6 +68,7 @@ docs:
 
 landing:
   - "landing/**"
+  - "website/**"
   - "docs/_static/custom.css"
   - "docs/_templates/page.html"
   - "results-explorer/index.html"

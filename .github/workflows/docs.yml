@@ -37,7 +37,6 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           RECOVERY_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
           CURRENT_SHA: ${{ github.sha }}
           CURRENT_REF: ${{ github.ref }}
@@ -58,14 +57,14 @@ jobs:
             SOURCE_SHA="$RECOVERY_SOURCE_SHA"
           fi
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          BASE_SHA="${PR_BASE_SHA:-$GROUP_BASE_SHA}"
+          BASE_SHA="$PR_BASE_SHA"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+          if [ "$EVENT_NAME" != pull_request ]; then
             echo 'changed=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Missing exact PR or merge-group base SHA."
+            echo "::error::Missing exact PR base SHA."
             exit 1
           fi
           git cat-file -e "$BASE_SHA^{commit}" || {
@@ -202,8 +201,7 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'develop') ||
-      github.event_name == 'merge_group'
+      (github.event_name == 'pull_request' && github.base_ref == 'develop')
     needs: [visual-inputs, build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -245,19 +243,18 @@ jobs:
 
       - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
           PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES: ${{ needs.visual-inputs.outputs.baseline_candidates }}
           PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
-          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '600' || '0' }}
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
       - name: Compare public site with exact base
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
@@ -267,9 +264,9 @@ jobs:
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.baseline.outputs.baseline_sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
-          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
-          APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
-          APPROVAL_REASON: ${{ github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON || github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
@@ -282,14 +279,6 @@ jobs:
           name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
           path: ${{ runner.temp }}/public-site-visual-current
           retention-days: 30
-
-      - name: Upload merge-queue candidate visual baseline
-        if: github.event_name == 'merge_group'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
-        with:
-          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
-          path: ${{ runner.temp }}/public-site-visual-current
-          retention-days: 7
 
       - name: Upload visual diagnostics
         if: failure()
@@ -327,7 +316,7 @@ jobs:
           if [ "$EVENT_NAME" = pull_request ] && [ "$BASE_REF" != develop ]; then
             exit 0
           fi
-          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+          if [ "$EVENT_NAME" != pull_request ]; then
             exit 0
           fi
           if [ "$SITE_CHANGED" = false ]; then

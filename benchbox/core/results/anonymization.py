@@ -40,6 +40,19 @@ _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+_OPTION_SOURCE_LABELS = frozenset(
+    {
+        "registered_default",
+        "saved_config",
+        "environment_variable",
+        "cli_option",
+        "runtime_override",
+        "requested",
+        "observed",
+        "inferred",
+        "unavailable",
+    }
+)
 _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS = frozenset({"clienthost"})
 _TUNING_SOURCE_FILE_PATH = ("platform", "tuning", "source_file")
 
@@ -484,6 +497,14 @@ class AnonymizationManager:
 
     def _anonymize_public_scalar(self, value: Any, key_path: tuple[str, ...]) -> Any:
         if value in (None, ""):
+            return value
+
+        if (
+            isinstance(value, str)
+            and value in _OPTION_SOURCE_LABELS
+            and len(key_path) >= 2
+            and _compact_key(key_path[-2]) == "platformoptionsources"
+        ):
             return value
 
         if isinstance(value, str) and self._looks_like_connection_string(value):

@@ -68,6 +68,7 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
       if (route.slug === "landing") {
+        await page.addStyleTag({ content: "html { scroll-behavior: auto !important; }" });
         for (const selector of [".feature-card", ".benchmark-card", ".install-step"]) {
           const cards = page.locator(selector);
           for (let index = 0; index < (await cards.count()); index += 1) {
@@ -101,6 +102,25 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
 
       const filename = `${route.slug}-${width}.png`;
       const screenshotPath = path.join(OUTPUT, filename);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      if (route.slug === "landing") {
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                new Promise<string>((resolve) =>
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() =>
+                      resolve(document.querySelector(".section-nav__link[aria-current]")?.getAttribute("href") ?? ""),
+                    ),
+                  ),
+                ),
+            ),
+          )
+          .toBe("#overview");
+        await page.evaluate(() => document.querySelector(".section-nav__links")?.scrollTo({ left: 0, behavior: "instant" }));
+        await expect.poll(() => page.evaluate(() => document.querySelector(".section-nav__links")?.scrollLeft ?? 0)).toBe(0);
+      }
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const digest = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
       captures.push({ digest, filename, route: route.path, viewport_width: width });

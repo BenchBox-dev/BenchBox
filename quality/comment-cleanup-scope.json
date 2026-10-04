@@ -2121,6 +2121,12 @@
           "prefix": "landing/"
         },
         {
+          "prefix": "website/"
+        },
+        {
+          "prefix": "deploy/"
+        },
+        {
           "prefix": "docker/"
         },
         {
@@ -2973,14 +2979,6 @@
       "owner": "comment-cleanup-expected-wrapper",
       "state": "blocked",
       "blocking_disposition": "Edit only the private wrapper before the validation cleanup task owns the rest of the file."
-    },
-    {
-      "id": "make-inventory-receipt",
-      "path": "make/inventory.json",
-      "carrier": "generated Make inventory",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Regenerate through the supported helper; preserve the historical monolith baseline."
     },
     {
       "id": "joinorder-synthetic-generated-docstring-writer",

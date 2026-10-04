@@ -1037,8 +1037,8 @@ class DatabricksAdapter(PlatformAdapter):
             self._schema_reset_in_place = True
             return True
         except Exception as e:
-            self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
-            return False
+            self.log_verbose(f"In-place reset of {catalog}.{schema} failed: {e}")
+            raise
         finally:
             if connection is not None:
                 connection.close()
@@ -1079,7 +1079,7 @@ class DatabricksAdapter(PlatformAdapter):
 
             if not (getattr(self, "create_catalog", False) and not getattr(self, "database_was_reused", False)):
                 cursor.execute(f"USE CATALOG {self.catalog}")
-                if not getattr(self, "database_was_reused", False):
+                if not getattr(self, "database_was_reused", False) and not getattr(self, "_validating_database", False):
                     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")

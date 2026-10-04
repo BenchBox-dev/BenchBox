@@ -245,4 +245,4 @@ benchbox run --platform dataproc-serverless --benchmark tpch \
 
 - [Google Cloud Dataproc](gcp-dataproc.md) - Cluster-based managed Spark
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

@@ -52,8 +52,7 @@ def find_dataframe_divergences(
     query_ids: list[int] | None = None,
     backends: tuple[str, ...] = DATAFRAME_BACKENDS,
 ) -> list[SurfaceDivergence]:
-    from benchbox.core.tpch import dataframe_queries as tpch_dataframe_queries
-    from benchbox.core.tpch.dataframe_queries import set_parameter_overrides, set_scale_factor
+    from benchbox.core.tpch.dataframe_queries import seeded_parameter_overrides
 
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     registry = benchmark.get_dataframe_queries()
@@ -81,11 +80,7 @@ def find_dataframe_divergences(
 
                 yield f"v{variant_id}:{backend}", check
 
-    previous_overrides = tpch_dataframe_queries._parameter_overrides
-    previous_scale_factor = tpch_dataframe_queries._scale_factor
-    set_parameter_overrides(None)
-    set_scale_factor(benchmark.scale_factor)
-    try:
+    with seeded_parameter_overrides(None, benchmark.scale_factor, 0):
         return find_surface_divergences(
             ids,
             reference_rows=reference_rows,
@@ -93,9 +88,6 @@ def find_dataframe_divergences(
             validation_error=ValidationError,
             reference_failure_cell="v0:canonical",
         )
-    finally:
-        set_parameter_overrides(previous_overrides)
-        set_scale_factor(previous_scale_factor)
 
 
 def main() -> int:

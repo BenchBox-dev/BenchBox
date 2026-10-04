@@ -28,7 +28,6 @@ docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md::_project/DON
 docs/operations/release-guide.md::_project/TODO/main/active/release-recovery-v0-3-1.yaml
 docs/operations/uat-framework.md::_project/release-evidence/uat-gate-summary.json
 docs/reference/public-contracts.md::_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
-make/inventory.json::_project/cross-surface-baseline-autodetect/summary.json
 make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.json
 scripts/release_readiness_check.py::_project/release-evidence/uat-gate-summary.json
 tests/uat/_cli.py::_project/release-evidence/uat-gate-summary.json

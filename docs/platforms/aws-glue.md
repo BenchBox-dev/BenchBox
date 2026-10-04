@@ -245,4 +245,4 @@ Minimum required IAM policy for the Glue job role:
 
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
 - [Amazon Athena Platform](athena.md) - Serverless Trino queries
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

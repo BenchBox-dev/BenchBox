@@ -10,7 +10,7 @@ import re
 import sys
 from typing import NamedTuple
 
-COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json", ".override.json")
 LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
 MINIMUM_PLATFORMS_PER_COHORT = 3

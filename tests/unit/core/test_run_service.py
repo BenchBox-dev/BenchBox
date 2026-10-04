@@ -270,6 +270,51 @@ class TestExecutionPort:
         assert enrich.call_args.kwargs["platform_adapter"] == "ADAPTER"
 
 
+class TestDataFrameThroughputIsRejected:
+    @pytest.mark.parametrize("phases", [["throughput"], ["power", "throughput"], ["load", "throughput"]])
+    def test_dataframe_throughput_raises(self, phases: list[str]):
+        from benchbox.core.run_service import reject_unsupported_dataframe_phases
+
+        with pytest.raises(ValueError, match="throughput phase is not supported in DataFrame mode"):
+            reject_unsupported_dataframe_phases("dataframe", phases)
+
+    @pytest.mark.parametrize(
+        ("mode", "phases"),
+        [("dataframe", ["power"]), ("dataframe", None), ("sql", ["power", "throughput"]), (None, ["throughput"])],
+    )
+    def test_other_requests_pass(self, mode, phases):
+        from benchbox.core.run_service import reject_unsupported_dataframe_phases
+
+        reject_unsupported_dataframe_phases(mode, phases)
+
+    def test_execute_run_refuses_before_building_an_adapter(self):
+        from unittest.mock import patch
+
+        from benchbox.core.run_service import execute_run
+
+        class _DataFrameDatabase:
+            execution_mode = "dataframe"
+            type = "polars-df"
+
+        factory_calls = []
+        with patch("benchbox.core.run_service.run_benchmark_lifecycle") as lifecycle:
+            with pytest.raises(ValueError, match="DataFrame mode"):
+                execute_run(
+                    config=_config(),
+                    benchmark_instance=object(),
+                    database_config=_DataFrameDatabase(),
+                    system_profile=None,
+                    platform_config=None,
+                    output_root="/tmp/out",
+                    phases_to_run=["load", "throughput"],
+                    adapter_factory=lambda **kwargs: factory_calls.append(kwargs),
+                    verbosity=SilentVerbosity(),
+                )
+
+        assert factory_calls == []
+        lifecycle.assert_not_called()
+
+
 class TestInteractionStaysInTheCli:
     def test_core_emits_no_console_output(self):
         tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))

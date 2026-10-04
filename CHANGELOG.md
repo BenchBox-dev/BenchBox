@@ -26,6 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compare these queries one-for-one with results recorded before this change
   at other scale factors.
 
+### Fixed
+
+- **DataFrame runs no longer crash when two BenchBox processes share the
+  Parquet cache.** The cache was rewritten in place, so a run that loaded data
+  while another run was scanning it could crash that run with a Polars
+  `Invalid argument (os error 22)` panic, a SIGBUS or a "must end with PAR1"
+  error. Cache files and manifests are now written to a temporary file and
+  renamed into place. Routine pruning preserves writer files regardless of age;
+  an explicit cache clear removes files abandoned by a crashed run.
+
+- **Dask TPC-DS queries order NULLs like the reference.** Q19, Q34, Q71 and Q73
+  sort one key ascending and another descending. On `dask-df` every key put
+  NULLs last, so rows with a NULL in a descending key were out of order. They
+  now match the other DataFrame platforms.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade

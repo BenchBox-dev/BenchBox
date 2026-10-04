@@ -25,6 +25,7 @@ pytestmark = [
 ]
 
 
+@pytest.mark.timeout(180)
 def test_clickbench_dataframe_surface_equivalent_to_sql(tmp_path):
     gate = GATES["clickbench"]
     data = gate.build(EQUIVALENCE_SCALE, tmp_path)

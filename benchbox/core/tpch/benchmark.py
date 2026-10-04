@@ -22,13 +22,27 @@ from benchbox.core.tpch.queries import TPCHQueries
 from benchbox.core.tpch.schema import TABLES
 from benchbox.core.tpch.streams import TPCHStreams
 
-TPCH_SF1_REFERENCE_SEED = 0o0101000000
+TPCH_ANSWER_SET_SCALE_FACTOR = 1.0
 
 
-def get_reference_seed(scale_factor: float) -> int | None:
-    if scale_factor == 1.0:
-        return TPCH_SF1_REFERENCE_SEED
-    return None
+def has_answer_set(scale_factor: float) -> bool:
+    return float(scale_factor) == TPCH_ANSWER_SET_SCALE_FACTOR
+
+
+def binds_answer_set_parameters(seed: int | None) -> bool:
+    return seed is None
+
+
+def power_stream_seed(seed: int | None, stream_id: int) -> int | None:
+    if seed is None:
+        return None
+    return seed + stream_id * 1000
+
+
+def describe_query_parameters(seed: int | None) -> str:
+    if seed is None:
+        return "qgen -d (TPC-H default substitution parameters)"
+    return f"qgen -r ({seed} + 1000 * stream_id)"
 
 
 @dataclass

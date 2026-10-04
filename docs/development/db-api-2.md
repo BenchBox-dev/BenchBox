@@ -489,8 +489,8 @@ Future versions may support asynchronous database operations using async/await:
 
 - [Adding New Platforms](adding-new-platforms.md) - Complete guide to implementing platform adapters
 - [PEP 249 - Python Database API Specification v2.0](https://peps.python.org/pep-0249/)
-- [Platform Development](platform-development.rst) - Platform development overview
-- [Architecture & Design](architecture-design.rst) - BenchBox architecture
+- [Platform Development](platform-development.md) - Platform development overview
+- [Architecture & Design](architecture-design.md) - BenchBox architecture
 
 ## Summary
 

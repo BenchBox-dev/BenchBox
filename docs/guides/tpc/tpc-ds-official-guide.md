@@ -839,6 +839,6 @@ For additional support:
 ## References
 
 - [TPC-DS Specification](http://www.tpc.org/tpcds/)
-- [BenchBox Documentation](../../index.rst)
+- [BenchBox Documentation](../../index.md)
 - [TPC-DS Benchmark Overview](../../benchmarks/tpc-ds.md)
 - [API Reference](../../reference/api-reference.md)

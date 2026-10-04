@@ -184,6 +184,70 @@ def test_q34_orders_a_null_preferred_flag_first_because_the_key_is_descending(fa
     assert [row[3] for row in _rows(impl(_context(family, tables)))] == [None, "Y", "N"]
 
 
+def _dask_context(tables, npartitions=2):
+    dd = pytest.importorskip("dask.dataframe")
+    import pandas as pd
+
+    from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
+
+    ctx = DaskDataFrameAdapter(use_distributed=False).create_context()
+    for name, data in tables.items():
+        ctx.register_table(name, dd.from_pandas(pd.DataFrame(data), npartitions=npartitions))
+    return ctx
+
+
+@pytest.mark.parametrize("npartitions", [1, 3])
+def test_mixed_direction_sort_places_nulls_per_key_on_dask(npartitions):
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    spec = {
+        "query_id": 15,
+        "base": "t",
+        "joins": [],
+        "group_by": ["g", "k"],
+        "aggs": [["total", "v", "sum"]],
+        "sort_by": ["g", "k"],
+        "descending": [False, True],
+    }
+    data = {"g": ["x", "x", "x", "y", "y"], "k": ["b", None, "a", None, "c"], "v": [1.0, 2.0, 3.0, 4.0, 5.0]}
+
+    assert _rows(queries._joined_agg_pandas_impl(_dask_context({"t": data}, npartitions), spec)) == [
+        ("x", None, 2.0),
+        ("x", "b", 1.0),
+        ("x", "a", 3.0),
+        ("y", None, 4.0),
+        ("y", "c", 5.0),
+    ]
+
+
+@pytest.mark.parametrize("npartitions", [1, 4, 7])
+def test_mixed_direction_sort_then_limit_matches_pandas_on_dask(npartitions):
+    import numpy as np
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    dd = pytest.importorskip("dask.dataframe")
+    rng = np.random.default_rng(7)
+    size = 300
+    frame = pd.DataFrame(
+        {
+            "a": rng.choice(["x", "y", "z", None], size),
+            "b": rng.choice([1.0, 2.0, 3.0, np.nan], size),
+            "c": rng.integers(0, 5, size),
+            "row": np.arange(size),
+        }
+    )
+    keys, descending = ["a", "b", "c", "row"], [False, True, False, False]
+
+    expected = queries._sort_null_largest_pandas(frame, keys, descending).head(40)
+    ordered = queries._sort_null_largest_pandas(dd.from_pandas(frame, npartitions=npartitions), keys, descending)
+    actual = ordered.head(40, npartitions=-1)
+
+    assert list(actual.columns) == list(frame.columns)
+    assert actual["row"].tolist() == expected["row"].tolist()
+
+
 def _q71_tables():
     return {
         "date_dim": {"d_date_sk": [1], "d_year": [2000], "d_moy": [12]},

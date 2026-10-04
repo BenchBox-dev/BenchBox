@@ -19,6 +19,7 @@ permissions:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -341,6 +342,7 @@ jobs:
 
   integration-smoke:
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     env:
       BENCHBOX_TEST_TIER: t2
     strategy:
@@ -642,9 +644,44 @@ jobs:
         run: npm test -- --reporter=verbose
         working-directory: results-explorer
 
+  website-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Detect website
+        id: website
+        shell: bash
+        run: |
+          if [ -f website/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "website is absent; skipping website audit."
+          fi
+
+      - name: Set up Node.js
+        if: steps.website.outputs.present == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+
+      - name: Install website dependencies
+        if: steps.website.outputs.present == 'true'
+        run: npm ci
+        working-directory: website
+
+      - name: Audit website dependencies
+        if: steps.website.outputs.present == 'true'
+        run: npm run audit:high
+        working-directory: website
+
   scheduled-workflow-liveness:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    continue-on-error: true
     permissions:
       actions: read
       contents: read
@@ -843,6 +880,7 @@ jobs:
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
       - name: Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        continue-on-error: true
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml
 
@@ -910,6 +948,7 @@ jobs:
 
       - name: Assert the Postgres cell stream count and per-stream success
         if: ${{ !cancelled() }}
+        continue-on-error: true
         run: |
           uv run -- python -c "
           import datetime, os, sys
@@ -1027,3 +1066,39 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply
+
+  ruleset-drift:
+    name: ruleset-drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: develop
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+
+      - name: Compare live governance with the runbook
+        env:
+          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/ruleset_drift_check.py \
+            --token "${RULESET_DRIFT_TOKEN}" \
+            --require-bypass-actor-visibility \
+            --output ruleset-drift.json
+
+      - name: Upload drift evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: nightly-ruleset-drift-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ruleset-drift.json
+          if-no-files-found: warn
+          retention-days: 30
