@@ -5,7 +5,7 @@
     "The SQL stream limitation is handled: c_tools generate(..., stream_id=n) renders stream 0 (c_tools.py ~258-261), so stream n > 0 must be rendered from -LOG values or generate_dsqgen_streams before SQL and DataFrame can agree",
     "TPC-H behavior is unchanged"
   ],
-  "context": "2026-10-03: done locally on feat/tpcds-production-binding (worktree BenchBox.wt-tpcds-t07, commit b513cfc29, based on t05g). The SQL power test renders stream k with -RNGSEED (seed or 1) + k + 1000 at the data's scale on dsqgen stream 0; the formula is now shared as power_parameter_seed() and used by both paths, so the DataFrame binding uses exactly the SQL's values. production_binding.py binds the adapted queries once per stream (parallel dsqgen -LOG, cached, outside query timers; ~3.5-5 s cold for 66 queries under load), and a dsqgen failure fails the run. Unadapted queries run on defaults. config.query_parameters lists bound and default queries per query, and adding an adapter later needs no change. TPC-H is unchanged. Tests: 17 new, including SQL-text reproduction from the DataFrame binding for every adapted query at no seed and seed 42, streams 0 and 1. End-to-end at SF 0.01, seed 7, 2 iterations, duckdb vs polars-df: adapted queries match 135/140 (stream, query) pairs, 92/140 before. The 5 left are variants 14b, 23b and 39b (see below). Query timing is not proven by the e2e (load average ~40); the wrapper adds ~1.8 µs per query. NEW GAP: production runs variant queries 14b/23b/39b, where SQL runs the template's second statement and the DataFrame side falls back to the base implementation (the first statement), giving different results. Needs variant implementations or an explicit refusal. Merge note: builder.py, result_factory.py, schema.py and schema_specs.yaml match the tpch-seed branch edits exactly; benchmark_mixin.py and public-contracts.md need both sides kept.",
+  "context": "2026-10-03: done locally on feat/tpcds-production-binding (worktree BenchBox.wt-tpcds-t07, commit b513cfc29, based on t05g). The SQL power test renders stream k with -RNGSEED (seed or 1) + k + 1000 at the data's scale on dsqgen stream 0; the formula is now shared as power_parameter_seed() and used by both paths, so the DataFrame binding uses exactly the SQL's values. production_binding.py binds the adapted queries once per stream (parallel dsqgen -LOG, cached, outside query timers; ~3.5-5 s cold for 66 queries under load), and a dsqgen failure fails the run. Unadapted queries run on defaults. config.query_parameters lists bound and default queries per query, and adding an adapter later needs no change. TPC-H is unchanged. Tests: 17 new, including SQL-text reproduction from the DataFrame binding for every adapted query at no seed and seed 42, streams 0 and 1. End-to-end at SF 0.01, seed 7, 2 iterations, duckdb vs polars-df: adapted queries match 135/140 (stream, query) pairs, 92/140 before. The 5 left are variants 14b, 23b and 39b (see below). Query timing is not proven by the e2e (load average ~40); the wrapper adds ~1.8 µs per query. NEW GAP: production runs variant queries 14b/23b/39b, where SQL runs the template's second statement and the DataFrame side falls back to the base implementation (the first statement), giving different results. Needs variant implementations or an explicit refusal. Merge note: builder.py, result_factory.py, schema.py and schema_specs.yaml match the tpch-seed branch edits exactly; benchmark_mixin.py and public-contracts.md need both sides kept.\n\n2026-10-04 closeout: Delivered in #2605: production DataFrame runs bind the SQL Power run's dsqgen values per stream and record the bound parameters.",
   "description": "Restore the override call in the production DataFrame path (benchbox/platforms/dataframe/benchmark_mixin.py; set_parameter_overrides has had no production caller since #2126) but only for queries whose implementation consumes the mapped parameters with no literal fallback (per the T2 inventory and T6 lint). Unmapped keys are ignored by implementations, so enabling globally would ship partial, unfaithful parity as stale defaults. Needs owner decision D3 (runtime -LOG vs committed defaults) and must not change TPC-H behavior.",
   "sessions": [
     {
@@ -39,6 +39,14 @@
       "op": "update",
       "op_id": "d3bfcdc89a4844fdae0d3e432dab9029",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:19:23Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6ae4e51f280f4a9badf1f72c3fb41af3",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
