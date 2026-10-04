@@ -4614,6 +4614,13 @@
       "status": "done",
       "title": "Connection Parameter Conflicts in TPC Test Methods"
     },
+    "connection-pool-passes-whole-config-to-create-connection-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "get_connection_from_pool passes the whole platform config to create_connection(**config), which raises TypeError for Glue and MotherDuck"
+    },
     "consider-whether-other-core-drivers-polars-clickhouse-connec": {
       "claim": null,
       "needs": [],

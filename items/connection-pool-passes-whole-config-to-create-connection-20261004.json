@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Test: `get_connection_from_pool` succeeds for every registered adapter against its driver fake, or the failure is an asserted, documented exemption.",
+    "ClickHouse server and Velox pool failures are explained in the PR."
+  ],
+  "context": "Source: PR #2632 contract-test author report (2026-10-04).",
+  "description": "## Problem (observed by the contract-test author against fakes)\n`get_connection_from_pool` calls `create_connection(**config)` with the whole platform configuration. For Glue and MotherDuck that raises `TypeError` (MotherDuck's signature is `create_connection(connection_config: dict | None)`). The same helper also failed for ClickHouse server (`TypeError`) and Velox (`AttributeError`) in the test harness; those two were not investigated and may come from the fakes.\n\n## Change\n- Make the pooled-connection path call `create_connection` the way each adapter's signature requires.\n- Investigate the ClickHouse server and Velox failures and either fix them or document why they are harness artifacts.\n- Cover the pooled path for every adapter in a signature-conformance test.\n\n## Guardrails (must preserve)\n- Existing pooled behaviour for adapters that work today.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/platforms/base/connection_lifecycle.py",
+    "tests/unit/platforms/test_no_midrun_destructive_ops.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:55:15Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2fa07ad566884d40ba6645941998e75c",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
