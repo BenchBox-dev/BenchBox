@@ -5,10 +5,9 @@ same policy into ``ci.yml`` as the ``base-guard`` job, because ``ci.yml``
 deliberately carries no branch filter: a stacked PR gets the ordinary six
 unit checks instead of an empty check list. Without the folded guard its
 content could slide into develop under a parent PR, never validated as its
-own integration-base diff. These tests pin the properties that make the
-folded guard work: it runs on every PR whatever its base, it re-runs when a
-PR is retargeted or a draft is marked ready, and it rejects a ready PR whose
-base is not an integration branch while letting a draft stack on its parent.
+own integration-base diff. These tests pin the two properties that make the
+folded guard work: it runs on every PR whatever its base, and it rejects a
+base that is not an integration branch.
 """
 
 from __future__ import annotations
@@ -83,20 +82,12 @@ def test_stacked_pr_base_guard_reevaluates_when_a_pr_is_retargeted() -> None:
 
 
 def test_stacked_pr_base_guard_reevaluates_when_draft_status_changes() -> None:
-    """Both draft transitions must re-run the guard.
-
-    A draft stacked on a parent branch passes; without `ready_for_review` it
-    would keep that stale pass after losing its draft status, and without
-    `converted_to_draft` a ready PR that failed on a feature base would keep
-    its stale failure after becoming an allowed draft.
-    """
     types = (_triggers(_load())["pull_request"] or {}).get("types", [])
     assert "ready_for_review" in types, "guard does not re-evaluate when a draft becomes ready"
     assert "converted_to_draft" in types, "guard does not re-evaluate when a ready PR becomes a draft"
 
 
 def test_stacked_pr_base_guard_names_integration_branches_and_can_fail() -> None:
-    """The guard must name every branch CI actually covers and still be able to fail."""
     job = _job()
     assert job.get("if") == "${{ github.event_name == 'pull_request' }}", (
         "base-guard must run on every PR event so a stacked base always reports"
@@ -129,13 +120,15 @@ def test_stacked_pr_base_guard_feeds_the_tooling_result() -> None:
     )
 
 
-def _run_guard(base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str]:
+def _run_guard(tmp_path: Path, base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str]:
     step = next(s for s in _job()["steps"] if s.get("name") == STEP_NAME)
     env = step.get("env", {})
     assert env.get("BASE_REF") == "${{ github.base_ref }}"
     assert env.get("IS_DRAFT") == "${{ github.event.pull_request.draft }}"
+    script = tmp_path / "base-guard.sh"
+    script.write_text(step["run"], encoding="utf-8")
     return subprocess.run(
-        ["bash", "-c", str(step["run"])],
+        ["bash", str(script)],
         env={"PATH": "/usr/bin:/bin", "BASE_REF": base_ref, "IS_DRAFT": "true" if draft else "false"},
         capture_output=True,
         text=True,
@@ -145,18 +138,18 @@ def _run_guard(base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str
 
 @pytest.mark.parametrize("draft", [True, False])
 @pytest.mark.parametrize("base", sorted(INTEGRATION_BRANCHES))
-def test_stacked_pr_base_guard_passes_integration_bases(base: str, draft: bool) -> None:
-    assert _run_guard(base, draft=draft).returncode == 0
+def test_stacked_pr_base_guard_passes_integration_bases(tmp_path: Path, base: str, draft: bool) -> None:
+    assert _run_guard(tmp_path, base, draft=draft).returncode == 0
 
 
-def test_stacked_pr_base_guard_passes_a_draft_on_a_feature_base() -> None:
-    result = _run_guard("fix/parent-branch", draft=True)
+def test_stacked_pr_base_guard_passes_a_draft_on_a_feature_base(tmp_path: Path) -> None:
+    result = _run_guard(tmp_path, "fix/parent-branch", draft=True)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "::error::" not in result.stdout
 
 
-def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base() -> None:
-    result = _run_guard("fix/parent-branch", draft=False)
+def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base(tmp_path: Path) -> None:
+    result = _run_guard(tmp_path, "fix/parent-branch", draft=False)
     assert result.returncode != 0
     assert "::error::" in result.stdout
     assert "fix/parent-branch" in result.stdout
