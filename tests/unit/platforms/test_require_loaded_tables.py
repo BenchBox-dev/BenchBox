@@ -23,6 +23,16 @@ def test_fails_when_required_table_is_empty():
         require_loaded_tables(OBT, {"tpcds_sales_returns_obt": 0})
 
 
+@pytest.mark.parametrize("stats", [{}, {"a": 0}, {"a": -5}, {"a": True}, {"a": "n/a"}])
+def test_unpinned_benchmarks_reject_loads_without_a_table_holding_rows(stats):
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), stats)
+
+
+def test_unpinned_benchmarks_pass_when_one_table_holds_rows_despite_error_sentinels():
+    require_loaded_tables(SimpleNamespace(), {"loaded": 50, "failed": -100})
+
+
 def test_benchmarks_without_requirements_reject_vacuous_loads():
     with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
         require_loaded_tables(SimpleNamespace(), {})

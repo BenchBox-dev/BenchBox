@@ -297,7 +297,7 @@ class FileArtifactMixin:
                     }
                 )
 
-        if not manifest["tables"]:
+        if not any(manifest["tables"].values()):
             raise RuntimeError(
                 f"TPC-DS data generation produced no table files in {output_dir}; refusing to write a manifest that lists no tables"
             )

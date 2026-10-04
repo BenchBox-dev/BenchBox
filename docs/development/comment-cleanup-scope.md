@@ -264,7 +264,8 @@ changes and validation. Detailed task and comparison receipts stay in local
 evidence or the tracker.
 
 Follow the active landing policy and exact-head hosted checks. Soundness changes
-currently require the repository owner's manual merge; do not bypass that action.
-After actual merge, verify the merged tree and trusted blocking enforcement,
-then finish tasks in dependency order. Local checks and pilot results do not
-certify UAT, deployment or production use.
+need the `oracle-review` check to pass on the current head and every review
+thread resolved before arming; do not bypass that check. After actual merge,
+verify the merged tree and trusted blocking enforcement, then finish tasks in
+dependency order. Local checks and pilot results do not certify UAT, deployment
+or production use.

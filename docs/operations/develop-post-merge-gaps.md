@@ -25,20 +25,28 @@ develop shares it. The full list of those workflows, what each loses when a push
 is dropped, and how to recover is in
 [`develop-push-drop-inventory.md`](develop-push-drop-inventory.md).
 
-## What changed with the six-unit CI
+## What changed with trunk.yml
 
-The post-merge workflow (`develop-post-merge.yml`), its hourly tip sweep, and
-its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
-Required checks now run on the exact tree that lands: the merge queue runs the
-six units on the speculative merge commit, so a dropped push on develop no
-longer leaves the tip ungated. What a dropped push can still cost is confined
-to the push-only workflows in the inventory. One matters for the queue itself:
+The earlier post-merge workflow (`develop-post-merge.yml`), its hourly tip sweep,
+and its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
+`.github/workflows/trunk.yml` restores validation of the merged tree: the fast
+lane, four-shard medium tier, correctness gate and required-local-cases. It also
+builds the verified release distribution artifact. A failing trunk run leads to
+a revert (`make trunk-revert PR=<n>`). Its `concurrency.queue: max` retains
+pending runs instead of replacing them when merges arrive together.
+
+This closes the concurrency-replacement gap for delivered events, not the
+event-delivery gap. A push that GitHub never delivers produces no run for that
+commit. The next delivered push tests a tree containing it but cannot certify
+that earlier commit's release artifact. The fast-lane count baseline and delta
+guard are retired. The remaining consequences include:
 
 | Workflow | Loses when its push is dropped | Recovery |
 | --- | --- | --- |
-| `docs.yml` | The protected public-site visual baseline for that commit. A PR or queue entry whose render inputs changed then fails closed at the baseline download. | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
+| `trunk.yml` | Test evidence and the release distribution artifact for that exact commit. Admission requires a successful trunk `push` run on `develop`; a dispatch or later commit cannot substitute. | Verify that the release candidate has its own successful push run before tagging it; otherwise choose a tested candidate or obtain an owner decision on recovery. |
+| `docs.yml` | The protected public-site visual baseline for that commit. A PR whose render inputs changed then has no baseline to compare against at the download step (the comparison is advisory). | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 
-Check whether a commit has a baseline before blaming a PR for this failure.
+Check exact-commit workflow evidence before blaming a PR or admitting a release.
 
 ## Diagnostic
 
@@ -47,7 +55,7 @@ Exact-SHA coverage for the last 10 develop commits, for one workflow:
 ```bash
 bash -c '
   shas=$(git log --format=%H origin/develop -10)
-  runs=$(gh run list --workflow docs.yml --limit 100 --json headSha --jq .[].headSha)
+  runs=$(gh run list --workflow trunk.yml --event push --branch develop --limit 100 --json headSha --jq .[].headSha)
   for s in $shas; do
     echo "$runs" | grep -q "$s" || { echo "missing: $s"; }
   done
@@ -55,8 +63,9 @@ bash -c '
 ```
 
 A missing SHA after a real push-drop episode is expected, and stays missing
-until it ages out of the window. Re-dispatch the workflow as above if a PR
-needs that commit as its base.
+until it ages out of the window. A docs baseline can be recovered by dispatch
+as above. A dispatched trunk run gives test evidence, but release admission
+requires a push-produced artifact and rejects dispatch as a substitute.
 
 ## Retired tooling
 

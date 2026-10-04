@@ -1,5 +1,7 @@
 # Native Merge Queue Canary Rehearsal Runbook
 
+> Historical: the merge queue was retired on 2026-10-03 (see `_project/decisions/merge-queue-retirement-2026-10-03.md`), so this rehearsal no longer applies.
+
 This runbook provides the operational procedure and scenario checklist for conducting an end-to-end rehearsal of the GitHub Native Merge Queue on `BenchBox-dev/BenchBox` prior to production enablement on `refs/heads/develop`.
 
 ---

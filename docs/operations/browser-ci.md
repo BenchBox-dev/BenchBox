@@ -27,7 +27,10 @@ required by the develop branch ruleset:
 | Ruleset | `develop-squash-only` (resolve by name; current id `15611785` until a transfer) |
 | Required context | `explorer` |
 | Unit job | `explorer` in `ci.yml`, `if: always()` |
-| Unit inputs | `explorer-tokens`, `explorer-vitest`, `parity-check`, `explorer-e2e`, `visual-inputs`, `public-site-visual-regression` |
+| Unit inputs | `explorer-tokens`, `explorer-vitest`, `parity-check`, `explorer-e2e`, `visual-inputs` |
+
+The `public-site-visual-regression` job still runs and uploads its report, but it
+is advisory until the public site is in production and feeds no required context.
 
 The unit job, not the Chromium job itself, holds the required context.
 `explorer-e2e` runs when the `ci-paths` classifier maps a changed path to the

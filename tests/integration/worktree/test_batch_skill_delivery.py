@@ -16,10 +16,10 @@ ROOT = Path(__file__).resolve().parents[3]
 
 DELIVERY_CATALOG_REV = "5c7ff93e8103ee5a4ac59ea2330625e85250b206"
 SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
-TODO_DB_VERSION = "0.8.1"
+TODO_DB_VERSION = "0.9.1"
 SCRIPTS_PROJECT = ROOT / "_project/scripts"
 WHEEL = SCRIPTS_PROJECT / f"vendor/todo_db-{TODO_DB_VERSION}-py3-none-any.whl"
-WHEEL_SHA256 = "cbeff5257efc05e2f7155d4b4dcdb5eeb8b9aa4b45c60d4a2c0a00d24fdd50a1"
+WHEEL_SHA256 = "760bc03241d25d8a5ebdefa3a64ca898dd9a63f093785afc06b5483d3b307637"
 REQUIRED_BATCH_TOOLS = {"register_batch", "prepare", "bind_batch_pr", "abort_batch"}
 
 
@@ -168,7 +168,7 @@ def test_installed_runtime_handshake_exposes_registered_batch_tools(tmp_path: Pa
         listed = _rpc(proc, "tools/list", {}, request_id=2)
         tools = listed["result"]["tools"]
         names = {tool["name"] for tool in tools}
-        assert len(tools) == 15
+        assert len(tools) == 19
         assert names >= REQUIRED_BATCH_TOOLS
     finally:
         proc.terminate()
@@ -180,6 +180,6 @@ def test_rollout_evidence_records_active_runtime_capability() -> None:
     runtime = evidence["runtime"]
     assert runtime["dependency_metadata_version"] == TODO_DB_VERSION
     assert runtime["schema_version"] == 3
-    assert runtime["tool_count"] == 15
+    assert runtime["tool_count"] == 19
     assert set(runtime["registered_batch_tools"]) == REQUIRED_BATCH_TOOLS
     assert evidence["verification"]["active_runtime_blocker"] is None

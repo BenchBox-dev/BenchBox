@@ -20,14 +20,14 @@ public corpus is never modified.
 Routes and behaviours with at least one browser-functional test:
 
 | Route / surface | Happy path | Failure path |
-|-----------------|------------|--------------|
-| Home            | ✅          | -            |
-| BenchmarkIndex  | ✅          | -            |
-| PlatformIndex   | ✅          | -            |
-| ResultDetail    | ✅          | ✅ (unreachable `results.duckdb`, sidecar fetch failure, unknown id) |
-| Compare         | ✅ (deep link, share URL, sticky-bar flow) | ✅ (benchmark mismatch, scale mismatch, unknown id) |
+| --- | --- | --- |
+| Home | ✅ | - |
+| BenchmarkIndex | ✅ | - |
+| PlatformIndex | ✅ | - |
+| ResultDetail | ✅ | ✅ (unreachable `results.duckdb`, sidecar fetch failure, unknown id) |
+| Compare | ✅ (deep link, share URL, sticky-bar flow) | ✅ (benchmark mismatch, scale mismatch, unknown id) |
 | Query workbench | ✅ (sort, column toggle, starter query, CSV + JSON download) | ✅ (read-only write surfaces error) |
-| NotFound        | ✅ (unknown `/results/...` path renders the 404 card) | - |
+| NotFound | ✅ (unknown `/results/...` path renders the 404 card) | - |
 | DuckDB-WASM attach | ✅ (cold load, `waitForDataLoaded`) | ✅ (RG-2 range-read capability via test server) |
 
 ## Running the suite locally
@@ -67,6 +67,9 @@ Failure artifacts (traces, screenshots, video, HTML report) land under
 and are both gitignored.
 
 ## Public-site visual baseline policy
+
+The public-site visual comparison is advisory until the public site is in
+production and feeds no required status context.
 
 The full public-site visual suite is broader than the Explorer's current
 functional gate. Its baseline policy is recorded in

@@ -137,7 +137,10 @@ export function RunReceipt({
           ? recordedRow(
               "Tuning verification",
               <>
-                <TuningVerificationBadge status={detail.tuning_validation_status} />
+                <TuningVerificationBadge
+                  status={detail.tuning_validation_status}
+                  receipt={detail.applied_receipt}
+                />
                 <AppliedReceiptDrilldown raw={detail.applied_receipt} />
               </>,
             )

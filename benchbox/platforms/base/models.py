@@ -73,6 +73,7 @@ class DatabaseValidationResult:
     tuning_valid: bool | None = None
     tables_valid: bool | None = None
     row_counts_valid: bool | None = None
+    database_empty: bool = False
 
 
 __all__ = [

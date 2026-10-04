@@ -93,17 +93,18 @@ skins, deliberate palette exports for design tooling, and similar.
 
 ## CI wiring
 
-`.github/workflows/ci.yml` job `explorer-tokens` runs on any pull request or
-merge-group event where the `ci-paths` classifier sets
+`.github/workflows/ci.yml` job `explorer-tokens` runs on a pull request where
+the `ci-paths` classifier sets
 `explorer-paths-needed`, which is the `explorer-tokens` group in
 `.github/path-filters.yml` (a change under `results-explorer/src/`). It runs
 `make lint-explorer-tokens`. The shared site theme has its own
 `site-theme-tokens` job in the `landing` unit. The job is
 part of the `explorer` unit in `.github/ci-units.yml`, so `explorer` fails when
 the scan fails and, because a skipped required job also fails its unit, when
-the scan is skipped while its paths changed. The merge queue runs the scan
-again on the composed tree, which is what catches a squash race that
-reintroduces literals after each PR passed on its own.
+the scan is skipped while its paths changed. The scan validates the pull request
+head; with the queue retired, it is not repeated on the composed tree. The
+post-merge trunk suite does not run this token scan, so a squash race that
+reintroduces literals is not covered by a second scan.
 
 ### When the gate is wrong (false positive)
 

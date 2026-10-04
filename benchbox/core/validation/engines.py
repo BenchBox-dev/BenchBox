@@ -190,7 +190,7 @@ class DataValidationEngine:
                 warnings=warnings,
             )
 
-        if not manifest.get("tables"):
+        if not any((manifest.get("tables") or {}).values()):
             errors.append("Manifest lists no tables; data generation produced no usable output")
 
         benchmark_type = manifest.get("benchmark", "").lower()

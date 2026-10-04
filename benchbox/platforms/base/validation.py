@@ -13,6 +13,7 @@ class ValidationResult:
     is_valid: bool
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    database_empty: bool = False
 
     def add_error(self, error: str) -> None:
         self.errors.append(error)
@@ -94,6 +95,7 @@ class SchemaValidator(BaseValidator):
 
             if missing_tables:
                 result.add_error(f"Missing tables: {', '.join(sorted(missing_tables))}")
+                result.database_empty = missing_tables == expected_tables
 
             if extra_tables:
                 extra_tables = self._filter_system_tables(extra_tables)
@@ -308,6 +310,7 @@ class DatabaseValidator:
         tuning_valid = None
         tables_valid = None
         row_counts_valid = None
+        database_empty = False
 
         try:
             with self.connection_validator.create_temporary_connection() as connection:
@@ -318,6 +321,7 @@ class DatabaseValidator:
 
                 schema_result = self.schema_validator.validate(connection)
                 tables_valid = schema_result.is_valid
+                database_empty = schema_result.database_empty
                 issues.extend(schema_result.errors)
                 warnings.extend(schema_result.warnings)
 
@@ -351,6 +355,7 @@ class DatabaseValidator:
             tuning_valid=tuning_valid,
             tables_valid=tables_valid,
             row_counts_valid=row_counts_valid,
+            database_empty=database_empty,
         )
 
     def _determine_validity(

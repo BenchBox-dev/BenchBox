@@ -16,6 +16,8 @@ from .interface import BenchmarkTunings, TableTuning, TuningColumn, TuningType, 
 
 logger = logging.getLogger(__name__)
 
+NO_TUNING_METADATA_ERROR = "No tuning metadata found in database"
+
 _COLUMN_TUNING_TYPE_VALUES = frozenset(
     {
         TuningType.PARTITIONING.value,
@@ -682,7 +684,7 @@ class TuningMetadataManager:
                 if self.last_load_error:
                     result.add_error(f"Failed to load tuning metadata: {self.last_load_error}")
                 else:
-                    result.add_error("No tuning metadata found in database")
+                    result.add_error(NO_TUNING_METADATA_ERROR)
                 return result
 
             self._compare_tuning_configurations(expected_tunings, existing_tunings, result)

@@ -156,7 +156,7 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
 ### No merge queue
 
 `develop-squash-only` (ruleset id `15611785`) has no `merge_queue` rule since
-2026-10-03.
+2026-10-03; see `_project/decisions/merge-queue-retirement-2026-10-03.md`.
 Agents arm a PR with `make pr-arm`, which enables auto-merge; it squash-merges
 when the required checks pass and every review thread is resolved. The drift
 check reports a `merge_queue` rule that reappears.
@@ -179,7 +179,8 @@ The soundness gate, as operated:
   classifies the soundness-critical surface. `oracle-review` checks the diff
   against the trusted base's predicate, including changes to the gate itself.
   A soundness-path PR needs the Codex connector's review or thumbs-up on its
-  current head, with every connector thread resolved.
+  current head, or the stand-in approval when the connector cannot review,
+  with every connector thread resolved.
 - **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without the connector's review. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
 - `make pr-open` does not arm auto-merge when it creates a PR; `make pr-arm`
   (or `make pr-open READY=1`) arms it after a live check of the PR, so a PR
