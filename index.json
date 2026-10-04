@@ -13326,6 +13326,13 @@
       "status": "done",
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
+    "oracle-review-quota-fallback": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Define a recorded fallback reviewer for oracle-review when the Codex connector is unavailable"
+    },
     "orphan-detector-freeze-branch-residual-20260804": {
       "claim": null,
       "needs": [],
