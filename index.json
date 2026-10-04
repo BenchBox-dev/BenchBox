@@ -21112,10 +21112,15 @@
       "title": "Sweep all platform from_config implementations to forward tuning configuration"
     },
     "tuning-gate-adr003-unrendered-intents-block-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T16:25:20Z",
+        "generation": "eec945b8a8174d62abfa7cf857b0ad73",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "DECISION GATE (D-5): amend ADR-003 so requested-but-not-rendered tuning is a named unsafe combination"
     },
     "tuning-gate-constraint-corroboration-20261001": {
