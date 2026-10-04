@@ -26,11 +26,22 @@ CLICKHOUSE_ADAPTERS = [
 
 
 class RecordingClient:
-    def __init__(self) -> None:
+    def __init__(self, tables: list[str] | None = None, columns: dict[str, list[str]] | None = None) -> None:
         self.statements: list[str] = []
+        self.tables = tables or []
+        self.columns = columns or {}
+
+    @property
+    def tuning_statements(self) -> list[str]:
+        return [s for s in self.statements if "system." not in s]
 
     def execute(self, statement: str, *args, **kwargs):
         self.statements.append(statement)
+        if "FROM system.tables" in statement:
+            return [(name,) for name in self.tables]
+        if "FROM system.columns" in statement:
+            table = re.search(r"table = '([^']+)'", statement).group(1)
+            return [(name,) for name in self.columns.get(table, [])]
         return []
 
 
@@ -133,7 +144,7 @@ class TestClickHousePhysicalIdentifiers:
 
         adapter.apply_table_tunings(tuning, client)
 
-        assert client.statements == ["OPTIMIZE TABLE lineitem FINAL"]
+        assert client.tuning_statements == ["OPTIMIZE TABLE lineitem FINAL"]
 
     def test_clustering_tuning_optimizes_the_physical_table(self, clickhouse_factory, adapter_cls, kwargs):
         adapter = clickhouse_factory(adapter_cls, kwargs)
@@ -142,7 +153,7 @@ class TestClickHousePhysicalIdentifiers:
 
         adapter.apply_table_tunings(tuning, client)
 
-        assert client.statements == ["OPTIMIZE TABLE lineitem FINAL"]
+        assert client.tuning_statements == ["OPTIMIZE TABLE lineitem FINAL"]
 
     def test_tuning_statements_name_the_table_the_schema_created(
         self, clickhouse_factory, adapter_cls, kwargs, tpch_benchmark
@@ -159,9 +170,39 @@ class TestClickHousePhysicalIdentifiers:
 
         adapter.apply_table_tunings(tuning, client)
 
-        targets = {re.match(r"OPTIMIZE TABLE (\S+) FINAL", s).group(1) for s in client.statements}
+        targets = {re.match(r"OPTIMIZE TABLE (\S+) FINAL", s).group(1) for s in client.tuning_statements}
         assert targets
         assert targets <= set(created)
+
+    def test_mixed_case_schema_is_resolved_through_the_catalog(self, clickhouse_factory, adapter_cls, kwargs):
+        adapter = clickhouse_factory(adapter_cls, kwargs)
+        client = RecordingClient(
+            tables=["DimDate", "DimCustomer", "lineitem"],
+            columns={"DimCustomer": ["SK_CustomerID", "CustomerID"]},
+        )
+
+        assert adapter.resolve_physical_table("DIMCUSTOMER", client) == "DimCustomer"
+        assert adapter.resolve_physical_table("DimCustomer", client) == "DimCustomer"
+        assert adapter.resolve_physical_table("LINEITEM", client) == "lineitem"
+        assert adapter.resolve_physical_column("DimCustomer", "sk_customerid", client) == "SK_CustomerID"
+
+        tuning = TableTuning(
+            table_name="DimCustomer",
+            sorting=[TuningColumn(name="SK_CustomerID", type="INTEGER", order=1)],
+        )
+        adapter.apply_table_tunings(tuning, client)
+
+        assert client.tuning_statements == ["OPTIMIZE TABLE DimCustomer FINAL"]
+
+    def test_unreadable_catalog_falls_back_to_the_adapter_policy(self, clickhouse_factory, adapter_cls, kwargs):
+        adapter = clickhouse_factory(adapter_cls, kwargs)
+
+        class Failing:
+            def execute(self, *args, **kwargs):
+                raise RuntimeError("catalog unavailable")
+
+        assert adapter.resolve_physical_table("LINEITEM", Failing()) == "lineitem"
+        assert adapter.resolve_physical_column("LINEITEM", "L_ORDERKEY", Failing()) == "l_orderkey"
 
     def test_mixed_case_logical_names_resolve_to_the_same_table(self, clickhouse_factory, adapter_cls, kwargs):
         adapter = clickhouse_factory(adapter_cls, kwargs)
