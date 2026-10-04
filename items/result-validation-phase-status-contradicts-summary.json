@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Find where phases.validation.status is derived and why it ignores query failures",
+    "phases.validation.status cannot be PASSED when any validated query failed, with a test built from a partial throughput run",
+    "Decision on whether existing corpus bundles need rechecking"
+  ],
+  "context": "Found during the 2026-10-04 throughput adversarial review while checking the SQLite bundle cited by sqlite-throughput-dialect-and-stream-isolation.",
+  "description": "The SQLite TPC-H SF1 throughput bundle ~/Developer/benchmark_runs/results/tpch_sf1_sqlite_sql_20261003_184424_5702d960.json (develop 061fac04d) has phases.validation.status = \"PASSED\" while summary.validation = \"partial\" and summary.queries = {failed: 45, passed: 21, total: 66} (verified from the JSON). Any consumer reading the phase status (corpus gates, explorer, UAT) would treat a failed run as validated.",
+  "links": [
+    "benchbox/core/results/builder.py",
+    "benchbox/core/results/schema.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:03:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "35d5d22c1d1e4b8cbfedbd3c785e2aec",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
