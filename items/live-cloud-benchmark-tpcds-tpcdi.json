@@ -6,7 +6,7 @@
     "All 18 result bundles pass scripts/validate_submission.py and validate_bundles with zero errors",
     "Valid scan bytes and cost metrics populated for BigQuery bundles"
   ],
-  "context": "Follows the initial cloud runs established in first-live-cloud-benchmark-run-and-publish. BigQuery adapter hotfixes for table casing, rate-limiting throttling (1s inter-chunk sleep), and query execution telemetry propagation are in place. TPC-DS at SF 10.0 involves 99 complex queries; monitor warehouse timeouts and API burst limits during execution.",
+  "context": "Follows the initial cloud runs established in first-live-cloud-benchmark-run-and-publish. BigQuery adapter hotfixes for table casing, rate-limiting throttling (1s inter-chunk sleep), and query execution telemetry propagation are in place. TPC-DS at SF 10.0 involves 99 complex queries; monitor warehouse timeouts and API burst limits during execution.\n\nDelivered 2026-10-04. All 18 bundles are published and live on benchbox.dev:\n- TPC-DI SF 0.1 and 1 on BigQuery and Snowflake in #2602.\n- TPC-DI SF 10 and all Databricks TPC-DI, plus all nine TPC-DS bundles, in #2615.\n- published-results mirror #2620; site promotion run 37213072128.\nEvery query succeeded. TPC-DI row counts agree across the three platforms. Snowflake and Databricks were rerun with validated cache-off receipts.\n\nOne deviation from the zero-errors criterion, by owner decision: five TPC-DS bundles keep unofficial classifications and are admitted through the lenient lane. They are SF 0.1 on all three platforms (unofficial_subscale) and BigQuery SF 1 and SF 10 (unofficial_nonstandard). Snowflake SF 0.1 and SF 10 carry owner-approved scale-invariant overrides. See results-data/CORPUS_NOTES.md \"Cloud TPC-DS bundles (2026-10-04)\" and \"TPC-DI at SF 10 and on Databricks (2026-10-04)\". Follow-up: local-tpcdi-bundles-regenerate-current-generator.",
   "description": "Expand live cloud benchmark execution beyond TPC-H to the remaining standard TPC analytical benchmarks: TPC-DS (99 complex decision support queries) and TPC-DI (data integration/ETL pipeline).\n\nExecute across all three cloud data warehouses (BigQuery, Databricks, Snowflake) at the established scale factors:\n- Scale factors: 0.1, 1.0, and 10.0\n- Target platforms:\n  * Google BigQuery (Serverless)\n  * Databricks SQL (Serverless 2X-Small)\n  * Snowflake (X-Small warehouse)\n- Expected runs: 18 total (9 TPC-DS runs, 9 TPC-DI runs).\n- Verification: Validate each generated bundle with benchbox.validation.bundle.validate_bundles and scripts/validate_submission.py. Ensure query success, power metrics, scan/billing metrics (BigQuery), and platform metadata are fully populated.",
   "sessions": [
     {
@@ -16,6 +16,14 @@
       "generation": "54e48a1431384c8fb5ca48029a3585d7",
       "op": "take",
       "op_id": "93cc54b533004716969a4440618128ca",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T18:42:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "37b0904c01e14d6dae9d1f73323cc294",
       "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
     }
   ]
