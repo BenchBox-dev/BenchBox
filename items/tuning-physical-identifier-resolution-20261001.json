@@ -3,7 +3,7 @@
     "tests/unit/platforms/test_physical_identifier_resolution.py: for each listed adapter, logical 'LINEITEM' resolves to exactly the identifier its create_schema produced (DuckDB via a live in-memory create_schema; others via fake drivers).",
     "No `table_tuning.table_name.upper()` / `.lower()` remains in tuning statement builders (grep check in the test)."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.5 (A1.11, CRIT-1a, CRIT-1b). Moved into Wave 1 because the ClickHouse OPTIMIZE and DuckDB index items depend on it (plan review F2).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.5 (A1.11, CRIT-1a, CRIT-1b). Moved into Wave 1 because the ClickHouse OPTIMIZE and DuckDB index items depend on it (plan review F2).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch fix/tuning-physical-identifiers; do not claim.",
   "description": "## Problem\nTuning statements use the template's logical name with ad-hoc casing (`table_tuning.table_name.upper()` / `.lower()`), not the physical name the adapter's `create_schema` produced:\n- **DuckDB:** `CREATE INDEX … ON LINEITEM (L_ORDERKEY…)` against quoted-lowercase tables makes DuckDB store the bound form `['(LINEITEM.L_ORDERKEY)']` and every index reports a false `mismatch`.\n- **ClickHouse:** `OPTIMIZE TABLE LINEITEM FINAL` fails (\"Table default.LINEITEM does not exist\"); ClickHouse is case-sensitive.\n- **BigQuery:** `apply_table_tunings` calls `get_table(dataset.table(table_tuning.table_name))` (`bigquery.py:2969-2972`) with the uppercase name, so the inspection fails on case-sensitive table names. A case-fallback helper already exists at `bigquery.py:1310-1319`.\n\n## Change\n- Add `PlatformAdapter.resolve_physical_table(logical_name) -> str` (and a column equivalent). It encodes each adapter's identifier policy: case folding, quoting, and schema or dataset qualification.\n- DuckDB resolves through `duckdb_tables()` / `duckdb_columns()` case-insensitively.\n- Replace casing hacks in the tuning builders of duckdb, clickhouse, snowflake, redshift, databricks, bigquery and synapse.\n\n## Guardrails (must preserve)\n- No change to schema creation itself.\n- The resolved name must equal the name `create_schema` created; this is tested per adapter.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/platforms/base/adapter.py",
@@ -23,6 +23,14 @@
       "op": "create",
       "op_id": "d14dee950eb1415ebbf0725646c8d7dd",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:29:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4677bfd55e3147be9281b3521e853d1b",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
