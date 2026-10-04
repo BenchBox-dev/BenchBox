@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "One source of truth for stream capability, with a test that class and manifest cannot disagree",
+    "Maintenance opens sessions through open_stream_connection with benchmark_type",
+    "Dead Databricks throughput code is removed or made reachable deliberately",
+    "Spark per-stream cache clearing is verified, and either moved outside the timed window or documented"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1).",
+  "description": "The throughput gate resolves capability from the platform manifest (connection_wrappers.py:194-201), but new_stream_connection dispatches on the class attribute (adapter.py:801). The class attribute is shared_cursor for 34 adapters whose manifest says unsupported.\n\nDead code: Databricks' _execute_tpch_throughput_test and new_stream_connection override (databricks/adapter.py:2720-2730) cannot run for throughput because its manifest says UNSUPPORTED.\n\nMaintenance calls self.new_stream_connection(connection) without the gate or benchmark_type (execution.py:578,677), so independent maintenance sessions skip configure_for_benchmark tuning.\n\nSpark: with disable_cache=True (the default), every stream calls spark.catalog.clearCache() on the shared session inside the timed window (spark_execution_mixin.py ~547), so streams clear each other's cache. Plausible; not reproduced.",
+  "links": [
+    "benchbox/platforms/base/connection_wrappers.py",
+    "benchbox/platforms/base/adapter.py",
+    "benchbox/platforms/base/execution.py",
+    "benchbox/platforms/databricks/adapter.py",
+    "benchbox/platforms/base/spark_execution_mixin.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:00:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "08133dda5e554cd28c1d9fd37bd15261",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
