@@ -18,14 +18,14 @@
   "kind": "missing path",
   "match": "/docs/_sources/.*",
   "reason": "Sphinx publishes every page source under _sources; the Astro build converts the Markdown and does not publish sources",
-  "owner_approval": "pending"
+  "owner_approval": "approved"
  },
  {
   "id": "sphinx-doctrees",
   "kind": "missing path",
   "match": "/docs/\\.doctrees/.*",
   "reason": "the Sphinx build cache is copied into the assembled site; it is not a public page and the Astro build has no equivalent",
-  "owner_approval": "pending"
+  "owner_approval": "approved"
  },
  {
   "id": "title-suffix-docs",

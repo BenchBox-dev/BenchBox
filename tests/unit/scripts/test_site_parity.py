@@ -267,7 +267,7 @@ def test_unreviewed_additions_fail_the_report_and_are_listed(tmp_path: Path) -> 
     assert added["by_rule"] == {"/sitemap.xml": ["/sitemap.xml"]}
 
 
-def test_committed_policy_files_carry_reasons_and_pending_approval() -> None:
+def test_committed_policy_files_carry_reasons_and_only_the_signed_approvals() -> None:
     rules = site_inventory.load_allowed_differences(site_parity.DEFAULT_ALLOWED)
     redirects = site_parity.load_redirect_pages(site_parity.DEFAULT_REDIRECTS)
     added = site_parity.load_added_paths(site_parity.DEFAULT_ADDED)
@@ -276,7 +276,17 @@ def test_committed_policy_files_carry_reasons_and_pending_approval() -> None:
 
     everything = rules + redirects + added + entries + losses
     assert redirects and added and all(entry["reason"].strip() for entry in everything)
-    assert {entry["owner_approval"] for entry in everything} == {"pending"}
+    assert {entry["owner_approval"] for entry in everything} <= {"pending", "approved"}
+    approved = {entry.get("id") or entry.get("path") for entry in everything if entry["owner_approval"] == "approved"}
+    assert approved == {
+        "/_static/",
+        "/docs/_static/",
+        "/docs/_sphinx_design_static/",
+        "/docs/.buildinfo",
+        "/docs/searchindex.js",
+        "sphinx-page-sources",
+        "sphinx-doctrees",
+    }
 
 
 CANONICAL_RULES = [
