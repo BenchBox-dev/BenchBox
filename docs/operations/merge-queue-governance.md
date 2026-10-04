@@ -8,7 +8,7 @@ This document defines how a change reaches `refs/heads/develop` and how `develop
 
 1. **Squash Integration Only:** All pull requests targeting `develop` must be integrated via squash merge. Merge commits and rebase-and-merge remain forbidden.
 2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history or required thread resolution through that ruleset. Code-owner review is disabled.
-3. **Soundness Review Boundary:** A result-affecting pull request (a path in `.github/soundness-paths.txt`) needs a completed external adversarial review of its current head. The required `oracle-review` check passes only when the Codex connector app has reviewed or thumbed up that head. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. A scheduled digest lists the soundness-path commits that merged and the review signal each had, and opens a tracker item for any with none. There is no attestation in the PR body: the author of a change can write that text, so it cannot bind, and the `soundness-flag` check that tested for it is deleted.
+3. **Soundness Review Boundary:** A result-affecting pull request (a path in `.github/soundness-paths.txt`) needs a completed external adversarial review of its current head. The required `oracle-review` check passes only when the Codex connector app has reviewed or thumbed up that head, or, when the connector cannot review, a listed attester has posted the stand-in approval for that head after an independent review. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. A scheduled digest lists the soundness-path commits that merged and the review signal each had, and opens a tracker item for any with none. There is no attestation in the PR body: the author of a change can write that text, so it cannot bind, and the `soundness-flag` check that tested for it is deleted.
 4. **Fail-Closed Execution:** A required check that cannot establish its result must report failure, not success.
 
 ---
@@ -25,7 +25,7 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 | `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
 | `landing` | `.github/workflows/ci.yml` | Site theme token scan on landing changes. |
 | `tooling` | `.github/workflows/ci.yml` | Every event. Base-branch guard, comment policy, content guard, skill integrity, and audit checks by path. |
-| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes when no soundness path changes, or when the Codex connector app has reviewed or thumbed up the current head and none of its threads is unresolved. A new push needs a new review. If no reviewer can run (all four tried on the head with recorded quota or unavailability evidence, and four hours without a connector signal), the owner reviews the exact head and follows the one-merge recovery window in the dev-loop ADR, D4. An owner comment does not satisfy the check, because every human and agent posts as the owner account. |
+| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes when no soundness path changes, or when the Codex connector app has reviewed or thumbed up the current head and none of its threads is unresolved. A new push needs a new review. When the connector cannot review, an independent stand-in review of the exact head followed by a `Stand-in oracle review: APPROVE <full head SHA>` comment from an account in `STANDIN_ATTESTERS` satisfies the check (dev-loop ADR, D4; `docs/operations/soundness-drain.md`). A plain owner comment does not. |
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
@@ -33,7 +33,7 @@ The public-site visual comparison runs only when a render input changed. It comp
 
 ## 3. Merge Path
 
-A pull request is armed with `make pr-arm`, which enables auto-merge for the exact head. GitHub merges the pull request with a squash commit once every required check is green on that head and all review threads are resolved. There is no queue and no combined-tree build before the merge. Because the strict up-to-date rule is off, a branch behind `develop` merges without a refresh unless it conflicts. A changed head needs fresh CI and connector review before re-arming.
+A pull request is armed with `make pr-arm`, which enables auto-merge for the exact head. GitHub merges the pull request with a squash commit once every required check is green on that head and all review threads are resolved. There is no queue and no combined-tree build before the merge. Because the strict up-to-date rule is off, a branch behind `develop` merges without a refresh unless it conflicts. A changed head needs fresh CI and a fresh connector review or stand-in approval before re-arming.
 
 Slow-marked reproducer jobs remain required PR CI through the `core` unit, because the post-merge run has no slow-signature lane.
 
@@ -58,7 +58,7 @@ make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 
 If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `auto_merge_soundness_paths.py`):
 
-1. Withdraw readiness before editing an armed PR (`make pr-landing-withdraw PR=<n> HEAD=<sha>`). After the last push, obtain CI and the connector's review or thumbs-up on that exact head before arming with `make pr-arm`. The `auto-merge-on-open.yml` workflow retains label-based revocation for `no-auto-merge`; it no longer revokes based on soundness paths.
+1. Withdraw readiness before editing an armed PR (`make pr-landing-withdraw PR=<n> HEAD=<sha>`). After the last push, obtain CI and the connector's review or thumbs-up (or the stand-in approval) on that exact head before arming with `make pr-arm`. The `auto-merge-on-open.yml` workflow retains label-based revocation for `no-auto-merge`; it no longer revokes based on soundness paths.
 2. The required `oracle-review` check must pass on the current head before the pull request can merge.
 3. A soundness-path pull request that sits green and unarmed is reported by the soundness-drain digest (`make soundness-drain-report`, see `docs/operations/soundness-drain.md`), not by the nightly green-unmerged sweep, which skips soundness-gated pull requests.
 

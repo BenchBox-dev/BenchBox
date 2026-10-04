@@ -56,7 +56,7 @@ a smooth scroll still in flight at capture; the capture spec now waits for it.
 | Merge queue testing the combined tree before merge | Required PR checks on the pull request head, then auto-merge. `.github/workflows/trunk.yml` tests `develop`: the fast lane, a four-shard medium tier, the correctness gate and required-local-cases. It also builds the verified release distribution artifact. |
 | Strict up-to-date rule (race lock) | The post-merge trunk run. A change that passed on an older base and breaks the merged tree shows up there, not in a queue. |
 | Ejection of a bad group | Revert first. `make trunk-revert PR=<n>` opens the revert of a merged pull request, and `make pr-open` refuses non-revert PRs while trunk has been red for more than 30 minutes. |
-| PR-body `Soundness review:` attestation (`soundness-flag`) | A required `oracle-review` check that passes only when the Codex connector app has reviewed the current head of a result-affecting PR. Required review-thread resolution and the scheduled post-merge digest are unchanged. |
+| PR-body `Soundness review:` attestation (`soundness-flag`) | A required `oracle-review` check that passes only when the Codex connector app has reviewed the current head of a result-affecting PR, or a listed attester has posted the stand-in approval for that head when the connector cannot review. Required review-thread resolution and the scheduled post-merge digest are unchanged. |
 | Visual comparison as a merge gate in queue groups | Advisory. The job still runs and uploads its report. It becomes a gate again when the public site is in production. |
 | Heavy tier run only in the queue | The four-shard medium tier, correctness gate and required-local-cases run in `trunk.yml` on pushes to `develop`; soundness and packaging carve-outs retain required PR coverage. |
 
@@ -82,13 +82,12 @@ admission never falls back to an older successful run or attempt.
 - Trunk stays red and nobody reverts. Signal: trunk red for more than two hours
   with no revert PR open. Response: the owner reverts the culprit with
   `make trunk-revert PR=<n>`.
-- No reviewer can run, so `oracle-review` never passes. Signal: the Codex
-  connector, `codex`, `muse` and `agy` have each been tried on the current head
-  and failed with recorded quota or unavailability evidence, and the connector
-  has been silent on that head for more than four hours. Response: the owner
-  reviews the exact head in their own session and follows the one-merge
-  recovery window in the dev-loop ADR, D4. Agents cannot satisfy the check by
-  posting an owner comment, and never run the window.
+- The Codex connector cannot review, so `oracle-review` never passes. Signal:
+  the connector reports its usage limit or leaves no signal on the current
+  head. Response: an independent stand-in review of that head, then the
+  `Stand-in oracle review: APPROVE <full head SHA>` comment from a listed
+  attester, as the dev-loop ADR, D4 describes. A plain owner comment does not
+  count.
 - Medium-tier shards are killed again. Signal: more than one shard kill a day.
   Response: read the shard's memory sampler output to find the test that is
   growing a worker.

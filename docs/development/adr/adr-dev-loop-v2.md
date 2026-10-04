@@ -95,7 +95,8 @@ by three controls:
    fixed. The digest below is the check on that.
 2. Review signal as a required check. For changes on the narrowed soundness path list,
    the required `oracle-review` status check passes only when the Codex connector app has
-   reviewed the current head: its submitted review or thumbs-up reaction. An "eyes"
+   reviewed the current head: its submitted review or thumbs-up reaction, or the stand-in
+   approval described below when the connector cannot review. An "eyes"
    reaction alone means the review has started, not finished. A review that exists shows
    that a reviewer looked, not what it examined.
 3. Post-merge digest. A scheduled report lists the commits that reached `develop` on the
@@ -115,26 +116,19 @@ The `oracle-review` check is a merge-blocking automated review signal. It supers
 the soundness list only, and only that item. That decision kept such signals advisory
 because a batch of failing Codex reviews exhausted the usage limit and deadlocked the
 queue. The `codex` CLI, `muse` and `agy` remain available as optional extra depth, each
-with its own quota, but only the Codex connector's review satisfies the check.
+with its own quota; on their own they do not satisfy the check.
 
-The owner's review replaces the connector's only when no reviewer can run. Every one of
-the Codex connector, `codex`, `muse` and `agy` must have been tried on the current head,
-with each attempt's time and its quota error or other unavailability evidence recorded in
-the pull request body, and the connector must have left no signal on that unchanged head
-for at least four hours. The owner then reviews the exact head in their own session, with
-the six CI checks green and every thread resolved. If the owner approves, they first try
-to recover the ordinary check (re-request the connector, or rerun or dispatch
-`oracle-review`). If no reviewer can still run, the owner, not an agent, pauses other
-armed pull requests, removes only `oracle-review` from the required checks, merges that
-one head with `gh pr merge --squash --match-head-commit`, and restores the check at once,
-whether or not the merge succeeded. Removing the check weakens it for every pull request
-on `develop`, so the window is used only when the owner can keep other merges out of it.
-A new push voids the owner's approval and restarts the four hours. Every human and agent
-posts as the owner account, so an owner comment cannot be told apart from an agent's; for
-that reason `oracle-review` does not accept one, and agents never post a review on the
-owner's behalf or run this window. All four reviewers were exhausted at once on
-2026-10-02, which blocked every workflow change for three days under the fail-closed rule
-alone.
+When the connector cannot review, for example at its usage limit, a stand-in review
+replaces it. An independent reviewer reviews the exact current head, and an account listed
+in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`) then posts a PR comment
+containing the line `Stand-in oracle review: APPROVE <full head SHA>`. The check accepts
+that comment only for the exact head, only when it was posted after the head commit and any
+retarget and never edited, and never while a connector review thread is unresolved. A new
+push needs a new stand-in comment. A plain owner review, thumbs-up or unmarked comment does
+not count. The attester account is also the one local automation uses, so the marker
+records who vouched for the review, not that a human read it. All four reviewers were
+exhausted at once on 2026-10-02, which blocked every workflow change for three days under
+the fail-closed rule alone.
 
 The soundness path list covers expected and reference results, digests,
 result-validation and equivalence comparators, result capture, corpus overrides,
@@ -143,7 +137,7 @@ protections remain. Documentation, ordinary decision records, runbooks, threat
 models, and `AGENTS.md` leave the list. The `single-repo-migration.md` decision
 remains protected because release curation parses it as configuration. The manifest-based
 `oracle-review` check replaces the former `tooling` attestation flag. The external
-review requirement is unchanged except for the owner-operated recovery above.
+review requirement is unchanged except for the stand-in review above.
 A new push or refresh changes the head and needs fresh CI and connector review
 before re-arming. No PR-body attestation satisfies or is required by the check.
 
