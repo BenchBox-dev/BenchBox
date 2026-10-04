@@ -18761,7 +18761,9 @@
     },
     "snowpark-tuning-surface-warehouse-and-session-params": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "tuning-requested-vs-rendered-reconciliation-20261001"
+      ],
       "priority": "medium",
       "status": "open",
       "title": "Decide Snowpark tuning surface: warehouse sizing and session params"
