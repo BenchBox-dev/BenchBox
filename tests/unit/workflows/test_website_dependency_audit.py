@@ -47,13 +47,13 @@ def test_audit_script_reuses_the_explorer_gate_against_the_website_package() -> 
 def test_audit_allowlist_entries_are_documented_and_expire() -> None:
     allowlist = json.loads((WEBSITE / "scripts/audit-high-allowlist.json").read_text(encoding="utf-8"))
 
-    assert [entry["id"] for entry in allowlist] == ["GHSA-ch52-4w7c-c8xp"]
+    # GHSA-ch52-4w7c-c8xp was cleared by http-cache-semantics 4.3.0; no finding is allowlisted.
+    assert allowlist == []
     for entry in allowlist:
         assert set(entry) == {"id", "package", "reason", "review_by", "link"}
         assert re.fullmatch(r"GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}", entry["id"])
         assert entry["id"] in entry["link"]
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", entry["review_by"])
-        assert "remote.js" in entry["reason"]
 
 
 def test_website_package_is_pinned_exactly_on_node_22() -> None:
