@@ -3,7 +3,7 @@
     "Per-platform unit tests (fake drivers): no OPTIMIZE/ANALYZE/VACUUM/ZORDER/RESUME RECLUSTER executes during apply_unified_tuning; each executes after its table's load, recorded with phase post_load.",
     "Bundle exposes post-load maintenance time separately from data_loading time (schema/docs updated)."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.4 (A1.5; plan review F12 extended the call-site list).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.4 (A1.5; plan review F12 extended the call-site list).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch feat/tuning-post-load-seam; do not claim.",
   "description": "## Problem\nMaintenance and layout ops run **before** data is loaded, inside `apply_unified_tuning`:\n- ClickHouse `OPTIMIZE … FINAL` (`clickhouse/tuning.py:319-345`; its only caller is `tuning.py:335`);\n- Redshift `ANALYZE`/`VACUUM` (`redshift.py:2612-2710`);\n- Databricks `_apply_delta_optimize(..., phase=\"pre_load\")` (`databricks/adapter.py:3609`);\n- Snowflake `RESUME RECLUSTER`.\n\nSo they act on empty tables.\n\n## Change\n- Add `PlatformAdapter.apply_post_load_tunings(table_name, effective_config, connection)`.\n- Call it after each table load, next to every existing `apply_ctas_sort` call site:\n  - `DataLoader.load` (`platforms/base/data_loading.py:2788-2791`);\n  - Snowflake, Databricks, Redshift, PostgreSQL, Athena, Synapse, ClickHouse Cloud, MotherDuck;\n  - DataFusion (`datafusion.py:861`);\n  - DuckDB's `apply_ctas_sort` override (`duckdb.py:1057`).\n- Move the ops listed above into it.\n- Record each through the recording connection with phase `post_load`. Use physical names from `tuning-physical-identifier-resolution-20261001`.\n- Make ClickHouse `OPTIMIZE` opt-in (expensive at scale).\n- Time post-load maintenance as its own phase so the measured load time stays comparable.\n\n## Guardrails (must preserve)\n- Ordering per table: load → CTAS sort (if any) → post-load ops.\n- Failures are recorded as failed and never break the run.\n\n## Do not\n- Do not run maintenance inside the timed load window without reporting it separately.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/platforms/base/data_loading.py",
@@ -23,6 +23,14 @@
       "op": "create",
       "op_id": "d6d27ad2d9ae4e588d6f47e907df5183",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T21:01:02Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "cd5da8dd657d40dfab1ad73fd1bf7e5d",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
