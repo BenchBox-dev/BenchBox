@@ -82,12 +82,13 @@ admission never falls back to an older successful run or attempt.
 - Trunk stays red and nobody reverts. Signal: trunk red for more than two hours
   with no revert PR open. Response: the owner reverts the culprit with
   `make trunk-revert PR=<n>`.
-- The Codex connector is down, so `oracle-review` never reports. Signal: the
-  check waiting for more than four hours. Response: the owner reviews the
-  change in their own session. If approved, they re-request the connector
-  review, or temporarily remove `oracle-review`, merge through the GitHub UI
-  themselves and restore the required context. Agents cannot satisfy the
-  check by posting an owner comment.
+- No reviewer can run, so `oracle-review` never passes. Signal: the Codex
+  connector, `codex`, `muse` and `agy` have each been tried on the current head
+  and failed with recorded quota or unavailability evidence, and the connector
+  has been silent on that head for more than four hours. Response: the owner
+  reviews the exact head in their own session and follows the one-merge
+  recovery window in the dev-loop ADR, D4. Agents cannot satisfy the check by
+  posting an owner comment, and never run the window.
 - Medium-tier shards are killed again. Signal: more than one shard kill a day.
   Response: read the shard's memory sampler output to find the test that is
   growing a worker.
