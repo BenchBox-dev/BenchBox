@@ -20743,7 +20743,7 @@
       "needs": [],
       "priority": "high",
       "status": "open",
-      "title": "TPC-H Power@Size and Throughput@Size omit refresh functions yet are exported as official QphH"
+      "title": "Stop exporting TPC-H QphH@Size as official while refresh functions are missing"
     },
     "tpch-refresh-functions-in-power-and-throughput": {
       "claim": null,
