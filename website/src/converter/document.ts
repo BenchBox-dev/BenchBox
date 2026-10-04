@@ -41,6 +41,8 @@ type PendingLabel = { label: string; at: SourcePosition; node: Html };
 type PendingFootnote = { label: string; node: Html };
 
 const AUTOMATIC_ID = /^id\d+$/;
+const DEFINITION_LINE = /^:\s/;
+const CONTAINER_PREFIX = /^(?:[ \t]*>[ \t]?)*[ \t]*/;
 const ATTRS_ID = /^#([^\s#.=]+)$/;
 const ATTRIBUTABLE = new Set(["paragraph", "list", "table", "code", "blockquote"]);
 const DIRECTIVE_LANG = /^\{([^}\s]+)\}$/;
@@ -404,9 +406,16 @@ class DocumentConverter implements ConvertContext {
       node.children = this.phrasing(node.children, frame);
       return this.registry.syntaxHandler("colon-fence", at).handle(node, at, this);
     }
-    if (this.extensions.has("deflist") && starts.some((line, index) => index > 0 && /^:\s/.test(line))) {
-      node.children = this.phrasing(node.children, frame);
-      return this.registry.syntaxHandler("deflist", at).handle(node, at, this);
+    if (this.extensions.has("deflist")) {
+      const raw = node.position ? frame.source.slice(node.position.start.offset, node.position.end.offset) : "";
+      const definitions = raw.split("\n").filter((line, index) => index > 0 && DEFINITION_LINE.test(line.replace(CONTAINER_PREFIX, ""))).length;
+      if (definitions > 0) {
+        if (starts.filter((line, index) => index > 0 && DEFINITION_LINE.test(line)).length !== definitions) {
+          throw new UnknownConstructError(at.file, at.line, "syntax:deflist-escape", "a backslash-escaped colon line inside a definition list is not supported");
+        }
+        node.children = this.phrasing(node.children, frame);
+        return this.registry.syntaxHandler("deflist", at).handle(node, at, this);
+      }
     }
     node.children = this.phrasing(node.children, frame);
     return [node];

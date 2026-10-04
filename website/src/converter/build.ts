@@ -122,9 +122,18 @@ export function clearOutput(outRoot: string): void {
   rmSync(outRoot, { recursive: true, force: true });
 }
 
+function dropSymlink(target: string): void {
+  try {
+    if (lstatSync(target).isSymbolicLink()) rmSync(target);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
+
 export function writeOutput(outRoot: string, files: Map<string, string>): void {
   assertOwnedOutput(outRoot);
   mkdirSync(outRoot, { recursive: true });
+  dropSymlink(path.join(outRoot, OUTPUT_MARKER));
   writeFileSync(path.join(outRoot, OUTPUT_MARKER), "");
   const keep = new Set([...files.keys(), OUTPUT_MARKER]);
   const stale = (directory: string, prefix: string): void => {
@@ -144,6 +153,7 @@ export function writeOutput(outRoot: string, files: Map<string, string>): void {
   stale(outRoot, "");
   for (const [relative, content] of files) {
     const target = path.join(outRoot, relative);
+    dropSymlink(target);
     let current: string | undefined;
     try {
       current = readFileSync(target, "utf-8");

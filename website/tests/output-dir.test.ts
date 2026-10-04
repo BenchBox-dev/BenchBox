@@ -62,6 +62,19 @@ describe("converter output directory", () => {
     expect(readFileSync(path.join(outside, "keep.md"), "utf-8")).toBe("outside");
   });
 
+  it("replaces a symlink at a kept file's path instead of writing through it", () => {
+    const root = scratch();
+    const outside = path.join(root, "outside.md");
+    writeFileSync(outside, "outside");
+    const out = path.join(root, "generated");
+    writeOutput(out, new Map([["content/a.md", "x"]]));
+    rmSync(path.join(out, "content", "a.md"));
+    symlinkSync(outside, path.join(out, "content", "a.md"));
+    writeOutput(out, new Map([["content/a.md", "new"]]));
+    expect(readFileSync(outside, "utf-8")).toBe("outside");
+    expect(readFileSync(path.join(out, "content", "a.md"), "utf-8")).toBe("new");
+  });
+
   it("clears only a marked directory", () => {
     const out = path.join(scratch(), "generated");
     mkdirSync(out);

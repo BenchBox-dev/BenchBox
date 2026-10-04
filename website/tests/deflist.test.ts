@@ -77,4 +77,21 @@ describe("deflist", () => {
   it("rejects a definition that starts with another block construct", () => {
     expect(build({ "a.md": `${FRONT}Term\n: 1. first\n` }).errors[0].message).toContain("deflist: a definition that starts with");
   });
+  it("keeps a backslash-escaped colon line as paragraph text, as MyST does", () => {
+    const result = build({ "a.md": `${FRONT}Term\n\\: not a definition\n` });
+    expect(result.errors).toEqual([]);
+    const body = bodyOf(result, "docs/a.md");
+    expect(body).not.toContain("<dl>");
+    expect(body).toContain("Term\n: not a definition");
+  });
+
+  it("finds definitions inside a blockquote from the raw lines", () => {
+    const result = build({ "a.md": `${FRONT}> Term\n> : Definition\n` });
+    expect(result.errors).toEqual([]);
+    expect(bodyOf(result, "docs/a.md")).toContain("<dt>Term</dt>");
+  });
+
+  it("rejects an escaped colon line mixed into a definition list", () => {
+    expect(build({ "a.md": `${FRONT}Term\n: Definition\n\\: escaped\n` }).errors.map((error) => error.message)).toEqual([expect.stringContaining("backslash-escaped colon line")]);
+  });
 });

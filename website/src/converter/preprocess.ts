@@ -5,7 +5,7 @@ import { parseMarkdown } from "./parse.ts";
 const LABEL_CONTENT = /^\(([^)\s][^)]*)\)=\s*$/;
 const ATTRS_CONTENT = /^\{([#.][^{}]*|[A-Za-z_][\w-]*=[^{}]*)\}\s*$/;
 const COMMENT_CONTENT = /^%/;
-const CANDIDATE = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)*[({%]/m;
+const CANDIDATE = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+[ \t>]*)*[({%]/m;
 const CONTAINER_PREFIX = /^((?:[ \t]*>[ \t]?)*)([ \t]*)(.*)$/;
 
 export const LABEL_MARKER = /^<!--benchbox-label (.+) -->$/;

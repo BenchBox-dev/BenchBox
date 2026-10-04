@@ -209,6 +209,11 @@ describe("doc role and links", () => {
     ]);
   });
 
+  it("does not resolve object prototype names as blog pages", () => {
+    const result = build({ "blog/index.md": "# Blog\n\n[x](constructor) [y](toString)\n" });
+    expect(result.errors.map((error) => (error as UnresolvedReferenceError).reference)).toEqual(["link:constructor", "link:toString"]);
+  });
+
   it("fails on unresolvable relative targets with file and line", () => {
     const result = build({ "a.md": "# A\n\n[d](nowhere/)\n\n[h](other.html) [s](sub/)\n", "sub/page.md": STUB, "other.md": STUB });
     expect(result.errors.map((error) => [error.file, error.line, (error as UnresolvedReferenceError).reference])).toEqual([

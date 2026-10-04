@@ -46,7 +46,7 @@ export const BLOG_PAGES: Readonly<Record<string, string>> = {
   "blog/author.html": "/blog/author.html",
 };
 
-type Resolution = { url: string; title?: TitleNode[] };
+type Resolution = { url: string; title?: TitleNode[]; blogPage?: string };
 
 function resolveTarget(target: string, context: ConvertContext, at: SourcePosition, fragment: string): Resolution {
   const unresolved = (detail: string): UnresolvedReferenceError => new UnresolvedReferenceError(at.file, at.line, `link:${withFragment(target, fragment)}`, detail);
@@ -54,9 +54,9 @@ function resolveTarget(target: string, context: ConvertContext, at: SourcePositi
   const insideDocs = path.relative(context.docsRoot, absolute);
   if (insideDocs.startsWith("..") || path.isAbsolute(insideDocs)) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
   const relative = insideDocs.split(path.sep).join("/");
-  if (relative in BLOG_PAGES) {
+  if (Object.hasOwn(BLOG_PAGES, relative)) {
     if (fragment !== "") throw unresolved(`${relative} has no anchors`);
-    return { url: BLOG_PAGES[relative] };
+    return { url: BLOG_PAGES[relative], blogPage: relative };
   }
   if (DOC_SUFFIX.test(target)) {
     const resolved = context.resolveDoc(target, at, "link");
@@ -123,6 +123,7 @@ export const linkSyntax: SyntaxHandler<"link"> = {
       return [node];
     }
     if (link && isEmpty(link)) {
+      if (resolution.blogPage !== undefined) throw emptyText(link, at, `${resolution.blogPage} is a generated blog page with no source title to fill it from`);
       if (resolution.title === undefined) throw emptyText(link, at, "MyST fills empty text only for a whole page that this site builds");
       link.children = resolution.title;
     }

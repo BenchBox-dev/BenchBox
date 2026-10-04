@@ -27,8 +27,8 @@ describe("links without text", () => {
     expect(bodyOf(result, "docs/a.md")).toContain("- [Using `--scale` – “x”](/docs/other.html)\n  - [Sec `--a` – “y”](/docs/other.html#sec-a-y)");
   });
 
-  it("fail when the target is not built", () => {
-    expect(messages({ "blog/index.md": "# Blog\n\n[](archive.html)\n" })).toEqual([expect.stringContaining("blog/index.md:3: link:archive.html has no link text and MyST fills empty text only for a whole page that this site builds")]);
+  it("say why a generated blog page cannot fill empty link text", () => {
+    expect(messages({ "blog/index.md": "# Blog\n\n[](archive.html)\n" })).toEqual([expect.stringContaining("blog/archive.html is a generated blog page with no source title")]);
   });
 
   it("fail where MyST renders empty or unresolved text", () => {

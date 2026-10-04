@@ -40,6 +40,18 @@ describe("label, attrs and comment lines", () => {
     expect(body).not.toContain("note");
   });
 
+  it.each([
+    ["a quote in a bullet item", "- > (lab)=\n  > Text.\n", "lab"],
+    ["a quote in an ordered item", "1. > % comment\n   > Text.\n", undefined],
+  ])("are found in %s even when no other line could hold one", (_where, source, label) => {
+    const result = build({ "a.md": `# A\n\n${source}` });
+    expect(result.errors).toEqual([]);
+    const body = bodyOf(result, "docs/a.md");
+    if (label) expect(body).toContain(`<span id="${label}"></span>`);
+    expect(body).not.toContain("(lab)=");
+    expect(body).not.toContain("comment");
+  });
+
   it("fail inside a definition list definition with a clear error", () => {
     const front = "---\nmyst:\n  enable_extensions:\n    - deflist\n---\n# A\n\n";
     expect(constructs({ "a.md": `${front}Term\n: def\n  (lbl)=\n  more\n` })).toEqual(["10 syntax:nested-marker"]);
