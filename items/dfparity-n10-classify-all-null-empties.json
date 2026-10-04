@@ -4,7 +4,7 @@
     "The PR has a passing Soundness review section",
     "t19 notes that these entries are interim"
   ],
-  "context": "Owner decision D7 (2026-10-03): #2544 edits benchbox/core/equivalence/ (a soundness path) and waits until #2567 retires the merge queue. Keep it until t19 replaces it.",
+  "context": "Owner decision D7 (2026-10-03): #2544 edits benchbox/core/equivalence/ (a soundness path) and waits until #2567 retires the merge queue. Keep it until t19 replaces it.\n\n2026-10-04 closeout: Delivered in #2605: the seven single all-NULL statements are classified with measured causes and reported apart from zero-row results.",
   "description": "Since #2396 stopped counting a scalar aggregate that collapses to one all-NULL row as coverage, the staged TPC-DS gate at SF 0.01 fails closed on Q13, Q23, Q32, Q61, Q90 and Q92, which are not in _TPCDS_LEGITIMATELY_EMPTY. Owner decision (2026-10-02): classify them now with a rationale each. This edits soundness paths, so it needs external review and a maintainer merge. t19 re-baselines the list later with scale-scoped criteria and answer-set evidence, so this is a deliberate interim exception.",
   "sessions": [
     {
@@ -38,6 +38,14 @@
       "op": "update",
       "op_id": "34d044ee02a94252b41c109d674d4277",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:02:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4f84766e67b5479cac9c5cf3c2fda7b8",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
