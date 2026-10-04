@@ -21517,15 +21517,10 @@
       "title": "Tracker hygiene: gate live-cloud tuned runs on the safety fix, reopen prematurely closed items, add dependency edges"
     },
     "tuning-trust-paths-soundness-manifest-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T18:56:54Z",
-        "generation": "865285fc2af04569947b69c250633d5e",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Make the tuning trust-path files soundness-manifest paths (extract corroboration out of adapter.py first)"
     },
     "tuning-verification-footprint-duckdb-clickhouse-20260722": {
