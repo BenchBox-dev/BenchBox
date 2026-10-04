@@ -6824,12 +6824,17 @@
       "title": "Promote the TPC-DS Polars-family gate to enforced with its CI pinning guards"
     },
     "dfparity-t21-tpch-seeded-path": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:36:24Z",
+        "generation": "81a30149875e48478197066c4cb7de20",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Investigate the TPC-H seeded-run reference-seed path (owner-contested; verify before any change)"
     },
     "dfparity-t22-production-render-scale-decision": {
