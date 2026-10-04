@@ -10830,6 +10830,13 @@
       "status": "done",
       "title": "Integrate Write Primitives DataFrame Mode with Runner and Registry"
     },
+    "integration-stub-installers-leak-across-tests-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Integration stub installers assign module attributes and never undo them; the fast tier does not run integration tests"
+    },
     "integration-test-suite-cleanup-remove-placeholder-and-failing-tests": {
       "claim": null,
       "needs": [],

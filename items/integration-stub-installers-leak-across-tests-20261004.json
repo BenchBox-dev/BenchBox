@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Every installer in tests/integration/platforms/common.py restores what it patches; a test proves it.",
+    "A check fails when a test leaves adapter-module attributes modified.",
+    "Decision recorded on running a minimal integration subset before merge."
+  ],
+  "context": "Source: PR #2632 CI failures and the agent that fixed them (2026-10-04). Related: dlv2-12-hermeticity-leak-detector (open); check for overlap before starting.",
+  "description": "## Problem (reproduced in a CI-like environment by an agent; one regression slipped past local fast runs)\n`tests/integration/platforms/common.py` has stub installers that set attributes on adapter modules directly and never restore them. The ClickHouse and LakeSail installers leaked across tests on shared xdist workers and broke a later contract test in CI; they now use `monkeypatch.setattr`. The Databricks, Redshift and other installers in the same file still assign directly. Separately, `pytest -m fast` skips `tests/integration`, so a real regression (the DuckLake force-recreate integration test) was only caught by CI.\n\n## Change\n- Convert the remaining installers to `monkeypatch.setattr` (or an equivalent that restores state).\n- Add a hermeticity check that fails when a test leaves adapter-module attributes changed.\n- Decide whether a small, fast subset of integration tests (such as the DuckLake lifecycle test) should run in the fast tier or in `make pr-preflight`.\n\n## Guardrails (must preserve)\n- Integration tests still skip cleanly without credentials or services.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "tests/integration/platforms/common.py",
+    "tests/utilities/leak_detector.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:56:18Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "518d604c88cb4609baf022e601f603e7",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
