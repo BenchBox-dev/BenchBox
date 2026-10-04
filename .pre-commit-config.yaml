@@ -102,7 +102,7 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
-        files: ^results-explorer/src/.*\.(tsx|ts|jsx|js|css|html)$
+        files: ^(results-explorer/src/.*\.(tsx|ts|jsx|js|css|html)|landing/shared/site-tokens\.css)$
 
       # Warn-only duplicate-code gate. Manual stage so it doesn't slow
       # every commit (pylint over benchbox/ takes ~60s). Run with

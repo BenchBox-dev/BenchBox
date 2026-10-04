@@ -579,10 +579,11 @@ lint-imports:
 
 # Token-scan gate for the Results Explorer retheme: fails when raw Tailwind
 # palette literals (text-/bg-/border-/...-{slate|gray|...}-{50..950}) appear
-# under results-explorer/src outside an explicit allowlist marker. Stdlib-only
-# so no dependency sync is required before the gate runs.
+# under results-explorer/src or the shared token file landing/shared/site-tokens.css
+# outside an explicit allowlist marker. Stdlib-only so no dependency sync is
+# required before the gate runs.
 lint-explorer-tokens:
-	python3 _project/scripts/scan_explorer_tokens.py
+	python3 _project/scripts/scan_explorer_tokens.py results-explorer/src landing/shared/site-tokens.css
 
 lint-site-theme-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx

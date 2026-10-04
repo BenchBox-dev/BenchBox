@@ -36,7 +36,7 @@ export default defineConfig({
       pagefind: false,
       disable404Route: true,
       lastUpdated: false,
-      customCss: ["./src/styles/tokens.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
+      customCss: ["../landing/shared/site-tokens.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
       components: {
         Header: "./src/components/starlight/Header.astro",
         ThemeProvider: "./src/components/starlight/ThemeProvider.astro",

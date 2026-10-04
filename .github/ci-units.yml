@@ -51,6 +51,7 @@ core:
 
 explorer:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "_project/scripts/explorer_pipeline/**"
   - "_project/scripts/explorer_publish.py"
   - "tests/parity/**"

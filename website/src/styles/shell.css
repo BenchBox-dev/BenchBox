@@ -1,3 +1,7 @@
+:root {
+  --header-height: 4rem;
+}
+
 *,
 *::before,
 *::after {
@@ -21,7 +25,7 @@ body.shell {
   top: 0;
   z-index: 1000;
   height: var(--header-height);
-  background: var(--header-bg);
+  background: var(--bb-site-header-bg);
   border-bottom: 1px solid var(--border-primary);
   backdrop-filter: blur(10px);
 }
