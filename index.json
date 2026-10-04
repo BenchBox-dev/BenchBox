@@ -2772,6 +2772,13 @@
       "status": "done",
       "title": "ClickHouse Cloud Deployment Mode"
     },
+    "clickhouse-cloud-existence-probe-attribute-error-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "ClickHouse Cloud: the existing-database probe raises AttributeError, so force_recreate is never exercised there"
+    },
     "clickhouse-coffeeshop-dialect-overrides": {
       "claim": null,
       "needs": [],
