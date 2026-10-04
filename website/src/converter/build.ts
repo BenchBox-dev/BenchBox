@@ -21,13 +21,22 @@ export type BuildResult = { files: Map<string, string>; errors: ConverterError[]
 export function inventoryEntries(infos: readonly DocInfo[]): InventoryEntry[] {
   const entries: InventoryEntry[] = [];
   for (const info of infos) {
-    if (info.collection !== "docs") continue;
-    const uri = info.route.replace(/^\/docs\//, "");
+    const uri = info.collection === "docs" ? info.route.replace(/^\/docs\//, "") : `..${info.route}`;
     entries.push({ name: info.path.replace(/\.(md|rst)$/, ""), role: "doc", uri, title: info.title });
-    for (const label of info.labels.values()) {
+    const seen = new Set<string>();
+    const post = /^blog\/(\d{4}-\d{2}-\d{2}-.+)\.(md|rst)$/.exec(info.path);
+    if (post) {
+      seen.add(post[1]);
+      entries.push({ name: post[1], role: "label", uri, title: info.title });
+    }
+    for (const label of [...info.labels.values(), ...info.headingLabels]) {
+      if (seen.has(label.label)) continue;
+      seen.add(label.label);
       entries.push({ name: label.label, role: "label", uri: `${uri}#${label.id}`, title: label.title === undefined ? info.title : label.title.map((node) => node.value).join("") });
     }
   }
+  entries.push({ name: "genindex", role: "label", uri: "genindex.html", title: "Index" });
+  entries.push({ name: "search", role: "label", uri: "search.html", title: "Search Page" });
   return entries.sort((a, b) => (a.role + a.name < b.role + b.name ? -1 : a.role + a.name > b.role + b.name ? 1 : 0));
 }
 

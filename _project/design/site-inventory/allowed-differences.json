@@ -30,21 +30,21 @@
  {
   "id": "title-suffix-docs",
   "kind": "changed heading",
-  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox 0\\.4\\.1 documentation\" -> \"(?P=t) \\| BenchBox\"",
+  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox \\d+\\.\\d+\\.\\d+\\S* documentation\" -> \"(?P=t) \\| BenchBox\"",
   "reason": "Sphinx titled every page with the project name and release; Astro titles docs pages with the site name only, and the page title itself is unchanged",
   "owner_approval": "pending"
  },
  {
   "id": "title-suffix-blog",
   "kind": "changed heading",
-  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox 0\\.4\\.1 documentation\" -> \"(?P=t) - BenchBox Blog\"",
+  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox \\d+\\.\\d+\\.\\d+\\S* documentation\" -> \"(?P=t) - BenchBox Blog\"",
   "reason": "Sphinx titled every page with the project name and release; Astro titles blog pages with the blog name, and the page title itself is unchanged",
   "owner_approval": "pending"
  },
  {
   "id": "docs-index-title",
   "kind": "changed heading",
-  "match": "/docs/index\\.html \\[title\\]: \"BenchBox 0\\.4\\.1 documentation\" -> \"Welcome to BenchBox’s documentation! \\| BenchBox\"",
+  "match": "/docs/index\\.html \\[title\\]: \"BenchBox \\d+\\.\\d+\\.\\d+\\S* documentation\" -> \"Welcome to BenchBox’s documentation! \\| BenchBox\"",
   "reason": "the Sphinx documentation root has no page title, so its title was only the project name and release; Astro uses the page heading",
   "owner_approval": "pending"
  },
@@ -86,8 +86,43 @@
  {
   "id": "canonical-link-added",
   "kind": "changed metadata",
-  "match": "\\S+ \\[canonical\\]: '' -> '/\\S*'",
-  "reason": "Sphinx wrote no canonical link; the Astro build writes one on every page",
+  "match": "(?P<p>/\\S+) \\[canonical\\]: '' -> '(?P=p)'",
+  "reason": "Sphinx wrote no canonical link; the Astro build writes one on every page, and it must be the page's own URL",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-added-root",
+  "kind": "changed metadata",
+  "match": "/index\\.html \\[canonical\\]: '' -> '/'",
+  "reason": "Sphinx wrote no canonical link; the landing page's canonical URL is the site root",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-added-directory-index",
+  "kind": "changed metadata",
+  "match": "(?P<d>/\\S*/)index\\.html \\[canonical\\]: '' -> '(?P=d)'",
+  "reason": "Sphinx wrote no canonical link; a directory index page's canonical URL is its directory",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-redirect-blog",
+  "kind": "changed metadata",
+  "match": "/docs/blog\\.html \\[canonical\\]: '' -> '/blog/'",
+  "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-redirect-genindex",
+  "kind": "changed metadata",
+  "match": "/docs/genindex\\.html \\[canonical\\]: '' -> '/docs/api.html'",
+  "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-redirect-search",
+  "kind": "changed metadata",
+  "match": "/docs/search\\.html \\[canonical\\]: '' -> '/docs/'",
+  "reason": "a retired Sphinx page that is now a redirect page whose canonical link names its target",
   "owner_approval": "pending"
  },
  {

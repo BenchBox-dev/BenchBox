@@ -23,5 +23,15 @@
   "path": "/pagefind/",
   "reason": "new directory: the Pagefind search index that replaces the Sphinx searchindex.js",
   "owner_approval": "pending"
+ },
+ {
+  "path": "/_images/",
+  "reason": "new directory entries: blog images are published at stable /_images/ URLs for every post, including images no Sphinx page referenced",
+  "owner_approval": "pending"
+ },
+ {
+  "path": "/blog.html",
+  "reason": "new page: the all-posts page that the Sphinx header linked to but never built",
+  "owner_approval": "pending"
  }
 ]

@@ -57,6 +57,26 @@ describe("download and image records", () => {
   });
 });
 
+describe("inventory entries", () => {
+  it("lists pages, heading targets, blog post labels and the retired index and search labels", () => {
+    const docsRoot = writeDocs({
+      "docs/api.md": "---\nmyst:\n  enable_extensions:\n    - attrs_block\n---\n\n# API\n\n{#thing-example}\n\n## Example\n\n(guide-label)=\n## Guide\n",
+      "docs/blog/2026-01-01-hello.md": "---\nblogpost: true\ndate: Jan 1, 2026\n---\n\n# Hello\n",
+    });
+    const result = buildSite({ docsRoot: path.join(docsRoot, "docs") });
+    expect(result.errors).toEqual([]);
+    const entries = JSON.parse(result.files.get("manifest/inventory-entries.json") ?? "[]") as { name: string; role: string; uri: string }[];
+    const find = (role: string, name: string) => entries.find((entry) => entry.role === role && entry.name === name)?.uri;
+    expect(find("doc", "api")).toBe("api.html");
+    expect(find("label", "thing-example")).toBe("api.html#thing-example");
+    expect(find("label", "guide-label")).toBe("api.html#guide-label");
+    expect(find("doc", "blog/2026-01-01-hello")).toBe("../blog/2026-01-01-hello.html");
+    expect(find("label", "2026-01-01-hello")).toBe("../blog/2026-01-01-hello.html");
+    expect(find("label", "genindex")).toBe("genindex.html");
+    expect(find("label", "search")).toBe("search.html");
+  });
+});
+
 describe("objects inventory", () => {
   it("writes a Sphinx version 2 inventory that lists pages and labels", () => {
     const bytes = renderObjectsInventory(

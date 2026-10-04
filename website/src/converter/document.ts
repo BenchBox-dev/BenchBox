@@ -111,6 +111,7 @@ class DocumentConverter implements ConvertContext {
   readonly components = new Set<ComponentName>();
   private readonly downloads = new Set<string>();
   private readonly images = new Set<string>();
+  private readonly headingLabels: LabelInfo[] = [];
   readonly pageData = new Map<string, unknown>();
   readonly tags: string[] = [];
   readonly toctrees: ToctreeBlock[] = [];
@@ -211,6 +212,7 @@ class DocumentConverter implements ConvertContext {
     const explicit = this.explicitId;
     this.explicitId = undefined;
     const own = this.ids.fromName(explicit ?? text);
+    if (explicit !== undefined) this.headingLabels.push({ label: explicit, id: own, title });
     if (!AUTOMATIC_ID.test(own)) return own;
     const primary = [...labels].reverse().find((entry) => !AUTOMATIC_ID.test(entry.id));
     if (!primary) return own;
@@ -579,6 +581,7 @@ class DocumentConverter implements ConvertContext {
       orphan: this.pageData.get("orphan") === true,
       downloads: [...this.downloads].sort(),
       images: [...this.images].sort(),
+      headingLabels: this.headingLabels,
     };
     return {
       path: this.file,

@@ -39,6 +39,7 @@ export type DocInfo = {
   orphan: boolean;
   downloads: string[];
   images: string[];
+  headingLabels: LabelInfo[];
 };
 
 export type ResolvedDoc = { path: string; route: string; title: string; titleNodes: TitleNode[] };

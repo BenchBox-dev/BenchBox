@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+import zlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ DESIGN_DIR = REPO_ROOT / "_project" / "design" / "site-inventory"
 DEFAULT_ALLOWED = DESIGN_DIR / "allowed-differences.json"
 DEFAULT_REDIRECTS = DESIGN_DIR / "redirect-pages.json"
 DEFAULT_ADDED = DESIGN_DIR / "added-paths.json"
+DEFAULT_INVENTORY_LOSSES = DESIGN_DIR / "allowed-inventory-losses.json"
 DEFAULT_KNOWN_BROKEN = DESIGN_DIR / "known-broken-links.json"
 DEFAULT_API_MAP = DESIGN_DIR / "api-reference-url-map.json"
 DEFAULT_PUBLISHED = DESIGN_DIR / "baseline-develop"
@@ -308,13 +310,71 @@ def redirect_checks(baseline_site: Path | None, candidate_site: Path, declared: 
     }
 
 
+INVENTORY_LINE = re.compile(r"(?P<name>.+?)\s+(?P<role>\S+)\s+(?P<priority>-?\d+)\s+(?P<uri>\S*)\s+(?P<title>.*)")
+
+
+def parse_inventory(path: Path) -> dict[tuple[str, str], str]:
+    raw = path.read_bytes()
+    header, position = [], 0
+    for _ in range(4):
+        end = raw.index(b"\n", position)
+        header.append(raw[position:end].decode("utf-8"))
+        position = end + 1
+    if header[0] != "# Sphinx inventory version 2":
+        raise ValueError(f"{path}: not a Sphinx version 2 inventory")
+    entries: dict[tuple[str, str], str] = {}
+    for line in zlib.decompress(raw[position:]).decode("utf-8").splitlines():
+        match = INVENTORY_LINE.fullmatch(line)
+        if match:
+            entries[(match["role"], match["name"])] = match["uri"]
+    return entries
+
+
+def load_inventory_losses(path: Path) -> list[dict[str, str]]:
+    return _check_entries(path, _read_json(path), ("id", "reason"))
+
+
+def inventory_check(
+    baseline_site: Path | None, candidate_site: Path, allowed: list[dict[str, str]] | None = None
+) -> dict[str, Any]:
+    if baseline_site is None:
+        return {"baseline": 0, "candidate": 0, "lost": [], "allowed": [], "added": 0}
+    baseline = parse_inventory(baseline_site / "docs" / "objects.inv")
+    candidate = parse_inventory(candidate_site / "docs" / "objects.inv")
+    lost = [f"{role} {name}" for role, name in sorted(set(baseline) - set(candidate))]
+    permitted = {entry["id"] for entry in allowed or []}
+    return {
+        "baseline": len(baseline),
+        "candidate": len(candidate),
+        "lost": [entry for entry in lost if entry not in permitted],
+        "allowed": [entry for entry in lost if entry in permitted],
+        "added": len(set(candidate) - set(baseline)),
+    }
+
+
 def e2e_summary(paths: Sequence[Path]) -> list[dict[str, Any]]:
     rows = []
     for path in paths:
+        if not path.is_file():
+            rows.append({"report": path.name, "failures": ["the expected browser report is missing"], "checks": 0})
+            continue
         data = _read_json(path)
         rows.append(
             {"report": path.name, "failures": list(data.get("failures", [])), "checks": len(data.get("axe", {}))}
         )
+    return rows
+
+
+def step_summary(paths: Sequence[Path]) -> list[dict[str, Any]]:
+    rows = []
+    for path in paths:
+        if not path.is_file():
+            rows.append({"check": path.stem, "exit": None, "failures": [f"{path.stem}: the step result is missing"]})
+            continue
+        data = _read_json(path)
+        failed = data.get("exit") != 0
+        failures = [f"{data['check']} exited {data.get('exit')}"] if failed else []
+        rows.append({"check": data["check"], "exit": data.get("exit"), "failures": failures})
     return rows
 
 
@@ -366,7 +426,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     api = api_map_check(_read_json(args.api_map), candidate, rules)
     redirects = redirect_checks(args.baseline_site, args.candidate_site, load_redirect_pages(args.redirect_pages))
     e2e = e2e_summary(args.e2e_report or [])
+    steps = step_summary(args.step_result or [])
+    inventory_losses = load_inventory_losses(args.allowed_inventory_losses)
+    inventory = inventory_check(args.baseline_site, args.candidate_site, inventory_losses)
     allowed = _merge_allowed(comparisons, added_rules)
+    allowed.extend(
+        {
+            "id": entry["id"],
+            "kind": "inventory entry",
+            "source": DEFAULT_INVENTORY_LOSSES.name,
+            "reason": entry["reason"],
+            "owner_approval": entry["owner_approval"],
+            "matches": {},
+            "samples": [],
+            "count": int(entry["id"] in inventory["allowed"]),
+        }
+        for entry in inventory_losses
+    )
     differences: dict[str, dict[str, list[str]]] = {}
     for comparison in gated:
         for kind, items in comparison["remaining"].items():
@@ -386,7 +462,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             for row in comparison["feeds"]
             for identifier in row["lost_ids"]
         ],
-        "redirect_pages": redirects["undeclared"] + redirects["target_changed"],
+        "redirect_pages": redirects["undeclared"]
+        + redirects["target_changed"]
+        + [f"declared but not built: {path}" for path in redirects["declared_missing"]]
+        + [f"present in the Sphinx site and gone: {path}" for path in redirects["baseline_redirects_lost"]],
+        "unreviewed_added_paths": [path for comparison in gated for path in comparison["added_paths"]["unreviewed"]],
+        "objects_inventory": inventory["lost"],
+        "gate_steps": [failure for row in steps for failure in row["failures"]],
         "browser_checks": [f"{row['report']}: {failure}" for row in e2e for failure in row["failures"]],
     }
     return {
@@ -408,6 +490,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "links": links,
         "redirects": redirects,
         "browser": e2e,
+        "steps": steps,
+        "objects_inventory": inventory,
         "allowed_differences": allowed,
         "unused_allowances": sorted(row["id"] for row in allowed if row["kind"] != "added path" and not row["count"]),
     }
@@ -530,6 +614,17 @@ def render_markdown(report: dict[str, Any]) -> str:
             ["Known-broken entries now fixed", links["known_now_fixed"]],
         ],
     )
+    inventory = report["objects_inventory"]
+    lines += _table(
+        ["Objects inventory", "Entries"],
+        [
+            ["Sphinx entries", inventory["baseline"]],
+            ["Astro entries", inventory["candidate"]],
+            ["Sphinx entries lost", len(inventory["lost"])],
+        ],
+    )
+    if report["steps"]:
+        lines += _table(["Gate step", "Exit status"], [[row["check"], row["exit"]] for row in report["steps"]])
     if report["browser"]:
         lines += _table(
             ["Browser report", "Axe checks", "Failures"],
@@ -550,7 +645,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         ],
     )
     if report["unused_allowances"]:
-        lines += ["## Allowances that matched nothing", ""]
+        lines += ["## Warnings: allowances that matched nothing", ""]
         lines += [f"- {identifier}" for identifier in report["unused_allowances"]] + [""]
     return "\n".join(lines)
 
@@ -567,9 +662,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--allowed-differences", type=Path, default=DEFAULT_ALLOWED)
     parser.add_argument("--redirect-pages", type=Path, default=DEFAULT_REDIRECTS)
     parser.add_argument("--added-paths", type=Path, default=DEFAULT_ADDED)
+    parser.add_argument("--allowed-inventory-losses", type=Path, default=DEFAULT_INVENTORY_LOSSES)
     parser.add_argument("--known-broken", type=Path, default=DEFAULT_KNOWN_BROKEN)
     parser.add_argument("--api-map", type=Path, default=DEFAULT_API_MAP)
     parser.add_argument("--e2e-report", type=Path, action="append")
+    parser.add_argument("--step-result", type=Path, action="append")
     return parser
 
 

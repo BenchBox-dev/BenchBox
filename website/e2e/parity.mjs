@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
-import { firstTagRoute, startSiteServer } from "./site-server.mjs";
+import { startSiteServer } from "./site-server.mjs";
+import { templateRoutes } from "./templates.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
@@ -18,17 +19,7 @@ function fail(message) {
   failures.push(message);
 }
 
-const templates = [
-  { name: "docs page", route: "/docs/usage/getting-started.html" },
-  { name: "docs index", route: "/docs/" },
-  { name: "blog post", route: "/blog/2026-05-18-v0-3-0-release-overview.html" },
-  { name: "blog index", route: "/blog/" },
-  { name: "tag page", route: firstTagRoute(siteDir) },
-  { name: "landing", route: "/" },
-  { name: "prompts", route: "/prompts/" },
-  { name: "404", route: "/no-such-page-for-parity.html", status: 404 },
-  { name: "Explorer", route: "/results/", settle: "main tbody tr" },
-];
+const templates = templateRoutes(siteDir, path.join(repoRoot, "website", "src", "pages"));
 
 for (const required of [path.join(siteDir, "404.html"), path.join(siteDir, "results", "index.html"), path.join(dataDir, "results.duckdb")]) {
   if (!existsSync(required)) throw new Error(`missing e2e input: ${required}`);
@@ -38,8 +29,12 @@ const { server } = await startSiteServer(siteDir, dataDir);
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 
-async function open(route, theme) {
+async function open(route, theme, stripRefresh = false) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: "light" });
+  if (stripRefresh) {
+    const markup = readFileSync(path.join(siteDir, route), "utf-8").replace(/<meta http-equiv="refresh"[^>]*>/i, "");
+    await context.route(`**${route}`, (request) => request.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: markup }));
+  }
   if (theme) await context.addInitScript((value) => localStorage.setItem("benchbox:theme", value), theme);
   const page = await context.newPage();
   const response = await page.goto(base + route, { waitUntil: "load" });
@@ -50,7 +45,7 @@ async function open(route, theme) {
 for (const template of templates) {
   for (const theme of ["light", "dark"]) {
     const key = `${template.name} ${theme}`;
-    const { page, context, response } = await open(template.route, theme);
+    const { page, context, response } = await open(template.route, theme, template.stripRefresh);
     if (template.settle) await page.waitForSelector(template.settle, { timeout: 60000 }).catch(() => fail(`${key}: ${template.settle} never rendered`));
     const expectedStatus = template.status ?? 200;
     if (response?.status() !== expectedStatus) fail(`${key}: ${template.route} answered ${response?.status()}, expected ${expectedStatus}`);
