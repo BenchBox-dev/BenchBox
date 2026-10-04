@@ -209,6 +209,29 @@ class TestValidateBundle:
         assert vr.ok, vr.errors
         assert not any("provenance cutoff" in warning for warning in vr.warnings)
 
+    @pytest.mark.parametrize("tuning", [{"validation_status": "not_applicable"}, {}])
+    def test_untuned_status_only_tuning_block_still_warns(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "tuning",
+        [{"requested": {"table_tunings": {"t": {}}}}, {"source": "yaml", "hash": "a" * 64}],
+    )
+    def test_requested_or_legacy_tuning_evidence_suppresses_the_warning(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
     def test_post_cutoff_z_order_does_not_warn(self):
         data = self._databricks_bundle()
         data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}

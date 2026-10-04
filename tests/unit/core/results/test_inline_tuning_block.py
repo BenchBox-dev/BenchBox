@@ -522,3 +522,80 @@ class TestUntunedStatusRoundTrips:
         tuning_block = bundle["platform"]["tuning"]
         assert tuning_block["validation_status"] == "applied_unverified"
         assert tuning_block["requested_config_hash"] == "a" * 64
+
+
+def _reexport_legacy_bundle(tmp_path: Path, tuning_block: dict | None) -> dict:
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    bundle = _export_untuned(source_dir, anonymize=False, tuning_validation_status="not_applicable")
+    if tuning_block is None:
+        bundle["platform"].pop("tuning", None)
+    else:
+        bundle["platform"]["tuning"] = tuning_block
+    (source_dir / "run.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+    result, _raw = load_result_file(source_dir / "run.json")
+    assert result.tuning_validation_status == (tuning_block or {}).get("validation_status")
+
+    again_dir = tmp_path / "again"
+    again_dir.mkdir()
+    result.output_filename = "run.json"
+    ResultExporter(output_dir=again_dir, anonymize=False).export_result(result, formats=["json"])
+    return json.loads((again_dir / "run.json").read_text(encoding="utf-8"))
+
+
+class TestReexportedLegacyBundleInventsNoStatus:
+    def test_bundle_without_a_tuning_block_stays_without_one(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, None)
+
+        assert "tuning" not in again["platform"]
+
+    def test_bundle_with_only_source_and_hash_keeps_them_and_gains_no_status(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, {"source": "yaml", "hash": "a" * 64})
+
+        tuning_block = again["platform"]["tuning"]
+        assert "validation_status" not in tuning_block
+        assert tuning_block["source"] == "yaml"
+        assert tuning_block["hash"] == "a" * 64
+        assert tuning_block["requested_config_hash"] == "a" * 64
+
+    def test_bundle_with_an_empty_tuning_block_gains_no_status(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, {})
+
+        assert "validation_status" not in again["platform"].get("tuning", {})
+
+    def test_status_recorded_by_the_original_run_survives(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, {"validation_status": "noop"})
+
+        assert again["platform"]["tuning"] == {"validation_status": "noop"}
+
+
+class TestTunedBundleDerivesStatusLikeUntuned:
+    def _tuned(self, tmp_path: Path, **overrides: object) -> dict:
+        benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
+        result = build_enhanced_benchmark_result(
+            benchmark=benchmark,
+            platform="duckdb",
+            query_results=[],
+            tunings_applied=dict(_REQUESTED_TUNING),
+            tuning_config_hash="a" * 64,
+            tuning_source="auto_discovered",
+            **overrides,
+        )
+        result.output_filename = "run.json"
+        ResultExporter(output_dir=tmp_path, anonymize=False).export_result(result, formats=["json"])
+        return json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))["platform"]["tuning"]
+
+    def test_unset_status_takes_the_applied_ledgers_status(self, tmp_path: Path) -> None:
+        tuning_block = self._tuned(
+            tmp_path,
+            applied_tuning_ledger=dict(_APPLIED_LEDGER),
+            applied_ledger_hash=_APPLIED_LEDGER["applied_ledger_hash"],
+        )
+
+        assert tuning_block["validation_status"] == "applied_unverified"
+
+    def test_unset_status_without_a_ledger_is_omitted_rather_than_not_validated(self, tmp_path: Path) -> None:
+        tuning_block = self._tuned(tmp_path)
+
+        assert "validation_status" not in tuning_block
