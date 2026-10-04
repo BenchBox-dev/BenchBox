@@ -184,6 +184,36 @@ follower. Site-changing PRs should land one at a time.
 `baseline_source_sha`, as shown above. Wait for its visual job, then re-run the
 failed job. A PR diagnostic artifact is never a substitute.
 
+### Renderer-switch pull request
+
+The Astro build is captured ahead of the switch by the non-required
+`Public-site visual Astro dry run` job in `ci.yml`, locally by
+`make site-build site-visual-capture`. It captures the same route and viewport
+matrix from `website/dist` with `PUBLIC_SITE_VISUAL_RENDERER=astro`, uploads
+`public-site-visual-astro-<run id>`, and never compares or replaces a baseline.
+Each manifest records its `renderer`. If a route or viewport changes, update
+the matrix in `public-site-pages.spec.ts` in the same change.
+
+The pull request that switches the CI renderer to Astro changes every capture
+against the Sphinx baseline of its exact base. It never skips, disables or
+loosens the comparison. Use the gating-phase slots, one per tree:
+
+1. Review the PR run's `public-site-visual-diagnostics-*` artifact against the
+   Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head SHA and
+   `APPROVAL_REASON` to the review note, then re-run the failed job.
+2. When the PR enters the merge queue, wait for the group's own run. Review that
+   group's diagnostics, set `APPROVED_MERGE_GROUP_SHA` to its
+   `merge_group.head_sha` and `MERGE_GROUP_APPROVAL_REASON` to the note, then
+   re-run. Queue position, and the PR approval, never substitute for this slot.
+   A re-formed group needs a fresh approval.
+3. After the merge, the `Documentation` push run on `develop` must capture the
+   Astro build and upload `public-site-visual-baseline-<merge commit>`. Confirm
+   the artifact exists and that its `manifest.json` has `"renderer": "astro"`.
+   If the push was dropped, dispatch Documentation with `baseline_source_sha`
+   set to the merge commit.
+4. Clear all four approval variables. Hold other site-changing PRs until step 3
+   is confirmed, because they need the Astro baseline for their exact base.
+
 ## What CI gates
 
 The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)

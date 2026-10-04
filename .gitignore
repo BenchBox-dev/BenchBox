@@ -249,6 +249,7 @@ node_modules/
 /.claude/skills/blog/
 /site-inventory/
 /site-parity/
+/site-visual-astro/
 /website/.astro/
 /website/.generated/
 /website/e2e-output/

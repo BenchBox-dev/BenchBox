@@ -28,6 +28,15 @@ if (!["", "capture", "compare"].includes(PHASE)) {
   throw new Error(`PUBLIC_SITE_VISUAL_PHASE must be capture, compare, or unset; got ${PHASE}`);
 }
 const SOURCE_SHA = process.env.PUBLIC_SITE_VISUAL_SOURCE_SHA ?? "unknown";
+const RENDERERS = ["sphinx", "astro"] as const;
+type Renderer = (typeof RENDERERS)[number];
+const RENDERER = (process.env.PUBLIC_SITE_VISUAL_RENDERER ?? "sphinx") as Renderer;
+if (!RENDERERS.includes(RENDERER)) {
+  throw new Error(`PUBLIC_SITE_VISUAL_RENDERER must be one of ${RENDERERS.join(", ")}; got ${RENDERER}`);
+}
+if (RENDERER === "astro" && PHASE !== "capture") {
+  throw new Error("PUBLIC_SITE_VISUAL_RENDERER=astro supports only PUBLIC_SITE_VISUAL_PHASE=capture until the renderer cutover");
+}
 // Match the protected baseline's UTC capture day so relative run ages do not
 // make an otherwise unchanged screenshot expire every midnight.
 const VISUAL_REFERENCE_TIME = new Date("2026-09-08T19:35:00Z");
@@ -64,7 +73,12 @@ test.describe.configure({ mode: "serial", timeout: 240_000 });
 // of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");
 
-type CapturedManifest = VisualManifest & { browser: string; source_sha: string; viewports: readonly number[] };
+type CapturedManifest = VisualManifest & {
+  browser: string;
+  renderer?: Renderer;
+  source_sha: string;
+  viewports: readonly number[];
+};
 
 async function captureManifest(browser: Browser): Promise<CapturedManifest> {
   await mkdir(OUTPUT, { recursive: true });
@@ -145,6 +159,7 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
     browser: "chromium",
     capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
     captures,
+    renderer: RENDERER,
     source_sha: SOURCE_SHA,
     viewports: VIEWPORTS,
   };
@@ -171,6 +186,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   }
   const baseline = JSON.parse(await readFile(path.join(BASELINE, "manifest.json"), "utf8")) as typeof manifest;
   expect(baseline.browser).toBe("chromium");
+  expect(baseline.renderer ?? "sphinx", "baseline renderer").toBe(manifest.renderer ?? "sphinx");
   // When comparison is required, the baseline must be bound to a real SHA:
   // an empty BASE_SHA skips this assertion and compares pixels only, which
   // would let a stale or wrong-tree baseline pass unread.

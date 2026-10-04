@@ -317,3 +317,59 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
     assert result.returncode == 0, result.stderr
     assert f"changed={expected}" in output.read_text()
     assert f"base_sha={base_sha}" in output.read_text()
+
+
+def test_astro_dry_run_captures_without_comparing_or_gating() -> None:
+    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    job = ci["jobs"]["public-site-visual-astro-dry-run"]
+    assert job["name"] == "Public-site visual Astro dry run"
+    assert "site-needed" in job["if"]
+    steps = {step["name"]: step for step in job["steps"] if "name" in step}
+    assert steps["Build website"]["run"] == "make site-build"
+    assert "make site-visual-capture" in steps["Capture public site from the Astro build"]["run"]
+    upload = steps["Upload Astro visual captures"]
+    assert upload["with"]["name"].startswith("public-site-visual-astro-")
+    text = str(job)
+    assert "download-public-site-visual-baseline" not in text
+    assert "PUBLIC_SITE_VISUAL_BASELINE" not in text
+    for name, other in ci["jobs"].items():
+        needs = other.get("needs", [])
+        needs = [needs] if isinstance(needs, str) else needs
+        assert "public-site-visual-astro-dry-run" not in needs, name
+
+    recipe = (REPO_ROOT / "make" / "documentation.mk").read_text(encoding="utf-8")
+    target = recipe.split(".PHONY: site-visual-capture\nsite-visual-capture:")[1].split("\n\n")[0]
+    assert "PUBLIC_SITE_VISUAL_RENDERER=astro" in target
+    assert "PUBLIC_SITE_VISUAL_PHASE=capture" in target
+    assert "website/dist" in target
+    assert "PUBLIC_SITE_VISUAL_BASELINE" not in target
+
+
+def test_capture_spec_records_the_renderer_and_keeps_the_matrix() -> None:
+    source = CAPTURE_SPEC.read_text(encoding="utf-8")
+    assert "PUBLIC_SITE_VISUAL_RENDERER" in source
+    assert "[390, 768, 1280, 1600]" in source
+    for route in ('"/"', '"/docs/usage/getting-started.html"', '"/results/benchmarks/"', '"/results/platforms/"'):
+        assert f"path: {route}" in source
+
+
+def test_visual_inputs_classify_website_in_both_workflows() -> None:
+    for path in (DOCS_WORKFLOW, REPO_ROOT / ".github/workflows/ci.yml"):
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        classifier = workflow["jobs"]["visual-inputs"]["steps"][1]["run"]
+        site_paths = classifier.split("SITE_PATHS=(")[1].split(")")[0]
+        assert "website/" in site_paths, path.name
+        assert "landing/" in site_paths, path.name
+
+
+def test_runbook_documents_both_renderer_switch_approval_slots() -> None:
+    runbook = (REPO_ROOT / "docs/development/results-explorer-browser-testing.md").read_text(encoding="utf-8")
+    section = runbook.split("### Renderer-switch pull request")[1].split("## What CI gates")[0]
+    for token in (
+        "APPROVED_HEAD_SHA",
+        "APPROVED_MERGE_GROUP_SHA",
+        "MERGE_GROUP_APPROVAL_REASON",
+        "Queue position",
+        '"renderer": "astro"',
+    ):
+        assert token in section
