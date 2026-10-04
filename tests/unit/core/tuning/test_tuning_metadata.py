@@ -1015,3 +1015,53 @@ def test_load_unified_tunings_section_only_config_is_not_none():
 
     assert loaded is not None
     assert isinstance(loaded, UnifiedTuningConfiguration)
+
+
+class _CountingAdapter(_FakeAdapter):
+    """_FakeAdapter that records connection open/close calls."""
+
+    def __init__(self, platform_name: str = "duckdb"):
+        super().__init__(platform_name)
+        self.opened = 0
+        self.closed: list[object] = []
+
+    def create_connection(self, **_kwargs) -> _FakeConn:
+        self.opened += 1
+        return super().create_connection()
+
+    def close_connection(self, conn) -> None:
+        self.closed.append(conn)
+        return None
+
+
+def test_manager_reuses_supplied_connection_and_never_closes_it():
+    """Mid-run metadata I/O must ride the run's own connection: no extra
+    connection is opened (each extra open re-enters create/drop handling and
+    can delete the run's database), and the shared connection is never closed
+    by the manager."""
+    adapter = _CountingAdapter("duckdb")
+    shared = adapter.create_connection()
+    assert adapter.opened == 1
+
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    manager = TuningMetadataManager(adapter, connection=shared)
+    assert manager.save_unified_tunings(config) is True
+    assert manager.validate_unified_tunings(config).is_valid is True
+    assert manager.get_metadata_summary()["table_exists"] is True
+    assert manager.clear_tunings() is True
+
+    assert adapter.opened == 1
+    assert shared not in adapter.closed
+
+
+def test_manager_without_supplied_connection_still_opens_temp_connections():
+    """The fallback path is preserved: with no shared connection the manager
+    still opens (and closes) its own temporary connection per operation."""
+    adapter = _CountingAdapter("duckdb")
+
+    config = UnifiedTuningConfiguration()
+    assert TuningMetadataManager(adapter).save_unified_tunings(config) is True
+
+    assert adapter.opened >= 1
+    assert len(adapter.closed) == adapter.opened
