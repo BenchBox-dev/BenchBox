@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "TPCHThroughputTest receives the adapter's target dialect and passes it to every get_query call (pre-generation and fallback)",
+    "A test asserts that for each throughput-capable platform, throughput stream SQL equals the power-path SQL for the same query, seed and stream parameters",
+    "stream_id is passed in the form get_query actually reads, with a test",
+    "The DuckDB real-database throughput test still passes"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Consensus finding from two reviewers; confirmed by script.",
+  "description": "`TPCHThroughputTest` calls `benchmark.get_query(...)` without `dialect=` (benchbox/core/tpch/throughput_test.py:259-264 and :307-312), and `execution.py:474-480` does not pass one. With no dialect, `tpch/benchmark.py:384-387` makes the target equal to the source (netezza). The power path passes `dialect=adapter.get_target_dialect()` (platform_power.py:114,141; power_test.py:289-295). TPC-DS throughput already passes the dialect (execution.py:340). The `stream_id=` keyword is also ignored by get_query, which reads only `params[\"stream_id\"]`.\n\nA reviewer compared all 22 queries with and without a dialect: they differ for duckdb, spark, mysql, doris, singlestore, sqlite and questdb; only postgres is identical. This is the root cause of the SQLite `INTERVAL '1 YEAR'` failures, and likely breaks Doris, SingleStore and QuestDB throughput. On DuckDB it means power and throughput time different SQL text, so the phases are not comparable.\n\nThis is a generic defect; the SQLite item covers only the SQLite symptom and connection model.",
+  "links": [
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/platforms/base/execution.py",
+    "benchbox/core/tpch/platform_power.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:57:32Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2996dd929e3a42eca07a36005f52c293",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
