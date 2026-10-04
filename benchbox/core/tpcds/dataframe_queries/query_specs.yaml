@@ -28,7 +28,8 @@ joined_aggregate:
     filters:
       - [eq, d_qoy, {param: quarter, default: 2}]
       - [eq, d_year, {param: year, default: 2000}]
-      - [or, [substr_in, ca_zip, 5, {param: zip_codes, default: ["85669", "86197", "88274", "83405", "86475", "85392", "85460", "80348", "81792"]}], [in, ca_state, {param: states, default: [CA, WA, GA]}], [gt, cs_sales_price, {param: min_price, default: 500}]]
+      # The template draws only the quarter and the year; the zip codes, states and price floor are fixed in its SQL.
+      - [or, [substr_in, ca_zip, 5, ["85669", "86197", "88274", "83405", "86475", "85392", "85460", "80348", "81792"]], [in, ca_state, [CA, WA, GA]], [gt, cs_sales_price, 500]]
     group_by: [ca_zip]
     aggs:
       - [total_sales, cs_sales_price, sum]
@@ -44,8 +45,9 @@ joined_aggregate:
     filters:
       - [in, d_year, {param: year, default: 1998, offsets: [0, 1, 2]}]
       - [between, d_dom, 1, 2]
-      - [eq, s_county, {param: county, default: Williamson County}]
-      - [in, hd_buy_potential, [">10000", Unknown]]
+      # The template draws four store counties (COUNTY_A to COUNTY_D, which may repeat) and two buying potentials.
+      - [in, s_county, {param: counties, default: [Williamson County, Williamson County, Williamson County, Williamson County]}]
+      - [or, [eq, hd_buy_potential, {param: buy_potential_1, default: ">10000"}], [eq, hd_buy_potential, {param: buy_potential_2, default: Unknown}]]
       - [gt, hd_vehicle_count, 0]
       - [ratio_gt, hd_dep_count, hd_vehicle_count, 1]
     group_by: [c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number]

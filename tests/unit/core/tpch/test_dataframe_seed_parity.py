@@ -168,11 +168,19 @@ def test_seeded_overrides_restored_when_a_query_raises() -> None:
 
 
 def test_dataframe_result_records_bound_parameter_set() -> None:
+    from types import SimpleNamespace
+
     from benchbox.platforms.dataframe.benchmark_mixin import _describe_query_parameters
 
-    assert _describe_query_parameters("tpch", None) == "qgen -d (TPC-H default substitution parameters)"
-    assert _describe_query_parameters("TPC-H", 17039360) == "qgen -r (17039360 + 1000 * stream_id)"
-    assert _describe_query_parameters("tpcds", 17039360) is None
+    assert (
+        _describe_query_parameters(SimpleNamespace(name="tpch", options={"seed": None}))
+        == "qgen -d (TPC-H default substitution parameters)"
+    )
+    assert (
+        _describe_query_parameters(SimpleNamespace(name="TPC-H", options={"seed": 17039360}))
+        == "qgen -r (17039360 + 1000 * stream_id)"
+    )
+    assert _describe_query_parameters(SimpleNamespace(name="tpcdi", options={"seed": 17039360})) is None
 
 
 def test_overlapping_runs_keep_seed_and_scale_bindings_isolated() -> None:

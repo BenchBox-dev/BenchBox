@@ -316,10 +316,20 @@ Allowed differences:
 - `execution.translation` is SQL-only additive metadata and may appear when SQL
   dialect translation was attempted. DataFrame bundles are not expected to emit
   matching translation metadata.
+- `config.query_parameters` is DataFrame-only for now: a TPC-DS DataFrame run
+  lists, query by query, which queries it bound to the `dsqgen -LOG` values of
+  the SQL power test's `-RNGSEED` for each stream (queries with a parameter
+  adapter) and which ran on `default_parameters.yaml`. SQL bundles do not
+  record it.
 - Exact timing values must not be compared across modes.
-- `config.query_parameters` is DataFrame-only for now: a TPC-H DataFrame run
-  records which substitution parameters it bound (`qgen -d` defaults, or the
-  values qgen draws for `seed + 1000 * stream_id`). SQL bundles do not record it.
+- `config.query_parameters` records the TPC-H substitution parameter convention.
+  Power runs and supported DataFrame runs use `qgen -d` without a seed, or
+  `qgen -r (seed + 1000 * stream_id)` with a seed. Standard SQL uses `qgen -d`.
+  SQL Throughput uses `base_seed + 1001 * stream_id + query_position`, with
+  a default base seed of 42 and positions starting at zero in each stream's
+  permutation. Combined SQL lists the requested phases separately; refresh
+  functions do not use qgen parameters. Unsupported harnesses that fall back
+  to Standard SQL record the default parameters.
 
 ## Result Model Extension Policy
 
@@ -388,6 +398,24 @@ finalization labels the result `not_run` instead of `passed`.
 Post-load validation that is not applicable because an adapter does not expose
 connection validation hooks records no validation stage; exceptions after a
 validation attempt remain failed validation stages.
+Failed per-query validation, including a warm-up query, prevents a clean pass
+and makes the CLI report failure. Aggregate query counts and timings continue
+to describe measurement executions.
+
+TPC-H SF1 answer files use `qgen -d` defaults. No numeric seed identifies that
+parameter set. Q11, Q16, Q18 and Q20 retain exact answer-file row-count checks
+for the defaults; other substitution parameters use the existing query-specific
+range or loose checks. This does not change value-comparison tolerances.
+`set_reference_seed_context` records this choice for the current thread:
+`True` selects exact validation for the defaults, `False` selects the existing
+query-specific range or loose checks, and `None` preserves exact validation
+when the parameter context is unknown.
+The bounded correctness-gate digest snapshot records the qgen seed it was
+generated with; the gate and its regeneration reuse it. The current snapshot
+records `reference_seed: null`, so both run qgen `-d` without a seed.
+Regenerate the snapshot on Linux with
+`make correctness-gate-digests-regen`; the snapshot detects regressions against
+DuckDB and is separate from the official answer files.
 
 ## Evidence Snapshot
 

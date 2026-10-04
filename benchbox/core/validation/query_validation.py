@@ -67,31 +67,6 @@ def _set_thread_context(state: threading.local, attribute: str, value: object) -
 
 
 def set_reference_seed_context(is_reference_seed: bool | None) -> None:
-    """Record, for the CURRENT THREAD, whether the query about to run through
-    QueryValidator is using the pinned TPC reference seed's substitution
-    parameters.
-
-    This module never derives or compares seeds itself -- callers (the TPC-H
-    power/throughput drivers) compute the comparison against
-    benchbox.core.tpch.benchmark.get_reference_seed() and pass the result in.
-
-    Values:
-        True: this query's actual seed matches the reference seed for its
-            scale factor (or the run used qgen defaults, which the TPC-H
-            drivers treat as reference-equivalent) -- exact validation applies
-            normally, including for the parameter-sensitive queries.
-        False: this query is running under different substitution parameters
-            than the reference answer set -- get_parameter_sensitive_query_ids
-            entries are relaxed from their canonical EXACT mode to their RANGE
-            bounds (or LOOSE tolerance) rather than exact-compared, so
-            spec-sanctioned parameter variance is accepted while a 0-row or
-            out-of-range result still fails.
-        None (the default/unset value): unknown -- preserves the pre-existing
-            behavior of always attempting EXACT validation. Benchmarks that
-            never call this function (TPC-DS, DataFrame validation, any other
-            QueryValidator caller) are therefore completely unaffected by the
-            relaxation below.
-    """
     _set_thread_context(_reference_seed_state, "is_reference_seed", is_reference_seed)
 
 

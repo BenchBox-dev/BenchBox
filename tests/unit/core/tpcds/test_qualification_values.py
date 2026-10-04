@@ -45,6 +45,8 @@ SPEC_SAMPLE = [
     (44, "NULLCOLSS.01", "ss_addr_sk"),
     (47, "ORDERBY.01", "s_store_name"),
     (72, "YEAR.01", "1999"),
+    (75, "YEAR.01", "2002"),
+    (75, "CATEGORY.01", "Books"),
     (88, "STORE.01", "Unknown"),
     (93, "REASON.01", "reason 28"),
 ]
@@ -126,3 +128,13 @@ def test_the_queries_empty_at_scale_factor_one_have_non_empty_official_answer_se
         54: 1,
         58: 3,
     }
+
+
+def test_q75_qualification_year_matches_the_official_answer_years(document):
+    from benchbox.core.expected_results.loader import _find_tpcds_answers_dir, parse_tpcds_answer_values
+
+    (block,) = parse_tpcds_answer_values(_find_tpcds_answers_dir() / "75.ans")
+    year = int(document["values"]["75"]["YEAR.01"])
+    assert block.columns[:2] == ("PREV_YEAR", "YEAR")
+    assert {row[:2] for row in block.rows} == {(str(year - 1), str(year))}
+    assert year == 2002

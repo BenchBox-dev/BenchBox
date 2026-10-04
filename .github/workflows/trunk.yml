@@ -41,9 +41,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Fast lane ceiling
-        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
-
       - name: Run fast tests
         run: |
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120

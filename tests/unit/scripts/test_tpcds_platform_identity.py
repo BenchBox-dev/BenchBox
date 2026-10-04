@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
-from tpcds_platform_identity import VOLATILE_TABLES, build_manifest, compare_manifests, main
+from tpcds_platform_identity import VOLATILE_TABLES, build_manifest, compare_manifests, main, table_entry
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium, pytest.mark.tpcds]
 
@@ -131,8 +131,8 @@ def test_manifest_is_deterministic_on_one_platform_and_covers_the_pinned_seed():
     except (TPCDSError, FileNotFoundError, RuntimeError) as exc:
         pytest.skip(f"dsqgen binary or templates unavailable: {exc}")
 
-    first = build_manifest(query_ids=(8, 39))
-    second = build_manifest(query_ids=(8, 39))
+    first = build_manifest(query_ids=(8, 39, 46))
+    second = build_manifest(query_ids=(8, 39, 46))
 
     assert compare_manifests({"first": first, "second": {**second, "platform": {"system": "x", "machine": "y"}}}) == []
     assert first["seed"] == 7 and first["scale_factor"] == 0.01
@@ -140,3 +140,29 @@ def test_manifest_is_deterministic_on_one_platform_and_covers_the_pinned_seed():
     assert first["tables"]["store_sales"]["rows"] > 0
     assert first["queries"]["39"]["values"]["YEAR.01"]
     assert len(first["queries"]["39"]["sql_sha256"]) == 64
+    # SF 0.01 draws one city for every Q46 slot; the SF 100 parameter pass draws distinct cities.
+    small = first["queries"]["46"]["values"]
+    large = first["parameter_scales"]["100.0"]["46"]["values"]
+    assert len({value for key, value in small.items() if key.startswith("CITY_")}) == 1
+    assert len({value for key, value in large.items() if key.startswith("CITY_")}) > 1
+
+
+def test_a_parameter_difference_at_a_parameter_only_scale_is_reported():
+    queries = {"46": {"values": {"CITY_A.01": "Oak Grove"}, "sql_sha256": "5" * 64}}
+    reference = _manifest(parameter_scales={"100.0": queries})
+    other = _manifest("Darwin", parameter_scales={"100.0": copy.deepcopy(queries)})
+    other["parameter_scales"]["100.0"]["46"]["values"]["CITY_A.01"] = "Midway"
+    problems = compare_manifests({"a": reference, "b": other})
+    assert problems == ["a vs b at SF 100.0: query 46 parameters differ (1): CITY_A.01: 'Oak Grove' against 'Midway'"]
+
+
+def test_manifests_with_different_parameter_only_scales_are_not_comparable_there():
+    problems = compare_manifests({"a": _manifest(parameter_scales={"100.0": {}}), "b": _manifest("Darwin")})
+    assert len(problems) == 1 and "parameter-only scales differ" in problems[0]
+
+
+def test_crlf_table_files_compare_equal_to_lf(tmp_path: Path):
+    lf, crlf = tmp_path / "lf.dat", tmp_path / "crlf.dat"
+    lf.write_bytes(b"1|a|\n2|b|\n")
+    crlf.write_bytes(b"1|a|\r\n2|b|\r\n")
+    assert table_entry(lf) == table_entry(crlf)

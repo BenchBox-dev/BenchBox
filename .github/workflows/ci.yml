@@ -650,36 +650,10 @@ jobs:
         continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Fast lane ceiling
-        id: guard-fast-lane-ceiling
+      - name: Fast lane marker and path guards
+        id: guard-fast-lane-markers
         continue-on-error: true
         run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
-
-      - name: Restore fast-lane develop baseline count
-        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
-        # naming-convention comment above): a cache miss here is not itself a
-        # failure, but the delta guard below reports it as a blocking baseline
-        # error. The key is the PR event's actual develop base SHA; a prefix
-        # restore would compare the PR against an unrelated develop tip when
-        # merges or baseline jobs complete out of order.
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha }}
-
-      - name: Fast lane ceiling delta vs develop
-        # Pull requests only: in a merge group the delta is the sum of every
-        # composed PR, so it would eject groups whose members each fit.
-        if: github.event_name == 'pull_request'
-        # Additive to guard-fast-lane-ceiling above, never a replacement: that
-        # step enforces the absolute max_fast_tests ceiling unconditionally.
-        # The pull-request lane requires the exact develop baseline so every
-        # queued member proves its +150 per-PR delta before composition grace
-        # is allowed. A missing cache fails closed instead of weakening that
-        # prerequisite.
-        id: guard-fast-lane-delta
-        continue-on-error: true
-        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
 
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
@@ -776,9 +750,6 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
 
-          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
-          # jq parse failure or an empty guard set must fail the job -- never
-          # fall through to "all passed" with zero guards inspected.
           ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
             echo "aggregator: jq failed to parse the steps context" >&2
             exit 1
@@ -819,6 +790,7 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

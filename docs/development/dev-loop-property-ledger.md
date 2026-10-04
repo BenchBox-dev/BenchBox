@@ -71,7 +71,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `docker-integration.yml` | product-safety | Container integration coverage |
 | `docs.yml` | product-safety | Public-site build, privacy scan, visual acceptance |
 | `extension-smoke.yml` | product-safety | Extension smoke coverage |
-| `fast-lane-baseline.yml` | tooling | Develop-tip fast-lane count that the ci.yml delta guard restores |
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
@@ -103,6 +102,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
+| `tpcds-official-qualification.yml` | product-safety | Weekly advisory SF 1 TPC-DS qualification diagnostic |
 | `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
 
 ### `tests/unit/workflows/`
@@ -193,7 +193,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_explorer_build_contract.py` | product-safety |
 | `test_explorer_receipt_ui_contract.py` | product-safety |
 | `test_fast_lane_ceiling_check.py` | pure-process |
-| `test_fast_lane_ratchet_check.py` | pure-process |
 | `test_generate_changelog_entry.py` | product-safety |
 | `test_heavy_tier_needed.py` | product-safety |
 | `test_generate_corpus_inventory.py` | product-safety |
@@ -217,6 +216,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
 | `test_reference_usage_audit.py` | tooling |
+| `test_regenerate_correctness_gate_digests.py` | product-safety | TPC-H gate digests regenerate from qgen default parameters and record a null seed |
 | `test_release_admitted_dist.py` | product-safety | Admitted directory matches its admission receipt, the tag and the commit before publication; only the verified wheel and sdist are staged |
 | `test_release_artifact_consumer.py` | product-safety | Producer receipt, provenance selection and archive admission fail closed |
 | `test_release_artifact_execution.py` | product-safety | Real tag objects, isolated verifier boundary, credential and Git configuration isolation, bounded download and no-replace publication |
@@ -361,13 +361,12 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `rp_scoped_check.py` | product-safety | read_primitives cross-surface check (KEEP trap) |
 | `timing_audit.py` | product-safety | Timing audit (KEEP trap) |
 | `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
-| `fast_lane_ceiling_check.py` | pure-process | Fast-lane ceiling and delta; retires with the fast lane |
+| `fast_lane_ceiling_check.py` | pure-process | Fast-lane marker and path guards; retires with the fast lane |
 | `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
 | `oracle_review_check.py` | product-safety | Connector review check for soundness-path changes |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
 | `soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
-| `fast_lane_ratchet_check.py` | pure-process | Fast-lane mechanics; retires with the fast lane |
 | `reference_usage_audit.py` | tooling | Reference hygiene |
 | `agent_instruction_audit.py` | tooling | Agent instruction lockstep |
 | `worktree_audit.py` | tooling | Worktree hygiene |
