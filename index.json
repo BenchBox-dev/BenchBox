@@ -19874,6 +19874,13 @@
       "status": "done",
       "title": "Add UAT and CI coverage for the throughput/concurrent phase (currently zero)"
     },
+    "throughput-uat-job-contract-and-signal": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput UAT job has no contract test, inline floor logic, and no failure signal while the nightly is red every night"
+    },
     "tigerdata-cloud-enhancements": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Assert and floor logic live in tests/uat/throughput.py with unit tests",
+    "A workflow contract test fails if the DuckDB throughput steps gain continue-on-error or lose if: !cancelled()",
+    "A throughput-uat failure produces a distinct signal (separate status or notification) independent of other nightly jobs"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Nightly history from gh run list by the reviewer.",
+  "description": "No test refers to the throughput-uat job or THROUGHPUT_FLOOR. Nothing prevents adding continue-on-error to the DuckDB steps or dropping `if: !cancelled()`. The assert and floor logic is inline Python in YAML (nightly.yml:1092-1111) with no unit tests.\n\nThe overall nightly failed 12 of 12 runs through 10-04 (on 10-04: test ubuntu-latest 3.14, ruleset-drift, and two quarantined Windows jobs). There is no failure notification, so a real DuckDB throughput failure would not stand out among the red runs.",
+  "links": [
+    ".github/workflows/nightly.yml",
+    "tests/uat/throughput.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:01:34Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "90cbc19a56d24e6b98ffb2dcddfb8588",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
