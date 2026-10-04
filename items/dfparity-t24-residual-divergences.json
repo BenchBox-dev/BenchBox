@@ -4,7 +4,7 @@
     "Each fix states its cause with evidence and does not change another query's status in the per-query probe",
     "Comparator strictness and the SQL reference are unchanged"
   ],
-  "context": "2026-10-03 progress. Local fix branches (commit-only):\n(a) fix/tpcds-q9-q46-q68 daf65b303\n(b) fix/tpcds-q4-q11-q19-pandas c4f873b59\n(c) fix/tpcds-q18-q27-null-values e2d102944\n(d) fix/tpcds-q70-top-states 15d4fb5e6\n(e) fix/tpcds-pandas-descending-nulls 76aefac08\n(f) fix/tpcds-null-sums-and-ascending 18e2264ea, on (e): all-NULL SUM gives NULL in Q3/42/52/55 (both families); pandas keeps NULL group keys; 20 Polars ascending sorts use NULL-as-largest (Q6 8 10 17 24 25 29 33 40 43 47 53 54 56 57 59 60 63 64 69 75 85 93). 25 tests fail before and pass after; probes unchanged.\nWith (a)+(b), SF 0.1 has 0 divergent cells.\nOPEN (do after integration, since these queries are being edited on t05i branches): the all-NULL SUM giving 0 likely also affects Q33, Q43 (when/otherwise sum), Q47, Q54, Q56, Q57, Q60, Q64 and Q75; _manufacturer_month_pandas (Q53/Q63) drops NULL-key groups; Q25 stddev_samp one-row NaN vs NULL in pandas; rank() of NULL vs SQL RANK; SF 1 re-measure of everything combined.",
+  "context": "2026-10-03 progress. Local fix branches (commit-only):\n(a) fix/tpcds-q9-q46-q68 daf65b303\n(b) fix/tpcds-q4-q11-q19-pandas c4f873b59\n(c) fix/tpcds-q18-q27-null-values e2d102944\n(d) fix/tpcds-q70-top-states 15d4fb5e6\n(e) fix/tpcds-pandas-descending-nulls 76aefac08\n(f) fix/tpcds-null-sums-and-ascending 18e2264ea, on (e): all-NULL SUM gives NULL in Q3/42/52/55 (both families); pandas keeps NULL group keys; 20 Polars ascending sorts use NULL-as-largest (Q6 8 10 17 24 25 29 33 40 43 47 53 54 56 57 59 60 63 64 69 75 85 93). 25 tests fail before and pass after; probes unchanged.\nWith (a)+(b), SF 0.1 has 0 divergent cells.\nOPEN (do after integration, since these queries are being edited on t05i branches): the all-NULL SUM giving 0 likely also affects Q33, Q43 (when/otherwise sum), Q47, Q54, Q56, Q57, Q60, Q64 and Q75; _manufacturer_month_pandas (Q53/Q63) drops NULL-key groups; Q25 stddev_samp one-row NaN vs NULL in pandas; rank() of NULL vs SQL RANK; SF 1 re-measure of everything combined.\n\n2026-10-04 closeout: Delivered in #2605/#2612: 0 divergent cells on Polars, pandas and DataFusion at the default draw and three other draws with repeats; SF1 qualification DataFrame-to-SQL 103/103 on each backend.",
   "description": "After every query binds the dsqgen values (t05a-h), some cells will still diverge for reasons other than parameters: implementation logic, shared helpers (helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml), multi-channel unions, ROLLUP grouping sets, windows, NULL and decimal semantics. Using the t14 report at the gate scale (about SF 0.1, per t20), fix each at its cause, preferring the shared helper over per-query copies, or classify it with evidence. No item owned this work before: t20 requires zero unclassified divergences but nothing fixed them. Guardrails: SQL reference unchanged; comparator tolerance 1e-10 and NULL vs NaN unchanged; NULL order fixed in implementations (D4); tie canonicalization only where t14 proves a true tie; no known_divergences entries. queries.py PRs serialize with any other queries.py PR.",
   "sessions": [
     {
@@ -62,6 +62,14 @@
       "op": "update",
       "op_id": "069965848c0643e69cad76e7470a1c68",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:13:37Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7ff8e4c0d0be4905b738867a4aef9004",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
