@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 class ClickHouseTuningMixin:
     """Implement tuning primitives for ClickHouse."""
 
+    physical_identifier_case = "lower"
+
     def get_effective_tuning_configuration(
         self,
     ) -> UnifiedTuningConfiguration | None:
@@ -317,6 +319,7 @@ class ClickHouseTuningMixin:
             return
 
         table_name = table_tuning.table_name
+        physical_table = self.resolve_physical_table(table_name, connection)
         self.logger.info(f"Applying ClickHouse tunings for table: {table_name}")
 
         try:
@@ -332,7 +335,7 @@ class ClickHouseTuningMixin:
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
                 self.logger.info(f"Optimizing table {table_name} for sorting on columns: {', '.join(column_names)}")
-                self.optimize_table(connection, table_name)
+                self.optimize_table(connection, physical_table)
 
             # Apply clustering optimization via OPTIMIZE TABLE FINAL
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -342,7 +345,7 @@ class ClickHouseTuningMixin:
                 self.logger.info(
                     f"Applying clustering optimization to table {table_name} on columns: {', '.join(column_names)}"
                 )
-                connection.execute(f"OPTIMIZE TABLE {table_name} FINAL")
+                connection.execute(f"OPTIMIZE TABLE {physical_table} FINAL")
 
             # Log partitioning strategy (must be defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
