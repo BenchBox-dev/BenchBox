@@ -5,7 +5,7 @@
     "Every DataFusion cell matches SQL or carries an evidenced classification.",
     "The DataFusion cell is enforced in CI with the repeat-run check, its whole-gate time is measured, and a maintainer signs off."
   ],
-  "context": "2026-10-03 feasibility (develop 964bea289, SF 0.01, evidence/rev3/t27_datafusion_feasibility.md): 97/99 run, 76 match SQL. Fix branches A-E later merged as #2589, #2590 and #2591 (merge timestamps 18:08:25Z, 17:30:26Z and 18:35:54Z) or integrated locally (Q27, Q51, SQL NULL rank ordering, Q67 integer-cent rank).\nNative production-loader evidence: all 103 TPC-DS statements matched unchanged SQL at SF 0.01, seed None, Power stream 0, measured at 1c907573d (runtime equal to integration bb366108020e2358d40e7fc0fb06f68d77e0f6a1); report /tmp/df103-production-final-report.md, results SHA256 d988cdf79ae72721b1bba86f7f6373debe59826b68d6407972e2eb5a2b411704.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): DataFusion is part of the enforced TPC-DS gate prepared in commit 2363f2f4b (backends expression, pandas, datafusion; CI step make tpcds-cross-surface-equivalence-report runs Polars and DataFusion). Gate at HEAD: DataFusion 70 nonvacuous of 103, 0 divergent. All four draws with --repeats 2 clean on DataFusion. SF 1 qualification at 94a6ab351: DataFusion DataFrame-to-SQL 103/103. Q36/Q86 subtotal order was wrong on DataFusion too and is fixed (c81944d96). Local Linux ARM64 gate timing for DataFusion 7.2-8.0 s over three runs. Remaining: hosted Ubuntu receipts, maintainer sign-off, publication.",
+  "context": "2026-10-03 feasibility (develop 964bea289, SF 0.01, evidence/rev3/t27_datafusion_feasibility.md): 97/99 run, 76 match SQL. Fix branches A-E later merged as #2589, #2590 and #2591 (merge timestamps 18:08:25Z, 17:30:26Z and 18:35:54Z) or integrated locally (Q27, Q51, SQL NULL rank ordering, Q67 integer-cent rank).\nNative production-loader evidence: all 103 TPC-DS statements matched unchanged SQL at SF 0.01, seed None, Power stream 0, measured at 1c907573d (runtime equal to integration bb366108020e358d40e7fc0fb06f68d77e0f6a1); report /tmp/df103-production-final-report.md, results SHA256 d988cdf79ae72721b1bba86f7f6373debe59826b68d6407972e2eb5a2b411704.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): DataFusion is part of the enforced TPC-DS gate prepared in commit 2363f2f4b (backends expression, pandas, datafusion; CI step make tpcds-cross-surface-equivalence-report runs Polars and DataFusion). Gate at HEAD: DataFusion 70 nonvacuous of 103, 0 divergent. All four draws with --repeats 2 clean on DataFusion. SF 1 qualification at 94a6ab351: DataFusion DataFrame-to-SQL 103/103. Q36/Q86 subtotal order was wrong on DataFusion too and is fixed (c81944d96). Local Linux ARM64 gate timing for DataFusion 7.2-8.0 s over three runs. Remaining: hosted Ubuntu receipts, maintainer sign-off, publication.\n\n2026-10-04 closeout: Delivered in #2612: native DataFusion is enforced with Polars in the required correctness-gate step (14/17/18 s hosted).",
   "description": "Owner decision D6 (2026-10-03) puts DataFusion in the parity goal. Today the cross-surface gate runs the expression family on Polars only (DATAFRAME_BACKENDS = (\"expression\", \"pandas\") in benchbox/core/equivalence/dataframe_surface.py). benchbox/platforms/dataframe/datafusion_df.py exists. First establish whether the 99 TPC-DS expression implementations run on DataFusion, then add a DataFusion cell to the gate and enforce it.",
   "sessions": [
     {
@@ -54,6 +54,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "d7f27e4263644a398b59c3e71432568d",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:31:52Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9f6b17366ed74e498340f761eb9b194f",
       "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
