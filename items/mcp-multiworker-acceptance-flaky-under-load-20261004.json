@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Either a reproduction and a fix with a test, or a recorded failed reproduction (N runs under load) and the item closed as not reproducible."
+  ],
+  "context": "Source: local full-suite run during PR #2625 verification (2026-10-04). Related existing flake items: flaky-bigquery-credential-defaults-confirm-prompt.",
+  "description": "## Problem (one observation; weak evidence)\nDuring a full `pytest -m fast` run on a developer machine that was running several other test sessions, `tests/integration/mcp/test_multiworker_acceptance.py::test_remote_contract_survives_alternating_workers` failed. It passed when run alone immediately afterwards (29 s), and the same suite later passed. It has not been seen failing in CI. The cause is unknown (timing, port or worker reuse under load are guesses).\n\n## Change\nReproduce under artificial load (parallel runs); if it reproduces, find the timing assumption and fix or bound it; if it does not, close with the reproduction attempt recorded.\n\n## Guardrails (must preserve)\n- The test keeps its alternating-worker coverage.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "tests/integration/mcp/test_multiworker_acceptance.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:57:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "81abab43721d48a48d24995d87b24649",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
