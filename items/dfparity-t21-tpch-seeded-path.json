@@ -6,7 +6,7 @@
     "Findings are presented to the owner with a recommendation and a named remediation item; no TPC-H code is changed without the owner's decision (D5)",
     "The stale set_parameter_overrides docstring and the 'stream 0' comment are corrected only if the owner agrees"
   ],
-  "context": "2026-10-03: investigation complete (evidence/rev3/t21_tpch_findings.md, develop 964bea289). Gap confirmed and independently spot-checked: the answer files match qgen -d, not TPCH_SF1_REFERENCE_SEED (Q11 1048 vs 1469 rows, Q18 57 vs 9, Q20 186 vs 188). Seeded DataFrame runs ignore the seed (22/22 parameters differ from SQL at seed 17039360) and are still labelled answer-file valid. Throughput bindings differ at 65 of 66 positions. Remediation item: tpch-df-seed-parity, awaiting owner sign-off (D9). Closes when the owner has seen the findings; the stale comments are fixed only under that item.",
+  "context": "2026-10-03: investigation complete (evidence/rev3/t21_tpch_findings.md, develop 964bea289). Gap confirmed and independently spot-checked: the answer files match qgen -d, not TPCH_SF1_REFERENCE_SEED (Q11 1048 vs 1469 rows, Q18 57 vs 9, Q20 186 vs 188). Seeded DataFrame runs ignore the seed (22/22 parameters differ from SQL at seed 17039360) and are still labelled answer-file valid. Throughput bindings differ at 65 of 66 positions. Remediation item: tpch-df-seed-parity, awaiting owner sign-off (D9). Closes when the owner has seen the findings; the stale comments are fixed only under that item.\n\n2026-10-04 closeout: Resolved by tpch-df-seed-parity: #2595 and #2604 (merged) make qgen -d the answer-file parameter set and bind seeded DataFrame runs.",
   "description": "The project owner does not accept earlier reviewers' TPC-H claims, so this item starts from facts I tested or verified and changes nothing without an owner decision. Tested with the bundled qgen on Q3: -d gives BUILDING / 1995-03-15; -r 17039360 (TPCH_SF1_REFERENCE_SEED, benchbox/core/tpch/benchmark.py:31-47, commented as the seed the official answer files used) gives HOUSEHOLD / 1995-03-24; -r 101000000 gives BUILDING / 1995-03-31. Verified: _tpch_reference_context (benchbox/core/dataframe/query_validation.py:209-215) returns true at SF=1 when the seed is None or equals the reference seed, and DataFrame runs bind the -d defaults. Also verified: the unseeded path is aligned by design (code comments; extracted qgen -d parameters equal get_tpch_parameters for all 22 queries at SF=1 and SF=0.01) and no production caller injects seed-derived TPC-H overrides (set_parameter_overrides docstring is stale). Not verified: a seeded end-to-end run, throughput-test seed handling, the 'stream 0' comment at cross_surface.py:1684.",
   "sessions": [
     {
@@ -40,6 +40,14 @@
       "op": "update",
       "op_id": "2b5b1481fe3e4468b6005cd60b1235aa",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:36:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "496b4523b3b9463bbea4d3f673867757",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
