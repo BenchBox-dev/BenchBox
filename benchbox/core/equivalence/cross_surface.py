@@ -2271,6 +2271,14 @@ def _requires_live_divergence(entry: str | ClassifiedDivergence) -> bool:
     return entry.requires_live_divergence if isinstance(entry, ClassifiedDivergence) else True
 
 
+def _emit_report_lines(lines: list[str]) -> None:
+    from benchbox.utils.printing import get_console
+
+    output = get_console(quiet=False)
+    for line in lines:
+        output.print(line, markup=False, highlight=False, soft_wrap=True)
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
@@ -2374,14 +2382,15 @@ def _report(
         f"({total - executed} not implemented by the DataFrame surface, "
         f"{vacuous_executed} vacuous empty-vs-empty) - {len(divergences)} divergent"
     )
+    lines = []
     if vacuous:
-        print(f"  vacuous queries: {len(vacuous) - len(all_null)} zero-row, {len(all_null)} single all-NULL row")
+        lines.append(f"  vacuous queries: {len(vacuous) - len(all_null)} zero-row, {len(all_null)} single all-NULL row")
         if not enforce_vacuity:
-            print(
+            lines.append(
                 "  vacuity is classified for the default parameter draw only; this draw lists it without failing: "
                 f"{vacuous}"
             )
-    print()
+    _emit_report_lines([*lines, ""])
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
     for divergence in sorted(divergences, key=lambda d: d.key):
@@ -2410,9 +2419,11 @@ def _report(
             f"legitimately_empty: {unclassified_empty} - make them discriminating or classify them with a rationale"
         )
     if stale_empty:
-        print(
-            f"GATE FAILURE - legitimately_empty entries whose reference now returns rows: {stale_empty} "
-            "- remove the stale classification in a reviewed change"
+        _emit_report_lines(
+            [
+                f"GATE FAILURE - legitimately_empty entries whose reference now returns rows: {stale_empty} "
+                "- remove the stale classification in a reviewed change"
+            ]
         )
     if resolved:
         print(
