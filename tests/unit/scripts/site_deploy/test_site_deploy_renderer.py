@@ -674,6 +674,17 @@ def test_visual_binding_records_the_verified_candidate_and_baseline(tmp_path: Pa
     )
 
 
+def test_visual_binding_without_a_receipted_generation_names_the_sphinx_precondition(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, candidate_tree, baseline_tree = _binding_inputs(tmp_path)
+    _write(out / "resolved.json", json.dumps({"release_tag": "v0.5.0", "release_sha": SHA_A, "deployed": None}))
+    args = ["visual-binding", "--out-dir", str(out), "--candidate", str(candidate_tree)]
+    assert cli.main([*args, "--baseline", str(baseline_tree)]) == 1
+    assert "deploy and receipt a Sphinx generation before switching" in capsys.readouterr().err
+    assert not (out / "visual-binding.json").exists()
+
+
 @pytest.mark.parametrize("tampered", ["candidate", "baseline"])
 def test_visual_binding_refuses_a_tree_that_differs_from_its_digest(tmp_path: Path, tampered: str) -> None:
     out, candidate_tree, baseline_tree = _binding_inputs(tmp_path)

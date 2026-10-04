@@ -62,7 +62,15 @@ Restore trunk's readiness or set `renderer: sphinx`.
 ### Cutover
 
 1. Cut a release from a tree that meets the list above. With the committed
-   `sphinx` policy this deploys as Sphinx, like any other release.
+   `sphinx` policy this deploys as Sphinx, like any other release. That deploy
+   is a precondition, not a formality: the first Astro deploy compares against
+   the deployed generation's artifact, so a receipted Sphinx generation must be
+   live before the switch. Without one, the pre-deploy visual comparison fails
+   (`no receipted production generation to compare the candidate with; deploy
+   and receipt a Sphinx generation before switching deploy/routes.yml to
+   renderer: auto`) and the Astro deploy cannot publish. Confirm the newest
+   `github-pages` deployment has a receipt before step 3. Trunk must also still
+   meet the list at the commit that will be deployed.
 2. Record the parity sign-off for that release (URL compatibility report and
    reviewed visual changes) in the cutover pull request.
 3. The owner's cutover pull request changes `renderer: sphinx` to
@@ -139,6 +147,18 @@ renderer change reports every capture as changed; with the same renderer, any
 changed capture fails until approved. The deploy job waits for this job and
 publishes only when it passed, or when it was skipped because it was not
 required. A deploy with no receipted production generation cannot pass it.
+
+The comparison is deliberately narrow. It covers two captures of release-sourced
+pages: `landing` (`/`) and `getting-started`
+(`/docs/usage/getting-started.html`). The other public-site captures
+(`release-overview`, one `/blog/` post, and `results`, `results-benchmarks` and
+`results-platforms` on `/results/`) are trunk-sourced, and the `Public-site
+visual regression` job in `ci.yml` covers them on every pull request that
+changes rendering, before it merges to trunk. No
+other page is compared before deploy: the layout of the remaining `/docs/`
+pages, the API reference, `/docs/dev/`, other blog posts, `/prompts/` and the
+Explorer views beyond those captures relies on the build, link, route and
+digest gates and on the parity sign-off recorded for the cutover release.
 
 Approval follows the exact-match rule of
 [the visual-change runbook](../development/results-explorer-browser-testing.md),

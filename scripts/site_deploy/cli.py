@@ -483,7 +483,10 @@ def command_visual_binding(args: argparse.Namespace) -> int:
     assembly = _read_json(args.out_dir / "route-assembly.json")
     baseline = (resolved.get("deployed") or {}).get("artifact_sha256")
     if not baseline:
-        raise artifacts.ArtifactError("no deployed artifact digest to bind the visual comparison to")
+        raise artifacts.ArtifactError(
+            "no deployed artifact digest to bind the visual comparison to; deploy and receipt a Sphinx "
+            "generation before switching deploy/routes.yml to renderer: auto"
+        )
     candidate = assembly["tree_sha256"]
     artifacts.verify_tree(args.candidate, candidate)
     artifacts.verify_tree(args.baseline, baseline)
