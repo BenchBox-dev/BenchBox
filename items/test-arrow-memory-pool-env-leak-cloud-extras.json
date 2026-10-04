@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The module that sets ARROW_DEFAULT_MEMORY_POOL is identified",
+    "The variable is set before the test session starts, or the guard allowlists it with a documented reason",
+    "Corpus unit tests pass in an environment with the cloud extras installed"
+  ],
+  "context": "Reproduced on 2026-10-04 in worktree BenchBox.wt-publish-validated-cloud-tpcdi (environment with cloud extras) against BenchBox.wt-throughput-runs (clean environment), both at develop 061fac04d. Contributors with the cloud extras installed see spurious local failures.",
+  "description": "In an environment with the cloud extras installed (Snowflake connector, thrift and others), `tests/unit/scripts/test_corpus_cohort_depth.py` errors at teardown with `test leaked process state past teardown (restored): env[ARROW_DEFAULT_MEMORY_POOL]`. Under xdist it hits the first test in each worker (5 errors); serially it hits one. The same tests pass (29/29) in an environment synced without the cloud extras. Some import in the cloud dependency chain sets the variable the first time it loads, and the guard blames whichever test runs then.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:55:31Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "67d74b65ca49402d9cb0b741f5450d61",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}

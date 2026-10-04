@@ -19558,6 +19558,13 @@
       "status": "done",
       "title": "\"Technical Debt & Refactoring - COMPLETED ✅\""
     },
+    "test-arrow-memory-pool-env-leak-cloud-extras": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Unit tests trip the process-state leak guard on ARROW_DEFAULT_MEMORY_POOL when cloud extras are installed"
+    },
     "test-export-invalid-output-dir-assumes-non-root": {
       "claim": null,
       "needs": [],
