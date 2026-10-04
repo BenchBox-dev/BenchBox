@@ -1,56 +1,4 @@
 #!/usr/bin/env python3
-"""Daily observability signal for parked soundness-path PRs.
-
-Soundness-path PRs correctly never auto-merge (see
-``_project/scripts/auto_merge_soundness_paths.py`` and
-``.github/workflows/auto-merge-on-open.yml``: the owner must review and
-merge those PRs by hand). That withholding gate is intentional and this
-script does NOT touch it -- no auto-merge, no auto-approve, nothing that
-changes whether or how a PR can merge. What the gate does not do on its own
-is tell anyone a PR has been sitting there: #1116 and #1142 both sat parked
-for days with accumulating conflicts before anyone noticed. This script is
-the missing "someone should look at this" signal:
-
-- It classifies every OPEN PR targeting ``develop`` as qualifying for the
-  drain queue when ALL of the following hold:
-    (a) required-lane green  -- EVERY develop-ruleset required status
-        context in ``REQUIRED_CHECK_NAMES`` has its LATEST check run on the
-        PR's head SHA completed with conclusion ``success``. Today that is
-        ``ci-required-result``, ``tooling``, ``Results Explorer browser gate``,
-        ``ruleset-drift``, and ``Public-site visual acceptance``
-        (docs/operations/repo-admin-settings.md; live ruleset
-        develop-squash-only). Partial green -- one context success, another
-        red or never reported -- is NOT required-green; a missing run is
-        fail-closed not-green.
-    (b) awaiting the owner   -- auto-merge is OFF *and* (the PR touches a
-        soundness-critical path per ``SOUNDNESS_PREFIXES``, OR the owner is
-        a requested reviewer).
-    (c) parked > 24h          -- more than 24 hours of park time (anchored
-        on the LAST required context to finish, NOT ``updated_at``: the label
-        writes below and ordinary human comments bump ``updated_at``, and a
-        gate based on it would flap a genuinely parked PR out of the queue).
-- The only mutations it ever performs (and only under ``--apply``) are:
-    1. adding/removing the ``awaiting-owner`` label to match the current
-       qualifying set, and
-    2. creating/updating ONE tracking issue (title "Soundness-PR drain
-       queue") with the current digest -- created/refreshed only while the
-       queue is non-empty; when the queue drains, an existing digest is
-       patched to the empty state exactly once, then left alone (silent).
-  It never merges, approves, or otherwise changes a PR's mergeability.
-
-Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the
-REST API). If neither is set but the ``gh`` CLI is on PATH, its token
-(``gh auth token``) is used instead -- this lets the script run locally
-against an interactively-authenticated ``gh`` without exporting a token by
-hand. No long-lived PAT is required or read from anywhere else.
-
-Usage:
-    uv run -- python _project/scripts/soundness_drain_report.py
-    uv run -- python _project/scripts/soundness_drain_report.py --json
-    uv run -- python _project/scripts/soundness_drain_report.py --apply
-    uv run -- python _project/scripts/soundness_drain_report.py --self-test
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -81,9 +29,6 @@ from required_lane import (  # noqa: E402
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 
-# The sole code owner today (mirrors .github/CODEOWNERS). Used to detect
-# "review requested from the owner" for non-soundness-path PRs that still
-# need the owner's eyes (e.g. a manual review request on a normal PR).
 OWNER_LOGIN = "joeharris76"
 
 DEFAULT_REPO = "BenchBox-dev/BenchBox"

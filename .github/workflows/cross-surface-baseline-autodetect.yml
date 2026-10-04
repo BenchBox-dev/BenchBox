@@ -22,15 +22,6 @@ name: Cross-Surface Baseline Auto-Prune
 # change and never prunes; this scheduled workflow is the ONLY path that ever
 # writes benchbox/core/equivalence/cross_surface_baseline.yaml.
 #
-# Soundness note: that YAML lives under benchbox/core/equivalence/**, a
-# CODEOWNERS soundness path (see _project/scripts/auto_merge_soundness_paths.py).
-# auto-merge-on-open.yml already refuses to enable auto-merge for any PR whose
-# diff touches that path, so the PR this workflow opens never auto-merges
-# regardless of which identity authors it - and this workflow additionally
-# never calls `gh pr merge --auto` itself. The maintainer reviews the diff
-# (which can only ever DROP a no-longer-reproducing entry - see the writer's
-# own contract in known_divergences_baseline.py) and merges by hand.
-#
 # Optional secret (never required for correctness, only for CI signal):
 #   CROSS_SURFACE_BASELINE_PR_TOKEN = a fine-grained PAT (this repo; contents +
 #     pull-requests: write) or GitHub App installation token.
@@ -164,9 +155,9 @@ jobs:
             echo "blocking PR gate (\`make <gate>-cross-surface-equivalence-report\`) never prunes -"
             echo "this scheduled workflow is the only path that writes this file."
             echo ""
-            echo "**This PR does not auto-merge.** \`benchbox/core/equivalence/**\` is a"
-            echo "soundness-critical CODEOWNERS path; review the diff (it can only ever REMOVE a"
-            echo "resolved entry - see the writer's own contract) and merge by hand."
+            echo "**Merge by hand after review.** \`benchbox/core/equivalence/**\` is a soundness"
+            echo "path, so \`oracle-review\` needs the Codex connector's review; check the diff (it"
+            echo "can only ever REMOVE a resolved entry - see the writer's own contract)."
             echo ""
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } > "${body_file}"
@@ -178,8 +169,6 @@ jobs:
             echo "PR #${existing} already open for ${PRUNE_BRANCH}; updating body."
             gh pr edit "${existing}" --body-file "${body_file}"
           fi
-          # Auto-merge is never enabled here, by design (soundness path) -
-          # regardless of which token authored this PR.
 
       - name: No changes
         if: steps.diff.outputs.changed == 'false'
