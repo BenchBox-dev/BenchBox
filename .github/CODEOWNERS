@@ -51,6 +51,7 @@ results-data/bundles/**/*.override.json @joeharris76
 .github/workflows/publication-transaction.yml @joeharris76
 .github/workflows/publication-recover.yml @joeharris76
 .github/workflows/publication-canaries.yml @joeharris76
+.github/workflows/site-deploy.yml @joeharris76
 scripts/publication/verify_lane_isolation.py @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
@@ -71,6 +72,8 @@ AGENTS.md @joeharris76
 .github/PULL_REQUEST_TEMPLATE.md @joeharris76
 .github/soundness-paths.txt @joeharris76
 _project/scripts/soundness_paths.py @joeharris76
+_project/scripts/oracle_review_check.py @joeharris76
+.github/workflows/oracle-review.yml @joeharris76
 _project/scripts/check_soundness_review.py @joeharris76
 .github/workflows/ci.yml @joeharris76
 .github/ci-units.yml @joeharris76
@@ -91,6 +94,8 @@ _project/scripts/auto_merge_soundness_paths.py @joeharris76
 scripts/check_decision_records.py @joeharris76
 publication/** @joeharris76
 scripts/publication/** @joeharris76
+scripts/site_deploy/** @joeharris76
+deploy/** @joeharris76
 benchbox/_binaries/** @joeharris76
 benchbox/utils/binary_manifest.py @joeharris76
 scripts/bundled_binary_manifest.py @joeharris76
@@ -106,3 +111,5 @@ scripts/run_comment_policy.py @joeharris76
 scripts/comment_payloads.py @joeharris76
 scripts/comment_execution.py @joeharris76
 scripts/comment_policy_entry.py @joeharris76
+_project/scripts/soundness_merge_digest.py @joeharris76
+.github/workflows/soundness-merge-digest.yml @joeharris76

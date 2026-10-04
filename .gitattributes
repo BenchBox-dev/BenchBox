@@ -1,9 +1,4 @@
 
-# Append-only bump log for the fast-lane test-count ceiling: two branches
-# each appending a dated entry should compose cleanly on merge instead of
-# conflicting on adjacent lines. See _project/config/fast_lane_ceiling_log.md.
-/_project/config/fast_lane_ceiling_log.md merge=union
-
 # The corpus is compared byte-for-byte against what the Explorer publishes, and
 # the publisher always emits LF (canonical_json_bytes). Without this, a Windows
 # checkout with core.autocrlf=true rewrites every multi-line bundle to CRLF, so

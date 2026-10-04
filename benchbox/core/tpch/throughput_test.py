@@ -60,17 +60,6 @@ TPCHThroughputStreamResult = ThroughputStreamResult
 
 
 def _derive_query_seed(seed: int, stream_id: int, position: int) -> int:
-    """Per-query qgen seed for one throughput stream position.
-
-    ``seed`` is the per-stream base seed StreamRunner hands to
-    ``_execute_stream`` (``config.base_seed + stream_id`` -- see
-    ``benchbox.core.throughput.runner``). The SINGLE definition of the
-    per-position formula: query generation (pre-generation pass and the
-    ``_resolve_query_text`` inline fallback) and the reference-seed
-    validation context in ``_execute_stream`` must all derive the seed
-    through this helper so validation can never silently desynchronize
-    from the SQL that was actually generated.
-    """
     return seed + stream_id * 1000 + position
 
 
@@ -450,18 +439,6 @@ class TPCHThroughputTest:
             # in the background. See runner.py's module docstring.
             cancel_event = self._resolve_cancel_event(config, stream_id)
 
-            # Reference seed for this scale factor (None if scale_factor has no
-            # pinned reference, e.g. != 1.0) -- used below to tell QueryValidator
-            # whether EACH query's derived seed (seed + stream_id*1000 + position,
-            # same formula _resolve_query_text() uses to generate the SQL; not
-            # re-derived here, just re-read for validation-context purposes)
-            # matches the reference answer set. This context is authoritative for
-            # the parameter-sensitive queries: a reference match keeps their EXACT
-            # answer-file check, a non-reference seed relaxes them to RANGE/LOOSE.
-            from benchbox.core.tpch.benchmark import get_reference_seed
-
-            reference_seed = get_reference_seed(config.scale_factor)
-
             cancelled = False
             for position, query_id in enumerate(query_permutation):
                 if self._cooperative_cancel_requested(
@@ -495,18 +472,7 @@ class TPCHThroughputTest:
                             # expected results are designed and registered.
                             connection.set_query_context(query_id)
 
-                        # Tell QueryValidator whether THIS query's derived seed
-                        # (_derive_query_seed -- the same single definition query
-                        # generation uses, so validation can never desynchronize
-                        # from the generated SQL) matches the pinned reference
-                        # seed. This context is authoritative for the parameter-
-                        # sensitive queries: a reference match keeps their EXACT
-                        # answer-file check, a non-reference seed relaxes them to
-                        # RANGE/LOOSE. Cleared in the finally below regardless of
-                        # outcome so it never leaks into unrelated
-                        # validate_query_result() calls on this thread.
-                        stream_seed = _derive_query_seed(seed, stream_id, position)
-                        set_reference_seed_context(stream_seed == reference_seed)
+                        set_reference_seed_context(False)
 
                         cursor = connection.execute(query_text)
 

@@ -35,7 +35,6 @@ docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md::_project/DON
 docs/operations/release-guide.md::_project/TODO/main/active/release-recovery-v0-3-1.yaml
 docs/operations/uat-framework.md::_project/release-evidence/uat-gate-summary.json
 docs/reference/public-contracts.md::_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
-make/inventory.json::_project/cross-surface-baseline-autodetect/summary.json
 make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.json
 results-explorer/src/lib/starterQueries.ts::_project/TODO/.../explorer-canonical-browser-duckdb-read-model.yaml
 scripts/phase2_metrics.py::_project/handoffs/review.md
@@ -46,7 +45,6 @@ tests/uat/gate_summary.py::_project/release-evidence/uat-gate-summary.json
 tests/unit/core/tpcds/test_tpcds_stdout_datagen.py::_project/DONE/tpcds-stdout-fix/patch-tpcds-source-stdout.yaml
 tests/unit/core/tpchavoc/test_tpchavoc_review_by.py::_project/TODO/main/planning/equivalence-waiver-expiry-policy.yaml
 tests/unit/core/tpchavoc/test_tpchavoc_vacuity_guard.py::_project/TODO/main/planning/tpchavoc-duckdb-gate-vacuity-guard.yaml
-tests/unit/platforms/dataframe/test_unified_frame_datafusion_ast.py::_project/TODO/main/planning/unified-frame-error-parsing-hardening.yaml
 tests/unit/scripts/test_e2e_specs_have_no_hardcoded_ids.py::_project/audits/results-explorer-usability-20260507.md
 tests/unit/scripts/test_pr_review_followups.py::_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml
 tests/unit/scripts/test_shrink_rollup.py::_project/shrink-ledger/cli.md

@@ -114,12 +114,12 @@ class TestTPCDSQueryRegistry:
             assert query.pandas_impl is not None, f"{query.query_id} missing pandas impl"
 
     def test_registry_callable_fingerprint(self):
-        """Fingerprint query IDs and callable names before generated-query shrink work."""
         from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES, queries as query_module
 
-        queries = sorted(TPCDS_DATAFRAME_QUERIES.get_all_queries(), key=lambda query: int(query.query_id[1:]))
+        queries = sorted(TPCDS_DATAFRAME_QUERIES.get_all_queries(), key=lambda query: query.query_id)
 
-        assert [query.query_id for query in queries] == [f"Q{query_id}" for query_id in range(1, 100)]
+        expected_ids = [f"Q{query_id}" for query_id in range(1, 100)] + ["Q14b", "Q23b", "Q24b", "Q39b"]
+        assert [query.query_id for query in queries] == sorted(expected_ids)
         for query in queries:
             assert QueryCategory.TPCDS in query.categories, f"{query.query_id} missing TPCDS category"
             normalized_id = query.query_id[1:].lower()

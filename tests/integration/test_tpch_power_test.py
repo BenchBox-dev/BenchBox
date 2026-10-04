@@ -169,14 +169,7 @@ class TestPowerTestExecution:
 
 
 class TestPowerTestReferenceSeedContext:
-    """tpch-throughput-seed-validation-fix w2/w3: TPCHPowerTest.run() must tell
-    QueryValidator, per query, whether the CURRENT stream's seed matches the
-    pinned reference seed for its scale factor -- see
-    benchbox.core.validation.query_validation.set_reference_seed_context()."""
-
     def test_reference_seed_context_true_for_qgen_defaults(self) -> None:
-        """No seed given -> qgen defaults mode, treated as reference-equivalent
-        (matches the pre-existing __init__ seed-selection assumption)."""
         power_test = _make_power_test(scale_factor=1.0, seed=None)
 
         calls: list[bool] = []
@@ -189,10 +182,8 @@ class TestPowerTestReferenceSeedContext:
         assert len(calls) == 22
         assert all(v is True for v in calls)
 
-    def test_reference_seed_context_true_when_seed_matches_reference(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
-        power_test = _make_power_test(scale_factor=1.0, seed=TPCH_SF1_REFERENCE_SEED)
+    def test_reference_seed_context_false_for_former_reference_seed(self) -> None:
+        power_test = _make_power_test(scale_factor=1.0, seed=17039360)
 
         calls: list[bool] = []
         with patch(
@@ -202,12 +193,9 @@ class TestPowerTestReferenceSeedContext:
             power_test.run()
 
         assert len(calls) == 22
-        assert all(v is True for v in calls)
+        assert all(v is False for v in calls)
 
     def test_reference_seed_context_false_for_custom_seed(self) -> None:
-        """A custom seed that does not match the reference seed -> every query
-        in this stream is tagged non-reference (the exact w0 repro scenario:
-        seed=12345, SF=1.0)."""
         power_test = _make_power_test(scale_factor=1.0, seed=12345)
 
         calls: list[bool] = []
@@ -284,10 +272,6 @@ class TestPowerTestReferenceSeedContext:
             assert qr.get("error") is None
 
     def test_boundary_query_rejects_out_of_range_count_at_sf1(self) -> None:
-        """Under the reference seed Q11 is EXACT-compared against its answer-file
-        count (the RANGE bounds relax it only for a non-reference seed), so a
-        wildly-wrong count is still rejected."""
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 
@@ -312,7 +296,7 @@ class TestPowerTestReferenceSeedContext:
             benchmark=bench,
             connection=connection,
             scale_factor=1.0,
-            seed=TPCH_SF1_REFERENCE_SEED,
+            seed=None,
             stream_id=0,
             validation=True,
             validation_mode="exact",

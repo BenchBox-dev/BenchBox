@@ -27,6 +27,9 @@ Four pandas implementations (Q5, Q77, Q80, Q88) do not run to completion against
 dead-key result is a lower bound. The classification lists below may only shrink: a query that becomes
 ``a`` fails as an unexpected pass until it is removed.
 
+The inventory reads the defaults file, not the adapters, so it is a diagnostic. Whether an adapter binds
+everything the SQL and the implementation use is checked in ``test_parameter_binding_coverage.py``.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
@@ -55,21 +58,16 @@ pytestmark = [
 ]
 
 # Queries whose implementations read a key missing from the defaults file (literal fallback).
-LITERAL_FALLBACK = frozenset({8, 10, 21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91})
+LITERAL_FALLBACK: frozenset[int] = frozenset()
 
 # Implementations that do not run to completion against the stand-in context.
-INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
+INCOMPLETE_RUNS = frozenset({"5:pandas"})
 
 # Category (c): the implementation cannot take the draw (it reads one value, or none).
-HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
+HARD_CODED: frozenset[int] = frozenset()
 
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
-BINDING_GAP = frozenset(
-    {
-        1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
-        49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
-    }
-)  # fmt: skip
+BINDING_GAP: frozenset[int] = frozenset()
 
 # The gate in the inventory's work item: more hard-coded queries than this makes the adapter work a
 # separate program.
@@ -77,14 +75,21 @@ HARD_CODED_BUDGET = 15
 
 _DEFINE = re.compile(r"define\s+(\w+)\s*=\s*(.*?);", re.S)
 _TOKEN = re.compile(r"\[(\w+?)(?:\.(\d+))?\]")
-_ABBREVIATIONS = {"ES": ["education"], "MS": ["marital"], "GEN": ["gender"], "CC": ["category"], "SMC": ["carrier"]}
+_ABBREVIATIONS = {
+    "ES": ["education"],
+    "MS": ["marital"],
+    "GEN": ["gender"],
+    "CC": ["category"],
+    "SMC": ["carrier"],
+    "HOUR": ["dep"],
+}
 
 
 class _Stub:
     """Stands in for any frame, column or expression: every operation returns another stub."""
 
     def __getattr__(self, name: str) -> Any:
-        if name.startswith("__") and name.endswith("__"):
+        if name == "npartitions" or (name.startswith("__") and name.endswith("__")):
             raise AttributeError(name)
         return _Stub()
 
@@ -192,8 +197,9 @@ def _matching_keys(name: str, keys: list[str]) -> list[str]:
     return found
 
 
-def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set[str]], set[str]]:
-    """Which dsqgen names reach the SQL: (indices used per name, derived flag, names inside defines, body names)."""
+def _template_usage(
+    text: str, logged_names: frozenset[str] = frozenset()
+) -> tuple[dict[str, set[int]], bool, dict[str, set[str]], set[str]]:
     text = re.sub(r"--[^\n]*", "", text)
     defines = {match.group(1): match.group(2) for match in _DEFINE.finditer(text)}
     body = _DEFINE.sub("", text)
@@ -208,7 +214,7 @@ def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set
     while changed:  # a define used by the SQL makes the names inside it used too
         changed = False
         for name, expression in defines.items():
-            if name in used:
+            if name in used and name not in logged_names:
                 before = {key: set(value) for key, value in used.items()}
                 note(expression)
                 changed = changed or before != {key: set(value) for key, value in used.items()}
@@ -221,12 +227,29 @@ def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set
     return used, derived, inside_defines, body_names
 
 
+def _group_lettered_names(logged: collections.Counter, used: dict[str, set[int]], body_names: set[str]) -> None:
+    lettered: dict[str, list[str]] = collections.defaultdict(list)
+    for name in list(used):
+        match = re.fullmatch(r"(\w+)_[A-H]", name)
+        if match and logged[name] == 1:
+            lettered[match.group(1)].append(name)
+    for base, members in lettered.items():
+        if len(members) < 2 or base in logged:
+            continue
+        logged[base] = len(members)
+        used[base] = set(range(1, len(members) + 1))
+        for member in members:
+            del used[member]
+        if body_names.intersection(members):
+            body_names.add(base)
+
+
 def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) -> tuple[set[str], bool]:
-    """Run one implementation against the stand-in and return the parameter keys it read."""
     import pandas as pd
 
     import benchbox.core.dataframe.benchmark_suite  # noqa: F401  (import order guard)
-    from benchbox.core.tpcds.dataframe_queries import get_tpcds_query, queries as query_module
+    from benchbox.core.tpcds.dataframe_queries import get_tpcds_query, queries as query_module, rollup_helper
+    from benchbox.core.tpcds.dataframe_queries.parameter_adapters import ADAPTERS
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDSParameters
 
     read: set[str] = set()
@@ -238,7 +261,12 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
 
     original_get_parameters = query_module.get_parameters
     original_to_datetime = pd.to_datetime
+    original_rollup = query_module._sales_returns_rollup_pandas
+    original_expand_rollup = rollup_helper.expand_rollup_pandas
     query_module.get_parameters = lambda qid: Recorder(query_id=qid, params=dict(defaults.get(qid, {})))
+    if query_id in ADAPTERS:
+        query_module._sales_returns_rollup_pandas = lambda ctx, combined: _Stub()
+        rollup_helper.expand_rollup_pandas = lambda *args, **kwargs: _Stub()
     pd.to_datetime = lambda value, *args, **kwargs: (
         _Stub() if isinstance(value, _Stub) else original_to_datetime(value, *args, **kwargs)
     )
@@ -248,10 +276,14 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
     outer_delay, outer_interval = signal.setitimer(signal.ITIMER_REAL, 0)
     complete = True
     try:
-        query = get_tpcds_query(f"Q{query_id}")
-        implementation = query.expression_impl if family == "expression" else query.pandas_impl
-        signal.setitimer(signal.ITIMER_REAL, _RUN_SECONDS, _RETRY_SECONDS)
-        implementation(_Stub())
+        implementations = [get_tpcds_query(f"Q{query_id}")]
+        second_statement = get_tpcds_query(f"Q{query_id}b")
+        if second_statement is not None:
+            implementations.append(second_statement)
+        for query in implementations:
+            implementation = query.expression_impl if family == "expression" else query.pandas_impl
+            signal.setitimer(signal.ITIMER_REAL, _RUN_SECONDS, _RETRY_SECONDS)
+            implementation(_Stub())
     except Exception:  # noqa: BLE001 - a partial read is still evidence; completeness is reported
         complete = False
     finally:
@@ -261,11 +293,15 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
             remaining = max(outer_delay - elapsed_seconds(started), 0.001)
             signal.setitimer(signal.ITIMER_REAL, remaining, outer_interval)
         query_module.get_parameters = original_get_parameters
+        query_module._sales_returns_rollup_pandas = original_rollup
+        rollup_helper.expand_rollup_pandas = original_expand_rollup
         pd.to_datetime = original_to_datetime
     return read, complete
 
 
 def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) -> QueryInventory:
+    from benchbox.core.tpcds.dataframe_queries.parameter_adapters import ADAPTERS
+
     result = QueryInventory(query_id)
     for family in ("expression", "pandas"):
         keys, complete = _read_keys(query_id, family, defaults)
@@ -278,7 +314,8 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
 
     logged = collections.Counter(key.rsplit(".", 1)[0] for key in dsqgen.generate_parameter_log(query_id).substitutions)
     template = (dsqgen.templates_dir / f"query{query_id}.tpl").read_text(encoding="utf-8", errors="replace")
-    used, result.derived, inside_defines, body_names = _template_usage(template)
+    used, result.derived, inside_defines, body_names = _template_usage(template, frozenset(logged))
+    _group_lettered_names(logged, used, body_names)
     consumed = sorted(result.consumed)
     matched = {name: _matching_keys(name, consumed) for name in logged if name in used}
 
@@ -308,8 +345,12 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
             continue
         if takes_a_list:
             # The implementation passes a list through (for example to is_in), so it can take every value the
-            # SQL uses; only the binding data is short, which is adapter work, not a code change.
-            result.data_shortfall.append(f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults")
+            # SQL uses; only the binding data is short, which is adapter work, not a code change. A query
+            # with an adapter takes its list from dsqgen, so the defaults file being short no longer matters.
+            if query_id not in ADAPTERS:
+                result.data_shortfall.append(
+                    f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults"
+                )
         else:
             result.shortfall.append(f"{name}: {len(used[name])} values reach the SQL, the implementation reads one")
 
@@ -350,8 +391,33 @@ def test_incomplete_runs_are_the_known_ones(inventory):
     assert incomplete <= INCOMPLETE_RUNS
 
 
-def test_literal_fallback_queries_are_the_known_fifteen(inventory):
+def test_literal_fallback_queries_are_the_known_ones(inventory):
     assert {entry.query_id for entry in inventory.values() if entry.fallback} == LITERAL_FALLBACK
+
+
+def test_lettered_names_count_as_one_list():
+    from benchbox.core.tpcds.c_tools import DSQGenBinary, TPCDSError
+
+    try:
+        dsqgen = DSQGenBinary()
+    except (TPCDSError, FileNotFoundError, RuntimeError) as exc:
+        pytest.skip(f"dsqgen binary or templates unavailable: {exc}")
+    logged = collections.Counter(key.rsplit(".", 1)[0] for key in dsqgen.generate_parameter_log(16).substitutions)
+    template = (dsqgen.templates_dir / "query16.tpl").read_text(encoding="utf-8", errors="replace")
+    used, _, _, body_names = _template_usage(template, frozenset(logged))
+    _group_lettered_names(logged, used, body_names)
+    assert used["COUNTY"] == {1, 2, 3, 4, 5}
+    assert logged["COUNTY"] == 5
+    assert "COUNTY_A" not in used
+    assert "COUNTYNUMBER" not in used
+
+
+def test_both_statements_count():
+    template = (
+        "define COLOR=ulist(dist(colors,1,1),2);\nselect 1 where c = '[COLOR.1]';\nselect 2 where c = '[COLOR.2]';"
+    )
+    used, _, _, _ = _template_usage(template)
+    assert used["COLOR"] == {1, 2}
 
 
 def test_derived_value_flag_marks_arithmetic_on_a_drawn_value(inventory):

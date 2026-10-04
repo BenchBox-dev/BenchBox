@@ -88,12 +88,16 @@ Q66|Web/Catalog Warehouse Monthly Sales|Union of web and catalog sales aggregate
 Q8|Store Sales Zip Code Net Profit|Analyzes store net profit filtered by preferred customer zip codes|M,A,Q,T
 Q9|Store Sales Quantity Bucket Analysis|Computes conditional averages across quantity buckets|A,N,T
 Q14|Cross-channel Item Sales|Finds items sold across all channels with ROLLUP aggregation|M,A,N,T
+Q14b|Cross-channel Item Sales Week over Week|Compares one week of store sales of cross-channel items with the same week a year earlier|M,A,N,T
 Q23|Frequent Items Best Customers|Sum of catalog+web sales for frequent items by best customers|M,A,Q,T
+Q23b|Frequent Items Best Customers by Name|Catalog+web sales of frequent items to the best customers, per customer name|M,A,Q,T
 Q24|Store Sales Returns by Color|Store sales with returns filtered by market and color threshold|M,A,Q,T
+Q24b|Store Sales Returns by Second Color|Store sales with returns filtered by market and the second color threshold|M,A,Q,T
 Q28|Store Sales Quantity Bucket Extended|Extended price analysis across 6 quantity buckets with filters|A,N,T
 Q88|Store Sales Time Period Counts|Counts store sales by 8 half-hour time periods with demographics|M,A,N,T
 Q21|Inventory Before/After Date|Compares inventory quantities before and after a specific date by warehouse|M,A,N,T
 Q22|Inventory ROLLUP by Product|Analyzes inventory with ROLLUP by product name, brand, class, category|M,A,N,T
 Q39|Inventory Variance Monthly|Compares inventory variance (coefficient of variation) across consecutive months|M,A,N,T
+Q39b|Inventory Variance Monthly High Variation|Q39 restricted to first-month coefficients of variation above 1.5|M,A,N,T
 Q64|Cross-Sales Income Band|Complex cross-sales analysis with income band filtering and year-over-year comparison|M,A,Q,N,T
 Q84|Customer Income Band Lookup|Customer lookup filtered by city and income band with store returns|M,Q,T

@@ -1,0 +1,262 @@
+# Python API Reference
+
+```{tags} reference, python-api
+```
+
+Complete reference for BenchBox's Python API, covering benchmarks, platform adapters, results, and utilities.
+
+## Overview
+
+BenchBox provides a comprehensive Python API for programmatic benchmark execution. The API is organized into several layers:
+
+- **Benchmark Layer**: Abstract interfaces and concrete benchmark implementations
+- **Platform Layer**: Database-specific adapters for query execution
+- **Results Layer**: Structured result objects and validation
+- **Utilities Layer**: Helper functions for common operations
+
+## Quick Start
+
+Basic benchmark execution:
+
+```python
+from benchbox.tpch import TPCH
+from benchbox.platforms.duckdb import DuckDBAdapter
+
+# Create benchmark and platform
+benchmark = TPCH(scale_factor=0.1)
+adapter = DuckDBAdapter()
+
+# Run benchmark
+results = benchmark.run_with_platform(adapter)
+
+# Access results
+print(f"Completed {results.successful_queries} queries")
+print(f"Average time: {results.average_query_time:.3f}s")
+```
+
+## API Organization
+
+### Core APIs
+
+```{toctree}
+:maxdepth: 1
+
+base
+benchmarks
+results
+result-analysis
+```
+
+### Platform Adapters
+
+```{toctree}
+:maxdepth: 1
+
+platforms/duckdb
+platforms/datafusion
+platforms/sqlite
+platforms/clickhouse
+platforms/databricks
+platforms/bigquery
+platforms/snowflake
+platforms/redshift
+```
+
+### Utilities
+
+```{toctree}
+:maxdepth: 1
+
+cloud-storage
+data-validation
+utilities-index
+additional-utilities
+```
+
+### Performance & Monitoring
+
+```{toctree}
+:maxdepth: 1
+
+performance-monitoring
+tuning
+```
+
+## Common Patterns
+
+### Data Generation
+
+```python
+from benchbox.tpcds import TPCDS
+
+# Generate data at specific scale
+benchmark = TPCDS(scale_factor=1.0, output_dir="./tpcds_data")
+data_files = benchmark.generate_data()
+
+# Reuse generated data
+benchmark2 = TPCDS(scale_factor=1.0, output_dir="./tpcds_data")
+# Skip regeneration if data exists
+```
+
+### Query Access
+
+```python
+from benchbox.tpch import TPCH
+
+benchmark = TPCH(scale_factor=0.1)
+
+# Get all queries
+queries = benchmark.get_queries()
+
+# Get specific query
+q1 = benchmark.get_query("q1")
+
+# Get query with parameters
+q1_parameterized = benchmark.get_query("q1", params={"date": "1998-09-02"})
+```
+
+### Platform Execution
+
+```python
+from benchbox.clickbench import ClickBench
+from benchbox.platforms.clickhouse import ClickHouseAdapter
+
+# Initialize components
+benchmark = ClickBench(scale_factor=0.01)
+adapter = ClickHouseAdapter(
+    host="localhost",
+    port=9000,
+    database="benchmark"
+)
+
+# Run with platform optimizations
+results = benchmark.run_with_platform(
+    adapter,
+    query_subset=["Q1", "Q2", "Q3"]  # Optional filtering
+)
+```
+
+### Result Analysis
+
+```python
+from benchbox.core.results.models import BenchmarkResults
+
+# Load results from file
+results = BenchmarkResults.from_json_file("results.json")
+
+# Analyze query performance
+for qr in results.query_results:
+    if qr.status == "SUCCESS":
+        print(f"{qr.query_id}: {qr.execution_time:.3f}s")
+
+# Calculate geometric mean
+import math
+times = [qr.execution_time for qr in results.query_results
+         if qr.status == "SUCCESS"]
+geomean = math.prod(times) ** (1.0 / len(times))
+```
+
+### Cross-Platform Comparison
+
+```python
+from benchbox.tpch import TPCH
+from benchbox.platforms.duckdb import DuckDBAdapter
+from benchbox.platforms.clickhouse import ClickHouseAdapter
+
+benchmark = TPCH(scale_factor=1.0)
+
+platforms = {
+    "DuckDB": DuckDBAdapter(),
+    "ClickHouse": ClickHouseAdapter(host="localhost")
+}
+
+results = {}
+for name, adapter in platforms.items():
+    print(f"Running on {name}...")
+    results[name] = benchmark.run_with_platform(adapter)
+
+# Compare performance
+for name, result in results.items():
+    print(f"{name}: {result.total_execution_time:.2f}s")
+```
+
+### Error Handling
+
+```python
+from benchbox.tpch import TPCH
+from benchbox.platforms.duckdb import DuckDBAdapter
+
+try:
+    benchmark = TPCH(scale_factor=0.1)
+    adapter = DuckDBAdapter()
+    results = benchmark.run_with_platform(adapter)
+
+    # Check for query failures
+    if results.failed_queries > 0:
+        print(f"Warning: {results.failed_queries} queries failed")
+        for qr in results.query_results:
+            if qr.status == "FAILED":
+                print(f"  {qr.query_id}: {qr.error_message}")
+
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Execution error: {e}")
+```
+
+## Type Hints
+
+BenchBox provides comprehensive type hints for IDE support:
+
+```python
+from typing import Optional, Dict, Any, List
+from benchbox.base import BaseBenchmark
+from benchbox.core.results.models import BenchmarkResults
+
+def run_benchmark(
+    benchmark: BaseBenchmark,
+    adapter,
+    config: Optional[Dict[str, Any]] = None
+) -> BenchmarkResults:
+    """Run benchmark with type-checked parameters."""
+    return benchmark.run_with_platform(adapter, **(config or {}))
+```
+
+## Configuration Classes
+
+Platform adapters accept configuration via constructor parameters:
+
+```python
+# DuckDB configuration
+from benchbox.platforms.duckdb import DuckDBAdapter
+
+adapter = DuckDBAdapter(
+    database_path=":memory:",  # or file path
+    memory_limit="4GB",
+    thread_limit=4,
+    enable_profiling=True
+)
+
+# ClickHouse configuration
+from benchbox.platforms.clickhouse import ClickHouseAdapter
+
+adapter = ClickHouseAdapter(
+    host="localhost",
+    port=9000,
+    database="benchmark",
+    username="default",
+    password="",
+    settings={
+        "max_memory_usage": "8GB",
+        "max_threads": 8
+    }
+)
+```
+
+## See Also
+
+- {doc}`/reference/api-reference` - High-level API overview
+- {doc}`/concepts/architecture` - System architecture and design
+- {doc}`/concepts/workflow` - Common workflow patterns
+- {doc}`/usage/examples` - Code examples and snippets
+- {doc}`/usage/troubleshooting` - Common issues and solutions
