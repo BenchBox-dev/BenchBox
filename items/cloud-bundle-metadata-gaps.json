@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The BigQuery adapter records a validated cache-off receipt, the engine version where the API exposes one, and the region or location in the standard fields",
+    "The Snowflake adapter always records the region",
+    "TPC-DI results record a compliance_class",
+    "The result schema or validator documents which of these fields are required for cloud submissions"
+  ],
+  "context": "Surfaced by fact extraction across the TPC-DI, TPC-DS and ClickBench cloud bundles during the live-cloud publication (PRs #2602 and #2615).",
+  "description": "Published cloud bundles carry uneven provenance metadata:\n\n- BigQuery bundles have no `platform.compute.cache_control` receipt (only `cache_enabled=false` and `query_cache_enabled=false`), `platform.version` is `unknown`, and there is no `platform.cloud.region` (only `location: US`).\n- Snowflake bundles from September 2026 (for example ClickBench) have no region field.\n- TPC-DI bundles on every platform have no `benchmark.compliance_class`.\n- `execution.official` and `seed` are missing on unofficial bundles.\n\nDatabricks and the October Snowflake runs record validated cache-off receipts and regions. Without a receipt, a reader can't verify from the bundle that BigQuery runs were cache-off, and the corpus can't compare regions or engine versions.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:56:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a0395eef923143158a36240f00c9fe82",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}

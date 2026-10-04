@@ -2925,6 +2925,13 @@
       "status": "done",
       "title": "Extract a shared staged-load template method for redshift/snowflake (and evaluate bigquery/databricks)"
     },
+    "cloud-bundle-metadata-gaps": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Cloud result bundles omit cache receipts, versions, regions and compliance class on some platforms"
+    },
     "cloud-config-error-messages-give-broken-instructions": {
       "claim": null,
       "needs": [],
