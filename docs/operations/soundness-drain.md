@@ -7,14 +7,11 @@
 
 ## The signal, and what it is not
 
-Soundness-path PRs (see `_project/scripts/auto_merge_soundness_paths.py`'s
-`SOUNDNESS_PREFIXES`) correctly **never auto-merge**. The readiness
-transaction in `scripts/pr_landing.py` withholds squash auto-merge when a PR's
-diff touches the comparator/parser surface, the oracle-adjacent reference
-data, the `sql_compat` rule-dispatch core, or the gate machinery itself. That
-withholding is intentional — CI
-cannot catch a change that redefines the oracle it validates against, so
-those PRs must be reviewed and merged by hand.
+Soundness-path PRs (paths in `.github/soundness-paths.txt`) merge only after
+the required `oracle-review` check passes, which needs the Codex connector's
+review of the current head. CI cannot catch a change that redefines the oracle
+it validates against, so such a PR can sit green but unmergeable while it
+waits for that review.
 
 What the gate does not do on its own is tell anyone a PR is *waiting*. Two
 PRs (#1116, #1142) sat parked for days, accumulating merge conflicts,
