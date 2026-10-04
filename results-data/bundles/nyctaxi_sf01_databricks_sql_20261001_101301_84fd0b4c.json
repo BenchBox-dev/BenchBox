@@ -1,0 +1,1343 @@
+{
+  "benchmark": {
+    "id": "nyctaxi",
+    "name": "NYC Taxi OLAP",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "access_token": "<redacted>",
+      "catalog": "saved_config",
+      "disable_result_cache": "saved_config",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "http_path": "path_d969e086da79",
+      "last_updated": "saved_config",
+      "last_validated": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "schema": "schema_ea670f1f4924",
+      "server_hostname": "endpoint_2e7e15d76935",
+      "show_query_plans": "saved_config",
+      "staging_root": "path_d969e086da79",
+      "status": "saved_config",
+      "tuning_source": "saved_config",
+      "uc_catalog": "saved_config",
+      "uc_schema": "saved_config",
+      "uc_volume": "saved_config"
+    },
+    "platform_options": {
+      "access_token": "<redacted>",
+      "catalog": "workspace",
+      "disable_result_cache": true,
+      "force_recreate": false,
+      "force_upload": false,
+      "http_path": "path_beacdad47159",
+      "last_updated": "2025-10-11T14:30:03.989289",
+      "last_validated": "2025-10-11T14:30:05.407571",
+      "normalize_plan_literals": false,
+      "schema": "schema_d4060c7297f6",
+      "server_hostname": "endpoint_ff40a358924c",
+      "show_query_plans": false,
+      "staging_root": "path_4c2bf9a41230",
+      "status": "valid",
+      "tuning_source": "baseline",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc"
+    }
+  },
+  "cost": {
+    "model": "actual"
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 183.428,
+        "min": 158.829,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "serverless",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "databricks-sql-connector",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "4.5.0",
+    "driver_version_resolved": "4.5.0",
+    "entry_point": "cli",
+    "mode": "sql",
+    "timestamp": "2026-10-01T10:11:15.166365",
+    "translation": {
+      "attempt_count": 126,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 125,
+          "count": 125,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "databricks",
+          "parser_grammar": "postgres",
+          "scope": "workload_query",
+          "source_dialect": "netezza",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "databricks",
+          "translator": "sqlglot",
+          "unique_queries": 105
+        },
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "databricks",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "databricks",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "netezza",
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 126,
+      "target_dialects": [
+        "databricks"
+      ],
+      "total_transpilation_calls": 126,
+      "translators": [
+        "sqlglot"
+      ],
+      "unique_queries_translated": 105
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-10-01T10:13:01.634140",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "dbu",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "us-east-2",
+      "cluster_size": "1.0",
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": "2X-Small"
+    },
+    "normalized_cost_usd": null,
+    "pricing_region": "us-east-2"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 24471,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 57236,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 5778,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 1254,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "4.5.0",
+    "cloud": {
+      "collection_status": "partial",
+      "provider": "aws",
+      "region": "us-east-2",
+      "region_collection_status": "available",
+      "source": "inferred",
+      "workspace": "workspace_b084c65ce68b"
+    },
+    "compute": {
+      "auto_stop_mins": 10,
+      "cache_control": {
+        "cache_disabled": true,
+        "settings": {
+          "use_cached_result": "false"
+        },
+        "validated": true
+      },
+      "channel": "CHANNEL_NAME_CURRENT",
+      "collection_status": "available",
+      "delta_auto_compact": true,
+      "delta_auto_optimize": true,
+      "max_cluster_count": 1,
+      "min_cluster_count": 1,
+      "photon_enabled": true,
+      "result_cache_enabled": false,
+      "serverless": true,
+      "source": "observed",
+      "spot_instance_policy": "COST_OPTIMIZED",
+      "state": "RUNNING",
+      "warehouse": "warehouse_846d876a8d98",
+      "warehouse_id": "warehouse_bc5f5094a483",
+      "warehouse_metadata_collection_status": "available",
+      "warehouse_size": "2X-Small",
+      "warehouse_type": "SERVERLESS"
+    },
+    "config": {
+      "auto_terminate_minutes": 30,
+      "catalog": "workspace",
+      "connection_mode": "remote",
+      "databricks_clustering_strategy": "none",
+      "dbsql_version": "2026.36",
+      "delta_auto_compact": true,
+      "delta_auto_optimize": true,
+      "driver_package": "databricks-sql-connector",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "4.5.0",
+      "driver_version_resolved": "4.5.0",
+      "enable_delta_optimization": true,
+      "engine_version": "2026.36",
+      "engine_version_source": "current_version",
+      "execution_mode": "sql",
+      "host": "host_83a5a38255ca",
+      "http_path": "path_beacdad47159",
+      "hudi_table_type": "cow",
+      "liquid_clustering_enabled": false,
+      "r_build_hash": "7a8881535ee395968babb208dc8c00ebd4e0b547",
+      "region": "us-east-2",
+      "requested_databricks_clustering_strategy": "none",
+      "resolved_databricks_clustering_strategy": "none",
+      "result_cache_enabled": false,
+      "schema": "schema_f8b9e66c59c6",
+      "server_hostname": "endpoint_ff40a358924c",
+      "staging_root": "path_4c2bf9a41230",
+      "table_format": "delta",
+      "u_build_hash": "9dea94816c243d7b1977f03d2e6092ddedf725b6",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc",
+      "warehouse_id": "warehouse_bc5f5094a483"
+    },
+    "deployment": {
+      "catalog": "workspace",
+      "collection_status": "available",
+      "connection_mode": "remote",
+      "deployment_type": "serverless",
+      "endpoint_class": "cloud_endpoint",
+      "http_path": "path_beacdad47159",
+      "metadata_source": "observed",
+      "schema": "schema_f8b9e66c59c6",
+      "warehouse_id": "warehouse_bc5f5094a483",
+      "workspace_host": "endpoint_ff40a358924c"
+    },
+    "driver_actual_version": "4.5.0",
+    "driver_package": "databricks-sql-connector",
+    "driver_resolved_version": "4.5.0",
+    "driver_runtime_strategy": "current-process",
+    "name": "Databricks",
+    "raw_config": {
+      "access_token": "<redacted>",
+      "applied_layout_operations": [
+        {
+          "mechanism": "optimize",
+          "phase": "post_load",
+          "statement": "OPTIMIZE TAXI_ZONES",
+          "status": "applied",
+          "table": "TAXI_ZONES"
+        },
+        {
+          "mechanism": "optimize",
+          "phase": "post_load",
+          "statement": "OPTIMIZE TRIPS",
+          "status": "applied",
+          "table": "TRIPS"
+        }
+      ],
+      "auto_terminate_minutes": 30,
+      "catalog": "workspace",
+      "databricks_clustering_strategy": "none",
+      "delta_auto_compact": true,
+      "delta_auto_optimize": true,
+      "disable_result_cache": true,
+      "enable_delta_optimization": true,
+      "host": "host_83a5a38255ca",
+      "http_path": "path_beacdad47159",
+      "hudi_table_type": "cow",
+      "liquid_clustering_enabled": false,
+      "region": "us-east-2",
+      "requested_databricks_clustering_strategy": "none",
+      "resolved_databricks_clustering_strategy": "none",
+      "result_cache_enabled": false,
+      "schema": "schema_f8b9e66c59c6",
+      "server_hostname": "endpoint_ff40a358924c",
+      "staging_root": "path_4c2bf9a41230",
+      "table_format": "delta",
+      "tuning_source": "baseline",
+      "type": "databricks",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc",
+      "warehouse_id": "warehouse_bc5f5094a483"
+    },
+    "raw_metadata": {
+      "compute_configuration": {
+        "auto_stop_mins": 10,
+        "channel": "CHANNEL_NAME_CURRENT",
+        "enable_photon": true,
+        "enable_serverless_compute": true,
+        "max_num_clusters": 1,
+        "min_num_clusters": 1,
+        "spot_instance_policy": "COST_OPTIMIZED",
+        "state": "RUNNING",
+        "warehouse_id": "warehouse_bc5f5094a483",
+        "warehouse_metadata_collection_status": "available",
+        "warehouse_name": "warehouse_846d876a8d98",
+        "warehouse_size": "2X-Small",
+        "warehouse_type": "SERVERLESS"
+      },
+      "dbsql_version": "2026.36",
+      "r_build_hash": "7a8881535ee395968babb208dc8c00ebd4e0b547",
+      "u_build_hash": "9dea94816c243d7b1977f03d2e6092ddedf725b6"
+    },
+    "storage": {
+      "catalog": "workspace",
+      "collection_status": "partial",
+      "schema": "schema_f8b9e66c59c6",
+      "source": "requested",
+      "staging_location": "path_4c2bf9a41230",
+      "table_format": "delta",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc"
+    },
+    "tuning": {
+      "applied": {
+        "dropped": [],
+        "statements": [
+          {
+            "mechanism": "optimize",
+            "phase": "post_load",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "mechanism": "optimize",
+            "phase": "post_load",
+            "statement_redacted": true,
+            "status": "executed"
+          }
+        ],
+        "status": "not_applicable"
+      },
+      "applied_ledger_hash": "855454326e7c2adaa9cdf801a3e0928abc5a12ad80bc53ee6f0f4da005c54dc3"
+    },
+    "version": "2026.36"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "trips-per-hour",
+      "iter": 0,
+      "ms": 552.0,
+      "rows": 24,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "trips-per-day",
+      "iter": 0,
+      "ms": 420.0,
+      "rows": 365,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "trips-per-month",
+      "iter": 0,
+      "ms": 477.7,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "trips-by-day-of-week",
+      "iter": 0,
+      "ms": 1078.6,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "top-pickup-zones",
+      "iter": 0,
+      "ms": 686.9,
+      "rows": 20,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "top-dropoff-zones",
+      "iter": 0,
+      "ms": 698.1,
+      "rows": 20,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "top-routes",
+      "iter": 0,
+      "ms": 700.2,
+      "rows": 50,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "borough-summary",
+      "iter": 0,
+      "ms": 767.6,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "revenue-by-payment-type",
+      "iter": 0,
+      "ms": 500.4,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "fare-distribution",
+      "iter": 0,
+      "ms": 401.2,
+      "rows": 21,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "tip-analysis",
+      "iter": 0,
+      "ms": 546.0,
+      "rows": 24,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "surcharge-revenue",
+      "iter": 0,
+      "ms": 477.8,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "distance-distribution",
+      "iter": 0,
+      "ms": 426.6,
+      "rows": 30,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "passenger-count-analysis",
+      "iter": 0,
+      "ms": 595.6,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "trip-duration-analysis",
+      "iter": 0,
+      "ms": 567.5,
+      "rows": 24,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "rate-code-summary",
+      "iter": 0,
+      "ms": 724.9,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "airport-trips",
+      "iter": 0,
+      "ms": 566.0,
+      "rows": 20,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "vendor-comparison",
+      "iter": 0,
+      "ms": 492.3,
+      "rows": 3,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "hourly-zone-heatmap",
+      "iter": 0,
+      "ms": 381.5,
+      "rows": 1752,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "weekday-weekend-comparison",
+      "iter": 0,
+      "ms": 408.1,
+      "rows": 48,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "rush-hour-analysis",
+      "iter": 0,
+      "ms": 429.2,
+      "rows": 3,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "monthly-year-over-year",
+      "iter": 0,
+      "ms": 427.3,
+      "rows": 15,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "single-day-summary",
+      "iter": 0,
+      "ms": 1188.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "zone-detail",
+      "iter": 0,
+      "ms": 595.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "full-scan-count",
+      "iter": 0,
+      "ms": 333.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "trips-per-hour",
+      "iter": 1,
+      "ms": 386.3,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "trips-per-day",
+      "iter": 1,
+      "ms": 504.2,
+      "rows": 365,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "trips-per-month",
+      "iter": 1,
+      "ms": 630.6,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "trips-by-day-of-week",
+      "iter": 1,
+      "ms": 392.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "top-pickup-zones",
+      "iter": 1,
+      "ms": 724.8,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "top-dropoff-zones",
+      "iter": 1,
+      "ms": 1865.3,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "top-routes",
+      "iter": 1,
+      "ms": 721.0,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "borough-summary",
+      "iter": 1,
+      "ms": 659.7,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "revenue-by-payment-type",
+      "iter": 1,
+      "ms": 385.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "fare-distribution",
+      "iter": 1,
+      "ms": 439.9,
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "tip-analysis",
+      "iter": 1,
+      "ms": 385.4,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "surcharge-revenue",
+      "iter": 1,
+      "ms": 443.1,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "distance-distribution",
+      "iter": 1,
+      "ms": 401.4,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "passenger-count-analysis",
+      "iter": 1,
+      "ms": 431.6,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "trip-duration-analysis",
+      "iter": 1,
+      "ms": 452.7,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "rate-code-summary",
+      "iter": 1,
+      "ms": 394.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "airport-trips",
+      "iter": 1,
+      "ms": 604.6,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "vendor-comparison",
+      "iter": 1,
+      "ms": 397.0,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "hourly-zone-heatmap",
+      "iter": 1,
+      "ms": 733.7,
+      "rows": 1662,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "weekday-weekend-comparison",
+      "iter": 1,
+      "ms": 455.1,
+      "rows": 48,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "rush-hour-analysis",
+      "iter": 1,
+      "ms": 491.1,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "monthly-year-over-year",
+      "iter": 1,
+      "ms": 424.9,
+      "rows": 15,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "single-day-summary",
+      "iter": 1,
+      "ms": 419.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "zone-detail",
+      "iter": 1,
+      "ms": 667.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "full-scan-count",
+      "iter": 1,
+      "ms": 412.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "trips-per-hour",
+      "iter": 2,
+      "ms": 386.0,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "trips-per-day",
+      "iter": 2,
+      "ms": 404.3,
+      "rows": 365,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "trips-per-month",
+      "iter": 2,
+      "ms": 407.5,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "trips-by-day-of-week",
+      "iter": 2,
+      "ms": 413.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "top-pickup-zones",
+      "iter": 2,
+      "ms": 590.9,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "top-dropoff-zones",
+      "iter": 2,
+      "ms": 632.5,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "top-routes",
+      "iter": 2,
+      "ms": 716.9,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "borough-summary",
+      "iter": 2,
+      "ms": 771.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "revenue-by-payment-type",
+      "iter": 2,
+      "ms": 657.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "fare-distribution",
+      "iter": 2,
+      "ms": 438.0,
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "tip-analysis",
+      "iter": 2,
+      "ms": 464.7,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "surcharge-revenue",
+      "iter": 2,
+      "ms": 424.0,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "distance-distribution",
+      "iter": 2,
+      "ms": 445.8,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "passenger-count-analysis",
+      "iter": 2,
+      "ms": 522.4,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "trip-duration-analysis",
+      "iter": 2,
+      "ms": 486.8,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "rate-code-summary",
+      "iter": 2,
+      "ms": 415.7,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "airport-trips",
+      "iter": 2,
+      "ms": 690.0,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "vendor-comparison",
+      "iter": 2,
+      "ms": 414.1,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "hourly-zone-heatmap",
+      "iter": 2,
+      "ms": 454.0,
+      "rows": 1734,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "weekday-weekend-comparison",
+      "iter": 2,
+      "ms": 461.6,
+      "rows": 48,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "rush-hour-analysis",
+      "iter": 2,
+      "ms": 453.5,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "monthly-year-over-year",
+      "iter": 2,
+      "ms": 463.7,
+      "rows": 15,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "single-day-summary",
+      "iter": 2,
+      "ms": 457.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "zone-detail",
+      "iter": 2,
+      "ms": 640.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "full-scan-count",
+      "iter": 2,
+      "ms": 347.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "trips-per-hour",
+      "iter": 3,
+      "ms": 406.9,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "trips-per-day",
+      "iter": 3,
+      "ms": 409.6,
+      "rows": 365,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "trips-per-month",
+      "iter": 3,
+      "ms": 405.2,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "trips-by-day-of-week",
+      "iter": 3,
+      "ms": 389.4,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "top-pickup-zones",
+      "iter": 3,
+      "ms": 608.8,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "top-dropoff-zones",
+      "iter": 3,
+      "ms": 643.2,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "top-routes",
+      "iter": 3,
+      "ms": 778.3,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "borough-summary",
+      "iter": 3,
+      "ms": 724.7,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "revenue-by-payment-type",
+      "iter": 3,
+      "ms": 542.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "fare-distribution",
+      "iter": 3,
+      "ms": 439.6,
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "tip-analysis",
+      "iter": 3,
+      "ms": 429.1,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "surcharge-revenue",
+      "iter": 3,
+      "ms": 478.8,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "distance-distribution",
+      "iter": 3,
+      "ms": 439.2,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "passenger-count-analysis",
+      "iter": 3,
+      "ms": 427.8,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "trip-duration-analysis",
+      "iter": 3,
+      "ms": 428.4,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "rate-code-summary",
+      "iter": 3,
+      "ms": 389.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "airport-trips",
+      "iter": 3,
+      "ms": 646.3,
+      "rows": 20,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "vendor-comparison",
+      "iter": 3,
+      "ms": 519.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "hourly-zone-heatmap",
+      "iter": 3,
+      "ms": 479.4,
+      "rows": 1740,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "weekday-weekend-comparison",
+      "iter": 3,
+      "ms": 417.8,
+      "rows": 48,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "rush-hour-analysis",
+      "iter": 3,
+      "ms": 431.5,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "monthly-year-over-year",
+      "iter": 3,
+      "ms": 388.3,
+      "rows": 15,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "single-day-summary",
+      "iter": 3,
+      "ms": 396.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "zone-detail",
+      "iter": 3,
+      "ms": 656.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "full-scan-count",
+      "iter": 3,
+      "ms": 409.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "84fd0b4c",
+    "iterations": 3,
+    "query_time_ms": 38669,
+    "streams": 4,
+    "timestamp": "2026-10-01T10:13:01.023041",
+    "total_duration_ms": 102916
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 24472.0,
+      "rows_loaded": 846244
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 75,
+      "total": 75
+    },
+    "timing": {
+      "avg_ms": 515.6,
+      "geometric_mean_ms": 494.0,
+      "max_ms": 1865.3,
+      "min_ms": 347.1,
+      "p90_ms": 716.9,
+      "p95_ms": 733.7,
+      "p99_ms": 1865.3,
+      "stdev_ms": 196.3,
+      "total_ms": 38669.3
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "taxi_zones": {
+      "rows": 265
+    },
+    "trips": {
+      "rows": 845979
+    }
+  },
+  "version": "2.2"
+}

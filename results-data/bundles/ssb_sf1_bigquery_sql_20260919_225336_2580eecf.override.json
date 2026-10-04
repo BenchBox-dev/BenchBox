@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "timing-plateau",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "BigQuery SSB at SF 1 loads 6,234,557 rows and scans 8.449 GB. Per-query means span 765 to 1,070 ms (max/min 1.40, CV 0.11). Query caching is recorded off and the median measurement/warmup ratio is 0.97. The narrow timing spread is consistent with fixed per-job and client latency dominating light queries. Provider queue and execution timings were not recorded, so that explanation is an inference.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/105f1207d597c9a5e04c40129ea7a42a3fbdbda0/results-data/CORPUS_NOTES.md#bigquery-ssb-timing-2026-10-03",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "ssb_sf1_bigquery_sql_20260919_225336_2580eecf"
+  ]
+}
