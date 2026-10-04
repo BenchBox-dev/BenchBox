@@ -52,7 +52,14 @@ EXPRESSION_PREFIX = "[\n"
 EXPRESSION_SUFFIX = "\n];"
 
 
-BASHLEX_FAILURES = (bashlex.errors.ParsingError, NotImplementedError, AttributeError, IndexError, TypeError)
+BASHLEX_FAILURES = (
+    bashlex.errors.ParsingError,
+    NotImplementedError,
+    AssertionError,
+    AttributeError,
+    IndexError,
+    TypeError,
+)
 
 
 def blank_text(text: str) -> str:
@@ -846,7 +853,7 @@ def heredoc_redirects(header: str) -> list[tuple[str, str, list[str], bool]]:
         closed = "\n".join([unquoted, *markers, unclosed_shell_suffix(unquoted)]) + "\n"
         try:
             trees = bashlex.parse(closed, strictmode=False)
-        except (bashlex.errors.ParsingError, NotImplementedError, ValueError):
+        except (*BASHLEX_FAILURES, ValueError):
             raise ValueError("shell heredoc header requires an adapter") from exc
         raw_markers = tokens
 
@@ -970,6 +977,8 @@ TIME_FLAGS = {"-l", "-p"}
 
 
 UNMODELED_MARKERS = {
+    "perl": re.compile(r"#|^=[A-Za-z]", re.M),
+    "ruby": re.compile(r"#|^=begin", re.M),
     "lua": re.compile(r"--"),
     "deno": re.compile(r"//|/\*"),
     "bun": re.compile(r"//|/\*"),

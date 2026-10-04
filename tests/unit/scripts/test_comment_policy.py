@@ -3144,3 +3144,22 @@ def test_shell_node_print_source_is_sent_to_the_typescript_scanner(source: str) 
 )
 def test_find_exec_and_deno_eval_options_are_read_in_order(path: str, source: str, lang: str, kinds: list) -> None:
     assert [f.kind for f in scan(path, source, lang, {})] == kinds
+
+
+@pytest.mark.parametrize("error", [AssertionError, AttributeError, IndexError, TypeError])
+def test_bashlex_internal_errors_count_as_parse_failures(monkeypatch: pytest.MonkeyPatch, error: type) -> None:
+    import comment_payloads
+
+    def crash(_source: str) -> None:
+        raise error("bashlex internal failure")
+
+    monkeypatch.setattr(comment_payloads.bashlex, "parse", crash)
+    assert [f.kind for f in scan("a.sh", "bash -c '# hi'\n", "bash")] == ["coverage-error"]
+    assert scan("a.sh", "awk '{print}' input.txt\n", "bash") == []
+
+
+def test_unparseable_chunk_with_perl_pod_or_ruby_block_comment_fails_closed() -> None:
+    perl = "LEVELS=($(perl -e '1;\n=pod\nnote\n=cut\n'))\n"
+    ruby = "LEVELS=($(ruby -e 'x = 1\n=begin\nnote\n=end\n'))\n"
+    assert [f.kind for f in scan("a.sh", perl, "bash")] == ["coverage-error"]
+    assert [f.kind for f in scan("a.sh", ruby, "bash")] == ["coverage-error"]
