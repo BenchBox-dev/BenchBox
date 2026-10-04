@@ -5,6 +5,7 @@
     "test_public_site_visual_workflow.py updated and green; ruleset drift check unchanged",
     "No change to required-context names or exact-base-SHA semantics"
   ],
+  "context": "Resumption 2026-10-04: implemented on wip/astro-51 (7853f283, f4b055b8, 15869e56), merged into wip/astro-52; independent re-review PASS. Non-required dry-run job captures the 6x4 matrix from the Astro build; renderer switch is an approvable difference (exact-head approval); runbook documents PR-head slot (wired) and that the merge_group slot is not wired (develop expects no merge queue per #2566). Ships in the PR after #2606.",
   "description": "The required context \"Public-site visual acceptance\" (ci-dedupe-11) compares captures from e2e/captures/public-site-pages.spec.ts with exact-base-SHA baseline artifacts.\n\nPrepare the renderer switch:\n- Capture the same routes from the Astro build. Routes are unchanged under D3; if any changes, update the route/viewport matrix in the same PR.\n- Point visual-inputs path classification at website/ and docs/.\n- Plan the intentional baseline change through the astro-site-03 procedure: separate exact-head approvals for the PR head and the merge_group head_sha. Queue position does not substitute for either.\n\nNever skip, disable or loosen the comparison. The baseline producer must publish an Astro-rendered baseline for the merge commit that switches the CI renderer.",
   "links": [
     "results-explorer/e2e/captures/public-site-pages.spec.ts",
@@ -28,6 +29,14 @@
       "op": "update",
       "op_id": "8db532ea02a94d73bc689ba8e6630ea4",
       "session_id": "0a04fc269d824c6d94e653994f36dbcb"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T15:56:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c0aed029fcac4b958a44660c51d97ddb",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
