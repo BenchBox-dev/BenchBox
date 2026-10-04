@@ -92,6 +92,50 @@
   ],
   "exceptions": [
     {
+      "path": "_project/scripts/regenerate_correctness_gate_digests.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "_project/scripts/regenerate_correctness_gate_digests.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "benchbox/core/expected_results/tpch_results.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "benchbox/core/expected_results/tpch_results.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
       "path": "tests/unit/scripts/test_ci_lint_environment_boundary.py",
       "symbol": "TestGateFailsClosed.test_ci_lint_environment_boundary_runs_the_guard_when_the_gate_is_broken",
       "text": "unresolved executable source: f'{broken} echo RAN; else echo SKIPPED; fi'",

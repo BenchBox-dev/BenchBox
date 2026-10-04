@@ -223,7 +223,13 @@ def load_tpch_expected_results(scale_factor: float = 1.0) -> dict[str, int]:
     return expected_results
 
 
-def load_tpch_value_digest_seed() -> int:
+def load_tpch_value_digest_seed() -> int | None:
+    """Return the qgen seed the stored TPC-H value digests were generated with.
+
+    ``None`` means the snapshot was generated with qgen ``-d`` default parameters,
+    so the gate must run without ``--seed``. The key is required, and any value
+    other than an integer or null is rejected.
+    """
     payload = json.loads(_TPCH_VALUE_DIGEST_REFERENCE_PATH.read_text(encoding="utf-8"))
     if (
         not isinstance(payload, dict)
@@ -232,9 +238,11 @@ def load_tpch_value_digest_seed() -> int:
         or payload["scale_factor"] != 1.0
     ):
         raise ValueError("TPC-H value-digest reference must describe the SF=1 TPC-H snapshot")
-    seed = payload.get("reference_seed")
-    if type(seed) is not int:
-        raise ValueError("TPC-H value-digest reference_seed must be an integer")
+    if "reference_seed" not in payload:
+        raise ValueError("TPC-H value-digest reference must record reference_seed (an integer or null)")
+    seed = payload["reference_seed"]
+    if seed is not None and type(seed) is not int:
+        raise ValueError("TPC-H value-digest reference_seed must be an integer or null")
     return seed
 
 
