@@ -47,3 +47,14 @@ def test_sql_override_keys_are_canonical_registry_platforms():
     sql_overrides = {key for key in PLATFORM_FALLBACK_DESCRIPTIONS if key in PLATFORM_TUNING_CAPABILITIES}
 
     assert sql_overrides == {"clickhouse"}
+
+
+@pytest.mark.parametrize(
+    "platform", ["duckdb", "polars", "pandas-df", "dask", "cudf", "datafusion-df", "clickhouse-local"]
+)
+def test_runtime_log_classifier_recognizes_every_platforms_fallback_line(platform):
+    from benchbox.core.tuning.coverage import BASIC_CONSTRAINTS, status_from_log_text
+
+    line = f"Tuning: using {get_fallback_description(platform)} (no optimized template available)"
+
+    assert status_from_log_text(line) == BASIC_CONSTRAINTS
