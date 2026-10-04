@@ -3,7 +3,7 @@
     "Unit test: no OPTIMIZE during apply_unified_tuning for ClickHouse adapters.",
     "e2e (chDB): the custom ClickHouse config from tuning-sort-realized-by-ddl-no-drop-20261001 yields zero failed statements and validation_status applied_verified."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.3 (CRIT-1b(ii)). Needs the post-load seam and identifier helper (plan review F2) and serializes after the sort-drop item (shared ClickHouse files).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.3 (CRIT-1b(ii)). Needs the post-load seam and identifier helper (plan review F2) and serializes after the sort-drop item (shared ClickHouse files).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch feat/tuning-post-load-seam; do not claim.",
   "description": "## Problem (reproduced)\n`ClickHouseTuningMixin.apply_table_tunings` (`benchbox/platforms/clickhouse/tuning.py:319-345`) runs `OPTIMIZE TABLE {table_tuning.table_name} FINAL` during `apply_unified_tuning`. The name is the template's uppercase name, so it fails on case-sensitive ClickHouse (\"Table default.LINEITEM does not exist\"). It also runs before data is loaded, so it would be a no-op anyway. The failed statement vetoes `applied_verified`. This affects ClickHouse local, server and cloud.\n\n## Change\n- Delete the OPTIMIZE calls from apply.\n- Run the opt-in OPTIMIZE through `apply_post_load_tunings` (`tuning-post-load-seam-20261001`), with names from `tuning-physical-identifier-resolution-20261001`, recorded as `post_load` (maintenance, non-blocking).\n\n## Guardrails (must preserve)\n- OPTIMIZE never runs pre-load.\n- A failure is recorded as failed and never breaks the run.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/platforms/clickhouse/tuning.py",
@@ -17,6 +17,14 @@
       "op": "create",
       "op_id": "501caccf865348a6b8ef5be983ac93fb",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T21:01:20Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a2c0672258aa45398ef0ea76f6867aac",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
