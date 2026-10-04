@@ -21289,10 +21289,10 @@
     },
     "tuning-no-midrun-destructive-db-handling-20261001": {
       "claim": {
-        "expires_at": "2026-10-05T11:39:59Z",
-        "generation": "19ad11659d4647f9acbb099f19e65fff",
+        "expires_at": "2026-10-05T17:46:48Z",
+        "generation": "1de364a0aa9341cea5ec7b09ca55e131",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2b0080b85042aeae675a52ec"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56"
       },
       "needs": [],
       "priority": "critical",

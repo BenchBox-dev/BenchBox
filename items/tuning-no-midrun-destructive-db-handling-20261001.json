@@ -31,6 +31,17 @@
       "op": "take",
       "op_id": "6f16050aa0c142ba8748d4c9c429efe4",
       "session_id": "b82cdf4756ed494499798523b1c292cb"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T17:46:48Z",
+      "client": "claude-code",
+      "displaced": "mcp:tbh:joe@joe-mac-mini.local:2b0080b85042aeae675a52ec",
+      "generation": "1de364a0aa9341cea5ec7b09ca55e131",
+      "op": "takeover",
+      "op_id": "780851994bf246c3a4dc764f32d8cc27",
+      "reason": "Predecessor session's process is dead (pid 59445) and its PR merged; owner authorized releasing the claim so follow-up work can be claimed separately. Acceptance work remains: PR #2632 adds the all-adapter contract test and a DuckLake fix; end-to-end checks are still open.",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
 }
