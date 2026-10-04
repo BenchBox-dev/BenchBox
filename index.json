@@ -11381,14 +11381,19 @@
       "title": "Run and publish live cloud benchmark results for SSB, AMPLab, and JoinOrder (BigQuery, Databricks, Snowflake)"
     },
     "live-cloud-benchmark-industry-suites": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T18:42:43Z",
+        "generation": "694c3a3206cd4965bb9f8b5a46dbf4a0",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64"
+      },
       "needs": [
         "first-live-cloud-benchmark-run-and-publish",
         "tuning-no-midrun-destructive-db-handling-20261001",
         "tuning-portable-metadata-store-20261001"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Run and publish live cloud benchmark results for ClickBench, CoffeeShop, and H2ODB (BigQuery, Databricks, Snowflake)"
     },
     "live-cloud-benchmark-primitives-timeseries-ai": {
