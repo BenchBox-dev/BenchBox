@@ -1,4 +1,4 @@
-import { atomTimestamp, BLOG_BASE_URL, BLOG_TITLE, FEED_LENGTH, newestFirst, slugify, type BlogPost } from "./blog.ts";
+import { atomTimestamp, BLOG_BASE_URL, BLOG_TITLE, feedCategory, FEED_LENGTH, newestFirst, slugify, type BlogPost } from "./blog.ts";
 
 const SITE_ORIGIN = "https://benchbox.dev";
 const GENERATOR = { uri: "https://astro.build/", name: "Astro" };
@@ -15,6 +15,29 @@ export function escapeXml(value: string): string {
 
 export function absoluteUrls(html: string): string {
   return html.replace(/\b(href|src)="(\/(?!\/)[^"]*)"/g, (_match, attribute: string, target: string) => `${attribute}="${SITE_ORIGIN}${target}"`);
+}
+
+const EXPRESSIVE_CODE = /<div class="expressive-code">[\s\S]*?<\/figure><\/div>/g;
+
+function plainCodeBlock(block: string): string {
+  const pre = /<pre\b([^>]*)>([\s\S]*?)<\/pre>/.exec(block);
+  if (!pre) return "";
+  const language = /data-language="([^"]*)"/.exec(pre[1])?.[1];
+  const lines = pre[2]
+    .split('<div class="ec-line">')
+    .slice(1)
+    .map((line) => line.replace(/<[^>]+>/g, ""));
+  const attribute = language ? ` class="language-${language}"` : "";
+  return `<pre><code${attribute}>${lines.join("\n")}</code></pre>`;
+}
+
+export function feedHtml(html: string): string {
+  return html
+    .replace(EXPRESSIVE_CODE, plainCodeBlock)
+    .replace(/<script\b[\s\S]*?<\/script>/g, "")
+    .replace(/<link\b[^>]*>/g, "")
+    .replace(/<button\b[\s\S]*?<\/button>/g, "")
+    .replace(/\sstyle="--[^"]*"/g, "");
 }
 
 function plainText(html: string): string {
@@ -45,13 +68,13 @@ function entry(post: BlogPost): string {
     "    <author>",
     `      <name>${escapeXml(post.author)}</name>`,
     "    </author>",
-    `    <content type="html">${escapeXml(absoluteUrls(post.html ?? ""))}</content>`,
+    `    <content type="html">${escapeXml(absoluteUrls(feedHtml(post.html ?? "")))}</content>`,
     `    <link href="${escapeXml(url)}"/>`,
   ];
   const summary = summaryOf(post);
   if (summary !== "") lines.push(`    <summary>${escapeXml(summary)}</summary>`);
   for (const tag of [...post.tags].sort()) {
-    if (slugify(tag) !== "") lines.push(`    <category term="${escapeXml(tag)}" label="${escapeXml(tag)}"/>`);
+    if (slugify(tag) !== "") lines.push(`    <category term="${escapeXml(feedCategory(tag))}" label="${escapeXml(tag)}"/>`);
   }
   lines.push(`    <published>${stamp}</published>`, "  </entry>");
   return lines.join("\n");

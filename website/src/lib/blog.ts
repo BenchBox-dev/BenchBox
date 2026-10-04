@@ -22,7 +22,7 @@ export type BlogPost = {
 
 export type PostSource = {
   id: string;
-  data: { title: string; date?: string; author?: string; tags?: string[]; series?: string; description?: string };
+  data: { title: string; blogpost?: boolean; date?: string; author?: string; tags?: string[]; series?: string; description?: string };
   rendered?: { html: string };
 };
 
@@ -44,11 +44,27 @@ export function atomTimestamp(date: Date): string {
 
 export function slugify(value: string): string {
   return value
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}_\s-]/gu, "")
     .trim()
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[-\s]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[-\s]+/g, "-");
+}
+
+export function feedCategory(tag: string): string {
+  return tag.replace(/ /g, "");
+}
+
+export function startOfTomorrow(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+}
+
+export function splitDrafts(posts: readonly BlogPost[], now: Date = new Date()): { published: BlogPost[]; drafts: BlogPost[] } {
+  const cutoff = startOfTomorrow(now).getTime();
+  return {
+    published: posts.filter((post) => post.date.getTime() < cutoff),
+    drafts: posts.filter((post) => post.date.getTime() >= cutoff),
+  };
 }
 
 export function toPost(source: PostSource): BlogPost {
@@ -124,6 +140,7 @@ export type Neighbours = { previous?: BlogPost; next?: BlogPost };
 export function neighbours(posts: readonly BlogPost[], post: BlogPost): Neighbours {
   const ordered = oldestFirst(posts);
   const position = ordered.findIndex((candidate) => candidate.slug === post.slug);
+  if (position < 0) return {};
   return { previous: ordered[position - 1], next: ordered[position + 1] };
 }
 

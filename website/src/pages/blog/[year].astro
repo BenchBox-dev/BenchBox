@@ -1,10 +1,10 @@
 ---
-import { getCollection } from "astro:content";
 import Collection from "../../components/blog/Collection.astro";
-import { toPost, yearGroups } from "../../lib/blog.ts";
+import { yearGroups } from "../../lib/blog.ts";
+import { loadBlog } from "../../lib/blog-posts.ts";
 
 export async function getStaticPaths() {
-  const posts = (await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost);
+  const posts = (await loadBlog()).published;
   return [...yearGroups(posts)].map(([year, published]) => ({ params: { year }, props: { year, published } }));
 }
 

@@ -54,7 +54,10 @@ function resolveTarget(target: string, context: ConvertContext, at: SourcePositi
   const insideDocs = path.relative(context.docsRoot, absolute);
   if (insideDocs.startsWith("..") || path.isAbsolute(insideDocs)) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
   const relative = insideDocs.split(path.sep).join("/");
-  if (relative in BLOG_PAGES) return { url: withFragment(BLOG_PAGES[relative], fragment) };
+  if (relative in BLOG_PAGES) {
+    if (fragment !== "") throw unresolved(`${relative} has no anchors`);
+    return { url: BLOG_PAGES[relative] };
+  }
   if (DOC_SUFFIX.test(target)) {
     const resolved = context.resolveDoc(target, at, "link");
     if (fragment !== "") context.checkFragment(resolved.path, fragment, at);

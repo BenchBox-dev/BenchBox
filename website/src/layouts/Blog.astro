@@ -20,6 +20,8 @@ interface Props {
   description?: string;
   author?: string;
   date?: string;
+  dateIso?: string;
+  searchable?: boolean;
   authorHref?: string;
   tags?: BlogLink[];
   series?: BlogSeries;
@@ -28,18 +30,18 @@ interface Props {
   isIndex: boolean;
 }
 
-const { title, titleId, description, author, date, authorHref, tags = [], series, previous, next, isIndex } = Astro.props;
+const { title, titleId, description, author, date, dateIso, searchable = true, authorHref, tags = [], series, previous, next, isIndex } = Astro.props;
 const hasMeta = Boolean(author || date || tags.length > 0);
 ---
 
-<Shell title={`${title} - BenchBox Blog`} description={description ?? `${title} - BenchBox blog post.`} type={isIndex ? "website" : "article"} searchable>
-  <article class="prose blog-post">
+<Shell title={`${title} - BenchBox Blog`} description={description ?? `${title} - BenchBox blog post.`} type={isIndex ? "website" : "article"} searchable={searchable}>
+  <article class="prose blog-post" data-pagefind-ignore={searchable ? undefined : ""}>
     <Breadcrumbs crumbs={blogTrail(title, isIndex)} />
     <h1 id={titleId}>{title}</h1>
     {
       hasMeta && (
         <p class="post-meta">
-          {date && <span class="post-meta__date">{date}</span>}
+          {date && <span class="post-meta__date">{dateIso ? <time datetime={dateIso}>{date}</time> : date}</span>}
           {author && (
             <span class="post-meta__author">
               {date && " · "}
@@ -80,12 +82,12 @@ const hasMeta = Boolean(author || date || tags.length > 0);
         <nav class="blog-pager" aria-label="Post navigation" data-pagefind-ignore>
           {previous && (
             <a class="blog-pager__previous" rel="prev" href={previous.href}>
-              &larr; {previous.label}
+              <span aria-hidden="true">&larr;</span> {previous.label}
             </a>
           )}
           {next && (
             <a class="blog-pager__next" rel="next" href={next.href}>
-              {next.label} &rarr;
+              {next.label} <span aria-hidden="true">&rarr;</span>
             </a>
           )}
         </nav>

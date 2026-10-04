@@ -38,6 +38,7 @@ const blog = defineCollection({
     author: z.string().optional(),
     tags: z.array(z.string()).optional(),
     series: z.string().optional(),
+    blogpost: z.boolean().optional(),
     description: z.string().optional(),
     sourcePath: z.string().optional(),
     titleId: z.string().optional(),

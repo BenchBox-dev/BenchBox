@@ -12,6 +12,6 @@ interface Props {
 const { title, posts, emptyText } = Astro.props;
 ---
 
-<Blog title={title} isIndex={false}>
+<Blog title={title} isIndex={false} searchable={false}>
   {posts.length > 0 ? <PostList posts={posts} /> : emptyText && <p>{emptyText}</p>}
 </Blog>

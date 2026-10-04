@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
-import { absoluteUrls, buildAtomFeed } from "../src/lib/atom.ts";
-import { authorPath, slugify, tagGroups, tagPath, toPost, type BlogPost } from "../src/lib/blog.ts";
+import { absoluteUrls, buildAtomFeed, feedHtml } from "../src/lib/atom.ts";
+import { authorPath, feedCategory, neighbours, slugify, splitDrafts, tagGroups, tagPath, toPost, type BlogPost } from "../src/lib/blog.ts";
 
 const websiteRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const blogRoot = path.join(websiteRoot, "..", "docs", "blog");
@@ -126,6 +126,8 @@ describe("blog urls", () => {
   it("slugs tags, authors and versions as ablog does", () => {
     expect(slugify("v0.2.1")).toBe("v021");
     expect(slugify("Joe Harris")).toBe("joe-harris");
+    expect(slugify("Crème Brûlée!")).toBe("creme-brulee");
+    expect(slugify("--edge--")).toBe("-edge-");
     expect(slugify("approximate-analytics")).toBe("approximate-analytics");
     expect(tagPath("duckdb-wasm")).toBe("/blog/tag/duckdb-wasm.html");
     expect(authorPath("Joe Harris")).toBe("/blog/author/joe-harris.html");
@@ -155,5 +157,53 @@ describe("editorial drafts", () => {
   it("are not read by any site source", () => {
     const sources = ["astro.config.ts", "src/content.config.ts", "src/converter/sources.ts"].map((file) => readFileSync(path.join(websiteRoot, file), "utf-8"));
     for (const source of sources) expect(source).not.toMatch(/_blog/);
+  });
+});
+
+describe("feed content", () => {
+  const rendered = readFileSync(path.join(websiteRoot, "tests", "fixtures", "expressive-code-block.html"), "utf-8");
+
+  it("reduces an Expressive Code block to a plain code block", () => {
+    expect(rendered).toContain("<script");
+    expect(rendered).toContain("<button");
+    expect(feedHtml(rendered)).toBe(
+      '<p>Intro text.</p>\n<pre><code class="language-bash">git remote set-url origin https://github.com/BenchBox-dev/BenchBox.git</code></pre>\n<p>Outro text.</p>\n',
+    );
+  });
+
+  it("leaves no script, link, button or inline colour variable in an entry", () => {
+    const post = toPost({ id: "blog/2026-01-01-x", data: { title: "X", date: "Jan 1, 2026" }, rendered: { html: rendered } });
+    const output = buildAtomFeed([post]);
+    expect(XMLValidator.validate(output)).toBe(true);
+    expect(output).not.toMatch(/&lt;(script|link|button)|style=&quot;--|_astro|Copy to clipboard/);
+    expect(output).toContain("&lt;pre&gt;&lt;code class=&quot;language-bash&quot;&gt;git remote set-url");
+  });
+
+  it("strips spaces from category terms as ablog does", () => {
+    expect(feedCategory("python api")).toBe("pythonapi");
+  });
+});
+
+describe("date-based drafts", () => {
+  const at = (date: string): BlogPost => toPost({ id: `blog/${date}-p`, data: { title: date, date } });
+  const today = new Date(Date.UTC(2026, 5, 10, 23, 59));
+  const posts = [at("Jun 9, 2026"), at("Jun 10, 2026"), at("Jun 11, 2026"), at("Jul 1, 2026")];
+
+  it("treats posts dated tomorrow or later (UTC) as drafts", () => {
+    const { published, drafts } = splitDrafts(posts, today);
+    expect(published.map((post) => post.title)).toEqual(["Jun 9, 2026", "Jun 10, 2026"]);
+    expect(drafts.map((post) => post.title)).toEqual(["Jun 11, 2026", "Jul 1, 2026"]);
+  });
+
+  it("publishes a post once its day starts", () => {
+    expect(splitDrafts(posts, new Date(Date.UTC(2026, 5, 11, 0, 0))).drafts.map((post) => post.title)).toEqual(["Jul 1, 2026"]);
+  });
+
+  it("keeps drafts out of the feed and out of tag groups", () => {
+    const tagged = [toPost({ id: "blog/a", data: { title: "A", date: "Jun 9, 2026", tags: ["t"] } }), toPost({ id: "blog/b", data: { title: "B", date: "Jun 20, 2026", tags: ["t", "u"] } })];
+    const { published } = splitDrafts(tagged, today);
+    expect([...tagGroups(published).keys()]).toEqual(["t"]);
+    expect(buildAtomFeed(published)).not.toContain("blog/b.html");
+    expect(neighbours(published, tagged[1])).toEqual({});
   });
 });

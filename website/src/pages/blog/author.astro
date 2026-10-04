@@ -1,12 +1,12 @@
 ---
-import { getCollection } from "astro:content";
 import Catalog from "../../components/blog/Catalog.astro";
 import Blog from "../../layouts/Blog.astro";
-import { authorGroups, authorPath, toPost } from "../../lib/blog.ts";
+import { authorGroups, authorPath } from "../../lib/blog.ts";
+import { loadBlog } from "../../lib/blog-posts.ts";
 
-const posts = (await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost);
+const posts = (await loadBlog()).published;
 ---
 
-<Blog title="Authors" isIndex={false}>
+<Blog title="Authors" isIndex={false} searchable={false}>
   <Catalog heading="Posts by" groups={[...authorGroups(posts)]} href={authorPath} />
 </Blog>
