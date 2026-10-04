@@ -189,6 +189,53 @@ bundled per-platform binaries (skipping those the host can't execute).
 
 ---
 
+## Patch: Defined arithmetic for the full-range `UnifInt` call (canonical addresses under optimization)
+
+### Problem
+
+`a_rnd()` in `bm_utils.c` draws its alphanumeric noise with
+`RANDOM(char_int, 0, MAX_LONG, column)`. `UnifInt()` in `rnd.c` special-cases
+that range and computes it in 32-bit `int`:
+
+```c
+dRange = DOUBLE_CAST (nHigh32 - nLow32 + 1);
+```
+
+With `nHigh32 == 0x7FFFFFFF` this is signed overflow, which C leaves undefined.
+Unoptimized builds wrap to `-2147483648`, and the reference TPC-H data depends on
+that value. Clang at `-O2` instead folds the expression to `+2147483648.0`,
+which changes every `V_STR` column: `S_ADDRESS` and `C_ADDRESS`. All other
+columns are unaffected because no other call takes this branch. The darwin
+binaries built with `Makefile.auto` (`-O2`) and any runtime `-O2` source build
+on macOS produced non-canonical supplier and customer addresses.
+
+### Solution
+
+Compute the wrapped value with unsigned arithmetic, which is defined, and
+convert back to a signed 32-bit value:
+
+```c
+nRange = (int32_t)((unsigned int)nHigh32 - (unsigned int)nLow32 + 1u);
+dRange = DOUBLE_CAST nRange;
+```
+
+Output now matches the reference data at every optimization level. A
+`-fsanitize=undefined` build reports no other undefined behavior for a full
+SF 0.01 `dbgen` run or for `qgen -d` over all 22 queries. `qgen` output was
+never affected.
+
+### Verification
+
+```bash
+./dbgen -f -s 0.01 -T s && head -n 1 supplier.tbl
+# 1|Supplier#000000001| N kD4on9OM Ipw3,gf0JBoQDd7tgrzrddZ|17|27-918-335-1736|5755.94|each slyly above the careful
+```
+
+`tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py` checks the SF 0.01
+supplier and customer SHA-256 values for every bundled binary the host can run.
+
+---
+
 ## Applying the Patch
 
 To apply these changes to a fresh TPC-H source distribution:
