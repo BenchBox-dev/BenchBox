@@ -15,6 +15,7 @@ pytestmark = [
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_PATH = ROOT / "_project/scripts/soundness_merge_digest.py"
 
+sys.path.insert(0, str(SCRIPT_PATH.parent))
 spec = importlib.util.spec_from_file_location("soundness_merge_digest", SCRIPT_PATH)
 assert spec is not None and spec.loader is not None
 digest = importlib.util.module_from_spec(spec)
@@ -150,6 +151,34 @@ def test_common_review_headings_are_recognised(body):
 def test_a_comment_naming_an_unapproved_reviewer_is_not_a_signal():
     pull = evidence(comments=(digest.Comment("dev", "Reviewer: my own judgement", AFTER),))
     assert digest.review_signals(pull) == ()
+
+
+def standin(sha, login="joeharris76", at=AFTER, prefix=""):
+    return digest.Comment(login, f"{prefix}Stand-in oracle review: APPROVE {sha}", at)
+
+
+def test_a_standin_approval_of_the_merged_head_from_a_listed_attester_is_a_signal():
+    assert digest.review_signals(evidence(comments=(standin(HEAD),))) == ("stand-in",)
+
+
+def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
+    assert digest.review_signals(refreshed(comments=(standin(REFRESH),))) == ("stand-in",)
+    assert digest.review_signals(refreshed(comments=(standin(HEAD),))) == ()
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        standin(OLD),
+        standin(HEAD, login="dev"),
+        standin(HEAD, at=BEFORE),
+        digest.Comment("joeharris76", f"```\nStand-in oracle review: APPROVE {HEAD}\n```", AFTER),
+        standin(HEAD, prefix="Looks fine. "),
+    ],
+    ids=["wrong-sha", "non-attester", "before-last-commit", "fenced", "mid-line"],
+)
+def test_a_standin_approval_that_does_not_qualify_is_not_a_signal(comment):
+    assert digest.review_signals(evidence(comments=(comment,))) == ()
 
 
 def test_a_thread_started_before_a_refresh_merge_is_still_counted():

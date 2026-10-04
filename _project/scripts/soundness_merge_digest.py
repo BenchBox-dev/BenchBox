@@ -12,6 +12,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from oracle_review_check import STANDIN_ATTESTERS, _attested_shas
+
 MANIFEST_PATH = ".github/soundness-paths.txt"
 PREDICATE_PATH = "_project/scripts/soundness_paths.py"
 GOVERNANCE_PATHS = frozenset(
@@ -148,6 +150,12 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         match = EXTERNAL_REVIEW_PATTERN.search(comment.body)
         if match and in_window(comment.created_at):
             signals.append(f"external-review:{match.group(1).lower()}")
+        if (
+            comment.login in STANDIN_ATTESTERS
+            and in_window(comment.created_at)
+            and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
+        ):
+            signals.append("stand-in")
     return tuple(dict.fromkeys(signals))
 
 
