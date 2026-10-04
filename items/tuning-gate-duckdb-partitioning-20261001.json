@@ -2,7 +2,7 @@
   "acceptance": [
     "Decision recorded (template README or ADR-003 addendum) selecting (A) or (B)."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-7 / task P1.5 (re-review R-1b).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-7 / task P1.5 (re-review R-1b).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda; do not claim.",
   "description": "## Problem\nEvery shipped DuckDB tuned template requests partitioning: TPC-H (LINEITEM, ORDERS), SSB (LINEORDER) and TPC-DS (6 fact tables). DuckDB always drops it (`benchbox/platforms/duckdb.py:1453-1472`), and dropped intents veto the upgrade (`benchbox/core/tuning/introspection.py:678`). The curated templates defeat their own verification.\n\n## Options\n- **(A) Recommended.** Remove partitioning from `examples/tunings/duckdb/*_tuned.yaml` and the packaged mirrors under `benchbox/core/tuning/templates/duckdb/`, and mark DuckDB partitioning `rendered_via=\"none\"`.\n- **(B)** Hive-partitioned Parquet in external-table mode only.\n\n## Guardrails\n- Keep the `TestPackagedTemplatesParity` test green.\n- The requested-config hash changes; record that in release notes.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "examples/tunings/duckdb",
@@ -17,6 +17,14 @@
       "op": "create",
       "op_id": "5fd5d89f44d048f3b9a036fe15ae9bd9",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T15:35:02Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ab273678ac2047f4aa5d4c5e27874431",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
