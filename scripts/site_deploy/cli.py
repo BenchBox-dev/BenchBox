@@ -250,6 +250,16 @@ def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any
     }
 
 
+def visual_comparison_required(deployed: generation.Deployed | None, renderer: str, release_sha: str) -> bool:
+    if deployed is None:
+        return renderer == renderer_module.ASTRO
+    return deployed.renderer != renderer or deployed.release_sha != release_sha
+
+
+def visual_approval_binding(release_sha: str, candidate_sha256: str, baseline_sha256: str) -> str:
+    return f"{release_sha}+{candidate_sha256}+{baseline_sha256}"
+
+
 def command_resolve(args: argparse.Namespace) -> int:
     if args.current_unknown and args.mode != "rollback":
         raise rollback_module.RollbackError("--current-unknown applies only to rollback mode")
@@ -262,9 +272,7 @@ def command_resolve(args: argparse.Namespace) -> int:
     deployed = outcome["deployed"]
     selected = outcome["selection"]["renderer"]
     deployed_renderer = deployed.renderer if deployed else None
-    visual_required = args.mode != "rollback" and (
-        selected == renderer_module.ASTRO or (deployed_renderer is not None and deployed_renderer != selected)
-    )
+    visual_required = args.mode != "rollback" and visual_comparison_required(deployed, selected, outcome["release_sha"])
     resolved = {
         "schema": RESOLVED_SCHEMA,
         "mode": args.mode,
@@ -466,6 +474,31 @@ def command_fetch_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_visual_binding(args: argparse.Namespace) -> int:
+    resolved = _read_json(args.out_dir / "resolved.json")
+    assembly = _read_json(args.out_dir / "route-assembly.json")
+    baseline = (resolved.get("deployed") or {}).get("artifact_sha256")
+    if not baseline:
+        raise artifacts.ArtifactError("no deployed artifact digest to bind the visual comparison to")
+    candidate = assembly["tree_sha256"]
+    artifacts.verify_tree(args.candidate, candidate)
+    artifacts.verify_tree(args.baseline, baseline)
+    binding = visual_approval_binding(resolved["release_sha"], candidate, baseline)
+    _write_json(
+        args.out_dir / "visual-binding.json",
+        {
+            "binding": binding,
+            "release_tag": resolved["release_tag"],
+            "release_sha": resolved["release_sha"],
+            "candidate_sha256": candidate,
+            "baseline_sha256": baseline,
+        },
+    )
+    _github_output({"binding": binding})
+    print(f"visual approval binding {binding}")
+    return 0
+
+
 def command_rollback_prepare(args: argparse.Namespace) -> int:
     resolved = _read_json(args.resolved)
     restore = rollback_module.load_restore(args.receipt, args.restored_tree)
@@ -485,9 +518,18 @@ def command_rollback_prepare(args: argparse.Namespace) -> int:
         current = rollback_module.load_restore(args.current_receipt, args.current_tree)
         if current.receipt_sha256 != (resolved.get("deployed") or {}).get("receipt_sha256"):
             raise rollback_module.RollbackError("the current receipt is not the deployed generation's receipt")
-        restored_results = [route for route in restore.receipt["routes"] if route["path"] == "/results/"]
-        routes = [route for route in current.receipt["routes"] if route["path"] != "/results/"] + restored_results
         digest = artifacts.compose_ui_first(args.current_tree, args.restored_tree, args.site_dir)
+        restored_results = [
+            {
+                **route,
+                "pins": artifacts.explorer_pins(
+                    args.site_dir / artifacts.RESULTS_DIR, args.out_dir / "pins-work", route.get("source_sha")
+                ),
+            }
+            for route in restore.receipt["routes"]
+            if route["path"] == "/results/"
+        ]
+        routes = [route for route in current.receipt["routes"] if route["path"] != "/results/"] + restored_results
         files = sum(1 for path in args.site_dir.rglob("*") if path.is_file())
     else:
         if args.site_dir.exists():
@@ -610,6 +652,12 @@ def build_parser() -> argparse.ArgumentParser:
     fetch.add_argument("--tree-dir", type=Path)
     fetch.add_argument("--verify-tree", action="store_true")
     fetch.set_defaults(handler=command_fetch_run)
+
+    binding = commands.add_parser("visual-binding")
+    binding.add_argument("--out-dir", type=Path, required=True)
+    binding.add_argument("--candidate", type=Path, required=True)
+    binding.add_argument("--baseline", type=Path, required=True)
+    binding.set_defaults(handler=command_visual_binding)
 
     prepare = commands.add_parser("rollback-prepare")
     prepare.add_argument("--receipt", type=Path, required=True)

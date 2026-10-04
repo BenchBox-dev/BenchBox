@@ -6,7 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from scripts.publication.assembler import compute_tree_digest
+from scripts.publication.assembler import compute_file_sha256, compute_tree_digest
 from scripts.site_deploy import checksums, cli, publish, receipt
 from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, SHA_B, make_receipt
 
@@ -372,3 +372,41 @@ def test_deployment_lookup_failures_exit_cleanly(tmp_path: Path, monkeypatch: py
         )
     assert code == 1
     assert "refuse: DeploymentLookupError" in capsys.readouterr().err
+
+
+def _ui_first(tmp_path: Path, *, current_snapshot: bool = True) -> tuple[int, Path]:
+    restored = _site(tmp_path / "restored", "old", snapshot=11)
+    current = _site(tmp_path / "current", "new", snapshot=12)
+    if not current_snapshot:
+        (current / "results" / "data" / "results.duckdb").unlink()
+    stored = _stored_receipt(tmp_path, restored, 7, ui=11, snapshot=11)
+    current_receipt = _stored_receipt(tmp_path, current, 8, ui=12, snapshot=12, trunk=SHA_B)
+    deployed = {
+        "corpus_sha": "9" * 40,
+        "artifact_sha256": compute_tree_digest(current)[0],
+        "receipt_sha256": receipt.receipt_sha256(current_receipt.read_bytes()),
+    }
+    extra = ["--current-tree", str(current), "--current-receipt", str(current_receipt), "--phase", "ui-first"]
+    return _prepare(tmp_path, stored, restored, _resolved(deployed, stored=stored), *extra), tmp_path / "out"
+
+
+def test_ui_first_pins_the_snapshot_that_is_actually_in_the_composed_tree(tmp_path: Path) -> None:
+    code, out = _ui_first(tmp_path)
+    assert code == 0
+    routes = json.loads((out / "route-assembly.json").read_text(encoding="utf-8"))["routes"]
+    pins = next(route for route in routes if route["path"] == "/results/")["pins"]
+    snapshot = tmp_path / "site-build" / "results" / "data" / "results.duckdb"
+    assert pins["snapshot"]["sha256"] == compute_file_sha256(snapshot)
+    assert pins["snapshot"]["sha256"] != compute_file_sha256(
+        tmp_path / "restored" / "results" / "data" / "results.duckdb"
+    )
+    assert pins["ui"]["source_sha"] == SHA_A
+
+
+def test_ui_first_refuses_a_composed_tree_without_a_snapshot(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, out = _ui_first(tmp_path, current_snapshot=False)
+    assert code == 1
+    assert "no snapshot to pin" in capsys.readouterr().err
+    assert not (out / "route-assembly.json").exists()

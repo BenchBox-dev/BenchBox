@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from scripts.assemble_public_site import REPO_ROOT, STAGE_BUILDERS, assemble_astro_stage, assemble_public_site, main
-from scripts.publication.assembler import compute_file_sha256
+from scripts.publication.assembler import compute_file_sha256, compute_tree_digest
 from scripts.site_deploy import candidate, cli, gates, generation, mixed_version, receipt, renderer, routes
 from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, SHA_B, FakeGitHub, make_receipt
 
@@ -20,6 +20,15 @@ TRUNK_PATH = ".github/workflows/trunk.yml"
 SPHINX_PAGE = '<html><head><script src="../_static/documentation_options.js?v=1"></script></head></html>'
 ASTRO_PAGE = '<html><head><link rel="stylesheet" href="/_astro/site.{label}.css"></head><body>{label}</body></html>'
 RECIPE = "site-build: docs-generate site-deps\n\t@npm --prefix website run build\n"
+DOCS_LINKS_PAGE = (
+    '<html><head><link rel="stylesheet" href="/_astro/site.css">'
+    '<link rel="canonical" href="https://benchbox.dev/docs/guide.html">'
+    '<meta http-equiv="refresh" content="0; url=/docs/api.html"></head><body>'
+    '<nav><a href="/docs/">Docs</a><a href="/docs/api.html#run">API</a><a href="/docs">Root</a></nav>'
+    '<a href="#local">here</a><a href="/blog/post.html">post</a><a href="/results/">results</a>'
+    '<img src="/docs/_images/chart.png" srcset="/docs/_images/chart.png 1x, /docs/_images/chart@2x.png 2x">'
+    "<p>The /docs/ tree</p></body></html>"
+)
 V041_SHAPE = (
     "docs/conf.py",
     "docs/index.rst",
@@ -111,8 +120,8 @@ def test_no_policy_can_force_astro(policy: str) -> None:
         routes.parse_manifest(data)
 
 
-def test_committed_manifest_selects_the_renderer_from_the_release_tag() -> None:
-    assert routes.load_manifest(MANIFEST).renderer_policy == renderer.POLICY_AUTO
+def test_committed_manifest_pins_sphinx_until_the_cutover_change() -> None:
+    assert routes.load_manifest(MANIFEST).renderer_policy == renderer.SPHINX
     data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
     del data["renderer"]
     assert routes.parse_manifest(data).renderer_policy == renderer.SPHINX
@@ -138,15 +147,36 @@ def test_an_unreadable_commit_fails_closed(tmp_path: Path) -> None:
         renderer.select_for_commit(renderer.POLICY_AUTO, repo, "f" * 40)
 
 
-def test_the_current_latest_release_tag_selects_sphinx() -> None:
-    tags = candidate.release_tags(REPO_ROOT)
-    if not tags:
-        pytest.skip("this checkout carries no release tags")
-    tag = candidate.latest_release_tag(tags)
+def _release_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    files = dict.fromkeys(V041_SHAPE, "x")
+    files["make/documentation.mk"] = "docs:\n"
+    _commit_tree(repo, files, tag="v0.4.1")
+    env = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
+    for name in V041_SHAPE:
+        if name.endswith(".rst"):
+            subprocess.run(["git", "-C", str(repo), "rm", "-q", name], check=True)
+    for name in _ready_paths():
+        _write(repo / name, _ready_text(name) or "x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), *env, "commit", "-q", "-m", "ready"], check=True)
+    subprocess.run(["git", "-C", str(repo), *env, "tag", "v0.5.0"], check=True)
+    return repo
+
+
+def test_the_committed_policy_selects_sphinx_for_any_release_tag(tmp_path: Path) -> None:
+    repo = _release_repo(tmp_path)
     policy = routes.load_manifest(MANIFEST).renderer_policy
-    selection = renderer.select_for_commit(policy, REPO_ROOT, candidate.tag_commit(REPO_ROOT, tag))
-    assert selection.renderer == renderer.SPHINX, f"{tag} selects astro: {selection.reason}"
-    assert "website/package.json" in selection.readiness.missing
+    for tag in ("v0.4.1", "v0.5.0"):
+        assert renderer.select_for_commit(policy, repo, tag).renderer == renderer.SPHINX, tag
+
+
+def test_auto_selects_astro_only_from_a_ready_release_tag(tmp_path: Path) -> None:
+    repo = _release_repo(tmp_path)
+    old = renderer.select_for_commit(renderer.POLICY_AUTO, repo, "v0.4.1")
+    assert old.renderer == renderer.SPHINX
+    assert "website/package.json" in old.readiness.missing
+    assert renderer.select_for_commit(renderer.POLICY_AUTO, repo, "v0.5.0").renderer == renderer.ASTRO
 
 
 def test_trunk_still_satisfies_the_astro_release_definition() -> None:
@@ -161,9 +191,10 @@ def _astro_checkout(
     page = ASTRO_PAGE.format(label=label)
     for name in ("index.html", "prompts/index.html", "docs/index.html", "docs/api.html", "blog/post.html", "404.html"):
         _write(dist / name, page)
+    _write(dist / "docs" / "guide.html", DOCS_LINKS_PAGE)
     _write(dist / "_astro" / f"site.{label}.css", f"{label} css")
     _write(dist / "_astro" / "shared.js", shared)
-    _write(dist / "_images" / "logo.svg", "logo")
+    _write(dist / "_images" / "logo.svg", f"{label} logo")
     _write(dist / "pagefind" / "index.json", label)
     _write(dist / "CNAME", "benchbox.dev\n")
     _write(dist / ".nojekyll", "")
@@ -211,9 +242,54 @@ def test_astro_assembly_takes_stable_routes_from_the_release_and_dev_routes_from
     assert {route["renderer"] for route in summary["routes"]} == {renderer.ASTRO}
     owners = summary["file_owners"]
     assert owners["_astro/shared.js"] == "/:."
-    assert owners["_astro/site.trunk.css"] == "/blog/:_astro"
-    assert owners["_images/logo.svg"] == "/:."
+    assert owners["_astro/site.trunk.css"] == "/docs/dev/:_astro"
+    assert owners["_images/logo.svg"] == "/blog/:_images"
+    assert read("_images/logo.svg") == "trunk logo"
     assert routes.owner_ref(routes.load_manifest(MANIFEST), "/docs/api.html", renderer.ASTRO) == "release"
+
+
+def test_trunk_docs_mounted_at_docs_dev_link_to_trunk_pages(tmp_path: Path) -> None:
+    release = _astro_checkout(tmp_path / "release", "release")
+    trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    _assemble_astro(tmp_path, release, trunk)
+    dev = (tmp_path / "out" / "docs" / "dev" / "guide.html").read_text(encoding="utf-8")
+    assert '<a href="/docs/dev/">Docs</a>' in dev
+    assert '<a href="/docs/dev/api.html#run">API</a>' in dev
+    assert '<a href="/docs/dev/">Root</a>' in dev
+    assert 'href="https://benchbox.dev/docs/dev/guide.html"' in dev
+    assert 'content="0; url=/docs/dev/api.html"' in dev
+    assert 'src="/docs/dev/_images/chart.png"' in dev
+    assert 'srcset="/docs/dev/_images/chart.png 1x, /docs/dev/_images/chart@2x.png 2x"' in dev
+    for unchanged in ('href="#local"', 'href="/blog/post.html"', 'href="/results/"', 'href="/_astro/site.css"'):
+        assert unchanged in dev
+    assert "<p>The /docs/ tree</p>" in dev
+    stable = (tmp_path / "out" / "docs" / "guide.html").read_text(encoding="utf-8")
+    assert stable == DOCS_LINKS_PAGE
+
+
+def test_astro_docs_dev_carries_its_own_assets_without_the_blog_route(tmp_path: Path) -> None:
+    release = _astro_checkout(tmp_path / "release", "release")
+    trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+    data["routes"] = [route for route in data["routes"] if route["path"] != "/blog/"]
+    summary = routes.assemble_routes(
+        manifest=routes.parse_manifest(data),
+        ref_roots={"release": release, "trunk": trunk},
+        site_dir=tmp_path / "out",
+        work_dir=tmp_path / "work",
+        stage_builder=assemble_astro_stage,
+        resolve_sha=lambda root: root.name,
+        renderer=renderer.ASTRO,
+    )
+    assert summary["file_owners"]["_astro/site.trunk.css"] == "/docs/dev/:_astro"
+
+
+def test_astro_explorer_without_a_snapshot_is_refused(tmp_path: Path) -> None:
+    release = _astro_checkout(tmp_path / "release", "release")
+    trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    (trunk / "website" / "dist" / "results" / "data" / "results.duckdb").unlink()
+    with pytest.raises(routes.RouteManifestError, match="no snapshot to pin"):
+        _assemble_astro(tmp_path, release, trunk)
 
 
 def test_astro_explorer_pins_the_ui_and_the_snapshot_separately(tmp_path: Path) -> None:
@@ -282,6 +358,7 @@ def _sphinx_checkout(root: Path, label: str, *, astro_page: str | None = None) -
     _write(root / "landing" / "index.html", f"{label} landing")
     _write(root / "results-explorer" / "package.json", "{}")
     _write(root / "results-explorer" / "dist" / "index.html", f"{label} explorer")
+    _write(root / "results-explorer" / "dist" / "data" / "results.duckdb", f"{label} snapshot")
     return root
 
 
@@ -361,11 +438,14 @@ def test_cli_refuses_a_renderer_that_differs_from_the_release_selection(tmp_path
     assert set(STAGE_BUILDERS) == set(renderer.RENDERERS)
 
 
-def _use(monkeypatch: pytest.MonkeyPatch, api: FakeGitHub, ready: bool) -> None:
+DEPLOYED_RELEASE = "9" * 40
+
+
+def _use(monkeypatch: pytest.MonkeyPatch, api: FakeGitHub, ready: bool, release_sha: str = SHA_A) -> None:
     monkeypatch.setattr(cli, "_client", api.client)
     monkeypatch.setattr(cli, "gh_receipt_loader", lambda repo: api.load_receipt)
     monkeypatch.setattr(candidate, "release_tags", lambda repo_dir: ["v0.4.1", "v0.5.0"])
-    monkeypatch.setattr(candidate, "tag_commit", lambda repo_dir, tag: SHA_A)
+    monkeypatch.setattr(candidate, "tag_commit", lambda repo_dir, tag: release_sha)
     monkeypatch.setattr(candidate, "first_parent_shas", lambda repo_dir, ref, limit=50: [SHA_B])
     monkeypatch.setattr(candidate, "is_ancestor", lambda repo_dir, ancestor, descendant: ancestor == SHA_A)
     paths = _ready_paths() if ready else list(V041_SHAPE)
@@ -384,9 +464,17 @@ def _use(monkeypatch: pytest.MonkeyPatch, api: FakeGitHub, ready: bool) -> None:
     )
 
 
-def _resolve(tmp_path: Path, *args: str) -> tuple[int, dict[str, Any]]:
+def _auto_repo(tmp_path: Path) -> Path:
+    data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+    data["renderer"] = renderer.POLICY_AUTO
+    _write(tmp_path / "auto-repo" / "deploy" / "routes.yml", yaml.safe_dump(data))
+    return tmp_path / "auto-repo"
+
+
+def _resolve(tmp_path: Path, *args: str, repo_dir: Path | None = None) -> tuple[int, dict[str, Any]]:
     output = tmp_path / "resolved.json"
-    code = cli.main(["resolve", "--output", str(output), *args])
+    repo = repo_dir or _auto_repo(tmp_path)
+    code = cli.main(["resolve", "--output", str(output), "--repo-dir", str(repo), *args])
     return code, json.loads(output.read_text(encoding="utf-8")) if output.exists() else {}
 
 
@@ -397,21 +485,29 @@ def _astro_receipt(run_id: int, trunk: str) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize(
-    ("ready", "deployed_astro", "expected", "visual"),
+    ("ready", "deployed_astro", "same_release", "expected", "visual"),
     [
-        (False, False, renderer.SPHINX, False),
-        (True, False, renderer.ASTRO, True),
-        (True, True, renderer.ASTRO, True),
-        (False, True, renderer.SPHINX, True),
+        (False, False, True, renderer.SPHINX, False),
+        (False, False, False, renderer.SPHINX, True),
+        (True, False, False, renderer.ASTRO, True),
+        (True, True, True, renderer.ASTRO, False),
+        (True, True, False, renderer.ASTRO, True),
+        (False, True, True, renderer.SPHINX, True),
     ],
 )
 def test_resolve_records_the_renderer_and_when_the_visual_guard_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ready: bool, deployed_astro: bool, expected: str, visual: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ready: bool,
+    deployed_astro: bool,
+    same_release: bool,
+    expected: str,
+    visual: bool,
 ) -> None:
     api = FakeGitHub()
     deployed = _astro_receipt(1, SHA_A) if deployed_astro else make_receipt(run_id=1, trunk=SHA_A)
     api.record_deployment(10, deployed, "2026-01-01T00:00:01Z")
-    _use(monkeypatch, api, ready)
+    _use(monkeypatch, api, ready, release_sha=DEPLOYED_RELEASE if same_release else SHA_A)
     outputs = tmp_path / "github-output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(outputs))
     code, resolved = _resolve(tmp_path, "--mode", "deploy")
@@ -422,6 +518,73 @@ def test_resolve_records_the_renderer_and_when_the_visual_guard_runs(
     lines = outputs.read_text(encoding="utf-8").splitlines()
     assert f"renderer={expected}" in lines
     assert f"visual_required={'true' if visual else 'false'}" in lines
+
+
+def test_resolve_with_the_committed_manifest_stays_on_sphinx_for_a_ready_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api = FakeGitHub()
+    api.record_deployment(10, make_receipt(run_id=1, trunk=SHA_A), "2026-01-01T00:00:01Z")
+    _use(monkeypatch, api, ready=True)
+    code, resolved = _resolve(tmp_path, "--mode", "deploy", repo_dir=REPO_ROOT)
+    assert code == 0
+    assert resolved["renderer"] == renderer.SPHINX
+    assert resolved["renderer_selection"]["policy"] == renderer.SPHINX
+
+
+def test_a_first_deploy_compares_only_when_it_would_publish_astro() -> None:
+    assert cli.visual_comparison_required(None, renderer.ASTRO, SHA_A) is True
+    assert cli.visual_comparison_required(None, renderer.SPHINX, SHA_A) is False
+
+
+def test_the_approval_binding_changes_with_release_candidate_and_baseline() -> None:
+    exact = cli.visual_approval_binding(SHA_A, "c" * 64, "b" * 64)
+    assert exact == f"{SHA_A}+{'c' * 64}+{'b' * 64}"
+    others = {
+        cli.visual_approval_binding(SHA_B, "c" * 64, "b" * 64),
+        cli.visual_approval_binding(SHA_A, "d" * 64, "b" * 64),
+        cli.visual_approval_binding(SHA_A, "c" * 64, "e" * 64),
+    }
+    assert exact not in others and len(others) == 3
+
+
+def _binding_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
+    candidate_tree = tmp_path / "candidate"
+    baseline_tree = tmp_path / "baseline"
+    _write(candidate_tree / "index.html", "candidate")
+    _write(baseline_tree / "index.html", "baseline")
+    out = tmp_path / "out"
+    _write(
+        out / "resolved.json",
+        json.dumps(
+            {
+                "release_tag": "v0.5.0",
+                "release_sha": SHA_A,
+                "deployed": {"artifact_sha256": compute_tree_digest(baseline_tree)[0]},
+            }
+        ),
+    )
+    _write(out / "route-assembly.json", json.dumps({"tree_sha256": compute_tree_digest(candidate_tree)[0]}))
+    return out, candidate_tree, baseline_tree
+
+
+def test_visual_binding_records_the_verified_candidate_and_baseline(tmp_path: Path) -> None:
+    out, candidate_tree, baseline_tree = _binding_inputs(tmp_path)
+    args = ["visual-binding", "--out-dir", str(out), "--candidate", str(candidate_tree)]
+    assert cli.main([*args, "--baseline", str(baseline_tree)]) == 0
+    recorded = json.loads((out / "visual-binding.json").read_text(encoding="utf-8"))
+    assert recorded["binding"] == cli.visual_approval_binding(
+        SHA_A, compute_tree_digest(candidate_tree)[0], compute_tree_digest(baseline_tree)[0]
+    )
+
+
+@pytest.mark.parametrize("tampered", ["candidate", "baseline"])
+def test_visual_binding_refuses_a_tree_that_differs_from_its_digest(tmp_path: Path, tampered: str) -> None:
+    out, candidate_tree, baseline_tree = _binding_inputs(tmp_path)
+    _write(tmp_path / tampered / "index.html", "edited")
+    args = ["visual-binding", "--out-dir", str(out), "--candidate", str(candidate_tree)]
+    assert cli.main([*args, "--baseline", str(baseline_tree)]) == 1
+    assert not (out / "visual-binding.json").exists()
 
 
 def test_resolve_fails_closed_when_the_tag_tree_is_unreadable(

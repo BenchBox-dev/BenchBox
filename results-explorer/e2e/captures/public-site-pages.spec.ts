@@ -41,7 +41,7 @@ if (RENDERER === "astro" && PHASE !== "capture") {
 // make an otherwise unchanged screenshot expire every midnight.
 const VISUAL_REFERENCE_TIME = new Date("2026-09-08T19:35:00Z");
 const VIEWPORTS = [390, 768, 1280, 1600] as const;
-const ROUTES = [
+const ALL_ROUTES = [
   { slug: "landing", path: "/", heading: /benchbox/i },
   { slug: "getting-started", path: "/docs/usage/getting-started.html", heading: /getting started/i },
   {
@@ -63,6 +63,16 @@ const ROUTES = [
     ready: /published platform/i,
   },
 ] as const;
+const SELECTED_SLUGS = (process.env.PUBLIC_SITE_VISUAL_ROUTES ?? "")
+  .split(",")
+  .map((slug) => slug.trim())
+  .filter((slug) => slug.length > 0);
+const UNKNOWN_SLUGS = SELECTED_SLUGS.filter((slug) => !ALL_ROUTES.some((route) => route.slug === slug));
+if (UNKNOWN_SLUGS.length > 0) {
+  throw new Error(`PUBLIC_SITE_VISUAL_ROUTES names unknown routes: ${UNKNOWN_SLUGS.join(", ")}`);
+}
+const ROUTES =
+  SELECTED_SLUGS.length > 0 ? ALL_ROUTES.filter((route) => SELECTED_SLUGS.includes(route.slug)) : ALL_ROUTES;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
 // Each Results viewport can spend up to 46 seconds on bounded cold-snapshot

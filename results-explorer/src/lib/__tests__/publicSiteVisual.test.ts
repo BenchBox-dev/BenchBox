@@ -191,3 +191,41 @@ describe("renderer-aware visual comparison", () => {
     expect(compareVisualManifestsAcrossRenderers(sphinx, partial, exact).missing).toEqual(["/docs/@390"]);
   });
 });
+
+describe("site-deploy approval bound to release, candidate and baseline", () => {
+  const release = "1".repeat(40);
+  const candidate = "c".repeat(64);
+  const baseline = "b".repeat(64);
+  const binding = (releaseSha: string, candidateSha: string, baselineSha: string) =>
+    `${releaseSha}+${candidateSha}+${baselineSha}`;
+  const sphinx: VisualManifest = { capture_profile: PUBLIC_SITE_CAPTURE_PROFILE, renderer: "sphinx", captures };
+  const moved: VisualManifest = {
+    ...sphinx,
+    captures: captures.map((capture) => ({ ...capture, digest: `${capture.digest}-next-release` })),
+  };
+  const approve = (approved: string) =>
+    compareVisualManifestsAcrossRenderers(sphinx, moved, {
+      approvedHeadSha: approved,
+      currentHeadSha: binding(release, candidate, baseline),
+      reason: "release pages reviewed",
+    });
+
+  it("fails an approval recorded for another release", () => {
+    const result = approve(binding("2".repeat(40), candidate, baseline));
+    expect(result.approvalApplied).toBe(false);
+    expect(result.changed).toEqual(["/@390", "/docs/@390"]);
+  });
+
+  it("fails an approval recorded for another candidate artifact", () => {
+    expect(approve(binding(release, "d".repeat(64), baseline)).approvalApplied).toBe(false);
+  });
+
+  it("fails an approval recorded against another baseline", () => {
+    expect(approve(binding(release, candidate, "e".repeat(64))).approvalApplied).toBe(false);
+  });
+
+  it("passes only the exact binding", () => {
+    const result = approve(binding(release, candidate, baseline));
+    expect(result).toMatchObject({ approvalApplied: true, changed: [], missing: [] });
+  });
+});

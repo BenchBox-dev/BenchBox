@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping
@@ -10,8 +11,8 @@ from typing import Any
 
 import yaml
 
-from scripts.publication.assembler import LaneArtifact, SiteAssembler, compute_file_sha256, compute_tree_digest
-from scripts.site_deploy import mixed_version
+from scripts.publication.assembler import LaneArtifact, SiteAssembler, compute_tree_digest
+from scripts.site_deploy import artifacts, mixed_version
 from scripts.site_deploy.renderer import ASTRO, POLICIES, RENDERERS, SPHINX
 
 REF_KINDS = ("release-tag", "trunk")
@@ -20,10 +21,15 @@ ROOT_FILE_NAMES = ("CNAME", ".nojekyll", "404.html")
 LANDING_EXCLUDES = ("docs", "blog", "results", "_static", "_images", *ROOT_FILE_NAMES)
 BLOG_ASSET_DIRS = ("_static", "_images")
 FULL_STAGE_BUILDERS = ("explorer",)
-ASTRO_SHARED_ASSET_DIRS = ("_astro", "_images")
-ASTRO_LANDING_EXCLUDES = ("docs", "blog", "results", *ROOT_FILE_NAMES)
-EXPLORER_SNAPSHOT = "data/results.duckdb"
-EXPLORER_SNAPSHOT_DIR = "data"
+ASTRO_ASSET_DIR = "_astro"
+ASTRO_IMAGE_DIR = "_images"
+ASTRO_LANDING_EXCLUDES = ("docs", "blog", "results", ASTRO_IMAGE_DIR, *ROOT_FILE_NAMES)
+DOCS_SOURCE_PREFIX = "/docs/"
+SITE_ORIGIN = "https://benchbox.dev"
+URL_ATTRIBUTE = re.compile(
+    r"""(\s(?:href|src|action|srcset|content|poster|data-[\w-]+)\s*=\s*)(["'])(.*?)\2""", re.IGNORECASE | re.DOTALL
+)
+DOCS_URL = re.compile(rf"(^|[\s,=]|{re.escape(SITE_ORIGIN)})/docs(?:/|(?=$|[?#\s,]))")
 SCHEMA = "site-deploy-route-assembly/v1"
 
 
@@ -144,14 +150,37 @@ def _extract(stage: Path, relative: str, destination: Path, excludes: tuple[str,
 
 def _mounts(route: Route, renderer: str = SPHINX) -> list[Mount]:
     astro = renderer == ASTRO
+    shared_assets = [Mount(ASTRO_ASSET_DIR, f"/{ASTRO_ASSET_DIR}/", shared=True)] if astro else []
     if route.builder == "landing":
         return [Mount("", route.path, ASTRO_LANDING_EXCLUDES if astro else LANDING_EXCLUDES)]
     if route.builder == "docs":
-        return [Mount("docs", route.path)]
+        return [Mount("docs", route.path), *shared_assets]
     if route.builder == "blog":
-        assets = ASTRO_SHARED_ASSET_DIRS if astro else BLOG_ASSET_DIRS
-        return [Mount("blog", route.path), *(Mount(name, f"/{name}/", shared=astro) for name in assets)]
+        if astro:
+            return [Mount("blog", route.path), *shared_assets, Mount(ASTRO_IMAGE_DIR, f"/{ASTRO_IMAGE_DIR}/")]
+        return [Mount("blog", route.path), *(Mount(name, f"/{name}/") for name in BLOG_ASSET_DIRS)]
     return [Mount("results", route.path)]
+
+
+def _rebase_value(value: str, prefix: str) -> str:
+    return DOCS_URL.sub(lambda match: f"{match.group(1)}{prefix}", value)
+
+
+def rebase_docs_links(html: str, prefix: str) -> str:
+    return URL_ATTRIBUTE.sub(
+        lambda match: f"{match.group(1)}{match.group(2)}{_rebase_value(match.group(3), prefix)}{match.group(2)}", html
+    )
+
+
+def _rebase_docs_tree(tree: Path, prefix: str) -> int:
+    changed = 0
+    for page in sorted(tree.rglob("*.html")):
+        original = page.read_text(encoding="utf-8")
+        rebased = rebase_docs_links(original, prefix)
+        if rebased != original:
+            page.write_text(rebased, encoding="utf-8")
+            changed += 1
+    return changed
 
 
 def owner_ref(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> str | None:
@@ -211,24 +240,6 @@ def _drop_shared_duplicates(extracted: Path, prefix: str, claimed: Mapping[str, 
     return bool(remaining)
 
 
-def _explorer_pins(extracted: Path, scratch: Path, source_sha: str) -> dict[str, Any]:
-    ui = scratch / "ui"
-    shutil.copytree(
-        extracted,
-        ui,
-        ignore=lambda directory, names: {EXPLORER_SNAPSHOT_DIR} if Path(directory) == extracted else set(),
-    )
-    ui_digest, _, _ = compute_tree_digest(ui)
-    snapshot = extracted / EXPLORER_SNAPSHOT
-    return {
-        "ui": {"source_sha": source_sha, "sha256": ui_digest},
-        "snapshot": {
-            "path": EXPLORER_SNAPSHOT,
-            "sha256": compute_file_sha256(snapshot) if snapshot.is_file() else None,
-        },
-    }
-
-
 def assemble_routes(
     *,
     manifest: RouteManifest,
@@ -276,6 +287,8 @@ def assemble_routes(
             raise RouteManifestError(
                 f"route {route.path} ({route.builder}) found no {mount.relative!r} in ref {route.ref}"
             )
+        if renderer == ASTRO and mount.relative == "docs" and mount.prefix != DOCS_SOURCE_PREFIX:
+            _rebase_docs_tree(extracted, mount.prefix)
         name = f"{route.path}:{mount.relative or '.'}"
         if mount.shared and not _drop_shared_duplicates(extracted, mount.prefix, claimed, name):
             continue
@@ -286,7 +299,10 @@ def assemble_routes(
         base = mount.prefix.strip("/")
         claimed.update({f"{base}/{rel}" if base else rel: sha for rel, sha in lane.file_manifest.items()})
         if route.builder == "explorer":
-            pins[route.path] = _explorer_pins(extracted, work_dir / "pins" / str(index), shas[route.ref])
+            try:
+                pins[route.path] = artifacts.explorer_pins(extracted, work_dir / "pins" / str(index), shas[route.ref])
+            except artifacts.ArtifactError as exc:
+                raise RouteManifestError(f"route {route.path}: {exc}") from exc
     for index, filename in enumerate(manifest.root_files):
         extracted = _extract(stages[manifest.root_files_ref], filename, work_dir / "lanes" / f"root-{index}")
         if extracted is None:

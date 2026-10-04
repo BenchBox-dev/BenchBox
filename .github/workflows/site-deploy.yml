@@ -101,8 +101,7 @@ jobs:
           if [ "$CURRENT_UNKNOWN" = "true" ]; then
             args+=(--current-unknown)
           fi
-          uv sync --frozen --no-dev --no-install-project
-          uv run --no-sync -- python -m scripts.site_deploy resolve "${args[@]}"
+          uv run --no-project --with "pyyaml==6.0.3" -- python -m scripts.site_deploy resolve "${args[@]}"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         if: always()
@@ -334,6 +333,8 @@ jobs:
     permissions:
       contents: read
       actions: read
+    env:
+      PUBLIC_SITE_VISUAL_ROUTES: landing,getting-started
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -351,7 +352,7 @@ jobs:
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: ${{ needs.resolve.outputs.resolved_artifact }}
+          name: ${{ needs.build.outputs.build_artifact }}
           path: out
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
@@ -376,6 +377,10 @@ jobs:
             echo "trunk_sha=$(jq -r '.deployed.trunk_sha' out/resolved.json)"
             echo "renderer=$(jq -r '.deployed_renderer' out/resolved.json)"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Bind the approval to the release, candidate and baseline
+        id: binding
+        run: python -m scripts.site_deploy visual-binding --out-dir out --candidate candidate --baseline production/tree
 
       - name: Install explorer dependencies
         working-directory: results-explorer
@@ -418,8 +423,8 @@ jobs:
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.production.outputs.trunk_sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.resolve.outputs.trunk_sha }}
-          PR_HEAD_SHA: ${{ needs.resolve.outputs.trunk_sha }}
-          APPROVED_HEAD_SHA: ${{ vars.SITE_DEPLOY_VISUAL_APPROVED_SHA }}
+          PR_HEAD_SHA: ${{ steps.binding.outputs.binding }}
+          APPROVED_HEAD_SHA: ${{ vars.SITE_DEPLOY_VISUAL_APPROVED_BINDING }}
           APPROVAL_REASON: ${{ vars.SITE_DEPLOY_VISUAL_APPROVAL_REASON }}
         run: npm run test:e2e:public-site
 
@@ -428,6 +433,7 @@ jobs:
         with:
           name: site-deploy-visual-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            out/visual-binding.json
             ${{ runner.temp }}/site-deploy-visual-production
             ${{ runner.temp }}/site-deploy-visual-candidate
           if-no-files-found: ignore

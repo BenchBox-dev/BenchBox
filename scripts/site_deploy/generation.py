@@ -41,6 +41,7 @@ class Deployed:
     newer_unreceipted: bool = False
     link_baseline: dict[str, list[list[str]]] = field(default_factory=dict)
     renderer: str = SPHINX
+    release_sha: str = ""
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ def deployed_from_receipt(receipt: dict[str, Any], receipt_sha: str, newer_unrec
         newer_unreceipted=newer_unreceipted,
         link_baseline=link_baseline,
         renderer=str(receipt.get("renderer") or SPHINX),
+        release_sha=str(receipt.get("release_sha") or ""),
     )
 
 
