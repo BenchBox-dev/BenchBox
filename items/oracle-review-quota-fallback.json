@@ -2,6 +2,7 @@
   "acceptance": [
     "An owner decision on the fallback (e.g. owner approval or a named alternative reviewer) and, if adopted, oracle-review recognizing it for the exact head commit"
   ],
+  "context": "2026-10-04 closeout: Delivered in #2635 (merged): a listed attester's 'Stand-in oracle review: APPROVE <head SHA>' comment satisfies oracle-review for that exact head.",
   "description": "oracle-review passes only on a Codex connector review or +1 after the head commit. When the connector hit its usage limit, soundness-path PRs (#2604, #2605, #2612, #2621, #2622, #2623) were reviewed by a stand-in agent and the review posted as a comment, but the check stayed red and cannot record that review. The process has no defined alternative.",
   "sessions": [
     {
@@ -10,6 +11,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "88a3a640496e4670846fc1a6fb6c828e",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:37:48Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b8becbbb2f544c3e8c4bbec70c6273a2",
       "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
