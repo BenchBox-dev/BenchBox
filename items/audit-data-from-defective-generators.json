@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Bundles in results-data and published corpora are checked for generator platform (macOS TPC-H, Windows TPC-DS) and date",
+    "Affected bundles are regenerated, labelled or withdrawn; cached datasets keyed by the old binaries are invalidated"
+  ],
+  "description": "Two generator defects fixed this cycle produced wrong data: TPC-H data generated with the packaged darwin-arm64 or darwin-x86_64 dbgen before #2622 has non-canonical supplier and customer addresses (affects Q2, Q10, Q15, Q20 values), and TPC-DS data generated on Windows before #2623 was generated at scale factor 1 regardless of the requested scale, with trailing separators. Any published result bundle, cached dataset or reference artifact built that way is wrong.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:08:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5f6f9e2697724ccfa9e749ebaaf0c292",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

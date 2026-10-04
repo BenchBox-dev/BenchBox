@@ -1145,6 +1145,13 @@
       "status": "done",
       "title": "Audit blog posts and historical release summaries for outdated Alpha/install language"
     },
+    "audit-data-from-defective-generators": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Audit published results and caches built with the defective macOS dbgen or Windows dsdgen"
+    },
     "audit-develop-sha-stamping-and-ci-gate": {
       "claim": null,
       "needs": [
