@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Build artifacts are untracked or generated outside the source tree",
+    "The tracked build configuration matches what the compile path uses, and a test or guard keeps them in sync"
+  ],
+  "description": "_sources/tpc-h/dbgen/ tracks stale Windows .o files and a Makefile.auto that no longer matches what benchbox/utils/tpc_compilation.py generates. The runtime auto-compile fallback rewrites both in place, so running it dirties the working tree and can mask which build configuration produced a binary.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:07:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "104f1e4b148d4f429596fca8123081da",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

@@ -20491,6 +20491,13 @@
       "status": "done",
       "title": "Unseeded TPC-H DataFrame runs use the SF=1 Q11 fraction at every scale"
     },
+    "tpch-dbgen-source-tree-hygiene": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Stop the TPC-H dbgen auto-compile fallback from rewriting tracked source files"
+    },
     "tpch-df-seed-parity": {
       "claim": null,
       "needs": [],
