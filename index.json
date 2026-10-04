@@ -20403,6 +20403,13 @@
       "status": "done",
       "title": "TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions"
     },
+    "tpcds-qualification-actionable-signal": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Make the weekly TPC-DS SF1 qualification report flag only new printed-answer mismatches"
+    },
     "tpcds-qualification-q17-malformed-answer": {
       "claim": null,
       "needs": [],
