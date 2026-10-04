@@ -6,7 +6,7 @@
     "MDX used only where a component is present (counted in build output)",
     "No committed generated content; docs/ unchanged by the build"
   ],
-  "context": "Prepared locally in worktree BenchBox.wt-astro-31 (uncommitted; vitest 171/171 green), to ship with astro-site-34 after PR #2597 merges. Converter complete per acceptance except the open independent-review findings (round 1 FAIL): H1 links.ts passes unresolved relative non-.md targets inside docs/ (real case docs/advanced/performance-optimization.md:806 '../reference/python-api/platforms/') and does not validate .md#fragment targets; H2 directive arguments/unused accepted options silently dropped (admonition argument should become first body line; list-table caption; toctree reversed/numbered/titlesonly/includehidden/name accepted but unapplied; MyST YAML option blocks in directive bodies); M1 visible toctrees count maxdepth by nested docs instead of section levels (root index 434 vs 262 items); M2 label/heading same-slug id order differs from Sphinx (driver-version-management#id1 vs #driver-version-management; test handlers.test.ts:97 locks current order); M3 golden fixtures copy real docs pages (must read docs/ directly). Lows: e2e/verify.mjs samples a removed API page; stale examples/ entries in known-broken-links.json; @astrojs/mdx unused direct dep; shiki transitive-only import in a test; drift tests for TAG_CATEGORIES and exclude lists; id-parity.ts unwired; inde[x].astro route test. Fix agents were stopped part-way (weekly model limit) — re-check each finding against the worktree before continuing. Mermaid deviation: client-side render with pinned mermaid@12.1.0 + <pre> fallback instead of build-time SVG. Reviewer scripts: scratchpad/rev31/.",
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as 9d295874 + 0d889d27 + 1a8a0aab (2026-10-04). Review round 2 FAIL (H1 eval-rst unbuilt targets, M1–M6, L1–L4) fixed in 1a8a0aab; round 3 review running. Blog archive/tag/author pages are not built (item 33); listed in UNBUILT_TARGETS with a test that fails once a route exists.",
   "description": "Write a converter that runs inside site-build and reads docs/**/*.md as the canonical source (guardrail G-b). It writes Astro content-collection entries to a gitignored build directory.\n\nOutput format: plain Markdown by default. MDX is emitted only for a page that needs a component (callout, mermaid, embed), so authoring and parsing constraints stay minimal.\n\nConstructs to handle, with counts re-measured after astro-site-30:\n- {tags} (219) → frontmatter tags and tag pages\n- toctrees (16 MyST + those converted from 39 RST) → sidebar config and section order\n- admonitions (26) → Callout\n- {doc}/{ref} and converted :doc: roles (236 before astro-site-30) → resolved relative links\n- {mermaid} (6) → build-time SVG\n- labels and explicit anchors kept as the same fragment ids; tables, images, Cobalt2-equivalent code highlighting\n\nAny directive, role or syntax it does not know is a hard build error naming file and line. Output is idempotent: a byte-identical rebuild from the same input.",
   "links": [
     "docs/conf.py",
@@ -45,6 +45,14 @@
       "op": "update",
       "op_id": "33a193e049234f52ae5efff6546cf1f8",
       "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T03:53:18Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f92c5516a8ea467c84eda0c7b9499956",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
