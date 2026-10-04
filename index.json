@@ -21790,12 +21790,17 @@
       "title": "Implement the decided sort-evidence model (record successful sort rewrites; requested-but-unexecuted sorts block)"
     },
     "tuning-sort-realized-by-ddl-no-drop-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T21:00:04Z",
+        "generation": "c88e02e43def4f7ba6252145fe274542",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [
         "tuning-gate-ledger-outcome-vocabulary-20261001"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Stop recording 'sort not applied' when the platform realizes the sort through DDL (ClickHouse, StarRocks)"
     },
     "tuning-soundness-test-coverage-20260712": {
