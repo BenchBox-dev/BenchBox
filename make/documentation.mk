@@ -91,8 +91,12 @@ site-dev: site-deps
 
 site-check: docs-generate site-deps
 	@npm --prefix website run check
-	@npm --prefix website test
+	@BENCHBOX_SITE_UNBUILT=1 npm --prefix website test
 	@npm --prefix website run audit:high
+
+site-test-built:
+	@npm --prefix website test
+	@npm --prefix website run verify:not-found
 
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build

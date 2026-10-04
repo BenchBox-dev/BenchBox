@@ -34,7 +34,7 @@ const { title, titleId, description, author, date, dateIso, searchable = true, a
 const hasMeta = Boolean(author || date || tags.length > 0);
 ---
 
-<Shell title={`${title} - BenchBox Blog`} description={description ?? `${title} - BenchBox blog post.`} type={isIndex ? "website" : "article"} searchable={searchable}>
+<Shell title={`${title} - BenchBox Blog`} description={description ?? (isIndex ? "BenchBox blog: release notes, benchmark deep dives and platform comparisons." : `${title} - BenchBox blog post.`)} type={isIndex ? "website" : "article"} searchable={searchable}>
   <article class="prose blog-post" data-pagefind-ignore={searchable ? undefined : ""}>
     <Breadcrumbs crumbs={blogTrail(title, isIndex)} />
     <h1 id={titleId}>{title}</h1>

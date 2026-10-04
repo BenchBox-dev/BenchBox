@@ -1,11 +1,14 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { builtSite } from "./built-site.ts";
 import { canonicalPath, pageMeta, renderRobots, renderSitemap, sitemapPathForFile } from "../src/lib/page-meta.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dist = path.resolve(here, "..", "dist");
+const repoRoot = path.resolve(here, "..", "..");
+const dist = builtSite();
 const origin = "https://benchbox.dev";
 
 describe("canonicalPath", () => {
@@ -58,16 +61,21 @@ describe("sitemap and robots", () => {
   });
 });
 
-function htmlPages(root: string, relative = ""): string[] {
-  return readdirSync(path.join(root, relative), { withFileTypes: true }).flatMap((entry) => {
-    const child = path.posix.join(relative, entry.name);
-    if (entry.isDirectory()) return entry.name === "pagefind" || entry.name === "_astro" || entry.name === "assets" ? [] : htmlPages(root, child);
-    return entry.name.endsWith(".html") ? [child] : [];
-  });
+function inventoryPages(site: string): string[] {
+  const code = [
+    "import json, sys",
+    "from pathlib import Path",
+    "sys.path.insert(0, 'scripts')",
+    "from site_inventory import build_inventory",
+    "print(json.dumps(sorted(build_inventory(Path(sys.argv[1]))['pages'])))",
+  ].join("\n");
+  const run = spawnSync("python3", ["-c", code, site], { cwd: repoRoot, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
+  if (run.status !== 0) throw new Error(`site inventory failed: ${run.stderr}`);
+  return (JSON.parse(run.stdout) as string[]).map((entry) => entry.slice(1));
 }
 
-function head(file: string): string {
-  const markup = readFileSync(path.join(dist, file), "utf-8");
+function head(site: string, file: string): string {
+  const markup = readFileSync(path.join(site, file), "utf-8");
   return markup.slice(0, markup.indexOf("</head>"));
 }
 
@@ -76,13 +84,14 @@ function content(markup: string, attribute: "name" | "property", value: string):
   return tag && /content="([^"]*)"/.exec(tag)?.[1];
 }
 
-describe.skipIf(!existsSync(path.join(dist, "index.html")))("built site", () => {
-  const pages = existsSync(dist) ? htmlPages(dist) : [];
+describe.skipIf(!dist)("built site", () => {
+  const site = dist as string;
+  const pages = dist ? inventoryPages(site) : [];
 
   it("gives every html page canonical, description, Open Graph and Twitter tags", () => {
     const missing: string[] = [];
     for (const file of pages) {
-      const markup = head(file);
+      const markup = head(site, file);
       const canonical = /<link[^>]*rel="canonical"[^>]*href="([^"]*)"/.exec(markup)?.[1] ?? /<link[^>]*href="([^"]*)"[^>]*rel="canonical"/.exec(markup)?.[1];
       const required = [
         canonical,
@@ -98,31 +107,42 @@ describe.skipIf(!existsSync(path.join(dist, "index.html")))("built site", () => 
       if (required.some((value) => !value)) missing.push(file);
       else if (!canonical?.startsWith(origin)) missing.push(`${file} (canonical origin)`);
       else if (file !== "404.html" && canonical !== `${origin}${sitemapPathForFile(file)}`) missing.push(`${file} (canonical ${canonical})`);
+      else if (content(markup, "property", "og:url") !== canonical) missing.push(`${file} (og:url)`);
+      else if (content(markup, "name", "twitter:card") !== "summary_large_image") missing.push(`${file} (twitter:card)`);
     }
     expect(pages.length).toBeGreaterThan(1000);
     expect(missing).toEqual([]);
   });
 
-  it("lists exactly the indexable pages in sitemap.xml", () => {
-    const listed = [...readFileSync(path.join(dist, "sitemap.xml"), "utf-8").matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
+  it("lists exactly the inventory html pages except 404.html in sitemap.xml", () => {
+    const listed = [...readFileSync(path.join(site, "sitemap.xml"), "utf-8").matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
     const expected = pages.filter((file) => file !== "404.html").map((file) => `${origin}${sitemapPathForFile(file)}`);
     expect(new Set(listed).size).toBe(listed.length);
     expect([...listed].sort()).toEqual([...expected].sort());
   });
 
   it("references the sitemap from robots.txt", () => {
-    expect(readFileSync(path.join(dist, "robots.txt"), "utf-8")).toContain(`Sitemap: ${origin}/sitemap.xml`);
+    expect(readFileSync(path.join(site, "robots.txt"), "utf-8")).toContain(`Sitemap: ${origin}/sitemap.xml`);
   });
 
-  it("keeps CNAME and .nojekyll", () => {
-    expect(readFileSync(path.join(dist, "CNAME"), "utf-8")).toBe(readFileSync(path.resolve(here, "..", "..", "docs", "CNAME"), "utf-8"));
-    expect(existsSync(path.join(dist, ".nojekyll"))).toBe(true);
+  it("keeps CNAME and .nojekyll and no stray sitemap files", () => {
+    expect(readFileSync(path.join(site, "CNAME"), "utf-8")).toBe(readFileSync(path.join(repoRoot, "docs", "CNAME"), "utf-8"));
+    expect(readFileSync(path.join(site, ".nojekyll"), "utf-8")).toBe("");
+    for (const stray of ["sitemap-index.xml", "sitemap-0.xml"]) expect(() => readFileSync(path.join(site, stray))).toThrow();
   });
 
-  it("keeps the results redirect in the 404 page", () => {
-    const markup = readFileSync(path.join(dist, "404.html"), "utf-8");
+  it("publishes the Explorer page exactly as the Explorer builds it", () => {
+    const published = readFileSync(path.join(site, "results", "index.html"), "utf-8");
+    const source = readFileSync(path.join(repoRoot, "results-explorer", "index.html"), "utf-8");
+    expect(published).toContain('<link rel="canonical" href="https://benchbox.dev/results/" />');
+    expect(source).toContain('href="https://benchbox.dev/results/"');
+  });
+
+  it("keeps the results redirect and noindex in the 404 page", () => {
+    const markup = readFileSync(path.join(site, "404.html"), "utf-8");
     expect(markup).toContain("benchbox.results.redirect");
     expect(markup).toContain("window.location.pathname.startsWith('/results/')");
     expect(markup).toContain("window.location.replace('/results/')");
+    expect(markup).toContain('name="robots" content="noindex"');
   });
 });

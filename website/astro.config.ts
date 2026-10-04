@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { unified } from "@astrojs/markdown-remark";
@@ -8,7 +8,7 @@ import type { AstroIntegration } from "astro";
 import { defineConfig } from "astro/config";
 import type { SidebarManifest } from "./src/converter/sidebar.ts";
 import { toStarlightSidebar } from "./src/converter/sidebar.ts";
-import { metaMarkup, pageMeta, renderRobots, renderSitemap, sitemapPathForFile } from "./src/lib/page-meta.ts";
+import { renderRobots, renderSitemap, sitemapPathForFile } from "./src/lib/page-meta.ts";
 import { docutilsQuotes, SMARTYPANTS } from "./src/lib/smartypants.ts";
 import { headingIds } from "./src/plugins/heading-ids.ts";
 
@@ -23,10 +23,6 @@ function generatedSidebar() {
   return toStarlightSidebar(JSON.parse(readFileSync(manifest, "utf-8")) as SidebarManifest);
 }
 
-function explorerDescription(markup: string): string | undefined {
-  return /<meta name="description" content="([^"]*)"/.exec(markup)?.[1];
-}
-
 function htmlFiles(root: string, relative = ""): string[] {
   return readdirSync(path.join(root, relative), { withFileTypes: true }).flatMap((entry) => {
     const child = path.posix.join(relative, entry.name);
@@ -34,6 +30,8 @@ function htmlFiles(root: string, relative = ""): string[] {
     return entry.name.endsWith(".html") ? [child] : [];
   });
 }
+
+const sitemapOwnedByPublishStatic: AstroIntegration = { name: "@astrojs/sitemap", hooks: {} };
 
 const publishStatic = (): AstroIntegration => ({
   name: "benchbox-publish-static",
@@ -43,13 +41,6 @@ const publishStatic = (): AstroIntegration => ({
       const explorerDist = path.join(repoRoot, "results-explorer", "dist");
       if (!existsSync(explorerDist)) throw new Error(`Results Explorer build is missing: ${explorerDist}`);
       cpSync(explorerDist, path.join(out, "results"), { recursive: true });
-      const explorerIndex = path.join(out, "results", "index.html");
-      const explorerMeta = metaMarkup(
-        pageMeta({ title: "BenchBox Results Explorer", description: explorerDescription(readFileSync(explorerIndex, "utf-8")), pathname: "/results/" }).filter(
-          (entry) => entry.attrs.name !== "description",
-        ),
-      );
-      writeFileSync(explorerIndex, readFileSync(explorerIndex, "utf-8").replace("</head>", `    ${explorerMeta}\n  </head>`));
       cpSync(path.join(repoRoot, "landing", "hero.png"), path.join(out, "hero.png"));
       const images = path.join(repoRoot, "docs", "blog", "images");
       mkdirSync(path.join(out, "_images"), { recursive: true });
@@ -57,7 +48,6 @@ const publishStatic = (): AstroIntegration => ({
       writeFileSync(path.join(out, ".nojekyll"), "");
       writeFileSync(path.join(out, "robots.txt"), renderRobots());
       const pages = htmlFiles(out).filter((file) => file !== "404.html");
-      for (const generated of ["sitemap-index.xml", "sitemap-0.xml"]) rmSync(path.join(out, generated), { force: true });
       writeFileSync(path.join(out, "sitemap.xml"), renderSitemap(pages.map(sitemapPathForFile)));
       for (const name of readdirSync(images)) cpSync(path.join(images, name), path.join(out, "_images", name));
     },
@@ -70,6 +60,7 @@ export default defineConfig({
   build: { format: "file" },
   markdown: { processor: unified({ remarkPlugins: [headingIds, docutilsQuotes], smartypants: SMARTYPANTS }) },
   integrations: [
+    sitemapOwnedByPublishStatic,
     starlight({
       title: "BenchBox",
       pagefind: false,

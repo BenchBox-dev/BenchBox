@@ -12,7 +12,6 @@ export type PageMetaInput = {
   description?: string;
   pathname: string;
   type?: "website" | "article";
-  card?: "summary" | "summary_large_image";
 };
 
 export function canonicalPath(pathname: string): string {
@@ -56,23 +55,13 @@ export function pageMeta(input: PageMetaInput): MetaTag[] {
     meta("property", "og:url", url),
     meta("property", "og:image", SOCIAL_IMAGE),
     meta("property", "og:image:alt", SOCIAL_IMAGE_ALT),
-    meta("name", "twitter:card", input.card ?? "summary"),
+    meta("name", "twitter:card", "summary_large_image"),
     meta("name", "twitter:title", input.title),
     meta("name", "twitter:description", description),
     meta("name", "twitter:image", SOCIAL_IMAGE),
   ];
 }
 
-export function metaMarkup(tags: readonly MetaTag[]): string {
-  return tags
-    .map(({ tag, attrs }) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${escapeAttribute(value)}"`).join(" ")} />`)
-    .join("\n    ");
-}
-
 function escapeXml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function escapeAttribute(value: string): string {
-  return escapeXml(value).replace(/"/g, "&quot;");
 }

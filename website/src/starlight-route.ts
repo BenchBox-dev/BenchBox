@@ -15,7 +15,7 @@ export const onRequest = defineRouteMiddleware((context) => {
   const title = route.entry.data.title;
   const description = route.entry.data.description ?? `${title} - BenchBox documentation.`;
   const present = new Set(route.head.map((entry) => entry.attrs?.name ?? entry.attrs?.property ?? entry.attrs?.rel));
-  for (const entry of pageMeta({ title, description, pathname: context.url.pathname, type: "article", card: "summary_large_image" })) {
+  for (const entry of pageMeta({ title, description, pathname: context.url.pathname, type: "article" })) {
     const key = entry.attrs.name ?? entry.attrs.property ?? entry.attrs.rel;
     if (!present.has(key)) route.head.push({ tag: entry.tag, attrs: entry.attrs, content: "" });
   }

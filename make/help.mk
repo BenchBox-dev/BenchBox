@@ -124,6 +124,7 @@ help:
 	@echo "  make site-build      Convert docs/ to website/.generated, then build the Astro site into website/dist (needs results-explorer/dist)"
 	@echo "  make site-dev        Run the Astro dev server in website/"
 	@echo "  make site-check      Typecheck website/ with astro check, run its converter tests and its high-severity audit"
+	@echo "  make site-test-built Run the website tests against website/dist and the not-found fallback e2e (run after site-build)"
 	@echo ""
 	@echo "PR Workflow & Worktrees:"
 	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
