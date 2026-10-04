@@ -6666,12 +6666,7 @@
       "title": "Add an AST lint banning params.get(\"k\", literal) fallbacks for unmapped TPC-DS keys"
     },
     "dfparity-t07-per-query-enablement": {
-      "claim": {
-        "expires_at": "2026-10-05T17:20:02Z",
-        "generation": "f116146f09ab4404af86468b32bb946a",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t05-adapter-batches",
         "dfparity-t00-owner-decisions",
@@ -6685,7 +6680,7 @@
         "dfparity-t05h-adapters-q44-q49-inventory"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Enable parameter overrides in production DataFrame runs per query, behind a consumption check"
     },
     "dfparity-t08-q70-expression-rounding": {
