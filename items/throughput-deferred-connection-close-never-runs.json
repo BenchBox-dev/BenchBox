@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Cleanup keeps its own reference to the throughput result/outstanding futures, independent of phase building",
+    "An end-to-end adapter.run_benchmark test with a deliberately hung stream asserts close_connection is not called until the stream finishes",
+    "Normal (no-timeout) runs still close the connection synchronously"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Consensus finding from two reviewers; call order verified directly.",
+  "description": "`_build_execution_phases` (benchbox/platforms/base/result_capture.py:1967-1969) clears `self._last_throughput_test_result` after building the phase. It runs at adapter.py:1103, before the `finally` block calls `_close_run_connection()` (adapter.py:1235, 1279-1288). That method passes the now-None attribute to `_defer_connection_close_until_quiescent`, which closes immediately when given None (adapter.py:1238-1240).\n\nEffect: on the normal path, whenever a throughput stream times out, the shared connection (DuckDB, SQLite, Spark) is closed under a still-running stream's cursor. This breaks the concurrency ADR rule that owned resources are not reused or closed while outstanding. The deferred-close thread added for containment never runs in a full benchmark run. Existing tests patch `_close_run_connection` out, so none covers this.\n\nVerified by reading the call order and reproduced by two reviewers (outstanding future + `_post_measurement_contained=True` -> close_connection called synchronously).",
+  "links": [
+    "benchbox/platforms/base/result_capture.py",
+    "benchbox/platforms/base/adapter.py",
+    "benchbox/core/throughput/containment.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:57:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a7230ae7943549c2b8a24dc1206c4ff4",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
