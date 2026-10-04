@@ -95,7 +95,6 @@ tests/unit/scripts/test_e2e_specs_have_no_hardcoded_ids.py
 tests/unit/scripts/test_explorer_build_contract.py
 tests/unit/scripts/test_explorer_receipt_ui_contract.py
 tests/unit/scripts/test_fast_lane_ceiling_check.py
-tests/unit/scripts/test_fast_lane_ratchet_check.py
 tests/unit/scripts/test_generate_changelog_entry.py
 tests/unit/scripts/test_generate_corpus_inventory.py
 tests/unit/scripts/test_guard_messages.py
@@ -117,6 +116,7 @@ tests/unit/scripts/test_pr_review_followups.py
 tests/unit/scripts/test_preflight_targets.py
 tests/unit/scripts/test_pytest_shard_evidence.py
 tests/unit/scripts/test_reference_usage_audit.py
+tests/unit/scripts/test_regenerate_correctness_gate_digests.py
 tests/unit/scripts/test_release_admitted_dist.py
 tests/unit/scripts/test_release_artifact_consumer.py
 tests/unit/scripts/test_release_artifact_execution.py

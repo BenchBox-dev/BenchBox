@@ -232,6 +232,7 @@ _project/reports/worktree-lifecycle/
 
 ci-log.txt
 /site/
+/make/inventory.json
 /.claude/worktrees
 
 # Node - declared in results-explorer/package.json; never vendor at repo root.

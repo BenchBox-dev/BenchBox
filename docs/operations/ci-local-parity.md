@@ -104,27 +104,9 @@ trailing `; \` continuation marker before comparing it against the `ci.yml`
 command text -- see `_normalize_recipe_lines` in
 `tests/system/test_ci_lint_parity.py`.
 
-If a guard genuinely cannot run locally (see the cache exception below
-for the only current example), add it to the `EXCLUDED_STEPS` dict in the
+If a guard genuinely cannot run locally, add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
-
-## Documented exceptions
-
-### Fast lane delta guard vs. develop
-
-The `lint` job's "Fast lane ceiling delta vs develop" step
-(`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
-develop fast-lane baseline count, populated by `fast-lane-baseline.yml`
-after every push to develop) and diffs this PR's own fast-lane collect
-count against it. The hosted pull-request command passes
-`--require-develop-baseline`, so a missing or invalid cache fails closed with
-`DELTA_CHECK_BASELINE_ERROR` rather than allowing a PR to enter a composition
-without proving its per-PR delta.
-There is no local equivalent for the cache restore, so `ci-lint` does not run
-this cache-dependent guard. Direct script callers that omit the strict flag
-retain the compatibility `DELTA_CHECK_SKIPPED` behavior. See
-`docs/operations/fast-lane-budget.md` for the full model.
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
