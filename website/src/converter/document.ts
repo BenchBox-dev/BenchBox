@@ -2,11 +2,12 @@ import { mergeDefinitionLists } from "./handlers/deflist.ts";
 import type { Code, FootnoteDefinition, Html, Paragraph, PhrasingContent, Root, RootContent } from "mdast";
 import { collectionOf, contentIdFor, DocsIndex, routeFor } from "./docs-index.ts";
 import { ConverterError, UnknownConstructError, UnresolvedReferenceError } from "./errors.ts";
+import { smarten } from "../lib/smartypants.ts";
 import { IdAllocator } from "./ids.ts";
 import type { Collection, DocInfo, LabelInfo, PageData, ResolvedDoc, ResolvedLabel, SourcePosition, TocNode, TocSection, ToctreeBlock } from "./model.ts";
 import { parse as parseYaml } from "yaml";
 import { parseFrontMatter, parseMarkdown, type FrontMatter } from "./parse.ts";
-import { ATTRS_MARKER, COMMENT_MARKER, LABEL_MARKER, preprocess } from "./preprocess.ts";
+import { ATTRS_MARKER, COMMENT_MARKER, LABEL_MARKER, MISPLACED_MARKER, preprocess } from "./preprocess.ts";
 import type { HandlerRegistry } from "./registry.ts";
 import type { ComponentName, ConvertContext, DirectiveCall } from "./types.ts";
 
@@ -17,6 +18,7 @@ export type ConvertedDocument = {
   data: PageData;
   root: Root;
   info: DocInfo;
+  positions: WeakMap<RootContent, SourcePosition>;
   components: ReadonlySet<ComponentName>;
   errors: readonly ConverterError[];
 };
@@ -122,6 +124,7 @@ class DocumentConverter implements ConvertContext {
   private attrs: { id: string; at: SourcePosition } | undefined;
   private explicitId: string | undefined;
   private readonly rawIds = new Map<string, SourcePosition>();
+  readonly positions = new WeakMap<RootContent, SourcePosition>();
 
   constructor(request: ConvertRequest) {
     this.file = request.path;
@@ -149,12 +152,14 @@ class DocumentConverter implements ConvertContext {
   }
 
   resolveDoc(target: string, at: SourcePosition, kind = "doc"): ResolvedDoc {
+    let resolved: ResolvedDoc;
     try {
-      return this.index.resolveDoc(this.file, target, at, kind);
+      resolved = this.index.resolveDoc(this.file, target, at, kind);
     } catch (error) {
       if (this.pass === "collect" && error instanceof UnresolvedReferenceError) return { path: target, route: "#", title: target };
       throw error;
     }
+    return resolved;
   }
 
   findDoc(target: string): ResolvedDoc | undefined {
@@ -170,8 +175,7 @@ class DocumentConverter implements ConvertContext {
     const info = this.index.get(path);
     if (!info) throw new UnresolvedReferenceError(at.file, at.line, `link:${path}#${fragment}`, "points at a missing document");
     if (info.ids.includes(fragment) || this.knownBroken(`${info.route}#${fragment}`)) return;
-    const reason = info.format === "rst" ? "cannot be checked: the target is a reStructuredText page this converter does not build" : `is not an id on ${info.path}`;
-    throw new UnresolvedReferenceError(at.file, at.line, `link:${path}#${fragment}`, reason);
+    throw new UnresolvedReferenceError(at.file, at.line, `link:${path}#${fragment}`, `is not an id on ${info.path}`);
   }
 
   resolveLabel(label: string, at: SourcePosition): ResolvedLabel {
@@ -283,7 +287,12 @@ class DocumentConverter implements ConvertContext {
 
   private blocks(children: RootContent[], frame: Frame): RootContent[] {
     const out: RootContent[] = [];
-    for (const child of children) out.push(...this.guard(() => this.attributed(child, frame)));
+    const top = frame.lineOffset === 0 && this.depth === 0 && this.nesting === 0;
+    for (const child of children) {
+      const produced = this.guard(() => this.attributed(child, frame));
+      if (top) for (const node of produced) this.positions.set(node, this.at(child, frame));
+      out.push(...produced);
+    }
     const dangling = this.attrs;
     this.attrs = undefined;
     if (dangling) this.errors.push(new UnknownConstructError(dangling.at.file, dangling.at.line, "syntax:attrs-block", "attrs block is not followed by a block it can attach to"));
@@ -326,6 +335,9 @@ class DocumentConverter implements ConvertContext {
       case "html":
         return this.html(node, at);
       case "heading": {
+        if (this.depth > 0 || this.nesting > 0) {
+          throw new UnknownConstructError(at.file, at.line, "syntax:nested-heading", "a heading inside a blockquote, list or directive body is a rubric in Sphinx, not a section; use bold text or move it out");
+        }
         node.children = this.phrasing(node.children, frame);
         return this.registry.syntaxHandler("heading", at).handle(node, at, this);
       }
@@ -370,6 +382,10 @@ class DocumentConverter implements ConvertContext {
   }
 
   private html(node: Html, at: SourcePosition): RootContent[] {
+    const misplaced = node.value.match(MISPLACED_MARKER);
+    if (misplaced) {
+      throw new UnknownConstructError(at.file, at.line, `syntax:misplaced-${misplaced[1]}`, `${misplaced[1]} line is indented four or more columns past its paragraph, where MyST reads it as plain text`);
+    }
     if (node.value === COMMENT_MARKER) return this.registry.syntaxHandler("comment", at).handle(node, at, this);
     if (LABEL_MARKER.test(node.value)) return this.registry.syntaxHandler("label", at).handle(node, at, this);
     this.releaseOnContent();
@@ -379,7 +395,7 @@ class DocumentConverter implements ConvertContext {
 
   private paragraph(node: Paragraph, at: SourcePosition, frame: Frame): RootContent[] {
     const raw = node.position ? frame.source.slice(node.position.start.offset, node.position.end.offset) : "";
-    if (raw.startsWith(":::")) {
+    if (raw.split("\n").some((line) => line.trimStart().startsWith(":::"))) {
       node.children = this.phrasing(node.children, frame);
       return this.registry.syntaxHandler("colon-fence", at).handle(node, at, this);
     }
@@ -473,6 +489,8 @@ class DocumentConverter implements ConvertContext {
       case "footnoteReference":
         return [{ type: "html", value: `<span id="${this.ids.automatic()}"></span>` }, node];
       case "html": {
+        if (MISPLACED_MARKER.test(node.value)) return this.html(node, at) as PhrasingContent[];
+        if (node.value.startsWith("<!--benchbox-")) throw new UnknownConstructError(at.file, at.line, "syntax:inline-marker", "label, attrs or comment line in a position MyST does not read as a block");
         const name = node.value.startsWith("<!--") ? "html-comment" : "raw-html-inline";
         return this.registry.syntaxHandler(name, at).handle(node, at, this) as PhrasingContent[];
       }
@@ -507,7 +525,8 @@ class DocumentConverter implements ConvertContext {
       if (generated.has(id)) this.errors.push(new ConverterError(at.file, at.line, `raw html id ${JSON.stringify(id)} duplicates an id the page already generates`));
     }
     const frontTitle = this.pageData.get("title");
-    const title = this.title ?? (typeof frontTitle === "string" ? frontTitle : undefined);
+    const rawTitle = this.title ?? (typeof frontTitle === "string" ? frontTitle : undefined);
+    const title = rawTitle === undefined ? undefined : smarten(rawTitle);
     if (title === undefined) {
       this.errors.push(new ConverterError(this.file, 1, "document has no title: add a first-level heading or a front matter title"));
     }
@@ -526,7 +545,6 @@ class DocumentConverter implements ConvertContext {
       path: this.file,
       route: routeFor(this.file),
       title: title ?? this.file,
-      format: "md",
       collection: this.collection,
       labels: this.labels,
       ids: [...new Set([...this.ids.all(), ...this.rawIds.keys()])].sort(),
@@ -542,6 +560,7 @@ class DocumentConverter implements ConvertContext {
       data,
       root: { type: "root", children: body },
       info,
+      positions: this.positions,
       components: this.components,
       errors: this.errors,
     };

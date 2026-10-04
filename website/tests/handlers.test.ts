@@ -201,16 +201,12 @@ describe("doc role and links", () => {
     );
   });
 
-  it("links to reStructuredText pages by their Sphinx route", () => {
-    const result = build({ "a.md": "# A\n\n[api](api/core.rst) [bare](api/core)\n", "api/core.rst": "Core\n====\n" });
-    expect(result.errors).toEqual([]);
-    expect(bodyOf(result, "docs/a.md")).toContain("[api](/docs/api/core.html) [bare](/docs/api/core.html)");
-  });
-
-  it("keeps links to real files under docs", () => {
-    const result = build({ "a.md": "# A\n\n[csv](data/x.csv)\n", "data/x.csv": "a\n" });
-    expect(result.errors).toEqual([]);
-    expect(bodyOf(result, "docs/a.md")).toContain("[csv](data/x.csv)");
+  it("fails on any reStructuredText page, which this site does not build", () => {
+    const result = build({ "a.md": "# A\n\n[api](api/core.rst)\n", "api/core.rst": "Core\n====\n" });
+    expect(result.errors.map((error) => error.message)).toEqual([
+      "api/core.rst:1: reStructuredText pages are not built by this site; convert the page to MyST Markdown",
+      "a.md:3: link:api/core.rst does not match a document under docs/ (looked for api/core.md)",
+    ]);
   });
 
   it("fails on unresolvable relative targets with file and line", () => {
@@ -224,11 +220,10 @@ describe("doc role and links", () => {
 
   it("validates fragments against the target page ids", () => {
     const result = build({
-      "a.md": "# A\n\n[ok](b.md#sec) [label](b.md#lbl) [bad](b.md#nope) [self](#gone) [bare](b#sec) [rst](c.rst#top)\n",
+      "a.md": "# A\n\n[ok](b.md#sec) [label](b.md#lbl) [bad](b.md#nope) [self](#gone) [bare](b#sec)\n",
       "b.md": "# B\n\n## Sec\n\n(lbl)=\nText.\n",
-      "c.rst": "C\n=\n",
     });
-    expect(result.errors.map((error) => (error as UnresolvedReferenceError).reference)).toEqual(["link:b.md#nope", "link:a.md#gone", "link:b#sec", "link:c.rst#top"]);
+    expect(result.errors.map((error) => (error as UnresolvedReferenceError).reference)).toEqual(["link:b.md#nope", "link:a.md#gone", "link:b#sec"]);
   });
 
   it("allows only the broken fragments listed as known Sphinx breakage", () => {
@@ -342,7 +337,13 @@ describe("unknown constructs", () => {
   it("renders a colon fence as the plain paragraph Sphinx renders without colon_fence", () => {
     const result = build({ "a.md": "# A\n\n:::{note}\nhi\n:::\n" });
     expect(result.errors).toEqual([]);
-    expect(bodyOf(result, "docs/a.md")).toContain(":::{note}\nhi\n:::");
+    expect(bodyOf(result, "docs/a.md")).toContain("&#58;::{note}\nhi\n&#58;::");
+  });
+
+  it("escapes a brace-less :::note fence so the page renders it as the literal text Sphinx shows", () => {
+    const result = build({ "a.md": "# A\n\nIntro line\n:::note\nliteral *text*\n:::\n" });
+    expect(result.errors).toEqual([]);
+    expect(bodyOf(result, "docs/a.md")).toContain("Intro line\n&#58;::note\nliteral *text*\n&#58;::");
   });
 
   it("rejects colon_fence when a page enables it", () => {

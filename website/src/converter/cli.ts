@@ -1,7 +1,6 @@
-import { rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertBuilt, buildSite, loadKnownBrokenLinks, writeOutput } from "./build.ts";
+import { assertBuilt, assertOwnedOutput, buildSite, clearOutput, loadKnownBrokenLinks, UnownedOutputError, writeOutput } from "./build.ts";
 import { ConversionFailedError, constructOf } from "./errors.ts";
 
 const websiteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -14,6 +13,14 @@ function option(name: string, fallback: string): string {
 const docsRoot = path.resolve(option("--docs", path.join(websiteRoot, "..", "docs")));
 const outRoot = path.resolve(option("--out", path.join(websiteRoot, ".generated")));
 const showAll = process.argv.includes("--all");
+
+try {
+  assertOwnedOutput(outRoot);
+} catch (error) {
+  if (!(error instanceof UnownedOutputError)) throw error;
+  process.stderr.write(`${error.message}\n`);
+  process.exit(1);
+}
 
 const knownBrokenLinks = loadKnownBrokenLinks(path.join(websiteRoot, "..", "_project", "design", "site-inventory", "known-broken-links.json"));
 
@@ -36,7 +43,7 @@ try {
   }
   const files = new Set(error.errors.map((failure) => failure.file));
   lines.push(`${error.errors.length} errors in ${files.size} files`);
-  rmSync(outRoot, { recursive: true, force: true });
+  clearOutput(outRoot);
   process.stderr.write(`${lines.join("\n")}\n`);
   process.exit(1);
 }

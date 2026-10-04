@@ -10,6 +10,7 @@ import { defineConfig } from "astro/config";
 import type { SidebarManifest } from "./src/converter/sidebar.ts";
 import { toStarlightSidebar } from "./src/converter/sidebar.ts";
 import { htmlSitemapUrl } from "./src/lib/sitemap-url.ts";
+import { docutilsQuotes, SMARTYPANTS } from "./src/lib/smartypants.ts";
 import { headingIds } from "./src/plugins/heading-ids.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,7 +44,7 @@ export default defineConfig({
   site: "https://benchbox.dev",
   trailingSlash: "ignore",
   build: { format: "file" },
-  markdown: { processor: unified({ remarkPlugins: [headingIds] }) },
+  markdown: { processor: unified({ remarkPlugins: [headingIds, docutilsQuotes], smartypants: SMARTYPANTS }) },
   integrations: [
     sitemap({ serialize: (item) => ({ ...item, url: htmlSitemapUrl(item.url) }) }),
     starlight({

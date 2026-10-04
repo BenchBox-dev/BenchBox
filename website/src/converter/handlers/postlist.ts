@@ -13,6 +13,10 @@ const DEFAULT_ENTRY_FORMAT = "{date} - {title}";
 
 type Post = { path: string; line: number; date: Date; title: string; route: string; excerpt: PhrasingContent[] };
 
+function descending(a: string, b: string): number {
+  return a < b ? 1 : a > b ? -1 : 0;
+}
+
 function parseDate(value: unknown, file: string, line: number): Date {
   const text = value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? "");
   const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -135,11 +139,11 @@ export const postlistDirective: DirectiveHandler = {
       .paths()
       .filter((candidate) => {
         const info = context.index.get(candidate);
-        return info?.collection === "blog" && info.format === "md" && candidate !== context.file;
+        return info?.collection === "blog" && candidate !== context.file;
       })
       .map((candidate) => loadPost(context, candidate))
       .filter((post): post is Post => post !== undefined)
-      .sort((a, b) => b.date.getTime() - a.date.getTime() || (a.path < b.path ? -1 : 1));
+      .sort((a, b) => b.date.getTime() - a.date.getTime() || descending(a.title, b.title) || descending(a.path, b.path));
     const out: RootContent[] = [];
     for (const post of posts) {
       out.push({ type: "paragraph", children: entryNodes(format, post, dateFormat, call.at) });

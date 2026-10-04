@@ -27,7 +27,6 @@ export type DocInfo = {
   path: string;
   route: string;
   title: string;
-  format: "md" | "rst";
   collection: Collection;
   labels: Map<string, LabelInfo>;
   ids: string[];

@@ -16,11 +16,11 @@ const files = {
 };
 
 describe("postlist directive", () => {
-  it("lists posts newest first with formatted dates, links and first-paragraph excerpts", () => {
+  it("lists posts by date then title, both descending as ablog does, with formatted dates, links and first-paragraph excerpts", () => {
     const result = build(files);
     expect(result.errors).toEqual([]);
     const body = bodyOf(result, "blog/index.md");
-    const order = ["March 05, 2026 - [New post](/blog/2026-03-05-new.html)", "March 05, 2026 - [Newer same day](/blog/2026-03-05-newer.html)", "January 01, 2026 - [Old post](/blog/2026-01-01-old.html)"].map((line) => body.indexOf(line));
+    const order = ["March 05, 2026 - [Newer same day](/blog/2026-03-05-newer.html)", "March 05, 2026 - [New post](/blog/2026-03-05-new.html)", "January 01, 2026 - [Old post](/blog/2026-01-01-old.html)"].map((line) => body.indexOf(line));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(body).toContain("New excerpt link here.");

@@ -42,11 +42,11 @@ describe("links to repository files", () => {
     expect(bodyOf(docsRoot, "docs/guide/a.md")).toContain("(https://github.com/BenchBox-dev/BenchBox/blob/develop/README.md)");
   });
 
-  it("leaves a target inside docs unchanged and fails on a missing repository target", () => {
+  it("points non-page files under docs at the repository and fails on a missing target", () => {
     const docsRoot = repository({ "docs/a.md": "# A\n\n[Gone](../nowhere.py) [Data](data.csv)\n", "docs/data.csv": "a\n" });
     const result = buildSite({ docsRoot });
     expect(result.errors.map((error) => error.message)).toEqual(["a.md:3: link:../nowhere.py does not match a file in the repository"]);
-    const kept = repository({ "docs/a.md": "# A\n\n[Data](data.csv)\n", "docs/data.csv": "a\n" });
-    expect(bodyOf(kept, "docs/a.md")).toContain("(data.csv)");
+    const kept = repository({ "docs/guide/a.md": "# A\n\n[Data](../data/x.csv#L2)\n", "docs/data/x.csv": "a\n" });
+    expect(bodyOf(kept, "docs/guide/a.md")).toContain("(https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/data/x.csv#L2)");
   });
 });

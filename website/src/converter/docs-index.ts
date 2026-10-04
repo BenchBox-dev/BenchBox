@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { ConverterError, UnresolvedReferenceError } from "./errors.ts";
 import type { Collection, DocInfo, LabelInfo, ResolvedDoc, ResolvedLabel, SourcePosition } from "./model.ts";
 import type { DocSourceFile } from "./sources.ts";
-import { rstTags } from "./tag-pages.ts";
 
 export function stemOf(relative: string): string {
   return relative.replace(/\.(md|rst)$/, "");
@@ -22,22 +21,11 @@ export function contentIdFor(relative: string): string {
   return collectionOf(relative) === "blog" ? stem : `docs/${stem}`;
 }
 
-export function rstTitle(raw: string): string | undefined {
-  const lines = raw.split("\n");
-  for (let index = 1; index < lines.length; index += 1) {
-    const underline = lines[index].trim();
-    const title = lines[index - 1].trim();
-    if (title && underline.length >= title.length && /^([=\-~^"#*+])\1+$/.test(underline)) return title;
-  }
-  return undefined;
-}
-
-export function placeholderInfo(source: { relative: string }, format: "md" | "rst"): DocInfo {
+export function placeholderInfo(source: { relative: string }): DocInfo {
   return {
     path: source.relative,
     route: routeFor(source.relative),
     title: stemOf(source.relative).split("/").pop() ?? source.relative,
-    format,
     collection: collectionOf(source.relative),
     labels: new Map(),
     ids: [],
@@ -65,16 +53,6 @@ export class DocsIndex {
     }
   }
 
-  static fromRstSources(sources: DocSourceFile[]): DocInfo[] {
-    return sources.map((source) => {
-      const info = placeholderInfo(source, "rst");
-      const raw = readFileSync(source.absolute, "utf-8");
-      info.title = rstTitle(raw) ?? info.title;
-      info.tags = rstTags(raw);
-      return info;
-    });
-  }
-
   paths(): string[] {
     return [...this.docs.keys()].sort();
   }
@@ -86,7 +64,7 @@ export class DocsIndex {
   findDoc(from: string, target: string): ResolvedDoc | undefined {
     const stem = this.stemFor(from, target);
     if (stem === undefined) return undefined;
-    for (const candidate of [`${stem}.md`, `${stem}.rst`]) {
+    for (const candidate of [`${stem}.md`]) {
       const info = this.docs.get(candidate);
       if (info) return { path: info.path, route: info.route, title: info.title };
     }

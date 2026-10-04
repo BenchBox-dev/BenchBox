@@ -1,11 +1,13 @@
 import type { Root, RootContent } from "mdast";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
+import remarkParse from "remark-parse";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
 import { stringify as stringifyYaml } from "yaml";
 import { COMPONENT_MODULES } from "./components.ts";
 import type { ConvertedDocument } from "./document.ts";
+import type { SourcePosition } from "./model.ts";
 
 export type SerializedDocument = { outputPath: string; content: string; format: "md" | "mdx" };
 
@@ -25,6 +27,34 @@ const STRINGIFY_OPTIONS = {
 
 const markdown = unified().use(remarkGfm).use(remarkStringify, STRINGIFY_OPTIONS);
 const mdx = unified().use(remarkGfm).use(remarkMdx).use(remarkStringify, STRINGIFY_OPTIONS);
+
+const mdxParser = unified().use(remarkParse).use(remarkGfm).use(remarkMdx);
+
+function mdxErrorLine(body: string): { line: number; reason: string } | undefined {
+  try {
+    mdxParser.parse(body);
+    return undefined;
+  } catch (error) {
+    const message = error as { line?: number; reason?: string; message: string };
+    return { line: message.line ?? 1, reason: message.reason ?? message.message };
+  }
+}
+
+export function findMdxProblem(document: ConvertedDocument): { at: SourcePosition; reason: string } | undefined {
+  const children = [...importsFor(document), ...document.root.children];
+  const problem = mdxErrorLine(mdx.stringify({ type: "root", children }));
+  if (!problem) return undefined;
+  for (let end = 1; end <= children.length; end += 1) {
+    const lines = mdx.stringify({ type: "root", children: children.slice(0, end) }).split("\n").length;
+    if (lines < problem.line) continue;
+    for (let back = end - 1; back >= 0; back -= 1) {
+      const at = document.positions.get(children[back]);
+      if (at) return { at, reason: problem.reason };
+    }
+    break;
+  }
+  return { at: { file: document.path, line: 1 }, reason: problem.reason };
+}
 
 function containsJsx(nodes: readonly RootContent[]): boolean {
   return nodes.some((node) => node.type.startsWith("mdx") || ("children" in node && containsJsx(node.children as RootContent[])));

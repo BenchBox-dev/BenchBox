@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { displayTag, rstTags, tagBasename } from "../src/converter/tag-pages.ts";
+import { displayTag, tagBasename } from "../src/converter/tag-pages.ts";
 import { build, bodyOf, cleanup, pageOf } from "./support.ts";
 
 afterEach(cleanup);
@@ -9,7 +9,7 @@ const files = {
   "README.md": "# Readme\n\n```{tags} beginner, cli\n```\n",
   "usage/index.md": "# Usage\n\n```{tags}\nbeginner,\nPython API\n```\n",
   "Zeta.md": "# Zeta Guide\n\n```{tags} advanced\n```\n",
-  "platforms/duck.rst": "Duck Platform\n=============\n\n.. tags:: reference, python-api\n\nBody text.\n",
+  "platforms/duck.md": "# Duck Platform\n\n```{tags} reference, python-api\n```\n\nBody text.\n",
   "plain.md": "# Plain\n",
   "blog/2026-01-01-post.md": "---\nblogpost: true\ndate: Jan 1, 2026\ntags: beginner, blogonly\n---\n\n# A post\n\nBody.\n",
 };
@@ -62,7 +62,7 @@ describe("tag page generation", () => {
     );
   });
 
-  it("sorts listed pages by source path with extension and includes rst pages", () => {
+  it("sorts listed pages by source path", () => {
     const result = build(files);
     const body = bodyOf(result, "docs/_tags/python-api.md");
     expect(body.indexOf("[Usage](/docs/usage/index.html)")).toBeGreaterThan(-1);
@@ -120,8 +120,9 @@ describe("toctree resolution of generated tag pages", () => {
     expect(result.errors.map((error) => error.message).join("\n")).toContain("_tags/cat-audience");
   });
 
-  it("keeps manifest tags for the blog collection", () => {
+  it("records blog post tags in the manifest only: no blog tag page is built", () => {
     const result = build(files);
+    expect([...result.files.keys()].filter((name) => name.startsWith("content/blog/") || name.includes("blogonly"))).toEqual(["content/blog/2026-01-01-post.md"]);
     const tags = JSON.parse(result.files.get("manifest/tags.json") ?? "{}") as Record<string, { path: string }[]>;
     expect(tags.blogonly.map((entry) => entry.path)).toEqual(["blog/2026-01-01-post.md"]);
   });
@@ -134,9 +135,4 @@ describe("tag helpers", () => {
     expect(tagBasename("python-api")).toBe("python-api");
   });
 
-  it("reads rst tag directives inline and as indented content", () => {
-    expect(rstTags("Title\n=====\n\n.. tags:: a, b\n\nText")).toEqual(["a", "b"]);
-    expect(rstTags("Title\n=====\n\n.. tags::\n\n   one, two,\n   three\n\nText")).toEqual(["one", "two", "three"]);
-    expect(rstTags("No tags here")).toEqual([]);
-  });
 });

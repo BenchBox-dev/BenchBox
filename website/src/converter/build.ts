@@ -6,7 +6,7 @@ import { ConverterError, ConversionFailedError } from "./errors.ts";
 import { createDefaultRegistry } from "./handlers/index.ts";
 import type { DocInfo } from "./model.ts";
 import type { HandlerRegistry } from "./registry.ts";
-import { serializeDocument } from "./serialize.ts";
+import { findMdxProblem, serializeDocument } from "./serialize.ts";
 import { generateTagSources } from "./tag-pages.ts";
 import { buildSidebar } from "./sidebar.ts";
 import { listDocSources } from "./sources.ts";
@@ -38,19 +38,16 @@ function hasUnknownToctreeTarget(document: ConvertedDocument, index: DocsIndex):
   return document.info.toctrees.some((block) => block.entries.some((entry) => entry.kind === "doc" && index.get(entry.path) === undefined));
 }
 
-function rstInfos(docsRoot: string): DocInfo[] {
-  return DocsIndex.fromRstSources(listDocSources(docsRoot, ".rst"));
-}
-
 export function buildSite(options: BuildOptions): BuildResult {
   const run: Run = { registry: options.registry ?? createDefaultRegistry(), docsRoot: options.docsRoot, knownBroken: options.knownBrokenLinks ?? new Set() };
   const sources: SourceText[] = listDocSources(options.docsRoot).map((source) => ({ relative: source.relative, raw: readFileSync(source.absolute, "utf-8") }));
-  const rst = rstInfos(options.docsRoot);
-  const errors: ConverterError[] = [];
-  const seed = new DocsIndex([...sources.map((source) => placeholderInfo(source, "md")), ...rst]);
+  const errors: ConverterError[] = listDocSources(options.docsRoot, ".rst").map(
+    (source) => new ConverterError(source.relative, 1, "reStructuredText pages are not built by this site; convert the page to MyST Markdown"),
+  );
+  const seed = new DocsIndex(sources.map((source) => placeholderInfo(source)));
   const firstPass = convertAll(sources, seed, run, "collect");
-  const generated = generateTagSources([...firstPass.map((document) => document.info), ...rst].filter((info) => info.collection === "docs").map((info) => ({ path: info.path, tags: info.tags })));
-  const generatedSeed = new DocsIndex([...seed.paths().map((path) => seed.get(path) as DocInfo), ...generated.map((source) => placeholderInfo(source, "md"))]);
+  const generated = generateTagSources(firstPass.map((document) => document.info).filter((info) => info.collection === "docs").map((info) => ({ path: info.path, tags: info.tags })));
+  const generatedSeed = new DocsIndex([...seed.paths().map((path) => seed.get(path) as DocInfo), ...generated.map((source) => placeholderInfo(source))]);
   const collected = firstPass.map((document, position) =>
     hasUnknownToctreeTarget(document, seed) ? convertAll([sources[position]], generatedSeed, run, "collect")[0] : document,
   );
@@ -58,7 +55,7 @@ export function buildSite(options: BuildOptions): BuildResult {
   const emitted = [...sources, ...generated];
   let index: DocsIndex;
   try {
-    index = new DocsIndex([...collected.map((document) => document.info), ...rst]);
+    index = new DocsIndex(collected.map((document) => document.info));
   } catch (error) {
     if (error instanceof ConverterError) return { files: new Map(), errors: [error], summary: { pages: 0, md: 0, mdx: 0, mdxPages: [] }, infos: [] };
     throw error;
@@ -73,6 +70,13 @@ export function buildSite(options: BuildOptions): BuildResult {
   const tags = new Map<string, { path: string; route: string; title: string }[]>();
   for (const document of documents) {
     const serialized = serializeDocument(document, sidebar.order[document.path]);
+    if (serialized.format === "mdx") {
+      const problem = findMdxProblem(document);
+      if (problem) {
+        errors.push(new ConverterError(problem.at.file, problem.at.line, `content is not valid MDX on this page, which uses a component: ${problem.reason}`));
+        continue;
+      }
+    }
     files.set(`content/${serialized.outputPath}`, serialized.content);
     if (serialized.format === "mdx") {
       summary.mdx += 1;
@@ -87,11 +91,39 @@ export function buildSite(options: BuildOptions): BuildResult {
   files.set("manifest/sidebar.json", json(sidebar));
   files.set("manifest/tags.json", json(Object.fromEntries([...tags.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)))));
   files.set("manifest/summary.json", json(summary));
+  if (errors.length > 0) return { files: new Map(), errors, summary, infos };
   return { files, errors, summary, infos };
 }
 
+export const OUTPUT_MARKER = ".benchbox-converter-output";
+
+export class UnownedOutputError extends Error {
+  constructor(outRoot: string) {
+    super(`refusing to touch ${outRoot}: it is not empty and has no ${OUTPUT_MARKER} file from an earlier converter run`);
+    this.name = "UnownedOutputError";
+  }
+}
+
+export function assertOwnedOutput(outRoot: string): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(outRoot);
+  } catch {
+    return;
+  }
+  if (entries.length > 0 && !entries.includes(OUTPUT_MARKER)) throw new UnownedOutputError(outRoot);
+}
+
+export function clearOutput(outRoot: string): void {
+  assertOwnedOutput(outRoot);
+  rmSync(outRoot, { recursive: true, force: true });
+}
+
 export function writeOutput(outRoot: string, files: Map<string, string>): void {
-  const keep = new Set(files.keys());
+  assertOwnedOutput(outRoot);
+  mkdirSync(outRoot, { recursive: true });
+  writeFileSync(path.join(outRoot, OUTPUT_MARKER), "");
+  const keep = new Set([...files.keys(), OUTPUT_MARKER]);
   const stale = (directory: string, prefix: string): void => {
     let entries: string[] = [];
     try {

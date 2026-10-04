@@ -88,19 +88,3 @@ export function generateTagSources(documents: readonly TaggedDocument[]): Virtua
   sources.push({ relative: `${TAGS_DIRECTORY}/tagsindex.md`, raw: indexPage() });
   return sources;
 }
-
-export function rstTags(raw: string): string[] {
-  const block: string[] = [];
-  let reading = false;
-  for (const untrimmed of raw.split("\n")) {
-    const line = untrimmed.trim();
-    if (line.includes(".. tags::")) {
-      reading = true;
-      block.push(...(line.split(".. tags::")[1] ?? "").split(","));
-    } else {
-      if (reading && line === "" && !(block.length === 1 && block[0] === "")) break;
-      if (reading) block.push(...line.split(","));
-    }
-  }
-  return block.map(displayTag).filter(Boolean);
-}

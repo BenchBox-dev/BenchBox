@@ -205,6 +205,30 @@ def test_check_reports_broken_links_within_one_inventory(tmp_path: Path, capsys:
     assert "/docs/guide.html#setup (missing fragment)" in capsys.readouterr().out
 
 
+def test_check_reports_allowances_that_no_longer_match(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    site = _fixture(tmp_path / "site")
+    _write(site, "docs/guide.html", GUIDE.replace('id="setup"', 'id="other"'))
+    inventory_path = tmp_path / "inv.json"
+    site_inventory.main(["build", "--site-dir", str(site), "--output", str(inventory_path)])
+    known = tmp_path / "known.json"
+    known.write_text(
+        json.dumps(
+            [
+                ["/index.html", "/docs/guide.html#setup", "missing fragment"],
+                ["/index.html", "/index.html#x", "missing fragment"],
+                ["/index.html", "/gone.html", "missing path"],
+            ]
+        ),
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    assert site_inventory.main(["check", "--inventory", str(inventory_path), "--known-broken", str(known)]) == 0
+    out = capsys.readouterr().out
+    assert "stale allowance: /index.html: /gone.html (missing path) (no longer broken)" in out
+    assert "broken internal link" not in out.split("summary:")[0]
+
+
 def test_missing_site_dir_is_a_usage_error(tmp_path: Path) -> None:
     code = site_inventory.main(["build", "--site-dir", str(tmp_path / "none"), "--output", str(tmp_path / "o.json")])
 

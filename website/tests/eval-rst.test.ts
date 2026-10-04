@@ -6,16 +6,28 @@ afterEach(cleanup);
 const wrap = (body: string) => `# A\n\n\`\`\`{eval-rst}\n${body}\n\`\`\`\n`;
 
 describe("eval-rst directive", () => {
-  it("converts hyperlink bullet items with trailing descriptions", () => {
-    const result = build({ "a.md": wrap("* `Archive <archive.html>`_ - Posts by year\n* `Tags <https://example.com/t>`_") });
+  it("resolves item targets like any link, with trailing descriptions", () => {
+    const result = build({ "a.md": wrap("* `Guide <b.md>`_ - Read this\n* `Tags <https://example.com/t>`_"), "b.md": "# B\n" });
     expect(result.errors).toEqual([]);
     const body = bodyOf(result, "docs/a.md");
-    expect(body).toContain("- [Archive](archive.html) - Posts by year");
+    expect(body).toContain("- [Guide](/docs/b.html) - Read this");
     expect(body).toContain("- [Tags](https://example.com/t)");
   });
 
+  it("fails on an item target that is not built, with its line", () => {
+    const result = build({ "a.md": wrap("* `Ok <https://example.com>`_\n* `Archive <archive.html>`_") });
+    expect(result.errors.map((error) => error.message)).toEqual(["a.md:5: link:archive.html does not match a document or file under docs/"]);
+  });
+
+  it("renders the ablog archive, tag and author links as text until the blog builds those pages", () => {
+    const result = build({ "blog/index.md": wrap("* `Archive <archive.html>`_ - by year\n* `Tags <tag.html>`_\n* `Authors <author.html>`_").replace("# A", "# Blog") });
+    expect(result.errors).toEqual([]);
+    const body = bodyOf(result, "blog/index.md");
+    expect(body).toContain("- Archive - by year\n- Tags\n- Authors");
+  });
+
   it("rejects any other rst construct with the offending line", () => {
-    const result = build({ "a.md": wrap("* `Archive <archive.html>`_\n\n.. note:: hello") });
+    const result = build({ "a.md": wrap("* `Ok <https://example.com>`_\n\n.. note:: hello") });
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].line).toBe(6);
     expect(result.errors[0].message).toContain("eval-rst supports only");

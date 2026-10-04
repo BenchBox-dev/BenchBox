@@ -1,3 +1,4 @@
+import { smarten } from "../lib/smartypants.ts";
 import type { DocsIndex } from "./docs-index.ts";
 import type { ToctreeEntry } from "./model.ts";
 
@@ -17,11 +18,11 @@ function claim(walk: Walk, path: string): void {
 
 function itemFor(walk: Walk, entry: ToctreeEntry, trail: string[]): SidebarItem | undefined {
   if (entry.kind === "self") return undefined;
-  if (entry.kind === "url") return { label: entry.title, link: entry.url };
+  if (entry.kind === "url") return { label: smarten(entry.title), link: entry.url };
   const info = walk.index.get(entry.path);
   if (!info) return undefined;
   claim(walk, info.path);
-  const item: SidebarItem = { label: entry.title ?? info.title, link: info.route };
+  const item: SidebarItem = { label: entry.title === undefined ? info.title : smarten(entry.title), link: info.route };
   if (trail.includes(info.path)) return item;
   const children = info.toctrees
     .flatMap((block) => block.entries)
@@ -39,7 +40,7 @@ export function buildSidebar(index: DocsIndex): SidebarManifest {
     claim(walk, root.path);
     for (const block of root.toctrees) {
       const items = block.entries.map((entry) => itemFor(walk, entry, [root.path])).filter((item): item is SidebarItem => item !== undefined);
-      groups.push({ label: block.caption ?? null, items });
+      groups.push({ label: block.caption === undefined ? null : smarten(block.caption), items });
     }
   }
   const order: Record<string, number> = {};

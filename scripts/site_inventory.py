@@ -587,10 +587,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.write_known_broken.write_text(dump_inventory(sorted(map(list, broken))), encoding="utf-8")
             print(f"wrote {args.write_known_broken}: {len(broken)} broken links")
             return 0
+        allowed: set[tuple[str, str, str]] = set()
         if args.known_broken is not None:
-            broken -= {(source, target, reason) for source, target, reason in _read_json(args.known_broken)}
+            allowed = {(source, target, reason) for source, target, reason in _read_json(args.known_broken)}
         report: dict[str, list[str]] = {kind: [] for kind in REPORT_KINDS}
-        report["broken internal link"] = [f"{p}: {t} ({r})" for p, t, r in sorted(broken)]
+        report["broken internal link"] = [f"{p}: {t} ({r})" for p, t, r in sorted(broken - allowed)]
+        report["stale allowance"] = [f"{p}: {t} ({r}) (no longer broken)" for p, t, r in sorted(allowed - broken)]
         report["missing image"] = [f"{p}: {k} (not served)" for p, k in sorted(missing_images(inventory))]
         sys.stdout.write(format_report(report))
         return exit_code(report, strict=False)
