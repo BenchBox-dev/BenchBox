@@ -76,21 +76,20 @@ Nothing it raises itself. A value that is neither a string nor empty, such as `5
 ```python
 from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
 
-# Netezza maps to PostgreSQL
 normalized = normalize_dialect_for_sqlglot("netezza")
 assert normalized == "postgres"
 
-# Supported dialects pass through unchanged
 normalized = normalize_dialect_for_sqlglot("duckdb")
 assert normalized == "duckdb"
 
-# Case-insensitive
 normalized = normalize_dialect_for_sqlglot("SNOWFLAKE")
 assert normalized == "snowflake"
 
 print(normalize_dialect_for_sqlglot("postgresql"))
 print(repr(normalize_dialect_for_sqlglot(None)))
 ```
+
+Netezza maps to PostgreSQL. Supported dialects pass through unchanged, and matching is case-insensitive.
 
 ```text
 postgresql
@@ -117,10 +116,11 @@ from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
 
 benchmark = TPCH(scale_factor=1.0)
 
-# Translate query for Netezza (uses PostgreSQL dialect)
 target_dialect = normalize_dialect_for_sqlglot("netezza")
 query_netezza = benchmark.get_query(1, dialect=target_dialect)
 ```
+
+The example gets Q1 translated for Netezza, which uses the PostgreSQL dialect.
 
 ### Query Translation
 
@@ -133,7 +133,7 @@ def translate_query(
     self,
     query_id: Union[int, str],
     dialect: str
-) -> str
+) -> str: ...
 ```
 
 **Parameters**:
@@ -151,12 +151,13 @@ def translate_query(
 
 **Basic Translation**:
 
+The example translates TPC-H Query 1 to several dialects.
+
 ```python
 from benchbox.tpch import TPCH
 
 benchmark = TPCH(scale_factor=1.0)
 
-# Translate TPC-H Query 1 to different dialects
 q1_duckdb = benchmark.translate_query(1, "duckdb")
 q1_postgres = benchmark.translate_query(1, "postgres")
 q1_bigquery = benchmark.translate_query(1, "bigquery")
@@ -170,16 +171,17 @@ print(q1_postgres)
 
 **Batch Translation**:
 
+TPC-H has 22 queries. The example translates all of them to Snowflake.
+
 ```python
 from benchbox.tpch import TPCH
 
 benchmark = TPCH(scale_factor=1.0)
 target_dialect = "snowflake"
 
-# Translate all queries
 translated_queries = {}
 
-for query_id in range(1, 23):  # TPC-H has 22 queries
+for query_id in range(1, 23):
     try:
         translated = benchmark.translate_query(query_id, target_dialect)
         translated_queries[f"Q{query_id}"] = translated
@@ -195,12 +197,13 @@ Successfully translated 22 queries to snowflake
 
 **Cross-Platform Validation**:
 
+The example tests the translation of one query across multiple platforms and then prints the results.
+
 ```python
 from benchbox.clickbench import ClickBench
 
 benchmark = ClickBench(scale_factor=0.01)
 
-# Test query translation across multiple platforms
 dialects_to_test = ["duckdb", "postgres", "mysql", "bigquery", "snowflake"]
 query_id = "Q1"
 
@@ -220,7 +223,6 @@ for dialect in dialects_to_test:
             "error": str(e)
         }
 
-# Print results
 print("Translation Results:")
 for dialect, result in translation_results.items():
     if result["success"]:
@@ -343,7 +345,7 @@ Unknown performance profile: fast. Available: ['quick', 'standard', 'thorough', 
 
 ### Multi-Dialect Benchmark
 
-Run benchmarks across multiple SQL dialects to test query compatibility. The example needs the DuckDB package (`pip install duckdb`).
+Run benchmarks across multiple SQL dialects to test query compatibility. The example needs the DuckDB package (`pip install duckdb`). It tests query translation for different target databases. It translates each query and records whether the translation succeeded. The translated SQL is not executed, because it may not run on DuckDB. A summary follows the results.
 
 ```python
 from benchbox.ssb import SSB
@@ -358,7 +360,6 @@ conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Test query translation for different target databases
 target_dialects = ["postgres", "mysql", "bigquery"]
 query_ids = ["Q1.1", "Q1.2", "Q1.3"]
 
@@ -370,10 +371,8 @@ for dialect in target_dialects:
 
     for query_id in query_ids:
         try:
-            # Translate query
             translated_query = benchmark.translate_query(query_id, dialect)
 
-            # Test if valid SQL (may not execute on DuckDB)
             result = {
                 "query_id": query_id,
                 "translated": True,
@@ -392,7 +391,6 @@ for dialect in target_dialects:
 
         dialect_results[dialect].append(result)
 
-# Summary
 print("\nTranslation Summary:")
 for dialect, results in dialect_results.items():
     success_count = sum(1 for r in results if r["translated"])
@@ -429,7 +427,7 @@ Translation Summary:
 
 ### Automated Dialect Testing
 
-Validate SQL dialect translation quality:
+Validate SQL dialect translation quality. The `validate_dialect_support` method checks whether a dialect is supported and working. It translates the first 5 queries, and the example prints the first 3 errors for each dialect:
 
 ```python
 from benchbox.tpch import TPCH
@@ -440,7 +438,6 @@ class DialectValidator:
         self.benchmark = benchmark
 
     def validate_dialect_support(self, dialect: str) -> dict:
-        """Validate if a dialect is supported and working."""
         normalized = normalize_dialect_for_sqlglot(dialect)
 
         results = {
@@ -452,8 +449,7 @@ class DialectValidator:
             "errors": []
         }
 
-        # Test translation for sample queries
-        sample_queries = list(range(1, 6))  # Test first 5 queries
+        sample_queries = list(range(1, 6))
 
         for query_id in sample_queries:
             try:
@@ -470,11 +466,9 @@ class DialectValidator:
 
         return results
 
-# Usage
 benchmark = TPCH(scale_factor=0.01)
 validator = DialectValidator(benchmark)
 
-# Validate multiple dialects
 dialects_to_validate = [
     "duckdb", "postgres", "mysql", "bigquery",
     "snowflake", "redshift", "clickhouse", "netezza"
@@ -492,7 +486,7 @@ for dialect in dialects_to_validate:
 
     if result["errors"]:
         print(f"  Errors:")
-        for error in result["errors"][:3]:  # Show first 3 errors
+        for error in result["errors"][:3]:
             print(f"    Q{error['query_id']}: {error['error'][:60]}...")
 ```
 
@@ -505,34 +499,26 @@ NETEZZA → postgres: ✓ SUPPORTED
 
 ### Custom Dialect Handling
 
-Handle custom or proprietary database dialects:
+Handle custom or proprietary database dialects. The handler maps custom dialects to the closest SQLGlot-supported dialect. Exasol ships its own SQLGlot dialect, so the identity entry (a native dialect with no fallback) keeps the generic fallback branch from defaulting it to postgres. Vertica uses PostgreSQL syntax, Greenplum is PostgreSQL-based, Yellowbrick uses PostgreSQL syntax, and MonetDB has PostgreSQL compatibility. `get_fallback_dialect` first tries the official normalization, then checks the custom mappings when no official mapping was found. The example translates one query for Vertica and one for Greenplum:
 
 ```python
 from benchbox.tpcds import TPCDS
 from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
 
 class CustomDialectHandler:
-    """Handle custom database dialects with fallback strategies."""
-
-    # Map custom dialects to closest SQLGlot-supported dialect.
-    # Exasol ships its own sqlglot dialect: the identity entry keeps
-    # the generic fallback branch below from defaulting it to postgres.
     CUSTOM_DIALECT_MAP = {
-        "exasol": "exasol",         # Native sqlglot dialect, no fallback
-        "vertica": "postgres",      # Vertica uses PostgreSQL syntax
-        "greenplum": "postgres",    # Greenplum is PostgreSQL-based
-        "yellowbrick": "postgres",   # Yellowbrick uses PostgreSQL syntax
-        "monetdb": "postgres",      # MonetDB has PostgreSQL compatibility
+        "exasol": "exasol",
+        "vertica": "postgres",
+        "greenplum": "postgres",
+        "yellowbrick": "postgres",
+        "monetdb": "postgres",
     }
 
     @classmethod
     def get_fallback_dialect(cls, dialect: str) -> str:
-        """Get fallback dialect for custom databases."""
-        # First try official normalization
         normalized = normalize_dialect_for_sqlglot(dialect)
 
-        # Then check custom mappings
-        if normalized == dialect.lower():  # No official mapping found
+        if normalized == dialect.lower():
             return cls.CUSTOM_DIALECT_MAP.get(dialect.lower(), "postgres")
 
         return normalized
@@ -544,7 +530,6 @@ class CustomDialectHandler:
         query_id: int,
         target_dialect: str
     ) -> str:
-        """Translate query for custom dialect with fallback."""
         fallback_dialect = cls.get_fallback_dialect(target_dialect)
 
         print(f"Translating {query_id} for {target_dialect} "
@@ -552,15 +537,12 @@ class CustomDialectHandler:
 
         return benchmark.translate_query(query_id, fallback_dialect)
 
-# Usage
 benchmark = TPCDS(scale_factor=0.1)
 
-# Translate for Vertica
 q1_vertica = CustomDialectHandler.translate_for_custom_dialect(
     benchmark, 1, "vertica"
 )
 
-# Translate for Greenplum
 q2_greenplum = CustomDialectHandler.translate_for_custom_dialect(
     benchmark, 2, "greenplum"
 )
@@ -577,13 +559,11 @@ TPC-DS query IDs are integers, so the example passes `1` and `2`; a string such 
 
 ### Dialect Translation
 
-1. **Always validate translations**: Test translated queries on target platform before production use
+1. **Always validate translations**: Test translated queries on target platform before production use. The example validates a translated query by running it on the target platform.
 
    ```python
-   # Good: Validate translated query
    translated = benchmark.translate_query(1, "postgres")
 
-   # Test on target platform
    try:
        result = postgres_conn.execute(translated)
        print("Translation validated successfully")
@@ -591,24 +571,22 @@ TPC-DS query IDs are integers, so the example passes `1` and `2`; a string such 
        print(f"Translation needs adjustment: {e}")
    ```
 
-2. **Use dialect normalization**: Normalize dialects before translation
+2. **Use dialect normalization**: Normalize dialects before translation. The example normalizes the dialect before use.
 
    ```python
    from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
 
-   # Normalize before use
    target_dialect = normalize_dialect_for_sqlglot(user_input_dialect)
    query = benchmark.translate_query(1, target_dialect)
    ```
 
-3. **Handle translation failures gracefully**: Not all SQL features translate perfectly
+3. **Handle translation failures gracefully**: Not all SQL features translate perfectly. If the dialect is not supported, fall back to a compatible dialect.
 
    ```python
    try:
        translated = benchmark.translate_query(query_id, dialect)
    except ValueError as e:
        print(f"Dialect not supported: {e}")
-       # Fall back to compatible dialect
        translated = benchmark.translate_query(query_id, "postgres")
    ```
 
@@ -645,33 +623,26 @@ TPC-DS query IDs are integers, so the example passes `1` and `2`; a string such 
 
 **Problem**: `ValueError: Error translating to dialect 'xyz': Unknown dialect 'xyz'.`
 
-**Solutions**:
+**Solutions**: (1) check whether the dialect needs normalization (`normalize_dialect_for_sqlglot("netezza")` returns `"postgres"`); (2) fall back to PostgreSQL, the most compatible dialect; (3) check the SQLGlot documentation for supported dialects at <https://sqlglot.com/sqlglot/dialects.html>.
 
 ```python
 from benchbox.utils.dialect_utils import normalize_dialect_for_sqlglot
 
-# 1. Check if dialect needs normalization
-normalized = normalize_dialect_for_sqlglot("netezza")  # Returns "postgres"
+normalized = normalize_dialect_for_sqlglot("netezza")
 
-# 2. Use fallback dialect
 try:
     query = benchmark.translate_query(1, "custom_db")
 except ValueError:
-    # Fall back to PostgreSQL (most compatible)
     query = benchmark.translate_query(1, "postgres")
-
-# 3. Check SQLGlot documentation for supported dialects
-# https://sqlglot.com/sqlglot/dialects.html
 ```
 
 ### Translation Quality Issues
 
 **Problem**: Translated query produces incorrect results or fails to execute
 
-**Solutions**:
+**Solutions**: (1) compare the original and translated queries; (2) test with a smaller dataset first; (3) make manual adjustments for platform-specific features, such as BigQuery-specific adjustments.
 
 ```python
-# 1. Compare original and translated queries
 original = benchmark.get_query(1)
 translated = benchmark.translate_query(1, "bigquery")
 
@@ -680,14 +651,10 @@ print(original)
 print("\nTranslated:")
 print(translated)
 
-# 2. Test with smaller dataset first
 small_benchmark = TPCH(scale_factor=0.01)
 translated = small_benchmark.translate_query(1, "bigquery")
-# Test execution...
 
-# 3. Manual adjustments for platform-specific features
 if "bigquery" in target_dialect:
-    # BigQuery-specific adjustments
     translated = translated.replace("::DATE", "")
 ```
 

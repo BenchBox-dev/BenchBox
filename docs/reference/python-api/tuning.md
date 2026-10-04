@@ -67,20 +67,19 @@ class TuningType(Enum):
     UNIQUE_CONSTRAINTS = "unique_constraints"
     CHECK_CONSTRAINTS = "check_constraints"
 
-    # Platform-specific optimizations
-    Z_ORDERING = "z_ordering"              # Databricks Delta Lake
-    LIQUID_CLUSTERING = "liquid_clustering"  # Databricks Delta Lake
-    AUTO_OPTIMIZE = "auto_optimize"        # Databricks
-    AUTO_COMPACT = "auto_compact"          # Databricks
-    BLOOM_FILTERS = "bloom_filters"        # Various platforms
-    MATERIALIZED_VIEWS = "materialized_views"  # Query acceleration
+    Z_ORDERING = "z_ordering"
+    LIQUID_CLUSTERING = "liquid_clustering"
+    AUTO_OPTIMIZE = "auto_optimize"
+    AUTO_COMPACT = "auto_compact"
+    BLOOM_FILTERS = "bloom_filters"
+    MATERIALIZED_VIEWS = "materialized_views"
 ```
 
 The values fall into three groups:
 
 - `PARTITIONING`, `CLUSTERING`, `DISTRIBUTION` and `SORTING` are table-level performance tunings.
 - `PRIMARY_KEYS`, `FOREIGN_KEYS`, `UNIQUE_CONSTRAINTS` and `CHECK_CONSTRAINTS` are schema constraint tunings.
-- The rest are platform-specific optimizations: `Z_ORDERING` (Databricks Delta Lake), `AUTO_OPTIMIZE` and `AUTO_COMPACT` (Databricks), `BLOOM_FILTERS` (various platforms) and `MATERIALIZED_VIEWS` (query acceleration).
+- The rest are platform-specific optimizations: `Z_ORDERING` and `LIQUID_CLUSTERING` (Databricks Delta Lake), `AUTO_OPTIMIZE` and `AUTO_COMPACT` (Databricks), `BLOOM_FILTERS` (various platforms) and `MATERIALIZED_VIEWS` (query acceleration).
 
 **Methods**:
 
@@ -106,15 +105,15 @@ Represents a column used in table tuning configurations.
 ```python
 @dataclass
 class TuningColumn:
-    name: str       # Column name
-    type: str       # SQL data type (e.g., 'DATE', 'INTEGER')
-    order: int      # Column order in tuning (1-based)
-    sort_order: str = "ASC"          # "ASC" or "DESC"
-    nulls_position: str = "DEFAULT"  # "FIRST", "LAST" or "DEFAULT"
+    name: str
+    type: str
+    order: int
+    sort_order: str = "ASC"
+    nulls_position: str = "DEFAULT"
     compression: Optional[str] = None
 ```
 
-`name` is the column name, `type` is the SQL data type (for example `'DATE'` or `'INTEGER'`), and `order` is the column's 1-based position in the tuning.
+`name` is the column name, `type` is the SQL data type (for example `'DATE'` or `'INTEGER'`), and `order` is the column's 1-based position in the tuning. `sort_order` is `"ASC"` or `"DESC"`. `nulls_position` is `"FIRST"`, `"LAST"` or `"DEFAULT"`.
 
 **Methods**:
 

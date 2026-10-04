@@ -49,18 +49,6 @@ def normalize_platform_name(name: str) -> str:
 
 
 def resolve_platform_selector(selector: str) -> str:
-    """Return the platform key that availability and dependency checks apply to.
-
-    A ``<platform>:<deployment>`` selector resolves to the first-class platform
-    for ClickHouse and otherwise to the base platform, after confirming the base
-    platform offers that deployment. A platform that declares no deployment modes
-    accepts only ``local``, matching ``PlatformRegistry.supports_deployment_mode``
-    and the adapter factory. A selector without a deployment suffix is returned
-    unchanged.
-
-    Raises:
-        ValueError: If the deployment is not offered by the base platform.
-    """
     key = selector.lower()
     if key in CLICKHOUSE_LEGACY_SELECTOR_MAP:
         return CLICKHOUSE_LEGACY_SELECTOR_MAP[key]

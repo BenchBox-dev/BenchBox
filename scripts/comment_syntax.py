@@ -164,7 +164,7 @@ def language(path: str) -> str | None:
         return "make"
     if name.startswith("Dockerfile"):
         return "docker"
-    if path.endswith((".md", ".rst")) and not path.startswith(("_project/", "_blog/")):
+    if path.endswith((".md", ".mdx", ".rst")) and not path.startswith(("_project/", "_blog/")):
         return "examples"
     if not PurePosixPath(path).suffix and path.startswith(OWNED_ROOTS):
         return "unsupported"
@@ -471,10 +471,6 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
 
 
 REVIEWED_JAVASCRIPT_FLOWS: dict[tuple[str, str], str] = {
-    (
-        "website/src/loaders/docs-loader.ts",
-        "unresolved process arguments require an executable-payload adapter",
-    ): "the only process call runs uv run python on the tracked scripts/rst_to_html.py file, scanned as Python, with a documentation file path as data",
     (
         "results-explorer/src/db.ts",
         "unresolved executable sql payload: scan.sql",

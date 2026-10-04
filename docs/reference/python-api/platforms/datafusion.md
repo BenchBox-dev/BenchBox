@@ -33,14 +33,12 @@ Basic usage:
 from benchbox import TPCH
 from benchbox.platforms.datafusion import DataFusionAdapter
 
-# In-memory analytics with Parquet (recommended)
 adapter = DataFusionAdapter(
     working_dir="./datafusion_working",
     memory_limit="16G",
     data_format="parquet"
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -234,14 +232,14 @@ In-memory analytics with default settings:
 ```python
 from benchbox.platforms.datafusion import DataFusionAdapter
 
-# Default configuration (Parquet format, 16G memory)
 adapter = DataFusionAdapter()
 
-# Custom working directory
 adapter = DataFusionAdapter(
     working_dir="/fast/ssd/datafusion"
 )
 ```
+
+The first adapter uses the defaults (Parquet format, 16G memory). The second sets a custom working directory.
 
 ### Performance Optimized
 
@@ -253,12 +251,14 @@ import os
 adapter = DataFusionAdapter(
     working_dir="/fast/nvme/datafusion",
     memory_limit="64G",
-    target_partitions=os.cpu_count(),  # Use all cores
-    data_format="parquet",  # Columnar format with compression
-    batch_size=16384,  # Larger batches for throughput
+    target_partitions=os.cpu_count(),
+    data_format="parquet",
+    batch_size=16384,
     temp_dir="/fast/ssd/temp"
 )
 ```
+
+`target_partitions=os.cpu_count()` uses all cores, Parquet is a columnar format with compression, and `batch_size=16384` uses larger batches for throughput.
 
 ### Memory Constrained
 
@@ -268,28 +268,30 @@ Optimized for memory-limited environments:
 adapter = DataFusionAdapter(
     memory_limit="4G",
     target_partitions=4,
-    data_format="csv",  # Lower memory footprint
+    data_format="csv",
     batch_size=4096
 )
 ```
+
+CSV has a lower memory footprint than Parquet.
 
 ### Data Format Selection
 
 Choose between CSV and Parquet formats:
 
 ```python
-# Parquet format (recommended for query performance)
 adapter_parquet = DataFusionAdapter(
     data_format="parquet",
     memory_limit="16G"
 )
 
-# CSV format (faster initial load, lower memory)
 adapter_csv = DataFusionAdapter(
     data_format="csv",
     memory_limit="8G"
 )
 ```
+
+Parquet is recommended for query performance. CSV gives a faster initial load and a lower memory footprint.
 
 ### Configuration from Unified Config
 
@@ -338,12 +340,9 @@ Directly registers CSV files as external tables:
 
 ```python
 adapter = DataFusionAdapter(data_format="csv")
-
-# Automatically handles TPC format:
-# - Pipe-delimited (|)
-# - Trailing delimiter
-# - No header row
 ```
+
+The CSV reader handles the TPC format automatically: pipe-delimited fields (`|`), a trailing delimiter and no header row.
 
 **Characteristics**:
 
@@ -358,14 +357,15 @@ Converts CSV to Parquet format first:
 
 ```python
 adapter = DataFusionAdapter(data_format="parquet")
-
-# Conversion process:
-# 1. Read CSV files with PyArrow
-# 2. Handle trailing delimiters
-# 3. Apply schema from benchmark
-# 4. Write compressed Parquet files
-# 5. Register Parquet tables in DataFusion
 ```
+
+The conversion process is:
+
+1. Read the CSV files with PyArrow.
+2. Handle trailing delimiters.
+3. Apply the schema from the benchmark.
+4. Write compressed Parquet files.
+5. Register the Parquet tables in DataFusion.
 
 **Characteristics**:
 
@@ -377,16 +377,12 @@ adapter = DataFusionAdapter(data_format="parquet")
 ### Performance Comparison
 
 ```python
-# CSV Mode
 adapter_csv = DataFusionAdapter(data_format="csv")
-# Load time: about 3 seconds (SF=1, 4 cores)
-# Query time: baseline (a COUNT(*) over lineitem took about 0.5 to 1.2 seconds)
 
-# Parquet Mode
 adapter_parquet = DataFusionAdapter(data_format="parquet")
-# Load time: about 10 seconds (SF=1, 4 cores)
-# Query time: faster than CSV (the same COUNT(*) took under 0.02 seconds)
 ```
+
+For scale factor 1 on 4 cores, CSV mode loads in about 3 seconds and is the query-time baseline: a `COUNT(*)` over `lineitem` took about 0.5 to 1.2 seconds. Parquet mode loads in about 10 seconds and its queries are faster: the same `COUNT(*)` took under 0.02 seconds.
 
 ## Query Execution
 
@@ -400,15 +396,14 @@ from benchbox.platforms.datafusion import DataFusionAdapter
 adapter = DataFusionAdapter()
 connection = adapter.create_connection()
 
-# Execute query using SessionContext
-# (the tables exist after create_schema() and load_data(); see Data Loading)
 df = connection.sql("SELECT COUNT(*) FROM lineitem")
 result_batches = df.collect()
 
-# Get row count
 row_count = result_batches[0].column(0)[0]
 print(f"Row count: {row_count}")
 ```
+
+The tables exist after `create_schema()` and `load_data()` (see Data Loading). Queries run on the `SessionContext`, and `collect()` returns a list of PyArrow record batches.
 
 ### Execute with Validation
 
@@ -443,14 +438,14 @@ from benchbox import TPCH
 adapter = DataFusionAdapter()
 adapter.enable_dry_run()
 
-# Queries are captured but not executed
 benchmark = TPCH(scale_factor=1.0)
 results = benchmark.run_with_platform(adapter, query_subset=[1, 6])
 
-# Access captured SQL: a list of dicts with "order", "sql" and "operation_type"
 for entry in adapter.captured_sql:
     print(f"{entry['order']}: {entry['sql'][:100]}...")
 ```
+
+Queries are captured but not executed, and the SQL is available in `adapter.captured_sql`. It is a list of dicts with `order`, `sql` and `operation_type`.
 
 ## Platform Information
 
@@ -490,9 +485,10 @@ if validation.warnings:
     for warning in validation.warnings:
         print(f"  - {warning}")
 
-# Access platform details
 print(f"DataFusion version: {validation.details.get('datafusion_version')}")
 ```
+
+`validation.details` holds the platform details, such as the DataFusion version.
 
 ## Advanced Features
 
@@ -501,12 +497,6 @@ print(f"DataFusion version: {validation.details.get('datafusion_version')}")
 Configure DataFusion SessionContext options:
 
 ```python
-# The adapter automatically configures:
-# - Target partitions (parallelism)
-# - Memory limits
-# - Parquet optimizations (pruning, pushdown)
-# - Batch size
-
 adapter = DataFusionAdapter(
     memory_limit="32G",
     target_partitions=16,
@@ -514,23 +504,24 @@ adapter = DataFusionAdapter(
 )
 ```
 
+The adapter also configures these automatically: Parquet optimizations (pruning and pushdown), the target partitions (parallelism), the memory limit, the batch size and identifier normalization (lowercase, for TPC compatibility).
+
 ### Working Directory Management
 
 Manage DataFusion working directory:
 
 ```python
-# Check if working directory exists with data
 exists = adapter.check_database_exists()
 
 if exists:
     print("Existing DataFusion data found")
 
-    # Drop existing data if needed
     adapter.drop_database()
 
-# Or force recreate
 adapter = DataFusionAdapter(force_recreate=True)
 ```
+
+`check_database_exists()` checks whether the working directory exists with data. Drop existing data if needed, or create the adapter with `force_recreate=True`.
 
 ### PyArrow Integration
 
@@ -543,18 +534,17 @@ import pyarrow.parquet as pq
 adapter = DataFusionAdapter(data_format="parquet")
 connection = adapter.create_connection()
 
-# Query results are PyArrow RecordBatches
 df = connection.sql("SELECT * FROM lineitem LIMIT 10")
 batches = df.collect()
 
-# Access as PyArrow Table
 table = pa.Table.from_batches(batches)
 print(f"Schema: {table.schema}")
 print(f"Rows: {table.num_rows}")
 
-# Convert to Pandas (requires the pandas package, which this extra does not install)
 pandas_df = table.to_pandas()
 ```
+
+Query results are PyArrow record batches. `pa.Table.from_batches` builds a PyArrow table from them. `to_pandas()` needs the `pandas` package, which this extra does not install.
 
 ## Advanced Features
 
@@ -568,10 +558,11 @@ from benchbox.platforms.datafusion import DataFusionAdapter
 adapter = DataFusionAdapter(memory_limit="16G", data_format="parquet")
 connection = adapter.create_connection()
 
-# Execute multiple custom queries
 result1 = connection.sql("SELECT COUNT(*) FROM lineitem").collect()
 result2 = connection.sql("SELECT AVG(l_extendedprice) FROM lineitem").collect()
 ```
+
+This runs two custom queries on one connection.
 
 **When to use**:
 
@@ -642,18 +633,18 @@ result2 = connection.sql("SELECT AVG(l_extendedprice) FROM lineitem").collect()
 4. **Tune batch size** for your workload:
 
    ```python
-   # Smaller batches: Lower latency, lower memory
    adapter = DataFusionAdapter(
        batch_size=4096,
        memory_limit="4G"
    )
 
-   # Larger batches: Higher throughput, higher memory
    adapter = DataFusionAdapter(
        batch_size=16384,
        memory_limit="32G"
    )
    ```
+
+   The first adapter uses smaller batches, which give lower latency and lower memory use. The second uses larger batches, which give higher throughput and higher memory use.
 
    **Batch Size Guidelines**:
 
@@ -705,18 +696,17 @@ adapter = DataFusionAdapter(
 **Solution**:
 
 ```python
-# Reduce memory limit or use CSV format
 adapter = DataFusionAdapter(
     memory_limit="8G",
     data_format="csv"
 )
 
-# Or lower the memory pool so that operators spill to disk earlier
-# (spill files go to the operating system's temporary directory)
 adapter = DataFusionAdapter(
     memory_limit="4G"
 )
 ```
+
+The first adapter reduces the memory limit and uses CSV format. The second lowers the memory pool so that operators spill to disk earlier. Spill files go to the operating system's temporary directory.
 
 ### Slow Query Performance
 
@@ -725,17 +715,16 @@ adapter = DataFusionAdapter(
 **Solutions**:
 
 ```python
-# 1. Use Parquet format
 adapter = DataFusionAdapter(data_format="parquet")
 
-# 2. Increase parallelism
 adapter = DataFusionAdapter(target_partitions=16)
 
-# 3. Use fast storage
 adapter = DataFusionAdapter(
     working_dir="/fast/nvme/datafusion"
 )
 ```
+
+These use Parquet format, increase parallelism and put the working directory on fast storage, in that order.
 
 ### SQL Feature Errors
 
@@ -744,17 +733,15 @@ adapter = DataFusionAdapter(
 **Solution**:
 
 ```python
-# Validate platform capabilities first
 validation = adapter.validate_platform_capabilities("tpcds")
 
 if validation.warnings:
     print("Platform warnings:")
     for warning in validation.warnings:
         print(f"  - {warning}")
-
-# BenchBox translates queries for the "datafusion" dialect, which is close to PostgreSQL
-# Some advanced SQL features may not be supported
 ```
+
+Validate the platform capabilities first. BenchBox translates queries for the `datafusion` dialect, which is close to PostgreSQL, so some advanced SQL features may not be supported.
 
 ## See Also
 

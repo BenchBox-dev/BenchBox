@@ -26,7 +26,6 @@ Transaction operations are not part of this benchmark in 0.4.1; they moved to th
 from benchbox import TPCH, WritePrimitives
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# 1. Load TPC-H data first (required)
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
@@ -35,15 +34,15 @@ conn = adapter.create_connection()
 adapter.create_schema(tpch, conn)
 adapter.load_data(tpch, conn, tpch.output_dir)
 
-# 2. Setup Write Primitives (generate_data adds the files that the bulk-load operations read)
 bench = WritePrimitives(scale_factor=0.01)
 bench.generate_data()
 bench.setup(conn)
 
-# 3. Execute operations
 result = bench.execute_operation("insert_single_row", conn)
 print(f"Success: {result.success}, Time: {result.write_duration_ms:.2f}ms")
 ```
+
+Load the TPC-H data first; it is required. Then set up Write Primitives and execute operations. `generate_data()` adds the files that the bulk-load operations read.
 
 Load the TPC-H tables into the database before calling `WritePrimitives.generate_data()`: it writes two extra files (`orders_stage.tbl`, `lineitem_stage.tbl`) into the TPC-H directory, and a later `adapter.load_data(tpch, ...)` call from that directory tries to load them and reports errors. The DuckDB adapter needs the `duckdb` package.
 
@@ -141,9 +140,9 @@ Raises `RuntimeError` when a TPC-H table is missing (`Required TPC-H table 'orde
 setup_result = bench.setup(conn, force=True)
 print(f"Tables created: {len(setup_result['tables_created'])}")
 print(f"Rows: {setup_result['table_row_counts']['delete_ops_lineitem']}")
-# Tables created: 18
-# Rows: 60175
 ```
+
+The example prints `Tables created: 18` and `Rows: 60175`.
 
 #### `is_setup(connection)`
 
@@ -160,10 +159,9 @@ if bench.is_setup(conn):
 
 <span id="benchbox.write_primitives.WritePrimitives.reset"></span>
 
-`reset(connection) -> None` truncates and refills the staging tables from the TPC-H tables (about 0.6 s at scale factor 0.01).
+`reset(connection) -> None` truncates and refills the staging tables from the TPC-H tables (about 0.6 s at scale factor 0.01). Reset after validation failures.
 
 ```python
-# Reset after validation failures
 bench.reset(conn)
 ```
 
@@ -171,10 +169,9 @@ bench.reset(conn)
 
 <span id="benchbox.write_primitives.WritePrimitives.teardown"></span>
 
-`teardown(connection) -> None` drops the staging tables; `is_setup()` is then false. The two bookkeeping tables stay.
+`teardown(connection) -> None` drops the staging tables; `is_setup()` is then false. The two bookkeeping tables stay. Call it when you are done.
 
 ```python
-# Cleanup when done
 bench.teardown(conn)
 ```
 
@@ -226,19 +223,19 @@ print(f"Validation: {result.validation_passed}")
 
 With a set-up database and `generate_data()` run, all 112 operations return `SUCCESS` at scale factor 0.01 on DuckDB, in about 1.4 seconds.
 
+The example runs all operations, then only the INSERT operations, then two specific operations.
+
 ```python
-# Run all operations
 results = bench.run_benchmark(conn)
 
-# Run only INSERT operations
 insert_results = bench.run_benchmark(conn, categories=["insert"])
 
-# Run specific operations
 specific_ops = ["insert_single_row", "update_single_row_pk"]
 results = bench.run_benchmark(conn, operation_ids=specific_ops)
 print(len(results))
-# 2
 ```
+
+The last statement prints `2`.
 
 ### Operation Query Methods
 
@@ -251,8 +248,9 @@ print(len(results))
 ```python
 operations = bench.get_all_operations()
 print(f"Total operations: {len(operations)}")
-# Total operations: 112
 ```
+
+The example prints `Total operations: 112`.
 
 #### `get_operation(operation_id)`
 
@@ -263,8 +261,9 @@ print(f"Total operations: {len(operations)}")
 ```python
 op = bench.get_operation("insert_single_row")
 print(f"Category: {op.category}")
-# Category: insert
 ```
+
+The example prints `Category: insert`.
 
 #### `get_operations_by_category(category)`
 
@@ -275,8 +274,9 @@ print(f"Category: {op.category}")
 ```python
 insert_ops = bench.get_operations_by_category("insert")
 print(f"INSERT operations: {len(insert_ops)}")
-# INSERT operations: 12
 ```
+
+The example prints `INSERT operations: 12`.
 
 #### `get_operation_categories()`
 
@@ -286,8 +286,9 @@ print(f"INSERT operations: {len(insert_ops)}")
 
 ```python
 categories = bench.get_operation_categories()
-# ['bulk_load', 'ddl', 'delete', 'insert', 'merge', 'update']
 ```
+
+The result is `['bulk_load', 'ddl', 'delete', 'insert', 'merge', 'update']`.
 
 #### `get_queries(dialect=None)`
 
@@ -328,10 +329,9 @@ sql = bench.get_query("insert_single_row")
 schema = bench.get_schema(dialect="duckdb")
 for table, definition in list(schema.items())[:3]:
     print(f"{table}: {len(definition['columns'])} columns")
-# region: 3 columns
-# nation: 4 columns
-# customer: 8 columns
 ```
+
+The example prints `region: 3 columns`, `nation: 4 columns` and `customer: 8 columns`.
 
 #### `get_create_tables_sql(dialect="standard", tuning_config=None)`
 
@@ -342,8 +342,9 @@ for table, definition in list(schema.items())[:3]:
 ```python
 create_sql = bench.get_create_tables_sql(dialect="postgres")
 print(create_sql.count("CREATE TABLE"))
-# 28
 ```
+
+The example prints `28`.
 
 #### `get_benchmark_info()`
 
@@ -354,8 +355,9 @@ print(create_sql.count("CREATE TABLE"))
 ```python
 info = bench.get_benchmark_info()
 print(info["total_operations"], info["data_source"])
-# 112 tpch
 ```
+
+The example prints `112 tpch`.
 
 ### OperationResult Class
 
@@ -495,11 +497,12 @@ There are no transaction operations in 0.4.1 (`get_operation_categories()` does 
 
 ### Complete Workflow
 
+The example loads the TPC-H data first, then sets up Write Primitives. It executes a single operation, runs all operations and then cleans up.
+
 ```python
 from benchbox import TPCH, WritePrimitives
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# 1. Load TPC-H data first
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
@@ -508,26 +511,22 @@ conn = adapter.create_connection()
 adapter.create_schema(tpch, conn)
 adapter.load_data(tpch, conn, tpch.output_dir)
 
-# 2. Setup Write Primitives
 bench = WritePrimitives(scale_factor=0.01)
 bench.generate_data()
 setup_result = bench.setup(conn, force=True)
 print(f"Setup: {setup_result['success']}")
 print(f"Tables: {len(setup_result['tables_created'])}")
 
-# 3. Execute single operation
 result = bench.execute_operation("insert_single_row", conn)
 print(f"Success: {result.success}")
 print(f"Time: {result.write_duration_ms:.2f}ms")
 print(f"Validation: {result.validation_passed}")
 
-# 4. Run all operations
 results = bench.run_benchmark(conn)
 print(f"Total: {len(results)}")
 successful = [r for r in results if r.success]
 print(f"Successful: {len(successful)}")
 
-# 5. Cleanup
 bench.teardown(conn)
 ```
 
@@ -545,8 +544,9 @@ Successful: 112
 
 ### Category-Based Testing
 
+Test each category separately, and reset between categories.
+
 ```python
-# Test each category separately
 categories = bench.get_operation_categories()
 
 for category in categories:
@@ -557,17 +557,17 @@ for category in categories:
         status = "OK" if result.success else "FAIL"
         print(f"  {status} {result.operation_id}: {result.write_duration_ms:.2f}ms")
 
-    # Reset between categories
     bench.reset(conn)
 ```
 
 ### Performance Analysis
 
+Run multiple iterations for stable timing, and reset between iterations.
+
 ```python
 import time
 from statistics import mean, median
 
-# Run multiple iterations for stable timing
 operation_id = "insert_single_row"
 iterations = 10
 times = []
@@ -577,7 +577,6 @@ for i in range(iterations):
     if result.success:
         times.append(result.write_duration_ms)
 
-    # Reset between iterations
     if i < iterations - 1:
         bench.reset(conn)
 
@@ -591,8 +590,9 @@ print(f"Max: {max(times):.2f}ms")
 
 ### Error Handling and Recovery
 
+Reset the staging tables to recover from an operation failure. After a validation failure, reset and retry.
+
 ```python
-# Handle operation failures
 result = bench.execute_operation("insert_batch_values_10", conn)
 
 if not result.success:
@@ -600,11 +600,9 @@ if not result.success:
     if result.cleanup_warning:
         print(f"Cleanup warning: {result.cleanup_warning}")
 
-    # Reset to recover
     print("Resetting staging tables...")
     bench.reset(conn)
 
-# Handle validation failures
 if not result.validation_passed:
     print("Validation failed:")
     for val_result in result.validation_results:
@@ -613,7 +611,6 @@ if not result.validation_passed:
             print(f"  Expected: {val_result['expected_rows']}")
             print(f"  Actual: {val_result['actual_rows']}")
 
-    # Reset and retry
     bench.reset(conn)
     result = bench.execute_operation("insert_batch_values_10", conn)
 ```
@@ -622,12 +619,12 @@ if not result.validation_passed:
 
 1. **Always Load TPC-H First**
 
-   ```python
-   # Wrong: Will fail
-   bench = WritePrimitives()
-   bench.setup(conn)  # RuntimeError: Required TPC-H table 'orders' not found
+   The first two statements are wrong: `setup` fails with a `RuntimeError` because the TPC-H table `orders` is not found. Load the TPC-H data first, as the remaining statements show.
 
-   # Correct: Load TPC-H first
+   ```python
+   bench = WritePrimitives()
+   bench.setup(conn)
+
    tpch = TPCH(scale_factor=1.0)
    tpch.generate_data()
    adapter = DuckDBAdapter()
@@ -647,19 +644,21 @@ if not result.validation_passed:
 
 3. **Run `generate_data()` for Bulk Loads**
 
+   Without `generate_data()`, the 36 `bulk_load` operations are skipped.
+
    ```python
-   # Without generate_data(), the 36 bulk_load operations are SKIPPED
    bench.generate_data()
    results = bench.run_benchmark(conn, categories=["bulk_load"])
    ```
 
 4. **Reset Between Test Runs**
 
+   Reset after each operation to start the next one from a clean state.
+
    ```python
-   # Reset to ensure clean state
    for operation_id in ["insert_single_row", "update_single_row_pk"]:
        result = bench.execute_operation(operation_id, conn)
-       bench.reset(conn)  # Clean slate for next operation
+       bench.reset(conn)
    ```
 
 5. **Validate and Handle Errors**
@@ -712,6 +711,8 @@ Write Primitives provides DataFrame support for write operations on DataFrame pl
 
 ### DataFrameWriteOperationsManager
 
+The example creates a manager, checks its capabilities and then executes a bulk load.
+
 ```python
 from benchbox.core.write_primitives.dataframe_operations import (
     DataFrameWriteOperationsManager,
@@ -722,14 +723,11 @@ from benchbox.core.write_primitives.dataframe_operations import (
 with open("orders.csv", "w") as f:
     f.write("o_orderkey,o_custkey,o_totalprice\n1,10,100.5\n2,20,250.0\n3,30,75.25\n")
 
-# Create manager
 manager = DataFrameWriteOperationsManager("polars-df")
 
-# Check capabilities
 caps = manager.get_capabilities()
 print(f"Supports UPDATE: {caps.supports_operation(WriteOperationType.UPDATE)}")
 
-# Execute BULK_LOAD
 result = manager.execute_bulk_load(
     source_path="orders.csv",
     target_path="orders",
@@ -785,7 +783,7 @@ class DataFrameWriteResult:
 
 ### DataFrameWriteCapabilities
 
-Platform capabilities for write operations:
+Platform capabilities for write operations. `supported_compressions` lists codecs such as `["zstd", "snappy", "gzip"]`:
 
 ```python
 @dataclass
@@ -794,7 +792,7 @@ class DataFrameWriteCapabilities:
     maintenance_caps: DataFrameMaintenanceCapabilities | None
     supports_bulk_load: bool = True
     supports_compression: bool = True
-    supported_compressions: list[str]  # e.g., ["zstd", "snappy", "gzip"]
+    supported_compressions: list[str]
     supports_partitioning: bool = False
     supports_sorting: bool = True
     supports_aggregate_persist: bool

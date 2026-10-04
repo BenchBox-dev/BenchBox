@@ -3161,3 +3161,11 @@ def test_unparseable_chunk_with_perl_pod_or_ruby_block_comment_fails_closed() ->
     ruby = "LEVELS=($(ruby -e 'x = 1\n=begin\nnote\n=end\n'))\n"
     assert [f.kind for f in scan("a.sh", perl, "bash")] == ["coverage-error"]
     assert [f.kind for f in scan("a.sh", ruby, "bash")] == ["coverage-error"]
+
+
+def test_mdx_pages_are_scanned_like_markdown() -> None:
+    from comment_syntax import language
+
+    assert language("website/src/content/docs/page.mdx") == "examples"
+    source = "import X from './x.astro';\n\n```python\nx = 1  # note\n```\n"
+    assert [f.text for f in scan("website/src/content/docs/page.mdx", source, "examples", {})] == ["# note"]

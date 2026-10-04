@@ -29,19 +29,18 @@ Cloud storage paths work transparently with BenchBox:
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with cloud storage output
 benchmark = TPCH(
     scale_factor=0.01,
     output_dir="s3://my-bucket/benchbox/tpch-data"
 )
 
-# Generate data into the configured output directory
 benchmark.generate_data()
 
-# Run benchmark
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
+
+The benchmark takes its output directory from `output_dir`. `generate_data()` writes the data to that directory, and the adapter then runs the benchmark.
 
 This example needs the `cloudstorage` extra and credentials for the bucket, so it was not run.
 
@@ -50,12 +49,12 @@ This example needs the `cloudstorage` extra and credentials for the bucket, so i
 Cloud storage support requires the optional `cloudstorage` dependency:
 
 ```bash
-# Install cloud storage support
 uv add benchbox --extra cloudstorage
 
-# Or install all cloud dependencies
 uv pip install "benchbox[cloud]"
 ```
+
+The first command installs cloud storage support only. The second installs all cloud dependencies.
 
 ## Supported Providers
 
@@ -101,19 +100,19 @@ Nothing it raises itself.
 ```python
 from benchbox.utils.cloud_storage import is_cloud_path
 
-# Cloud storage paths
 assert is_cloud_path("s3://bucket/path")
 assert is_cloud_path("gs://bucket/path")
 assert is_cloud_path("abfss://container@account.dfs.core.windows.net/path")
 assert is_cloud_path("dbfs:/Volumes/catalog/schema/volume/path")
 assert is_cloud_path("@~/staged/data")
 
-# Local paths
 assert not is_cloud_path("/local/path")
 assert not is_cloud_path("./relative/path")
 
 print(is_cloud_path("s3:/bucket/path"), is_cloud_path("s3a://bucket/path"))
 ```
+
+The first five assertions use cloud paths. The next two use local paths.
 
 ```text
 True False
@@ -622,6 +621,8 @@ Without `cloudpathlib`:
 
 Run benchmarks across multiple cloud providers. The benchmark steps need credentials for each provider and were not run. Without credentials, every provider is skipped and the loop prints the error from `validate_cloud_credentials`.
 
+For each location the loop validates the credentials before it starts, reads the path information, then creates and runs the benchmark. A summary of the results is printed at the end.
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
@@ -630,7 +631,6 @@ from benchbox.utils.cloud_storage import (
     get_cloud_path_info
 )
 
-# Define cloud storage locations
 cloud_locations = {
     "aws": "s3://my-benchbox-bucket/tpch-data",
     "gcp": "gs://my-benchbox-bucket/tpch-data",
@@ -644,20 +644,17 @@ for provider, location in cloud_locations.items():
     print(f"Running TPC-H benchmark on {provider.upper()}")
     print(f"{'='*60}")
 
-    # Validate credentials before starting
     cred_result = validate_cloud_credentials(location)
 
     if not cred_result["valid"]:
         print(f"⚠️  Skipping {provider}: {cred_result['error']}")
         continue
 
-    # Get path information
     info = get_cloud_path_info(location)
     print(f"✅ Credentials valid for {info['provider']}")
     print(f"   Bucket: {info['bucket']}")
     print(f"   Path: {info['path']}")
 
-    # Create and run benchmark
     benchmark = TPCH(scale_factor=0.01, output_dir=location)
 
     try:
@@ -678,7 +675,6 @@ for provider, location in cloud_locations.items():
         results[provider] = {"status": "failed", "error": str(e)}
         print(f"\n❌ {provider.upper()} failed: {e}")
 
-# Summary
 print(f"\n{'='*60}")
 print("RESULTS SUMMARY")
 print(f"{'='*60}")
@@ -691,7 +687,7 @@ for provider, result in results.items():
 
 ### Credential Validation Workflow
 
-Validate cloud credentials before benchmark execution:
+Validate cloud credentials before benchmark execution. `validate_and_setup_storage` returns `True` at once for a local path. For a cloud path it validates the credentials. On failure it prints the provider's setup guide and returns `False`. The call at the end proceeds with the benchmark when the setup is valid. Otherwise it shows an error:
 
 ```python
 from benchbox.utils.cloud_storage import (
@@ -701,16 +697,13 @@ from benchbox.utils.cloud_storage import (
 )
 
 def validate_and_setup_storage(output_path: str) -> bool:
-    """Validate cloud storage setup and provide guidance if needed."""
 
-    # Check if path is cloud storage
     if not is_cloud_path(output_path):
         print("✅ Using local storage - no cloud setup needed")
         return True
 
     print(f"Cloud storage output detected: {output_path}")
 
-    # Validate credentials
     result = validate_cloud_credentials(output_path)
 
     if result["valid"]:
@@ -723,18 +716,14 @@ def validate_and_setup_storage(output_path: str) -> bool:
         print(f"   Error: {result['error']}")
         print()
 
-        # Show setup guide
         guide = format_cloud_usage_guide(result['provider'])
         print(guide)
 
         return False
 
-# Usage
 if validate_and_setup_storage("s3://my-bucket/data"):
-    # Proceed with benchmark
     pass
 else:
-    # Show error and exit
     print("Please configure cloud credentials and try again")
 ```
 
@@ -767,18 +756,15 @@ Without `cloudpathlib`, the same call reports `Provider: unknown` and `Error: cl
 
 ### Cloud Path Adapter Pattern
 
-Use CloudPathAdapter for transparent local/cloud path handling:
+Use CloudPathAdapter for transparent local/cloud path handling. The same code works with both local and cloud paths. The function creates a benchmark directory with `results` and `data` subdirectories. The call at the end uses a local path:
 
 ```python
 from benchbox.utils.cloud_storage import CloudPathAdapter
 
 def organize_benchmark_results(base_path: str, benchmark_name: str):
-    """Organize benchmark results with transparent cloud/local handling."""
 
-    # CloudPathAdapter works with both local and cloud paths
     base = CloudPathAdapter(base_path)
 
-    # Create directory structure
     benchmark_dir = base / benchmark_name
     benchmark_dir.mkdir()
 
@@ -798,7 +784,6 @@ def organize_benchmark_results(base_path: str, benchmark_name: str):
         "data_dir": str(data_dir)
     }
 
-# Works with local paths
 local_dirs = organize_benchmark_results(
     "/tmp/benchbox",
     "tpch"
@@ -818,29 +803,25 @@ With the `cloudstorage` extra and credentials, an `s3://` base path gives the sa
 
 ### Custom Data Generator with Cloud Support
 
-Create a custom data generator on top of `CloudStorageGeneratorMixin`:
+Create a custom data generator on top of `CloudStorageGeneratorMixin`. The generator writes a `customer` table and an `orders` table. The first call generates into a local directory. The second call passes an ADLS Gen2 staging wrapper, so the files are generated into its local staging directory:
 
 ```python
 from pathlib import Path
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 
 class CustomBenchmarkGenerator(CloudStorageGeneratorMixin):
-    """Custom benchmark generator with cloud storage support."""
 
     def __init__(self, row_count: int):
         self.row_count = row_count
 
     def generate_data(self, output_dir, verbose: bool = False):
-        """Generate benchmark data into a local or staging directory."""
 
         def local_generate(local_dir):
-            """Generate data locally."""
             import csv
 
             local_dir = Path(local_dir)
             local_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate customer table
             customer_path = local_dir / "customer.csv"
             with open(customer_path, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -848,7 +829,6 @@ class CustomBenchmarkGenerator(CloudStorageGeneratorMixin):
                 for i in range(self.row_count):
                     writer.writerow([i, f'Customer{i}', f'Region{i % 5}'])
 
-            # Generate orders table
             orders_path = local_dir / "orders.csv"
             with open(orders_path, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -869,11 +849,9 @@ class CustomBenchmarkGenerator(CloudStorageGeneratorMixin):
 
 generator = CustomBenchmarkGenerator(row_count=1000)
 
-# Local storage
 local_paths = generator.generate_data("/tmp/custom-benchmark")
 print(f"Generated locally: {local_paths}")
 
-# ADLS Gen2 target: generate into the local staging directory
 staged = create_path_handler("abfss://container@account.dfs.core.windows.net/custom-benchmark")
 staged_paths = generator.generate_data(staged)
 print(sorted(staged_paths), staged.cloud_target)
@@ -886,7 +864,7 @@ Generated locally: {'customer': PosixPath('/tmp/custom-benchmark/customer.csv'),
 
 ### Path Information Inspection
 
-Inspect and analyze cloud paths programmatically:
+Inspect and analyze cloud paths programmatically. The function checks whether the path is a cloud path, gets its detailed information, and validates its credentials. The calls at the end analyze different paths:
 
 ```python
 from benchbox.utils.cloud_storage import (
@@ -896,26 +874,22 @@ from benchbox.utils.cloud_storage import (
 )
 
 def analyze_storage_path(path: str):
-    """Comprehensive storage path analysis."""
 
     print(f"Analyzing path: {path}")
     print("=" * 60)
 
-    # Check if cloud path
     if not is_cloud_path(path):
         print("Type: Local filesystem")
         return
 
     print("Type: Cloud storage")
 
-    # Get detailed information
     info = get_cloud_path_info(path)
 
     print(f"Provider: {info['provider'].upper()}")
     print(f"Bucket/Container: {info['bucket']}")
     print(f"Path: {info['path']}")
 
-    # Validate credentials
     cred = validate_cloud_credentials(path)
 
     if cred["valid"]:
@@ -924,7 +898,6 @@ def analyze_storage_path(path: str):
         print(f"Credentials: ❌ Invalid - {cred['error']}")
         print(f"Required environment variables: {', '.join(cred['env_vars'])}")
 
-# Analyze different paths
 analyze_storage_path("abfss://container@account.dfs.core.windows.net/benchbox/tpch-data")
 analyze_storage_path("/tmp/local/data")
 ```
@@ -954,13 +927,11 @@ Type: Local filesystem
    ```python
    from benchbox.utils.cloud_storage import validate_cloud_credentials
 
-   # Validate before benchmark
    result = validate_cloud_credentials(output_path)
    if not result["valid"]:
        print(f"Error: {result['error']}")
        exit(1)
 
-   # Proceed with benchmark
    benchmark.generate_data()
    ```
 
@@ -971,7 +942,6 @@ Type: Local filesystem
    ```python
    from benchbox.utils.cloud_storage import CloudPathAdapter
 
-   # Works with any path type
    path = CloudPathAdapter(user_provided_path)
    path.mkdir()
    results_file = path / "results.json"
@@ -995,13 +965,11 @@ Type: Local filesystem
 
 4. **Organize Cloud Storage Efficiently**
 
-   Use consistent naming conventions for cloud storage:
+   Use consistent naming conventions for cloud storage. The first path organizes data by benchmark and scale factor. The second includes a timestamp for results:
 
    ```python
-   # Good: Organized by benchmark and scale
    output_dir = f"s3://bucket/benchmarks/{benchmark_name}/sf{scale_factor}"
 
-   # Good: Include timestamp for results
    from datetime import datetime
    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
    results_dir = f"s3://bucket/results/{timestamp}"
@@ -1033,9 +1001,6 @@ Type: Local filesystem
 **Solution**:
 
 ```python
-# Install cloud storage support
-# uv add benchbox --extra cloudstorage
-
 from benchbox.utils.cloud_storage import validate_cloud_path_support
 
 if not validate_cloud_path_support():
@@ -1047,7 +1012,7 @@ if not validate_cloud_path_support():
 
 **Problem**: Cloud operations fail with credential errors
 
-**Solution**:
+**Solution**: When validation fails, print the provider-specific setup guide:
 
 ```python
 from benchbox.utils.cloud_storage import (
@@ -1058,7 +1023,6 @@ from benchbox.utils.cloud_storage import (
 result = validate_cloud_credentials("s3://bucket/path")
 
 if not result["valid"]:
-    # Show provider-specific setup guide
     guide = format_cloud_usage_guide(result["provider"])
     print(guide)
 ```
@@ -1067,34 +1031,27 @@ if not result["valid"]:
 
 **Problem**: Invalid cloud path format
 
-**Solution**:
+**Solution**: The first three paths are correct for AWS S3, Google Cloud Storage (`gcs://` is accepted as an alias) and Azure. `bad_s3` is missing a slash, so `create_path_handler` raises `ValueError`. `bad_s3a` is not a recognised scheme, so it is treated as a local path:
 
 ```python
-# Correct formats
-s3_path = "s3://bucket/path"           # ✅ AWS S3
-gcs_path = "gs://bucket/path"          # ✅ Google Cloud Storage ("gcs://" is accepted as an alias)
-azure_path = "abfss://container@account.dfs.core.windows.net/path"  # ✅ Azure
+s3_path = "s3://bucket/path"
+gcs_path = "gs://bucket/path"
+azure_path = "abfss://container@account.dfs.core.windows.net/path"
 
-# Incorrect formats
-bad_s3 = "s3:/bucket/path"             # ❌ Missing slash: create_path_handler raises ValueError
-bad_s3a = "s3a://bucket/path"          # ❌ Not a recognised scheme: treated as a local path
+bad_s3 = "s3:/bucket/path"
+bad_s3a = "s3a://bucket/path"
 ```
 
 ### Network Timeouts
 
 **Problem**: Large file uploads timeout
 
-**Solution**:
+**Solution**: For large benchmarks, test cloud connectivity with a small scale factor first, then proceed with the full scale:
 
 ```python
-# For large benchmarks, use smaller scale factors initially
-# to test cloud connectivity
-
-# Test with small scale first
 test_benchmark = TPCH(scale_factor=0.01, output_dir="s3://bucket/test")
 test_benchmark.generate_data()
 
-# Then proceed with full scale
 full_benchmark = TPCH(scale_factor=10.0, output_dir="s3://bucket/full")
 full_benchmark.generate_data()
 ```

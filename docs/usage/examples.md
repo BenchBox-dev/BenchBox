@@ -1367,7 +1367,6 @@ FEATURE_PATTERNS = {
 def analyze_tpcds_queries():
 
     tpcds = TPCDS(scale_factor=0.01)
-    # Get all queries
     queries = tpcds.get_queries()
 
     analysis_results = {}

@@ -24,20 +24,16 @@ The TPC-DS benchmark models a retail product supplier with 99 complex decision s
 from benchbox import TPCDS
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = TPCDS(scale_factor=1.0)
-
-# Generate data
 benchmark.generate_data()
 
-# Run on platform
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
 print(f"Completed in {results.total_execution_time:.2f}s")
 ```
 
-The DuckDB adapter needs the `duckdb` package. Scale factor 1.0 writes about 1 GB.
+The example creates the benchmark, generates the data, runs it on DuckDB and prints the total time. The DuckDB adapter needs the `duckdb` package. Scale factor 1.0 writes about 1 GB.
 
 ## API Reference
 
@@ -121,8 +117,9 @@ The files are pipe-delimited `.dat` files named after the table (`store_sales.da
 ```python
 data_files = benchmark.generate_data()
 print(f"Generated {len(data_files)} table files")
-# Generated 25 table files
 ```
+
+This prints `Generated 25 table files`.
 
 ### get_query(query_id, \*, params=None, seed=None, scale_factor=None, dialect=None)
 
@@ -143,18 +140,13 @@ print(f"Generated {len(data_files)} table files")
 Raises `TypeError` for a non-integer `query_id` or `seed` or a non-numeric `scale_factor`, and `ValueError` for a `query_id` outside 1 to 99 (`Query ID must be 1-99, got 0`) or a `scale_factor` that is not positive.
 
 ```python
-# Get query 1
 q1 = benchmark.get_query(1)
-
-# Get with dialect translation
 q1_bq = benchmark.get_query(1, dialect="bigquery")
-
-# Get with a seed and scale factor 10
 q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
-
-# Second form of query 14
 q14_b = benchmark.get_query(14, variant="b")
 ```
+
+The examples get query 1, get it translated for BigQuery, get it with seed 42 and scale factor 10, and get the second form of query 14, in that order.
 
 ### get_queries(dialect=None, base_dialect=None)
 
@@ -167,14 +159,12 @@ Unlike `get_query`, it always renders scale-dependent parameters for scale facto
 With a `dialect`, each query is translated from `base_dialect` (default `netezza`) with SQLGlot.
 
 ```python
-# Get all queries
 queries = benchmark.get_queries()
 print(f"Total queries: {len(queries)}")
-# Total queries: 99
-
-# Get with dialect translation
 queries_bq = benchmark.get_queries(dialect="bigquery")
 ```
+
+The first call gets all queries and prints `Total queries: 99`. The second gets them with dialect translation.
 
 ### get_available_queries()
 
@@ -185,8 +175,9 @@ queries_bq = benchmark.get_queries(dialect="bigquery")
 ```python
 query_ids = benchmark.get_available_queries()
 print(f"Available queries: {len(query_ids)}")
-# Available queries: 99
 ```
+
+This prints `Available queries: 99`.
 
 ### get_available_tables()
 
@@ -197,8 +188,9 @@ print(f"Available queries: {len(query_ids)}")
 ```python
 tables = benchmark.get_available_tables()
 print(f"Tables: {', '.join(tables[:3])}, ...")
-# Tables: call_center, catalog_page, catalog_returns, ...
 ```
+
+This prints `Tables: call_center, catalog_page, catalog_returns, ...`.
 
 ### generate_table_data(table_name, output_dir=None)
 
@@ -216,9 +208,9 @@ print(f"Tables: {', '.join(tables[:3])}, ...")
 schema = benchmark.get_schema()
 for name in ("store_sales", "date_dim"):
     print(f"{schema[name]['name']}: {len(schema[name]['columns'])} columns")
-# store_sales: 23 columns
-# date_dim: 28 columns
 ```
+
+This prints `store_sales: 23 columns` and `date_dim: 28 columns`.
 
 ### get_create_tables_sql(dialect="standard", tuning_config=None)
 
@@ -237,8 +229,9 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 create_sql = benchmark.get_create_tables_sql()
 create_sql_keys = benchmark.get_create_tables_sql(tuning_config=UnifiedTuningConfiguration())
 print(create_sql.count("PRIMARY KEY"), create_sql_keys.count("PRIMARY KEY"), create_sql_keys.count("FOREIGN KEY"))
-# 0 23 87
 ```
+
+This prints `0 23 87`: no primary keys without a tuning configuration, and 23 primary keys and 87 foreign keys with one.
 
 ### generate_streams(num_streams=1, rng_seed=None, streams_output_dir=None)
 
@@ -255,7 +248,6 @@ print(create_sql.count("PRIMARY KEY"), create_sql_keys.count("PRIMARY KEY"), cre
 The files are named `stream_0.sql`, `stream_1.sql` and so on. Each starts with comment lines (stream id, scale factor, seed), then every query of the stream in its permuted order with a `-- Query N (Stream S, Position P)` comment. A stream holds 103 entries: the 99 queries with 14, 23, 24 and 39 each split into an `a` and a `b` part.
 
 ```python
-# Generate 4 concurrent streams
 streams = benchmark.generate_streams(
     num_streams=4,
     rng_seed=42,
@@ -264,11 +256,9 @@ streams = benchmark.generate_streams(
 
 for stream_path in streams:
     print(f"Stream: {stream_path}")
-# Stream: streams/stream_0.sql
-# Stream: streams/stream_1.sql
-# Stream: streams/stream_2.sql
-# Stream: streams/stream_3.sql
 ```
+
+The example generates 4 streams and prints their paths, `streams/stream_0.sql` to `streams/stream_3.sql`.
 
 ### get_stream_info(stream_id)
 
@@ -355,27 +345,26 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 
 ### Basic Benchmark Run
 
+The benchmark uses scale factor 1 (about 1 GB). The example generates the data, runs on DuckDB and prints the results.
+
 ```python
 from benchbox import TPCDS
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark with scale factor 1 (about 1 GB)
 benchmark = TPCDS(scale_factor=1.0)
-
-# Generate data
 benchmark.generate_data()
 
-# Run on DuckDB
 adapter = DuckDBAdapter()
 results = benchmark.run_with_platform(adapter)
 
-# Print results
 print(f"Benchmark: {results.benchmark_name}")
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.successful_queries}/{results.total_queries}")
 ```
 
 ### Query Subset Execution
+
+The example loads the data and then executes the first ten queries (1 to 10).
 
 ```python
 from benchbox import TPCDS
@@ -387,11 +376,8 @@ benchmark.generate_data()
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
-
-# Execute the first ten queries
 for query_id in range(1, 11):
     query = benchmark.get_query(query_id)
     result = adapter.execute_query(conn, query, f"query{query_id}")
@@ -399,6 +385,8 @@ for query_id in range(1, 11):
 ```
 
 ### Query Complexity Analysis
+
+The queries are sorted by complexity: subquery count first, then joins, then window functions.
 
 ```python
 from benchbox import TPCDS
@@ -420,7 +408,6 @@ for query_id, query_text in queries.items():
     }
     complexity_metrics.append(metrics)
 
-# Sort by complexity
 sorted_queries = sorted(
     complexity_metrics,
     key=lambda x: (x["subqueries"], x["joins"], x["window_functions"]),
@@ -469,12 +456,13 @@ print(df)
 
 ### Variant Testing
 
+The example generates the queries with different seeds and then compares the query variants.
+
 ```python
 from benchbox import TPCDS
 
 benchmark = TPCDS(scale_factor=1.0)
 
-# Generate queries with different seeds
 variants = {}
 for seed in [42, 123, 456]:
     variant_queries = {}
@@ -485,7 +473,6 @@ for seed in [42, 123, 456]:
         )
     variants[seed] = variant_queries
 
-# Compare query variants
 q1_v1 = variants[42][1]
 q1_v2 = variants[123][1]
 if q1_v1 != q1_v2:
@@ -493,6 +480,8 @@ if q1_v1 != q1_v2:
 ```
 
 ### Stream-Based Testing
+
+The example generates 4 streams and runs them in parallel, one thread for each stream.
 
 ```python
 from benchbox import TPCDS
@@ -502,7 +491,6 @@ import concurrent.futures
 benchmark = TPCDS(scale_factor=0.01)
 benchmark.generate_data()
 
-# Generate 4 streams
 streams = benchmark.generate_streams(num_streams=4, rng_seed=42)
 
 adapter = DuckDBAdapter()
@@ -522,7 +510,6 @@ def run_stream(stream_id):
 
     return {"stream_id": stream_id, "total_time": total_time}
 
-# Run streams in parallel
 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
     futures = [executor.submit(run_stream, i) for i in range(4)]
     results = [f.result() for f in concurrent.futures.as_completed(futures)]

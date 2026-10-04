@@ -41,7 +41,6 @@ In 0.4.1 `ClickHouseAdapter()` starts in local mode. Server mode is selected wit
 from benchbox.tpch import TPCH
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Connect to ClickHouse server
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -51,7 +50,6 @@ adapter = ClickHouseAdapter(
     password=""
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -59,17 +57,17 @@ results = benchmark.run_with_platform(adapter)
 
 ### Local Mode (Embedded)
 
+This example runs embedded ClickHouse with chDB. `database_path` is optional and sets persistent storage.
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Embedded ClickHouse with chDB
 adapter = ClickHouseAdapter(
     mode="local",
-    database_path="./benchmark.chdb"  # Optional persistent storage
+    database_path="./benchmark.chdb"
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -252,10 +250,11 @@ These were run in local mode for this page. Server-mode behaviour of the same me
 
 ### Server Mode - Local Development
 
+The first adapter connects to the default local server. The second adds authentication.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Default local server
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -263,7 +262,6 @@ adapter = ClickHouseAdapter(
     database="benchmark"
 )
 
-# With authentication
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -276,12 +274,13 @@ adapter = ClickHouseAdapter(
 
 ### Server Mode - Production
 
+This example connects to a production server with TLS. Port 9440 is the secure native port.
+
 ```python
-# Production server with TLS
 adapter = ClickHouseAdapter(
     mode="server",
     host="clickhouse.example.com",
-    port=9440,  # Secure native port
+    port=9440,
     database="production_benchmarks",
     username="admin",
     password="production_password",
@@ -293,11 +292,11 @@ adapter = ClickHouseAdapter(
 
 ### Local Mode - Development
 
+The first adapter runs in memory, which is fast but keeps no data. The second uses persistent storage, so the data survives restarts.
+
 ```python
-# In-memory execution (fast, no persistence)
 adapter = ClickHouseAdapter(mode="local")
 
-# Persistent storage (data survives restarts)
 adapter = ClickHouseAdapter(
     mode="local",
     database_path="./benchmarks/clickhouse_local.chdb"
@@ -306,16 +305,17 @@ adapter = ClickHouseAdapter(
 
 ### Performance Tuning
 
+Raise `max_memory_usage` for large datasets. `max_execution_time` is in seconds, so 600 is a 10 minute timeout. `max_threads=32` uses all available cores on a 32-core machine. `compression` is disabled by default for compatibility.
+
 ```python
-# High-performance configuration
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
     database="benchmark",
-    max_memory_usage="64GB",     # Increase for large datasets
-    max_execution_time=600,      # 10 minute timeout
-    max_threads=32,              # Use all available cores
-    compression=False            # Disabled by default for compatibility
+    max_memory_usage="64GB",
+    max_execution_time=600,
+    max_threads=32,
+    compression=False
 )
 ```
 
@@ -323,13 +323,14 @@ adapter = ClickHouseAdapter(
 
 ### Bulk Loading from Files
 
+The example creates the table, then bulk-inserts from a CSV file.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
 adapter = ClickHouseAdapter(mode="server", host="localhost", database="benchmark")
 conn = adapter.create_connection()
 
-# Load from CSV
 conn.execute("""
     CREATE TABLE lineitem (
         l_orderkey UInt32,
@@ -352,7 +353,6 @@ conn.execute("""
     ORDER BY (l_orderkey, l_linenumber)
 """)
 
-# Bulk insert from CSV file
 conn.execute("""
     INSERT INTO lineitem
     FROM INFILE 'data/lineitem.tbl'
@@ -362,8 +362,9 @@ conn.execute("""
 
 ### Loading from S3
 
+ClickHouse can read directly from S3. The first statement reads public objects. The second passes credentials.
+
 ```python
-# ClickHouse can read directly from S3
 conn.execute("""
     CREATE TABLE lineitem AS
     SELECT * FROM s3(
@@ -372,7 +373,6 @@ conn.execute("""
     )
 """)
 
-# With credentials
 conn.execute("""
     CREATE TABLE lineitem AS
     SELECT * FROM s3(
@@ -388,17 +388,17 @@ conn.execute("""
 
 ### Execute Queries Directly
 
+`conn.execute` returns a list of tuples. The example runs a simple count and then a more complex analytical query.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
 adapter = ClickHouseAdapter(mode="server", host="localhost", database="benchmark")
 conn = adapter.create_connection()
 
-# Simple query
 result = conn.execute("SELECT COUNT(*) FROM lineitem")
-row_count = result[0][0]  # Result is list of tuples
+row_count = result[0][0]
 
-# Complex analytical query
 result = conn.execute("""
     SELECT
         l_returnflag,
@@ -415,8 +415,9 @@ result = conn.execute("""
 
 ### Query Plans and Optimization
 
+The first statement gets the query plan. The second analyzes the query pipeline.
+
 ```python
-# Get query plan
 plan = conn.execute("""
     EXPLAIN
     SELECT * FROM lineitem
@@ -425,7 +426,6 @@ plan = conn.execute("""
 for row in plan:
     print(row[0])
 
-# Analyze query pipeline
 pipeline = conn.execute("""
     EXPLAIN PIPELINE
     SELECT COUNT(*) FROM lineitem
@@ -437,8 +437,9 @@ pipeline = conn.execute("""
 
 ### Table Engines
 
+`MergeTree` is the most common engine for analytics. `ReplacingMergeTree` deduplicates rows by the sorting key.
+
 ```python
-# MergeTree (most common for analytics)
 conn.execute("""
     CREATE TABLE orders (
         o_orderkey UInt32,
@@ -451,7 +452,6 @@ conn.execute("""
     PARTITION BY toYYYYMM(o_orderdate)
 """)
 
-# ReplacingMergeTree (deduplication)
 conn.execute("""
     CREATE TABLE customer_updates (
         c_custkey UInt32,
@@ -465,8 +465,9 @@ conn.execute("""
 
 ### Materialized Views
 
+This view pre-aggregates orders by date.
+
 ```python
-# Create materialized view for pre-aggregation
 conn.execute("""
     CREATE MATERIALIZED VIEW orders_by_date
     ENGINE = SummingMergeTree()
@@ -482,8 +483,9 @@ conn.execute("""
 
 ### Distributed Queries
 
+This query runs across multiple shards. It needs a cluster setup.
+
 ```python
-# Query across multiple shards (cluster setup required)
 result = conn.execute("""
     SELECT
         l_returnflag,
@@ -497,20 +499,19 @@ result = conn.execute("""
 
 ### Memory Management
 
-1. **Set appropriate memory limits** per query:
+1. **Set appropriate memory limits** per query. `max_memory_usage` is the per-query limit:
 
    ```python
    adapter = ClickHouseAdapter(
        mode="server",
        host="localhost",
-       max_memory_usage="16GB"  # Per query limit
+       max_memory_usage="16GB"
    )
    ```
 
-2. **Monitor memory usage** during execution:
+2. **Monitor memory usage** during execution. This query checks the memory of running queries:
 
    ```python
-   # Check memory usage
    result = conn.execute("""
        SELECT
            query,
@@ -521,69 +522,60 @@ result = conn.execute("""
    """)
    ```
 
-3. **Use external aggregation** for large GROUP BY:
+3. **Use external aggregation** for large GROUP BY. This setting enables external aggregation automatically:
 
    ```python
-   # Enable external aggregation automatically
    conn.execute("SET max_bytes_before_external_group_by = 10000000000")
    ```
 
 ### Performance Optimization
 
-1. **Choose optimal table engine** and ordering key:
+1. **Choose optimal table engine** and ordering key. Ordering by commonly filtered columns is good. Including all filter columns is better. These are illustrative SQL fragments; supply complete table definitions before execution.
 
-   ```python
-   # Good: Order by commonly filtered columns
+   ```sql
    CREATE TABLE lineitem (...)
    ENGINE = MergeTree()
    ORDER BY (l_shipdate, l_orderkey)
 
-   # Better: Include all filter columns
    ORDER BY (l_shipdate, l_returnflag, l_orderkey)
    ```
 
-2. **Use appropriate data types**:
+2. **Use appropriate data types**. Prefer smaller types:
 
-   ```python
-   # Prefer smaller types
-   UInt8 instead of UInt32 for small integers
-   Date instead of DateTime for date-only fields
-   LowCardinality(String) for repeated strings
-   ```
+   - `UInt8` instead of `UInt32` for small integers
+   - `Date` instead of `DateTime` for date-only fields
+   - `LowCardinality(String)` for repeated strings
 
-3. **Partition large tables**:
+3. **Partition large tables**. `toYYYYMM` makes monthly partitions. This is an illustrative SQL fragment; supply a complete table definition before execution.
 
-   ```python
+   ```sql
    CREATE TABLE lineitem (...)
    ENGINE = MergeTree()
-   PARTITION BY toYYYYMM(l_shipdate)  # Monthly partitions
+   PARTITION BY toYYYYMM(l_shipdate)
    ORDER BY (l_orderkey, l_linenumber)
    ```
 
 ### Connection Management
 
-1. **Reuse connections** for multiple queries:
+1. **Reuse connections** for multiple queries, and close the connection when you are done:
 
    ```python
    adapter = ClickHouseAdapter(mode="server", host="localhost")
    conn = adapter.create_connection()
 
-   # Run multiple queries
    for query_id in range(1, 23):
        result = conn.execute(queries[query_id])
 
-   # Close when done
    adapter.close_connection(conn)
    ```
 
-2. **Set connection timeouts** appropriately:
+2. **Set connection timeouts** appropriately. Long-running benchmarks need longer timeouts. `max_execution_time=600` is 10 minutes:
 
    ```python
-   # Long-running benchmarks need longer timeouts
    adapter = ClickHouseAdapter(
        mode="server",
        host="localhost",
-       max_execution_time=600  # 10 minutes
+       max_execution_time=600
    )
    ```
 
@@ -595,22 +587,22 @@ result = conn.execute("""
 
 **Solutions**:
 
+1. Check whether the server is running.
+2. Start the server if it is not running.
+3. Check that the port is listening.
+4. Test the connection. The Python block below also verifies the connection.
+
 ```bash
-# 1. Check if server is running
 ps aux | grep clickhouse-server
 
-# 2. Start server if not running
 sudo service clickhouse-server start
 
-# 3. Check port is listening
 netstat -ln | grep 9000
 
-# 4. Test connection
 clickhouse-client --host=localhost --port=9000
 ```
 
 ```python
-# Verify connection in Python
 import socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 result = sock.connect_ex(('localhost', 9000))
@@ -626,36 +618,37 @@ else:
 
 **Solutions**:
 
+1. Increase the memory limit.
+2. Enable external operations.
+3. Reduce the scale factor for testing. Start small.
+
 ```python
-# 1. Increase memory limit
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
     max_memory_usage="32GB"
 )
 
-# 2. Enable external operations
 conn = adapter.create_connection()
 conn.execute("SET max_bytes_before_external_group_by = 20000000000")
 conn.execute("SET max_bytes_before_external_sort = 20000000000")
 
-# 3. Reduce scale factor for testing
-benchmark = TPCH(scale_factor=0.1)  # Start small
+benchmark = TPCH(scale_factor=0.1)
 ```
 
 ### Local Mode Import Error
 
 **Problem**: `ImportError: ClickHouse local mode requires chDB but it is not installed.` in local mode
 
-**Solution**:
+**Solution**: Install chDB with the local-mode extra:
 
 ```bash
-# Install chDB with the local-mode extra
 pip install "benchbox[clickhouse-local]"
 ```
 
+Or switch to server mode, which needs the `clickhouse` extra:
+
 ```python
-# Or switch to server mode (needs the clickhouse extra)
 adapter = ClickHouseAdapter(mode="server", host="localhost")
 ```
 
@@ -665,26 +658,24 @@ adapter = ClickHouseAdapter(mode="server", host="localhost")
 
 **Solutions**:
 
+1. Increase the thread count so queries use more CPU cores.
+2. Check the query plan. If it shows `FullScanStep` (a table scan), the table may need a better `ORDER BY`.
+3. Enable query profiling, run the query, then check the query log. In server mode the log is `system.query_log`. chDB has no `system.query_log`.
+
 ```python
-# 1. Increase thread count
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
-    max_threads=16  # Use more CPU cores
+    max_threads=16
 )
 
-# 2. Check query plan
 plan = conn.execute("EXPLAIN SELECT ...")
-# Look for FullScanStep (table scan) - may need better ORDER BY
 
-# 3. Enable query profiling (server mode: chDB has no system.query_log)
 conn.execute("SET log_queries = 1")
 conn.execute("SET log_query_threads = 1")
 
-# Run query
 result = conn.execute("SELECT ...")
 
-# Check query log
 log = conn.execute("""
     SELECT
         query,

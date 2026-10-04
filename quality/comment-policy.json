@@ -38619,7 +38619,7 @@
       "path": "tests/unit/scripts/test_path_filter_decision.py",
       "symbol": "test_visual_inputs_classify_website_as_a_render_input",
       "text": "unresolved executable source: 'bash'",
-      "payload": "sha256:b87fb92f08d2bca4e1eaaf841d57323101a6cdae4ad5dacf5eb6115ce7b8c2e4",
+      "payload": "sha256:1ef4f09594da95172311eaf1a8eb7db1d83f4adfe4422529b0b74471645e1481",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": ".github/workflows/ci.yml",
@@ -38841,7 +38841,7 @@
       "path": "tests/unit/workflows/test_oracle_review_workflow.py",
       "symbol": "_run_step",
       "text": "unresolved executable source: 'bash'",
-      "payload": "sha256:8db4224e812fbdd8c4a8e7130d4aee8dd3a9ed2ad18852e7e6a3c422ae4b2e5c",
+      "payload": "sha256:3be3946ff868dcedd4bbafee00dc133519d0054d484eff9aea16ce681e458c1c",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": ".github/workflows/oracle-review.yml",
@@ -38897,6 +38897,31 @@
       "alternative": "A literal binary path would stop the test from exercising the binary the package ships for the host.",
       "owner": "BenchBox maintainers",
       "removal": "Remove when the executable-payload adapter can resolve the bundled binary path statically."
+    },
+    {
+      "path": "results-explorer/src/__tests__/linkColourScoping.test.ts",
+      "symbol": "",
+      "text": "// @vitest-environment node",
+      "kind": "directive",
+      "consumer": "results-explorer/package.json",
+      "necessity": "The TypeScript compiler or Vitest reads this directive to select types, environment or a suppression for the file.",
+      "alternative": "Configure the setting in tsconfig or the Vitest configuration instead.",
+      "owner": "comment-cleanup-explorer-build",
+      "removal": "Remove when the setting moves to configuration.",
+      "expires": "2027-01-04"
+    },
+    {
+      "path": "tests/unit/scripts/site_deploy/test_site_deploy_gates.py",
+      "symbol": "html-output:inputs.site_dir / 'docs' / 'old.html'",
+      "text": "unresolved HTML output source",
+      "payload": "sha256:33739fc48952d882ad236167e0af539e83537a6c0fa4a6cc419e89b6d9c29f72",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/site_deploy/test_site_deploy_gates.py",
+      "owner": "BenchBox maintainers",
+      "necessity": "The test writes fixed placeholder HTML into a temporary site tree under tmp_path to exercise the deploy gates; the written text holds no comment.",
+      "alternative": "A literal output path would stop the test from exercising the gate's own site-directory handling.",
+      "removal": "Remove when the executable-payload adapter can resolve this source statically."
     }
   ]
 }

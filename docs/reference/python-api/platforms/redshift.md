@@ -34,7 +34,6 @@ Common use cases:
 from benchbox.tpch import TPCH
 from benchbox.platforms.redshift import RedshiftAdapter
 
-# Connect to Redshift cluster
 adapter = RedshiftAdapter(
     host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
     port=5439,
@@ -43,7 +42,6 @@ adapter = RedshiftAdapter(
     password="SecurePassword123"
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -54,7 +52,6 @@ results = benchmark.run_with_platform(adapter)
 ### With S3 Data Loading
 
 ```python
-# Efficient loading via S3 COPY command
 adapter = RedshiftAdapter(
     host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
     username="admin",
@@ -65,6 +62,8 @@ adapter = RedshiftAdapter(
     iam_role="arn:aws:iam::123456789:role/RedshiftCopyRole"
 )
 ```
+
+This configuration loads data efficiently through the S3 COPY command.
 
 ## API Reference
 
@@ -313,8 +312,9 @@ Each method is marked with how its description was checked. Calls that talk to R
 
 ### IAM Role Authentication (Recommended)
 
+The commands below create an IAM role with S3 read permissions, attach the S3 read policy to it, and associate the role with the cluster.
+
 ```bash
-# Create IAM role with S3 read permissions
 aws iam create-role --role-name RedshiftCopyRole \
     --assume-role-policy-document '{
         "Version": "2012-10-17",
@@ -325,11 +325,9 @@ aws iam create-role --role-name RedshiftCopyRole \
         }]
     }'
 
-# Attach S3 read policy
 aws iam attach-role-policy --role-name RedshiftCopyRole \
     --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
-# Associate role with cluster
 aws redshift modify-cluster-iam-roles \
     --cluster-identifier my-cluster \
     --add-iam-roles arn:aws:iam::123456789:role/RedshiftCopyRole
@@ -362,18 +360,21 @@ adapter = RedshiftAdapter(
 ### Workload Management (WLM)
 
 ```python
-# Use multiple query slots for large queries
 adapter = RedshiftAdapter(
     host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
     username="admin",
     password="password",
-    wlm_query_slot_count=3  # Use 3 slots for more resources
+    wlm_query_slot_count=3
 )
 ```
+
+Using multiple query slots gives large queries more resources. This example uses 3 slots.
 
 ## Data Loading
 
 ### Via S3 COPY (Recommended)
+
+The data is generated locally. `load_data` automatically uploads it to S3 and then loads it with COPY.
 
 ```python
 from benchbox.platforms.redshift import RedshiftAdapter
@@ -390,12 +391,10 @@ adapter = RedshiftAdapter(
     iam_role="arn:aws:iam::123456789:role/RedshiftCopyRole"
 )
 
-# Generate data locally
 data_dir = Path("./tpch_data")
 benchmark = TPCH(scale_factor=1.0, output_dir=data_dir)
 benchmark.generate_data()
 
-# Create the tables, then load data (automatically uploads to S3 then uses COPY)
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 table_stats, load_time, _ = adapter.load_data(benchmark, conn, data_dir)
@@ -405,13 +404,13 @@ print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
 
 ### Direct Loading (Small Datasets)
 
+For small datasets (under 100 MB), skip S3. No `s3_bucket` is specified here, so the adapter loads with direct INSERT statements.
+
 ```python
-# For small datasets (< 100MB), skip S3
 adapter = RedshiftAdapter(
     host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
     username="admin",
     password="password"
-    # No s3_bucket specified - uses direct INSERT
 )
 ```
 
@@ -419,8 +418,9 @@ adapter = RedshiftAdapter(
 
 ### Distribution Keys
 
+This creates a table with a distribution key.
+
 ```python
-# Create table with distribution key
 cursor.execute("""
     CREATE TABLE orders (
         o_orderkey BIGINT,
@@ -437,26 +437,28 @@ cursor.execute("""
 
 ### Sort Keys
 
-```python
-# Compound sort key (most common)
+Illustrative SQL fragments; supply complete table definitions before execution.
+
+```sql
 CREATE TABLE lineitem (...)
 SORTKEY (l_shipdate, l_orderkey)
 
-# Interleaved sort key (for multiple filters)
 CREATE TABLE lineitem (...)
 INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
 ```
 
+The first table uses a compound sort key, which is the most common choice. The second uses an interleaved sort key, which suits queries with multiple filters.
+
 ### Compression
 
+`compupdate` sets the COPY compression analysis: `PRESET` (the default) applies encodings from the column types without sampling, `ON` samples the data, and `OFF` disables it. The query below then checks the compression encoding of each column.
+
 ```python
-# COPY compression analysis: PRESET (default), ON (sample the data) or OFF
 adapter = RedshiftAdapter(
     host="my-cluster...",
-    compupdate="PRESET"  # Applies encodings from the column types, without sampling
+    compupdate="PRESET"
 )
 
-# Check compression
 cursor.execute("""
     SELECT
         "column",
@@ -470,16 +472,16 @@ cursor.execute("""
 ### Vacuum and Analyze
 
 ```python
-# Manual maintenance
 adapter.vacuum_table(conn, "lineitem")
 adapter.analyze_table(conn, "lineitem")
 
-# Or automatic
 adapter = RedshiftAdapter(
     auto_vacuum=True,
     auto_analyze=True
 )
 ```
+
+The first two calls run maintenance manually. The adapter settings run it automatically.
 
 ## Best Practices
 
@@ -488,31 +490,32 @@ adapter = RedshiftAdapter(
 1. **Choose appropriate DISTSTYLE**:
 
    ```sql
-   -- EVEN: Small tables, no joins
    CREATE TABLE region (...) DISTSTYLE EVEN
 
-   -- KEY: Large fact tables (distribute by join key)
    CREATE TABLE orders (...) DISTSTYLE KEY DISTKEY (o_custkey)
 
-   -- ALL: Small dimension tables (broadcast to all nodes)
    CREATE TABLE nation (...) DISTSTYLE ALL
    ```
+
+   `EVEN` suits small tables with no joins. `KEY` suits large fact tables; distribute by the join key. `ALL` suits small dimension tables, which are broadcast to all nodes.
 
 ### Sort Keys
 
 1. **Use compound sort keys** for range/equality filters:
 
    ```sql
-   -- Good for: WHERE l_shipdate BETWEEN ... AND l_orderkey = ...
    SORTKEY (l_shipdate, l_orderkey)
    ```
+
+   This suits queries such as `WHERE l_shipdate BETWEEN ... AND l_orderkey = ...`.
 
 2. **Use interleaved for multiple filter combinations**:
 
    ```sql
-   -- Good for varying filter combinations
    INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
    ```
+
+   This suits varying filter combinations.
 
 ### Data Loading
 
@@ -534,16 +537,11 @@ adapter = RedshiftAdapter(
 
 **Problem**: Cannot connect to cluster
 
-**Solutions**:
+**Solutions**: check the cluster status, verify that the security group allows inbound traffic on port 5439, check VPC routing and the NAT gateway, and test connectivity:
 
 ```bash
-# 1. Check cluster status
 aws redshift describe-clusters --cluster-identifier my-cluster
 
-# 2. Verify security group allows inbound on port 5439
-# 3. Check VPC routing and NAT gateway
-
-# 4. Test connectivity
 psql -h my-cluster.123456.us-east-1.redshift.amazonaws.com \
      -U admin -d dev -p 5439
 ```
@@ -552,15 +550,9 @@ psql -h my-cluster.123456.us-east-1.redshift.amazonaws.com \
 
 **Problem**: COPY command fails
 
-**Solutions**:
+**Solutions**: verify the IAM role permissions (the role needs `s3:GetObject` and `s3:ListBucket`), check that the S3 bucket region matches the cluster region, and view the error details:
 
 ```python
-# 1. Verify IAM role permissions
-# Role needs: s3:GetObject, s3:ListBucket
-
-# 2. Check S3 bucket region matches cluster region
-
-# 3. View error details
 cursor.execute("""
     SELECT * FROM stl_load_errors
     ORDER BY starttime DESC
@@ -572,13 +564,11 @@ cursor.execute("""
 
 **Problem**: Queries slower than expected
 
-**Solutions**:
+**Solutions**: check the query execution plan, verify the distribution keys, check sort key usage, and run VACUUM and ANALYZE:
 
 ```python
-# 1. Check query execution plan
 plan = adapter.get_query_plan(conn, query)
 
-# 2. Verify distribution keys
 cursor.execute("""
     SELECT
         TRIM(t.name) AS table,
@@ -590,13 +580,11 @@ cursor.execute("""
     WHERE c.distkey = TRUE
 """)
 
-# 3. Check sort key usage
 cursor.execute("""
     SELECT * FROM svv_table_info
     WHERE "table" = 'lineitem'
 """)
 
-# 4. Run VACUUM and ANALYZE
 adapter.vacuum_table(conn, "lineitem")
 adapter.analyze_table(conn, "lineitem")
 ```

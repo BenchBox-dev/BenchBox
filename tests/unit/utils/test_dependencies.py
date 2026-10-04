@@ -526,7 +526,6 @@ class TestInstallCommandDetection:
 
     @pytest.mark.parametrize("platform", ["timescaledb", "pg-duckdb", "pg-mooncake", "paradedb", "citus", "cedardb"])
     def test_get_install_command_psycopg_platforms_use_the_postgresql_extra(self, platform: str):
-        """These platforms only need psycopg and have no extra of their own."""
         import tomllib
 
         pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"

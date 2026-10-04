@@ -961,8 +961,6 @@ class TestDataFrameSuffixModeResolution:
 
 
 class TestPlatformDeploymentSelectorAvailability:
-    """`--platform <name>:<mode>` must be checked against the platform it resolves to."""
-
     @staticmethod
     def _resolve(platform: str, available: dict[str, bool], *, dry_run: bool = False, mode: str | None = None):
         from benchbox.cli.platform import PlatformManager, normalize_platform_name
@@ -1092,7 +1090,6 @@ class TestPlatformDeploymentSelectorAvailability:
 
     @pytest.mark.parametrize("selector", ["polars:local", "databricks:local", "snowflake:local", "sqlite:local"])
     def test_local_selector_on_a_platform_without_modes_agrees_with_the_adapter_factory(self, selector: str):
-        """The registry treats ``local`` as the implicit deployment of a platform that declares none."""
         from benchbox.cli.platform import resolve_platform_selector
         from benchbox.core.platform_registry import PlatformRegistry
         from benchbox.platforms.adapter_factory import _normalize_platform_name
@@ -1115,7 +1112,6 @@ class TestPlatformDeploymentSelectorAvailability:
 
     @pytest.mark.parametrize("platform_key", ["clickhouse-local", "clickhouse:local"])
     def test_benchmark_gate_applies_to_the_resolved_platform(self, platform_key: str):
-        """A selector must not slip past the registry's benchmark block for its platform."""
         s = SimpleNamespace(platform_key=platform_key, benchmark="metadata_primitives", logger=None, ctx=MagicMock())
         printed = MagicMock()
         with patch.object(_run_module, "console", printed):
