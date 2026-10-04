@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -46,7 +46,7 @@ async function open(route, { width = 1280, theme, javaScriptEnabled = true, orig
   if (theme) await context.addInitScript((value) => localStorage.setItem("benchbox:theme", value), theme);
   if (init) await context.addInitScript(init);
   const page = await context.newPage();
-  if (before) before(page);
+  if (before) await before(page);
   await page.goto(origin + route, { waitUntil: "networkidle" });
   return { page, context };
 }
@@ -54,6 +54,23 @@ async function open(route, { width = 1280, theme, javaScriptEnabled = true, orig
 async function hydrated(page) {
   await page.waitForFunction(() => !document.querySelector("astro-island[ssr]") && location.search.includes("goal="), null, { timeout: 30000 });
   await settled(page);
+}
+
+async function stableSearch(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        let previous = location.search;
+        let steady = 0;
+        const step = () => {
+          steady = location.search === previous ? steady + 1 : 0;
+          previous = location.search;
+          if (steady >= 2 && previous.includes("goal=")) resolve(previous);
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+  );
 }
 
 async function settled(page) {
@@ -156,34 +173,90 @@ function contrast(a, b) {
   await context.close();
 }
 
-for (const theme of ["light", "dark"]) {
-  const old = await open("/", { theme, origin: oldBase });
-  const expected = await old.page.evaluate(() => {
-    const probe = (variable) => {
-      const el = document.createElement("span");
-      el.style.color = `var(${variable})`;
-      document.body.appendChild(el);
-      const color = getComputedStyle(el).color;
-      el.remove();
+const prismRoot = path.join(here, "..", "node_modules", "prismjs");
+const prismTypes = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
+
+async function servePrism(context) {
+  await context.route(/^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/prism\/1\.29\.0\//, async (route) => {
+    const relative = new URL(route.request().url()).pathname.replace(/^\/ajax\/libs\/prism\/1\.29\.0\//, "");
+    const file = path.join(prismRoot, relative);
+    if (!file.startsWith(prismRoot) || !existsSync(file)) return route.fulfill({ status: 404, body: "" });
+    return route.fulfill({ status: 200, contentType: prismTypes[path.extname(file)] ?? "text/plain", body: readFileSync(file) });
+  });
+}
+
+const PRISM_TOMORROW_TEXT = "rgb(204, 204, 204)";
+
+function codeColours(page) {
+  return page.evaluate(() => {
+    const blocks = [...document.querySelectorAll(".code-block pre code")];
+    const resolve = (host, variable) => {
+      const probe = document.createElement("span");
+      probe.style.color = `var(${variable})`;
+      host.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
       return color;
     };
-    return { comment: probe(document.documentElement.dataset.bbTheme === "light" ? "--code-line-number" : "--text-muted"), string: probe("--prism-string"), keyword: probe("--prism-keyword") };
+    return {
+      fg: getComputedStyle(blocks[0].closest("pre")).color,
+      bg: getComputedStyle(blocks[0].closest(".code-block")).backgroundColor,
+      variables: Object.fromEntries(["--text-muted", "--code-line-number", "--code-comment", "--text-secondary", "--prism-string", "--prism-keyword", "--prism-deleted", "--prism-variable", "--prism-operator"].map((name) => [name, resolve(blocks[0], name)])),
+      blocks: blocks.map((code) => {
+        const chars = [];
+        const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const color = getComputedStyle(node.parentElement).color;
+          for (const ch of node.textContent) if (!/\s/.test(ch)) chars.push([ch, color]);
+        }
+        return chars;
+      }),
+    };
   });
+}
+
+for (const theme of ["light", "dark"]) {
+  const old = await open("/", { theme, origin: oldBase, before: (target) => servePrism(target.context()) });
+  const prismLoaded = await until(old.page, () => document.querySelectorAll(".token").length > 20 && document.querySelector("#install .token.keyword"));
+  check(prismLoaded, `Prism did not highlight the static page in ${theme}`);
+  const oldColours = await codeColours(old.page);
   await old.context.close();
   const current = await open("/", { theme });
-  const actual = await current.page.evaluate(() => {
-    const colorOf = (root, test) => {
-      const span = [...document.querySelectorAll(`${root} span`)].find((el) => el.children.length === 0 && test(el.textContent));
-      return span ? getComputedStyle(span).color : null;
-    };
-    return {
-      comment: colorOf("#hero-code", (text) => text.startsWith("# CLI")),
-      keyword: colorOf("#install .install-step:nth-child(3) pre", (text) => text.trim() === "from"),
-    };
-  });
-  report.landing[`tokens ${theme}`] = { expected, actual };
-  for (const kind of ["comment", "keyword"]) check(actual[kind] === expected[kind], `${kind} token colour in ${theme} is ${actual[kind]}, old page uses ${expected[kind]}`);
+  const newColours = await codeColours(current.page);
   await current.context.close();
+
+  const translate = (color) => {
+    if (color === PRISM_TOMORROW_TEXT) return newColours.fg;
+    const names = Object.keys(oldColours.variables).filter((name) => oldColours.variables[name] === color);
+    if (theme === "dark" || names.length === 0) return color;
+    const mapped = new Set(names.map((name) => newColours.variables[name === "--text-muted" ? "--code-comment" : name]));
+    return mapped.size === 1 ? [...mapped][0] : color;
+  };
+  const differences = [];
+  check(oldColours.blocks.length === newColours.blocks.length, `code block count differs in ${theme}`);
+  oldColours.blocks.forEach((oldChars, index) => {
+    const newChars = newColours.blocks[index] ?? [];
+    check(oldChars.map(([ch]) => ch).join("") === newChars.map(([ch]) => ch).join(""), `code text differs in block ${index}`);
+    let run = null;
+    oldChars.forEach(([ch, color], position) => {
+      const want = translate(color);
+      const got = newChars[position]?.[1];
+      if (want === got) {
+        run = null;
+        return;
+      }
+      if (run && run.want === want && run.got === got) run.text += ch;
+      else {
+        run = { block: index, text: ch, want, got, was: color };
+        differences.push(run);
+      }
+    });
+  });
+  const ratios = Object.fromEntries([...new Set(newColours.blocks.flat().map(([, color]) => color))].map((color) => [color, contrast(color, newColours.bg)]));
+  for (const [color, ratio] of Object.entries(ratios)) check(ratio >= 4.5, `code colour ${color} on ${newColours.bg} in ${theme} is ${ratio.toFixed(2)}:1`);
+  report.landing[`tokens ${theme}`] = { ratios, variables: newColours.variables, oldVariables: oldColours.variables, differences };
+  for (const d of differences.slice(0, 12)) fail(`code colour in ${theme}, block ${d.block}, "${d.text}": Prism page ${d.was} (expected ${d.want}), Astro ${d.got}`);
+  if (differences.length > 12) fail(`${differences.length - 12} more code colour differences in ${theme}`);
 }
 
 for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
@@ -196,6 +269,10 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
       const key = `${name} ${theme} ${width}`;
       report[name === "landing" ? "landing" : "prompts"][`axe ${theme} ${width}`] = result.violations.map((v) => `${v.id}:${v.impact}`);
       if (result.violations.length) fail(`axe ${key}: ${result.violations.map((v) => `${v.id} ${v.nodes.slice(0, 2).map((n) => n.target.join(" ")).join("|")}`).join("; ")}`);
+      if (route === "/") {
+        const code = await new AxeBuilder({ page }).include("pre").withRules(["color-contrast"]).analyze();
+        if (code.violations.length) fail(`axe code blocks ${key}: ${code.violations.map((v) => `${v.id} ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join("|")}`).join("; ")}`);
+      }
       const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
       check(overflow <= 0, `horizontal overflow ${key}: ${overflow}`);
       await context.close();
@@ -330,7 +407,7 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   let safetyShown = safetyBefore;
   for (const value of options) {
     await page.selectOption("#sel-platform", value);
-    await until(page, (id) => location.search.includes(`platform=${id}`), value);
+    check(await until(page, (id) => location.search.includes(`platform=${id}`), value), `url did not record platform ${value}`);
     if (await page.locator("#block-cloud-safety").isVisible()) {
       safetyShown = true;
       break;
@@ -342,11 +419,11 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   check(glyph.includes("⚠"), "credential safety heading has no warning glyph");
   check((await page.locator("#cloud-safety-list li").count()) > 0, "credential safety list empty");
 
-  const url = await page.evaluate(() => location.search);
+  const url = await stableSearch(page);
   await page.reload({ waitUntil: "networkidle" });
   await hydrated(page);
   check(await until(page, () => document.querySelector("#sel-deployment").value === "managed"), "deployment not restored from the url");
-  check((await page.evaluate(() => location.search)) === url, "url state changed across reload");
+  check((await stableSearch(page)) === url, "url state changed across reload");
   await context.close();
 }
 

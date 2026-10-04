@@ -34,3 +34,12 @@ html:has(.landing) {
 :root[data-bb-theme="light"] .landing {
   --code-comment: var(--code-line-number);
 }
+
+:root[data-bb-theme="light"] .landing .code-block pre {
+  --prism-string: #60a5fa;
+  --prism-keyword: #a78bfa;
+  --prism-deleted: #f87171;
+  --prism-variable: #fb923c;
+  --prism-operator: #2dd4bf;
+  --text-secondary: #cbd5e1;
+}

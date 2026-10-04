@@ -132,6 +132,59 @@ describe("mcp prompt content", () => {
   });
 });
 
+describe("completeness of the ported invariants", () => {
+  const bigquery = catalog.platforms.find((p) => p.id === "bigquery");
+  const [first, second] = catalog.platforms.filter((p) => p.interfaces.includes("sql") && p.deployments.includes("local"));
+
+  it("dry-runs both platforms when comparing", () => {
+    const out = prompt({ goal: "compare" });
+    expect(out).toContain(`/tmp/benchbox-dryrun-${first.id}`);
+    expect(out).toContain(`/tmp/benchbox-dryrun-${second.id}`);
+    expect(out).toContain(`\` and \`${out.match(/Dry run first: `[^`]*` and `([^`]*)`/)?.[1]}\`. Inspect the plans.`);
+    expect(prompt({})).toContain("Inspect the plan.");
+  });
+
+  it("calls check_dependencies for each selected platform", () => {
+    expect(prompt({ surface: "mcp", platform: "bigquery", deployment: "managed" })).toContain('`check_dependencies(platform="bigquery")`');
+    const compare = prompt({ surface: "mcp", goal: "compare", deployment: "managed" });
+    expect(compare).toMatch(/`check_dependencies\(platform="[^"]+"\)` and `check_dependencies\(platform="[^"]+"\)`/);
+  });
+
+  it("appends deployment safety lines to the MCP workflow only when credentials apply", () => {
+    const out = prompt({ surface: "mcp", platform: "bigquery", deployment: "managed" });
+    expect(out).toContain("Deployment safety:");
+    expect(out).toContain(`  • ${bigquery?.safety_terms?.dependency}`);
+    expect(out).toContain(`  • ${bigquery?.safety_terms?.dry_run}`);
+    expect(out).toContain("Stop and ask the user if credentials or config are missing");
+    expect(prompt({ surface: "mcp" })).not.toContain("Deployment safety:");
+  });
+
+  it("describes the MCP result payload and never asks for result paths from both responses", () => {
+    for (const goal of ["test_one", "compare"]) {
+      const out = prompt({ surface: "mcp", goal });
+      if (goal === "test_one") expect(out).toContain("MCP tool result payload");
+      expect(out).not.toContain("`mcp_metadata.result_file` paths from both live responses");
+    }
+  });
+
+  it("warns about sub-scale dsdgen on every prompt path", () => {
+    const warning = "TPC-DS sub-scale warning";
+    expect(prompt({ benchmark: "tpcds", scale: "0.01" })).toContain(warning);
+    expect(prompt({ benchmark: "tpcds", scale: "0.01", goal: "compare" })).toContain(warning);
+    expect(prompt({ benchmark: "tpcds", scale: "0.01", surface: "mcp", goal: "compare" })).toContain(warning);
+    expect(prompt({ benchmark: "tpcds", scale: "0.01", surface: "mcp" })).toContain(warning);
+  });
+
+  it("smokes both platforms at 0.01 before the compare dry run in the MCP workflow", () => {
+    const out = prompt({ surface: "mcp", goal: "compare", deployment: "managed", scale: "1.0" });
+    const tool = catalog.mcp.run_tool;
+    const smoke = out.split("\n").find((line) => line.includes("SMOKE: call ")) ?? "";
+    expect(smoke).toMatch(new RegExp(`\`${tool}\\(platform="[^"]+", benchmark="tpch", scale_factor=0\\.01, dry_run=false\\)\` and \`${tool}\\(platform="[^"]+", benchmark="tpch", scale_factor=0\\.01, dry_run=false\\)\``));
+    expect(smoke).toContain("before the target-scale dry run. Abort if either smoke run fails.");
+    expect(out.indexOf("SMOKE: call ")).toBeLessThan(out.indexOf("dry_run=true"));
+  });
+});
+
 describe("safety blocks", () => {
   it("lists credential safety only for deployments that need secrets", () => {
     expect(buildOutput(catalog, normaliseState(catalog, managedPaid)).safety.length).toBeGreaterThan(0);

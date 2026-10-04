@@ -1,6 +1,6 @@
 ---
 import { codeToHtml } from "shiki";
-import { landingCodeTheme } from "../lib/code-theme.ts";
+import { landingCodeTheme, landingTransformers } from "../lib/code-theme.ts";
 
 interface Props {
   code: string;
@@ -14,6 +14,7 @@ const html = await codeToHtml(code, {
   lang,
   theme: landingCodeTheme,
   transformers: [
+    ...landingTransformers(lang),
     {
       pre(node) {
         delete node.properties.style;
