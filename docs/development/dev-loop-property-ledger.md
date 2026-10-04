@@ -1,5 +1,9 @@
 # Development Loop Safety Property Ledger
 
+Test enrollment is frozen at 2026-10-03: new tests need no row, but every
+workflow and script still needs one, and a row is removed only when its file
+is deleted.
+
 Safety properties keep their guards until a replacement guard proves
 coverage. No workflow, script, test, or hook listed here may be deleted by
 a modernization change unless its row shows the property still covered or
