@@ -1,0 +1,31 @@
+---
+import { shellBrand, shellLinks } from "../lib/header-links.ts";
+
+interface Props {
+  wrapper?: "footer" | "div";
+}
+
+const { wrapper: Wrapper = "footer" } = Astro.props;
+const brand = shellBrand();
+const links = shellLinks(Astro.url.pathname);
+---
+
+<Wrapper class="site-footer" data-site-footer>
+  <div class="site-footer__inner">
+    <p class="site-footer__legal">{brand.label} is open source under the MIT License.</p>
+    <nav class="site-footer__nav" aria-label="Footer">
+      {
+        links.map((link) => (
+          <a
+            class="site-footer__link"
+            href={link.href}
+            target={link.external ? "_blank" : undefined}
+            rel={link.external ? "noopener" : undefined}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</Wrapper>

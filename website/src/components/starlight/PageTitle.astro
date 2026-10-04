@@ -1,0 +1,11 @@
+---
+import StarlightPageTitle from "@astrojs/starlight/components/PageTitle.astro";
+import { docsTrail, type TrailEntry } from "../../lib/breadcrumbs.ts";
+import Breadcrumbs from "../Breadcrumbs.astro";
+
+const { sidebar, entry } = Astro.locals.starlightRoute;
+const crumbs = docsTrail(sidebar as TrailEntry[], entry.data.title, Astro.url.pathname);
+---
+
+<Breadcrumbs crumbs={crumbs} />
+<StarlightPageTitle />

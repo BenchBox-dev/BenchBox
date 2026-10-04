@@ -2,6 +2,7 @@
 import "../../../landing/shared/site-tokens.css";
 import "../styles/shell.css";
 import "../styles/starlight-map.css";
+import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import ThemeScript from "../components/ThemeScript.astro";
 
@@ -26,12 +27,11 @@ const { title, description, searchable = false } = Astro.props;
     <slot name="head" />
   </head>
   <body class="shell">
+    <a class="skip-link" href="#main">Skip to content</a>
     <SiteHeader />
     <main id="main" data-pagefind-body={searchable ? "" : undefined}>
       <slot />
     </main>
-    <footer class="site-footer">
-      <p>BenchBox is open source under the MIT License.</p>
-    </footer>
+    <SiteFooter />
   </body>
 </html>

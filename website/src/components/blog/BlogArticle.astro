@@ -1,7 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import { render } from "astro:content";
-import Shell from "../../layouts/Shell.astro";
+import Blog from "../../layouts/Blog.astro";
 
 interface Props {
   post: CollectionEntry<"blog">;
@@ -11,10 +11,13 @@ const { post } = Astro.props;
 const { Content } = await render(post);
 ---
 
-<Shell title={`${post.data.title} - BenchBox Blog`} description={post.data.description} searchable>
-  <article class="prose">
-    <h1 id={post.data.titleId}>{post.data.title}</h1>
-    <p class="post-meta">{post.data.author} · {post.data.date}</p>
-    <Content />
-  </article>
-</Shell>
+<Blog
+  title={post.data.title}
+  titleId={post.data.titleId}
+  description={post.data.description}
+  author={post.data.author}
+  date={post.data.date}
+  isIndex={post.id === "blog/index"}
+>
+  <Content />
+</Blog>

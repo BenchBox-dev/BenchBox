@@ -66,6 +66,7 @@ def _contrast(foreground: str, background: str) -> float:
         "landing/prompts/index.html",
         "docs/_templates/page.html",
         "results-explorer/index.html",
+        "website/src/components/ThemeScript.astro",
     ],
 )
 def test_early_theme_bootstrap_normalizes_stored_choice(path: str) -> None:

@@ -11,6 +11,12 @@ pytestmark = [
 
 ROOT = Path(__file__).resolve().parents[2]
 
+ASTRO_HEADER = "website/src/components/SiteHeader.astro"
+ASTRO_LINKS = "website/src/lib/header-links.ts"
+ASTRO_THEME_TOGGLE = "website/src/components/ThemeToggle.astro"
+ASTRO_FOOTER = "website/src/components/SiteFooter.astro"
+CONTRACT_IMPORT = "results-explorer/src/components/headerContract.ts"
+
 EXPECTED_LINKS = [
     ("Home", "https://benchbox.dev/"),
     ("Docs", "https://benchbox.dev/docs/"),
@@ -79,6 +85,8 @@ def test_global_header_link_contract_is_identical_across_surfaces(path: str, sur
         ("landing/prompts/index.html", "prompts"),
         ("docs/_templates/page.html", "docs"),
         ("results-explorer/src/components/Layout.tsx", "results"),
+        (ASTRO_HEADER, "astro header"),
+        (ASTRO_LINKS, "astro links"),
     ],
 )
 def test_global_header_has_no_header_theme_control(path: str, surface: str) -> None:
@@ -86,6 +94,59 @@ def test_global_header_has_no_header_theme_control(path: str, surface: str) -> N
 
     assert "data-benchbox-theme-toggle" not in source, f"{surface} header should not expose a theme toggle button"
     assert "benchbox-site-header__theme" not in source, f"{surface} header should not carry the removed theme class"
+
+
+def test_astro_header_renders_the_explorer_header_contract() -> None:
+    header = _read(ASTRO_HEADER)
+    links = _read(ASTRO_LINKS)
+    contract = _read("results-explorer/src/components/headerContract.ts")
+
+    assert CONTRACT_IMPORT in links, "astro shell must import the contract the Explorer renders"
+    for name in (
+        "HEADER_BRAND",
+        "HEADER_CTA",
+        "HEADER_LINKS",
+        "HEADER_NAV_ARIA_LABEL",
+        "HEADER_TOGGLE_ARIA_LABEL",
+    ):
+        assert name in links, f"astro shell does not consume {name}"
+    for label, href in EXPECTED_LINKS:
+        assert label in contract, f"contract missing label {label!r}"
+        assert href in contract, f"contract missing href {href!r}"
+        assert href not in header, f"astro header must not hard-code {href!r}"
+    assert "shellLinks(" in header
+    assert "shellCta()" in header
+    assert "aria-label={shellLabels.nav}" in header
+    assert "aria-label={shellLabels.toggle}" in header
+    assert 'id="benchbox-site-header-nav"' in header
+    assert 'aria-controls="benchbox-site-header-nav"' in header
+    assert "data-site-header-toggle" in header
+
+
+def test_astro_header_links_resolve_to_site_paths_in_contract_order() -> None:
+    links = _read(ASTRO_LINKS)
+    contract = _read("results-explorer/src/components/headerContract.ts")
+
+    assert 'SITE_ORIGIN = "https://benchbox.dev"' in links
+    assert "HEADER_LINKS.map(" in links
+    labels = [label for label, _ in EXPECTED_LINKS if label != "Run benchmark"]
+    positions = [contract.find(f'label: "{label}"') for label in labels]
+    assert all(position >= 0 for position in positions)
+    assert positions == sorted(positions)
+    assert "activeOnSurface" in links
+
+
+def test_astro_footer_radiogroup_binds_the_shared_theme_labels() -> None:
+    toggle = _read(ASTRO_THEME_TOGGLE)
+    footer = _read(ASTRO_FOOTER)
+
+    assert toggle.count('role="radiogroup"') == 1
+    assert "aria-label={shellLabels.theme}" in toggle
+    assert "aria-label={option.label}" in toggle
+    for option in ("system", "light", "dark"):
+        assert f"shellLabels.themeOptions.{option}" in toggle
+    assert "data-theme-option" in toggle
+    assert 'role="radiogroup"' not in footer
 
 
 def test_results_footer_radiogroup_binds_the_shared_aria_label() -> None:

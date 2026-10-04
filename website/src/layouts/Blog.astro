@@ -1,0 +1,33 @@
+---
+import Breadcrumbs from "../components/Breadcrumbs.astro";
+import { blogTrail } from "../lib/breadcrumbs.ts";
+import Shell from "./Shell.astro";
+
+interface Props {
+  title: string;
+  titleId?: string;
+  description?: string;
+  author?: string;
+  date?: string;
+  isIndex: boolean;
+}
+
+const { title, titleId, description, author, date, isIndex } = Astro.props;
+const meta = [author, date].filter(Boolean).join(" · ");
+---
+
+<Shell title={`${title} - BenchBox Blog`} description={description} searchable>
+  <article class="prose blog-post">
+    <Breadcrumbs crumbs={blogTrail(title, isIndex)} />
+    <h1 id={titleId}>{title}</h1>
+    {meta && <p class="post-meta">{meta}</p>}
+    <slot />
+    {
+      !isIndex && (
+        <p class="blog-post__back" data-pagefind-ignore>
+          <a href="/blog/">All posts</a>
+        </p>
+      )
+    }
+  </article>
+</Shell>
