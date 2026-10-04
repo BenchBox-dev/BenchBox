@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Test on real DuckDB: each delete operation removes the rows it reports, and a statement that errors surfaces as a failed operation.",
+    "The maintenance phase result no longer reports success for an operation whose statement failed."
+  ],
+  "context": "Source: found by an agent reproducing the TPC-DS maintenance regression (PR #2643, 2026-10-04). Result-integrity issue; not caused by the composite-key change.",
+  "description": "## Problem (reproduced once, by an agent)\nIn the TPC-DS maintenance operations, `DELETE ... LIMIT` is a syntax error on DuckDB. The error is caught and logged as a warning, and the operation still reports success with 0 rows deleted or an estimated count. A maintenance result can therefore claim work that never happened. Which delete operations are affected, and on which platforms, has not been enumerated.\n\n## Change\n- List every delete operation in `benchbox/core/tpcds/maintenance_operations.py` that uses `LIMIT` (or another non-portable form) and check it per supported SQL dialect.\n- Use a portable form (key subquery, `rowid`/`ctid`, or per-dialect SQL) and make a failed statement a failed operation.\n- Report the real affected row count, not an estimate, where the engine returns one.\n\n## Guardrails (must preserve)\n- Operation counts and names in results stay compatible.\n- The returns and sales insert fixes (composite keys) are unaffected.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/core/tpcds/maintenance_operations.py",
+    "benchbox/core/tpcds/maintenance_test.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:53:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d9b36c2677904591b3dfe57f0bb29a5f",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
