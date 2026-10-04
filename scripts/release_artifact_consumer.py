@@ -1,9 +1,3 @@
-"""Bind release distributions to one successful trunk producer attempt on develop.
-
-This admission boundary never builds or publishes packages. Older artifacts
-without a producer receipt are deliberately unsupported.
-"""
-
 from __future__ import annotations
 
 import argparse

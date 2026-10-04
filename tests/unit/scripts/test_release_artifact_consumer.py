@@ -14,9 +14,6 @@ import pytest
 
 from scripts import release_artifact_consumer as consumer
 
-# Medium tier: these 81 nodes would take the fast-lane count past its ceiling, and this module is
-# imported by the medium execution tests. The medium tier runs on every push to develop and on pull
-# requests that change soundness paths, which this change does.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
 SHA = "a" * 40
