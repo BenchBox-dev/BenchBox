@@ -6,6 +6,7 @@
     "npm audit:high clean; lockfile committed; no root package.json unless ADR D10 changed",
     "visual-inputs classifies website/** as a render input (test in test_path_filter_decision.py)"
   ],
+  "context": "DONE 2026-10-04: merged in https://github.com/BenchBox-dev/BenchBox/pull/2597 (develop def3036c). Make targets site-build/site-check/site-dev/site-deps registered in make/inventory.json. Deviations: Node 22 (Astro 7 requires it); site-build feeds the required landing unit result (review finding: an ungated build could rot).",
   "description": "Create the website/ Astro package using the layout variant chosen at G1:\n- TypeScript strict\n- `astro check` as the typecheck\n- exact package-lock.json\n- Node 20, matching ci.yml setup-node\n- an `audit:high` script mirroring results-explorer\n\nAdd make targets site-build, site-dev and site-check, registered in make/inventory.json.\n\nAdd a ci.yml job `site-build` that runs npm ci, check, build and audit:high. Do not add it to required checks yet. Extend the visual-inputs path classifier for website/.\n\nMake sure comment-policy-check, the dependency audit and the inventory drift checks cover website/.",
   "links": [
     ".github/workflows/ci.yml",
@@ -29,6 +30,14 @@
       "generation": "1484425ce40b446ebe256afa009188a3",
       "op": "take",
       "op_id": "cb19979511d54742b89f015b87b917eb",
+      "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b",
+      "at": "2026-10-04T01:02:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "79c25c8bb7d5402ba9f1ba2ad63f328d",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
     }
   ]
