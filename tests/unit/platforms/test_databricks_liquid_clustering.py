@@ -70,13 +70,13 @@ def test_apply_table_tunings_uses_liquid_clustering_when_configured(_mock_databr
     adapter.apply_table_tunings(table_tuning, mock_connection)
 
     execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-    assert any("ALTER TABLE TEST_TABLE CLUSTER BY (event_time, customer_id)" in call for call in execute_calls)
+    assert any("ALTER TABLE test_table CLUSTER BY (event_time, customer_id)" in call for call in execute_calls)
     assert not any("ZORDER BY" in call for call in execute_calls)
     assert adapter._liquid_clustering_operations == [
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": ["event_time", "customer_id"],
-            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time, customer_id)",
+            "statement": "ALTER TABLE test_table CLUSTER BY (event_time, customer_id)",
             "mode": "manual",
         }
     ]
@@ -111,12 +111,12 @@ def test_apply_table_tunings_keeps_z_order_default_behavior(_mock_databricks_sql
     adapter.apply_table_tunings(table_tuning, mock_connection)
 
     execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-    assert any("OPTIMIZE TEST_TABLE ZORDER BY (cluster_key, dist_key)" in call for call in execute_calls)
+    assert any("OPTIMIZE test_table ZORDER BY (cluster_key, dist_key)" in call for call in execute_calls)
     assert adapter._z_order_operations == [
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": ["cluster_key", "dist_key"],
-            "statement": "OPTIMIZE TEST_TABLE ZORDER BY (cluster_key, dist_key)",
+            "statement": "OPTIMIZE test_table ZORDER BY (cluster_key, dist_key)",
         }
     ]
     assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
@@ -173,12 +173,12 @@ def test_apply_table_tunings_uses_liquid_auto_when_configured(_mock_databricks_s
     adapter.apply_table_tunings(table_tuning, mock_connection)
 
     execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-    assert any("ALTER TABLE TEST_TABLE CLUSTER BY AUTO" in call for call in execute_calls)
+    assert any("ALTER TABLE test_table CLUSTER BY AUTO" in call for call in execute_calls)
     assert adapter._liquid_clustering_operations == [
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": [],
-            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY AUTO",
+            "statement": "ALTER TABLE test_table CLUSTER BY AUTO",
             "mode": "auto",
         }
     ]
@@ -211,7 +211,7 @@ def test_apply_table_tunings_liquid_clustering_falls_back_to_sort_columns(_mock_
     adapter.apply_table_tunings(table_tuning, mock_connection)
 
     execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-    assert any("ALTER TABLE TEST_TABLE CLUSTER BY (ship_date, order_key)" in call for call in execute_calls)
+    assert any("ALTER TABLE test_table CLUSTER BY (ship_date, order_key)" in call for call in execute_calls)
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
@@ -233,9 +233,9 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
 
     adapter._liquid_clustering_operations.append(
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": ["event_time"],
-            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time)",
+            "statement": "ALTER TABLE test_table CLUSTER BY (event_time)",
         }
     )
 
@@ -251,9 +251,9 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
     assert metadata["liquid_clustering_columns_config"] == ["event_time"]
     assert metadata["liquid_clustering_operations"] == [
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": ["event_time"],
-            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time)",
+            "statement": "ALTER TABLE test_table CLUSTER BY (event_time)",
         }
     ]
     assert metadata["z_order_operations"] == []
@@ -270,9 +270,9 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
     assert platform_info["configuration"]["liquid_clustering_columns_config"] == ["event_time"]
     assert platform_info["configuration"]["liquid_clustering_operations"] == [
         {
-            "table": "TEST_TABLE",
+            "table": "test_table",
             "columns": ["event_time"],
-            "statement": "ALTER TABLE TEST_TABLE CLUSTER BY (event_time)",
+            "statement": "ALTER TABLE test_table CLUSTER BY (event_time)",
         }
     ]
     assert platform_info["configuration"]["z_order_operations"] == []
