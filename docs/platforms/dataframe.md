@@ -16,6 +16,8 @@ BenchBox supports native DataFrame benchmarking alongside traditional SQL databa
 | **Read Primitives** | Full | 149 queries (both families) |
 | **Write Primitives** | Full | INSERT, UPDATE, DELETE, MERGE, BULK_LOAD |
 
+These counts describe registered query implementations. SQL/DataFrame parity must be checked for the same data, parameters, scale, and engine. See [TPC-DS DataFrame parity](../development/tpcds-dataframe-parity.md) for binding and coverage requirements.
+
 ## Why DataFrame Benchmarking Matters
 
 ### The Challenge

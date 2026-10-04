@@ -13,6 +13,7 @@ from benchbox.core.results.status import (
     result_cli_failure_reason,
     result_failed_query_count,
     result_is_clean_pass,
+    result_non_clean_reason,
     result_unvalidated_reason,
 )
 
@@ -172,3 +173,46 @@ def test_result_unvalidated_reason_none_when_query_failed() -> None:
 def test_result_unvalidated_reason_none_for_cli_failure_statuses(status: str) -> None:
     result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
     assert result_unvalidated_reason(result) is None
+
+
+@pytest.mark.parametrize("run_type", ["warmup", "measurement"])
+def test_failed_query_validation_prevents_a_clean_pass_without_changing_measurement_counts(run_type):
+    query_rows = [
+        {
+            "id": "Q18",
+            "status": "FAILED",
+            "run_type": run_type,
+            "row_count_validation": {"status": "FAILED", "expected": 57, "actual": 9},
+        },
+        {"id": "Q18", "status": "SUCCESS", "run_type": "measurement"},
+    ]
+    result = SimpleNamespace(
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        validation_status="PASSED",
+        query_results=query_rows,
+    )
+    assert result_failed_query_count(result) == 0
+    assert not result_is_clean_pass(result)
+    assert result_non_clean_reason(result) == "query validation failed"
+    assert result_cli_failure_reason(result) == "query validation failed"
+    assert not bundle_is_clean_pass(
+        {"summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}}, "queries": query_rows}
+    )
+
+
+@pytest.mark.parametrize("status", ["PASSED", "SKIPPED"])
+def test_warmup_without_failed_validation_preserves_clean_measurements(status):
+    result = SimpleNamespace(
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        validation_status="PASSED",
+        query_results=[
+            {"status": "SUCCESS", "run_type": "warmup", "row_count_validation": {"status": status}},
+            {"status": "SUCCESS", "run_type": "measurement"},
+        ],
+    )
+    assert result_is_clean_pass(result)
+    assert result_cli_failure_reason(result) is None

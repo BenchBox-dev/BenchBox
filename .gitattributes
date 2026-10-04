@@ -1,6 +1,4 @@
 
-/_project/config/fast_lane_ceiling_log.md merge=union
-
 /results-data/** text eol=lf
 /_binaries/**/tpcds.dst -text
 /_binaries/**/dists.dss -text

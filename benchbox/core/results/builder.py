@@ -43,6 +43,7 @@ from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
 )
+from benchbox.core.results.query_status import has_failed_query_validation
 
 if TYPE_CHECKING:
     pass
@@ -423,7 +424,9 @@ class ResultBuilder:
         platform_environment = self._build_platform_environment_metadata(platform_info)
 
         validation_status = self._validation_status
-        if failed_queries and validation_status == "PASSED":
+        if has_failed_query_validation(query_results_list):
+            validation_status = "FAILED"
+        elif failed_queries and validation_status == "PASSED":
             validation_status = "PARTIAL"
 
         return BenchmarkResults(

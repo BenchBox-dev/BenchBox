@@ -65,6 +65,14 @@ def test_dataframe_ids_map_to_sql_ids():
         ("tpch_skew", TPCHSkew(scale_factor=0.01, output_dir=probe_dir), TPCH_SKEW_DATAFRAME_QUERIES),
     ]:
         sql_ids = set(benchmark.get_queries().keys())
+        if label == "tpcds":
+            assert sql_ids == {str(number) for number in range(1, 100)}
+            variants = {"14b", "23b", "24b", "39b"}
+            for variant in variants:
+                number = int(variant[:-1])
+                sql = benchmark.get_query(number, variant="b")
+                assert sql and sql != benchmark.get_query(number, variant="a")
+            sql_ids |= variants
         df_ids = set(registry.get_query_ids())
         assert {_q_strip(df_id) for df_id in df_ids} == sql_ids, (
             f"{label} Q-prefix strip diverges: "

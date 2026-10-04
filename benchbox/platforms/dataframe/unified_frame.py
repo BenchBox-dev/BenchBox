@@ -1071,8 +1071,8 @@ class UnifiedExpr(_DataFusionDeferredOperations):
 
             return UnifiedExpr(self._expr.over(window))
 
-        if order_by:
-            return UnifiedExpr(self._expr.over(partition_cols))
+        if order_by is not None:
+            return UnifiedExpr(self._expr.over(partition_cols, order_by=order_by))
         return UnifiedExpr(self._expr.over(partition_cols))
 
     def cum_sum(self) -> UnifiedExpr:
@@ -1081,9 +1081,7 @@ class UnifiedExpr(_DataFusionDeferredOperations):
 
             return UnifiedExpr(F.sum(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.sum(self._expr))
+            return _DataFusionDeferredCumulative(self._expr, "sum")
         return UnifiedExpr(self._expr.cum_sum())
 
     def cum_max(self) -> UnifiedExpr:
@@ -1092,9 +1090,7 @@ class UnifiedExpr(_DataFusionDeferredOperations):
 
             return UnifiedExpr(F.max(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            return UnifiedExpr(df_f.max(self._expr))
+            return _DataFusionDeferredCumulative(self._expr, "max")
         return UnifiedExpr(self._expr.cum_max())
 
     def cum_min(self) -> UnifiedExpr:
@@ -1263,7 +1259,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_cols = [partition_by] if isinstance(partition_by, str) else list(partition_by)
         partition_exprs = [df_col(c) if isinstance(c, str) else c for c in partition_cols]
 
-        order_expr = self._rank_source.sort(ascending=not self._rank_descending)
+        order_expr = self._rank_source.sort(ascending=not self._rank_descending, nulls_first=self._rank_descending)
 
         window = Window(partition_by=partition_exprs, order_by=[order_expr])
 
@@ -1279,6 +1275,27 @@ class _DataFusionDeferredRank(UnifiedExpr):
             rank_func = df_f.rank()
 
         return UnifiedExpr(rank_func.over(window))
+
+
+class _DataFusionDeferredCumulative(UnifiedExpr):
+    def __init__(self, expr: DataFusionExpr, operation: str) -> None:
+        super().__init__(expr)
+        self._operation = operation
+
+    def over(self, partition_by: str | list[str], order_by: str | None = None) -> UnifiedExpr:
+        from datafusion import col as df_col, functions as df_f
+        from datafusion.expr import Window, WindowFrame
+
+        if order_by is None:
+            raise ValueError("DataFusion cumulative windows require an explicit order_by column")
+        partition_cols = [partition_by] if isinstance(partition_by, str) else list(partition_by)
+        window = Window(
+            partition_by=[df_col(column) for column in partition_cols],
+            order_by=[df_col(order_by).sort(ascending=True, nulls_first=False)],
+            window_frame=WindowFrame("rows", None, 0),
+        )
+        aggregate = df_f.sum(self._expr) if self._operation == "sum" else df_f.max(self._expr)
+        return UnifiedExpr(aggregate.over(window))
 
 
 class _DataFusionDeferredFilter(UnifiedExpr):

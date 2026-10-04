@@ -1,5 +1,4 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
@@ -50,7 +49,7 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
             expected_row_count_min, expected_row_count_max = range_bounds
             mode_notes = (
                 f"Parameter-sensitive TPC-H query; EXACT against the answer file at the "
-                f"reference seed, non-reference seeds accept the SF=1.0 row-count range "
+                f"qgen -d defaults; randomized parameters accept the SF=1.0 row-count range "
                 f"{expected_row_count_min}-{expected_row_count_max}."
             )
         elif query_id in TPCH_LOOSE_QUERY_IDS:
@@ -58,7 +57,7 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
             expected_row_count_max = None
             mode_notes = (
                 "Parameter-sensitive TPC-H query; EXACT against the answer file at the "
-                "reference seed, non-reference seeds use the default ±50% loose row-count tolerance."
+                "qgen -d defaults; randomized parameters use the default ±50% loose row-count tolerance."
             )
         else:
             expected_row_count_min = None

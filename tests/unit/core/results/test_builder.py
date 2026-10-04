@@ -20,6 +20,49 @@ pytestmark = [
 ]
 
 
+def test_failed_warmup_validation_is_exported_without_corrupting_measurement_metrics():
+    from benchbox.core.results.schema import build_result_payload
+    from benchbox.core.results.status import result_cli_failure_reason
+    from benchbox.validation.bundle import ValidationResult, _validate_execution_consistency
+
+    builder = ResultBuilder(
+        benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=1.0),
+        platform=PlatformInfoInput(name="duckdb", platform_version="1.3.2"),
+    )
+    builder.add_query_results(
+        [
+            normalize_query_result(
+                {
+                    "query_id": "18",
+                    "status": "FAILED",
+                    "run_type": "warmup",
+                    "iteration": 0,
+                    "execution_time_seconds": 1.0,
+                    "rows_returned": 9,
+                    "row_count_validation": {"status": "FAILED", "expected": 57, "actual": 9},
+                }
+            ),
+            normalize_query_result(
+                {"query_id": "18", "status": "SUCCESS", "iteration": 1, "execution_time_seconds": 0.5}
+            ),
+        ]
+    )
+    result = builder.build()
+    payload = build_result_payload(result)
+    assert result.total_queries == result.successful_queries == 1
+    assert result.failed_queries == 0
+    assert result.total_execution_time == 0.5
+    assert result.validation_status == "FAILED"
+    assert payload["summary"]["validation"] == "failed"
+    assert payload["queries"][0]["row_count_validation"]["status"] == "FAILED"
+    assert result_cli_failure_reason(result) is not None
+    payload["summary"]["validation"] = "passed"
+    validation = ValidationResult("test")
+    _validate_execution_consistency(payload, validation)
+    assert not validation.ok
+    assert any("row_count_validation.status='FAILED'" in error for error in validation.errors)
+
+
 class TestNormalizeBenchmarkId:
     @pytest.mark.parametrize(
         ("input_name", "expected_id"),

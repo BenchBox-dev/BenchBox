@@ -12,7 +12,6 @@ from typing import TypedDict, cast
 
 class FastLanePolicy(TypedDict, total=False):
     enabled: bool
-    max_fast_tests: int
     forbidden_marker_expressions: list[str]
     forbidden_path_substrings: list[str]
 
@@ -27,61 +26,6 @@ def _load_fast_lane_policy(path: Path) -> FastLanePolicy:
 
 
 _COLLECT_COUNT_PATTERN = re.compile(r"(\d+)/(\d+) tests collected(?: \((\d+) deselected\))?")
-
-FAST_LANE_HEADROOM_WARNING_THRESHOLD = 100
-
-FAST_LANE_DELTA_FAIL_THRESHOLD = 150
-FAST_LANE_DELTA_WARN_THRESHOLD = 75
-
-CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
-
-MAX_MERGE_QUEUE_ENTRIES = 5
-MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD * MAX_MERGE_QUEUE_ENTRIES
-
-
-def _github_event_name() -> str | None:
-    runner_event = os.environ.get("GITHUB_EVENT_NAME", "").strip()
-    if runner_event:
-        return runner_event
-
-    event_path = os.environ.get("GITHUB_EVENT_PATH", "").strip()
-    if not event_path:
-        return None
-    try:
-        with open(event_path, encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except (OSError, ValueError):
-        return None
-    event = payload.get("event_name") or payload.get("event")
-    if isinstance(event, str) and event.strip():
-        return event.strip()
-    if "merge_group" in payload:
-        return "merge_group"
-    action = payload.get("action")
-    if isinstance(action, str) and action.strip():
-        return "pull_request"
-    return None
-
-
-def _ceiling_grace_from_event(raw: str | None) -> int:
-    event = _github_event_name()
-    if raw is None or not raw.strip():
-        return 0
-    if event != "merge_group":
-        raise ValueError(f"--ceiling-grace is only valid for merge_group runs (event: {event!r})")
-    return _parse_ceiling_grace(raw)
-
-
-def _parse_ceiling_grace(raw: str | None) -> int:
-    if raw is None or not raw.strip():
-        return 0
-    text = raw.strip()
-    if not re.fullmatch(r"[0-9]+", text):
-        raise ValueError(f"--ceiling-grace must be a plain integer, got {raw!r}")
-    grace = int(text, 10)
-    if not 0 <= grace <= MAX_CEILING_GRACE:
-        raise ValueError(f"--ceiling-grace must be between 0 and {MAX_CEILING_GRACE}, got {grace}")
-    return grace
 
 
 def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
@@ -141,76 +85,21 @@ def _parse_collect_count(output: str) -> int | None:
     return None
 
 
-def _has_justified_ceiling_bump(repo_root: Path) -> bool:
-    policy_path = repo_root / "_project" / "config" / "fast_test_lane_policy.json"
-    try:
-        current_limit = int(_load_fast_lane_policy(policy_path).get("max_fast_tests", 500))
-        base_policy = subprocess.run(
-            ["git", "show", f"origin/develop:{policy_path.relative_to(repo_root)}"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if base_policy.returncode != 0:
-            return False
-        base_limit = int(json.loads(base_policy.stdout).get("max_fast_tests", 500))
-        if current_limit <= base_limit or (current_limit - base_limit) % 500 != 0:
-            return False
-        log_diff = subprocess.run(
-            ["git", "diff", "origin/develop...HEAD", "--", CEILING_LOG_PATH],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except (OSError, ValueError, json.JSONDecodeError):
-        return False
-
-    return any(
-        line.startswith("+")
-        and not line.startswith("+++")
-        and re.search(r"\+\s*-\s*\d{4}-\d{2}-\d{2}:.*\bBump(?:ed)?\b", line, re.IGNORECASE)
-        for line in log_diff.stdout.splitlines()
-    )
-
-
-def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_grace: int = 0) -> list[str]:
+def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str]:
     if not policy or not policy.get("enabled", True):
         return []
 
     violations: list[str] = []
-    max_fast_tests = int(policy.get("max_fast_tests", 500))
     forbidden_marker_expressions = policy.get("forbidden_marker_expressions", [])
     forbidden_path_substrings = policy.get("forbidden_path_substrings", [])
 
-    rc, fast_output = _run_pytest_collect(repo_root, "fast")
-    print(f"Fast lane collect exit code: {rc}")
-    if rc not in (0, 5):
-        raise _collect_environment_error("fast", rc, fast_output)
-    fast_count = _parse_collect_count(fast_output)
-    if fast_count is None:
-        raise _collect_environment_error("fast", rc, fast_output)
-    print(f"Fast lane tests collected: {fast_count}")
-    if ceiling_grace:
-        print(f"Composition grace active: {ceiling_grace} tests (merge queue composition only)")
-    if fast_count > max_fast_tests + ceiling_grace:
-        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests} (grace {ceiling_grace})")
-    elif fast_count > max_fast_tests:
-        print(
-            f"FAST_LANE_WARNING: composed tree collects {fast_count}, "
-            f"{fast_count - max_fast_tests} over the {max_fast_tests} ceiling but within the "
-            f"{ceiling_grace}-test composition grace - bump per {CEILING_LOG_PATH} conventions (+500 quantum)"
-        )
-    else:
-        headroom = max_fast_tests - fast_count
-        if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:
-            print(
-                f"FAST_LANE_WARNING: headroom {headroom} below "
-                f"{FAST_LANE_HEADROOM_WARNING_THRESHOLD} - bump per {CEILING_LOG_PATH} "
-                "conventions (+500 quantum)"
-            )
     if forbidden_path_substrings:
+        rc, fast_output = _run_pytest_collect(repo_root, "fast")
+        print(f"Fast lane collect exit code: {rc}")
+        if rc not in (0, 5):
+            raise _collect_environment_error("fast", rc, fast_output)
+        if _parse_collect_count(fast_output) is None:
+            raise _collect_environment_error("fast", rc, fast_output)
         offending_lines = [
             line
             for line in fast_output.splitlines()
@@ -234,158 +123,23 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_
     return violations
 
 
-def _emit_fast_count(repo_root: Path) -> int:
-    rc, output = _run_pytest_collect(repo_root, "fast")
-    if rc not in (0, 5):
-        print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
-        return 1
-    count = _parse_collect_count(output)
-    if rc != 0 or count is None:
-        print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
-        return 1
-    print(count)
-    return 0
-
-
-def _delta_check(repo_root: Path, develop_count_file: Path, *, require_baseline: bool = False) -> int:
-
-    def baseline_unavailable(reason: str) -> int:
-        if require_baseline:
-            print(
-                "DELTA_CHECK_BASELINE_ERROR: "
-                f"{reason}; expected an exact develop fast-lane count at {develop_count_file}",
-                file=sys.stderr,
-            )
-            return 1
-        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
-        return 0
-
-    if not develop_count_file.exists():
-        return baseline_unavailable("no develop baseline available")
-
-    try:
-        develop_count = int(develop_count_file.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return baseline_unavailable("develop baseline is missing or invalid")
-
-    rc, output = _run_pytest_collect(repo_root, "fast")
-    if rc not in (0, 5):
-        print(
-            f"DELTA_CHECK_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}",
-            file=sys.stderr,
-        )
-        return 1
-    pr_count = _parse_collect_count(output)
-    if pr_count is None:
-        print(
-            f"DELTA_CHECK_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}",
-            file=sys.stderr,
-        )
-        return 1
-
-    delta = pr_count - develop_count
-    print(f"Fast lane delta vs develop: pr={pr_count} develop={develop_count} delta={delta:+d}")
-
-    if delta > FAST_LANE_DELTA_FAIL_THRESHOLD:
-        if _has_justified_ceiling_bump(repo_root):
-            print(
-                "FAST_LANE_DELTA_BUMP_AUTHORIZED: this PR records a +500 ceiling bump "
-                f"with a dated justification in {CEILING_LOG_PATH}"
-            )
-            return 0
-        print(
-            f"FAST_LANE_DELTA_VIOLATION: this PR adds {delta} fast tests over develop's baseline "
-            f"of {develop_count} (limit +{FAST_LANE_DELTA_FAIL_THRESHOLD} per PR). Mark new/converted "
-            "tests medium instead of fast (pytestmark = [pytest.mark.unit, pytest.mark.medium]), split "
-            "the change across PRs. A ceiling bump does not waive this per-PR delta guard."
-        )
-        return 1
-
-    if delta > FAST_LANE_DELTA_WARN_THRESHOLD:
-        print(
-            f"FAST_LANE_DELTA_WARNING: this PR adds {delta} fast tests over develop's baseline of "
-            f"{develop_count} (soft warning threshold +{FAST_LANE_DELTA_WARN_THRESHOLD}, hard limit "
-            f"+{FAST_LANE_DELTA_FAIL_THRESHOLD}). Consider marking new tests medium if they don't need "
-            "sub-second fast-lane execution."
-        )
-        return 0
-
-    return 0
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Enforce the fast-lane test-count ceiling.")
+    parser = argparse.ArgumentParser(description="Enforce the fast-lane forbidden-marker and forbidden-path guards.")
     parser.add_argument(
         "--fast-lane-policy",
         default="_project/config/fast_test_lane_policy.json",
         help="Fast-lane guardrail JSON file path",
     )
     parser.add_argument("--strict", action="store_true", help="Fail on any fast-lane policy violation")
-    parser.add_argument(
-        "--ceiling-grace",
-        default=None,
-        help=(
-            "Composition grace in tests above the fast-lane ceiling that warns instead of failing "
-            f"(merge_group lane only; 0-{MAX_CEILING_GRACE}). The lane is derived inside "
-            "the script from runner-provided event identity, never a workflow-controlled grace value."
-        ),
-    )
-    parser.add_argument(
-        "--emit-fast-count",
-        action="store_true",
-        help=(
-            "Collect the fast lane and print ONLY the machine-readable count (stdout), then exit. "
-            "Ignores every other mode; used to persist a develop baseline count for --delta-check."
-        ),
-    )
-    parser.add_argument(
-        "--delta-check",
-        action="store_true",
-        help=(
-            "Compare this run's fast-lane collect count against a develop baseline count file "
-            "(--develop-count-file). Additive to the absolute ceiling check, never a replacement."
-        ),
-    )
-    parser.add_argument(
-        "--develop-count-file",
-        help="Path (repo-root-relative or absolute) to the develop baseline count file, used with --delta-check.",
-    )
-    parser.add_argument(
-        "--require-develop-baseline",
-        action="store_true",
-        help="Fail --delta-check when the exact develop baseline is missing or invalid.",
-    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
-
-    if args.require_develop_baseline and not args.delta_check:
-        print("--require-develop-baseline requires --delta-check", file=sys.stderr)
-        return 2
-
-    if args.emit_fast_count:
-        return _emit_fast_count(repo_root)
-
-    if args.delta_check:
-        if not args.develop_count_file:
-            print("--delta-check requires --develop-count-file", file=sys.stderr)
-            return 2
-        develop_count_file = Path(args.develop_count_file)
-        if not develop_count_file.is_absolute():
-            develop_count_file = repo_root / develop_count_file
-        return _delta_check(repo_root, develop_count_file, require_baseline=args.require_develop_baseline)
-
-    try:
-        ceiling_grace = _ceiling_grace_from_event(args.ceiling_grace)
-    except ValueError as exc:
-        print(f"FAST_LANE_CONFIGURATION_ERROR: {exc}", file=sys.stderr)
-        return 2
 
     fast_lane_policy = _load_fast_lane_policy(repo_root / args.fast_lane_policy)
     fast_lane_violations: list[str]
     fast_lane_environment_error = False
     try:
-        fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy, ceiling_grace=ceiling_grace)
+        fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
     except FastLaneCollectError as exc:
         fast_lane_violations = exc.violations
         print(f"Fast lane policy violations: {len(fast_lane_violations)}")

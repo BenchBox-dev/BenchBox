@@ -427,7 +427,8 @@ def test_local_platform_benchmark_matrix(
         seed = load_tpch_value_digest_seed()
         if not set(query_subset) <= load_tpch_value_digests(scale_factor).keys():
             raise ValueError("TPC-H digest gate query subset is not covered by the stored snapshot")
-        command.extend(["--seed", str(seed)])
+        if seed is not None:
+            command.extend(["--seed", str(seed)])
 
     result = run_cli_command(command, cwd=case_dir, timeout=MATRIX_CASE_TIMEOUT)
 

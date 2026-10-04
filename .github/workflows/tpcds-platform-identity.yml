@@ -1,5 +1,6 @@
 name: TPC-DS Platform Identity
 
+
 on:
   schedule:
     - cron: "30 4 * * *"
@@ -9,6 +10,8 @@ on:
       - "benchbox/_binaries/tpc-ds/**"
       - "benchbox/core/tpcds/c_tools.py"
       - "benchbox/core/tpcds/parameter_log.py"
+      - "benchbox/core/tpcds/queries.py"
+      - "benchbox/core/tpcds/streams.py"
       - "benchbox/core/tpcds/benchmark/**"
       - "benchbox/core/tpcds/generator/**"
       - "benchbox/utils/tpc_compilation.py"
@@ -27,10 +30,11 @@ jobs:
     name: TPC-DS manifest (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -78,5 +82,14 @@ jobs:
           path: manifests
           merge-multiple: true
 
-      - name: Compare
-        run: python scripts/tpcds_platform_identity.py compare manifests/manifest-*.json
+      - name: Compare Linux and macOS
+        run: python scripts/tpcds_platform_identity.py compare manifests/manifest-Linux-*.json manifests/manifest-macOS-*.json
+
+      - name: Compare with Windows (advisory)
+        continue-on-error: true
+        run: |
+          if ls manifests/manifest-Windows-*.json >/dev/null 2>&1; then
+            python scripts/tpcds_platform_identity.py compare manifests/manifest-*.json
+          else
+            echo "No Windows manifest was produced; see the Windows manifest job."
+          fi

@@ -584,22 +584,10 @@ jobs:
         continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Fast lane ceiling
-        id: guard-fast-lane-ceiling
+      - name: Fast lane marker and path guards
+        id: guard-fast-lane-markers
         continue-on-error: true
         run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
-
-      - name: Restore fast-lane develop baseline count
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25
-        with:
-          path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha }}
-
-      - name: Fast lane ceiling delta vs develop
-        if: github.event_name == 'pull_request'
-        id: guard-fast-lane-delta
-        continue-on-error: true
-        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
 
       - name: UAT spec LOC table drift check
         id: guard-uat-loc-table
@@ -712,6 +700,7 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09

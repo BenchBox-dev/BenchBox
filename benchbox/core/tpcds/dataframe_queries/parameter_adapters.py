@@ -70,12 +70,25 @@ def _q1(values: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+def _q2(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"])}
+
+
 def _q3(values: Mapping[str, str]) -> dict[str, Any]:
     return {
         "manufact_id": int(values["MANUFACT.01"]),
         "month": int(values["MONTH.01"]),
         "agg_column": values["AGGC.01"].lower(),
     }
+
+
+def _q5(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q6(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month}
 
 
 def _q7(values: Mapping[str, str]) -> dict[str, Any]:
@@ -89,6 +102,15 @@ def _q7(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q8(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "qoy": int(values["QOY.01"]), "zip_codes": _listed(values, "ZIP")}
+
+
+def _q9(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "quantity_ranges": [(1, 20), (21, 40), (41, 60), (61, 80), (81, 100)],
+        "thresholds": [int(value) for value in _listed(values, "RC")],
+        "agg_then": values["AGGCTHEN.01"].lower(),
+        "agg_else": values["AGGCELSE.01"].lower(),
+    }
 
 
 def _q10(values: Mapping[str, str]) -> dict[str, Any]:
@@ -114,7 +136,17 @@ def _q13(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q14(values: Mapping[str, str]) -> dict[str, Any]:
-    return {"year": int(values["YEAR.01"])}
+    return {"year": int(values["YEAR.01"]), "day": int(values["DAY.01"])}
+
+
+def _q15(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "quarter": int(values["QOY.01"])}
+
+
+def _q16(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    counties = [values[f"COUNTY_{letter}.01"] for letter in "ABCDE"]
+    return {"year": year, "month": month, "state": values["STATE.01"], "counties": counties}
 
 
 def _q17(values: Mapping[str, str]) -> dict[str, Any]:
@@ -148,6 +180,15 @@ def _q23(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": year, "month": month, "top_percent": int(values["TOPPERCENT.01"])}
 
 
+def _q24(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "market_id": int(values["MARKET.01"]),
+        "amount_column": values["AMOUNTONE.01"].lower(),
+        "color": values["COLOR.01"],
+        "second_color": values["COLOR.02"],
+    }
+
+
 def _q25(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "agg": values["AGG.01"]}
 
@@ -159,6 +200,23 @@ def _q26(values: Mapping[str, str]) -> dict[str, Any]:
 def _q27(values: Mapping[str, str]) -> dict[str, Any]:
     states = [values[f"STATE_{letter}.01"] for letter in "ABCDEF"]
     return {**_demographics(values), "states": states}
+
+
+def _q28(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "list_prices": [int(value) for value in _listed(values, "LISTPRICE")],
+        "coupon_amts": [int(value) for value in _listed(values, "COUPONAMT")],
+        "wholesale_costs": [int(value) for value in _listed(values, "WHOLESALECOST")],
+    }
+
+
+def _q29(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "agg": values["AGG.01"]}
+
+
+def _q30(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "state": values["STATE.01"]}
 
 
 def _q31(values: Mapping[str, str]) -> dict[str, Any]:
@@ -192,6 +250,15 @@ def _q35(values: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+def _year_select_one(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "select_one": values["SELECTONE.01"]}
+
+
+def _q19(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "manager_id": int(values["MANAGER.01"])}
+
+
 def _q36(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "states": [values[f"STATE_{letter}.01"] for letter in "ABCDEFGH"]}
 
@@ -219,12 +286,41 @@ def _q40(values: Mapping[str, str]) -> dict[str, Any]:
     return {"sales_date": values["SALES_DATE.01"]}
 
 
+def _q41(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "manufact": int(values["MANUFACT.01"]),
+        "colors": _listed(values, "COLOR"),
+        "units": _listed(values, "UNIT"),
+        "sizes": _listed(values, "SIZE"),
+    }
+
+
+def _q42(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month}
+
+
+def _q43(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "gmt_offset": float(values["GMT.01"])}
+
+
 def _q44(values: Mapping[str, str]) -> dict[str, Any]:
     return {"store_sk": int(values["STORE.01"]), "null_col": values["NULLCOLSS.01"]}
 
 
 def _q45(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "qoy": int(values["QOY.01"]), "gbobc": values["GBOBC.01"]}
+
+
+def _q46(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "year_offsets": [0, 1, 2],
+        "dow": [6, 0],
+        "cities": [values[f"CITY_{letter}.01"] for letter in "ABCDE"],
+        "dep_count": int(values["DEPCNT.01"]),
+        "vehicle_count": int(values["VEHCNT.01"]),
+    }
 
 
 def _q49(values: Mapping[str, str]) -> dict[str, Any]:
@@ -275,6 +371,16 @@ def _q67(values: Mapping[str, str]) -> dict[str, Any]:
     return _dms(values)
 
 
+def _q68(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "year_offsets": [0, 1, 2],
+        "cities": [values["CITY_A.01"], values["CITY_B.01"]],
+        "dep_count": int(values["DEPCNT.01"]),
+        "vehicle_count": int(values["VEHCNT.01"]),
+    }
+
+
 def _q70(values: Mapping[str, str]) -> dict[str, Any]:
     return _dms(values)
 
@@ -282,6 +388,35 @@ def _q70(values: Mapping[str, str]) -> dict[str, Any]:
 def _q71(values: Mapping[str, str]) -> dict[str, Any]:
     year, month = _year_and_month(values)
     return {"year": year, "month": month}
+
+
+def _q72(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "buy_potential": values["BP.01"], "marital_status": values["MS.01"]}
+
+
+def _q73(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "counties": [values[f"COUNTY_{letter}.01"] for letter in "ABCD"],
+        "buy_potential_1": values["BPONE.01"],
+        "buy_potential_2": values["BPTWO.01"],
+    }
+
+
+def _q74(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "aggone": values["AGGONE.01"],
+        "order_by": [int(position) for position in _listed(values, "ORDERC")],
+    }
+
+
+def _q75(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "category": values["CATEGORY.01"]}
+
+
+def _thirty_day_window(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"sales_date": values["SALES_DATE.01"]}
 
 
 def _q76(values: Mapping[str, str]) -> dict[str, Any]:
@@ -292,12 +427,20 @@ def _q76(values: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
+def _q78(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "select_columns": values["SELECTONE.01"]}
+
+
 def _q79(values: Mapping[str, str]) -> dict[str, Any]:
     return {
         "year": int(values["YEAR.01"]),
         "dep_count": int(values["DEPCNT.01"]),
         "vehicle_count": int(values["VEHCNT.01"]),
     }
+
+
+def _q81(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "state": values["STATE.01"]}
 
 
 def _q82(values: Mapping[str, str]) -> dict[str, Any]:
@@ -316,6 +459,27 @@ def _q83(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q84(values: Mapping[str, str]) -> dict[str, Any]:
     return {"city": values["CITY.01"], "income_band": int(values["INCOME.01"])}
+
+
+def _q85(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "marital_statuses": _listed(values, "MS"),
+        "education_statuses": _listed(values, "ES"),
+        "states": _listed(values, "STATE"),
+    }
+
+
+def _q88(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"dep_counts": [int(value) for value in _listed(values, "HOUR")]}
+
+
+def _q89(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "categories": [values[f"CAT_{letter}.01"] for letter in "ABCDEF"],
+        "classes": [values[f"CLASS_{letter}.01"] for letter in "ABCDEF"],
+    }
 
 
 def _q90(values: Mapping[str, str]) -> dict[str, Any]:
@@ -344,28 +508,102 @@ def _q93(values: Mapping[str, str]) -> dict[str, Any]:
     return {"reason": values["REASON.01"]}
 
 
+def _q94(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "states": [values["STATE.01"]]}
+
+
+def _q96(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"hour": int(values["HOUR.01"]), "dep_count": int(values["DEPCNT.01"])}
+
+
 def _q98(values: Mapping[str, str]) -> dict[str, Any]:
     return {"categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
 
 
+def _q47_q57(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "select_one": values["SELECTONE.01"],
+        "select_two": values["SELECTTWO.01"],
+        "order_by": values["ORDERBY.01"],
+    }
+
+
+def _q48(values: Mapping[str, str]) -> dict[str, Any]:
+    marital, education, states = _listed(values, "MS"), _listed(values, "ES"), _listed(values, "STATE")
+    parameters: dict[str, Any] = {"year": int(values["YEAR.01"])}
+    for group in range(3):
+        parameters[f"demo{group + 1}_marital"] = marital[group]
+        parameters[f"demo{group + 1}_education"] = education[group]
+        parameters[f"states{group + 1}"] = states[group * 3 : group * 3 + 3]
+    return parameters
+
+
+def _q52(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month}
+
+
+def _q55(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "manager_id": int(values["MANAGER.01"])}
+
+
+def _q56(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "colors": _listed(values, "COLOR"), "gmt_offset": int(values["GMT.01"])}
+
+
+def _q61(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "gmt_offset": float(values["GMT.01"]), "category": values["CATEGORY.01"]}
+
+
+def _q64(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "price_min": int(values["PRICE.01"]),
+        "colors": _listed(values, "COLOR"),
+    }
+
+
+def _q69(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "states": _listed(values, "STATE")}
+
+
 ADAPTERS: dict[int, Adapter] = {
     1: _q1,
+    2: _q2,
     3: _q3,
+    4: _year_select_one,
+    5: _q5,
+    6: _q6,
     7: _q7,
     8: _q8,
+    9: _q9,
     10: _q10,
+    11: _year_select_one,
     12: _q12,
     13: _q13,
     14: _q14,
+    15: _q15,
+    16: _q16,
     17: _q17,
     18: _q18,
+    19: _q19,
     20: _q20,
     21: _q21,
     22: _q22,
     23: _q23,
+    24: _q24,
     25: _q25,
     26: _q26,
     27: _q27,
+    28: _q28,
+    29: _q29,
+    30: _q30,
     31: _q31,
     32: _q32,
     33: _q33,
@@ -376,34 +614,62 @@ ADAPTERS: dict[int, Adapter] = {
     38: _q38,
     39: _q39,
     40: _q40,
+    41: _q41,
+    42: _q42,
+    43: _q43,
     44: _q44,
     45: _q45,
+    46: _q46,
+    47: _q47_q57,
+    48: _q48,
     49: _q49,
     50: _q50,
     51: _dms_window,
+    52: _q52,
     53: _dms_window,
     54: _q54,
+    55: _q55,
+    56: _q56,
+    57: _q47_q57,
     58: _q58,
     59: _q59,
     60: _q60,
+    61: _q61,
     62: _dms_window,
     63: _dms_window,
+    64: _q64,
     65: _q65,
     66: _q66,
     67: _q67,
+    68: _q68,
+    69: _q69,
     70: _q70,
     71: _q71,
+    72: _q72,
+    73: _q73,
+    74: _q74,
+    75: _q75,
     76: _q76,
+    77: _thirty_day_window,
+    78: _q78,
     79: _q79,
+    80: _thirty_day_window,
+    81: _q81,
     82: _q82,
     83: _q83,
     84: _q84,
+    85: _q85,
     86: _month_seq,
     87: _month_seq,
+    88: _q88,
+    89: _q89,
     90: _q90,
     91: _q91,
     92: _q92,
     93: _q93,
+    94: _q94,
+    95: _q94,
+    96: _q96,
     97: _month_seq,
     98: _q98,
     99: _month_seq,

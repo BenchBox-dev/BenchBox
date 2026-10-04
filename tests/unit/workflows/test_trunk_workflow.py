@@ -50,14 +50,6 @@ def test_shard_evidence_is_labelled_with_this_workflow() -> None:
         assert "--workflow ci.yml" not in command
 
 
-def test_fast_job_enforces_the_ungraced_fast_lane_ceiling() -> None:
-    commands = [step.get("run", "") for step in _workflow()["jobs"]["fast"]["steps"]]
-    ceiling = [command for command in commands if "fast_lane_ceiling_check.py" in command]
-    assert len(ceiling) == 1
-    assert "--strict" in ceiling[0]
-    assert "--ceiling-grace" not in ceiling[0]
-
-
 def test_required_local_cases_run_after_each_merge() -> None:
     job = _workflow()["jobs"]["required-local-cases"]
     assert job["runs-on"] == "ubuntu-latest"

@@ -634,3 +634,27 @@ TPC-DS Tables (Scale Factor 1.0)
      - Fixed size (does not scale)
 
 See the TPC-DS specification for complete row counts.
+
+TPC-DS Answer Values
+--------------------
+
+``benchbox.core.expected_results.loader.parse_tpcds_answer_values(path)`` reads
+an official answer file into a tuple of ``TpcdsAnswerBlock`` objects. Each block
+contains ``columns`` and ``rows`` as tuples. Cells retain the file's text, with
+padding removed; an empty cell becomes ``None``. Numeric conversion and result
+tolerance belong to the caller.
+
+The parser accepts fixed-width and pipe-delimited layouts, multiple result
+sets, and UTF-8 or Latin-1 files. Fixed-width columns follow the dashed
+separator, with tabs expanded to eight-column stops. A bounded fallback accepts
+the shifted fields in ``24.ans`` only when every field fits its column. Missing
+files raise ``FileNotFoundError``; malformed rows raise ``ValueError`` naming
+the file and result set.
+
+``load_tpcds_answer_values(scale_factor=1.0, null_order="first")`` loads the
+available answer files as a mapping from query number strings to block tuples.
+Only scale factor 1.0 is supported. ``null_order`` accepts ``"first"`` or
+``"last"`` and selects the corresponding file when a query has NULL-order
+variants. A missing answer directory or malformed file raises an error.
+Individual absent files are omitted, so a qualification runner must verify
+the complete query and statement inventory before certifying results.

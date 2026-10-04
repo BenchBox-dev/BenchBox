@@ -188,6 +188,7 @@ _project/reports/worktree-lifecycle/
 
 ci-log.txt
 /site/
+/make/inventory.json
 /.claude/worktrees
 
 node_modules/

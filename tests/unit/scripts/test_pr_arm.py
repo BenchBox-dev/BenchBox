@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -241,8 +240,7 @@ def test_makefile_exposes_pr_arm_through_the_helper_and_declares_it_phony() -> N
     makefile = (ROOT / "Makefile").read_text()
     assert "\npr-arm:\n" in makefile
     assert "scripts/pr_arm.py" in makefile
-    phony = next(line for line in makefile.splitlines() if line.startswith(".PHONY: pr-arm "))
-    assert re.search(r"(?<![\w-])pr-arm(?![\w-])", phony)
+    assert ".PHONY: pr-arm" in makefile.splitlines()
 
 
 def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str, str]]:

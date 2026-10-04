@@ -105,7 +105,6 @@ CANT_AFFECT_CANARY = frozenset(
         ".codespell-ignore.txt",
         "_project/audits/",
         "_project/config/fast_test_lane_policy.json",
-        "_project/config/fast_lane_ceiling_log.md",
     }
 )
 

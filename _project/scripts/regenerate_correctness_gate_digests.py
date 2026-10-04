@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Copyright 2026 Joe Harris / BenchBox Project
-
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ REFERENCE_PATH = (
 
 _PROVENANCE_NOTE = (
     "Reference VALUE digests for the bounded correctness-gate TPC-H queries at SF=1 with the "
-    "pinned reference qgen seed. REGENERATE with `make correctness-gate-digests-regen` "
+    "{parameters}. REGENERATE with `make correctness-gate-digests-regen` "
     "(_project/scripts/regenerate_correctness_gate_digests.py), which runs the same gate "
     "configuration with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes this file -- do NOT hand-copy. "
     "This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the "
@@ -47,7 +46,7 @@ def _query_ids() -> list[str]:
     return [qid.strip() for qid in raw.split(",") if qid.strip()]
 
 
-def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
+def _run_gate(work_dir: Path, query_ids: list[str], seed: int | None) -> dict:
     from benchbox.core.results.loader import find_latest_result
 
     command = [
@@ -65,10 +64,10 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int) -> dict:
         "generate,load,power",
         "--queries",
         ",".join(query_ids),
-        "--seed",
-        str(seed),
         "--non-interactive",
     ]
+    if seed is not None:
+        command.extend(["--seed", str(seed)])
 
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
@@ -128,7 +127,7 @@ def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, s
     return digests
 
 
-def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> dict:
+def build_reference(digests: dict[str, str], seed: int | None, duckdb_version: str) -> dict:
     return {
         "benchmark": "tpch",
         "scale_factor": 1.0,
@@ -143,7 +142,9 @@ def build_reference(digests: dict[str, str], seed: int, duckdb_version: str) -> 
             "generated_with_duckdb": duckdb_version,
             "generated_with_platform": "duckdb",
             "phases": "generate,load,power",
-            "note": _PROVENANCE_NOTE,
+            "note": _PROVENANCE_NOTE.format(
+                parameters="qgen -d default substitution parameters" if seed is None else f"qgen seed {seed}"
+            ),
         },
         "digests": digests,
     }

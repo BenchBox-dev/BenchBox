@@ -33,8 +33,9 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
 	soundness-drain-report soundness-drain-self-test worktree-audit worktree-finish
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images site-inventory site-inventory-diff site-inventory-check site-deps site-build site-dev site-check test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix test-required-local-cases joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit
+.PHONY: coverage-check
 
+.PHONY: test
 test: test-fast
 	@echo "Default test run completed. Use 'make help' to see all test options."
 
@@ -56,18 +57,22 @@ publication-help:
 	@echo "  4. Approve the github-pages environment once; the workflow validates and records the result."
 	@echo "  Retry with a new transaction run against the same artifact after a pre-write failure."
 
+.PHONY: test-all
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
+.PHONY: test-unit
 test-unit:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "unit" --tb=short
 
+.PHONY: test-integration
 test-integration:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
 
+.PHONY: test-tpch
 test-tpch:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "tpch" --tb=short
 
@@ -77,12 +82,15 @@ test-quick:
 test-verbose:
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v
 
+.PHONY: test-pytest
 test-pytest:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not stress"
 
+.PHONY: test-fast
 test-fast:
 	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
+.PHONY: test-unlock
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
 	case "$$LOCK_DIR" in \
@@ -92,9 +100,11 @@ test-unlock:
 	LOCK_PATH="$$LOCK_DIR/test.lock"; \
 	python3 scripts/local_validation.py clear-test-lock "$$LOCK_PATH"
 
+.PHONY: test-medium
 test-medium:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
+.PHONY: test-medium-selected
 test-medium-selected:
 	@set -eu; \
 	OUTPUT=$$(mktemp); \
@@ -104,9 +114,11 @@ test-medium-selected:
 		--marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" --cant-affect-list empty \
 		--product-code-only --run-selected --output "$$OUTPUT"
 
+.PHONY: test-slow
 test-slow:
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
+.PHONY: test-stress
 test-stress:
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
@@ -117,6 +129,7 @@ test-smoke: test-quick
 
 CORRECTNESS_GATE_QUERY_IDS := 1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22
 
+.PHONY: test-correctness-gate
 test-correctness-gate:
 	@REPORT="$$(mktemp)"; \
 	BENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python -m pytest -m stress "tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]" -n 0 --tb=short --timeout=1200 -v --junitxml="$$REPORT"; \
@@ -126,45 +139,59 @@ test-correctness-gate:
 	rm -f "$$REPORT"; \
 	test $$PYTEST_STATUS -eq 0 && test $$GUARD_STATUS -eq 0
 
+.PHONY: plan-capture-gate
 plan-capture-gate:
 	uv run -- python -m pytest tests/integration/test_plan_capture_gate.py -q -n 0 --tb=short
 
+.PHONY: correctness-gate-digests-regen
 correctness-gate-digests-regen:
 	BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py
 
+.PHONY: tpchavoc-equivalence-report
 tpchavoc-equivalence-report:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence
 
+.PHONY: tpchavoc-equivalence-report-postgres
 tpchavoc-equivalence-report-postgres:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine postgres
 
+.PHONY: tpchavoc-equivalence-report-datafusion
 tpchavoc-equivalence-report-datafusion:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine datafusion
 
+.PHONY: tpchavoc-equivalence-report-clickhouse
 tpchavoc-equivalence-report-clickhouse:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine clickhouse
 
+.PHONY: tpchavoc-dataframe-equivalence-report
 tpchavoc-dataframe-equivalence-report:
 	uv run -- python -m benchbox.core.tpchavoc.dataframe_equivalence
 
+.PHONY: ssb-cross-surface-equivalence-report
 ssb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark ssb
 
+.PHONY: amplab-cross-surface-equivalence-report
 amplab-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark amplab
 
+.PHONY: coffeeshop-cross-surface-equivalence-report
 coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
+.PHONY: clickbench-cross-surface-equivalence-report
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 
+.PHONY: joinorder-synthetic-cross-surface-equivalence-report
 joinorder-synthetic-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
 
+.PHONY: h2odb-cross-surface-equivalence-report
 h2odb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark h2odb
 
+.PHONY: read-primitives-cross-surface-equivalence-report
 read-primitives-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
 
@@ -189,27 +216,34 @@ tpch-cross-surface-equivalence-report:
 tpcds-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
 
+.PHONY: cross-surface-update-baseline
 cross-surface-update-baseline:
 	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>"; exit 1; }
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
 
+.PHONY: cross-surface-baseline-autodetect
 cross-surface-baseline-autodetect:
 	uv run -- python _project/scripts/cross_surface_baseline_autodetect.py \
 		--json-out _project/cross-surface-baseline-autodetect/summary.json
 
+.PHONY: oracle-coverage-map
 oracle-coverage-map:
 	uv run -- python _project/scripts/generate_oracle_coverage_map.py
 
+.PHONY: oracle-coverage-map-check
 oracle-coverage-map-check:
 	uv run -- python _project/scripts/generate_oracle_coverage_map.py --check
 
+.PHONY: cross-surface-applicability-report
 cross-surface-applicability-report:
 	uv run -- python _project/scripts/cross_surface_applicability_sweep.py
 
+.PHONY: test-local-matrix
 test-local-matrix:
 	uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -m stress -n 0 --tb=short -v
 	@echo "Tip: set BENCHBOX_SERVICE_LOCAL_MATRIX=1 to include Trino/Presto/Firebolt/PostgreSQL/TimescaleDB service-backed locals."
 
+.PHONY: test-required-local-cases
 test-required-local-cases:
 	@set -eu; \
 	DIR=$$(mktemp -d); \
@@ -225,6 +259,7 @@ test-required-local-cases:
 		--nodeids "$$DIR/required.txt" --checked-sha "$$SHA" || STATUS=$$?; \
 	exit $$STATUS
 
+.PHONY: joinorder-verify-reference-results
 joinorder-verify-reference-results:
 	@[ -n "$(JOINORDER_POSTGRES_CONTAINER)" ] || { echo "JOINORDER_POSTGRES_CONTAINER is required"; exit 2; }
 	uv run -- python _project/scripts/build_joinorder_data.py verify-reference-results \
@@ -235,18 +270,23 @@ joinorder-verify-reference-results:
 		--queries "$(JOINORDER_QUERIES)" \
 		--reference "$(JOINORDER_REFERENCE)"
 
+.PHONY: test-duckdb
 test-duckdb:
 	uv run -- python -m pytest -m "duckdb" --tb=short
 
+.PHONY: test-sqlite
 test-sqlite:
 	uv run -- python -m pytest -m "sqlite" --tb=short
 
+.PHONY: test-pyspark
 test-pyspark:
 	./scripts/run_pyspark_tests.sh
 
+.PHONY: test-read-primitives
 test-read-primitives:
 	uv run -- python -m pytest -m "primitives" --tb=short
 
+.PHONY: test-benchmarks
 test-benchmarks:
 	uv run -- python -m pytest -m "tpch or tpcds or ssb or amplab or clickbench or h2odb or merge" --tb=short
 
@@ -259,6 +299,7 @@ test-olap:
 test-window:
 	uv run -- python -m pytest -m "window_functions" --tb=short
 
+.PHONY: test-ci
 test-ci:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300
 
@@ -276,39 +317,51 @@ test-parallel-fast:
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
+.PHONY: coverage-fast
 coverage-fast:
 	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120
 
+.PHONY: coverage-all
 coverage-all:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
 
+.PHONY: coverage-opt-in-all
 coverage-opt-in-all:
 	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
 
+.PHONY: coverage
 coverage: coverage-all
 
+.PHONY: coverage-html
 coverage-html:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=html:htmlcov --cov-fail-under=0
 
+.PHONY: coverage-report
 coverage-report:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=0
 
 
+.PHONY: complexity-check
 complexity-check:
 	uv run -- python _project/scripts/check_complexity.py
 
+.PHONY: complexity-report
 complexity-report:
 	uv run -- python _project/scripts/check_complexity.py --no-fail --top 30
 
+.PHONY: quality-governance-typecheck
 quality-governance-typecheck:
 	uv run ty check --error all _project/scripts/check_complexity.py
 
+.PHONY: install
 install:
 	uv sync
 
+.PHONY: develop
 develop:
 	uv sync --group dev
 
+.PHONY: clean
 clean:
 	rm -rf build/
 	rm -rf dist/
@@ -322,6 +375,7 @@ clean:
 	find . -name '*.pyo' -delete
 	find . -name '.DS_Store' -delete
 
+.PHONY: lint
 lint:
 	uv run ruff check .
 	$(MAKE) comment-policy-check
@@ -346,6 +400,7 @@ audit-raw:
 audit-raw-check:
 	uv run -- python _project/scripts/dependency_audit/parse_deps.py --check
 
+.PHONY: audit-sha-check
 audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
 	uv run --no-project -- python _project/scripts/audit_sha_check.py \
@@ -358,26 +413,32 @@ audit-sha-check:
 windows-antipatterns-check:
 	uv run -- python scripts/check_windows_antipatterns.py
 
-.PHONY: comment-policy-check comment-policy-strict comment-policy-report
+.PHONY: comment-policy-check
 comment-policy-check:
 	uv run -- python scripts/run_comment_policy.py --native-tests
 
+.PHONY: comment-policy-strict
 comment-policy-strict:
 	uv run -- python scripts/check_comment_policy.py --mode strict
 
+.PHONY: comment-policy-report
 comment-policy-report:
 	uv run -- python scripts/check_comment_policy.py --mode report
 
+.PHONY: lint-markers
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
 	uv run -- python -m pytest tests/unit/test_marker_strategy.py -q
 
+.PHONY: lint-imports
 lint-imports:
 	uv run -- lint-imports
 
+.PHONY: lint-explorer-tokens
 lint-explorer-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py
 
+.PHONY: lint-site-theme-tokens
 lint-site-theme-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx
 
@@ -389,22 +450,27 @@ SNAPSHOT ?= results-explorer/public/data/results.duckdb
 explorer-snapshot-check:
 	uv run -- python _project/scripts/results_explorer_snapshot_invariants.py "$(SNAPSHOT)"
 
+.PHONY: artifact-hygiene
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
+.PHONY: agent-instructions-check
 agent-instructions-check:
 	uv run -- python _project/scripts/agent_instruction_audit.py
 
+.PHONY: agent-identity-check
 agent-identity-check:
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-git-identity
 
 AGENT_IDENTITY_BASE_REF ?= origin/develop
+.PHONY: agent-commit-range-check
 agent-commit-range-check:
 	@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)
 
 SKILL_SYNC ?= tools/skill-sync
 
+.PHONY: skill-sync
 skill-sync:
 	@dry_run=""; \
 	for flag_word in $(MAKEFLAGS); do \
@@ -423,6 +489,7 @@ skill-sync:
 	"$(SKILL_SYNC)" apply && \
 	cp .claude/skills/skill-sync.config.yaml .agents/skills/skill-sync.config.yaml
 
+.PHONY: skill-sync-check
 skill-sync-check:
 	@if [ ! -x "$(SKILL_SYNC)" ]; then \
 		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
@@ -446,6 +513,7 @@ skill-sync-check:
 	fi; \
 	echo "skill-sync-check: tracked mirror up to date."
 
+.PHONY: skill-integrity-check
 skill-integrity-check:
 	@set -eu; \
 	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf; \
@@ -456,21 +524,27 @@ skill-integrity-check:
 	$(MAKE) agent-commit-range-check; \
 	$(MAKE) artifact-hygiene
 
+.PHONY: duplicate-check
 duplicate-check:
 	uv run -- python scripts/check_duplicate_code.py
 
+.PHONY: duplicate-check-verbose
 duplicate-check-verbose:
 	uv run -- python scripts/check_duplicate_code.py --verbose --top-n 30
 
+.PHONY: duplicate-check-json
 duplicate-check-json:
 	uv run -- python scripts/check_duplicate_code.py --json
 
+.PHONY: duplicate-check-delta
 duplicate-check-delta:
 	uv run -- python scripts/check_duplicate_code.py --delta-vs "$(if $(BASE_REF),$(BASE_REF),origin/develop)"
 
+.PHONY: makefile-inventory-check
 makefile-inventory-check:
 	uv run -- python make/check_makefile_inventory.py
 
+.PHONY: mutation-test
 mutation-test:
 	@echo "Running mutation tests on critical modules..."
 	uv run -- mutmut run
@@ -506,6 +580,7 @@ guards-fix:
 	git status --porcelain; \
 	exit "$$status"
 
+.PHONY: ci-lint
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -553,7 +628,7 @@ ci-lint:
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
 	uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \
-	[ $$? -eq 0 ] || failed="$$failed fast-lane-ceiling"; \
+	[ $$? -eq 0 ] || failed="$$failed fast-lane-guards"; \
 	uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \
 	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
 	$(MAKE) compat-docs-check; \
@@ -593,17 +668,20 @@ ci-lint:
 	fi; \
 	echo "✅ CI lint checks passed"
 
+.PHONY: ci-test
 ci-test:
 	@echo "Running CI test suite..."
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
+.PHONY: ci-docs
 ci-docs:
 	@echo "Running CI docs checks..."
 	@$(MAKE) docs-validate
 	@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html
 	@echo "✅ CI docs build passed"
 
+.PHONY: security-audit
 security-audit:
 	@echo "Running security audit..."
 	@if [ -n "$(PIP_AUDIT_IGNORE_VULNS)" ]; then \
@@ -623,6 +701,7 @@ SPELLCHECK_EXCLUDE_PATHS := \
 	':(exclude,glob)**/_project/**'  ':(exclude,glob)_project/**' \
 	':(exclude,glob)**/_blog/**'     ':(exclude,glob)_blog/**'
 
+.PHONY: spellcheck
 spellcheck:
 	@echo "Running spellcheck..."
 	git ls-files -z -- $(SPELLCHECK_EXCLUDE_PATHS) \
@@ -636,6 +715,7 @@ ci-linkcheck:
 	@cat docs/_build/linkcheck/output.txt 2>/dev/null || echo "No output file generated"
 	@echo "✅ Linkcheck passed"
 
+.PHONY: test-package
 test-package:
 	@echo "Building and testing package installation..."
 	rm -rf dist/
@@ -656,11 +736,13 @@ test-package:
 	uv run --isolated --no-project --with "$$wheel" -- benchbox --help > /dev/null
 	@echo "✅ Package test passed"
 
+.PHONY: test-integration-smoke
 test-integration-smoke:
 	@echo "Running integration smoke tests..."
 	uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
 	@echo "✅ Integration smoke tests passed"
 
+.PHONY: ci-local
 ci-local:
 	@echo "========================================"
 	@echo "Running all CI checks locally..."
@@ -711,18 +793,23 @@ ci-linux:
 	echo "==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'"; \
 	container machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd "$(CURDIR)" && $(CI_LINUX_CMD)'
 
+.PHONY: typecheck
 typecheck:
 	uv run ty check
 
 typecheck-uv: typecheck
 
+.PHONY: validate-imports
 validate-imports: lint-imports
 
+.PHONY: catalog-schema-check
 catalog-schema-check:
 	uv run -- python -m benchbox.core.catalog_schema
 
+.PHONY: dependency-check
 dependency-check:
 	uv run -- python -m benchbox.utils.dependency_validation $(ARGS)
+.PHONY: format
 format:
 	uv run ruff format .
 
@@ -737,8 +824,8 @@ run-test:
 
 RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
-.PHONY: release-cut release-cut-abort release-finalize .release-cut-tree-required
 
+.PHONY: .release-cut-tree-required
 .release-cut-tree-required:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make release-cut VERSION=X.Y.Z" >&2; \
@@ -752,6 +839,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 		fi; \
 	fi
 
+.PHONY: release-cut
 release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
 	sh scripts/release_cut_start.sh "$(VERSION)"
@@ -772,10 +860,10 @@ release-cut: .release-cut-tree-required
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
 	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	git rm -f --ignore-unmatch tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py
-	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
+	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
 	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
 	git rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py
-	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
@@ -811,10 +899,12 @@ release-cut: .release-cut-tree-required
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
+.PHONY: release-cut-abort
 release-cut-abort:
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
 	sh scripts/release_cut_abort.sh "$(VERSION)"
 
+.PHONY: release-finalize
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	uv run -- python scripts/release_finalize.py --version "$(VERSION)" --required-contexts "$(RELEASE_REQUIRED_CONTEXTS)"
@@ -823,21 +913,22 @@ release-finalize:
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
-.PHONY: release-prep release-check
+.PHONY: release-prep
 release-prep:
 	@test -n "$(VERSION)" || (echo "Usage: make release-prep VERSION=X.Y.Z" && exit 1)
 	uv run --frozen -- python scripts/release_flow.py prep --version "$(VERSION)" $(if $(SINCE_REF),--since-ref "$(SINCE_REF)",)
 
+.PHONY: release-check
 release-check:
 	@test -n "$(VERSION)" || (echo "Usage: make release-check VERSION=X.Y.Z" && exit 1)
 	uv run --locked -- python scripts/release_flow.py check --version "$(VERSION)" $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
 
-.PHONY: pr-arm pr-preflight pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test trunk-revert
-
+.PHONY: agent-write-preflight
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
+.PHONY: pr-preflight
 pr-preflight:
 	@set -eu; \
 	git fetch origin develop --quiet; \
@@ -863,6 +954,7 @@ pr-preflight:
 	if [ "$$STATUS" -eq 5 ]; then echo "Mapped tests are all deselected by the default markers."; STATUS=0; fi; \
 	exit "$$STATUS"
 
+.PHONY: pr-preflight-fast-tests
 pr-preflight-fast-tests:
 	@set -eu; \
 	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
@@ -919,6 +1011,7 @@ pr-followup-resume:
 	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
 	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
 
+.PHONY: pr-content-guard
 pr-content-guard:
 	@set -eu; \
 	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
@@ -949,6 +1042,7 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
+.PHONY: pr-open
 pr-open:
 	@set -eu; \
 	$(MAKE) -s agent-write-preflight; \
@@ -1033,6 +1127,7 @@ pr-open:
 		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"; \
 	fi
 
+.PHONY: pr-arm-auto-merge
 pr-arm-auto-merge:
 	@set -eu; \
 	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
@@ -1054,6 +1149,7 @@ pr-arm-auto-merge:
 PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)
 PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)
 PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)
+.PHONY: pr-arm
 pr-arm: override PR := $(value PR)
 pr-arm: override HEAD := $(value HEAD)
 pr-arm: override REPO := $(value REPO)
@@ -1066,11 +1162,13 @@ pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
 
+.PHONY: trunk-revert
 trunk-revert:
 	@$(MAKE) -s agent-write-preflight
 	@case "$(PR)" in ""|*[!0-9]*) echo "PR=<merged PR number> is required" >&2; exit 2 ;; esac
 	@uv run -- python scripts/trunk_revert.py revert --pr "$(PR)" --repo "$(or $(REPO),BenchBox-dev/BenchBox)"
 
+.PHONY: pr-ready
 pr-ready:
 	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
 	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
@@ -1088,10 +1186,12 @@ pr-ready:
 		$(MAKE) -s pr-arm PR="$(PR)" REPO="$(or $(REPO),BenchBox-dev/BenchBox)" HEAD="$(HEAD)"; \
 	fi
 
+.PHONY: shrink-rollup
 shrink-rollup:
 	@git fetch origin develop --quiet
 	@uv run --project _project/scripts -- python _project/scripts/shrink_rollup.py
 
+.PHONY: pr-fanout
 pr-fanout:
 	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
 	TMP=$$(mktemp); \
@@ -1110,6 +1210,7 @@ pr-fanout:
 	for log in "$$LOGDIR"/*.log; do [ -e "$$log" ] && cat "$$log"; done; \
 	exit $$STATUS
 
+.PHONY: pr-refresh
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
@@ -1119,6 +1220,7 @@ pr-refresh:
 	git merge --no-edit origin/develop && \
 	$(MAKE) -s pr-open
 
+.PHONY: pr-conflict-scan
 pr-conflict-scan:
 	@CURRENT="$(BRANCH)"; \
 	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
@@ -1134,6 +1236,7 @@ pr-conflict-scan:
 		echo "  ⚠ textual conflict with PR #$$num ($$branch) in $$files — coordinate before landing"; \
 	done; true
 
+.PHONY: pr-status
 pr-status:
 	@if [ "$(ALL_OPEN)" = "1" ] || [ "$(ALL_OPEN)" = "true" ] || [ "$(ALL_OPEN)" = "yes" ]; then \
 		echo "All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):"; \
@@ -1144,6 +1247,7 @@ pr-status:
 	gh pr list --base develop --state open --limit "$$LIMIT" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
+.PHONY: pr-review-followups-list
 pr-review-followups-list:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
 		--base "$(PR_REVIEW_BASE)" \
@@ -1156,6 +1260,7 @@ pr-review-followups-list:
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
 		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)")
 
+.PHONY: pr-review-followups
 pr-review-followups:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \
 		--base "$(PR_REVIEW_BASE)" \
@@ -1172,6 +1277,7 @@ pr-review-followups:
 		$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \
 		$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)
 
+.PHONY: dev-loop-metrics
 dev-loop-metrics:
 	@set -e; \
 	TMP=$$(mktemp -d); \
@@ -1222,18 +1328,19 @@ include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 
+.PHONY: branch-prune-merged
 branch-prune-merged:
 	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
 	@DRY_RUN='$(if $(filter 1,$(DRY_RUN)),1,$(if $(strip $(DRY_RUN)),invalid,))' \
 		uv run -- python scripts/branch_prune_merged.py
 
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
-
+.PHONY: uat-artifact-hygiene
 uat-artifact-hygiene:
 	@uv run --no-sync -- python -m tests.uat.artifact_hygiene \
 		$(if $(OUTPUT),--output "$(OUTPUT)",) \
 		$(if $(THRESHOLD_BYTES),--threshold-bytes "$(THRESHOLD_BYTES)",)
 
+.PHONY: uat-cell
 uat-cell:
 	@if [ -z "$(PLATFORM)" ] || [ -z "$(BENCHMARK)" ] || [ -z "$(SCALE)" ]; then \
 		echo "Usage: make uat-cell PLATFORM=<name> BENCHMARK=<name> SCALE=<float>" >&2; \
@@ -1248,6 +1355,7 @@ uat-cell:
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
 
+.PHONY: uat-validate
 uat-validate:
 	@if [ -z "$(RESULTS_DIR)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
 		echo "Usage: make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]" >&2; \
@@ -1258,6 +1366,7 @@ uat-validate:
 		--output-tsv "$(OUTPUT_TSV)" \
 		$(if $(FLOOR),--floor "$(FLOOR)",)
 
+.PHONY: uat-report
 uat-report:
 	@if [ -z "$(CELLS_JSONL)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
 		echo "Usage: make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=...] [CROSS_SCALE_FLOOR=N]" >&2; \
@@ -1269,6 +1378,7 @@ uat-report:
 		$(if $(RUNGS),--rungs "$(RUNGS)",) \
 		$(if $(CROSS_SCALE_FLOOR),--cross-scale-floor "$(CROSS_SCALE_FLOOR)",)
 
+.PHONY: uat-explorer-smoke
 uat-explorer-smoke:
 	@if [ -z "$(BUNDLES_DIR)" ] || [ -z "$(OUTPUT_DIR)" ] || [ -z "$(LOG_DIR)" ]; then \
 		echo "Usage: make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]" >&2; \
@@ -1280,6 +1390,7 @@ uat-explorer-smoke:
 		--log-dir "$(LOG_DIR)" \
 		$(if $(BROWSERS),--browsers "$(BROWSERS)",)
 
+.PHONY: uat-package
 uat-package:
 	@if [ -z "$(CONFIG)" ] || [ -z "$(SUBMISSIONS_DIR)" ] || [ -z "$(RESULTS)" ]; then \
 		echo "Usage: make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS=\"r1.json r2.json ...\"" >&2; \
@@ -1292,6 +1403,7 @@ uat-package:
 
 UAT_BRING_UP_KNOWN_PLATFORMS := cedardb clickhouse-server databend doris influxdb lakesail pg-duckdb pg-mooncake postgresql presto questdb singlestore starrocks timescaledb trino velox
 
+.PHONY: uat-bring-up
 uat-bring-up:
 	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
 	@if [ -z "$(PLATFORM)" ]; then \
@@ -1304,6 +1416,7 @@ uat-bring-up:
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
+.PHONY: uat-prepull
 uat-prepull:
 	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
 	@if [ -z "$(PLATFORM)" ]; then \
@@ -1316,6 +1429,7 @@ uat-prepull:
 		$(if $(PREPULL_TIMEOUT_S),--prepull-timeout-s "$(PREPULL_TIMEOUT_S)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
+.PHONY: uat-docker-cleanup
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
 		$(if $(ENGINE),--engine "$(ENGINE)",) \
@@ -1323,6 +1437,7 @@ uat-docker-cleanup:
 		$(if $(PREFIX),--prefix "$(PREFIX)",) \
 		$(if $(APPLY),--apply,)
 
+.PHONY: uat-sweep
 uat-sweep:
 	@if [ -z "$(CONFIG)" ]; then \
 		echo "Usage: make uat-sweep CONFIG=<path> [DRY_RUN=1]" >&2; \
@@ -1331,9 +1446,11 @@ uat-sweep:
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)" \
 		$(if $(DRY_RUN),--dry-run,)
 
+.PHONY: uat-smoke
 uat-smoke:
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml
 
+.PHONY: uat-stress
 uat-stress:
 	@uv run --no-sync -- python -m tests.uat._cli stress \
 		$(if $(CONFIG),--config "$(CONFIG)",) \
@@ -1341,6 +1458,7 @@ uat-stress:
 		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
 		$(if $(SCALE),--scale "$(SCALE)",)
 
+.PHONY: uat-gate-check
 uat-gate-check:
 	@if [ -z "$(STAGE1)" ] || [ -z "$(STAGE2)" ] || [ -z "$(STAGE3)" ]; then \
 		echo "Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]" >&2; \
@@ -1352,6 +1470,7 @@ uat-gate-check:
 		--stage3 "$(STAGE3)" \
 		$(if $(OUTPUT),--output "$(OUTPUT)",)
 
+.PHONY: uat-execute
 uat-execute:
 	@if [ -z "$(CONFIG)" ]; then \
 		echo "Usage: make uat-execute CONFIG=<path>" >&2; \

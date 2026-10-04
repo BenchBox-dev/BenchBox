@@ -1501,6 +1501,20 @@ class ResultCaptureMixin:
             },
             "sorted_ingestion": self.get_sorted_ingestion_metadata(),
         }
+        from benchbox.core.results.builder import normalize_benchmark_id
+
+        if normalize_benchmark_id(str(run_config.get("benchmark_name") or "")) == "tpch":
+            from benchbox.core.tpch.benchmark import describe_query_parameters
+
+            seed = run_config.get("seed")
+            execution_type = run_config.get("test_execution_type", "standard")
+            if run_config.get("_effective_execution_type") is not None:
+                execution_type = "standard"
+            execution_metadata["run_config"]["query_parameters"] = describe_query_parameters(
+                None if seed is None else int(seed),
+                execution_type=execution_type,
+                requested_phases=set((run_config.get("options") or {}).get("requested_phases") or []),
+            )
         tuning_profile_metadata = self._build_tuning_profile_metadata(run_config)
         if tuning_profile_metadata:
             execution_metadata["tuning_profile"] = tuning_profile_metadata

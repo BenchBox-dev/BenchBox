@@ -1,0 +1,66 @@
+name: TPC-DS Official Qualification Report
+
+on:
+  schedule:
+    - cron: '0 12 * * 0'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tpcds-official-qualification-report
+  cancel-in-progress: false
+
+jobs:
+  qualification-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      POLARS_MAX_THREADS: '2'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - name: Set benchmark output directory
+        run: echo "BENCHBOX_OUTPUT_DIR=${RUNNER_TEMP}/benchmark_runs" >> "$GITHUB_ENV"
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+      - name: Install local engine dependencies
+        run: uv sync --group dev --extra duckdb --extra dataframe-polars --extra dataframe-pandas --extra dataframe-datafusion
+      - name: Audit all qualification substitution tables
+        run: |
+          mkdir -p "${{ runner.temp }}/tpcds-qualification"
+          uv run --with pypdf==6.0.0 -- python scripts/audit_tpcds_qualification.py --pdf _sources/tpc-ds/specification/specification_4.0.0.pdf --parameters benchbox/core/tpcds/dataframe_queries/qualification_values.json --output "${{ runner.temp }}/tpcds-qualification/parameter-audit.json"
+      - name: Compare SF1 qualification values
+        id: report
+        continue-on-error: true
+        run: >-
+          uv run -- python -m benchbox.core.tpcds.qualification.runner
+          --output-dir "${{ runner.temp }}/tpcds-qualification"
+          --query-seconds 120 --overall-seconds 1200
+      - name: Summarize qualification diagnostics
+        if: always()
+        env:
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
+        run: |
+          echo "TPC-DS SF1 qualification diagnostic outcome: ${REPORT_OUTCOME}. Strict printed-answer mismatches and execution failures remain in the artifacts; this advisory report does not certify TPC compliance." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "${{ runner.temp }}/tpcds-qualification/summary.jsonl" ]; then
+            cat "${{ runner.temp }}/tpcds-qualification/summary.jsonl" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: tpcds-official-qualification
+          path: |
+            ${{ runner.temp }}/tpcds-qualification/inputs.json
+            ${{ runner.temp }}/tpcds-qualification/parameter-audit.json
+            ${{ runner.temp }}/tpcds-qualification/*.jsonl
+            ${{ runner.temp }}/tpcds-qualification/*.log
+          if-no-files-found: warn
+          retention-days: 14

@@ -56,7 +56,7 @@ def build_dataframe_contexts(connection: Any, tables: Iterable[Any]) -> dict[str
 
 
 def materialize_rows(result: Any) -> list[tuple[Any, ...]]:
-    native = getattr(result, "native", result)
+    native = result if hasattr(result, "collect") else getattr(result, "native", result)
     if hasattr(native, "collect"):
         native = native.collect()
     if hasattr(native, "rows"):
@@ -64,7 +64,11 @@ def materialize_rows(result: Any) -> list[tuple[Any, ...]]:
     elif hasattr(native, "itertuples"):
         raw_rows = native.itertuples(index=False, name=None)
     else:
-        raise TypeError(f"cannot materialize result of type {type(native).__name__}")
+        import pyarrow as pa
+
+        if not isinstance(native, pa.Table):
+            raise TypeError(f"cannot materialize result of type {type(native).__name__}")
+        raw_rows = zip(*(column.to_pylist() for column in native.columns))
     return [tuple(_normalize_value(value) for value in row) for row in raw_rows]
 
 

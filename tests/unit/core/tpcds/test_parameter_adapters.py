@@ -13,6 +13,8 @@ from benchbox.core.tpcds.dataframe_queries.parameter_adapters import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium, pytest.mark.tpcds]
 
+UNADAPTED = 1
+
 
 class _StubDSQGen:
     def __init__(self, substitutions, binary_path):
@@ -62,12 +64,75 @@ class TestAdapters:
         assert parameters["counties"] == [f"County {letter}" for letter in "ABCDEFGH"]
         assert parameters["year"] == 1999
 
-    def test_q41_the_negative_control_has_no_adapter(self):
-        assert 41 not in ADAPTERS
+    def test_q41_binds_every_drawn_attribute(self):
+        logged = {"MANUFACT.01": "742"}
+        logged.update({f"COLOR.{n:02d}": f"color{n}" for n in range(1, 17)})
+        logged.update({f"UNIT.{n:02d}": f"unit{n}" for n in range(1, 17)})
+        logged.update({f"SIZE.{n:02d}": f"size{n}" for n in range(1, 7)})
+        assert ADAPTERS[41](logged) == {
+            "manufact": 742,
+            "colors": [f"color{n}" for n in range(1, 17)],
+            "units": [f"unit{n}" for n in range(1, 17)],
+            "sizes": [f"size{n}" for n in range(1, 7)],
+        }
+
+    def test_q24_takes_both_statements_colors(self):
+        logged = {"COLOR.01": "orchid", "COLOR.02": "chiffon", "AMOUNTONE.01": "ss_sales_price", "MARKET.01": "7"}
+        assert ADAPTERS[24](logged) == {
+            "market_id": 7,
+            "amount_column": "ss_sales_price",
+            "color": "orchid",
+            "second_color": "chiffon",
+        }
+
+    def test_q74_keeps_the_drawn_column_order(self):
+        logged = {"ORDERC.01": "2", "ORDERC.02": "1", "ORDERC.03": "3", "AGGONE.01": "max", "YEAR.01": "2001"}
+        assert ADAPTERS[74](logged) == {"year": 2001, "aggone": "max", "order_by": [2, 1, 3]}
+
+    def test_q47_and_q57_pass_the_drawn_select_list_and_tie_break_through(self):
+        logged = {
+            "YEAR.01": "2001",
+            "SELECTONE.01": "v1.s_store_name, v1.s_company_name",
+            "SELECTTWO.01": ",v1.d_year",
+            "ORDERBY.01": "psum",
+        }
+        expected = {
+            "year": 2001,
+            "select_one": "v1.s_store_name, v1.s_company_name",
+            "select_two": ",v1.d_year",
+            "order_by": "psum",
+        }
+        assert ADAPTERS[47](logged) == expected
+        assert ADAPTERS[57](logged) == expected
+
+    def test_q48_groups_three_demographics_and_three_state_triples(self):
+        logged = {
+            "YEAR.01": "2000",
+            **{f"MS.0{i}": m for i, m in enumerate("MDU", 1)},
+            **{f"ES.0{i}": e for i, e in enumerate(("A", "B", "C"), 1)},
+            **{f"STATE.0{i}": f"S{i}" for i in range(1, 10)},
+        }
+        parameters = ADAPTERS[48](logged)
+        assert parameters["demo2_marital"] == "D"
+        assert parameters["demo3_education"] == "C"
+        assert parameters["states1"] == ["S1", "S2", "S3"]
+        assert parameters["states3"] == ["S7", "S8", "S9"]
+
+    def test_q55_takes_the_drawn_manager(self):
+        logged = {"YEAR.01": "2001", "MONTH.01": "12", "MANAGER.01": "36"}
+        assert ADAPTERS[55](logged) == {"year": 2001, "month": 12, "manager_id": 36}
+
+    def test_q64_binds_the_price_floor_and_all_six_colors(self):
+        logged = {"YEAR.01": "2000", "PRICE.01": "35", **{f"COLOR.0{i}": f"c{i}" for i in range(1, 7)}}
+        assert ADAPTERS[64](logged) == {
+            "year": 2000,
+            "price_min": 35,
+            "colors": ["c1", "c2", "c3", "c4", "c5", "c6"],
+        }
 
     def test_adapted_queries_are_the_known_ones(self):
         assert adapter_query_ids() == (
-            1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 44, 45, 49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 93, 97, 98, 99,
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
         )  # fmt: skip
 
     def test_q1_lowers_the_drawn_return_column(self):
@@ -77,6 +142,15 @@ class TestAdapters:
     def test_q3_takes_the_drawn_summed_column(self):
         logged = {"MANUFACT.01": "436", "MONTH.01": "12", "AGGC.01": "ss_ext_sales_price"}
         assert ADAPTERS[3](logged) == {"manufact_id": 436, "month": 12, "agg_column": "ss_ext_sales_price"}
+
+    @pytest.mark.parametrize("query_id", [4, 11])
+    def test_q4_and_q11_take_the_year_and_the_drawn_customer_column(self, query_id):
+        logged = {"YEAR.01": "2001", "SELECTONE.01": "t_s_secyear.customer_email_address"}
+        assert ADAPTERS[query_id](logged) == {"year": 2001, "select_one": "t_s_secyear.customer_email_address"}
+
+    def test_q19_takes_the_drawn_manager_month_and_year(self):
+        logged = {"YEAR.01": "2001", "MONTH.01": "12", "MGR_IDX.01": "3", "MANAGER.01": "94"}
+        assert ADAPTERS[19](logged) == {"year": 2001, "month": 12, "manager_id": 94}
 
     def test_q7_takes_the_demographic_values(self):
         logged = {"YEAR.01": "1998", "ES.01": "Primary", "MS.01": "W", "GEN.01": "F"}
@@ -133,8 +207,8 @@ class TestAdapters:
             "states3": ["S7", "S8", "S9"],
         }
 
-    def test_q14_and_q17_take_only_the_year(self):
-        assert ADAPTERS[14]({"YEAR.01": "1999", "DAY.01": "16"}) == {"year": 1999}
+    def test_q14_binds_both_statements_and_q17_binds_the_fixed_quarter(self):
+        assert ADAPTERS[14]({"YEAR.01": "1999", "DAY.01": "16"}) == {"year": 1999, "day": 16}
         assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001, "quarter": 1}
 
 
@@ -152,9 +226,11 @@ class TestBinding:
         assert len(binding.dsqgen_sha256) == 64
         assert dsqgen.calls == [(44, {"seed": 11, "scale_factor": 0.1, "stream_id": 2})]
 
-    def test_a_query_without_an_adapter_does_not_fall_back_to_the_defaults(self, tmp_path):
-        with pytest.raises(KeyError, match="Q41 has no parameter adapter"):
-            bind_parameters(41, scale_factor=1.0, dsqgen=_StubDSQGen({}, tmp_path / "dsqgen"))
+    def test_a_query_without_an_adapter_does_not_fall_back_to_the_defaults(self, tmp_path, monkeypatch):
+        monkeypatch.delitem(ADAPTERS, UNADAPTED)
+        assert UNADAPTED not in ADAPTERS
+        with pytest.raises(KeyError, match=f"Q{UNADAPTED} has no parameter adapter"):
+            bind_parameters(UNADAPTED, scale_factor=1.0, dsqgen=_StubDSQGen({}, tmp_path / "dsqgen"))
 
     def test_a_value_dsqgen_did_not_log_is_reported(self, tmp_path):
         binary = tmp_path / "dsqgen"
@@ -192,6 +268,49 @@ def test_adapted_values_are_the_values_in_the_sql_for_the_same_seed_and_scale(ds
     assert f"d_year={q49['year']}" in squashed(49)
     assert f"d_moy={q49['month']}" in squashed(49)
     assert "r_reason_desc='" + "".join(q93["reason"].split()) + "'" in squashed(93)
+
+
+@pytest.mark.parametrize("seed,stream_id", [(None, 0), (None, 1), (42, 0), (42, 1)])
+@pytest.mark.parametrize("query_id", [72, 75, 77, 78, 80, 81, 94, 95, 96])
+def test_remaining_adapters_match_the_rendered_sql(dsqgen, query_id, seed, stream_id):
+    binding = bind_parameters(query_id, scale_factor=0.01, seed=seed, stream_id=stream_id, dsqgen=dsqgen)
+    sql = dsqgen.generate_with_parameters(query_id, dict(binding.logged), scale_factor=0.01, seed=seed or 1)
+    sql = "".join(sql.split()).lower()
+    parameters = binding.parameters
+
+    if query_id == 72:
+        assert f"d1.d_year={parameters['year']}" in sql
+        assert f"hd_buy_potential='{parameters['buy_potential'].lower()}'" in sql
+        assert f"cd_marital_status='{parameters['marital_status'].lower()}'" in sql
+    elif query_id == 75:
+        assert f"curr_yr.d_year={parameters['year']}" in sql
+        assert f"prev_yr.d_year={parameters['year']}-1" in sql
+        assert f"i_category='{parameters['category'].lower()}'" in sql
+    elif query_id in (77, 80):
+        date = parameters["sales_date"]
+        assert f"d_datebetweencast('{date}'asdate)and(cast('{date}'asdate)+30days)" in sql
+    elif query_id == 78:
+        columns = "".join(parameters["select_columns"].split()).lower()
+        assert f"{columns},round(ss_qty/" in sql
+        assert f"orderby{columns},ss_qtydesc,ss_wcdesc,ss_spdesc" in sql
+        assert f"ss_sold_year={parameters['year']}" in sql
+    elif query_id == 81:
+        assert f"d_year={parameters['year']}" in sql
+        assert f"ca_state='{parameters['state'].lower()}'" in sql
+    elif query_id in (94, 95):
+        date = f"{binding.logged['YEAR.01']}-{binding.logged['MONTH.01']}-01"
+        assert (parameters["year"], parameters["month"]) == (
+            int(binding.logged["YEAR.01"]),
+            int(binding.logged["MONTH.01"]),
+        )
+        assert f"d_datebetween'{date}'and(cast('{date}'asdate)+60days)" in sql
+        assert len(parameters["states"]) == 1
+        assert f"ca_state='{parameters['states'][0].lower()}'" in sql
+    elif query_id == 96:
+        assert f"time_dim.t_hour={parameters['hour']}" in sql
+        assert "time_dim.t_minute>=30" in sql
+        assert f"household_demographics.hd_dep_count={parameters['dep_count']}" in sql
+        assert "store.s_store_name='ese'" in sql
 
 
 def test_the_batch_adapters_bind_the_values_that_are_in_the_sql(dsqgen):
@@ -267,22 +386,15 @@ class TestGateBuilderWiring:
 
         import benchbox.core.equivalence.builders.base as base
         import benchbox.tpcds as tpcds_module
-        from benchbox.core.equivalence.builders.tpcds import build_tpcds_duckdb
+        from benchbox.core.equivalence.builders.tpcds import TPCDS_GATE_QUERY_IDS, build_tpcds_duckdb
         from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES, get_tpcds_query
         from benchbox.core.tpcds.dataframe_queries.parameters import get_parameters
+        from benchbox.core.tpcds.dataframe_queries.production_binding import clear_binding_cache, query_number
 
-        class FakeBenchmark:
-            def __init__(self, scale_factor, output_dir, **_):
-                self.scale_factor = scale_factor
-
-            def generate_data(self):
-                return []
-
-            def get_queries(self, dialect=None, **_):
-                return {str(query_id): "select 1" for query_id in (39, 41, 44)}
+        monkeypatch.setenv("BENCHBOX_CACHE_DIR", str(tmp_path / "cache"))
+        clear_binding_cache()
 
         def recording(query_id):
-
             def run(ctx):
                 if ctx == "boom":
                     raise RuntimeError("boom")
@@ -292,12 +404,14 @@ class TestGateBuilderWiring:
 
         registry = {
             query_id: dataclasses.replace(
-                get_tpcds_query(f"Q{query_id}"), pandas_impl=recording(query_id), expression_impl=recording(query_id)
+                get_tpcds_query(f"Q{query_id}"),
+                pandas_impl=recording(query_number(query_id)),
+                expression_impl=recording(query_number(query_id)),
             )
-            for query_id in (39, 41, 44)
+            for query_id in TPCDS_GATE_QUERY_IDS
         }
-        monkeypatch.setattr(TPCDS_DATAFRAME_QUERIES, "get_or_raise", lambda name: registry[int(name[1:])])
-        monkeypatch.setattr(tpcds_module, "TPCDS", FakeBenchmark)
+        monkeypatch.setattr(TPCDS_DATAFRAME_QUERIES, "get_or_raise", lambda name: registry[name[1:]])
+        monkeypatch.setattr(tpcds_module.TPCDS, "generate_data", lambda self: [])
         monkeypatch.setattr(base, "_load_duckdb_cell", lambda *args, **kwargs: object())
         data = build_tpcds_duckdb(0.01, tmp_path)
         return SimpleNamespace(data=data, registry=registry, get_parameters=get_parameters)
@@ -312,12 +426,12 @@ class TestGateBuilderWiring:
         for implementation in (query.pandas_impl, query.expression_impl):
             assert _bound_keys(implementation(None), binding) == dict(binding.parameters)
         assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]
-        assert (binding.scale_factor, binding.seed, binding.stream_id) == (0.01, None, 0)
+        assert (binding.scale_factor, binding.seed, binding.stream_id) == (0.01, 1001, 0)
         assert re.fullmatch(r"[0-9a-f]{64}", binding.dsqgen_sha256)
 
     def test_other_lookups_between_lookup_and_execution_do_not_lose_the_binding(self, gate, dsqgen):
         q39 = gate.data.dataframe_query("39")
-        gate.data.dataframe_query("41")
+        gate.data.dataframe_query(str(UNADAPTED))
         q44 = gate.data.dataframe_query("44")
 
         for query, number in ((q44, 44), (q39, 39)):
@@ -334,12 +448,12 @@ class TestGateBuilderWiring:
 
         assert gate.get_parameters(44).params == TPCDS_DEFAULT_PARAMS[44]
 
-    def test_the_shared_registry_object_is_not_modified_and_unadapted_queries_are_returned_as_is(self, gate, dsqgen):
-        original = gate.registry[39].pandas_impl
+    def test_the_shared_registry_object_is_not_modified_and_every_query_is_bound(self, gate, dsqgen):
+        original = gate.registry["39"].pandas_impl
 
         adapted = gate.data.dataframe_query("39")
 
-        assert adapted is not gate.registry[39]
-        assert gate.registry[39].pandas_impl is original
-        assert gate.data.dataframe_query("41") is gate.registry[41]
-        assert 41 not in gate.data.dataframe_query.bindings
+        assert adapted is not gate.registry["39"]
+        assert gate.registry["39"].pandas_impl is original
+        assert gate.data.dataframe_query(str(UNADAPTED)) is not gate.registry[str(UNADAPTED)]
+        assert set(gate.data.dataframe_query.bindings) == set(range(1, 100))

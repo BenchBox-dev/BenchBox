@@ -39,6 +39,17 @@ def int_or_none(value: Any) -> int | None:
     return None
 
 
+def has_failed_query_validation(query_rows: Any) -> bool:
+    if not isinstance(query_rows, list):
+        return False
+    return any(
+        isinstance(query, dict)
+        and isinstance(evidence := query.get("row_count_validation"), dict)
+        and str(evidence.get("status") or "").strip().upper() == "FAILED"
+        for query in query_rows
+    )
+
+
 def _query_row_failed(query: Any) -> bool:
     if not isinstance(query, dict):
         return False

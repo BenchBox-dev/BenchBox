@@ -39,7 +39,25 @@ def power_stream_seed(seed: int | None, stream_id: int) -> int | None:
     return seed + stream_id * 1000
 
 
-def describe_query_parameters(seed: int | None) -> str:
+def describe_query_parameters(
+    seed: int | None, *, execution_type: str = "power", requested_phases: set[str] | None = None
+) -> str:
+    if execution_type == "standard":
+        seed = None
+    elif execution_type == "throughput":
+        from benchbox.core.tpch.throughput_test import TPCHThroughputTestConfig
+
+        base_seed = TPCHThroughputTestConfig().base_seed if seed is None else seed
+        return f"qgen -r ({base_seed} + 1001 * stream_id + query_position)"
+    elif execution_type == "maintenance":
+        return "not applicable (TPC-H refresh functions)"
+    elif execution_type == "combined":
+        phases = requested_phases or {"power", "throughput", "maintenance"}
+        return "; ".join(
+            f"{phase}: {describe_query_parameters(seed, execution_type=phase)}"
+            for phase in ("power", "throughput", "maintenance")
+            if phase in phases
+        )
     if seed is None:
         return "qgen -d (TPC-H default substitution parameters)"
     return f"qgen -r ({seed} + 1000 * stream_id)"

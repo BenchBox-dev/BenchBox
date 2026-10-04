@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -40,28 +41,29 @@ def _load_default_params() -> dict[int, dict[str, Any]]:
 
 TPCDS_DEFAULT_PARAMS: dict[int, dict[str, Any]] = _load_default_params()
 
-_parameter_overrides: dict[int, dict[str, Any]] | None = None
+_parameter_overrides: ContextVar[dict[int, dict[str, Any]] | None] = ContextVar(
+    "tpcds_parameter_overrides", default=None
+)
 
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
-    global _parameter_overrides
-    _parameter_overrides = overrides
+    _parameter_overrides.set(overrides)
 
 
 @contextmanager
 def parameter_overrides(overrides: dict[int, dict[str, Any]]) -> Iterator[None]:
-    previous = _parameter_overrides
-    set_parameter_overrides({**(previous or {}), **overrides})
+    token = _parameter_overrides.set({**(_parameter_overrides.get() or {}), **overrides})
     try:
         yield
     finally:
-        set_parameter_overrides(previous)
+        _parameter_overrides.reset(token)
 
 
 def get_parameters(query_id: int) -> TPCDSParameters:
     params = dict(TPCDS_DEFAULT_PARAMS.get(query_id, {}))
-    if _parameter_overrides is not None and query_id in _parameter_overrides:
-        params.update(_parameter_overrides[query_id])
+    overrides = _parameter_overrides.get()
+    if overrides is not None and query_id in overrides:
+        params.update(overrides[query_id])
     return TPCDSParameters(query_id=query_id, params=params)
 
 
