@@ -401,6 +401,11 @@ def test_ui_first_pins_the_snapshot_that_is_actually_in_the_composed_tree(tmp_pa
         tmp_path / "restored" / "results" / "data" / "results.duckdb"
     )
     assert pins["ui"]["source_sha"] == SHA_A
+    results = next(route for route in routes if route["path"] == "/results/")
+    composed = compute_tree_digest(tmp_path / "site-build" / "results")[0]
+    assert results["lane_sha256"] == {"/results/:results": composed}
+    assert composed != compute_tree_digest(tmp_path / "restored" / "results")[0]
+    assert results["corpus_sha"] == pins["snapshot"]["corpus_sha"] == "9" * 40
 
 
 def test_ui_first_refuses_a_composed_tree_without_a_snapshot(

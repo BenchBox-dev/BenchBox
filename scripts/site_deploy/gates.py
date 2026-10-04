@@ -38,6 +38,7 @@ class GateInputs:
     release_tag: str | None = None
     routes_manifest: Path | None = None
     renderer: str = SPHINX
+    file_owners: dict[str, str] | None = None
 
 
 Runner = Callable[[list[str], Path], tuple[int, str]]
@@ -250,7 +251,10 @@ def link_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     allowed = {tuple(entry) for entry in known}
 
     def trunk_involved(entry: tuple[str, ...]) -> bool:
-        return any(routes_module.is_trunk_owned(manifest, endpoint, inputs.renderer) for endpoint in entry[:2])
+        return any(
+            routes_module.is_trunk_owned(manifest, endpoint, inputs.renderer, inputs.file_owners)
+            for endpoint in entry[:2]
+        )
 
     fresh_trunk = [entry for entry in listing if entry not in allowed and trunk_involved(entry)]
     if fresh_trunk:

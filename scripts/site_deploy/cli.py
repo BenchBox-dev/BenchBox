@@ -12,6 +12,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from scripts.publication.assembler import compute_tree_digest
 from scripts.site_deploy import (
     artifacts,
     candidate as candidate_module,
@@ -378,6 +379,7 @@ def command_gates(args: argparse.Namespace) -> int:
         ui_version=args.ui_version,
         release_tag=resolved["release_tag"],
         renderer=renderer,
+        file_owners=assembly.get("file_owners"),
     )
     gates = gates_module.run_gates(inputs)
     if live_version is not None:
@@ -519,16 +521,24 @@ def command_rollback_prepare(args: argparse.Namespace) -> int:
         if current.receipt_sha256 != (resolved.get("deployed") or {}).get("receipt_sha256"):
             raise rollback_module.RollbackError("the current receipt is not the deployed generation's receipt")
         digest = artifacts.compose_ui_first(args.current_tree, args.restored_tree, args.site_dir)
-        restored_results = [
-            {
-                **route,
-                "pins": artifacts.explorer_pins(
-                    args.site_dir / artifacts.RESULTS_DIR, args.out_dir / "pins-work", route.get("source_sha")
-                ),
-            }
-            for route in restore.receipt["routes"]
-            if route["path"] == "/results/"
-        ]
+        composed_results = args.site_dir / artifacts.RESULTS_DIR
+        composed_digest = compute_tree_digest(composed_results)[0]
+        current_corpus = resolved["deployed"]["corpus_sha"]
+        restored_results = []
+        for route in restore.receipt["routes"]:
+            if route["path"] != "/results/":
+                continue
+            pins = artifacts.explorer_pins(composed_results, args.out_dir / "pins-work", route.get("source_sha"))
+            pins["snapshot"]["corpus_sha"] = current_corpus
+            lanes = route.get("lane_sha256") or {f"{route['path']}:results": ""}
+            restored_results.append(
+                {
+                    **route,
+                    "lane_sha256": dict.fromkeys(lanes, composed_digest),
+                    "corpus_sha": current_corpus,
+                    "pins": pins,
+                }
+            )
         routes = [route for route in current.receipt["routes"] if route["path"] != "/results/"] + restored_results
         files = sum(1 for path in args.site_dir.rglob("*") if path.is_file())
     else:

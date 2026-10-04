@@ -163,7 +163,13 @@ def _mounts(route: Route, renderer: str = SPHINX) -> list[Mount]:
 
 
 def _rebase_value(value: str, prefix: str) -> str:
-    return DOCS_URL.sub(lambda match: f"{match.group(1)}{prefix}", value)
+    def rebase(match: re.Match[str]) -> str:
+        url = match.string[match.start() + len(match.group(1)) :]
+        if url.startswith(prefix) or url == prefix.rstrip("/"):
+            return match.group(0)
+        return f"{match.group(1)}{prefix}"
+
+    return DOCS_URL.sub(rebase, value)
 
 
 def rebase_docs_links(html: str, prefix: str) -> str:
@@ -183,10 +189,25 @@ def _rebase_docs_tree(tree: Path, prefix: str) -> int:
     return changed
 
 
-def owner_ref(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> str | None:
+def _lane_ref(manifest: RouteManifest, lane: str) -> str | None:
+    if lane.startswith("root:"):
+        return manifest.root_files_ref
+    route_path = lane.rpartition(":")[0]
+    return next((route.ref for route in manifest.routes if route.path == route_path), None)
+
+
+def owner_ref(
+    manifest: RouteManifest,
+    path: str,
+    renderer: str = SPHINX,
+    file_owners: Mapping[str, str] | None = None,
+) -> str | None:
     clean = path.split("#", 1)[0].split("?", 1)[0]
     if any(clean == f"/{name}" for name in manifest.root_files):
         return manifest.root_files_ref
+    lane = (file_owners or {}).get(clean.lstrip("/"))
+    if lane is not None and (ref := _lane_ref(manifest, lane)) is not None:
+        return ref
     best: tuple[int, str] | None = None
     for route in manifest.routes:
         for mount in _mounts(route, renderer):
@@ -196,8 +217,13 @@ def owner_ref(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> str
     return best[1] if best else None
 
 
-def is_trunk_owned(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> bool:
-    ref = owner_ref(manifest, path, renderer)
+def is_trunk_owned(
+    manifest: RouteManifest,
+    path: str,
+    renderer: str = SPHINX,
+    file_owners: Mapping[str, str] | None = None,
+) -> bool:
+    ref = owner_ref(manifest, path, renderer, file_owners)
     return ref is not None and manifest.refs[ref] == "trunk"
 
 

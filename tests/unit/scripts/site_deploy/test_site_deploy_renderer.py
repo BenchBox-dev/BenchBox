@@ -684,3 +684,25 @@ def test_the_mixed_version_gate_also_refuses_a_mixed_renderer_tree(tmp_path: Pat
     assert result["status"] == gates.FAIL
     assert "sphinx: 1" in result["detail"]
     assert "mixed_version" in gates.ROLLBACK_GATES
+
+
+def test_a_url_already_under_the_target_prefix_is_not_rebased_twice() -> None:
+    html = '<a href="/docs/dev/x.html">a</a><a href="/docs/dev">b</a><a href="https://benchbox.dev/docs/dev/y">c</a>'
+    assert routes.rebase_docs_links(html, "/docs/dev/") == html
+    assert routes.rebase_docs_links('<a href="/docs/development/z.html">', "/docs/dev/") == (
+        '<a href="/docs/dev/development/z.html">'
+    )
+
+
+def test_link_ownership_follows_the_lane_that_supplied_the_file(tmp_path: Path) -> None:
+    release = _astro_checkout(tmp_path / "release", "release")
+    trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    summary = _assemble_astro(tmp_path, release, trunk)
+    manifest = routes.load_manifest(MANIFEST)
+    owners = summary["file_owners"]
+    assert routes.owner_ref(manifest, "/_astro/site.trunk.css", renderer.ASTRO, owners) == "trunk"
+    assert routes.owner_ref(manifest, "/_astro/site.release.css", renderer.ASTRO, owners) == "release"
+    assert routes.owner_ref(manifest, "/_astro/shared.js#x", renderer.ASTRO, owners) == "release"
+    assert routes.is_trunk_owned(manifest, "/_astro/site.trunk.css", renderer.ASTRO, owners)
+    assert routes.owner_ref(manifest, "/404.html", renderer.ASTRO, owners) == "trunk"
+    assert routes.owner_ref(manifest, "/docs/dev/", renderer.ASTRO, owners) == "trunk"
