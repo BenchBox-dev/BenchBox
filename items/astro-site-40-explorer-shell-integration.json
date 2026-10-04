@@ -6,6 +6,7 @@
     "Loading/error states pass axe and announce via live region",
     "Explorer artifact digest recorded separately from the site artifact"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (9bb371a3, 70626f12, 09659d17), 2026-10-04. Shared shell model (shellModel.ts) + landing/shared/site-shell.css + SiteShell.tsx mirrored to Astro components, browser parity in website/e2e/explorer.mjs. Review round 1 FAIL (sticky header, menu focus) fixed; round 2 PASS; theme flicker fixed. Explorer header non-sticky as before; /results/ published byte-identical to the Explorer build (build hook asserts). Visual change on /results* awaits owner approval.",
   "description": "results-explorer/src/App.tsx owns the routing (preact-router, absolute /results/ paths) and the full layout.\n\nWork:\n- Extract the header and frame into the shared shell component from astro-site-22, consumed by both the site and the Explorer.\n- Scope or remove Explorer global CSS so it cannot leak into or be overridden by site CSS.\n- Keep query-string state, nested-route deep links, the hard-coded /results/ links (resultsNav.ts, MetaLeaderboard.tsx, headerContract.ts), the DuckDB fetch path /results/data/results.duckdb, and worker/WASM asset paths.\n- Give loading and error states accessible names and live regions.\n- The Explorer stays a separate build artifact pinned by its own SHA and digest (D12). The site build consumes its dist; it does not rebuild Explorer source.\n\nNo changes to queries, metrics, admission or withdrawal logic.",
   "links": [
     "results-explorer/src/App.tsx",
@@ -21,6 +22,14 @@
       "op": "create",
       "op_id": "45b394a5089f4b128ad8126fce234ba3",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T08:36:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1765ef52dfde4307b21da3cbf3e436c1",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
