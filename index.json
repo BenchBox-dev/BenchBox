@@ -20560,10 +20560,15 @@
       "title": "Stop the TPC-H dbgen auto-compile fallback from rewriting tracked source files"
     },
     "tpch-df-seed-parity": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:37:18Z",
+        "generation": "5822fccd6c57442ca1890fb0edb57dea",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-H DataFrame runs must bind the SQL run's seed-derived parameters, and the reference-seed assumption must be corrected (needs owner sign-off)"
     },
     "tpch-skew-dataframe-sql-id-mapping": {
