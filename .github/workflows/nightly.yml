@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   test:
+    name: >-
+      test (${{ matrix.os }}, ${{ matrix.python-version }})${{
+      matrix.os == 'windows-latest' && ' (quarantine #2568)' || '' }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
@@ -352,6 +355,9 @@ jobs:
           retention-days: 14
 
   integration-smoke:
+    name: >-
+      integration-smoke (${{ matrix.os }}, ${{ matrix.python-version }})${{
+      matrix.os == 'windows-latest' && ' (quarantine #2569)' || '' }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     env:
@@ -697,6 +703,7 @@ jobs:
         working-directory: results-explorer
 
   scheduled-workflow-liveness:
+    name: "scheduled-workflow-liveness (quarantine #2570)"
     # Guard for the release-canary-scheduled-activation TODO's failure class:
     # a workflow that declares `on.schedule` but is not on the DEFAULT branch
     # never registers and never runs — nothing red appears anywhere (this is
@@ -987,7 +994,7 @@ jobs:
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3)
+      - name: "Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
         # w4: the same stream-count contract on a client/server engine. Unlike
         # DuckDB's SHARED_CURSOR fast path, PostgreSQL opts into
         # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
@@ -1070,7 +1077,7 @@ jobs:
               print('::notice::No THROUGHPUT_FLOOR_MEDIAN configured; floor check in observe-only mode')
           "
 
-      - name: Assert the Postgres cell stream count and per-stream success
+      - name: "Assert the Postgres cell stream count and per-stream success (quarantine #2571)"
         # w4 defense-in-depth, mirroring the DuckDB assert above: runs under
         # `if: !cancelled()` so a failed sweep still gates instead of skipping.
         # Globs the postgresql result (not duckdb) within the same run window.
