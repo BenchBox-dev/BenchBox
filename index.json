@@ -20774,7 +20774,7 @@
         "tpch-throughput-seed-validation-fix"
       ],
       "priority": "medium",
-      "status": "blocked",
+      "status": "open",
       "title": "Parameter-aware expected row counts for TPC-H Q11/16/18/20 (validate instead of exclude)"
     },
     "tpch-throughput-rowcount-validation-range-mode": {

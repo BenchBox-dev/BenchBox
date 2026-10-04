@@ -1,5 +1,5 @@
 {
-  "context": "Reuse the established correctness-gate policy the parent's exclusion mirrors —\nderive expectations from the seed's parameters instead of excluding. Small,\nadditive change to the validation path, guarded by a wrong-seed regression\ntest.\n",
+  "context": "Reuse the established correctness-gate policy the parent's exclusion mirrors —\nderive expectations from the seed's parameters instead of excluding. Small,\nadditive change to the validation path, guarded by a wrong-seed regression\ntest.\n\n2026-10-04 adversarial review: status moved from blocked to open because its only dependency (tpch-throughput-seed-validation-fix) is done. Widen scope: only Q11, Q16, Q18 and Q20 are relaxed (expected_results/tpch_results.py:15-29), and every throughput stream validates against stream-0 answers because set_query_context(query_id) passes no stream_id (tpch/throughput_test.py:473). Q13's group count depends on WORD1/WORD2, and Q2 and Q15 may also be parameter-sensitive, so valid runs could fail at SF1 (plausible, unverified). Derive the parameter-sensitive set empirically across many qgen seeds before choosing which queries need parameter-aware expectations.",
   "description": "Promoted from the deferred item in\n[[tpch-throughput-seed-validation-fix]] (surfaced by the UAT-effort\nassessment, 2026-07-16). The seed-validation fix currently EXCLUDES Q11,\nQ16, Q18, and Q20 from row-count validation because their result cardinality\ndepends on the substitution parameters (the seed), and a single fixed\nexpectation would be wrong for a different seed. Excluding them unblocks the\ngate but leaves four queries unvalidated for row count.\n\nThis item closes that hole by deriving the expected row count PER SEED rather\nthan excluding the query — computing the parameter-aware answer-set\ncardinality for the seed in use, so Q11/16/18/20 are validated like the rest.\n\nGated on the parent because the exclusion lives in the parent's validation\npath; this strengthening only makes sense once that path exists and is green.\n",
   "legacy": {
     "anti_patterns": [
@@ -132,5 +132,15 @@
         "wid": "w2"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:07:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "93bd4c98ddc747499555577681cdc16d",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
 }
