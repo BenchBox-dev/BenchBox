@@ -1,9 +1,1 @@
-[
-  {
-    "id": "GHSA-ch52-4w7c-c8xp",
-    "package": "http-cache-semantics",
-    "reason": "http-cache-semantics <= 4.2.0 has no patched release. It is used only by astro's build-time remote-image cache (astro/dist/assets/build/remote.js); the site uses no remote images, and the package never reaches the served output. astro is a production dependency, so --omit=dev does not clear the finding.",
-    "review_by": "2026-12-01",
-    "link": "https://github.com/advisories/GHSA-ch52-4w7c-c8xp"
-  }
-]
+[]
