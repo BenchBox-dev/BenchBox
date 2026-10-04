@@ -155,6 +155,7 @@ jobs:
         id: path-flags
         run: |
           set -euo pipefail
+          test -f .ci-paths/changed.txt
           audit=false
           validator=false
           if grep -qE '^(_project/audits/|results-explorer/e2e/captures/)' .ci-paths/changed.txt; then audit=true; fi
