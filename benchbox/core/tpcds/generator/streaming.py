@@ -5,6 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from benchbox.core.tpcds.c_tools import tpcds_option
 from benchbox.utils.printing import emit
 
 
@@ -24,13 +25,13 @@ class StreamingGenerationMixin:
     def _generate_single_table_streaming(self, output_dir: Path, table_name: str) -> None:
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose" if self.verbose else "-quiet",
-            "-force",
-            "-terminate",
+            tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+            tpcds_option("force"),
+            tpcds_option("terminate"),
             "n",
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),
-            "-table",
+            tpcds_option("table"),
             table_name,
         ]
         expected_filename = f"{table_name}.dat"
@@ -99,13 +100,13 @@ class StreamingGenerationMixin:
 
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose" if self.verbose else "-quiet",
-                "-force",
-                "-terminate",
+                tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+                tpcds_option("force"),
+                tpcds_option("terminate"),
                 "n",
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),
-                "-table",
+                tpcds_option("table"),
                 parent_table,
             ]
 
@@ -170,19 +171,19 @@ class StreamingGenerationMixin:
     def _generate_single_table_chunk_streaming(self, output_dir: Path, table_name: str, chunk_id: int) -> None:
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose" if self.verbose else "-quiet",
-            "-force",
-            "-terminate",
+            tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+            tpcds_option("force"),
+            tpcds_option("terminate"),
             "n",
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),
-            "-table",
+            tpcds_option("table"),
             table_name,
-            "-child",
+            tpcds_option("child"),
             str(chunk_id),
-            "-parallel",
+            tpcds_option("parallel"),
             str(self.parallel),
-            "-FILTER",
+            tpcds_option("filter"),
             "Y",
         ]
 
@@ -315,17 +316,17 @@ class StreamingGenerationMixin:
 
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose" if self.verbose else "-quiet",
-                "-force",
-                "-terminate",
+                tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+                tpcds_option("force"),
+                tpcds_option("terminate"),
                 "n",
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),
-                "-table",
+                tpcds_option("table"),
                 parent_table,
-                "-child",
+                tpcds_option("child"),
                 str(chunk_id),
-                "-parallel",
+                tpcds_option("parallel"),
                 str(self.parallel),
             ]
 

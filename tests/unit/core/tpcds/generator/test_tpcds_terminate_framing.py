@@ -18,10 +18,9 @@ pytestmark = [
 
 _TPCDS_GENERATOR_DIR = Path(benchbox.__file__).parent / "core" / "tpcds" / "generator"
 
-
-_TERMINATE_PAIR = re.compile(r'"-terminate"\s*,\s*"([^"]+)"')
-
-_TERMINATE_TOKEN = re.compile(r'"-terminate"')
+_TERMINATE_PAIR = re.compile(r'tpcds_option\("terminate"\)\s*,\s*"([^"]+)"')
+_TERMINATE_TOKEN = re.compile(r'tpcds_option\("terminate"\)')
+_RAW_OPTION = re.compile(r'"[-/][A-Za-z_]+"')
 
 
 def _generator_sources() -> list[Path]:
@@ -53,3 +52,9 @@ def test_every_terminate_flag_is_n(source: Path) -> None:
             "'n' to disable trailing field separators (BenchBox framing "
             "convention)."
         )
+
+
+@pytest.mark.parametrize("source", _generator_sources(), ids=lambda p: p.name)
+def test_dsdgen_options_use_the_platform_prefix(source: Path) -> None:
+    raw = _RAW_OPTION.findall(source.read_text(encoding="utf-8"))
+    assert not raw, f"{source.name}: pass dsdgen options through tpcds_option(), not raw literals {raw}"

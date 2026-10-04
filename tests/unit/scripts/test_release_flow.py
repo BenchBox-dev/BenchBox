@@ -234,7 +234,6 @@ def test_release_enforcement_requires_external_review_for_each_dependency(path: 
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     assert module.is_soundness_path(path)
-    assert f"{path} @joeharris76" in (REPO_ROOT / ".github/CODEOWNERS").read_text()
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")

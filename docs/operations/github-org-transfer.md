@@ -120,7 +120,7 @@ Order:
 ## G6 — Pin-update (after G5)
 
 Retarget public and load-bearing owner strings. Do not touch
-`SOUNDNESS_PREFIXES` / CODEOWNERS soundness paths, JoinOrder
+`SOUNDNESS_PREFIXES` soundness paths, JoinOrder
 `data_manifest.toml`, or `_DEFAULT_ANSWERS_BASE_URL`. Edit
 `repo-admin-settings.md` parse blocks **in place** (owner strings and
 new ruleset IDs only). See the tracker item

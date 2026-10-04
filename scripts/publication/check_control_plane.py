@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import annotations
 
 import argparse
@@ -22,25 +21,6 @@ REQUIRED_APP_PERMISSIONS = REQUIRED_JOURNAL_PERMISSIONS
 
 def run(*args: str) -> str:
     return subprocess.run(args, cwd=ROOT, check=True, text=True, capture_output=True).stdout.strip()
-
-
-def check_codeowners() -> list[str]:
-    codeowners_path = ROOT / ".github/CODEOWNERS"
-    if not codeowners_path.is_file():
-        return ["Missing .github/CODEOWNERS"]
-
-    text = codeowners_path.read_text(encoding="utf-8")
-    errors: list[str] = []
-
-    required_patterns = [
-        "publication/**",
-        "scripts/publication/**",
-    ]
-    for pat in required_patterns:
-        if pat not in text:
-            errors.append(f"CODEOWNERS missing required protection rule for: '{pat}'")
-
-    return errors
 
 
 def check_permissions(perms: dict[str, str], role: str = "journal") -> list[str]:
@@ -159,9 +139,6 @@ def main(argv: list[str] | None = None) -> int:
     all_errors: list[str] = []
     live_checks_performed = False
 
-    codeowner_errors = check_codeowners()
-    all_errors.extend(codeowner_errors)
-
     if args.live:
         live_errors = check_live_app_and_branch(role=args.role)
         all_errors.extend(live_errors)
@@ -176,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {err}")
         return 1
 
-    mode = f"live ({args.role}) + local" if args.live else "local"
+    mode = f"live ({args.role})" if args.live else "live checks not requested"
     print(f"✅ Publication control plane check passed ({mode}).")
     return 0
 

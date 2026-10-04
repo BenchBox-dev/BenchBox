@@ -55,10 +55,10 @@ def test_real_base_policy_does_not_expand_an_ordinary_code_change(
 def test_policy_union_keeps_base_removals_and_pr_additions(
     policy_sources: dict[str, str], base_rule: bool, pr_rule: bool, expected: bool
 ) -> None:
-    manifest = policy_sources[POLICY_FILES[2]].replace("file\tAGENTS.md\n", "")
-    base = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tAGENTS.md\n" if base_rule else "")}
-    pr = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tAGENTS.md\n" if pr_rule else "")}
-    result = _classify(["AGENTS.md"], base, pr)
+    manifest = policy_sources[POLICY_FILES[2]].replace("file\tscripts/pr_arm.py\n", "")
+    base = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tscripts/pr_arm.py\n" if base_rule else "")}
+    pr = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tscripts/pr_arm.py\n" if pr_rule else "")}
+    result = _classify(["scripts/pr_arm.py"], base, pr)
     assert result["heavy_needed"] is expected, result["reason"]
 
 
@@ -69,7 +69,7 @@ def test_ambient_imports_and_manifest_cannot_replace_either_policy(
     monkeypatch.setenv("PYTHONPATH", str(tmp_path))
     monkeypatch.setenv("SOUNDNESS_PATH_MANIFEST", str(tmp_path / "absent"))
     monkeypatch.setitem(sys.modules, "soundness_paths", object())
-    assert _classify(["AGENTS.md"], policy_sources, policy_sources)["heavy_needed"] is True
+    assert _classify(["scripts/pr_arm.py"], policy_sources, policy_sources)["heavy_needed"] is True
     result = _classify(["ordinary.py"], policy_sources, policy_sources)
     assert result["heavy_needed"] is False, result["reason"]
 
@@ -92,9 +92,9 @@ def test_installed_startup_hook_cannot_replace_the_snapshot_helper(
     assert hostile != original
     (site_packages / "soundness_paths.py").write_text(hostile, encoding="utf-8")
     (site_packages / "policy-startup.pth").write_text("import soundness_paths\n", encoding="utf-8")
-    pr = {**policy_sources, POLICY_FILES[2]: policy_sources[POLICY_FILES[2]].replace("file\tAGENTS.md\n", "")}
+    pr = {**policy_sources, POLICY_FILES[2]: policy_sources[POLICY_FILES[2]].replace("file\tscripts/pr_arm.py\n", "")}
     monkeypatch.setattr(heavy.sys, "executable", str(interpreter))
-    result = _classify(["AGENTS.md"], policy_sources, pr)
+    result = _classify(["scripts/pr_arm.py"], policy_sources, pr)
     assert result["heavy_needed"] is True, result["reason"]
     assert "soundness path touched" in result["reason"]
 

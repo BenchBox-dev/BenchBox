@@ -20,6 +20,14 @@ from benchbox.utils.tpc_compilation import (
 )
 
 
+def _option_prefix() -> str:
+    return "/" if sys.platform == "win32" else "-"
+
+
+def tpcds_option(name: str) -> str:
+    return f"{_option_prefix()}{name.upper()}"
+
+
 def _resolve_tpcds_tool_and_template_paths() -> tuple[Path, Path]:
     from benchbox.utils.tpc_compilation import get_tpc_templates_dir
 
@@ -240,7 +248,7 @@ class DSQGenBinary:
         is_multi_part: bool,
         streams: Optional[int] = None,
     ) -> tuple[list[str], str]:
-        _opt = "/" if sys.platform == "win32" else "-"
+        _opt = _option_prefix()
         template_arg = self._resolve_template_arg(query_id, variant, is_multi_part)
 
         cmd = [str(self.dsqgen_path)]

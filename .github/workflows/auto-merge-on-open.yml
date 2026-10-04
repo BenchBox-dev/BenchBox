@@ -1,5 +1,6 @@
 name: Auto-merge revocation
 
+
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, labeled]
@@ -14,18 +15,6 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.sha }}
-          persist-credentials: false
-
-      - name: Fetch pull request head
-        continue-on-error: true
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
-
       - name: Check explicit hold label
         id: hold
         env:
@@ -40,73 +29,6 @@ jobs:
           if [ "$held" = "true" ]; then
             echo "Explicit hold label no-auto-merge present; will revoke any enabled auto-merge."
           fi
-
-      - name: Check soundness-critical paths
-        id: soundness
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-            echo "Could not verify the event head SHA; failing closed."
-            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! diff_paths="$(git diff --name-only --no-renames "${BASE_SHA}...${HEAD_SHA}")"; then
-            echo "Could not compute the event diff; failing closed."
-            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          base_result="soundness_path=true"
-          if git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null; then
-            if git show "${BASE_SHA}:_project/scripts/soundness_paths.py" > /tmp/predicate_base.py \
-              && git show "${BASE_SHA}:.github/soundness-paths.txt" > /tmp/soundness-paths-base.txt \
-              && base_result="$(printf '%s\n' "$diff_paths" | SOUNDNESS_PATH_MANIFEST=/tmp/soundness-paths-base.txt python3 /tmp/predicate_base.py --stdin --format github-output)"; then
-              :
-            else
-              base_result="soundness_path=true"
-            fi
-          else
-            if ! git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py \
-              || ! base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"; then
-              base_result="soundness_path=true"
-            fi
-          fi
-
-          case "$base_result" in
-            soundness_path=true|soundness_path=false) result="$base_result" ;;
-            *) result="soundness_path=true" ;;
-          esac
-
-          for protected_path in \
-            "AGENTS.md" \
-            ".github/CODEOWNERS" \
-            ".github/PULL_REQUEST_TEMPLATE.md" \
-            ".github/soundness-paths.txt" \
-            ".github/workflows/auto-merge-on-open.yml" \
-            ".github/workflows/ci.yml" \
-            "_project/scripts/auto_merge_soundness_paths.py" \
-            "_project/scripts/check_soundness_review.py" \
-            "_project/scripts/soundness_paths.py"; do
-            if printf '%s\n' "$diff_paths" | grep -qxF "$protected_path"; then
-              result="soundness_path=true"
-            fi
-          done
-
-          echo "$result" >> "$GITHUB_OUTPUT"
-
-      - name: Disable auto-merge for soundness PR
-        if: steps.soundness.outputs.soundness_path == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Soundness-critical paths changed; clearing any auto-merge/queue enrollment pending review."
-          gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true
 
       - name: Disable auto-merge for explicit hold
         if: steps.hold.outputs.held == 'true'

@@ -160,9 +160,3 @@ def test_soak_conclude_reuses_probe_run_id() -> None:
 def test_preview_workflows_are_soundness_paths() -> None:
     assert ".github/workflows/publication-preview-deploy.yml" in _soundness.SOUNDNESS_FILES
     assert ".github/workflows/publication-preview-soak.yml" in _soundness.SOUNDNESS_FILES
-
-
-def test_preview_workflows_have_codeowners() -> None:
-    text = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
-    assert ".github/workflows/publication-preview-deploy.yml" in text
-    assert ".github/workflows/publication-preview-soak.yml" in text

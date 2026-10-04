@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from benchbox.core.tpcds.c_tools import tpcds_option
 from benchbox.utils.printing import emit
 from benchbox.utils.tpc_compilation import CompilationStatus, ensure_tpc_binaries
 
@@ -121,11 +122,11 @@ class DsdgenRunnerMixin:
     def _run_file_based_dsdgen(self, output_dir: Path) -> None:
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose",
-            "-force",
-            "-terminate",
+            tpcds_option("verbose"),
+            tpcds_option("force"),
+            tpcds_option("terminate"),
             "n",
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),
         ]
 
@@ -239,15 +240,15 @@ class DsdgenRunnerMixin:
         def generate_chunk(chunk_id: int) -> None:
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose",
-                "-force",
-                "-terminate",
+                tpcds_option("verbose"),
+                tpcds_option("force"),
+                tpcds_option("terminate"),
                 "n",
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),
-                "-child",
+                tpcds_option("child"),
                 str(chunk_id),
-                "-parallel",
+                tpcds_option("parallel"),
                 str(self.parallel),
             ]
 

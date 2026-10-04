@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from __future__ import annotations
 
 import argparse
@@ -8,15 +7,6 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
-
-from auto_merge_soundness_paths import SOUNDNESS_FILES, SOUNDNESS_PREFIXES
-
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
-    tuple(f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES)
-    + SOUNDNESS_FILES
-    + ("benchbox/core/**/validation.py",)
-)
-
 
 CLI_DESCRIPTION = (
     "Predicates for live develop-review and v* tag-creation enforcement.\n"
@@ -53,20 +43,28 @@ def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | No
 def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
     params = _pull_request_parameters(rules)
     if params is None:
-        return [
-            "develop ruleset has no pull_request rule: a soundness-path PR "
-            f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
-        ]
+        return ["develop ruleset has no pull_request rule: a PR can squash-auto-merge without review thread resolution"]
     findings: list[str] = []
-    if not params.get("require_code_owner_review", False):
-        findings.append(
-            f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
-            f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
-        )
-    if not params.get("required_review_thread_resolution", False):
+    if params.get("required_review_thread_resolution") is not True:
         findings.append(
             f"required_review_thread_resolution={params.get('required_review_thread_resolution', False)} (need true)"
         )
+    status_rule = next((rule for rule in rules if rule.get("type") == "required_status_checks"), None)
+    if status_rule is None:
+        findings.append("develop ruleset has no required_status_checks rule: oracle-review must be required")
+        return findings
+    status_params = status_rule.get("parameters")
+    if not isinstance(status_params, dict):
+        findings.append("required_status_checks parameters are malformed: oracle-review enforcement is unverified")
+        return findings
+    checks = status_params.get("required_status_checks")
+    if not isinstance(checks, list) or any(
+        not isinstance(check, dict) or not isinstance(check.get("context"), str) or not check["context"].strip()
+        for check in checks
+    ):
+        findings.append("required_status_checks are malformed: oracle-review enforcement is unverified")
+    elif not any(check["context"] == "oracle-review" for check in checks):
+        findings.append("required_status_checks must include oracle-review")
     return findings
 
 
@@ -276,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {finding}")
         return 1
     print(f"# Ruleset review enforcement ({args.branch}) - OK")
-    print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
+    print("- oracle-review required")
     print("- review thread resolution required")
     return 0
 

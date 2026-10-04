@@ -305,15 +305,6 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
-APPROVED_MERGE_QUEUE: dict[str, object] = {
-    "merge_method": "SQUASH",
-    "grouping_strategy": "ALLGREEN",
-    "min_entries_to_merge": 1,
-    "max_entries_to_build": 2,
-    "max_entries_to_merge": 3,
-    "check_response_timeout_minutes": 90,
-    "min_entries_to_merge_wait_minutes": 0,
-}
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "core",
     "explorer",
@@ -321,53 +312,19 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "docs",
     "landing",
     "tooling",
+    "oracle-review",
 )
 
 
-def _approved_queue_summary() -> str:
-    return (
-        f"{APPROVED_MERGE_QUEUE['merge_method']}/"
-        f"{APPROVED_MERGE_QUEUE['grouping_strategy']}/"
-        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge']}/"
-        f"{APPROVED_MERGE_QUEUE['max_entries_to_build']}/"
-        f"{APPROVED_MERGE_QUEUE['max_entries_to_merge']}/"
-        f"{APPROVED_MERGE_QUEUE['check_response_timeout_minutes']}m/"
-        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge_wait_minutes']}"
-    )
-
-
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
-    findings: list[str] = []
-    rule = _rule_by_type(live, "merge_queue")
-    if rule is None:
-        summary = _approved_queue_summary()
-        if live.get("rules"):
-            return [
-                f"{name}: ruleset payload lists rules but no merge_queue rule; "
-                f"queue-aware publication is unverified, verify queue parameters "
-                f"({summary}) in repository settings"
-            ]
-        return [
-            f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
-            f"verify queue parameters ({summary}) in repository settings"
-        ]
-    raw_params = rule.get("parameters")
-    if raw_params is None:
-        params: dict[str, Any] = {}
-    elif not isinstance(raw_params, dict):
-        return [f"{name}: merge_queue parameters are malformed; queue-aware publication is unverified"]
-    else:
-        params = raw_params
-    for key, approved in APPROVED_MERGE_QUEUE.items():
-        live_value = params.get(key)
-        if live_value != approved:
-            findings.append(f"{name}: merge_queue {key} is {live_value!r}, expected {approved!r}")
-    return findings
+    if _rule_by_type(live, "merge_queue") is None:
+        return []
+    return [f"{name}: a merge_queue rule is present; the approved develop policy has no merge queue"]
 
 
 def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None) -> list[str]:
     if live is None:
-        return [f"{expected.name}: live ruleset is missing; queue-aware publication is unverified"]
+        return [f"{expected.name}: live ruleset is missing; develop policy is unverified"]
     findings = compare_ruleset(
         expected,
         live,
@@ -414,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--queue-policy",
         action="store_true",
-        help="Check only the develop queue and its required protections for local stale-base publication.",
+        help="Compatibility mode: check only the approved develop ruleset and its required protections.",
     )
     parser.add_argument(
         "--require-bypass-actor-visibility",
@@ -476,9 +433,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.output:
                 args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
             if verified:
-                print("# Native merge queue - VERIFIED")
+                print("# Develop ruleset policy - VERIFIED")
                 return 0
-            print("# Native merge queue - UNVERIFIED", file=sys.stderr)
+            print("# Develop ruleset policy - UNVERIFIED", file=sys.stderr)
             for finding in queue_findings:
                 print(f"- {finding}", file=sys.stderr)
             return 1

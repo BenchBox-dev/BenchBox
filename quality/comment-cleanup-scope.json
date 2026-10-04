@@ -4583,12 +4583,12 @@
     },
     {
       "path": "_sources/tpc-h/PATCHES.md",
-      "blob_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "blob_sha256": "70d3b232f21228e03a1b6906b4bad01220b9a87fbd8fc27c5b59aa08efcb67d8",
       "byte_start": 0,
-      "byte_end": 5991,
-      "retained_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "byte_end": 7716,
+      "retained_sha256": "70d3b232f21228e03a1b6906b4bad01220b9a87fbd8fc27c5b59aa08efcb67d8",
       "governing_requirement": "The patch record accompanies the TPC-H tool source, but no independent governing-notice obligation is established.",
-      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-h/PATCHES.md",
+      "source_identity": "e23ba66c9484e7ada6d8b71536246e0a58cac26b:_sources/tpc-h/PATCHES.md",
       "owner": "comment-cleanup-scope-policy",
       "blocking_disposition": "Classify separately from required notices; preserve exact bytes until provenance is resolved."
     },
