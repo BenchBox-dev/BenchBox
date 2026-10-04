@@ -138,7 +138,7 @@ class TuningConfigMixin:
                 )
 
                 effective_config = self.get_effective_tuning_configuration()
-                if effective_config:
+                if effective_config and self.tuning_enabled:
                     result = metadata_manager.validate_unified_tunings(effective_config)
                 else:
                     existing_tunings = metadata_manager.load_unified_tunings()
