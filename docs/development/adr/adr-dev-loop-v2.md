@@ -77,9 +77,9 @@ The results corpus homes remain unchanged:
 ### D4: Soundness hold via connector review and thread resolution
 
 Soundness paths are classified by `.github/soundness-paths.txt`. The required
-`oracle-review` check binds the Codex connector's review to the current head,
-required thread resolution binds disposition of findings, and the scheduled
-digest checks the merged evidence. Code-owner review and PR-body attestation
+`oracle-review` check binds the Codex connector's review, or the stand-in approval, to
+the current head, required thread resolution binds disposition of findings, and the
+scheduled digest checks the merged evidence. Code-owner review and PR-body attestation
 are retired. The soundness-path revocation is removed and the replacement check
 is required in the live ruleset; explicit hold-label revocation remains.
 
@@ -138,8 +138,8 @@ models, and `AGENTS.md` leave the list. The `single-repo-migration.md` decision
 remains protected because release curation parses it as configuration. The manifest-based
 `oracle-review` check replaces the former `tooling` attestation flag. The external
 review requirement is unchanged except for the stand-in review above.
-A new push or refresh changes the head and needs fresh CI and connector review
-before re-arming. No PR-body attestation satisfies or is required by the check.
+A new push or refresh changes the head and needs fresh CI and a fresh connector review
+or stand-in approval before re-arming. No PR-body attestation satisfies or is required by the check.
 
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
