@@ -21140,10 +21140,15 @@
       "title": "DECISION GATE (D-7): remove partitioning from DuckDB tuned templates or implement it"
     },
     "tuning-gate-ledger-outcome-vocabulary-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T16:22:22Z",
+        "generation": "882a2861028340c3bc40417baeab0693",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "DECISION GATE (D-6): ledger outcome and phase vocabulary (dropped for skips, satisfied_by, closed phase set)"
     },
     "tuning-gate-load-only-semantics-20261001": {
