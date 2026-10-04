@@ -222,7 +222,7 @@ def test_cli_passes_explicit_draw_backends_and_repeats(monkeypatch):
     assert gate.backends == ("expression", "pandas", "datafusion")
     assert gate.build.func is tpcds.build_tpcds_duckdb
     assert gate.build.keywords == {"seed": 42, "stream_id": 1}
-    assert options == {"update_baseline": False, "repeats": 3, "shard": None}
+    assert options == {"update_baseline": False, "repeats": 3}
     assert "tpcds" in cross_surface.GATES
 
 
@@ -262,36 +262,4 @@ def test_default_baseline_maintenance_still_reaches_its_existing_refusal_rules(m
     assert cross_surface.main(["--benchmark", "ssb", "--update-baseline"]) == 1
     gate, options = calls[0]
     assert gate is cross_surface.get_gate("ssb")
-    assert options == {"update_baseline": True, "repeats": 1, "shard": None}
-
-
-def test_shards_compare_alternate_statements_of_the_validated_inventory(draw, monkeypatch):
-    seen: list[list[str]] = []
-    data = dataclasses.replace(draw, connection=duckdb.connect())
-    gate = dataclasses.replace(cross_surface.get_gate("tpcds"), build=lambda *a: data, backends=("pandas",))
-    monkeypatch.setattr(cross_surface, "build_production_contexts", lambda *a, **k: {"pandas": None})
-
-    def capture(*_args, query_ids, **_kwargs):
-        seen.append(list(query_ids))
-        return []
-
-    monkeypatch.setattr(cross_surface, "find_cross_surface_divergences", capture)
-    for index in (1, 2):
-        data = dataclasses.replace(draw, connection=duckdb.connect())
-        cross_surface.run_gate(dataclasses.replace(gate, build=lambda *a, data=data: data), shard=(index, 2))
-    assert seen[0] == list(draw.query_ids)[0::2]
-    assert seen[1] == list(draw.query_ids)[1::2]
-    assert sorted(seen[0] + seen[1]) == sorted(draw.query_ids)
-
-
-@pytest.mark.parametrize("value", ["0/2", "3/2", "2", "a/b"])
-def test_cli_rejects_malformed_shard(value):
-    with pytest.raises(SystemExit):
-        cross_surface.main(["--benchmark", "tpcds", "--shard", value])
-
-
-def test_cli_passes_shard(monkeypatch):
-    calls = []
-    monkeypatch.setattr(cross_surface, "run_gate", lambda gate, **kw: calls.append(kw) or 0)
-    assert cross_surface.main(["--benchmark", "tpcds", "--backend", "pandas", "--shard", "2/2"]) == 0
-    assert calls[0]["shard"] == (2, 2)
+    assert options == {"update_baseline": True, "repeats": 1}

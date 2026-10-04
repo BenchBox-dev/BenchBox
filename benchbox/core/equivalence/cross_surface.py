@@ -91,7 +91,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import date
 from importlib import resources
 from pathlib import Path
@@ -2144,9 +2144,7 @@ def _report_flaky(name: str, flaky: list[tuple[str, str, list[str | None]]], rep
         line(f"  {query}_{cell}: diverged in {diverged} of {repeats} runs; e.g. {detail[:200]}")
 
 
-def run_gate(
-    gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: int = 1, shard: tuple[int, int] | None = None
-) -> int:
+def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: int = 1) -> int:
     """Run one benchmark's cross-surface gate and print a categorized report.
 
     When ``update_baseline`` is set, any resolved known-divergence entries are
@@ -2172,15 +2170,6 @@ def run_gate(
                 validate_tpcds_gate_data(data)
                 console.print(
                     canonical_json_text(data.query_parameters), markup=False, highlight=False, soft_wrap=True, end=""
-                )
-            if shard is not None:
-                # Compare every count-th query starting at index - 1, after the full
-                # inventory has been built and validated. Together the shards cover
-                # every query exactly once.
-                index, count = shard
-                data = replace(
-                    data,
-                    query_ids=[qid for position, qid in enumerate(data.query_ids) if position % count == index - 1],
                 )
             contexts = build_production_contexts(
                 data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
@@ -2483,17 +2472,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--backend", action="append", choices=sorted(_PRODUCTION_ADAPTERS), help="Backend to compare.")
     parser.add_argument("--seed", type=int, help="TPC-DS Power Test query seed.")
     parser.add_argument("--power-stream", type=int, help="TPC-DS Power stream ID (default: 0).")
-    parser.add_argument(
-        "--shard",
-        help="Compare only shard K of N (K/N, 1-based): every Nth query from the full, validated inventory.",
-    )
     args = parser.parse_args(argv)
-    shard = None
-    if args.shard is not None:
-        match = re.fullmatch(r"(\d+)/(\d+)", args.shard)
-        if match is None or not 1 <= int(match.group(1)) <= int(match.group(2)):
-            parser.error("--shard must be K/N with 1 <= K <= N")
-        shard = (int(match.group(1)), int(match.group(2)))
     if args.repeats < 1:
         parser.error("--repeats must be at least 1")
     if args.benchmark != "tpcds" and (args.seed is not None or args.power_stream is not None):
@@ -2502,9 +2481,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--seed and --power-stream must be nonnegative")
     if args.backend is not None and len(set(args.backend)) != len(args.backend):
         parser.error("--backend must not repeat a backend")
-    if args.update_baseline and (
-        args.backend is not None or args.seed is not None or args.power_stream is not None or shard is not None
-    ):
+    if args.update_baseline and (args.backend is not None or args.seed is not None or args.power_stream is not None):
         parser.error("--update-baseline requires the default draw and backend selection")
     gate = get_gate(args.benchmark)
     if args.backend is not None:
@@ -2513,7 +2490,7 @@ def main(argv: list[str] | None = None) -> int:
         gate = replace(gate, build=partial(build_tpcds_duckdb, seed=args.seed, stream_id=args.power_stream or 0))
         if args.seed is not None or args.power_stream:
             gate = replace(gate, vacuity_classified=False)
-    return run_gate(gate, update_baseline=args.update_baseline, repeats=args.repeats, shard=shard)
+    return run_gate(gate, update_baseline=args.update_baseline, repeats=args.repeats)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
