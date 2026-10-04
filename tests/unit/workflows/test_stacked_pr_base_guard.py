@@ -85,6 +85,9 @@ def test_stacked_pr_base_guard_reevaluates_when_draft_status_changes() -> None:
     types = (_triggers(_load())["pull_request"] or {}).get("types", [])
     assert "ready_for_review" in types, "guard does not re-evaluate when a draft becomes ready"
     assert "converted_to_draft" in types, "guard does not re-evaluate when a ready PR becomes a draft"
+    assert sorted(types) == sorted(
+        ["opened", "synchronize", "reopened", "edited", "ready_for_review", "converted_to_draft"]
+    ), "ci.yml pull_request types changed; every listed event re-runs the guard and the CI lanes"
 
 
 def test_stacked_pr_base_guard_names_integration_branches_and_can_fail() -> None:
