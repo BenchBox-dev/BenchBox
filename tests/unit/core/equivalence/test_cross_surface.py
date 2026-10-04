@@ -1684,3 +1684,10 @@ def test_report_lists_vacuity_without_failing_for_an_unclassified_draw(capsys):
     assert "lists it without failing: ['Q1']" in out
     assert "GATE FAILURE" not in out
     assert _report([SurfaceDivergence("Q2", "pandas", "value mismatch")], **arguments) == 1
+
+
+def test_derived_order_is_not_checked_for_order_by_all():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a, b FROM t ORDER BY ALL DESC"
+    assert _derived_order_violation(sql, [("a", "INTEGER"), ("b", "INTEGER")], [(1, 2), (3, 4)]) is None

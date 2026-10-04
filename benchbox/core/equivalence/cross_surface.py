@@ -402,7 +402,12 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
                 return None
             target = exp.column(f"__c{ordinal - 1}")
         else:
-            for column in list(target.find_all(exp.Column)):
+            references = list(target.find_all(exp.Column))
+            if not references:
+                # A term with no column reference, such as DuckDB's ORDER BY ALL,
+                # cannot be evaluated over the returned columns.
+                return None
+            for column in references:
                 # A qualified reference names an input column, which SQL resolves
                 # before output names, so it cannot be read from the result.
                 position = None if column.table else positions.get(column.name.lower())
