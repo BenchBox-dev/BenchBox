@@ -21133,15 +21133,10 @@
       "title": "DECISION GATE (D-8): should --tuning tuned on DataFrame platforms resolve the curated <platform>_optimized.yaml profiles?"
     },
     "tuning-gate-duckdb-partitioning-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T16:23:17Z",
-        "generation": "cb82da74387f4f888dba3f1e6fe210c4",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "DECISION GATE (D-7): remove partitioning from DuckDB tuned templates or implement it"
     },
     "tuning-gate-ledger-outcome-vocabulary-20261001": {
