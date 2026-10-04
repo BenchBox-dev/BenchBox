@@ -172,3 +172,12 @@ Known gaps, each a place where a comment can pass unreported:
   given such a flag is reported.
 - Commands passed to a runner such as `ssh` or `watch` as one string are not
   split, so an interpreter inside that string is not followed.
+- HTML comments and MyST `%` lines in Markdown prose are not scanned. In the
+  maintained docs they are copyright headers, generator start and end markers,
+  `<!-- content-ok -->` markers read by `scripts/blog_content_validation.py`,
+  and two `%` lines in `docs/blog/index.md` that keep a heading id stable.
+- Comments inside Python string values are not scanned unless the string
+  reaches a recognized SQL, shell or HTML sink. Generated SQL and scripts keep
+  such comments where they are part of the product's output, for example
+  maintenance SQL headers, dry-run DDL previews, stream-file headers, the Trino
+  tuning note and the AWS Glue job script.
