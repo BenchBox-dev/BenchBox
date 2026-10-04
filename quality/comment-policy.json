@@ -37676,7 +37676,7 @@
       "path": "tests/unit/scripts/test_release_flow.py",
       "symbol": "html-output:root / 'landing' / 'index.html'",
       "text": "unresolved HTML output source",
-      "payload": "sha256:064821acd58981aabc587addf8d2e76933d425276048f89798231c5e3a22895e",
+      "payload": "sha256:fed7c49bc9da238eb778a5f96fba6293adca816635cd73b83f14d13663e3544c",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": "tests/unit/scripts/test_release_flow.py",
@@ -37689,7 +37689,7 @@
       "path": "tests/unit/scripts/test_release_flow.py",
       "symbol": "test_candidate_selection_cli_is_stdlib_only_and_preserves_lock",
       "text": "unresolved executable source: sys.executable",
-      "payload": "sha256:064821acd58981aabc587addf8d2e76933d425276048f89798231c5e3a22895e",
+      "payload": "sha256:fed7c49bc9da238eb778a5f96fba6293adca816635cd73b83f14d13663e3544c",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": "tests/unit/scripts/test_release_flow.py",
@@ -38629,32 +38629,6 @@
       "removal": "Remove when the executable-payload adapter can resolve this source statically."
     },
     {
-      "path": "tests/unit/scripts/test_release_flow.py",
-      "symbol": "test_candidate_selection_cli_is_stdlib_only_and_preserves_lock",
-      "text": "unresolved executable source: sys.executable",
-      "payload": "sha256:1b94c93d654a3408daa4b00c9146047105ab1c61eeafa481d793c06f9fac97a6",
-      "finding_kind": "payload-error",
-      "kind": "fixture",
-      "consumer": "scripts/release_flow.py",
-      "necessity": "The test runs the tracked scripts/release_flow.py, copied into a temporary candidate tree, under sys.executable -I -S; the script is scanned in place.",
-      "alternative": "Inlining the executed or written text as a literal would stop the test from exercising the checked source it targets.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the executable-payload adapter can resolve this source statically."
-    },
-    {
-      "path": "tests/unit/scripts/test_release_flow.py",
-      "symbol": "html-output:root / 'landing' / 'index.html'",
-      "text": "unresolved HTML output source",
-      "payload": "sha256:1b94c93d654a3408daa4b00c9146047105ab1c61eeafa481d793c06f9fac97a6",
-      "finding_kind": "payload-error",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_release_flow.py",
-      "necessity": "The test writes the LANDING test template, formatted with a version string, into a temporary candidate tree; the template is a string literal in the same file and holds no comment.",
-      "alternative": "Inlining the executed or written text as a literal would stop the test from exercising the checked source it targets.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the executable-payload adapter can resolve this source statically."
-    },
-    {
       "path": "tests/unit/test_conftest_git_environment.py",
       "symbol": "test_a_hook_environment_cannot_redirect_scratch_git_commands",
       "text": "unresolved executable source: sys.executable",
@@ -38901,6 +38875,41 @@
       "alternative": "Inlining the script as a literal would stop the test from exercising the checked workflow it targets.",
       "owner": "BenchBox maintainers",
       "removal": "Remove when the executable-payload adapter can resolve this source statically."
+    },
+    {
+      "path": "tests/unit/core/tpcds/generator/test_dsdgen_platform_options.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "COPYRIGHT.md",
+      "necessity": "The repository contribution rule in COPYRIGHT.md requires appropriate copyright headers. Retain this existing authored notice payload unchanged in a source header.",
+      "alternative": "Removing or replacing this payload would lose existing notice wording. A runtime docstring is unnecessary; an exact source comment retains the notice without carrying explanatory prose.",
+      "owner": "comment-cleanup-amplab",
+      "removal": "Remove or change only after the owner records the governing notice requirement and confirms that the exact existing notice may be changed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/generator/test_dsdgen_platform_options.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Preserve the existing per-file MIT-license reference conservatively while individual-file notice obligations are adjudicated. LICENSE requires copyright and permission notices in distributed copies; no claim is made that this abbreviated reference is legally required.",
+      "alternative": "Removing or replacing this payload would lose existing notice wording. A runtime docstring is unnecessary; an exact source comment retains the notice without carrying explanatory prose.",
+      "owner": "comment-cleanup-amplab",
+      "removal": "Remove or change only after the owner records the governing notice requirement and confirms that the exact existing notice may be changed."
+    },
+    {
+      "path": "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py",
+      "symbol": "_generate_rows",
+      "text": "unresolved executable source: str(dbgen_exe)",
+      "payload": "sha256:e2ef3fff57b6bad0143719556a410df3d20f4da5757e07978313df74b2b8f555",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py",
+      "necessity": "The test runs the bundled TPC-H dbgen binary, resolved at run time for the host platform, to check its row framing; the arguments are fixed generator options.",
+      "alternative": "A literal binary path would stop the test from exercising the binary the package ships for the host.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the executable-payload adapter can resolve the bundled binary path statically."
     }
   ]
 }

@@ -27,28 +27,28 @@ REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
     ): "container_cli() returns BENCHBOX_CONTAINER_CLI or docker; this call removes a container",
     (
         "benchbox/core/tpcds/generator/runner.py",
-        "[str(self.dsdgen_exe), '-verbose', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-child', str(chunk_id), '-parallel', str(self.parallel)]",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpcds/generator/runner.py",
-        "[str(self.dsdgen_exe), '-verbose', '-force', '-terminate', 'n', '-scale', str(self.scale_factor)]",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor), tpcds_option('child'), str(chunk_id), tpcds_option('parallel'), str(self.parallel)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpcds/generator/streaming.py",
-        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', parent_table, '-child', str(chunk_id), '-parallel', str(self.parallel)]",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose') if self.verbose else tpcds_option('quiet'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor), tpcds_option('table'), table_name]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpcds/generator/streaming.py",
-        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', parent_table]",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose') if self.verbose else tpcds_option('quiet'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor), tpcds_option('table'), parent_table]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpcds/generator/streaming.py",
-        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', table_name, '-child', str(chunk_id), '-parallel', str(self.parallel), '-FILTER', 'Y']",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose') if self.verbose else tpcds_option('quiet'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor), tpcds_option('table'), table_name, tpcds_option('child'), str(chunk_id), tpcds_option('parallel'), str(self.parallel), tpcds_option('filter'), 'Y']",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpcds/generator/streaming.py",
-        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', table_name]",
-    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+        "[str(self.dsdgen_exe), tpcds_option('verbose') if self.verbose else tpcds_option('quiet'), tpcds_option('force'), tpcds_option('terminate'), 'n', tpcds_option('scale'), str(self.scale_factor), tpcds_option('table'), parent_table, tpcds_option('child'), str(chunk_id), tpcds_option('parallel'), str(self.parallel)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary; tpcds_option() returns a fixed option name with the platform prefix",
     (
         "benchbox/core/tpch/generator.py",
         "[str(dbgen_exe), '-vf', '-s', str(self.scale_factor)]",
