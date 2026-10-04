@@ -6,7 +6,7 @@
     "MDX used only where a component is present (counted in build output)",
     "No committed generated content; docs/ unchanged by the build"
   ],
-  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as 9d295874 + 0d889d27 + 1a8a0aab (2026-10-04). Review round 2 FAIL (H1 eval-rst unbuilt targets, M1–M6, L1–L4) fixed in 1a8a0aab; round 3 review running. Blog archive/tag/author pages are not built (item 33); listed in UNBUILT_TARGETS with a test that fails once a route exists.",
+  "context": "Done 2026-10-04: merged in #2606 (b77ccf7c7). Evidence: website/tests/converter.test.ts plus 5 golden pages (benchbox-primitives, blog, getting-started, industry-benchmarks, tpc-ds-diagrams); full docs convert in CI site-build (green on #2606 head 083b48d7); site-parity green (0 broken links/fragments); no generated content tracked.",
   "description": "Write a converter that runs inside site-build and reads docs/**/*.md as the canonical source (guardrail G-b). It writes Astro content-collection entries to a gitignored build directory.\n\nOutput format: plain Markdown by default. MDX is emitted only for a page that needs a component (callout, mermaid, embed), so authoring and parsing constraints stay minimal.\n\nConstructs to handle, with counts re-measured after astro-site-30:\n- {tags} (219) → frontmatter tags and tag pages\n- toctrees (16 MyST + those converted from 39 RST) → sidebar config and section order\n- admonitions (26) → Callout\n- {doc}/{ref} and converted :doc: roles (236 before astro-site-30) → resolved relative links\n- {mermaid} (6) → build-time SVG\n- labels and explicit anchors kept as the same fragment ids; tables, images, Cobalt2-equivalent code highlighting\n\nAny directive, role or syntax it does not know is a hard build error naming file and line. Output is idempotent: a byte-identical rebuild from the same input.",
   "links": [
     "docs/conf.py",
@@ -61,6 +61,14 @@
       "generation": "c7ca31f09a724e41a55ba457959182dc",
       "op": "take",
       "op_id": "977917346c624177a4d91f132c7800ef",
+      "session_id": "33fc81e6079f4095960e58f09da5ba3c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:eab247781550a2228da6f8b3",
+      "at": "2026-10-04T23:52:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4f74a36adfd6485aa42b6438766b9e47",
       "session_id": "33fc81e6079f4095960e58f09da5ba3c"
     }
   ]
