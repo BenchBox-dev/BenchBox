@@ -5386,6 +5386,13 @@
       "status": "done",
       "title": "\"✅ Databricks Adapter: Correct Data Loading Approach (COPY INTO + Unity Catalog Volumes)\""
     },
+    "databricks-clickbench-q29-q43-result-mismatch": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Databricks ClickBench Q29 and Q43 return different results from BigQuery and Snowflake"
+    },
     "databricks-dataframe-mode": {
       "claim": null,
       "needs": [],

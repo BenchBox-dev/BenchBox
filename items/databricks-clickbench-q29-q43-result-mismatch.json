@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Databricks Q29 rewrites the regular-expression backreference so its result matches BigQuery and Snowflake at SF 0.1, 1 and 10",
+    "The cause of the Q43 difference is identified and fixed, with Databricks matching BigQuery and Snowflake row counts at SF 0.1, 1 and 10",
+    "A regression test covers the Databricks translation of both queries",
+    "The three Databricks ClickBench cells are rerun with cache off and validated, and the corpus bundles and the CORPUS_NOTES disclosure are updated or withdrawn accordingly"
+  ],
+  "context": "Found while publishing the live-cloud corpus. The Databricks ClickBench bundles clickbench_sf01_databricks_sql_20261003_220608_70c9438e, clickbench_sf1_databricks_sql_20261003_230712_3a9e1d61 and clickbench_sf10_databricks_sql_20261003_231900_2437b487 were published with this discrepancy disclosed in results-data/CORPUS_NOTES.md, section \"Cloud ClickBench (2026-10-04)\", at the owner's direction. Their Q29 and Q43 timings measure different work from the other platforms.",
+  "description": "Databricks SQL runs of ClickBench return different output row counts from BigQuery and Snowflake on two of 43 queries at every scale. BigQuery and Snowflake agree with each other on all 43.\n\n- Q29: Databricks returns 0 rows at SF 0.1 and 1 row at SF 1 and SF 10; BigQuery and Snowflake return 0, 0 and 6. Cause confirmed: the Databricks translation keeps the `\\1` backreference in `REGEXP_REPLACE(Referer, '^https?://(?:www\\.)?([^/]+)/.*$', '\\1')`, but Spark SQL needs `$1`, so every referrer collapses into one group.\n- Q43: Databricks returns 1 row at every scale; BigQuery and Snowflake return 2, 22 and 159. The query groups by `DATE_TRUNC('MINUTE', EventTime)`. The Databricks DDL declares `EventTime TIMESTAMP NOT NULL`. Cause not yet identified; check how EventTime values are loaded on Databricks (type, parsing, time zone) and how DATE_TRUNC is translated.\n\nThe September 2026 Databricks ClickBench runs show the same counts, so this predates the cache-off reruns. The validator cannot detect it because ClickBench has no expected answers.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T11:26:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ed3c9ba0615644dba8475193c9053fb7",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}
