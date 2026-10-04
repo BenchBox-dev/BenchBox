@@ -3,7 +3,7 @@
     "The behavior of both families on multi-state data is stated with evidence",
     "Both families match the SQL on a multi-state fixture, or the deviation is documented with a test"
   ],
-  "context": "2026-10-03: fixed locally on branch fix/tpcds-q70-top-states (worktree BenchBox.wt-tpcds-q70, commit 15d4fb5e6, based on feat/tpcds-bind-dsqgen-values). Tested on DuckDB: the template's inner rank is 1 for every state, so both families now keep every non-NULL s_state (an explicit non-NULL filter keeps pandas from matching NaN). A second latent bug was fixed too: the expression family sorted state-subtotal rows (lochierarchy 1) by state, while the SQL's CASE key is NULL there. New tests/unit/core/tpcds/test_q70_state_filter.py (4 tests on an 8-state frame against DuckDB) fails before the fix and passes after. Full SF 0.1 probe: no status changes. Lands after the combined adapter PR merges.",
+  "context": "2026-10-03: fixed locally on branch fix/tpcds-q70-top-states (worktree BenchBox.wt-tpcds-q70, commit 15d4fb5e6, based on feat/tpcds-bind-dsqgen-values). Tested on DuckDB: the template's inner rank is 1 for every state, so both families now keep every non-NULL s_state (an explicit non-NULL filter keeps pandas from matching NaN). A second latent bug was fixed too: the expression family sorted state-subtotal rows (lochierarchy 1) by state, while the SQL's CASE key is NULL there. New tests/unit/core/tpcds/test_q70_state_filter.py (4 tests on an 8-state frame against DuckDB) fails before the fix and passes after. Full SF 0.1 probe: no status changes. Lands after the combined adapter PR merges.\n\n2026-10-04 closeout: Delivered in #2605: Q70 keeps every state like the SQL (tests/unit/core/tpcds/test_q70_state_filter.py).",
   "description": "Q70's template computes rank() over (partition by s_state) from a group by s_state, so every partition has one row, the rank is always 1, and the 'ranking <= 5' filter keeps all states (reasoning from the SQL, not run). The DataFrame implementations apply a global top-5 state filter following the spec prose. It is inert while the data holds one state (SQL returns 3 rows at every scale tested) but would diverge from the SQL once more states appear. The pandas half was reported by a reviewer and is unverified by me. Decide whether to follow the template (keep all states) or document the deviation, and make both families consistent with the SQL.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "op": "update",
       "op_id": "1fdb7cbc45e148f5bb7c82bcb0b85d65",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:34:37Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "71253edce6274ad2a2b65f5b95eba694",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
