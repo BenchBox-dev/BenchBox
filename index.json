@@ -19881,6 +19881,13 @@
       "status": "open",
       "title": "Throughput UAT job has no contract test, inline floor logic, and no failure signal while the nightly is red every night"
     },
+    "throughput-uat-result-resolution-and-stream-count": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput UAT asserts still glob for results and count streams across all phases"
+    },
     "tigerdata-cloud-enhancements": {
       "claim": null,
       "needs": [],

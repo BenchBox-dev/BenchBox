@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Assert steps read result_path from the sweep's cells.jsonl and check benchmark.platform and scale_factor inside the JSON",
+    "Stream-count and metric checks count throughput rows only and exclude failed queries",
+    "Unreadable result JSON fails the cell",
+    "Stale docs, comments and the dead-path test are updated or removed"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Stream-count over-counting is latent with current configs.",
+  "description": "The result-path manifest is only partly used:\n- resolve_official_result_path discards its platform and scale arguments (tests/uat/throughput.py:71), and runner.py:300 accepts any existing .json without a token check.\n- Both nightly assert steps still use glob plus mtime (nightly.yml:1068-1074, 1134-1140). The Postgres pattern tpch_sf1_postgres* is not an exact token.\n\nvalidate_stream_count counts distinct stream values across all query rows (throughput.py:116-120). Power warm-up and measurement rows also carry stream numbers (execution.py:225,237), so adding power to a config could let 2 real throughput streams plus power rows pass a 3-stream check. validate_throughput_metric counts failed queries in total_queries, and only recomputes from the same JSON with a 2x band, so it catches formula bugs only.\n\nrunner.py:459-460: a \"could not read result JSON\" error leaves a passed cell as passed. Currently masked by an earlier check.\n\nStale: docs/operations/uat-framework.md:608 says both cells gate. throughput.py:3-12 and matrix.py:502-504 describe the unused _forward_requested_streams patch, and tests/integration/test_throughput_stream_count.py:240-291 still tests it.",
+  "links": [
+    "tests/uat/throughput.py",
+    "tests/uat/runner.py",
+    ".github/workflows/nightly.yml",
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:01:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "dbf6c6eef15b43a09064bd84364b491f",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
