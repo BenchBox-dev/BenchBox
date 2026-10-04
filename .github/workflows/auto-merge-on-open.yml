@@ -6,23 +6,6 @@ name: Auto-merge revocation
 # arm paths are `make pr-ready` / `make pr-arm-auto-merge` (or
 # `make pr-open READY=1` when reusing an already-open, reviewed PR) on a
 # finished branch. A newly created PR stays held. This workflow NEVER arms.
-#
-# What this workflow does — revocation only, re-evaluated on every trigger:
-#   1. Durable hold label `no-auto-merge` present: disable auto-merge.
-#      `labeled` is in the trigger list so applying the label revokes
-#      without needing a push. The label also blocks the local arm path
-#      (`make pr-arm-auto-merge` refuses it) and the nightly green-unmerged
-#      sweep treats it as intentional (not stranded). Remove the label
-#      before arming. See docs/operations/pr-triage.md.
-#   2. Draft status — job-level skip: a draft cannot carry auto-merge, so
-#      there is nothing to revoke.
-#
-# Result-affecting changes are gated by the required `oracle-review` status
-# check, not by this workflow.
-#
-# The workflow reads only the PR's labels and never checks out or executes PR
-# code, so the write token used by the revoke step cannot be exposed by a
-# workflow edit in the PR.
 
 on:
   pull_request_target:
