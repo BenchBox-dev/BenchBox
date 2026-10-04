@@ -93,7 +93,7 @@ class _PartiallyApplyingStubAdapter(PlatformAdapter):
         return 0.0
 
     def load_data(self, benchmark, connection, data_dir):
-        return {}, 0.0, None
+        return {"orders": 1}, 0.0, None
 
     def configure_for_benchmark(self, connection, benchmark_type):
         return None
