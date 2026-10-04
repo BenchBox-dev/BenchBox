@@ -1586,7 +1586,12 @@ def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | N
     # no reused-DB drift_check) -> no companion, mirroring build_tuning_payload's
     # "nothing to record" None. A reused DB re-applies no tuning DDL (empty
     # statements/dropped) but its drift_check must still ship (ADR-001 addendum).
-    if not payload.get("statements") and not payload.get("dropped") and not payload.get("drift_check"):
+    if (
+        not payload.get("statements")
+        and not payload.get("dropped")
+        and not payload.get("satisfied")
+        and not payload.get("drift_check")
+    ):
         return None
     return payload
 

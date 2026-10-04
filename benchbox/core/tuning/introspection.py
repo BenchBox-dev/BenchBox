@@ -419,6 +419,15 @@ def _statement_table(statement: AppliedStatement) -> str | None:
     return None
 
 
+def statement_table(statement: AppliedStatement) -> str | None:
+    return _statement_table(statement)
+
+
+def statement_order_by_columns(statement: AppliedStatement) -> tuple[str, ...] | None:
+    match = _ORDER_BY_RE.search(_strip_sql_literals_and_comments(str(statement.statement or "")))
+    return normalize_columns(match.group("cols")) if match else None
+
+
 def ledger_tables(ledger: AppliedTuningLedger) -> set[str]:
     """Normalized table names the executed ledger statements reference.
 
