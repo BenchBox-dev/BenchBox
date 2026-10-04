@@ -20627,6 +20627,15 @@
       "status": "open",
       "title": "QphDS@Size is computed as sqrt(Power x Throughput), not the TPC-DS formula"
     },
+    "tpcds-qphds-spec-metric-implementation": {
+      "claim": null,
+      "needs": [
+        "tpcds-qphds-nonspec-formula"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Implement the TPC-DS QphDS@Size spec metric (two throughput tests, two maintenance runs, load time)"
+    },
     "tpcds-qualification-actionable-signal": {
       "claim": null,
       "needs": [],

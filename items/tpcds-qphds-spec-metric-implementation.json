@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Two throughput tests and two maintenance runs execute in spec order, with tests",
+    "Load time is captured and used as T_LD",
+    "QphDS@Size uses the spec formula and is exported as official only when every input is valid",
+    "Docs match"
+  ],
+  "description": "Scope moved here from tpcds-qphds-nonspec-formula by owner decision on 2026-10-04: suppress the non-spec QphDS first, and implement the spec later. QphDS@Size = SF x Q / (T_PT x T_TT x T_DM x T_LD)^(1/4), with Q = 99 x S, T_TT = TT1 + TT2, T_DM = DM1 + DM2, and T_LD = 0.01 x S x T_load. Needs a second throughput test (streams S+1..2S), data maintenance between the throughput tests, and captured load time.",
+  "links": [
+    "benchbox/core/tpcds/official_benchmark.py",
+    "benchbox/core/results/metrics.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:37:32Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "49753ae7ec1e4cebbd64569c591190f3",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
