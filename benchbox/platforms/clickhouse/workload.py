@@ -164,18 +164,23 @@ class ClickHouseWorkloadMixin:
             if self.tuning_enabled and effective_config is not None:
                 table_tunings = effective_config.table_tunings
 
-            # Split schema into individual statements and execute
+            primary_keys_enabled = effective_config.primary_keys.enabled if effective_config else True
+
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
+            prepared_statements = []
             for statement in statements:
-                # Optimize table definitions for ClickHouse
                 table_name = self._extract_table_name(statement)
                 nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
                 optimized = self._optimize_table_definition(
                     statement,
                     table_tunings,
                     nullable_columns=nullable_columns,
+                    primary_keys_enabled=primary_keys_enabled,
                 )
+                prepared_statements.append((statement, table_name, optimized))
+
+            for statement, table_name, optimized in prepared_statements:
                 connection.execute(optimized)
                 # Record a tuned MergeTree CREATE TABLE into the applied ledger
                 # here, immediately after it executes. The tuned keys are
@@ -202,6 +207,7 @@ class ClickHouseWorkloadMixin:
         table_tunings: dict[str, Any] | None = None,
         *,
         nullable_columns: set[str] | None = None,
+        primary_keys_enabled: bool = True,
     ) -> str:
         """Optimize table definition for ClickHouse.
 
@@ -256,10 +262,22 @@ class ClickHouseWorkloadMixin:
             flags=re.IGNORECASE,
         )
 
-        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
+        tuned_order_by_applies = "ORDER BY" not in statement.upper()
+        schema_primary_key_columns = self._extract_primary_key_columns(statement)
+        tuning_clauses = self._resolve_tuned_ddl_clauses(
+            statement,
+            table_tunings,
+            primary_key_columns=(
+                schema_primary_key_columns if primary_keys_enabled and tuned_order_by_applies else None
+            ),
+        )
         if nullable_columns:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
             statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
+
+        tuned_sort_key_applies = tuned_order_by_applies and tuning_clauses is not None and bool(tuning_clauses.sort_by)
+        if tuned_sort_key_applies and schema_primary_key_columns:
+            statement = self._strip_primary_key_constraints(statement)
 
         # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()
@@ -287,6 +305,8 @@ class ClickHouseWorkloadMixin:
                 # Tuned rendering: ORDER BY (sort + clustering columns), via
                 # the shared ClickHouseDDLGenerator.
                 order_by_clause = f" ORDER BY ({tuning_clauses.sort_by})"
+                if tuning_clauses.primary_key:
+                    order_by_clause += f" PRIMARY KEY ({tuning_clauses.primary_key})"
             else:
                 # Engine-mandatory baseline: MergeTree requires ORDER BY.
                 # Extract primary key columns if any exist in the statement.
@@ -580,7 +600,38 @@ class ClickHouseWorkloadMixin:
             index += 1
         return len(segment.rstrip())
 
-    def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
+    @classmethod
+    def _strip_primary_key_constraints(cls, statement: str) -> str:
+        import re
+
+        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return statement
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+
+        kept_segments: list[str] = []
+        dropped_last_segment = False
+        spans = cls._top_level_column_spans(body)
+        for position, (start, end) in enumerate(spans):
+            segment = body[start:end]
+            if re.match(r"^\s*PRIMARY\s+KEY\s*\(", segment, re.IGNORECASE):
+                dropped_last_segment = position == len(spans) - 1
+                continue
+            kept_segments.append(re.sub(r"\s+PRIMARY\s+KEY\b", "", segment, flags=re.IGNORECASE))
+
+        rebuilt = ",".join(kept_segments)
+        if dropped_last_segment:
+            rebuilt = rebuilt.rstrip() + body[len(body.rstrip()) :]
+        return statement[: open_index + 1] + rebuilt + statement[close_index:]
+
+    def _resolve_tuned_ddl_clauses(
+        self,
+        statement: str,
+        table_tunings: dict[str, Any] | None,
+        primary_key_columns: list[str] | None = None,
+    ):
         """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
 
         Returns None when tuning is not enabled, no table_tuning is
@@ -613,7 +664,7 @@ class ClickHouseWorkloadMixin:
         from benchbox.core.tuning.ddl_generator import get_ddl_generator
 
         generator = get_ddl_generator("clickhouse")
-        clauses = generator.generate_tuning_clauses(table_tuning)
+        clauses = generator.generate_tuning_clauses(table_tuning, primary_key_columns=primary_key_columns or None)
         if clauses.is_empty():
             return None
         self._normalize_tuning_clause_identifiers(statement, clauses)
