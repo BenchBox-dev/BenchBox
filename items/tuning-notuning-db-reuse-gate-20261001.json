@@ -3,7 +3,7 @@
     "Unit test: notuning + DB without metadata → valid; notuning + DB with tuning metadata → error 'Refusing to reuse a tuned database for a notuning run'.",
     "e2e: two consecutive `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --tuning notuning --phases generate,load,power --queries 1 --non-interactive -v` runs; the second logs 'Database being reused' and no 'Deleted database file'."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.2 as revised (R-2; plan review F1). Independent of the metadata-store portability item.\n\nRESERVED (2026-10-04): in flight in the tuning-rework batch session (workstream W1). Implemented and published as PR #2626, branch fix/tuning-notuning-db-reuse-gate; unit and local e2e acceptance satisfied. Do not claim or implement; workstream W2 must not take this item. Finish it after #2626 merges.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.2 as revised (R-2; plan review F1). Independent of the metadata-store portability item.\n\nResumption notes (2026-10-04): shipped in PR #2626 (merged as 27373468e) exactly as specified, with two SQLite regression tests; the two-run DuckDB notuning e2e (second run logs 'Database being reused', no 'Deleted database file') was run locally. Known limit raised by an independent review, deliberately not addressed because this item forbids a baseline marker: a physically tuned database whose tuning metadata save failed or never ran (failed save is non-fatal, crash between apply and save, external-table path, constraints-only config with a swallowed marker save) is reused by a later notuning run as a baseline. Candidate follow-up: mark or clean the database when a tuned run's metadata save fails. Needs an owner decision; no item filed.",
   "description": "## Problem (reproduced)\nNotuning runs never reuse their database. A second notuning DuckDB run logs \"❌ Tuning: No tuning metadata found in database → Database is not configured for this run → recreating\".\n\nRoot cause (plan review F1): notuning runs get a non-None baseline config (`build_baseline_unified_config()`, `benchbox/cli/commands/run.py:1203,2525`). So `_validate_database_tunings` takes the `if effective_config:` branch (`benchbox/platforms/base/tuning_config.py:138-140`) and requires metadata that is never written; `save_tuning_metadata` only runs when tuning is enabled (`adapter.py:1568`). The `else` branch (`tuning_config.py:141-151`) already has the correct notuning semantics, including \"Refusing to reuse a tuned database for a notuning run\".\n\n## Change\nChange the condition to `if effective_config and self.tuning_enabled:`.\n\n## Guardrails (must preserve)\n- A tuned database is still refused for a notuning run.\n- Baseline databases need no metadata table.\n\n## Do not\n- Do not write a baseline marker row. The write site would be unreachable and it adds a metadata-store dependency.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/platforms/base/tuning_config.py",
@@ -33,6 +33,14 @@
       "generation": "9b89ccc65c0b4889beac74763d58088a",
       "op": "take",
       "op_id": "7d4eef3edff941d5b03d6efeba988cff",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T18:50:34Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2d55b48197cd40fdaa51479bad817b0a",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
