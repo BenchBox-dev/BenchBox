@@ -223,16 +223,16 @@ report.states = {};
       });
     },
   });
-  await page.waitForSelector("[aria-busy='true']", { timeout: 15000 }).catch(() => null);
+  await page.locator("main [role=status]").first().waitFor({ state: "attached", timeout: 15000 }).catch(() => null);
   const loading = await page.evaluate(() => {
-    const busy = [...document.querySelectorAll("main [aria-busy='true']")];
-    const named = busy.filter((el) => el.getAttribute("aria-label") || el.getAttribute("aria-labelledby"));
-    const live = [...document.querySelectorAll("main [role=status], main [aria-live]")].filter((el) => (el.textContent ?? "").trim().length > 0);
-    return { busy: busy.length, named: named.map((el) => el.getAttribute("aria-label")), live: live.map((el) => (el.textContent ?? "").trim().slice(0, 60)) };
+    const statuses = [...document.querySelectorAll("main [role=status]")];
+    const named = statuses.filter((el) => el.getAttribute("aria-label") || el.getAttribute("aria-labelledby"));
+    const live = statuses.filter((el) => el.getAttribute("aria-live") === "polite" && (el.textContent ?? "").trim().length > 0);
+    return { statuses: statuses.length, named: named.map((el) => el.getAttribute("aria-label")), live: live.map((el) => (el.textContent ?? "").trim().slice(0, 60)) };
   });
   const loadingViolations = await blocking(page);
   report.states.loading = { ...loading, axe: loadingViolations };
-  if (!loading.busy || !loading.named.length || !loading.live.length) fail(`loading state lacks a named busy region and a live status: ${JSON.stringify(loading)}`);
+  if (!loading.statuses || !loading.named.length || !loading.live.length) fail(`loading state lacks a named polite status region: ${JSON.stringify(loading)}`);
   if (loadingViolations.length) fail(`loading state axe: ${loadingViolations.join("; ")}`);
   held.splice(0).forEach((release) => release());
   await context.close();
@@ -250,10 +250,10 @@ report.states = {};
   });
   const alert = page.locator("main [role=alert]").filter({ has: page.getByRole("heading", { name: "Could not load results" }) });
   await alert.waitFor({ state: "visible", timeout: 60000 }).catch(() => null);
-  const errorState = await alert.evaluate((el) => ({ name: el.getAttribute("aria-labelledby") ? document.getElementById(el.getAttribute("aria-labelledby"))?.textContent : null, live: el.getAttribute("aria-live"), role: el.getAttribute("role") })).catch(() => null);
+  const errorState = await alert.evaluate((el) => ({ name: el.getAttribute("aria-labelledby") ? document.getElementById(el.getAttribute("aria-labelledby"))?.textContent : null, role: el.getAttribute("role") })).catch(() => null);
   const errorViolations = await blocking(page);
   report.states.error = { blocked, ...errorState, axe: errorViolations };
-  if (!errorState || errorState.name !== "Could not load results" || errorState.live !== "assertive") fail(`error state is not a named live alert: ${JSON.stringify(errorState)}`);
+  if (!errorState || errorState.name !== "Could not load results" || errorState.role !== "alert") fail(`error state is not a named alert: ${JSON.stringify(errorState)}`);
   if (errorViolations.length) fail(`error state axe: ${errorViolations.join("; ")}`);
   await page.unroute("**/results/assets/duckdb-*worker*.js");
   await alert.getByRole("button", { name: "Retry" }).click();
@@ -277,6 +277,125 @@ report.states = {};
   report.states.snapshotMissing = { visible: await alert.isVisible().catch(() => false), axe: snapshotViolations };
   if (!report.states.snapshotMissing.visible) fail("a missing snapshot did not surface the named error alert");
   if (snapshotViolations.length) fail(`snapshot error axe: ${snapshotViolations.join("; ")}`);
+  await context.close();
+}
+
+const docsPage = "/docs/usage/getting-started.html";
+const resultsPage = "/results/";
+
+async function headerScript(route) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(base + route, { waitUntil: "load" });
+  await page.locator("[data-site-header-toggle]").waitFor({ state: "visible", timeout: 30000 });
+  const toggle = page.locator("[data-site-header-toggle]");
+  const expanded = () => toggle.getAttribute("aria-expanded");
+  const out = {};
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  out.opened = await expanded();
+  const visited = [];
+  await page.keyboard.press("Tab");
+  for (let step = 0; step < 8; step += 1) {
+    if (!(await page.evaluate(() => !!document.activeElement?.closest("[data-site-header-panel]")))) break;
+    visited.push(await page.evaluate(() => document.activeElement.textContent.trim()));
+    await page.keyboard.press("Tab");
+  }
+  out.visited = visited.join("|");
+  await toggle.focus();
+  if ((await expanded()) !== "true") await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Escape");
+  out.escape = { expanded: await expanded(), focusOnToggle: await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle")) };
+  await toggle.click();
+  await page.locator(".site-header__cta").focus();
+  for (let step = 0; step < 3; step += 1) await page.keyboard.press("Tab");
+  out.tabOut = await expanded();
+  await toggle.click();
+  out.reopened = await expanded();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForTimeout(200);
+  out.grewClosed = await expanded();
+  await page.locator(".site-header__link", { hasText: "Blog" }).focus();
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.waitForTimeout(200);
+  out.shrinkFocusOnToggle = await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle"));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const radio = (name) => page.getByRole("radio", { name });
+  await radio("Light theme").click();
+  await radio("Light theme").focus();
+  const choices = [];
+  for (const key of ["ArrowRight", "ArrowRight", "ArrowRight", "ArrowLeft", "Home", "End", "ArrowUp"]) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(150);
+    choices.push(await page.evaluate(() => document.documentElement.dataset.bbThemeChoice));
+  }
+  out.radioKeys = choices.join(",");
+  out.styles = await page.evaluate(() => {
+    const read = (selector) => {
+      const el = document.querySelector(selector);
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return [style.color, style.fontFamily, style.fontSize, style.lineHeight, style.textDecorationLine, selector === ".site-header" ? "" : Math.round(rect.height)].join(" / ");
+    };
+    return { header: read(".site-header"), headerLink: read(".site-header__link"), footer: read(".site-footer"), footerLink: read(".site-footer__link"), legal: read(".site-footer__legal") };
+  });
+  await context.close();
+  return out;
+}
+
+{
+  const docs = await headerScript(docsPage);
+  const results = await headerScript(resultsPage);
+  report.headerParity = { docs, results };
+  const expectations = { opened: "true", visited: "Home|Docs|Blog|Results|GitHub|Run benchmark", tabOut: "false", grewClosed: "false", shrinkFocusOnToggle: true };
+  for (const [name, value] of Object.entries(expectations)) {
+    if (docs[name] !== value) fail(`docs header ${name} is ${docs[name]}`);
+  }
+  if (docs.escape.expanded !== "false" || !docs.escape.focusOnToggle) fail(`docs Escape behaviour ${JSON.stringify(docs.escape)}`);
+  for (const key of Object.keys(docs)) {
+    if (JSON.stringify(docs[key]) !== JSON.stringify(results[key])) fail(`header behaviour differs between docs and results for ${key}: ${JSON.stringify(docs[key])} vs ${JSON.stringify(results[key])}`);
+  }
+}
+
+{
+  const { page, context } = await open("/results/tpch/?sf=0.01&phase=power", { width: 1280 });
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const header = page.getByTestId("benchbox-global-header");
+  await header.waitFor({ state: "visible", timeout: 30000 });
+  const preview = page.locator('[data-testid="summary-chart-preview-query_heatmap"]').first();
+  const previewShown = await preview.waitFor({ state: "attached", timeout: 30000 }).then(() => true).catch(() => false);
+  if (previewShown && !(await preview.evaluate((el) => el.open))) await preview.locator("summary").click();
+  const scroller = page.getByTestId("query-heatmap-scroll-container").first();
+  const heatmapShown = await scroller.waitFor({ state: "visible", timeout: 30000 }).then(() => true).catch(() => false);
+  if (heatmapShown) {
+    await scroller.evaluate((container) => {
+      const tbody = container.querySelector("tbody");
+      if (!tbody) return;
+      const rows = [...tbody.querySelectorAll("tr")];
+      for (let repeat = 0; repeat < 18; repeat += 1) for (const row of rows) tbody.appendChild(row.cloneNode(true));
+    });
+  }
+  const position = await header.evaluate((el) => getComputedStyle(el).position);
+  const target = heatmapShown ? await scroller.evaluate((container) => window.scrollY + container.getBoundingClientRect().top + 180) : 600;
+  await page.evaluate((y) => window.scrollTo(0, y), target);
+  await page.waitForTimeout(300);
+  const headerBottom = await header.evaluate((el) => Math.round(el.getBoundingClientRect().bottom));
+  report.stickiness = { position, scrolled: await page.evaluate(() => Math.round(window.scrollY)), headerBottom, heatmapShown };
+  if (position === "sticky" || position === "fixed") fail(`explorer header is ${position}`);
+  if (headerBottom > 0) fail(`explorer header did not scroll away: bottom=${headerBottom}`);
+  if (!heatmapShown) fail("the query heatmap did not render, so sticky coverage was not checked");
+  else {
+    const sticky = page.getByTestId("query-heatmap-page-sticky-header").first();
+    const covered = await sticky.evaluate((el) => {
+      for (const node of [el.parentElement, el]) if (node) node.style.pointerEvents = "auto";
+      const rect = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + Math.max(1, Math.min(rect.height / 2, 10)));
+      return { top: Math.round(rect.top), covered: !(hit && el.contains(hit)), hit: hit ? `${hit.tagName}.${String(hit.className).slice(0, 60)}[${hit.getAttribute("data-testid") ?? ""}]` : null };
+    });
+    report.stickiness.heatmap = covered;
+    if (covered.covered || covered.top > 1) fail(`heatmap sticky header is covered or displaced: ${JSON.stringify(covered)}`);
+  }
   await context.close();
 }
 

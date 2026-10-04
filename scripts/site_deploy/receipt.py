@@ -76,11 +76,13 @@ def explorer_artifact(routes: list[dict[str, Any]]) -> dict[str, Any] | None:
         if route.get("builder") != "explorer":
             continue
         lanes = route.get("lane_sha256") or {}
+        if len(lanes) != 1:
+            raise ReceiptError(f"explorer route {route.get('path')} must have exactly one lane, found {len(lanes)}")
         return {
             "path": route["path"],
             "source_sha": route.get("source_sha"),
             "corpus": route.get("corpus"),
-            "sha256": next(iter(lanes.values())) if len(lanes) == 1 else None,
+            "sha256": next(iter(lanes.values())),
             "lane_sha256": lanes,
         }
     return None

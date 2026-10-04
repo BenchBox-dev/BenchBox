@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { explorerReceipt, treeDigest } from "../src/lib/tree-digest.ts";
+import { treeDigest } from "../src/lib/tree-digest.ts";
 
 const roots: string[] = [];
 
@@ -45,13 +45,9 @@ describe("tree digest", () => {
     expect(changed.sha256).not.toBe(first.sha256);
   });
 
-  it("records the source and mounted digests apart", () => {
-    const source = treeDigest(tree({ "index.html": "<head></head>" }));
-    const mounted = treeDigest(tree({ "index.html": "<head><meta></head>" }));
-    const receipt = explorerReceipt(source, mounted);
-    expect(receipt.source_sha256).toBe(source.sha256);
-    expect(receipt.mounted_sha256).toBe(mounted.sha256);
-    expect(receipt.source_sha256).not.toBe(receipt.mounted_sha256);
-    expect(receipt.mounted_path).toBe("/results/");
+  it("refuses a symlink anywhere in the tree", () => {
+    const root = tree({ "a.txt": "1" });
+    symlinkSync(path.join(root, "a.txt"), path.join(root, "link.txt"));
+    expect(() => treeDigest(root)).toThrow(/symlink/);
   });
 });

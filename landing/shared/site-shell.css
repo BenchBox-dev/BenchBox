@@ -6,7 +6,14 @@
   outline-offset: 2px;
 }
 
+.site-header,
+.site-footer {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
 .site-header {
+  color: var(--text-secondary);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -221,6 +228,8 @@
 }
 
 .site-footer__link {
+  color: var(--accent-primary);
+  text-decoration: underline;
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;

@@ -88,7 +88,7 @@ def test_global_header_link_contract_is_identical_across_surfaces(path: str, sur
         ("landing/index.html", "landing"),
         ("landing/prompts/index.html", "prompts"),
         ("docs/_templates/page.html", "docs"),
-        ("results-explorer/src/components/Layout.tsx", "results"),
+        (PREACT_SHELL, "results"),
         (ASTRO_HEADER, "astro header"),
         (ASTRO_LINKS, "astro links"),
     ],
@@ -368,3 +368,19 @@ def test_explorer_global_rules_are_scoped_to_the_explorer_root() -> None:
     ]
     assert unscoped == []
     assert 'class="bb-explorer-page"' in _read("results-explorer/index.html")
+
+
+def test_explorer_header_has_no_search_box_by_design() -> None:
+    astro = _read(ASTRO_HEADER)
+    preact = _read(PREACT_SHELL)
+
+    assert "<SearchBox />" in astro
+    assert "SearchBox" not in preact
+    assert "search-button" not in preact
+    assert "data-search-open" not in preact
+
+
+def test_explorer_keeps_its_header_non_sticky() -> None:
+    css = _read("results-explorer/src/index.css")
+
+    assert re.search(r"\.bb-explorer-page \.site-header\s*\{\s*position:\s*static;", css)

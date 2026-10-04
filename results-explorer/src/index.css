@@ -32,8 +32,8 @@
         outline-color: var(--bb-focus-ring-on-dark);
     }
 
-    .site-footer__link {
-        color: var(--accent-primary);
+    .bb-explorer-page .site-header {
+        position: static;
     }
 
     /* Keep the leaderboard display controls inside the viewport when browser

@@ -214,7 +214,6 @@ function OverviewSkeleton() {
       aria-label="Loading results overview"
       aria-live="polite"
       aria-atomic="true"
-      aria-busy="true"
       class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8"
       data-testid="overview-skeleton"
     >

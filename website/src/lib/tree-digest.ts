@@ -7,6 +7,7 @@ export type TreeDigest = { sha256: string; totalBytes: number; totalFiles: numbe
 function directories(root: string): string[] {
   const found = [root];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (entry.isSymbolicLink()) throw new Error(`symlink in digested tree: ${path.join(root, entry.name)}`);
     if (entry.isDirectory()) found.push(...directories(path.join(root, entry.name)));
   }
   return found;
@@ -18,7 +19,10 @@ export function treeDigest(root: string): TreeDigest {
   let totalFiles = 0;
   for (const directory of directories(root).sort()) {
     const files = readdirSync(directory, { withFileTypes: true })
-      .filter((entry) => !entry.isDirectory())
+      .filter((entry) => {
+        if (entry.isSymbolicLink()) throw new Error(`symlink in digested tree: ${path.join(directory, entry.name)}`);
+        return !entry.isDirectory();
+      })
       .map((entry) => entry.name)
       .sort();
     for (const name of files) {
@@ -31,18 +35,4 @@ export function treeDigest(root: string): TreeDigest {
     }
   }
   return { sha256: hash.digest("hex"), totalBytes, totalFiles };
-}
-
-export function explorerReceipt(source: TreeDigest, mounted: TreeDigest): Record<string, unknown> {
-  return {
-    schema: "site-explorer-artifact/v1",
-    source: "results-explorer/dist",
-    source_sha256: source.sha256,
-    source_total_files: source.totalFiles,
-    source_total_bytes: source.totalBytes,
-    mounted_path: "/results/",
-    mounted_sha256: mounted.sha256,
-    mounted_total_files: mounted.totalFiles,
-    mounted_total_bytes: mounted.totalBytes,
-  };
 }

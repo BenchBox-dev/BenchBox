@@ -16,8 +16,6 @@ export function ErrorState({ title, description, detail, action, class: extraCla
   return (
     <div
       role="alert"
-      aria-live="assertive"
-      aria-atomic="true"
       aria-labelledby={titleId}
       class={`flex flex-col gap-3 rounded-lg p-6 tone-danger ${extraClass}`}
     >

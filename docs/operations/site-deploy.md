@@ -140,11 +140,11 @@ Each route also records `lane_sha256`, the digest of every tree it contributes t
 artifact, and the receipt carries an `explorer` block with the Results Explorer's
 digest (`sha256`), source SHA and corpus. The Explorer is pinned by that digest on
 its own, apart from the whole-site `artifact.sha256`, so a change to prose never
-reads as an Explorer change. The site build writes
-`website/.receipts/explorer-artifact.json` with the digest of `results-explorer/dist`
-as consumed (`source_sha256`) and of the `/results/` tree as published
-(`mounted_sha256`, which differs because the build adds page metadata to the entry
-document). The build copies the Explorer build output and never rebuilds its source.
+reads as an Explorer change. The site build copies
+`results-explorer/dist` byte for byte into `/results/` and fails if the mounted tree's
+digest differs from the source's; it never rebuilds the Explorer source. Digests are
+computed with the assembler's algorithm, and a symlink in the tree is a hard error in
+the Node digest.
 
 ## Rollback
 

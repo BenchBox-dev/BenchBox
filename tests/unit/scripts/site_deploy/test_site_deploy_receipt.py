@@ -134,3 +134,9 @@ def test_receipt_records_the_explorer_digest_apart_from_the_site_artifact() -> N
 
 def test_receipt_without_an_explorer_route_records_none() -> None:
     assert r.explorer_artifact([{"path": "/", "builder": "landing"}]) is None
+
+
+def test_receipt_refuses_an_explorer_route_with_several_lanes() -> None:
+    route = {"path": "/results/", "builder": "explorer", "lane_sha256": {"a": "1" * 64, "b": "2" * 64}}
+    with pytest.raises(r.ReceiptError):
+        r.explorer_artifact([route])

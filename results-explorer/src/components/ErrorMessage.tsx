@@ -10,7 +10,7 @@ interface ErrorMessageProps {
 export function ErrorMessage({ title = "Something went wrong", message, onRetry }: ErrorMessageProps) {
   const titleId = useId();
   return (
-    <div role="alert" aria-live="assertive" aria-atomic="true" aria-labelledby={titleId} class="rounded-lg p-6 tone-danger">
+    <div role="alert" aria-labelledby={titleId} class="rounded-lg p-6 tone-danger">
       <h3 id={titleId} class="mb-1 text-sm font-semibold">{title}</h3>
       <p class="text-sm">{message}</p>
       {onRetry && (

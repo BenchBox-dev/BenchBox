@@ -19,30 +19,54 @@ interface SiteHeaderProps {
 }
 
 export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const openRef = useRef(false);
+  const panelFocusRef = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const brand = shellBrand("absolute");
   const links = shellLinks(pathname, "absolute");
   const cta = shellCta("absolute");
 
+  function setOpen(next: boolean) {
+    openRef.current = next;
+    setOpenState(next);
+  }
+
   useEffect(() => {
-    if (!open) return;
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(min-width: 56.3125rem)");
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setOpen(false);
+        return;
+      }
+      const active = document.activeElement;
+      const inPanel = active instanceof HTMLElement && active.closest("[data-site-header-panel]") !== null;
+      if (inPanel || (panelFocusRef.current && (active === null || active === document.body))) toggleRef.current?.focus();
+      panelFocusRef.current = false;
+    };
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (!openRef.current || event.key !== "Escape" || document.querySelector("dialog[open]")) return;
       setOpen(false);
       toggleRef.current?.focus();
     };
-    const onPointerDown = (event: Event) => {
-      if (headerRef.current && event.target instanceof Node && !headerRef.current.contains(event.target)) setOpen(false);
+    const onClick = (event: Event) => {
+      if (!(event.target instanceof Element && event.target.closest("[data-site-header-panel]"))) panelFocusRef.current = false;
+      if (openRef.current && headerRef.current && event.target instanceof Node && !headerRef.current.contains(event.target)) setOpen(false);
     };
     document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("click", onPointerDown);
+    document.addEventListener("click", onClick);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("click", onPointerDown);
+      document.removeEventListener("click", onClick);
     };
-  }, [open]);
+  }, []);
 
   return (
     <header
@@ -51,6 +75,13 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
       data-site-header
       data-open={open ? "true" : "false"}
       data-testid={testId}
+      onFocusIn={(event) => {
+        panelFocusRef.current = event.target instanceof Element && event.target.closest("[data-site-header-panel]") !== null;
+      }}
+      onFocusOut={(event) => {
+        const next = event.relatedTarget;
+        if (openRef.current && next instanceof Node && !headerRef.current?.contains(next)) setOpen(false);
+      }}
     >
       <div class="site-header__inner">
         <a class="site-header__logo" href={brand.href}>
@@ -64,7 +95,7 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
           aria-controls="site-header-panel"
           aria-expanded={open ? "true" : "false"}
           data-site-header-toggle
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => setOpen(!openRef.current)}
         >
           <span class="site-header__toggle-lines" aria-hidden="true" />
         </button>
