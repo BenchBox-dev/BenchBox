@@ -1,11 +1,12 @@
 # PR base branch policy
 
-Only PRs based on an integration branch enter the merge queue. Stacking is
-allowed narrowly: a stack belongs to one author and one tracker item and is at
-most three PRs deep. Every PR above the bottom one is a **draft** that targets
-its parent branch, so it gets Codex connector review and CI there. When the
-parent squash-merges, retarget the child to `develop`, rebase it onto the
-squash commit with `git rebase --onto origin/develop <old parent tip>`, let CI
+Ready PRs target an integration branch. Stacking is allowed narrowly: a stack
+belongs to one agent and one tracker item and is at most three PRs deep. Agents
+must not build on another agent's unmerged branch. Every PR above the bottom one
+is a **draft** that targets its parent branch, so it gets Codex connector review
+and CI there. When the parent squash-merges, retarget the child to `develop`,
+rebase it onto the squash commit with
+`git rebase --onto origin/develop <old parent tip>`, let CI
 rerun, and only then arm it. `make pr-open` always targets `develop`, so open
 an upper draft with `gh pr create --draft --base <parent branch>`.
 `make pr-arm` refuses a PR whose base is not `develop`.
@@ -115,10 +116,11 @@ conflicts, or a filter bug, from an empty or partial check list alone.
 
 ## Agent checklist
 
-- `make pr-open` (and manual `gh pr create`) must target `develop` unless the
-  change is explicitly for `release` or `published-results`.
+- Ordinary PRs created with `make pr-open` or `gh pr create` target `develop`
+  unless the change is explicitly for `release` or `published-results`.
+  Parent-based drafts follow the exception below.
 - Open a PR with `--base` set to another feature branch only as a draft in a
-  stack (one author, one tracker item, depth 3 or less); never arm it before
+  stack (one agent, one tracker item, depth 3 or less); never arm it before
   it is retargeted at `develop`.
 - If `base-guard` fails on a ready PR, fix the base; do not try to "add CI" to
   the stacked base by editing branch filters.
