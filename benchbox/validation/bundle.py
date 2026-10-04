@@ -2311,6 +2311,7 @@ def _oversized_applied_ledger_arrays(applied: dict) -> list[tuple[str, int]]:
     candidates = (
         ("statements", applied.get("statements")),
         ("dropped", applied.get("dropped")),
+        ("satisfied", applied.get("satisfied")),
         ("receipt.entries", receipt.get("entries")),
         ("receipt.observed", receipt.get("observed")),
         ("receipt.dropped", receipt.get("dropped")),
