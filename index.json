@@ -978,18 +978,13 @@
       "title": "Convert the 26 non-autodoc .rst docs pages to MyST Markdown inside the current Sphinx build"
     },
     "astro-site-31-myst-to-mdx-converter": {
-      "claim": {
-        "expires_at": "2026-10-05T23:51:38Z",
-        "generation": "c7ca31f09a724e41a55ba457959182dc",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:eab247781550a2228da6f8b3"
-      },
+      "claim": null,
       "needs": [
         "astro-site-20-package-scaffold-and-ci",
         "astro-site-30-rst-to-myst-in-place"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Write a build-time MyST-to-Markdown converter for Astro that fails closed on unknown constructs"
     },
     "astro-site-32-port-docs-generators": {
