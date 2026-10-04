@@ -21154,15 +21154,10 @@
       "title": "DECISION GATE (D-4): what --tuning means for load-only runs (--phases generate,load)"
     },
     "tuning-gate-local-result-anonymization-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T16:25:59Z",
-        "generation": "6305cd68be1b45f5ae0211c85890b911",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "DECISION GATE (D-3): should the CLI's local result file be anonymized by default?"
     },
     "tuning-gate-sort-evidence-model-20261001": {
