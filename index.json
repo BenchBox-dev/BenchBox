@@ -11370,14 +11370,19 @@
       "title": "Lint lane reports ALL guard failures in one CI round trip (no fail-fast between independent guards)"
     },
     "live-cloud-benchmark-academic-suites": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T18:43:49Z",
+        "generation": "08c3c96c81e6411e8a0d71af4fb0757a",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64"
+      },
       "needs": [
         "first-live-cloud-benchmark-run-and-publish",
         "tuning-no-midrun-destructive-db-handling-20261001",
         "tuning-portable-metadata-store-20261001"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Run and publish live cloud benchmark results for SSB, AMPLab, and JoinOrder (BigQuery, Databricks, Snowflake)"
     },
     "live-cloud-benchmark-industry-suites": {
