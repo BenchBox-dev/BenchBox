@@ -1,0 +1,8211 @@
+{
+  "benchmark": {
+    "id": "tpchavoc",
+    "name": "TPC-Havoc",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "gzip"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "saved_config",
+      "default_output_location": "saved_config",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "location": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "project_id": "project_6ab0d019ccae",
+      "show_query_plans": "saved_config",
+      "staging_root": "path_d969e086da79",
+      "status": "saved_config",
+      "storage_bucket": "bucket_aa4b9df65128",
+      "storage_prefix": "prefix_5c53d7013283",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "dataset_85fd478089fd",
+      "default_output_location": "path_399fe063fc9e",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T18:56:25.263788",
+      "location": "US",
+      "normalize_plan_literals": false,
+      "project_id": "project_9d60772868dd",
+      "show_query_plans": false,
+      "staging_root": "path_399fe063fc9e",
+      "status": "valid",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "",
+      "tuning_source": "baseline"
+    }
+  },
+  "cost": {
+    "model": "actual",
+    "total_usd": 0.19631385803222656
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 415.492,
+        "min": 381.162,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "serverless",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "gzip"
+    },
+    "driver_package": "google-cloud-bigquery",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "3.45.1",
+    "driver_version_resolved": "3.45.1",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "timestamp": "2026-09-29T13:54:50.492203",
+    "translation": {
+      "attempt_count": 1101,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 1100,
+          "count": 1100,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "bigquery",
+          "parser_grammar": "postgres",
+          "scope": "workload_query",
+          "source_dialect": "netezza",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "bigquery",
+          "translator": "sqlglot",
+          "unique_queries": 220
+        },
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "bigquery",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "bigquery",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "netezza",
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 1101,
+      "target_dialects": [
+        "bigquery"
+      ],
+      "total_transpilation_calls": 1101,
+      "translators": [
+        "sqlglot"
+      ],
+      "unique_queries_translated": 220
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-09-29T14:12:45.961782",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "tib_scanned",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "normalized",
+    "cost_usd": "0.19631385803222656",
+    "deployment": {
+      "cloud_provider": "gcp",
+      "cloud_region": "US",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0.19631385803222656",
+    "pricing_region": "US"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 65698,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 951388,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 8863,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 8841,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "3.45.1",
+    "cloud": {
+      "collection_status": "partial",
+      "location": "US",
+      "project": "project_9d60772868dd",
+      "provider": "gcp",
+      "source": "observed"
+    },
+    "compute": {
+      "cache_enabled": false,
+      "collection_status": "available",
+      "dataset_metadata_collection_status": "available",
+      "edition": "ON_DEMAND",
+      "job_priority": "INTERACTIVE",
+      "pricing_model": "on-demand",
+      "source": "observed"
+    },
+    "config": {
+      "cloud_provider": "GCP",
+      "connection_mode": "remote",
+      "dataset_id": "dataset_e65e8a8a22bc",
+      "driver_package": "google-cloud-bigquery",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "3.45.1",
+      "driver_version_resolved": "3.45.1",
+      "execution_mode": "sql",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "dataset": "dataset_e65e8a8a22bc",
+      "deployment_type": "serverless",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "requested"
+    },
+    "driver_actual_version": "3.45.1",
+    "driver_package": "google-cloud-bigquery",
+    "driver_resolved_version": "3.45.1",
+    "driver_runtime_strategy": "current-process",
+    "name": "BigQuery",
+    "raw_config": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "dataset_e65e8a8a22bc",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e",
+      "tuning_source": "baseline",
+      "type": "bigquery"
+    },
+    "raw_metadata": {
+      "cloud_provider": "GCP",
+      "compute_configuration": {
+        "dataset_created": "2026-09-29T17:55:06.884000+00:00",
+        "dataset_location": "US",
+        "dataset_metadata_collection_status": "available",
+        "dataset_modified": "2026-09-29T17:55:06.884000+00:00",
+        "edition": "ON_DEMAND",
+        "pricing_model": "on-demand"
+      }
+    },
+    "storage": {
+      "bucket": "bucket_71a5e582935b",
+      "collection_status": "partial",
+      "prefix": "prefix_60098b0cc37e",
+      "source": "requested",
+      "staging_location": "path_399fe063fc9e"
+    },
+    "version": "unknown"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "1_v1",
+      "iter": 0,
+      "ms": 921.2,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v2",
+      "iter": 0,
+      "ms": 928.0,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v3",
+      "iter": 0,
+      "ms": 1010.2,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v4",
+      "iter": 0,
+      "ms": 1162.5,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v5",
+      "iter": 0,
+      "ms": 1022.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v6",
+      "iter": 0,
+      "ms": 952.0,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v8",
+      "iter": 0,
+      "ms": 1261.8,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v9",
+      "iter": 0,
+      "ms": 1001.4,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v10",
+      "iter": 0,
+      "ms": 994.4,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v1",
+      "iter": 0,
+      "ms": 1001.9,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v3",
+      "iter": 0,
+      "ms": 1267.7,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v4",
+      "iter": 0,
+      "ms": 828.0,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v5",
+      "iter": 0,
+      "ms": 885.5,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v6",
+      "iter": 0,
+      "ms": 867.8,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v7",
+      "iter": 0,
+      "ms": 967.5,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v8",
+      "iter": 0,
+      "ms": 808.4,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v9",
+      "iter": 0,
+      "ms": 825.4,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2_v10",
+      "iter": 0,
+      "ms": 810.6,
+      "rows": 44,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v1",
+      "iter": 0,
+      "ms": 1449.9,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v2",
+      "iter": 0,
+      "ms": 1182.7,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v3",
+      "iter": 0,
+      "ms": 1108.2,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v4",
+      "iter": 0,
+      "ms": 951.1,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v5",
+      "iter": 0,
+      "ms": 873.0,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v6",
+      "iter": 0,
+      "ms": 1185.7,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v7",
+      "iter": 0,
+      "ms": 1066.3,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v8",
+      "iter": 0,
+      "ms": 857.8,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v9",
+      "iter": 0,
+      "ms": 901.1,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3_v10",
+      "iter": 0,
+      "ms": 1011.5,
+      "rows": 1216,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v1",
+      "iter": 0,
+      "ms": 910.0,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v2",
+      "iter": 0,
+      "ms": 890.8,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v3",
+      "iter": 0,
+      "ms": 1053.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v4",
+      "iter": 0,
+      "ms": 1371.4,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v5",
+      "iter": 0,
+      "ms": 860.5,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v6",
+      "iter": 0,
+      "ms": 961.0,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v7",
+      "iter": 0,
+      "ms": 815.4,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v8",
+      "iter": 0,
+      "ms": 865.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v9",
+      "iter": 0,
+      "ms": 848.3,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4_v10",
+      "iter": 0,
+      "ms": 952.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v1",
+      "iter": 0,
+      "ms": 880.5,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v2",
+      "iter": 0,
+      "ms": 919.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v3",
+      "iter": 0,
+      "ms": 1063.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v4",
+      "iter": 0,
+      "ms": 1065.1,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v5",
+      "iter": 0,
+      "ms": 1488.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v6",
+      "iter": 0,
+      "ms": 841.0,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v7",
+      "iter": 0,
+      "ms": 953.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v8",
+      "iter": 0,
+      "ms": 1277.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v9",
+      "iter": 0,
+      "ms": 1526.5,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5_v10",
+      "iter": 0,
+      "ms": 919.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v1",
+      "iter": 0,
+      "ms": 899.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v2",
+      "iter": 0,
+      "ms": 829.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v3",
+      "iter": 0,
+      "ms": 878.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v4",
+      "iter": 0,
+      "ms": 706.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v5",
+      "iter": 0,
+      "ms": 725.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v6",
+      "iter": 0,
+      "ms": 797.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v7",
+      "iter": 0,
+      "ms": 878.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v8",
+      "iter": 0,
+      "ms": 940.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v9",
+      "iter": 0,
+      "ms": 699.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6_v10",
+      "iter": 0,
+      "ms": 864.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v1",
+      "iter": 0,
+      "ms": 919.8,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v2",
+      "iter": 0,
+      "ms": 885.9,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v3",
+      "iter": 0,
+      "ms": 980.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v4",
+      "iter": 0,
+      "ms": 936.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v5",
+      "iter": 0,
+      "ms": 950.4,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v6",
+      "iter": 0,
+      "ms": 1108.2,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v7",
+      "iter": 0,
+      "ms": 1331.9,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v8",
+      "iter": 0,
+      "ms": 1545.6,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v9",
+      "iter": 0,
+      "ms": 860.9,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7_v10",
+      "iter": 0,
+      "ms": 971.0,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v1",
+      "iter": 0,
+      "ms": 982.4,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v2",
+      "iter": 0,
+      "ms": 969.0,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v3",
+      "iter": 0,
+      "ms": 1049.0,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v4",
+      "iter": 0,
+      "ms": 998.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v5",
+      "iter": 0,
+      "ms": 1002.5,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v6",
+      "iter": 0,
+      "ms": 995.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v7",
+      "iter": 0,
+      "ms": 1266.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v8",
+      "iter": 0,
+      "ms": 890.6,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v9",
+      "iter": 0,
+      "ms": 897.7,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8_v10",
+      "iter": 0,
+      "ms": 1188.6,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v1",
+      "iter": 0,
+      "ms": 1003.6,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v2",
+      "iter": 0,
+      "ms": 1039.4,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v3",
+      "iter": 0,
+      "ms": 1250.4,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v4",
+      "iter": 0,
+      "ms": 1160.0,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v5",
+      "iter": 0,
+      "ms": 1144.2,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v6",
+      "iter": 0,
+      "ms": 960.4,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v7",
+      "iter": 0,
+      "ms": 907.8,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v8",
+      "iter": 0,
+      "ms": 1454.5,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v9",
+      "iter": 0,
+      "ms": 1314.1,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9_v10",
+      "iter": 0,
+      "ms": 947.8,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v1",
+      "iter": 0,
+      "ms": 1968.7,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v2",
+      "iter": 0,
+      "ms": 2110.7,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v3",
+      "iter": 0,
+      "ms": 2021.4,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v4",
+      "iter": 0,
+      "ms": 2006.2,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v5",
+      "iter": 0,
+      "ms": 2023.7,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v6",
+      "iter": 0,
+      "ms": 1836.4,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v7",
+      "iter": 0,
+      "ms": 2229.1,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v8",
+      "iter": 0,
+      "ms": 2010.8,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v9",
+      "iter": 0,
+      "ms": 2391.9,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10_v10",
+      "iter": 0,
+      "ms": 4219.6,
+      "rows": 3767,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v1",
+      "iter": 0,
+      "ms": 1058.7,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v2",
+      "iter": 0,
+      "ms": 735.0,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v3",
+      "iter": 0,
+      "ms": 821.5,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v4",
+      "iter": 0,
+      "ms": 810.0,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v5",
+      "iter": 0,
+      "ms": 778.5,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v6",
+      "iter": 0,
+      "ms": 1506.4,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v7",
+      "iter": 0,
+      "ms": 732.7,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v8",
+      "iter": 0,
+      "ms": 825.0,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v9",
+      "iter": 0,
+      "ms": 849.9,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11_v10",
+      "iter": 0,
+      "ms": 726.3,
+      "rows": 22,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v1",
+      "iter": 0,
+      "ms": 855.0,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v2",
+      "iter": 0,
+      "ms": 794.4,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v3",
+      "iter": 0,
+      "ms": 685.0,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v4",
+      "iter": 0,
+      "ms": 746.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v5",
+      "iter": 0,
+      "ms": 853.2,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v6",
+      "iter": 0,
+      "ms": 852.3,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v7",
+      "iter": 0,
+      "ms": 716.4,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v8",
+      "iter": 0,
+      "ms": 1242.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v9",
+      "iter": 0,
+      "ms": 838.8,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12_v10",
+      "iter": 0,
+      "ms": 1418.3,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v1",
+      "iter": 0,
+      "ms": 799.2,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v2",
+      "iter": 0,
+      "ms": 856.3,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v3",
+      "iter": 0,
+      "ms": 763.9,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v4",
+      "iter": 0,
+      "ms": 789.2,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v5",
+      "iter": 0,
+      "ms": 1213.9,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v6",
+      "iter": 0,
+      "ms": 855.0,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v7",
+      "iter": 0,
+      "ms": 889.0,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v8",
+      "iter": 0,
+      "ms": 1071.2,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v9",
+      "iter": 0,
+      "ms": 807.1,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13_v10",
+      "iter": 0,
+      "ms": 918.1,
+      "rows": 37,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v1",
+      "iter": 0,
+      "ms": 971.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v2",
+      "iter": 0,
+      "ms": 846.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v3",
+      "iter": 0,
+      "ms": 749.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v4",
+      "iter": 0,
+      "ms": 803.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v5",
+      "iter": 0,
+      "ms": 705.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v6",
+      "iter": 0,
+      "ms": 840.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v7",
+      "iter": 0,
+      "ms": 674.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v8",
+      "iter": 0,
+      "ms": 771.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v9",
+      "iter": 0,
+      "ms": 913.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14_v10",
+      "iter": 0,
+      "ms": 752.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v1",
+      "iter": 0,
+      "ms": 819.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v2",
+      "iter": 0,
+      "ms": 1145.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v3",
+      "iter": 0,
+      "ms": 732.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v4",
+      "iter": 0,
+      "ms": 791.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v5",
+      "iter": 0,
+      "ms": 726.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v6",
+      "iter": 0,
+      "ms": 784.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v7",
+      "iter": 0,
+      "ms": 825.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v8",
+      "iter": 0,
+      "ms": 891.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v9",
+      "iter": 0,
+      "ms": 789.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15_v10",
+      "iter": 0,
+      "ms": 836.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v1",
+      "iter": 0,
+      "ms": 938.4,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v2",
+      "iter": 0,
+      "ms": 860.7,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v3",
+      "iter": 0,
+      "ms": 751.8,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v4",
+      "iter": 0,
+      "ms": 724.1,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v5",
+      "iter": 0,
+      "ms": 1102.9,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v6",
+      "iter": 0,
+      "ms": 808.4,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v7",
+      "iter": 0,
+      "ms": 937.4,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v8",
+      "iter": 0,
+      "ms": 899.8,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v9",
+      "iter": 0,
+      "ms": 931.1,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16_v10",
+      "iter": 0,
+      "ms": 835.9,
+      "rows": 2762,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v1",
+      "iter": 0,
+      "ms": 751.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v2",
+      "iter": 0,
+      "ms": 877.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v3",
+      "iter": 0,
+      "ms": 746.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v4",
+      "iter": 0,
+      "ms": 782.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v5",
+      "iter": 0,
+      "ms": 1598.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v6",
+      "iter": 0,
+      "ms": 966.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v7",
+      "iter": 0,
+      "ms": 815.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v8",
+      "iter": 0,
+      "ms": 843.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v9",
+      "iter": 0,
+      "ms": 988.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17_v10",
+      "iter": 0,
+      "ms": 733.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v1",
+      "iter": 0,
+      "ms": 1069.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v2",
+      "iter": 0,
+      "ms": 827.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v3",
+      "iter": 0,
+      "ms": 884.8,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v4",
+      "iter": 0,
+      "ms": 1120.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v5",
+      "iter": 0,
+      "ms": 794.5,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v6",
+      "iter": 0,
+      "ms": 913.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v7",
+      "iter": 0,
+      "ms": 893.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v8",
+      "iter": 0,
+      "ms": 907.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v9",
+      "iter": 0,
+      "ms": 977.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18_v10",
+      "iter": 0,
+      "ms": 876.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v1",
+      "iter": 0,
+      "ms": 716.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v2",
+      "iter": 0,
+      "ms": 717.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v3",
+      "iter": 0,
+      "ms": 845.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v4",
+      "iter": 0,
+      "ms": 712.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v5",
+      "iter": 0,
+      "ms": 756.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v6",
+      "iter": 0,
+      "ms": 727.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v7",
+      "iter": 0,
+      "ms": 789.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v8",
+      "iter": 0,
+      "ms": 795.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v9",
+      "iter": 0,
+      "ms": 916.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19_v10",
+      "iter": 0,
+      "ms": 775.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v1",
+      "iter": 0,
+      "ms": 882.3,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v2",
+      "iter": 0,
+      "ms": 816.2,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v3",
+      "iter": 0,
+      "ms": 901.5,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v4",
+      "iter": 0,
+      "ms": 776.9,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v5",
+      "iter": 0,
+      "ms": 890.4,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v6",
+      "iter": 0,
+      "ms": 736.2,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v7",
+      "iter": 0,
+      "ms": 1040.3,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v8",
+      "iter": 0,
+      "ms": 840.7,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v9",
+      "iter": 0,
+      "ms": 1016.9,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20_v10",
+      "iter": 0,
+      "ms": 834.8,
+      "rows": 9,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v1",
+      "iter": 0,
+      "ms": 1023.7,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v2",
+      "iter": 0,
+      "ms": 1023.4,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v3",
+      "iter": 0,
+      "ms": 835.4,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v4",
+      "iter": 0,
+      "ms": 1220.3,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v5",
+      "iter": 0,
+      "ms": 994.4,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v6",
+      "iter": 0,
+      "ms": 813.6,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v7",
+      "iter": 0,
+      "ms": 847.0,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v8",
+      "iter": 0,
+      "ms": 1195.0,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v9",
+      "iter": 0,
+      "ms": 793.6,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21_v10",
+      "iter": 0,
+      "ms": 857.6,
+      "rows": 47,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v1",
+      "iter": 0,
+      "ms": 808.2,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v2",
+      "iter": 0,
+      "ms": 943.5,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v3",
+      "iter": 0,
+      "ms": 850.9,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v4",
+      "iter": 0,
+      "ms": 854.1,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v5",
+      "iter": 0,
+      "ms": 933.7,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v6",
+      "iter": 0,
+      "ms": 725.9,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v7",
+      "iter": 0,
+      "ms": 1109.2,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v8",
+      "iter": 0,
+      "ms": 758.4,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v9",
+      "iter": 0,
+      "ms": 1292.0,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22_v10",
+      "iter": 0,
+      "ms": 920.4,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1_v1",
+      "iter": 1,
+      "ms": 905.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v2",
+      "iter": 1,
+      "ms": 971.9,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v3",
+      "iter": 1,
+      "ms": 1024.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v4",
+      "iter": 1,
+      "ms": 1235.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v5",
+      "iter": 1,
+      "ms": 1082.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v6",
+      "iter": 1,
+      "ms": 1128.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v8",
+      "iter": 1,
+      "ms": 1129.3,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v9",
+      "iter": 1,
+      "ms": 1279.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v10",
+      "iter": 1,
+      "ms": 1371.3,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v1",
+      "iter": 1,
+      "ms": 1204.1,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v3",
+      "iter": 1,
+      "ms": 1363.3,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v4",
+      "iter": 1,
+      "ms": 1333.1,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v5",
+      "iter": 1,
+      "ms": 1119.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v6",
+      "iter": 1,
+      "ms": 1237.5,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v7",
+      "iter": 1,
+      "ms": 1893.8,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v8",
+      "iter": 1,
+      "ms": 1175.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v9",
+      "iter": 1,
+      "ms": 1263.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2_v10",
+      "iter": 1,
+      "ms": 885.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v1",
+      "iter": 1,
+      "ms": 1074.5,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v2",
+      "iter": 1,
+      "ms": 928.3,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v3",
+      "iter": 1,
+      "ms": 997.9,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v4",
+      "iter": 1,
+      "ms": 1084.4,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v5",
+      "iter": 1,
+      "ms": 1181.5,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v6",
+      "iter": 1,
+      "ms": 1081.6,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v7",
+      "iter": 1,
+      "ms": 1225.3,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v8",
+      "iter": 1,
+      "ms": 1294.9,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v9",
+      "iter": 1,
+      "ms": 1330.5,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3_v10",
+      "iter": 1,
+      "ms": 2560.2,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v1",
+      "iter": 1,
+      "ms": 942.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v2",
+      "iter": 1,
+      "ms": 1356.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v3",
+      "iter": 1,
+      "ms": 939.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v4",
+      "iter": 1,
+      "ms": 1138.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v5",
+      "iter": 1,
+      "ms": 952.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v6",
+      "iter": 1,
+      "ms": 1009.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v7",
+      "iter": 1,
+      "ms": 977.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v8",
+      "iter": 1,
+      "ms": 934.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v9",
+      "iter": 1,
+      "ms": 926.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4_v10",
+      "iter": 1,
+      "ms": 862.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v1",
+      "iter": 1,
+      "ms": 1024.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v2",
+      "iter": 1,
+      "ms": 1199.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v3",
+      "iter": 1,
+      "ms": 1222.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v4",
+      "iter": 1,
+      "ms": 1215.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v5",
+      "iter": 1,
+      "ms": 1068.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v6",
+      "iter": 1,
+      "ms": 1352.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v7",
+      "iter": 1,
+      "ms": 1441.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v8",
+      "iter": 1,
+      "ms": 1475.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v9",
+      "iter": 1,
+      "ms": 1299.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5_v10",
+      "iter": 1,
+      "ms": 1114.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v1",
+      "iter": 1,
+      "ms": 1157.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v2",
+      "iter": 1,
+      "ms": 947.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v3",
+      "iter": 1,
+      "ms": 1116.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v4",
+      "iter": 1,
+      "ms": 1022.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v5",
+      "iter": 1,
+      "ms": 1327.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v6",
+      "iter": 1,
+      "ms": 1191.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v7",
+      "iter": 1,
+      "ms": 1007.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v8",
+      "iter": 1,
+      "ms": 1296.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v9",
+      "iter": 1,
+      "ms": 929.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6_v10",
+      "iter": 1,
+      "ms": 1210.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v1",
+      "iter": 1,
+      "ms": 1568.9,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v2",
+      "iter": 1,
+      "ms": 1105.4,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v3",
+      "iter": 1,
+      "ms": 902.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v4",
+      "iter": 1,
+      "ms": 1048.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v5",
+      "iter": 1,
+      "ms": 917.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v6",
+      "iter": 1,
+      "ms": 2081.4,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v7",
+      "iter": 1,
+      "ms": 1210.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v8",
+      "iter": 1,
+      "ms": 2519.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v9",
+      "iter": 1,
+      "ms": 1054.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7_v10",
+      "iter": 1,
+      "ms": 1104.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v1",
+      "iter": 1,
+      "ms": 1285.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v2",
+      "iter": 1,
+      "ms": 1111.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v3",
+      "iter": 1,
+      "ms": 1465.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v4",
+      "iter": 1,
+      "ms": 1419.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v5",
+      "iter": 1,
+      "ms": 1203.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v6",
+      "iter": 1,
+      "ms": 1128.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v7",
+      "iter": 1,
+      "ms": 1116.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v8",
+      "iter": 1,
+      "ms": 1259.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v9",
+      "iter": 1,
+      "ms": 1444.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8_v10",
+      "iter": 1,
+      "ms": 955.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v1",
+      "iter": 1,
+      "ms": 1235.6,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v2",
+      "iter": 1,
+      "ms": 1082.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v3",
+      "iter": 1,
+      "ms": 2122.4,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v4",
+      "iter": 1,
+      "ms": 1221.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v5",
+      "iter": 1,
+      "ms": 1400.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v6",
+      "iter": 1,
+      "ms": 1308.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v7",
+      "iter": 1,
+      "ms": 1214.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v8",
+      "iter": 1,
+      "ms": 1152.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v9",
+      "iter": 1,
+      "ms": 1095.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9_v10",
+      "iter": 1,
+      "ms": 1088.3,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v1",
+      "iter": 1,
+      "ms": 2453.6,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v2",
+      "iter": 1,
+      "ms": 2404.5,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v3",
+      "iter": 1,
+      "ms": 2688.9,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v4",
+      "iter": 1,
+      "ms": 2277.7,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v5",
+      "iter": 1,
+      "ms": 3554.6,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v6",
+      "iter": 1,
+      "ms": 2309.4,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v7",
+      "iter": 1,
+      "ms": 3219.3,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v8",
+      "iter": 1,
+      "ms": 2599.3,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v9",
+      "iter": 1,
+      "ms": 2313.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10_v10",
+      "iter": 1,
+      "ms": 2511.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v1",
+      "iter": 1,
+      "ms": 909.1,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v2",
+      "iter": 1,
+      "ms": 1112.0,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v3",
+      "iter": 1,
+      "ms": 925.2,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v4",
+      "iter": 1,
+      "ms": 1767.7,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v5",
+      "iter": 1,
+      "ms": 919.1,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v6",
+      "iter": 1,
+      "ms": 948.8,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v7",
+      "iter": 1,
+      "ms": 1976.4,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v8",
+      "iter": 1,
+      "ms": 907.7,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v9",
+      "iter": 1,
+      "ms": 888.6,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11_v10",
+      "iter": 1,
+      "ms": 955.4,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v1",
+      "iter": 1,
+      "ms": 939.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v2",
+      "iter": 1,
+      "ms": 861.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v3",
+      "iter": 1,
+      "ms": 1040.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v4",
+      "iter": 1,
+      "ms": 847.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v5",
+      "iter": 1,
+      "ms": 10145.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v6",
+      "iter": 1,
+      "ms": 829.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v7",
+      "iter": 1,
+      "ms": 1209.7,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v8",
+      "iter": 1,
+      "ms": 1198.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v9",
+      "iter": 1,
+      "ms": 1010.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12_v10",
+      "iter": 1,
+      "ms": 1358.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v1",
+      "iter": 1,
+      "ms": 940.2,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v2",
+      "iter": 1,
+      "ms": 1002.3,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v3",
+      "iter": 1,
+      "ms": 1011.0,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v4",
+      "iter": 1,
+      "ms": 904.8,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v5",
+      "iter": 1,
+      "ms": 984.5,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v6",
+      "iter": 1,
+      "ms": 978.9,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v7",
+      "iter": 1,
+      "ms": 1027.8,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v8",
+      "iter": 1,
+      "ms": 1538.2,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v9",
+      "iter": 1,
+      "ms": 1239.5,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13_v10",
+      "iter": 1,
+      "ms": 1107.1,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v1",
+      "iter": 1,
+      "ms": 852.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v2",
+      "iter": 1,
+      "ms": 885.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v3",
+      "iter": 1,
+      "ms": 961.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v4",
+      "iter": 1,
+      "ms": 1010.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v5",
+      "iter": 1,
+      "ms": 1406.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v6",
+      "iter": 1,
+      "ms": 1210.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v7",
+      "iter": 1,
+      "ms": 722.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v8",
+      "iter": 1,
+      "ms": 837.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v9",
+      "iter": 1,
+      "ms": 1016.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14_v10",
+      "iter": 1,
+      "ms": 995.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v1",
+      "iter": 1,
+      "ms": 1184.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v2",
+      "iter": 1,
+      "ms": 882.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v3",
+      "iter": 1,
+      "ms": 887.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v4",
+      "iter": 1,
+      "ms": 1031.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v5",
+      "iter": 1,
+      "ms": 835.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v6",
+      "iter": 1,
+      "ms": 884.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v7",
+      "iter": 1,
+      "ms": 1113.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v8",
+      "iter": 1,
+      "ms": 935.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v9",
+      "iter": 1,
+      "ms": 842.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15_v10",
+      "iter": 1,
+      "ms": 862.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v1",
+      "iter": 1,
+      "ms": 912.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v2",
+      "iter": 1,
+      "ms": 1193.7,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v3",
+      "iter": 1,
+      "ms": 944.9,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v4",
+      "iter": 1,
+      "ms": 1061.7,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v5",
+      "iter": 1,
+      "ms": 837.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v6",
+      "iter": 1,
+      "ms": 1250.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v7",
+      "iter": 1,
+      "ms": 980.6,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v8",
+      "iter": 1,
+      "ms": 902.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v9",
+      "iter": 1,
+      "ms": 1334.9,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16_v10",
+      "iter": 1,
+      "ms": 1009.9,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v1",
+      "iter": 1,
+      "ms": 800.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v2",
+      "iter": 1,
+      "ms": 828.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v3",
+      "iter": 1,
+      "ms": 1016.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v4",
+      "iter": 1,
+      "ms": 772.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v5",
+      "iter": 1,
+      "ms": 904.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v6",
+      "iter": 1,
+      "ms": 841.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v7",
+      "iter": 1,
+      "ms": 969.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v8",
+      "iter": 1,
+      "ms": 879.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v9",
+      "iter": 1,
+      "ms": 1350.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17_v10",
+      "iter": 1,
+      "ms": 884.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v1",
+      "iter": 1,
+      "ms": 877.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v2",
+      "iter": 1,
+      "ms": 1126.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v3",
+      "iter": 1,
+      "ms": 944.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v4",
+      "iter": 1,
+      "ms": 1384.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v5",
+      "iter": 1,
+      "ms": 936.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v6",
+      "iter": 1,
+      "ms": 1463.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v7",
+      "iter": 1,
+      "ms": 1001.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v8",
+      "iter": 1,
+      "ms": 925.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v9",
+      "iter": 1,
+      "ms": 1202.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18_v10",
+      "iter": 1,
+      "ms": 1057.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v1",
+      "iter": 1,
+      "ms": 796.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v2",
+      "iter": 1,
+      "ms": 878.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v3",
+      "iter": 1,
+      "ms": 782.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v4",
+      "iter": 1,
+      "ms": 969.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v5",
+      "iter": 1,
+      "ms": 830.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v6",
+      "iter": 1,
+      "ms": 902.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v7",
+      "iter": 1,
+      "ms": 2587.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v8",
+      "iter": 1,
+      "ms": 964.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v9",
+      "iter": 1,
+      "ms": 1019.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19_v10",
+      "iter": 1,
+      "ms": 1060.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v1",
+      "iter": 1,
+      "ms": 1171.2,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v2",
+      "iter": 1,
+      "ms": 959.5,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v3",
+      "iter": 1,
+      "ms": 884.6,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v4",
+      "iter": 1,
+      "ms": 871.7,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v5",
+      "iter": 1,
+      "ms": 912.7,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v6",
+      "iter": 1,
+      "ms": 939.5,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v7",
+      "iter": 1,
+      "ms": 1038.5,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v8",
+      "iter": 1,
+      "ms": 924.8,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v9",
+      "iter": 1,
+      "ms": 749.3,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20_v10",
+      "iter": 1,
+      "ms": 949.2,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v1",
+      "iter": 1,
+      "ms": 991.1,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v2",
+      "iter": 1,
+      "ms": 1023.9,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v3",
+      "iter": 1,
+      "ms": 1095.8,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v4",
+      "iter": 1,
+      "ms": 1035.8,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v5",
+      "iter": 1,
+      "ms": 907.3,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v6",
+      "iter": 1,
+      "ms": 912.4,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v7",
+      "iter": 1,
+      "ms": 944.9,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v8",
+      "iter": 1,
+      "ms": 941.2,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v9",
+      "iter": 1,
+      "ms": 1022.9,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21_v10",
+      "iter": 1,
+      "ms": 866.8,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v1",
+      "iter": 1,
+      "ms": 1141.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v2",
+      "iter": 1,
+      "ms": 809.4,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v3",
+      "iter": 1,
+      "ms": 777.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v4",
+      "iter": 1,
+      "ms": 758.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v5",
+      "iter": 1,
+      "ms": 874.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v6",
+      "iter": 1,
+      "ms": 961.7,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v7",
+      "iter": 1,
+      "ms": 826.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v8",
+      "iter": 1,
+      "ms": 897.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v9",
+      "iter": 1,
+      "ms": 1263.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22_v10",
+      "iter": 1,
+      "ms": 860.4,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1_v1",
+      "iter": 2,
+      "ms": 1177.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v2",
+      "iter": 2,
+      "ms": 1144.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v3",
+      "iter": 2,
+      "ms": 1561.3,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v4",
+      "iter": 2,
+      "ms": 1136.4,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v5",
+      "iter": 2,
+      "ms": 1044.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v6",
+      "iter": 2,
+      "ms": 974.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v8",
+      "iter": 2,
+      "ms": 1662.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v9",
+      "iter": 2,
+      "ms": 955.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v10",
+      "iter": 2,
+      "ms": 968.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v1",
+      "iter": 2,
+      "ms": 834.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v3",
+      "iter": 2,
+      "ms": 972.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v4",
+      "iter": 2,
+      "ms": 946.7,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v5",
+      "iter": 2,
+      "ms": 996.8,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v6",
+      "iter": 2,
+      "ms": 1043.2,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v7",
+      "iter": 2,
+      "ms": 949.5,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v8",
+      "iter": 2,
+      "ms": 838.4,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v9",
+      "iter": 2,
+      "ms": 915.3,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2_v10",
+      "iter": 2,
+      "ms": 986.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v1",
+      "iter": 2,
+      "ms": 877.6,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v2",
+      "iter": 2,
+      "ms": 1023.2,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v3",
+      "iter": 2,
+      "ms": 1173.4,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v4",
+      "iter": 2,
+      "ms": 1247.1,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v5",
+      "iter": 2,
+      "ms": 947.6,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v6",
+      "iter": 2,
+      "ms": 1006.9,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v7",
+      "iter": 2,
+      "ms": 1115.2,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v8",
+      "iter": 2,
+      "ms": 977.1,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v9",
+      "iter": 2,
+      "ms": 1041.0,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3_v10",
+      "iter": 2,
+      "ms": 1182.5,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v1",
+      "iter": 2,
+      "ms": 1402.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v2",
+      "iter": 2,
+      "ms": 938.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v3",
+      "iter": 2,
+      "ms": 1139.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v4",
+      "iter": 2,
+      "ms": 866.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v5",
+      "iter": 2,
+      "ms": 1073.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v6",
+      "iter": 2,
+      "ms": 1369.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v7",
+      "iter": 2,
+      "ms": 734.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v8",
+      "iter": 2,
+      "ms": 998.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v9",
+      "iter": 2,
+      "ms": 981.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4_v10",
+      "iter": 2,
+      "ms": 836.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v1",
+      "iter": 2,
+      "ms": 1139.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v2",
+      "iter": 2,
+      "ms": 1315.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v3",
+      "iter": 2,
+      "ms": 1676.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v4",
+      "iter": 2,
+      "ms": 1296.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v5",
+      "iter": 2,
+      "ms": 1040.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v6",
+      "iter": 2,
+      "ms": 1001.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v7",
+      "iter": 2,
+      "ms": 1975.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v8",
+      "iter": 2,
+      "ms": 1411.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v9",
+      "iter": 2,
+      "ms": 1165.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5_v10",
+      "iter": 2,
+      "ms": 1104.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v1",
+      "iter": 2,
+      "ms": 867.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v2",
+      "iter": 2,
+      "ms": 869.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v3",
+      "iter": 2,
+      "ms": 1114.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v4",
+      "iter": 2,
+      "ms": 898.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v5",
+      "iter": 2,
+      "ms": 899.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v6",
+      "iter": 2,
+      "ms": 879.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v7",
+      "iter": 2,
+      "ms": 862.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v8",
+      "iter": 2,
+      "ms": 890.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v9",
+      "iter": 2,
+      "ms": 914.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6_v10",
+      "iter": 2,
+      "ms": 807.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v1",
+      "iter": 2,
+      "ms": 1017.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v2",
+      "iter": 2,
+      "ms": 1048.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v3",
+      "iter": 2,
+      "ms": 969.4,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v4",
+      "iter": 2,
+      "ms": 995.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v5",
+      "iter": 2,
+      "ms": 844.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v6",
+      "iter": 2,
+      "ms": 904.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v7",
+      "iter": 2,
+      "ms": 994.4,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v8",
+      "iter": 2,
+      "ms": 2411.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v9",
+      "iter": 2,
+      "ms": 950.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7_v10",
+      "iter": 2,
+      "ms": 913.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v1",
+      "iter": 2,
+      "ms": 1555.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v2",
+      "iter": 2,
+      "ms": 980.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v3",
+      "iter": 2,
+      "ms": 1094.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v4",
+      "iter": 2,
+      "ms": 1162.3,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v5",
+      "iter": 2,
+      "ms": 1576.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v6",
+      "iter": 2,
+      "ms": 928.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v7",
+      "iter": 2,
+      "ms": 1456.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v8",
+      "iter": 2,
+      "ms": 1209.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v9",
+      "iter": 2,
+      "ms": 1095.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8_v10",
+      "iter": 2,
+      "ms": 1180.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v1",
+      "iter": 2,
+      "ms": 1169.1,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v2",
+      "iter": 2,
+      "ms": 1129.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v3",
+      "iter": 2,
+      "ms": 1502.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v4",
+      "iter": 2,
+      "ms": 1179.1,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v5",
+      "iter": 2,
+      "ms": 1799.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v6",
+      "iter": 2,
+      "ms": 899.3,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v7",
+      "iter": 2,
+      "ms": 1311.4,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v8",
+      "iter": 2,
+      "ms": 1107.6,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v9",
+      "iter": 2,
+      "ms": 1224.4,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9_v10",
+      "iter": 2,
+      "ms": 1130.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v1",
+      "iter": 2,
+      "ms": 2129.0,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v2",
+      "iter": 2,
+      "ms": 2539.3,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v3",
+      "iter": 2,
+      "ms": 2061.3,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v4",
+      "iter": 2,
+      "ms": 2147.7,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v5",
+      "iter": 2,
+      "ms": 2024.8,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v6",
+      "iter": 2,
+      "ms": 2132.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v7",
+      "iter": 2,
+      "ms": 2494.8,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v8",
+      "iter": 2,
+      "ms": 2223.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v9",
+      "iter": 2,
+      "ms": 2461.4,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10_v10",
+      "iter": 2,
+      "ms": 2282.0,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v1",
+      "iter": 2,
+      "ms": 953.5,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v2",
+      "iter": 2,
+      "ms": 822.4,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v3",
+      "iter": 2,
+      "ms": 740.2,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v4",
+      "iter": 2,
+      "ms": 880.3,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v5",
+      "iter": 2,
+      "ms": 844.7,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v6",
+      "iter": 2,
+      "ms": 896.1,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v7",
+      "iter": 2,
+      "ms": 885.0,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v8",
+      "iter": 2,
+      "ms": 1004.3,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v9",
+      "iter": 2,
+      "ms": 851.8,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11_v10",
+      "iter": 2,
+      "ms": 781.3,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v1",
+      "iter": 2,
+      "ms": 872.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v2",
+      "iter": 2,
+      "ms": 780.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v3",
+      "iter": 2,
+      "ms": 993.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v4",
+      "iter": 2,
+      "ms": 789.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v5",
+      "iter": 2,
+      "ms": 1010.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v6",
+      "iter": 2,
+      "ms": 881.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v7",
+      "iter": 2,
+      "ms": 961.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v8",
+      "iter": 2,
+      "ms": 930.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v9",
+      "iter": 2,
+      "ms": 766.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12_v10",
+      "iter": 2,
+      "ms": 908.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v1",
+      "iter": 2,
+      "ms": 929.5,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v2",
+      "iter": 2,
+      "ms": 994.0,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v3",
+      "iter": 2,
+      "ms": 884.2,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v4",
+      "iter": 2,
+      "ms": 838.2,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v5",
+      "iter": 2,
+      "ms": 1427.0,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v6",
+      "iter": 2,
+      "ms": 1168.0,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v7",
+      "iter": 2,
+      "ms": 986.4,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v8",
+      "iter": 2,
+      "ms": 1879.5,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v9",
+      "iter": 2,
+      "ms": 786.7,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13_v10",
+      "iter": 2,
+      "ms": 1000.0,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v1",
+      "iter": 2,
+      "ms": 886.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v2",
+      "iter": 2,
+      "ms": 847.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v3",
+      "iter": 2,
+      "ms": 860.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v4",
+      "iter": 2,
+      "ms": 752.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v5",
+      "iter": 2,
+      "ms": 867.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v6",
+      "iter": 2,
+      "ms": 1163.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v7",
+      "iter": 2,
+      "ms": 2767.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v8",
+      "iter": 2,
+      "ms": 918.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v9",
+      "iter": 2,
+      "ms": 844.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14_v10",
+      "iter": 2,
+      "ms": 1465.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v1",
+      "iter": 2,
+      "ms": 1036.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v2",
+      "iter": 2,
+      "ms": 1411.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v3",
+      "iter": 2,
+      "ms": 750.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v4",
+      "iter": 2,
+      "ms": 899.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v5",
+      "iter": 2,
+      "ms": 754.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v6",
+      "iter": 2,
+      "ms": 830.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v7",
+      "iter": 2,
+      "ms": 770.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v8",
+      "iter": 2,
+      "ms": 935.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v9",
+      "iter": 2,
+      "ms": 877.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15_v10",
+      "iter": 2,
+      "ms": 827.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v1",
+      "iter": 2,
+      "ms": 843.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v2",
+      "iter": 2,
+      "ms": 2315.8,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v3",
+      "iter": 2,
+      "ms": 2038.7,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v4",
+      "iter": 2,
+      "ms": 837.4,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v5",
+      "iter": 2,
+      "ms": 955.2,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v6",
+      "iter": 2,
+      "ms": 952.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v7",
+      "iter": 2,
+      "ms": 826.0,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v8",
+      "iter": 2,
+      "ms": 1152.0,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v9",
+      "iter": 2,
+      "ms": 842.6,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16_v10",
+      "iter": 2,
+      "ms": 829.9,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v1",
+      "iter": 2,
+      "ms": 1365.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v2",
+      "iter": 2,
+      "ms": 746.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v3",
+      "iter": 2,
+      "ms": 860.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v4",
+      "iter": 2,
+      "ms": 1027.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v5",
+      "iter": 2,
+      "ms": 813.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v6",
+      "iter": 2,
+      "ms": 893.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v7",
+      "iter": 2,
+      "ms": 1163.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v8",
+      "iter": 2,
+      "ms": 899.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v9",
+      "iter": 2,
+      "ms": 1037.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17_v10",
+      "iter": 2,
+      "ms": 987.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v1",
+      "iter": 2,
+      "ms": 935.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v2",
+      "iter": 2,
+      "ms": 1241.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v3",
+      "iter": 2,
+      "ms": 1003.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v4",
+      "iter": 2,
+      "ms": 1557.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v5",
+      "iter": 2,
+      "ms": 1006.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v6",
+      "iter": 2,
+      "ms": 1169.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v7",
+      "iter": 2,
+      "ms": 1070.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v8",
+      "iter": 2,
+      "ms": 1007.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v9",
+      "iter": 2,
+      "ms": 1692.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18_v10",
+      "iter": 2,
+      "ms": 1035.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v1",
+      "iter": 2,
+      "ms": 857.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v2",
+      "iter": 2,
+      "ms": 887.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v3",
+      "iter": 2,
+      "ms": 823.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v4",
+      "iter": 2,
+      "ms": 826.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v5",
+      "iter": 2,
+      "ms": 808.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v6",
+      "iter": 2,
+      "ms": 1037.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v7",
+      "iter": 2,
+      "ms": 1087.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v8",
+      "iter": 2,
+      "ms": 884.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v9",
+      "iter": 2,
+      "ms": 1383.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19_v10",
+      "iter": 2,
+      "ms": 886.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v1",
+      "iter": 2,
+      "ms": 853.3,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v2",
+      "iter": 2,
+      "ms": 831.0,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v3",
+      "iter": 2,
+      "ms": 768.8,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v4",
+      "iter": 2,
+      "ms": 856.7,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v5",
+      "iter": 2,
+      "ms": 1099.9,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v6",
+      "iter": 2,
+      "ms": 1039.6,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v7",
+      "iter": 2,
+      "ms": 756.8,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v8",
+      "iter": 2,
+      "ms": 800.7,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v9",
+      "iter": 2,
+      "ms": 847.4,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20_v10",
+      "iter": 2,
+      "ms": 740.3,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v1",
+      "iter": 2,
+      "ms": 982.2,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v2",
+      "iter": 2,
+      "ms": 1573.6,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v3",
+      "iter": 2,
+      "ms": 865.0,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v4",
+      "iter": 2,
+      "ms": 1212.3,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v5",
+      "iter": 2,
+      "ms": 1179.0,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v6",
+      "iter": 2,
+      "ms": 972.9,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v7",
+      "iter": 2,
+      "ms": 902.1,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v8",
+      "iter": 2,
+      "ms": 847.4,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v9",
+      "iter": 2,
+      "ms": 873.8,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21_v10",
+      "iter": 2,
+      "ms": 932.3,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v1",
+      "iter": 2,
+      "ms": 808.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v2",
+      "iter": 2,
+      "ms": 823.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v3",
+      "iter": 2,
+      "ms": 728.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v4",
+      "iter": 2,
+      "ms": 824.0,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v5",
+      "iter": 2,
+      "ms": 1120.3,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v6",
+      "iter": 2,
+      "ms": 1007.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v7",
+      "iter": 2,
+      "ms": 786.1,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v8",
+      "iter": 2,
+      "ms": 752.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v9",
+      "iter": 2,
+      "ms": 868.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22_v10",
+      "iter": 2,
+      "ms": 779.1,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1_v1",
+      "iter": 3,
+      "ms": 1099.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v2",
+      "iter": 3,
+      "ms": 928.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v3",
+      "iter": 3,
+      "ms": 1070.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v4",
+      "iter": 3,
+      "ms": 778.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v5",
+      "iter": 3,
+      "ms": 1574.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v6",
+      "iter": 3,
+      "ms": 1084.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v8",
+      "iter": 3,
+      "ms": 1363.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v9",
+      "iter": 3,
+      "ms": 1044.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1_v10",
+      "iter": 3,
+      "ms": 897.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v1",
+      "iter": 3,
+      "ms": 822.9,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v3",
+      "iter": 3,
+      "ms": 1126.7,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v4",
+      "iter": 3,
+      "ms": 900.6,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v5",
+      "iter": 3,
+      "ms": 969.5,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v6",
+      "iter": 3,
+      "ms": 875.9,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v7",
+      "iter": 3,
+      "ms": 937.0,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v8",
+      "iter": 3,
+      "ms": 881.7,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v9",
+      "iter": 3,
+      "ms": 792.5,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2_v10",
+      "iter": 3,
+      "ms": 738.3,
+      "rows": 44,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v1",
+      "iter": 3,
+      "ms": 1200.5,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v2",
+      "iter": 3,
+      "ms": 857.8,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v3",
+      "iter": 3,
+      "ms": 873.7,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v4",
+      "iter": 3,
+      "ms": 1042.9,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v5",
+      "iter": 3,
+      "ms": 1327.9,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v6",
+      "iter": 3,
+      "ms": 906.1,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v7",
+      "iter": 3,
+      "ms": 911.8,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v8",
+      "iter": 3,
+      "ms": 860.3,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v9",
+      "iter": 3,
+      "ms": 1017.1,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3_v10",
+      "iter": 3,
+      "ms": 830.8,
+      "rows": 1216,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v1",
+      "iter": 3,
+      "ms": 822.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v2",
+      "iter": 3,
+      "ms": 906.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v3",
+      "iter": 3,
+      "ms": 751.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v4",
+      "iter": 3,
+      "ms": 783.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v5",
+      "iter": 3,
+      "ms": 731.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v6",
+      "iter": 3,
+      "ms": 952.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v7",
+      "iter": 3,
+      "ms": 794.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v8",
+      "iter": 3,
+      "ms": 750.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v9",
+      "iter": 3,
+      "ms": 928.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4_v10",
+      "iter": 3,
+      "ms": 741.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v1",
+      "iter": 3,
+      "ms": 1031.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v2",
+      "iter": 3,
+      "ms": 1010.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v3",
+      "iter": 3,
+      "ms": 940.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v4",
+      "iter": 3,
+      "ms": 1048.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v5",
+      "iter": 3,
+      "ms": 1012.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v6",
+      "iter": 3,
+      "ms": 1008.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v7",
+      "iter": 3,
+      "ms": 1207.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v8",
+      "iter": 3,
+      "ms": 1179.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v9",
+      "iter": 3,
+      "ms": 971.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5_v10",
+      "iter": 3,
+      "ms": 1166.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v1",
+      "iter": 3,
+      "ms": 739.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v2",
+      "iter": 3,
+      "ms": 780.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v3",
+      "iter": 3,
+      "ms": 790.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v4",
+      "iter": 3,
+      "ms": 837.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v5",
+      "iter": 3,
+      "ms": 706.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v6",
+      "iter": 3,
+      "ms": 796.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v7",
+      "iter": 3,
+      "ms": 884.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v8",
+      "iter": 3,
+      "ms": 904.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v9",
+      "iter": 3,
+      "ms": 760.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6_v10",
+      "iter": 3,
+      "ms": 754.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v1",
+      "iter": 3,
+      "ms": 913.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v2",
+      "iter": 3,
+      "ms": 1086.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v3",
+      "iter": 3,
+      "ms": 793.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v4",
+      "iter": 3,
+      "ms": 904.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v5",
+      "iter": 3,
+      "ms": 811.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v6",
+      "iter": 3,
+      "ms": 823.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v7",
+      "iter": 3,
+      "ms": 979.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v8",
+      "iter": 3,
+      "ms": 1519.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v9",
+      "iter": 3,
+      "ms": 1252.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7_v10",
+      "iter": 3,
+      "ms": 919.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v1",
+      "iter": 3,
+      "ms": 1288.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v2",
+      "iter": 3,
+      "ms": 859.3,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v3",
+      "iter": 3,
+      "ms": 906.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v4",
+      "iter": 3,
+      "ms": 1147.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v5",
+      "iter": 3,
+      "ms": 840.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v6",
+      "iter": 3,
+      "ms": 1046.7,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v7",
+      "iter": 3,
+      "ms": 1332.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v8",
+      "iter": 3,
+      "ms": 1227.9,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v9",
+      "iter": 3,
+      "ms": 814.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8_v10",
+      "iter": 3,
+      "ms": 1056.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v1",
+      "iter": 3,
+      "ms": 909.1,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v2",
+      "iter": 3,
+      "ms": 999.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v3",
+      "iter": 3,
+      "ms": 967.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v4",
+      "iter": 3,
+      "ms": 1128.8,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v5",
+      "iter": 3,
+      "ms": 1253.9,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v6",
+      "iter": 3,
+      "ms": 1017.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v7",
+      "iter": 3,
+      "ms": 1167.0,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v8",
+      "iter": 3,
+      "ms": 1091.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v9",
+      "iter": 3,
+      "ms": 1092.5,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9_v10",
+      "iter": 3,
+      "ms": 1054.2,
+      "rows": 175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v1",
+      "iter": 3,
+      "ms": 2275.0,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v2",
+      "iter": 3,
+      "ms": 1928.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v3",
+      "iter": 3,
+      "ms": 2398.7,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v4",
+      "iter": 3,
+      "ms": 3014.8,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v5",
+      "iter": 3,
+      "ms": 2183.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v6",
+      "iter": 3,
+      "ms": 2212.4,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v7",
+      "iter": 3,
+      "ms": 15706.5,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v8",
+      "iter": 3,
+      "ms": 1991.8,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v9",
+      "iter": 3,
+      "ms": 2299.1,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10_v10",
+      "iter": 3,
+      "ms": 2238.3,
+      "rows": 3767,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v1",
+      "iter": 3,
+      "ms": 1186.1,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v2",
+      "iter": 3,
+      "ms": 1127.9,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v3",
+      "iter": 3,
+      "ms": 857.5,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v4",
+      "iter": 3,
+      "ms": 813.8,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v5",
+      "iter": 3,
+      "ms": 876.7,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v6",
+      "iter": 3,
+      "ms": 909.8,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v7",
+      "iter": 3,
+      "ms": 898.0,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v8",
+      "iter": 3,
+      "ms": 736.0,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v9",
+      "iter": 3,
+      "ms": 786.5,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11_v10",
+      "iter": 3,
+      "ms": 771.0,
+      "rows": 22,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v1",
+      "iter": 3,
+      "ms": 784.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v2",
+      "iter": 3,
+      "ms": 800.3,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v3",
+      "iter": 3,
+      "ms": 755.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v4",
+      "iter": 3,
+      "ms": 818.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v5",
+      "iter": 3,
+      "ms": 887.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v6",
+      "iter": 3,
+      "ms": 778.4,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v7",
+      "iter": 3,
+      "ms": 730.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v8",
+      "iter": 3,
+      "ms": 939.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v9",
+      "iter": 3,
+      "ms": 768.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12_v10",
+      "iter": 3,
+      "ms": 944.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v1",
+      "iter": 3,
+      "ms": 765.1,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v2",
+      "iter": 3,
+      "ms": 968.3,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v3",
+      "iter": 3,
+      "ms": 805.6,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v4",
+      "iter": 3,
+      "ms": 828.6,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v5",
+      "iter": 3,
+      "ms": 915.6,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v6",
+      "iter": 3,
+      "ms": 1029.9,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v7",
+      "iter": 3,
+      "ms": 852.3,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v8",
+      "iter": 3,
+      "ms": 1394.4,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v9",
+      "iter": 3,
+      "ms": 1196.6,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13_v10",
+      "iter": 3,
+      "ms": 918.4,
+      "rows": 37,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v1",
+      "iter": 3,
+      "ms": 895.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v2",
+      "iter": 3,
+      "ms": 828.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v3",
+      "iter": 3,
+      "ms": 943.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v4",
+      "iter": 3,
+      "ms": 807.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v5",
+      "iter": 3,
+      "ms": 755.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v6",
+      "iter": 3,
+      "ms": 773.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v7",
+      "iter": 3,
+      "ms": 997.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v8",
+      "iter": 3,
+      "ms": 866.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v9",
+      "iter": 3,
+      "ms": 808.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14_v10",
+      "iter": 3,
+      "ms": 771.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v1",
+      "iter": 3,
+      "ms": 908.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v2",
+      "iter": 3,
+      "ms": 834.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v3",
+      "iter": 3,
+      "ms": 940.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v4",
+      "iter": 3,
+      "ms": 839.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v5",
+      "iter": 3,
+      "ms": 862.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v6",
+      "iter": 3,
+      "ms": 751.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v7",
+      "iter": 3,
+      "ms": 1744.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v8",
+      "iter": 3,
+      "ms": 1072.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v9",
+      "iter": 3,
+      "ms": 968.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15_v10",
+      "iter": 3,
+      "ms": 829.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v1",
+      "iter": 3,
+      "ms": 947.7,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v2",
+      "iter": 3,
+      "ms": 1012.8,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v3",
+      "iter": 3,
+      "ms": 934.2,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v4",
+      "iter": 3,
+      "ms": 791.5,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v5",
+      "iter": 3,
+      "ms": 800.5,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v6",
+      "iter": 3,
+      "ms": 875.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v7",
+      "iter": 3,
+      "ms": 755.5,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v8",
+      "iter": 3,
+      "ms": 1464.2,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v9",
+      "iter": 3,
+      "ms": 832.1,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16_v10",
+      "iter": 3,
+      "ms": 1578.5,
+      "rows": 2762,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v1",
+      "iter": 3,
+      "ms": 877.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v2",
+      "iter": 3,
+      "ms": 870.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v3",
+      "iter": 3,
+      "ms": 810.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v4",
+      "iter": 3,
+      "ms": 804.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v5",
+      "iter": 3,
+      "ms": 905.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v6",
+      "iter": 3,
+      "ms": 801.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v7",
+      "iter": 3,
+      "ms": 882.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v8",
+      "iter": 3,
+      "ms": 774.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v9",
+      "iter": 3,
+      "ms": 1028.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17_v10",
+      "iter": 3,
+      "ms": 1541.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v1",
+      "iter": 3,
+      "ms": 1774.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v2",
+      "iter": 3,
+      "ms": 1144.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v3",
+      "iter": 3,
+      "ms": 996.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v4",
+      "iter": 3,
+      "ms": 1122.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v5",
+      "iter": 3,
+      "ms": 903.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v6",
+      "iter": 3,
+      "ms": 1157.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v7",
+      "iter": 3,
+      "ms": 1260.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v8",
+      "iter": 3,
+      "ms": 923.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v9",
+      "iter": 3,
+      "ms": 905.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18_v10",
+      "iter": 3,
+      "ms": 993.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v1",
+      "iter": 3,
+      "ms": 853.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v2",
+      "iter": 3,
+      "ms": 749.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v3",
+      "iter": 3,
+      "ms": 686.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v4",
+      "iter": 3,
+      "ms": 875.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v5",
+      "iter": 3,
+      "ms": 750.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v6",
+      "iter": 3,
+      "ms": 787.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v7",
+      "iter": 3,
+      "ms": 853.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v8",
+      "iter": 3,
+      "ms": 833.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v9",
+      "iter": 3,
+      "ms": 735.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19_v10",
+      "iter": 3,
+      "ms": 668.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v1",
+      "iter": 3,
+      "ms": 763.3,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v2",
+      "iter": 3,
+      "ms": 811.9,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v3",
+      "iter": 3,
+      "ms": 1040.7,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v4",
+      "iter": 3,
+      "ms": 890.4,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v5",
+      "iter": 3,
+      "ms": 794.2,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v6",
+      "iter": 3,
+      "ms": 889.9,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v7",
+      "iter": 3,
+      "ms": 1032.4,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v8",
+      "iter": 3,
+      "ms": 817.5,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v9",
+      "iter": 3,
+      "ms": 933.8,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20_v10",
+      "iter": 3,
+      "ms": 949.1,
+      "rows": 9,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v1",
+      "iter": 3,
+      "ms": 850.3,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v2",
+      "iter": 3,
+      "ms": 792.2,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v3",
+      "iter": 3,
+      "ms": 932.3,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v4",
+      "iter": 3,
+      "ms": 1748.5,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v5",
+      "iter": 3,
+      "ms": 785.4,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v6",
+      "iter": 3,
+      "ms": 948.0,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v7",
+      "iter": 3,
+      "ms": 894.0,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v8",
+      "iter": 3,
+      "ms": 800.0,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v9",
+      "iter": 3,
+      "ms": 850.2,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21_v10",
+      "iter": 3,
+      "ms": 882.8,
+      "rows": 47,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v1",
+      "iter": 3,
+      "ms": 719.7,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v2",
+      "iter": 3,
+      "ms": 693.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v3",
+      "iter": 3,
+      "ms": 674.6,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v4",
+      "iter": 3,
+      "ms": 685.0,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v5",
+      "iter": 3,
+      "ms": 700.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v6",
+      "iter": 3,
+      "ms": 693.0,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v7",
+      "iter": 3,
+      "ms": 691.0,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v8",
+      "iter": 3,
+      "ms": 775.1,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v9",
+      "iter": 3,
+      "ms": 803.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22_v10",
+      "iter": 3,
+      "ms": 1160.2,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "143d6f5e",
+    "iterations": 3,
+    "query_time_ms": 734235,
+    "streams": 4,
+    "timestamp": "2026-09-29T14:12:45.903827",
+    "total_duration_ms": 1070424
+  },
+  "summary": {
+    "cost": {
+      "total_bytes_billed": 34535899136,
+      "total_bytes_scanned": 22488253804
+    },
+    "data": {
+      "load_time_ms": 65698.5,
+      "rows_loaded": 866602
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 654,
+      "total": 654
+    },
+    "timing": {
+      "avg_ms": 1122.7,
+      "geometric_mean_ms": 1044.7,
+      "max_ms": 15706.5,
+      "min_ms": 668.5,
+      "p90_ms": 1465.8,
+      "p95_ms": 2129.0,
+      "p99_ms": 2688.9,
+      "stdev_ms": 779.7,
+      "total_ms": 734234.8
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "CUSTOMER": {
+      "load_ms": 6272,
+      "rows": 15000
+    },
+    "LINEITEM": {
+      "load_ms": 24252,
+      "rows": 600572
+    },
+    "NATION": {
+      "load_ms": 4659,
+      "rows": 25
+    },
+    "ORDERS": {
+      "load_ms": 9802,
+      "rows": 150000
+    },
+    "PART": {
+      "load_ms": 5346,
+      "rows": 20000
+    },
+    "PARTSUPP": {
+      "load_ms": 5155,
+      "rows": 80000
+    },
+    "REGION": {
+      "load_ms": 3832,
+      "rows": 5
+    },
+    "SUPPLIER": {
+      "load_ms": 6328,
+      "rows": 1000
+    }
+  },
+  "version": "2.2"
+}

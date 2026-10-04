@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "scale-invariant",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "ClickBench loads 100,000, 1,000,000, and 10,000,000 rows at SF 0.1, 1, and 10. Despite the 100x row increase, the geometric mean grows 1.33x and the median per-query mean grows 1.32x. The result cache is recorded off, measurement runs at 0.99 to 1.02 of warmup, all 43 queries succeed, and output row counts match BigQuery for every query at every scale. Measured client statement overhead is 82 to 90 ms against query geometric means of 252 to 335 ms, while eight heavier queries grow at least 2x. This is consistent with fixed query and client overhead dominating the lighter queries rather than cached results or a scale/load defect; Snowflake scan bytes and provider queue/execution phases were not captured.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/09e1aaf8d856535f569da4be96d7b4412f243063/results-data/CORPUS_NOTES.md#cloud-clickbench-2026-10-04",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "clickbench_sf01_snowflake_sql_20260920_024607_616ff980"
+  ]
+}
