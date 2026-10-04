@@ -297,6 +297,23 @@ class AppliedTuningLedger:
             return FAILED
         return NOOP
 
+    def snapshot(self) -> tuple[int, int]:
+        return len(self.executed_statements), len(self.dropped)
+
+    def describe_apply_step(self, since: tuple[int, int]) -> str:
+        executed_before, dropped_before = since
+        executed, dropped = self.snapshot()
+        statements = executed - executed_before
+        noun = "statement" if statements == 1 else "statements"
+        return (
+            f"Tuning apply step complete ({statements} {noun}; "
+            f"{dropped - dropped_before} intents not rendered at apply time)"
+        )
+
+    def describe_outcome(self) -> str:
+        failed = sum(1 for s in self.statements if s.status == STATEMENT_FAILED)
+        return f"Tuning outcome after load: {len(self.executed_statements)} executed, {failed} failed, {len(self.dropped)} dropped"
+
     def applied_ledger_hash(self) -> str | None:
         """SHA-256 over the ORDERED executed statements (physical identity).
 

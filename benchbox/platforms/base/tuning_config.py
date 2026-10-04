@@ -52,6 +52,7 @@ class TuningConfigMixin:
     canonical_platform_type: str
     logger: logging.Logger
     tuning_enabled: bool
+    _tuning_marker_save_failed: bool
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to the database.
@@ -178,6 +179,7 @@ class TuningConfigMixin:
         Returns:
             True if metadata was saved successfully, False otherwise
         """
+        self._tuning_marker_save_failed = False
         effective_config = self.get_effective_tuning_configuration()
         if not self.tuning_enabled or not effective_config:
             return True
@@ -187,6 +189,7 @@ class TuningConfigMixin:
 
             metadata_manager = TuningMetadataManager(self, connection=connection)
             saved = metadata_manager.save_unified_tunings(effective_config)
+            self._tuning_marker_save_failed = bool(metadata_manager.marker_save_failed)
             if metadata_manager.marker_save_failed:
                 from benchbox.core.tuning.metadata import MetadataValidationResult
 
