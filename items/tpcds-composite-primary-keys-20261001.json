@@ -4,7 +4,7 @@
     "e2e: `benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --tuning tuned --phases generate,load,power --queries 3 --non-interactive` exits 0 with all 25 tables loaded (repeat with --tuning auto).",
     "Audit result recorded in capability_registry notes for Redshift, BigQuery, Snowflake and Databricks."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P0.2 (CRIT-2, A1.9; plan review F15). Repro: build DuckDBAdapter with tuning_config=UnifiedTuningConfiguration.from_dict(yaml of examples/tunings/duckdb/tpcds_tuned.yaml), create_schema(TPCDS(0.01), duckdb.connect(':memory:')), then query duckdb_constraints(); the fact tables show single-column PKs.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P0.2 (CRIT-2, A1.9; plan review F15). Repro: build DuckDBAdapter with tuning_config=UnifiedTuningConfiguration.from_dict(yaml of examples/tunings/duckdb/tpcds_tuned.yaml), create_schema(TPCDS(0.01), duckdb.connect(':memory:')), then query duckdb_constraints(); the fact tables show single-column PKs.\n\nRESERVED (2026-10-04): in flight in the tuning-rework batch session (workstream W1). Implemented and published as PR #2631, branch fix/tpcds-composite-primary-keys. Do not claim or implement; workstream W2 must not take this item. Known gap: the --tuning tuned e2e loads no data in the author's checkout (dsdgen produced no files); the --tuning auto e2e loads all 25 tables. Finish it after #2631 merges.",
   "description": "## Problem (reproduced)\n`benchbox/core/tpcds/schema/table_specs.yaml` marks only one column as primary key on six fact tables and none on `inventory`. Each column row is `[name, type, size, nullable, primary_key, fk]`; for example `ss_item_sk` is false around line 1628 and `ss_ticket_number` true around line 1677. The generated DDL is `PRIMARY KEY(ss_ticket_number)`.\n\nDuckDB TPC-DS `tuned` and `auto` fail: all six fact tables hit `PRIMARY KEY or UNIQUE constraint violation: duplicate key \"1\"` and the run halts. Enforcing engines (Postgres family, SQLite, MotherDuck, DuckLake) would fail the same way. On optimizer-trusted informational keys (Redshift; Snowflake/Databricks with RELY), a wrong key risks silently wrong results.\n\n## Change\nSet the spec composite keys, in spec order:\n- `store_sales (ss_item_sk, ss_ticket_number)`;\n- `store_returns (sr_item_sk, sr_ticket_number)`;\n- `catalog_sales (cs_item_sk, cs_order_number)`;\n- `catalog_returns (cr_item_sk, cr_order_number)`;\n- `web_sales (ws_item_sk, ws_order_number)`;\n- `web_returns (wr_item_sk, wr_order_number)`;\n- `inventory (inv_date_sk, inv_item_sk, inv_warehouse_sk)`.\n\nConfirm the DDL emits PK columns in spec order, not table column position.\n\n## Audit (record results in capability-registry notes)\n- **Known:** BigQuery emits `PRIMARY KEY (…) NOT ENFORCED` (`bigquery.py:2146,2157,2196`). There is no `RELY` in `snowflake.py` or `databricks/adapter.py`.\n- **Remaining:** whether the Redshift planner exploits informational keys for the TPC-DS queries.\n\n## Guardrails (must preserve)\n- Untuned (`notuning`) runs are unaffected.\n- Note in release notes that tuned/auto TPC-DS results before and after this change are not comparable.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/core/tpcds/schema/table_specs.yaml",
@@ -18,6 +18,14 @@
       "op": "create",
       "op_id": "038e7282bd714a99ae49929274ea43aa",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T14:51:07Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "13370c49855c483c8a5e298cb0e3a524",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
 }
