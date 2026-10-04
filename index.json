@@ -17862,6 +17862,13 @@
       "status": "done",
       "title": "Consolidate run-official into run --official flag"
     },
+    "run-py-module-size-allowlist-growth-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "benchbox/cli/commands/run.py keeps growing: extract platform and selector resolution so the size allowlist stops being re-baselined"
+    },
     "run-service-all-exports-private-names": {
       "claim": null,
       "needs": [],

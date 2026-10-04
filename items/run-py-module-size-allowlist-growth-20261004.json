@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "run.py is at least 300 lines shorter and its ALLOWLIST entry is lowered to the real count.",
+    "tests/unit/cli and tests/system/test_module_size_thresholds.py pass unchanged apart from import paths."
+  ],
+  "context": "Source: PR #2630 CI failure (2026-10-04).",
+  "description": "## Problem (observed)\n`benchbox/cli/commands/run.py` was one line under its size limit on develop; the platform-selector fix pushed it to 3,320 lines and failed `tests/system/test_module_size_thresholds.py`. The entry was re-baselined by hand (its comment already lists many re-baselines). Each change that touches the CLI repeats this.\n\n## Change\nExtract cohesive groups out of `run.py` (platform and selector resolution, mode resolution and availability checks, the benchmark compatibility gate) into modules under `benchbox/cli/`, keeping imports for existing callers and tests working.\n\n## Guardrails (must preserve)\n- No behaviour change; the CLI test suites pass unchanged.\n- Tests that import private helpers from `benchbox.cli.commands.run` keep working or are updated in the same PR.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/cli/commands/run.py",
+    "tests/system/test_module_size_thresholds.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:56:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0e751b4bc57449489dd315f0d15bcc45",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
