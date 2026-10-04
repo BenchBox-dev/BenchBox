@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "The darwin-x86_64 dbgen is run (Intel macOS runner or Rosetta) and its SF 0.01 supplier/customer hashes match the canonical values asserted in tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py"
+  ],
+  "description": "#2622 fixed a signed overflow in UnifInt (rnd.c) that made -O2 builds write non-canonical supplier and customer addresses, and rebuilt both darwin binaries. The darwin-arm64 build was verified (SF1 supplier f5699b5d..., customer a035a33a...); the darwin-x86_64 build was cross-compiled and never executed because Rosetta was unavailable. Its correctness rests on a disassembly comparison only.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:06:54Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "27d9165ad70645f18f03a6612168e426",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}
