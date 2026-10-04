@@ -89,9 +89,8 @@ jobs:
       content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
       skill-integrity-needed: ${{ steps.classify.outputs.skill-integrity-needed }}
       skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
-      changed-paths: ${{ steps.classify.outputs.changed-paths }}
-      code-paths: ${{ steps.classify.outputs.code-paths }}
-      unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
+      audit-paths-changed: ${{ steps.path-flags.outputs.audit-paths-changed }}
+      submission-validator-changed: ${{ steps.path-flags.outputs.submission-validator-changed }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
       framing-needed: ${{ steps.classify.outputs.framing-needed }}
@@ -151,6 +150,17 @@ jobs:
             --lists-dir .ci-paths \
             --github-output "$GITHUB_OUTPUT" \
             --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Flag changed paths read by later jobs
+        id: path-flags
+        run: |
+          set -euo pipefail
+          audit=false
+          validator=false
+          if grep -qE '^(_project/audits/|results-explorer/e2e/captures/)' .ci-paths/changed.txt; then audit=true; fi
+          if grep -qxE '\.github/workflows/validate-submission\.yml|scripts/check_submission_validator_sync\.py' .ci-paths/changed.txt; then validator=true; fi
+          echo "audit-paths-changed=$audit" >> "$GITHUB_OUTPUT"
+          echo "submission-validator-changed=$validator" >> "$GITHUB_OUTPUT"
 
       - name: Classify merge units
         id: units
@@ -459,7 +469,7 @@ jobs:
   audit-sha:
     name: audit-sha
     needs: ci-paths
-    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+    if: ${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -1355,7 +1365,7 @@ jobs:
       - name: Corpus validation
         run: uv run -- python results-data/validate_corpus.py
       - name: Submission validator stays in sync
-        if: ${{ contains(needs.ci-paths.outputs.changed-paths, '.github/workflows/validate-submission.yml') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_submission_validator_sync.py') }}
+        if: ${{ needs.ci-paths.outputs.submission-validator-changed == 'true' }}
         run: |
           git fetch --no-tags --depth=1 origin published-results
           git show FETCH_HEAD:.github/workflows/validate-submission.yml \
@@ -1954,4 +1964,4 @@ jobs:
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+            --expect audit-sha=${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }}

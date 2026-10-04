@@ -106,6 +106,10 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
         "has no standalone Make target. The local preflight consumes the same "
         "classifier through pr-preflight."
     ),
+    ("ci.yml", "ci-paths", "Flag changed paths read by later jobs"): (
+        "Hosted job-output step; it turns the classifier's changed-path list into "
+        "booleans so later jobs do not receive the full list, and has no local gate."
+    ),
     ("ci.yml", "tpch-binary-framing", "Verify bundled dbgen binaries emit clean framing"): (
         "Cross-platform macOS/Windows binary smoke; the local macOS checkout has no Windows runner equivalent."
     ),
