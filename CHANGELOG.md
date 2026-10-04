@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Before you upgrade
 
+- **TPC-DS tuned and auto runs now declare the specification's composite
+  primary keys.** Six fact tables had a one-column key and `inventory` had
+  none, so DuckDB (and any engine that enforces keys) rejected the load with a
+  duplicate-key error. The keys are now `(ss_item_sk, ss_ticket_number)`,
+  `(sr_item_sk, sr_ticket_number)`, `(cs_item_sk, cs_order_number)`,
+  `(cr_item_sk, cr_order_number)`, `(ws_item_sk, ws_order_number)`,
+  `(wr_item_sk, wr_order_number)` and
+  `(inv_date_sk, inv_item_sk, inv_warehouse_sk)`. The three returns tables no
+  longer declare a single-column foreign key to the matching sales table; the
+  specification's reference is composite, which BenchBox can't express.
+  Platforms that use keys as planning hints, such as Redshift, may choose
+  different plans. Don't compare tuned or auto TPC-DS results recorded before
+  this change with results after it. Runs without tuning are unchanged.
 - **TPC-DS queries now use parameters for the data's scale factor.** Standard
   TPC-DS runs at a scale factor other than 1 used to take their query
   parameters from scale factor 1. They now use values generated for the scale

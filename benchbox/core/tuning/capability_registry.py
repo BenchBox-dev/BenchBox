@@ -268,6 +268,12 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             "Compatible per the legacy map; no adapter code creates a materialized view.",
         ),
         **_constraint_entries(),
+        _T.PRIMARY_KEYS: _ddl(
+            _INLINE_CONSTRAINT,
+            "Declared keys are informational and unenforced on Databricks. The adapter never emits RELY "
+            "(no RELY in benchbox/platforms/databricks/adapter.py), so BenchBox does not ask the optimizer to "
+            "rely on declared keys. The effect of RELY on plans was not measured.",
+        ),
     },
     "snowflake": {
         _T.CLUSTERING: _post_load(
@@ -289,6 +295,13 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
         ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         **_constraint_entries(),
+        _T.PRIMARY_KEYS: _ddl(
+            _INLINE_CONSTRAINT,
+            "Primary keys on standard Snowflake tables are informational and unenforced (Snowflake table "
+            "considerations documentation). The adapter never emits RELY (no RELY in "
+            "benchbox/platforms/snowflake.py), so a declared key is not asserted as trustworthy to the "
+            "optimizer.",
+        ),
     },
     "bigquery": {
         _T.PARTITIONING: _none(
@@ -308,7 +321,13 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             "(apply_table_tunings only logs a recreation hint, bigquery.py:2013-2027).",
         ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
-        _T.PRIMARY_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
+        _T.PRIMARY_KEYS: _ddl(
+            _INLINE_CONSTRAINT,
+            "Rendered as a table-level 'PRIMARY KEY (...) NOT ENFORCED' constraint (bigquery.py:2146, 2157); "
+            "foreign keys are likewise NOT ENFORCED (bigquery.py:2196). BigQuery never rejects a wrong key, "
+            "so the composite TPC-DS keys are pinned by tests/unit/benchmarks/test_schema_pk_conformance.py "
+            "rather than by the engine.",
+        ),
         _T.FOREIGN_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
         _T.CHECK_CONSTRAINTS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
     },
@@ -344,6 +363,15 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
         ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         **_constraint_entries(),
+        _T.PRIMARY_KEYS: _ddl(
+            _INLINE_CONSTRAINT,
+            "Redshift documents primary and foreign keys as informational and unenforced, but states that "
+            "the planner uses them for uniqueness inference, subquery decorrelation, join ordering and "
+            "redundant-join removal and assumes they are valid as loaded, so a wrong key can return "
+            "incorrect results (AWS Table constraints documentation). Whether the planner changes plans "
+            "for the TPC-DS queries has not been measured; that needs a live cluster. Correct keys "
+            "matter here because the planner trusts them.",
+        ),
     },
     "sqlite": _constraint_entries(),
     "postgresql": {
