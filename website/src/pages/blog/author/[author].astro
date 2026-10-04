@@ -1,0 +1,14 @@
+---
+import { getCollection } from "astro:content";
+import Collection from "../../../components/blog/Collection.astro";
+import { authorGroups, slugify, toPost } from "../../../lib/blog.ts";
+
+export async function getStaticPaths() {
+  const posts = (await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost);
+  return [...authorGroups(posts)].map(([name, written]) => ({ params: { author: slugify(name) }, props: { name, written } }));
+}
+
+const { name, written } = Astro.props;
+---
+
+<Collection title={`Posts by ${name}`} posts={written} />

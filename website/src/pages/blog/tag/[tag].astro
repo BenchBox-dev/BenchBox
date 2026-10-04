@@ -1,0 +1,14 @@
+---
+import { getCollection } from "astro:content";
+import Collection from "../../../components/blog/Collection.astro";
+import { slugify, tagGroups, toPost } from "../../../lib/blog.ts";
+
+export async function getStaticPaths() {
+  const posts = (await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost);
+  return [...tagGroups(posts)].map(([label, tagged]) => ({ params: { tag: slugify(label) }, props: { label, tagged } }));
+}
+
+const { label, tagged } = Astro.props;
+---
+
+<Collection title={`Posts tagged ${label}`} posts={tagged} />

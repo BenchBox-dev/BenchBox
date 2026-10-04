@@ -39,13 +39,13 @@ function repositoryTarget(absolute: string, docsRoot: string, fragment: string, 
   return withFragment(relative === "" ? `${REPOSITORY_URL}/tree/${REPOSITORY_REF}` : `${REPOSITORY_URL}/${kind}/${REPOSITORY_REF}/${relative}`, fragment);
 }
 
-export const UNBUILT_TARGETS: Readonly<Record<string, string>> = {
-  "blog/archive.html": "ablog archive page; the Astro blog does not build it yet",
-  "blog/tag.html": "ablog tag index; the Astro blog does not build it yet",
-  "blog/author.html": "ablog author index; the Astro blog does not build it yet",
+export const BLOG_PAGES: Readonly<Record<string, string>> = {
+  "blog/archive.html": "/blog/archive.html",
+  "blog/tag.html": "/blog/tag.html",
+  "blog/author.html": "/blog/author.html",
 };
 
-type Resolution = { url: string; title?: string } | { unbuilt: string };
+type Resolution = { url: string; title?: string };
 
 function resolveTarget(target: string, context: ConvertContext, at: SourcePosition, fragment: string): Resolution {
   const unresolved = (detail: string): UnresolvedReferenceError => new UnresolvedReferenceError(at.file, at.line, `link:${withFragment(target, fragment)}`, detail);
@@ -53,7 +53,7 @@ function resolveTarget(target: string, context: ConvertContext, at: SourcePositi
   const insideDocs = path.relative(context.docsRoot, absolute);
   if (insideDocs.startsWith("..") || path.isAbsolute(insideDocs)) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
   const relative = insideDocs.split(path.sep).join("/");
-  if (relative in UNBUILT_TARGETS) return { unbuilt: relative };
+  if (relative in BLOG_PAGES) return { url: withFragment(BLOG_PAGES[relative], fragment) };
   if (DOC_SUFFIX.test(target)) {
     const resolved = context.resolveDoc(target, at, "link");
     if (fragment !== "") context.checkFragment(resolved.path, fragment, at);
@@ -117,10 +117,6 @@ export const linkSyntax: SyntaxHandler<"link"> = {
       if (!(error instanceof UnresolvedReferenceError) || !context.knownBroken(`${routeFor(context.file)}#${node.url}`)) throw error;
       if (link && isEmpty(link)) throw emptyText(link, at, "its target is broken");
       return [node];
-    }
-    if ("unbuilt" in resolution) {
-      if (!link) throw new UnresolvedReferenceError(at.file, at.line, `link:${node.url}`, `points at ${resolution.unbuilt}, which is not built: ${UNBUILT_TARGETS[resolution.unbuilt]}`);
-      return link.children;
     }
     if (link && isEmpty(link)) {
       if (resolution.title === undefined) throw emptyText(link, at, "MyST fills empty text only for a whole page");

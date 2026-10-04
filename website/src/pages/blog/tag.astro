@@ -1,0 +1,12 @@
+---
+import { getCollection } from "astro:content";
+import Catalog from "../../components/blog/Catalog.astro";
+import Blog from "../../layouts/Blog.astro";
+import { tagGroups, tagPath, toPost } from "../../lib/blog.ts";
+
+const posts = (await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost);
+---
+
+<Blog title="Tags" isIndex={false}>
+  <Catalog heading="Posts tagged" groups={[...tagGroups(posts)]} href={tagPath} />
+</Blog>

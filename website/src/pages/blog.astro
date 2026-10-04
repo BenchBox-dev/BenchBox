@@ -1,0 +1,9 @@
+---
+import { getCollection } from "astro:content";
+import Collection from "../components/blog/Collection.astro";
+import { newestFirst, toPost } from "../lib/blog.ts";
+
+const posts = newestFirst((await getCollection("blog")).filter((entry) => entry.id !== "blog/index").map(toPost));
+---
+
+<Collection title="All Posts" posts={posts} />

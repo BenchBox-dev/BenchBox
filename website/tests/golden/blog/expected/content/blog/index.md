@@ -52,6 +52,6 @@ January 22, 2026 - [2026-01-22-welcome](/blog/2026-01-22-welcome.html)
 
 Browse by:
 
-- Archive - Posts organized by year
-- Tags - Posts organized by topic
-- Authors - Posts organized by author
+- [Archive](/blog/archive.html) - Posts organized by year
+- [Tags](/blog/tag.html) - Posts organized by topic
+- [Authors](/blog/author.html) - Posts organized by author

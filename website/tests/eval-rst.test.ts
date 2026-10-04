@@ -19,11 +19,11 @@ describe("eval-rst directive", () => {
     expect(result.errors.map((error) => error.message)).toEqual(["a.md:5: link:archive.html does not match a document or file under docs/"]);
   });
 
-  it("renders the ablog archive, tag and author links as text until the blog builds those pages", () => {
+  it("links the ablog archive, tag and author pages to the routes the blog builds", () => {
     const result = build({ "blog/index.md": wrap("* `Archive <archive.html>`_ - by year\n* `Tags <tag.html>`_\n* `Authors <author.html>`_").replace("# A", "# Blog") });
     expect(result.errors).toEqual([]);
     const body = bodyOf(result, "blog/index.md");
-    expect(body).toContain("- Archive - by year\n- Tags\n- Authors");
+    expect(body).toContain("- [Archive](/blog/archive.html) - by year\n- [Tags](/blog/tag.html)\n- [Authors](/blog/author.html)");
   });
 
   it("rejects any other rst construct with the offending line", () => {
