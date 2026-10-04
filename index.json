@@ -6885,12 +6885,17 @@
       "title": "Enforce the TPC-DS pandas-family gate (owner decision D6: pandas is in the parity goal)"
     },
     "dfparity-t27-datafusion-gate": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:32:16Z",
+        "generation": "e77fc37f4bac4d86a0d8de65565867a3",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t20-promote-polars-gate"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Run and enforce the TPC-DS expression family on DataFusion (owner decision D6)"
     },
     "dfparity-t28-variant-implementations": {
