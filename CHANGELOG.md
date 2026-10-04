@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-04
+
 ### Before you upgrade
 
 - **TPC-DS queries now use parameters for the data's scale factor.** Standard
@@ -199,6 +201,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errors by switching to a single-threaded mode. Comparison links that name
   missing results no longer stall the page. Navigation highlights the right
   section on local and run pages.
+- **Runs fail when no data loads.** A stale or empty datagen manifest, or a
+  missing `zstd` command, used to leave the loader with nothing to load, so
+  every table held zero rows and the run still validated and exported a
+  result. Loading now fails when the data source names no tables, and
+  validation fails when no table loads a positive number of rows. TPC-DS
+  generation no longer writes a manifest that lists no tables, and a manifest
+  with no tables or no files is rejected and regenerated. A missing `zstd`
+  command is reported before any table loads.
+- **Repeated no-tuning runs reuse their database.** Every second no-tuning run
+  rebuilt the database because validation asked for tuning metadata that
+  no-tuning runs never write.
+- **The ORDER BY equivalence check fails closed.** When a query's sort terms
+  could not be evaluated over the returned rows, the check passed. It now
+  reports the cell as divergent. Queries with no ORDER BY, SQL that does not
+  parse, and terms with no output column keep the unordered comparison.
+- **TPC-DS data generation on Windows honours its options.** The Windows
+  `dsdgen` ignored `-` options, so a request for scale factor 0.01 generated
+  scale factor 1 and ignored table and chunk selection. BenchBox now passes
+  the `/` prefix on Windows. Output on other platforms is unchanged.
+- **TPC-DS OBT loads its queries from an installed wheel.** `get_queries()`
+  raised `FileNotFoundError` from the 0.4.1 wheel because the templates were
+  read from a source tree the wheel does not ship.
+- **TPC-H addresses on macOS match the reference data.** The bundled macOS
+  `dbgen` was built with optimization and produced different `S_ADDRESS` and
+  `C_ADDRESS` values from the reference data at every scale factor, so the
+  correctness gate failed Q2, Q10 and Q15. The rebuilt binaries produce the
+  reference values. Regenerate TPC-H data made on macOS with earlier versions.
+- **Tuning output describes what happened.** The console no longer prints
+  "Unified tuning configuration applied" or "Tuning metadata saved" unless
+  the work succeeded, and it reports how many statements ran, failed or were
+  dropped. A fresh database with no benchmark tables no longer logs a tuning
+  metadata error. The Results Explorer reads "Checked; not corroborated" when
+  a run carries a post-load check receipt, and its Tuned badges follow the
+  recorded validation status.
 
 ## [0.4.1] - 2026-09-24
 
@@ -1031,7 +1067,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Discussions**: [Ask questions and request features](https://github.com/BenchBox-dev/BenchBox/discussions)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1

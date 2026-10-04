@@ -1,9 +1,0 @@
-{
-  "enabled": true,
-  "forbidden_marker_expressions": [
-    "resource_heavy",
-    "stress",
-    "live_integration"
-  ],
-  "forbidden_path_substrings": []
-}
