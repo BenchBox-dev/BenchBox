@@ -425,3 +425,100 @@ class TestInlinedSourceFileKeepsItsPublicForm:
         raw = (tmp_path / "run.json").read_text(encoding="utf-8")
         assert "alice" not in raw
         assert json.loads(raw)["platform"]["tuning"]["source_file"].startswith("path_")
+
+
+_SESSION_ONLY_LEDGER = {
+    "status": "not_applicable",
+    "applied_ledger_hash": "e" * 64,
+    "statements": [
+        {
+            "statement": "PRAGMA journal_mode = WAL",
+            "phase": "session",
+            "status": "executed",
+            "mechanism": "session_setting",
+        }
+    ],
+    "dropped": [],
+}
+
+
+def _export_untuned(tmp_path: Path, *, anonymize: bool, **overrides: object) -> dict:
+    benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
+    result = build_enhanced_benchmark_result(
+        benchmark=benchmark,
+        platform=str(overrides.pop("platform", "duckdb")),
+        query_results=[],
+        **overrides,
+    )
+    result.output_filename = "run.json"
+    ResultExporter(output_dir=tmp_path, anonymize=anonymize).export_result(result, formats=["json"])
+    return json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("anonymize", [True, False])
+class TestUntunedBundleStatesItsValidationStatus:
+    def test_run_without_a_ledger_carries_only_not_applicable(self, tmp_path: Path, anonymize: bool) -> None:
+        bundle = _export_untuned(tmp_path, anonymize=anonymize, tuning_validation_status="not_applicable")
+
+        assert bundle["platform"]["tuning"] == {"validation_status": "not_applicable"}
+
+    def test_unset_status_is_reported_as_not_applicable(self, tmp_path: Path, anonymize: bool) -> None:
+        bundle = _export_untuned(tmp_path, anonymize=anonymize)
+
+        assert bundle["platform"]["tuning"] == {"validation_status": "not_applicable"}
+
+    def test_status_agrees_with_the_applied_ledger_of_a_session_only_run(self, tmp_path: Path, anonymize: bool) -> None:
+        bundle = _export_untuned(
+            tmp_path,
+            anonymize=anonymize,
+            platform="sqlite",
+            tuning_validation_status="not_applicable",
+            applied_tuning_ledger=dict(_SESSION_ONLY_LEDGER),
+            applied_ledger_hash=_SESSION_ONLY_LEDGER["applied_ledger_hash"],
+        )
+
+        tuning_block = bundle["platform"]["tuning"]
+        assert tuning_block["validation_status"] == "not_applicable"
+        assert tuning_block["validation_status"] == tuning_block["applied"]["status"]
+
+    def test_unset_status_takes_the_applied_ledgers_status(self, tmp_path: Path, anonymize: bool) -> None:
+        bundle = _export_untuned(
+            tmp_path,
+            anonymize=anonymize,
+            platform="sqlite",
+            applied_tuning_ledger={**_SESSION_ONLY_LEDGER, "status": "noop"},
+            applied_ledger_hash=_SESSION_ONLY_LEDGER["applied_ledger_hash"],
+        )
+
+        tuning_block = bundle["platform"]["tuning"]
+        assert tuning_block["validation_status"] == "noop"
+        assert tuning_block["applied"]["status"] == "noop"
+
+
+class TestUntunedStatusRoundTrips:
+    def test_loader_reads_the_untuned_status_back(self, tmp_path: Path) -> None:
+        _export_untuned(tmp_path, anonymize=False, tuning_validation_status="not_applicable")
+
+        result, _raw = load_result_file(tmp_path / "run.json")
+
+        assert result.tuning_validation_status == "not_applicable"
+        assert not result.tunings_applied
+
+    def test_reexport_keeps_the_block_unchanged(self, tmp_path: Path) -> None:
+        first = _export_untuned(tmp_path, anonymize=False, tuning_validation_status="not_applicable")
+        result, _raw = load_result_file(tmp_path / "run.json")
+
+        second_dir = tmp_path / "again"
+        second_dir.mkdir()
+        result.output_filename = "run.json"
+        ResultExporter(output_dir=second_dir, anonymize=False).export_result(result, formats=["json"])
+
+        again = json.loads((second_dir / "run.json").read_text(encoding="utf-8"))
+        assert again["platform"]["tuning"] == first["platform"]["tuning"]
+
+    def test_tuned_bundle_still_carries_its_full_block(self, tmp_path: Path) -> None:
+        bundle, _tuning, _applied = _export(tmp_path, anonymize=False)
+
+        tuning_block = bundle["platform"]["tuning"]
+        assert tuning_block["validation_status"] == "applied_unverified"
+        assert tuning_block["requested_config_hash"] == "a" * 64

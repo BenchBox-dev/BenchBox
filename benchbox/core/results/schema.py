@@ -592,9 +592,7 @@ def _build_platform_section(
     if "client_version" not in platform:
         platform["client_version"] = "unknown"
 
-    tuning = _build_tuning_summary(result)
-    if tuning:
-        platform["tuning"] = tuning
+    platform["tuning"] = _build_tuning_summary(result)
 
     return platform
 
@@ -1664,10 +1662,23 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
     return metrics if metrics else None
 
 
-def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
+def _untuned_validation_status(result: BenchmarkResults) -> str:
+    from benchbox.core.tuning.applied_ledger import NOT_APPLICABLE, NOT_VALIDATED
+
+    status = (getattr(result, "tuning_validation_status", None) or "").lower()
+    if status and status != NOT_VALIDATED:
+        return status
+    ledger = getattr(result, "applied_tuning_ledger", None)
+    ledger_status = ledger.get("status") if isinstance(ledger, dict) else None
+    if isinstance(ledger_status, str) and ledger_status:
+        return ledger_status.lower()
+    return NOT_APPLICABLE
+
+
+def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     """Build tuning summary for platform block."""
     if not result.tunings_applied:
-        return None
+        return {"validation_status": _untuned_validation_status(result)}
 
     tuning_applied = result.tunings_applied or {}
     summary: dict[str, Any] = {}
@@ -1733,7 +1744,7 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
             logical_profile["coverage"] = coverage
         summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
 
-    return summary if summary else None
+    return summary
 
 
 def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:

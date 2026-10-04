@@ -90,7 +90,7 @@ def test_default_df_result_emits_no_applied_companion_and_noop_status():
     assert result.tuning_validation_status == "noop"
     assert build_applied_ledger_payload(result) is None
 
-    # With an empty requested config there is no platform.tuning summary block
-    # (nothing to summarize) -- the honest status still lives on the result.
+    # With an empty requested config the platform.tuning block carries only the
+    # honest derived status.
     payload = build_result_payload(result)
-    assert "tuning" not in payload["platform"]
+    assert payload["platform"]["tuning"] == {"validation_status": "noop"}
