@@ -26,8 +26,9 @@ def require_loaded_tables(benchmark: Any, table_stats: dict[str, Any] | None) ->
     loaded = {str(name).lower(): rows for name, rows in (table_stats or {}).items()}
     problems = []
     if not required:
-        row_counts = [rows for rows in loaded.values() if isinstance(rows, (int, float))]
-        if not row_counts or sum(row_counts) <= 0:
+        if not any(
+            isinstance(rows, (int, float)) and not isinstance(rows, bool) and rows > 0 for rows in loaded.values()
+        ):
             problems.append("no rows were loaded for any table")
     else:
         for table in required:

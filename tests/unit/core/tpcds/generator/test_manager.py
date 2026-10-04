@@ -68,6 +68,15 @@ def test_write_manifest_refuses_to_record_zero_tables(tmp_gen, tmp_path):
     assert not (tmp_path / "_datagen_manifest.json").exists()
 
 
+def test_write_manifest_refuses_tables_without_files(tmp_gen, tmp_path):
+    tmp_gen.compress_data = False
+    tmp_gen.compression_type = "none"
+    with pytest.raises(RuntimeError, match="produced no table files"):
+        tmp_gen._write_manifest(tmp_path, {"item": []})
+
+    assert not (tmp_path / "_datagen_manifest.json").exists()
+
+
 def test_write_manifest_records_generated_tables(tmp_gen, tmp_path):
     tmp_gen.compress_data = False
     tmp_gen.compression_type = "none"
