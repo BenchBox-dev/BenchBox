@@ -20335,6 +20335,13 @@
       "status": "open",
       "title": "Cut the TPC-DS cross-surface gate's setup time so the pandas step keeps budget headroom"
     },
+    "tpcds-gate-vacuous-statement-coverage": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Give the 26 always-empty TPC-DS statements nonempty coverage in a blocking lane"
+    },
     "tpcds-obt-benchmark-implementation": {
       "claim": null,
       "needs": [],

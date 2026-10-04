@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Each of the 26 statements is compared on nonempty data in a lane that fails on divergence (for example a bounded larger-scale subset or targeted draws), within an agreed time budget",
+    "The legitimately-empty map keeps a cause for any statement that still cannot be made nonempty"
+  ],
+  "context": "Causes per statement are in _TPCDS_LEGITIMATELY_EMPTY (benchbox/core/equivalence/cross_surface.py). Earlier SQL-only draw searches: dfparity-t19-emptiness-rebaseline context.",
+  "description": "At SF 0.01, 26 statements return no rows (or one all-NULL row) on all four Power draws the PR gate and trunk job use: 3, 4, 8, 10, 23, 23b, 24, 24b, 31, 32, 37, 39, 39b, 41, 54, 58, 61, 64, 65, 73, 82, 85, 90, 91, 92, 93. They match SQL with rows only at SF 1, in the weekly advisory qualification lane. A DataFrame regression in projection, aggregation or ordering of these statements would pass the blocking gates.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:12:01Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5786497cbbd34814af7054ab748635fd",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}
