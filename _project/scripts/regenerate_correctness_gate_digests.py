@@ -204,12 +204,10 @@ def render(reference: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     import duckdb
 
-    from benchbox.core.tpch.benchmark import get_reference_seed
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
 
     query_ids = _query_ids()
-    seed = get_reference_seed(1.0)
-    if seed is None:
-        raise SystemExit("no reference seed for SF=1 (get_reference_seed(1.0) returned None)")
+    seed = load_tpch_value_digest_seed()
 
     with tempfile.TemporaryDirectory(prefix="benchbox-digest-regen-") as tmp:
         payload = _run_gate(Path(tmp), query_ids, seed)
