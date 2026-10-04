@@ -2,7 +2,7 @@
   "acceptance": [
     "ADR-001 addendum merged defining outcome vocabulary (a)-(d) and the phase set."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-6. Evidence: a chDB custom tuning run had 3 corroborated keys but 2 spurious sorted_ingestion drops vetoing the upgrade.\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda; do not claim.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-6. Evidence: a chDB custom tuning run had 3 corroborated keys but 2 spurious sorted_ingestion drops vetoing the upgrade.\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda (PR #2634); do not claim.\n\nDECISION (owner-endorsed 2026-10-04; ADR-001 addendum \"ledger outcome and phase vocabulary\"):\n(a) Deliberate skips (e.g. Databricks Hudi/Delta-only layout ops) are recorded as dropped(reason) with reason \"skipped: <cause>\". They block the upgrade and never yield STATEMENT_FAILED or overall failed.\n(b) An intent realized by DDL (e.g. ClickHouse/StarRocks sort via ORDER BY in CREATE TABLE, per the registry) is recorded as satisfied_by: {\"intent\": ..., \"satisfied_by\": <index of the executed DDL statement in the ledger>, \"reason\": ...}, serialized in its own \"satisfied\" list next to \"dropped\". Non-blocking, never a verdict, never corroboration; only the referenced DDL statement's own verdict counts.\n(c) Closed phase set {ddl, post_load, session}. record() maps aliases (pre_load, schema, create -> ddl; postload, post-load, maintenance -> post_load) and coerces anything else to ddl with a warning log; capture never raises. A unit test statically asserts every in-tree producer passes a member of the closed set.\n(d) No new status values. overall_status considers every physical phase; drops never produce failed; a ledger whose only physical outcomes are drops returns noop; executed statements plus drops return applied_unverified (drops already block verification in corroborate()).",
   "description": "## Problem\n1. **Deliberate skips are recorded as failures.** `_fold_layout_operations_into_ledger` maps every non-\"applied\" op to `STATEMENT_FAILED` (`benchbox/platforms/base/adapter.py:1502`). Databricks records Hudi and Delta-only skips with status \"skipped\" (`databricks/adapter.py:2489-2496, 3640-3700`).\n2. **Intents realized by DDL are recorded as dropped.** The shared sorted-ingestion hook records \"does not support CTAS sort\" for ClickHouse and StarRocks sorts that their `ORDER BY` DDL already applied (`benchbox/platforms/base/sorted_ingestion.py:144-152`).\n3. **Phases are unvalidated.** Databricks emits `\"pre_load\"`, `overall_status` filters by `{ddl, post_load}` (`applied_ledger.py:291`), and `record()` doesn't validate phase.\n\n## Must decide\n- **(a)** Skips map to `dropped(reason)`: they block the upgrade but never yield `failed`.\n- **(b)** Add a non-blocking `satisfied_by(<statement ref>)`, or record nothing when the registry says the intent is realized by DDL.\n- **(c)** The closed phase set `{ddl, post_load, session}`, with `record()` normalizing or rejecting others.\n- **(d)** The `overall_status` semantics when the only physical outcomes are drops.\n\n## Guardrails\n- `satisfied_by` must never mint corroboration on its own.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "docs/development/tuning-adr-001-trust-and-hash-semantics.md",
@@ -25,6 +25,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "00e5b1b9c76b4b2989ed695c5afff127",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:07:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6d5baa9e8a3b4a8b827f503a731c09c6",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
