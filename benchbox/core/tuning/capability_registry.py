@@ -216,7 +216,11 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             "MergeTree requires ORDER BY. When no tuned sort/cluster columns are configured, "
             "_optimize_table_definition falls back to primary-key-derived columns or ORDER BY tuple() -- "
             "this fallback is the engine-mandatory baseline (see ADR-3 baseline policy), not tuned "
-            "rendering.",
+            "rendering. ClickHouse enables primary keys even without tuning, so a change to a benchmark's "
+            "declared keys changes the untuned MergeTree ORDER BY: the TPC-DS composite keys moved "
+            "store_sales from ORDER BY (ss_ticket_number) to ORDER BY (ss_item_sk, ss_ticket_number) and "
+            "inventory from ORDER BY tuple() to ORDER BY (inv_date_sk, inv_item_sk, inv_warehouse_sk), "
+            "pinned by tests/unit/platforms/test_clickhouse_tpcds_untuned_layout.py.",
         ),
         _T.UNIQUE_CONSTRAINTS: _none(
             "unimplemented",
@@ -325,8 +329,10 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             _INLINE_CONSTRAINT,
             "Rendered as a table-level 'PRIMARY KEY (...) NOT ENFORCED' constraint (bigquery.py:2146, 2157); "
             "foreign keys are likewise NOT ENFORCED (bigquery.py:2196). BigQuery never rejects a wrong key, "
-            "so the composite TPC-DS keys are pinned by tests/unit/benchmarks/test_schema_pk_conformance.py "
-            "rather than by the engine.",
+            "so the key definitions, including the composite TPC-DS keys, are checked by "
+            "tests/unit/benchmarks/test_schema_pk_conformance.py rather than by the engine. That test covers "
+            "the generated key definitions only; the NOT ENFORCED rewrite is covered by "
+            "tests/unit/platforms/test_bigquery_adapter.py.",
         ),
         _T.FOREIGN_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
         _T.CHECK_CONSTRAINTS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),

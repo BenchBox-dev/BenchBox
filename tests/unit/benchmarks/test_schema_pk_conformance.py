@@ -141,6 +141,7 @@ DDL_BUILDERS: dict[str, Callable[[], str]] = {
 }
 
 DUCKDB_TEMPLATE_BENCHMARKS = {"tpch", "tpcds", "ssb", "joinorder", "clickbench", "amplab", "h2odb"}
+DUCKDB_TEMPLATES_WITHOUT_KEY_PINS = {"read_primitives", "tpchavoc"}
 
 
 def _duckdb_primary_keys(ddl: str) -> dict[str, tuple[str, ...]]:
@@ -182,7 +183,7 @@ def test_every_duckdb_template_benchmark_is_pinned() -> None:
         path.name.removesuffix("_tuned.yaml")
         for path in (REPO_ROOT / "benchbox/core/tuning/templates/duckdb").glob("*_tuned.yaml")
     }
-    assert templates >= DUCKDB_TEMPLATE_BENCHMARKS
+    assert templates == DUCKDB_TEMPLATE_BENCHMARKS | DUCKDB_TEMPLATES_WITHOUT_KEY_PINS
     assert set(EXPECTED_KEYS) == set(DDL_BUILDERS) == set(KEY_SOURCES) == DUCKDB_TEMPLATE_BENCHMARKS
 
 
