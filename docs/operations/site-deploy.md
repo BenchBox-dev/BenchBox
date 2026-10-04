@@ -21,6 +21,91 @@ root-relative paths; docs pages use their own `_static`, so the two Sphinx
 builds never collide. The assembler refuses any path claimed twice. The corpus
 SHA in a receipt is the git tree hash of `results-data/` at the trunk SHA.
 
+## Renderer
+
+One renderer builds every route of an artifact. `renderer: auto` in
+`deploy/routes.yml` selects it from the tree of the release tag commit, never
+from the working tree:
+
+- Astro, when that tree contains every one of `website/package.json`,
+  `website/package-lock.json`, `website/astro.config.ts`,
+  `website/src/converter/cli.ts`, `website/src/pages/index.astro`,
+  `website/src/pages/404.astro`, `website/src/pages/blog.astro`, at least one
+  file under each of `website/src/pages/docs/`, `website/src/pages/blog/` and
+  `website/src/pages/prompts/`, a `site-build:` target in
+  `make/documentation.mk`, and no `.rst` file under `docs/` (every page has
+  been migrated to MyST). This is what "the release tag contains `website/` and
+  all migrated content" means.
+- Sphinx otherwise. No released tag up to `v0.4.1` contains `website/`, so
+  production stays on Sphinx until a release cut from a tree that meets the list
+  above. `test_the_current_latest_release_tag_selects_sphinx` runs the selector
+  against the newest tag in the checkout, and
+  `test_trunk_still_satisfies_the_astro_release_definition` shows that the next
+  release cut from `develop` switches the whole site.
+
+While the selection is Sphinx, `/docs/dev/`, `/blog/` and the root files still
+come from a Sphinx build of trunk, so trunk must keep building with Sphinx until
+the release that switches the site has been deployed.
+
+`renderer: sphinx` holds every route on Sphinx regardless of the tag. No policy
+forces Astro. `scripts/site_deploy/renderer.py` holds the list, and the resolve
+step writes the selection and its reasons to `resolved.json`.
+
+With Astro, both refs run `make site-build`, which needs the ref's own
+`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap)
+and `/docs/`, including the API reference, come from the release tag's
+`website/dist`; `/docs/dev/` and `/blog/` from trunk's; `/results/` is trunk's
+Explorer build and snapshot, and the root `404.html`, `CNAME` and `.nojekyll`
+come from trunk. Hashed assets under `/_astro/` and `/_images/` are shared:
+trunk adds the files the release lacks, a byte-identical file is kept once,
+and the same path with different bytes fails the assembly.
+
+Assembly refuses a mixed-renderer artifact. Each ref's stage must be the
+selected renderer's output (an Astro stage must contain `_astro/`), and every
+HTML page outside `/results/` is classified by its markers: a Sphinx page loads
+`_static/documentation_options.js`, an Astro page loads `/_astro/` assets or
+carries Astro's generator meta. A page or asset of the other renderer fails the
+assembly and removes the partial tree; the `mixed_version` gate repeats the
+check on the final tree in deploy, preview and rollback runs. `assemble_public_site.py
+--renderer` must equal the selection it recomputes from the release checkout.
+A `ui-first` rollback across renderers is refused, because it would put one
+renderer's root `404.html` into the other's artifact; use the `full` phase.
+
+Each receipt records `renderer` at the top and on every route, and the Explorer
+block adds `pins`: the UI digest (the Explorer tree without `data/`) with its
+trunk SHA, and the snapshot's sha256 with the corpus SHA.
+
+Known limits of the Astro layout: the trunk build is not built for a
+`/docs/dev/` base, so its absolute links to `/docs/...` resolve to the release
+pages, and the search index follows the release tag.
+
+## Visual comparison before deploy
+
+Route and digest probes prove that the served bytes are the artifact's bytes,
+not that the layout is right. The layout guards are the `Public-site visual
+regression` comparison of every trunk render in `ci.yml`, and, for a deploy,
+the `Pre-deploy visual comparison` job of this workflow. That job runs when the
+resolve step reports `visual_required`: the candidate is Astro, or its renderer
+differs from the deployed one. It is skipped for rollback, which restores an
+artifact that was compared when it was first deployed.
+
+The job fetches the deployed generation's artifact through `fetch-run
+--verify-tree` (digest checked against its receipt), captures it and the
+candidate with `results-explorer/e2e/captures/public-site-pages.spec.ts`, and
+compares the manifests with `compareVisualManifestsAcrossRenderers`. A renderer
+change reports every capture as changed. The deploy job waits for this job and
+publishes only when it passed, or when it was skipped because it was not
+required. A deploy with no receipted production generation cannot pass it.
+
+Approval follows the exact-head rule of
+[the visual-change runbook](../development/results-explorer-browser-testing.md):
+after reviewing the `site-deploy-visual-<run_id>-<attempt>` artifact, set the
+repository variables `SITE_DEPLOY_VISUAL_APPROVED_SHA` to the candidate trunk
+SHA (`trunk_sha` in `resolved.json`) and `SITE_DEPLOY_VISUAL_APPROVAL_REASON`
+to the review note, re-run the failed jobs, and clear both afterwards. The pull
+request slot (`APPROVED_HEAD_SHA`) is never read here, and a missing capture
+always fails.
+
 ## Candidate and generation
 
 The merge queue is retired on `develop`, so `ci.yml` no longer certifies a trunk

@@ -238,6 +238,17 @@ position never substituting for either.
 4. Clear the approval variables. Hold other site-changing PRs until step 3
    is confirmed, because they need the Astro baseline for their exact base.
 
+### Site-deploy comparison
+
+A site-deploy run whose candidate is Astro, or whose renderer differs from the
+deployed one, captures the last production artifact and the assembled candidate
+with the same spec and compares them before the deploy job may start (see
+[the site deploy runbook](../operations/site-deploy.md#visual-comparison-before-deploy)).
+The approval rule is the one above, in a separate pair of repository variables
+named in that runbook: the approved SHA must equal the candidate trunk SHA and
+the reason must be nonempty. The PR slot never applies to a deploy, and a deploy
+approval never applies to a PR.
+
 ## What CI gates
 
 The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)
