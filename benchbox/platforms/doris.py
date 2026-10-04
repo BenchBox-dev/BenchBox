@@ -12,7 +12,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from urllib.parse import urlparse, urlunparse
 
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
@@ -464,7 +464,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
 
         def _put_once(target_url: str):
             if callable(data):
-                with data() as body:
+                with cast(Any, data)() as body:
                     return _requests.put(target_url, data=body, headers=headers, **kwargs)
             return _requests.put(target_url, data=data, headers=headers, **kwargs)
 

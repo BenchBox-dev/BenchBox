@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -99,7 +100,7 @@ def test_uc_volume_single_file_upload_and_download(
 
         download_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/customer.tbl.zst"
 
-        with workspace.files.download(download_path) as download_response:
+        with cast(Any, workspace.files.download)(download_path) as download_response:
             downloaded_content = download_response.contents.read()
 
         assert downloaded_content == original_content, (
@@ -151,11 +152,11 @@ def test_uc_volume_sharded_files_upload_and_download(
         )
 
         shard1_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/orders.tbl.1.zst"
-        with workspace.files.download(shard1_path) as download_response:
+        with cast(Any, workspace.files.download)(shard1_path) as download_response:
             downloaded_shard1 = download_response.contents.read()
 
         shard2_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/orders.tbl.2.zst"
-        with workspace.files.download(shard2_path) as download_response:
+        with cast(Any, workspace.files.download)(shard2_path) as download_response:
             downloaded_shard2 = download_response.contents.read()
 
         assert downloaded_shard1 == shard1_content, (
@@ -257,7 +258,7 @@ def test_uc_volume_nonexistent_file_is_skipped(databricks_adapter: DatabricksAda
         )
 
         customer_path = f"/Volumes/{databricks_adapter.uc_catalog}/{databricks_adapter.uc_schema}/{databricks_adapter.uc_volume}/customer.tbl.zst"
-        with workspace.files.download(customer_path) as download_response:
+        with cast(Any, workspace.files.download)(customer_path) as download_response:
             downloaded_content = download_response.contents.read()
 
         assert downloaded_content == valid_content

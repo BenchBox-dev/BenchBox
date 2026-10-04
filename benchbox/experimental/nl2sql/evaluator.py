@@ -174,8 +174,9 @@ class NL2SQLEvaluator:
 
         try:
             cursor = self.connection.execute(generated_sql.strip())
-            if hasattr(cursor, "description") and cursor.description:
-                generated_columns = [col[0].lower() for col in cursor.description]
+            description = getattr(cursor, "description", None)
+            if description:
+                generated_columns = [col[0].lower() for col in description]
             generated_results = list(cursor.fetchall()[: self.max_sample_rows])
         except Exception as e:
             error_message = f"Generated SQL error: {str(e)}"
@@ -183,8 +184,9 @@ class NL2SQLEvaluator:
 
         try:
             cursor = self.connection.execute(expected_sql.strip())
-            if hasattr(cursor, "description") and cursor.description:
-                expected_columns = [col[0].lower() for col in cursor.description]
+            description = getattr(cursor, "description", None)
+            if description:
+                expected_columns = [col[0].lower() for col in description]
             expected_results = list(cursor.fetchall()[: self.max_sample_rows])
         except Exception as e:
             error_message = f"Expected SQL error: {str(e)}"

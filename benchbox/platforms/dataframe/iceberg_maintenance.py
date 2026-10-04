@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from benchbox.utils.clock import mono_time
 
@@ -205,7 +205,7 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
                         except ValueError:
                             pass
 
-                    return op_class(column, value)
+                    return cast(Any, op_class)(column, value)
 
         self.logger.warning(f"Could not parse condition '{condition}', using AlwaysTrue")
         return AlwaysTrue()

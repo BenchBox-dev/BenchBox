@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -171,7 +172,7 @@ class TestIcebergMaintenanceCoverage:
 
         from pyiceberg.expressions import EqualTo
 
-        expr = EqualTo("id", 1)
+        expr = cast(Any, EqualTo)("id", 1)
         count = ops._do_delete("default.del_nonstr_tbl", expr)
         assert count >= 0
 
