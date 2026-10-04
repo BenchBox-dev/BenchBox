@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Local TPC-DI bundles are rerun with the current native generator (seed 42) at every published scale",
+    "Their table row counts and QVQ12/QAQ7 result counts match the cloud bundles at each scale",
+    "The superseded local bundles are replaced through the normal corpus PR path, and the CORPUS_NOTES caveat is updated"
+  ],
+  "context": "Found during the live-cloud corpus publication (PRs #2602 and #2615). Rerunning the local engines costs nothing.",
+  "description": "The published TPC-DI cohorts mix two data versions. The cloud bundles (BigQuery, Snowflake and Databricks at SF 0.1, 1 and 10) were loaded after the generator change in #2220 (`cac8582a0`). They agree on all sixteen table row counts and on QVQ12/QAQ7 result counts: 100/1 at SF 0.1, 32/2 at SF 1, 1/1 at SF 10. The local TPC-DI bundles in the corpus predate that change and report QVQ12=9 and QAQ7=1 at SF 1. So local and cloud timings in the same cohort are measured over different data. results-data/CORPUS_NOTES.md section \"TPC-DI cloud data comparison (2026-10-03)\" discloses this.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:52:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "af23fbc52a5c4c978910d7561811c7ab",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}

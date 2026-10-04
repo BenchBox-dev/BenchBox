@@ -11423,6 +11423,13 @@
       "status": "done",
       "title": "Add cost tracking for local/self-hosted platforms"
     },
+    "local-tpcdi-bundles-regenerate-current-generator": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Rerun local TPC-DI corpus bundles on the current generator; they disagree with cloud results"
+    },
     "logging-standardization": {
       "claim": null,
       "needs": [],
