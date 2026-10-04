@@ -52,7 +52,7 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!openRef.current || event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+      if (!openRef.current || event.key !== "Escape" || document.querySelector('dialog[open], [aria-modal="true"]')) return;
       setOpen(false);
       toggleRef.current?.focus();
     };
@@ -80,6 +80,7 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
       }}
       onFocusOut={(event) => {
         const next = event.relatedTarget;
+        if (next instanceof Element && !next.closest("[data-site-header-panel]")) panelFocusRef.current = false;
         if (openRef.current && next instanceof Node && !headerRef.current?.contains(next)) setOpen(false);
       }}
     >

@@ -283,6 +283,18 @@ report.states = {};
 const docsPage = "/docs/usage/getting-started.html";
 const resultsPage = "/results/";
 
+function readStyles(page) {
+  return page.evaluate(() => {
+    const read = (selector) => {
+      const el = document.querySelector(selector);
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return [style.color, style.fontFamily, style.fontSize, style.lineHeight, style.textDecorationLine, [".site-header", ".site-footer"].includes(selector) ? "" : Math.round(rect.height)].join(" / ");
+    };
+    return { header: read(".site-header"), headerLink: read(".site-header__link"), cta: read(".site-header__cta"), footer: read(".site-footer"), footerLink: read(".site-footer__link"), legal: read(".site-footer__legal") };
+  });
+}
+
 async function headerScript(route) {
   const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
   const page = await context.newPage();
@@ -294,6 +306,7 @@ async function headerScript(route) {
   await toggle.focus();
   await page.keyboard.press("Enter");
   out.opened = await expanded();
+  out.stylesMobile = await readStyles(page);
   const visited = [];
   await page.keyboard.press("Tab");
   for (let step = 0; step < 8; step += 1) {
@@ -304,7 +317,16 @@ async function headerScript(route) {
   out.visited = visited.join("|");
   await toggle.focus();
   if ((await expanded()) !== "true") await page.keyboard.press("Enter");
+  await page.evaluate(() => {
+    const modal = document.createElement("div");
+    modal.setAttribute("aria-modal", "true");
+    modal.id = "probe-modal";
+    document.body.append(modal);
+  });
   await page.keyboard.press("Tab");
+  await page.keyboard.press("Escape");
+  out.escapeIgnoredUnderModal = await expanded();
+  await page.evaluate(() => document.getElementById("probe-modal")?.remove());
   await page.keyboard.press("Escape");
   out.escape = { expanded: await expanded(), focusOnToggle: await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle")) };
   await toggle.click();
@@ -327,19 +349,10 @@ async function headerScript(route) {
   const choices = [];
   for (const key of ["ArrowRight", "ArrowRight", "ArrowRight", "ArrowLeft", "Home", "End", "ArrowUp"]) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
     choices.push(await page.evaluate(() => document.documentElement.dataset.bbThemeChoice));
   }
   out.radioKeys = choices.join(",");
-  out.styles = await page.evaluate(() => {
-    const read = (selector) => {
-      const el = document.querySelector(selector);
-      const style = getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      return [style.color, style.fontFamily, style.fontSize, style.lineHeight, style.textDecorationLine, selector === ".site-header" ? "" : Math.round(rect.height)].join(" / ");
-    };
-    return { header: read(".site-header"), headerLink: read(".site-header__link"), footer: read(".site-footer"), footerLink: read(".site-footer__link"), legal: read(".site-footer__legal") };
-  });
+  out.styles = await readStyles(page);
   await context.close();
   return out;
 }
@@ -348,7 +361,7 @@ async function headerScript(route) {
   const docs = await headerScript(docsPage);
   const results = await headerScript(resultsPage);
   report.headerParity = { docs, results };
-  const expectations = { opened: "true", visited: "Home|Docs|Blog|Results|GitHub|Run benchmark", tabOut: "false", grewClosed: "false", shrinkFocusOnToggle: true };
+  const expectations = { opened: "true", visited: "Home|Docs|Blog|Results|GitHub|Run benchmark", tabOut: "false", escapeIgnoredUnderModal: "true", grewClosed: "false", shrinkFocusOnToggle: true };
   for (const [name, value] of Object.entries(expectations)) {
     if (docs[name] !== value) fail(`docs header ${name} is ${docs[name]}`);
   }

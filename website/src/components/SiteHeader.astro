@@ -68,7 +68,7 @@ const cta = shellCta();
     if (isOpen() && event.relatedTarget instanceof Node && !header.contains(event.relatedTarget)) setOpen(false);
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && isOpen() && !document.querySelector("dialog[open]")) {
+    if (event.key === "Escape" && isOpen() && !document.querySelector('dialog[open], [aria-modal="true"]')) {
       setOpen(false);
       toggle?.focus();
     }
