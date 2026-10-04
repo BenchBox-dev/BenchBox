@@ -2189,7 +2189,7 @@ def test_astro_sources_are_a_registered_maintained_language() -> None:
 
 def test_astro_template_comments_are_found_without_flagging_embedded_blocks() -> None:
     source = "<div>{/* expression */}</div>\n<!-- html -->\n<style>a::after { content: '<!-- data -->'; }</style>\n"
-    findings = scan("a.astro", source, "astro", {})
+    findings = scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
     assert [(f.line, f.kind, f.text) for f in findings if f.kind == "comment" and f.text.startswith("<!--")] == [
         (2, "comment", "<!-- html -->")
     ]
@@ -2206,7 +2206,11 @@ ASTRO_STRING_MARKER_SOURCES = [
 
 def test_astro_html_comment_markers_inside_strings_are_data() -> None:
     for source in ASTRO_STRING_MARKER_SOURCES:
-        assert not [f for f in scan("a.astro", source, "astro", {}) if f.text.startswith("<!--")]
+        assert not [
+            f
+            for f in scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
+            if f.text.startswith("<!--")
+        ]
 
 
 @pytest.mark.parametrize(
@@ -2882,9 +2886,9 @@ def test_reviewed_joinorder_copy_where_clause_is_an_integer_id_list() -> None:
     "source",
     ["<p>{x}</p>\n", '<a href="http://example.com">x</a>\n', '<p>{"http://example.com"}</p>\n'],
 )
-def test_astro_expressions_without_comment_tokens_need_no_parse(source: str) -> None:
+def test_astro_expressions_without_comment_tokens_are_still_parsed(source: str) -> None:
     requests = javascript_requests("a.astro", source, "astro")
-    assert all("//" in value or "/*" in value for value in requests.values())
+    assert len(requests) == source.count("{")
 
 
 def test_astro_expression_comment_lines_map_to_source_lines() -> None:
@@ -2918,7 +2922,7 @@ def test_astro_regex_literals_and_division_in_expressions(source: str, expressio
 
 @pytest.mark.parametrize("source", ['<p>{/"/.test(s)}</p>\n', "<p>{/{/.test(s)}</p>\n", "<p>{a / b}</p>\n"])
 def test_astro_regex_literal_without_comment_tokens_is_not_a_coverage_error(source: str) -> None:
-    assert scan("a.astro", source, "astro", {}) == []
+    assert scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")}) == []
 
 
 def test_astro_frontmatter_regex_literal_with_backtick_does_not_open_a_template() -> None:
@@ -2929,14 +2933,17 @@ def test_astro_frontmatter_regex_literal_with_backtick_does_not_open_a_template(
 
 def test_astro_html_comment_inside_jsx_in_an_expression_is_found() -> None:
     source = "<ul>{xs.map((x) => <li><!-- in jsx --></li>)}</ul>\n<p>{'<!-- data -->'}</p>\n"
-    findings = scan("a.astro", source, "astro", {})
+    findings = scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
     assert [(f.line, f.text) for f in findings] == [(1, "<!-- in jsx -->")]
 
 
 def test_astro_frontmatter_ends_at_the_first_top_level_fence() -> None:
     source = "---\nconst text = `\n---\nstill code\n`;\nconst other = '---';\n---\n<p>{text}</p>\n"
     requests = javascript_requests("a.astro", source, "astro")
-    assert list(requests.values()) == ["const text = `\n---\nstill code\n`;\nconst other = '---';\n"]
+    assert list(requests.values()) == [
+        "const text = `\n---\nstill code\n`;\nconst other = '---';\n",
+        "[\ntext\n];",
+    ]
     assert not scan("a.astro", source, "astro", {k: [] for k in requests})
 
 
@@ -2953,17 +2960,18 @@ def test_astro_unterminated_frontmatter_is_a_coverage_error() -> None:
 
 def test_astro_frontmatter_script_and_style_are_scanned_as_their_own_languages() -> None:
     requests = javascript_requests("a.astro", ASTRO_SOURCE, "astro")
-    assert len(requests) == 3
-    comments = ["// frontmatter explanation", "// script explanation", "/* expression explanation */"]
-    lines = [1, 1, 2]
+    assert len(requests) == 4
+    comments = ["// frontmatter explanation", "// script explanation", "/* expression explanation */", None]
+    lines = [1, 1, 2, 2]
     rows = {
-        key: [{"kind": "comment", "line": line, "text": text, "symbol": ""}]
+        key: [{"kind": "comment", "line": line, "text": text, "symbol": ""}] if text else []
         for key, text, line in zip(requests, comments, lines, strict=True)
     }
     assert list(requests.values()) == [
         '// frontmatter explanation\nconst title = "x";\n',
         '\n  // script explanation\n  console.log("<!-- data -->");\n',
         "[\n/* expression explanation */\n];",
+        "[\ntitle\n];",
     ]
     findings = scan("a.astro", ASTRO_SOURCE, "astro", rows)
     assert sorted((f.line, f.text) for f in findings) == [
@@ -2989,3 +2997,87 @@ def test_myst_eval_rst_content_is_scanned_like_an_rst_page() -> None:
     source = "```{eval-rst}\n.. code-block:: python\n\n   x = 1  # note\n```\n"
     assert [f.text for f in scan("docs/a.md", source, "examples", {})] == ["# note"]
     assert scan("docs/blog/index.md", "```{eval-rst}\n* `Archive <archive.html>`_\n```\n", "examples", {}) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["mytool", "-c", "# hello"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run("echo hi # there", shell=flag)\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["echo hi # there"], shell=flag)\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["psql", "--command=SELECT 1 -- hi"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["node", "--eval=// hi"])\n', "python"),
+        ("a.sh", "bash --command='# hello'\n", "bash"),
+        ("a.sh", "node -e'// hi'\n", "bash"),
+        ("a.sh", "lua -e '-- hi'\n", "bash"),
+        ("a.sh", "deno eval '// hi'\n", "bash"),
+        ("a.sh", "bun -e '// hi'\n", "bash"),
+        ("a.sh", "php -r '# hi'\n", "bash"),
+        ("a.sh", "Rscript -e '# hi'\n", "bash"),
+        ("a.sh", "powershell -c '# hi'\n", "bash"),
+        ("a.py", 'from pathlib import Path\n(Path("d").joinpath("o.html")).write_text("<!-- hi -->")\n', "python"),
+        ("ci.yml", 'job:\n  script: "call();// hi"\n', "yaml"),
+    ],
+)
+def test_unmodeled_executable_forms_fail_closed(path: str, source: str, lang: str) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] in (["payload-error"], ["coverage-error"])
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "text"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["sqlite3", "a.db", "SELECT 1 -- hi"])\n', "python", "-- hi"),
+        ("a.py", 'import subprocess\nsubprocess.run(["duckdb", "a.db", "SELECT 1 -- hi"])\n', "python", "-- hi"),
+        ("x.yml", "a:\n  entry: bash -c '# hello'\n", "yaml", "# hello"),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["docker", "exec", "c", "bash", "-c", "# hi"])\n',
+            "python",
+            "# hi",
+        ),
+        ("a.sh", "docker exec c bash -c '# hi'\n", "bash", "# hi"),
+        ("a.sh", "sqlite3 a.db 'SELECT 1 -- hi'\n", "bash", "-- hi"),
+        ("a.sh", "psql -c 'SELECT 1 -- hi'\n", "bash", "-- hi"),
+        ("a.sh", "bash -ce '# hi'\n", "bash", "# hi"),
+    ],
+)
+def test_sql_clients_entry_keys_and_nested_commands_are_scanned(path: str, source: str, lang: str, text: str) -> None:
+    assert [f.text for f in scan(path, source, lang, {})] == [text]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["git", "-c", "user.name=x", "commit"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["docker", "run", "-e", "A=1", "img"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["ls", "-l"], shell=False)\n', "python"),
+        ("a.sh", "perl script.pl --verbose\n", "bash"),
+        ("a.sh", "sqlite3 a.db 'SELECT 1'\n", "bash"),
+    ],
+)
+def test_data_flags_and_comment_free_sources_stay_clean(path: str, source: str, lang: str) -> None:
+    assert scan(path, source, lang, {}) == []
+
+
+def test_every_astro_expression_is_sent_to_the_typescript_scanner() -> None:
+    source = '<div>{query("SELECT 1 -- hi")}</div>\n'
+    assert list(javascript_requests("a.astro", source, "astro").values()) == ['[\nquery("SELECT 1 -- hi")\n];']
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('LEVELS=($(printf "%s\\n" 1 2 | awk -v max="$MAX" \'$1 <= max\' | sort -nu))\n', []),
+        ('if ! awk "BEGIN { exit !($s >= 1) }"; then\n  exit 1\nfi\n', ["coverage-error"]),
+        ("if ! awk -v s=\"$s\" 'BEGIN { exit !(s >= 1) }'; then\n  exit 1\nfi\n", []),
+        ("LEVELS=($(printf x | awk '{print} # note'))\n", ["coverage-error"]),
+        ("LEVELS=($(psql -c 'SELECT 1 -- note'))\n", ["coverage-error"]),
+    ],
+)
+def test_unparseable_shell_chunks_fail_closed_only_when_they_can_hold_a_comment(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_heredoc_inside_command_substitution_is_skipped_as_data() -> None:
+    source = "BODY=$(cat <<EOF | awk '{print}'\nIt's data\nEOF\n)\necho \"$BODY\"\n"
+    assert scan("a.sh", source, "bash") == []

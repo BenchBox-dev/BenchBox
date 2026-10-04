@@ -154,3 +154,19 @@ Make constructs need review and adapter work. Details are in
 `scripts/comment_syntax.py`, `comment_payloads.py` and `comment_execution.py`;
 add a regression fixture to `tests/unit/scripts/test_comment_policy.py` when
 extending an adapter.
+
+Known gaps, each a place where a comment can pass unreported:
+
+- TOML values and YAML or JSON keys other than the recognized command keys
+  (`run`, `command`, `entrypoint`, `entry`, `script`, SQL keys, and
+  `package.json` scripts) are not extracted as code.
+- A Python `open()` whose path cannot be resolved is not treated as an HTML
+  sink, so text written through it is not scanned.
+- A JavaScript wrapper that only passes its argument to a reviewed SQL wrapper
+  is accepted without checking its call sites.
+- A shell chunk that the parser cannot read is skipped when it holds no
+  comment marker for the interpreter it names; a program assembled from
+  variables at run time is not inspected in that case.
+- Unknown programs that take `-c` or `-e` as data are listed in
+  `DATA_FLAG_PROGRAMS` in `scripts/comment_execution.py`; any other program
+  given such a flag is reported.

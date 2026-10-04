@@ -4,7 +4,7 @@ import ast
 import re
 from collections import defaultdict
 
-from comment_payloads import command_words, inline_source_index
+from comment_payloads import SQL_CLIENTS, command_words, inline_source_index, sql_client_source_index
 
 REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
     (
@@ -113,6 +113,63 @@ UNMODELED_INTERPRETERS = {
     "fish",
     "ksh",
     "dash",
+}
+INLINE_SHAPED_FLAG = re.compile(r"-[ceErp]|--(?:eval|command|exec|execute|print)(?:=.*)?|-[ceErp]\S+", re.S)
+COMMAND_RUNNERS = {
+    "docker",
+    "podman",
+    "kubectl",
+    "ssh",
+    "xargs",
+    "chroot",
+    "nsenter",
+    "flock",
+    "watch",
+    "su",
+    "runuser",
+    "doas",
+}
+DATA_FLAG_PROGRAMS = {
+    "dbgen",
+    "ioreg",
+    "claude",
+    "qgen",
+    "dsdgen",
+    "dsqgen",
+    "git",
+    "docker",
+    "podman",
+    "tar",
+    "gh",
+    "kubectl",
+    "ssh",
+    "scp",
+    "rsync",
+    "curl",
+    "wget",
+    "grep",
+    "rg",
+    "find",
+    "xargs",
+    "make",
+    "uv",
+    "pip",
+    "pytest",
+    "ruff",
+    "gzip",
+    "zstd",
+    "unzip",
+    "zip",
+    "openssl",
+    "security",
+    "sysctl",
+    "ps",
+    "lsof",
+    "pg_ctl",
+    "pg_dump",
+    "pg_restore",
+    "createdb",
+    "dropdb",
 }
 OS_EXEC_ACTORS = {
     f"os.{name}"
@@ -247,10 +304,12 @@ class PythonBindings:
                 return None
             if any(keyword.arg == "executable" for keyword in node.keywords):
                 return command, "unsupported", None
-            shell = any(
-                keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
-                for keyword in node.keywords
-            )
+            shell_values = [keyword.value for keyword in node.keywords if keyword.arg == "shell"]
+            if any(
+                not (isinstance(value, ast.Constant) and value.value in {True, False, None}) for value in shell_values
+            ):
+                return command, "unsupported", None
+            shell = any(isinstance(value, ast.Constant) and value.value is True for value in shell_values)
             value = self.dereference(command)
             if isinstance(value, (ast.List, ast.Tuple)):
                 if shell and value.elts:
@@ -393,6 +452,13 @@ class PythonBindings:
         elif (
             isinstance(target, ast.Call)
             and isinstance(target.func, ast.Attribute)
+            and target.func.attr == "joinpath"
+            and target.args
+        ):
+            leaf = self.literal(target.args[-1])
+        elif (
+            isinstance(target, ast.Call)
+            and isinstance(target.func, ast.Attribute)
             and target.func.attr == "with_suffix"
             and len(target.args) == 1
         ):
@@ -431,6 +497,8 @@ class PythonBindings:
                     return "absolute"
                 value = self.literal(node.args[0]) if len(node.args) == 1 and not node.keywords else None
                 return "absolute" if value and value.startswith("/") else "relative"
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "joinpath" and node.args:
+                return self.path_kind(node.func.value, seen)
             if (
                 isinstance(node.func, ast.Attribute)
                 and node.func.attr == "with_name"
@@ -552,7 +620,25 @@ class PythonBindings:
             return self.process_payload(args[skip:])
         if name in UNMODELED_INTERPRETERS:
             return args[0], "unsupported", None
+        if name in SQL_CLIENTS:
+            try:
+                index = sql_client_source_index(name, words)
+            except ValueError:
+                return args[0], "unsupported", None
+            return (args[index], "sql", self.literal(args[index])) if index is not None else None
         if language is None and program is not None:
+            if name in COMMAND_RUNNERS:
+                for index, word in enumerate(words[1:], start=1):
+                    nested = word.rsplit("/", 1)[-1] if word else None
+                    if nested and (
+                        nested.startswith("python")
+                        or nested in {"node", "sh", "bash", "zsh"} | SQL_CLIENTS | UNMODELED_INTERPRETERS
+                    ):
+                        return self.process_payload(args[index:])
+            if name not in DATA_FLAG_PROGRAMS and any(
+                word is not None and INLINE_SHAPED_FLAG.fullmatch(word) for word in words[1:]
+            ):
+                return args[0], "unsupported", None
             return None
         return self.inline_process_payload(args, words, language)
 

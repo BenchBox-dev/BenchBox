@@ -123,7 +123,7 @@ if [ -f "$hook_config" ]; then
       if ($0 ~ /^[[:space:]]*-[[:space:]]*/) {
         value = $0
         sub(/^[[:space:]]*-[[:space:]]*/, "", value)
-        sub(/[[:space:]]+#.*$/, "", value)
+        sub(/[[:space:]]+\043.*$/, "", value)
         gsub(/[[:space:]]+$/, "", value)
         print value
         next

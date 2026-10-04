@@ -308,7 +308,6 @@ def astro_expression_sources(path: str, source: str) -> list[tuple[int, str, str
             f"expression:{index}",
         )
         for index, (start, end) in enumerate(astro_template_parts(source)[1])
-        if re.search(r"//|/\*", template[start:end])
     ]
 
 
@@ -465,7 +464,7 @@ def inline_source_index(words: list[str | None], language: str | None) -> int | 
     inline_flags = {
         "python": {"-c"},
         "bash": {"-c", "-lc", "--command"},
-        "javascript": {"-e", "--eval"},
+        "javascript": {"-e", "--eval", "-p", "--print"},
         "sql": {"-c", "--command"},
     }.get(language or "", {"-c", "-e", "--eval", "--command", "-lc"})
     python_flags = {
@@ -496,8 +495,17 @@ def inline_source_index(words: list[str | None], language: str | None) -> int | 
             if index + 1 < len(words):
                 return index + 1
             raise ValueError("inline interpreter argument requires explicit support")
+        if word.startswith("--") and word.split("=", 1)[0] in inline_flags:
+            raise ValueError("inline interpreter argument requires explicit support")
+        if language == "bash" and re.fullmatch(r"-[A-Za-z]+", word) and "c" in word[1:]:
+            if index + 1 < len(words):
+                return index + 1
+            raise ValueError("inline interpreter argument requires explicit support")
+        short_inline = {flag for flag in inline_flags if len(flag) == 2}
+        if not word.startswith("--") and any(word.startswith(flag) for flag in short_inline):
+            raise ValueError("inline interpreter argument requires explicit support")
         if language == "python":
-            if word == "-m" or word == "--" or (word and not word.startswith("-")):
+            if word in {"-m", "--", "-"} or (word and not word.startswith("-")):
                 return None
             if word not in python_flags and not word.startswith(("-W", "-X")):
                 raise ValueError("interpreter option operand requires explicit support")
@@ -515,6 +523,110 @@ def inline_source_index(words: list[str | None], language: str | None) -> int | 
         else:
             index += 1
     return None
+
+
+SQL_CLIENT_VALUE_OPTIONS = {
+    "-separator",
+    "-nullvalue",
+    "-newline",
+    "-init",
+    "-vfs",
+    "-maxsize",
+    "-mmap",
+    "-pagecache",
+    "-lookaside",
+    "-heap",
+}
+SQL_CLIENT_FLAGS = {
+    "-batch",
+    "-bail",
+    "-header",
+    "-noheader",
+    "-csv",
+    "-json",
+    "-line",
+    "-list",
+    "-markdown",
+    "-table",
+    "-box",
+    "-html",
+    "-ascii",
+    "-column",
+    "-quote",
+    "-readonly",
+    "-no-stdin",
+    "-unsigned",
+    "-echo",
+    "-interactive",
+    "-safe",
+    "-version",
+    "-help",
+}
+
+
+def sql_client_source_index(name: str, words: list[str | None]) -> int | None:
+    if name == "psql":
+        index = 1
+        while index < len(words):
+            word = words[index]
+            if word in {"-c", "--command"}:
+                if index + 1 < len(words):
+                    return index + 1
+                raise ValueError("inline SQL client argument requires explicit support")
+            if word is not None and (word.startswith("--command=") or (word.startswith("-c") and word != "-c")):
+                raise ValueError("inline SQL client argument requires explicit support")
+            index += 2 if word in PSQL_VALUE_OPTIONS else 1
+        return None
+    positional = 0
+    index = 1
+    while index < len(words):
+        word = words[index]
+        if word is None:
+            raise ValueError("dynamic SQL client argument requires an adapter")
+        if word in {"-c", "-s", "-cmd", "--command"}:
+            if index + 1 < len(words):
+                return index + 1
+            raise ValueError("inline SQL client argument requires explicit support")
+        if word in SQL_CLIENT_VALUE_OPTIONS:
+            index += 2
+            continue
+        if word.startswith("-"):
+            if word not in SQL_CLIENT_FLAGS:
+                raise ValueError("SQL client option requires explicit support")
+            index += 1
+            continue
+        positional += 1
+        if positional == 2:
+            return index
+        index += 1
+    return None
+
+
+SQL_CLIENTS = {"psql", "duckdb", "sqlite3"}
+PSQL_VALUE_OPTIONS = {
+    "-h",
+    "--host",
+    "-p",
+    "--port",
+    "-U",
+    "--username",
+    "-d",
+    "--dbname",
+    "-f",
+    "--file",
+    "-v",
+    "--set",
+    "--variable",
+    "-P",
+    "--pset",
+    "-o",
+    "--output",
+    "-L",
+    "--log-file",
+    "-T",
+    "-F",
+    "-R",
+}
 
 
 def command_words(words: list[str | None]) -> list[str | None]:
@@ -845,31 +957,118 @@ def unwrap_static_command(words: list) -> list:
 
 
 SHELL_INLINE_INTERPRETER = re.compile(
-    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh|ksh|dash|fish|perl|ruby|php|lua|pwsh|deno|bun|tclsh|osascript)\b"
-    r"[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)\b"
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)"
+    r"|(?<![\w.-])(?:ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
+    r"|psql|duckdb|sqlite3)(?=[\s;|&)]|$)"
 )
 SHELL_WRAPPERS = {"sudo", "nice", "nohup", "timeout", "time", "command", "exec", "stdbuf", "ionice", "uvx"}
 TIME_FLAGS = {"-l", "-p"}
-UNMODELED_INLINE_FLAG = re.compile(r"-[A-Za-z]*[ceE]|--eval|--command")
 
 
-def check_unmodeled_inline(words: list) -> None:
+UNMODELED_MARKERS = {
+    "lua": re.compile(r"--"),
+    "deno": re.compile(r"//|/\*"),
+    "bun": re.compile(r"//|/\*"),
+    "php": re.compile(r"#|//|/\*"),
+    "osascript": re.compile(r"--|#|\(\*"),
+    "pwsh": re.compile(r"#|<#"),
+    "powershell": re.compile(r"#|<#"),
+}
+AWK_VALUE_OPTIONS = {"-v", "-F", "-f"}
+
+
+def unmodeled_program_word(words: list, command: str):
+    if command in {"awk", "gawk", "mawk"}:
+        index = 1
+        while index < len(words):
+            word = words[index]
+            if word.parts:
+                if index > 1 and not words[index - 1].parts and words[index - 1].word in AWK_VALUE_OPTIONS:
+                    index += 1
+                    continue
+                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            if word.word == "-f":
+                return None
+            if word.word in AWK_VALUE_OPTIONS:
+                index += 2
+                continue
+            if word.word.startswith("-") and word.word != "-":
+                index += 1
+                continue
+            return word
+        return None
     for index, word in enumerate(words[1:], start=1):
         if word.parts:
-            if word.word.startswith("-"):
-                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
-            continue
-        if UNMODELED_INLINE_FLAG.fullmatch(word.word):
-            program = words[index + 1] if index + 1 < len(words) else None
-        elif re.match(r"-[A-Za-z]", word.word) and re.search(r"[ceE]", word.word[1:]):
-            program = word
-        else:
-            continue
-        if program is None or program.parts or "#" in program.word:
             raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+        text = word.word
+        if command == "deno" and text == "eval" or INLINE_OPTION.fullmatch(text):
+            if index + 1 >= len(words):
+                raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+            return words[index + 1]
+        if text.startswith("-") and not PLAIN_OPTION.fullmatch(text) and re.match(r"-[A-Za-z]*[ceEr]", text):
+            return word
+        if not text.startswith("-"):
+            return None
+    return None
 
 
-SHELL_UNMODELED = {"perl", "ruby", "php", "lua", "pwsh", "deno", "bun", "tclsh", "osascript", "fish", "ksh", "dash"}
+def check_unmodeled_inline(words: list, command: str) -> None:
+    program = unmodeled_program_word(words, command)
+    if program is None:
+        return
+    markers = UNMODELED_MARKERS.get(command, re.compile(r"#"))
+    if program.parts or markers.search(program.word):
+        raise ValueError("inline source for an unmodeled interpreter requires an adapter")
+
+
+SHELL_UNMODELED = {
+    "perl",
+    "ruby",
+    "php",
+    "lua",
+    "Rscript",
+    "osascript",
+    "pwsh",
+    "powershell",
+    "deno",
+    "bun",
+    "tclsh",
+    "awk",
+    "gawk",
+    "mawk",
+    "fish",
+    "ksh",
+    "dash",
+}
+SHELL_COMMAND_RUNNERS = {
+    "docker",
+    "podman",
+    "kubectl",
+    "ssh",
+    "xargs",
+    "chroot",
+    "nsenter",
+    "flock",
+    "watch",
+    "su",
+    "runuser",
+    "doas",
+}
+SHELL_NESTED_TARGETS = {"node", "sh", "bash", "zsh", "eval"} | SQL_CLIENTS | SHELL_UNMODELED
+COMMENT_MARKERS = re.compile(r"#|//|/\*|--|<#")
+PLAIN_OPTION = re.compile(r"--?[A-Za-z][A-Za-z0-9_-]*|--")
+INLINE_OPTION = re.compile(r"-[A-Za-z]*[ceEr]|--(?:eval|command)")
+
+
+def logical_line_end(
+    source: str, index: int, depth: int, start: int, chunks: list[tuple[int, str]]
+) -> tuple[int, str | None]:
+    line = source[source.rfind("\n", 0, index) + 1 : index]
+    marker = re.search(r"(?<!<)<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?", line)
+    if depth == 0:
+        chunks.append((start, source[start:index]))
+        start = index + 1
+    return start, marker.group(1) if marker else None
 
 
 def shell_logical_chunks(source: str) -> list[tuple[int, str]]:
@@ -910,13 +1109,8 @@ def shell_logical_chunks(source: str) -> list[tuple[int, str]]:
         elif char == "#" and (index == 0 or source[index - 1] in " \t\n;"):
             end = source.find("\n", index)
             index = (length if end < 0 else end) - 1
-        elif char == "\n" and depth == 0:
-            chunk = source[start:index]
-            marker = re.search(r"(?<!<)<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?", chunk)
-            chunks.append((start, chunk))
-            start = index + 1
-            if marker:
-                heredoc = marker.group(1)
+        elif char == "\n":
+            start, heredoc = logical_line_end(source, index, depth, start, chunks)
         index += 1
     if quote is not None or depth or heredoc is not None:
         raise ValueError("shell command source requires an executable-payload adapter")
@@ -946,6 +1140,26 @@ def neutral_list_operators(text: str) -> str:
     return "".join(characters)
 
 
+SHELL_MODELED_INLINE = re.compile(
+    r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ceE]|--eval|--command)"
+)
+SHELL_UNMODELED_NAME = re.compile(
+    r"(?<![\w.-])(ksh|dash|fish|perl|ruby|php|lua|pwsh|powershell|deno|bun|tclsh|osascript|Rscript|awk|gawk|mawk"
+    r"|psql|duckdb|sqlite3)(?=[\s;|&)]|$)"
+)
+
+
+def chunk_can_hold_comment(chunk: str) -> bool:
+    if SHELL_MODELED_INLINE.search(chunk):
+        return True
+    for match in SHELL_UNMODELED_NAME.finditer(chunk):
+        name = match.group(1)
+        markers = re.compile(r"--|/\*") if name in SQL_CLIENTS else UNMODELED_MARKERS.get(name, re.compile(r"#"))
+        if markers.search(chunk, match.end()):
+            return True
+    return False
+
+
 def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
     if not SHELL_INLINE_INTERPRETER.search(source):
         return []
@@ -962,6 +1176,8 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
                 try:
                     units.append((offset, chunk, bashlex.parse(neutral_list_operators(chunk))))
                 except (bashlex.errors.ParsingError, NotImplementedError):
+                    if not chunk_can_hold_comment(chunk):
+                        continue
                     raise ValueError("shell command source requires an executable-payload adapter") from exc
     result = []
     for offset, text, trees in units:
@@ -981,8 +1197,17 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                 command = words[0].word.rsplit("/", 1)[-1]
                 words = unwrap_static_command(words)
                 command = words[0].word.rsplit("/", 1)[-1]
+                if command in SHELL_COMMAND_RUNNERS:
+                    for index, word in enumerate(words[1:], start=1):
+                        nested = word.word.rsplit("/", 1)[-1]
+                        if not word.parts and (
+                            re.fullmatch(r"python[0-9.]*", nested) or nested in SHELL_NESTED_TARGETS
+                        ):
+                            words = words[index:]
+                            command = nested
+                            break
                 if command in SHELL_UNMODELED:
-                    check_unmodeled_inline(words)
+                    check_unmodeled_inline(words, command)
                 inert = command == "uv" and len(words) > 1 and words[1].word not in {"run", "tool", "--"}
                 if command in {"env", "uv"} and not inert:
                     if any(word.parts for word in words):
@@ -997,12 +1222,17 @@ def shell_command_unit(path: str, source: str, offset: int, unit: str, trees: li
                     if inert
                     else "python"
                     if re.fullmatch(r"python[0-9.]*", command)
+                    else "sql"
+                    if command in SQL_CLIENTS
                     else {"node": "javascript", "sh": "bash", "bash": "bash", "zsh": "bash", "eval": "bash"}.get(
                         command
                     )
                 )
+                static_words = [None if word.parts else word.word for word in words]
                 source_index = (
-                    inline_source_index([None if word.parts else word.word for word in words], language)
+                    sql_client_source_index(command, static_words)
+                    if command in SQL_CLIENTS
+                    else inline_source_index(static_words, language)
                     if language and command != "eval"
                     else None
                 )
@@ -1265,7 +1495,7 @@ def command_key_sources(
 ) -> list[tuple[int, str, str, str, str]]:
     name = key.value
     line = value.start_mark.line + 1
-    if name in {"command", "entrypoint"}:
+    if name in {"command", "entrypoint", "entry"}:
         if isinstance(value, yaml.ScalarNode):
             return [(line, path + ".bash", value.value, "bash", f"{symbol}.{name}")]
         if isinstance(value, yaml.SequenceNode):
@@ -1284,7 +1514,7 @@ def command_key_sources(
             tokens = shlex.split(text, comments=False)
         except ValueError as exc:
             raise ValueError("script value outside actions/github-script requires an adapter") from exc
-        if any(token.startswith(("//", "/*")) for token in tokens):
+        if any(token.startswith(("//", "/*")) or re.search(r"[;(,=!?{}]\s*(?://|/\*)", token) for token in tokens):
             raise ValueError("script value outside actions/github-script requires an adapter")
         return [(line, path + ".bash", text, "bash", f"{symbol}.{name}")]
     if (

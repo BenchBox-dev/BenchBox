@@ -105,7 +105,7 @@ IFS=',' read -r -a PLATFORMS <<<"$PLATFORMS_CSV"
 IFS=',' read -r -a SCALES <<<"$SCALES_CSV"
 
 for s in "${SCALES[@]}"; do
-  if ! awk "BEGIN { exit !($s >= 1) }"; then
+  if ! awk -v s="$s" 'BEGIN { exit !(s >= 1) }'; then
     echo "Invalid scale factor for TPC-DS: $s (must be >= 1)" >&2
     exit 1
   fi
