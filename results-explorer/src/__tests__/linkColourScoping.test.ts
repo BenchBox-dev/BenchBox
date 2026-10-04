@@ -21,7 +21,7 @@ describe("Explorer link colour scoping", () => {
   });
 
   it("never lets the page scope raise the specificity of a link colour rule", () => {
-    const colourRules = [...css.matchAll(/^\s*([^{}@\n][^{}\n]*)\{\s*[^}]*?\bcolor:/gm)].map((match) => match[1].trim());
+    const colourRules = [...css.matchAll(/^\s*([^{}@\n][^{}\n]*)\{\s*[^}]*?\bcolor:/gm)].map((match) => (match[1] ?? "").trim());
     const scoped = colourRules.filter((selector) => /\.bb-explorer(-page)?\s+a\b/.test(selector) && !selector.includes(":where("));
     expect(scoped).toEqual([]);
   });
