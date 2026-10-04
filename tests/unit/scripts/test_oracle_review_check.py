@@ -33,6 +33,7 @@ def _decide(
     reviews: list[dict[str, Any]] | None = None,
     reactions: list[dict[str, Any]] | None = None,
     threads: list[dict[str, Any]] | None = None,
+    base_date: str | None = None,
 ) -> tuple[int, str]:
     return oracle_review_check.decide(
         HEAD,
@@ -42,11 +43,14 @@ def _decide(
         reactions or [],
         threads or [],
         oracle_review_check.any_soundness_path,
+        base_date,
     )
 
 
-def _review(login: str = CONNECTOR, commit_id: str = HEAD, state: str = "COMMENTED") -> dict[str, Any]:
-    return {"login": login, "commit_id": commit_id, "state": state}
+def _review(
+    login: str = CONNECTOR, commit_id: str = HEAD, state: str = "COMMENTED", submitted_at: str = AFTER_HEAD
+) -> dict[str, Any]:
+    return {"login": login, "commit_id": commit_id, "state": state, "submitted_at": submitted_at}
 
 
 def _reaction(content: str = "+1", created_at: str = AFTER_HEAD, login: str = CONNECTOR) -> dict[str, Any]:
@@ -224,3 +228,37 @@ def test_latest_run_for_a_restored_head_moves_the_head_transition() -> None:
         oracle_review_check.any_soundness_path,
     )
     assert status == 1
+
+
+RETARGETED = "2026-10-01T14:00:00Z"
+AFTER_RETARGET = "2026-10-01T15:00:00Z"
+
+
+def test_review_before_a_retarget_waits() -> None:
+    status, _ = _decide(reviews=[_review()], base_date=RETARGETED)
+    assert status == oracle_review_check.WAITING
+
+
+def test_review_after_a_retarget_passes() -> None:
+    status, _ = _decide(reviews=[_review(submitted_at=AFTER_RETARGET)], base_date=RETARGETED)
+    assert status == oracle_review_check.PASS
+
+
+def test_thumbs_up_before_a_retarget_waits() -> None:
+    status, _ = _decide(reactions=[_reaction()], base_date=RETARGETED)
+    assert status == oracle_review_check.WAITING
+
+
+def test_thumbs_up_after_a_retarget_passes() -> None:
+    status, _ = _decide(reactions=[_reaction(created_at=AFTER_RETARGET)], base_date=RETARGETED)
+    assert status == oracle_review_check.PASS
+
+
+def test_latest_base_change_picks_the_newest_retarget() -> None:
+    events = [
+        {"event": "base_ref_changed", "created_at": "2026-10-01T10:00:00Z"},
+        {"event": "commented", "created_at": "2026-10-01T16:00:00Z"},
+        {"event": "base_ref_changed", "created_at": RETARGETED},
+    ]
+    assert oracle_review_check.latest_base_change(events) == RETARGETED
+    assert oracle_review_check.latest_base_change([{"event": "commented", "created_at": RETARGETED}]) is None

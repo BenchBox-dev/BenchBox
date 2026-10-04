@@ -6,50 +6,6 @@ name: Auto-merge revocation
 # arm paths are `make pr-ready` / `make pr-arm-auto-merge` (or
 # `make pr-open READY=1` when reusing an already-open, reviewed PR) on a
 # finished branch. A newly created PR stays held. This workflow NEVER arms.
-#
-# History: this file used to arm on `opened` (defeating the #1567 Makefile
-# hold — live proof: #1568/#1569 merged hands-free seconds after creation),
-# then after #1592 armed only on `ready_for_review`. That arm path never
-# fired once: drafts are not used in this repo, so no `ready_for_review`
-# event ever occurred (0 events across PRs #1459–#1630). The dead arm step
-# was removed per _project/decisions/auto-merge-policy-consolidation-2026-08-06.md
-# (D2); a dead enabling path in the gate machinery is pure comprehension
-# cost. If the draft workflow is ever adopted, arm via `make pr-ready`, not
-# by resurrecting an arm step here.
-#
-# What this workflow does — revocation only, re-evaluated on every trigger:
-#   1. Soundness paths touched (union of base-ref and PR-copy predicate,
-#      fail-closed): disable auto-merge. A push that newly touches a
-#      soundness-critical path must not ride an auto-merge armed by an
-#      earlier (non-soundness) state. GitHub only auto-disables auto-merge
-#      on push when the pusher lacks write access, so in the normal
-#      same-repo/write-author flow a stale enabled auto-merge would
-#      otherwise survive and merge after checks without review.
-#   2. Durable hold label `no-auto-merge` present: disable auto-merge.
-#      `labeled` is in the trigger list so applying the label revokes
-#      without needing a push. The label also blocks the local arm path
-#      (`make pr-arm-auto-merge` refuses it) and the nightly green-unmerged
-#      sweep treats it as intentional (not stranded). Remove the label
-#      before arming. See docs/operations/pr-triage.md.
-#   3. Draft status — job-level skip: a draft cannot carry auto-merge, so
-#      there is nothing to revoke.
-#
-# Soundness predicate evaluation (disable path):
-#   The workflow evaluates the trusted base-ref predicate. A PR that adds a
-#   rule must touch the protected manifest or predicate, and self-touch is
-#   forced to soundness below.
-#
-# The workflow uses pull_request_target and checks out only the immutable base
-# tree. It never executes Python or shell code from the PR head, so the write
-# token used by the revoke step cannot be exposed by a workflow or predicate
-# edit in the PR. The repo-layer backstop is
-# the develop ruleset's require_code_owner_review rule, re-enabled
-# 2026-07-21 with required approvals 0 (retired 2026-07-18 over a
-# self-approval deadlock, then restored — see
-# docs/operations/repo-admin-settings.md, "Soundness-path review
-# enforcement"). CODEOWNERS mirrors the soundness prefixes 1:1. GitHub
-# reviews the diff and merges manually. The trusted-target execution removes
-# the former workflow-tamper exposure.
 
 on:
   pull_request_target:
@@ -69,18 +25,6 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.sha }}
-          persist-credentials: false
-
-      - name: Fetch pull request head
-        continue-on-error: true
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
-
       - name: Check explicit hold label
         id: hold
         env:
@@ -99,92 +43,6 @@ jobs:
           if [ "$held" = "true" ]; then
             echo "Explicit hold label no-auto-merge present; will revoke any enabled auto-merge."
           fi
-
-      - name: Check soundness-critical paths
-        id: soundness
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          # A missing or stale head ref is an inability to certify the diff,
-          # not evidence that the diff is safe. Emit a result so the revoke
-          # step still runs instead of failing before it can disable auto-merge.
-          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
-            echo "Could not verify the event head SHA; failing closed."
-            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # --no-renames so a rename OUT of a protected tree surfaces the deleted
-          # source path. With rename detection on, `git diff` reports only the
-          # (unprotected) destination, so a PR that removes a soundness-critical
-          # file via rename would slip past the gate.
-          if ! diff_paths="$(git diff --name-only --no-renames "${BASE_SHA}...${HEAD_SHA}")"; then
-            echo "Could not compute the event diff; failing closed."
-            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Evaluate only the trusted base-ref predicate. A PR that adds a new
-          # rule must touch the protected manifest or predicate, both of which
-          # are forced to soundness below. Never execute the PR copy because it
-          # could expose this workflow's write-capable pull-request token.
-          base_result="soundness_path=true"
-          if git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null; then
-            if git show "${BASE_SHA}:_project/scripts/soundness_paths.py" > /tmp/predicate_base.py \
-              && git show "${BASE_SHA}:.github/soundness-paths.txt" > /tmp/soundness-paths-base.txt \
-              && base_result="$(printf '%s\n' "$diff_paths" | SOUNDNESS_PATH_MANIFEST=/tmp/soundness-paths-base.txt python3 /tmp/predicate_base.py --stdin --format github-output)"; then
-              :
-            else
-              base_result="soundness_path=true"
-            fi
-          else
-            if ! git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py \
-              || ! base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"; then
-              base_result="soundness_path=true"
-            fi
-          fi
-
-          case "$base_result" in
-            soundness_path=true|soundness_path=false) result="$base_result" ;;
-            *) result="soundness_path=true" ;;
-          esac
-
-          # A PR could still edit the predicate or workflow to make FUTURE PRs
-          # unsafe without itself needing owner review. Force soundness_path=true
-          # whenever the diff touches any review-gate machinery, regardless of
-          # what the trusted base predicate says about the rest of the diff.
-          for protected_path in \
-            "AGENTS.md" \
-            ".github/CODEOWNERS" \
-            ".github/PULL_REQUEST_TEMPLATE.md" \
-            ".github/soundness-paths.txt" \
-            ".github/workflows/auto-merge-on-open.yml" \
-            ".github/workflows/ci.yml" \
-            "_project/scripts/auto_merge_soundness_paths.py" \
-            "_project/scripts/check_soundness_review.py" \
-            "_project/scripts/soundness_paths.py"; do
-            if printf '%s\n' "$diff_paths" | grep -qxF "$protected_path"; then
-              result="soundness_path=true"
-            fi
-          done
-
-          echo "$result" >> "$GITHUB_OUTPUT"
-
-      - name: Disable auto-merge for soundness PR
-        if: steps.soundness.outputs.soundness_path == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Soundness-critical paths changed; clearing any auto-merge/queue enrollment pending review."
-          # A push that newly touches a soundness path must not ride an auto-merge
-          # enabled by an earlier (non-soundness) push. Disabling auto-merge also
-          # dequeues the PR from any active merge queue. --disable-auto exits
-          # non-zero when auto-merge is already off, so tolerate that.
-          gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true
 
       - name: Disable auto-merge for explicit hold
         if: steps.hold.outputs.held == 'true'

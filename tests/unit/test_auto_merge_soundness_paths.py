@@ -25,6 +25,25 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
     "path",
     [
         "benchbox/core/tpchavoc/validation.py",
+        "benchbox/core/validation/engines.py",
+        "benchbox/utils/data_validation.py",
+        "benchbox/core/tpcdi/query_validation.py",
+        "benchbox/core/tpchavoc/dataframe_equivalence.py",
+        "benchbox/core/tpchavoc/equivalence.py",
+        "benchbox/core/results/result_digest.py",
+        "_project/scripts/regenerate_correctness_gate_digests.py",
+        "benchbox/core/dataframe/query_validation.py",
+        "benchbox/core/datavault/validation_specs.yaml",
+        "benchbox/core/validation/cross_platform.py",
+        "benchbox/core/validation/query_validation.py",
+        "benchbox/core/validation/data.py",
+        "benchbox/platforms/base/validation.py",
+        "benchbox/core/tpc_validation.py",
+        "_project/scripts/build_joinorder_data.py",
+        "_project/joinorder/reference_cardinalities.json",
+        "_project/joinorder/tiny_reference_cardinalities.json",
+        "_sources/tpc-h/dbgen/answers/q1.out",
+        "_sources/tpc-ds/answer_sets/1.ans",
         "benchbox/core/results/validation.py",
         "benchbox/core/equivalence/cross_surface.py",
         "benchbox/core/equivalence/nested/module.py",
@@ -65,7 +84,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
-        ".github/CODEOWNERS",
         "_project/scripts/soundness_merge_digest.py",
         ".github/workflows/soundness-merge-digest.yml",
         # Committed plausibility override artifacts waive validator findings.
@@ -85,6 +103,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
         "_project/scripts/auto_merge_soundness_paths.py",
         ".github/workflows/release.yml",
+        ".github/workflows/pr.yml",
+        ".github/workflows/release-canary.yml",
+        ".github/workflows/trunk.yml",
+        ".github/workflows/nightly.yml",
+        ".github/workflows/new-example.yml",
+        "scripts/pr_arm.py",
+        "_project/decisions/single-repo-migration.md",
         "scripts/check_decision_records.py",
     ],
 )
@@ -109,12 +134,11 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "docs/reference/hosted-results-contract.md",
         "docs/reference/threat-model.md",
         "tests/unit/test_auto_merge_soundness_paths.py",
-        # pr.yml stays outside the soundness surface by decision (high churn;
-        # its ci-required-result contract is pinned by the develop ruleset +
-        # ruleset-drift canary, not by owner review).
-        ".github/workflows/pr.yml",
-        # Not a prefix-collision false positive for .github/workflows/release.yml.
-        ".github/workflows/release-canary.yml",
+        "AGENTS.md",
+        ".github/workflowsx/new-example.yml",
+        "scripts/pr_arm.py.bak",
+        "_sources/tpc-h/dbgen/answersx/q1.out",
+        "_sources/tpc-ds/answer_sets_backup/1.ans",
         "",
         # sql_compat/ is deliberately narrow: only the rule-dispatch core is
         # a soundness path, not the whole (high-churn) tree.
@@ -228,73 +252,3 @@ def test_shared_predicate_executable_guard_rejects_non_executable_index_mode(tmp
 
     with pytest.raises(AssertionError, match="expected git mode 100755, got 100644"):
         _assert_git_index_executable(SCRIPT_PATH, env=env)
-
-
-def test_codeowners_covers_soundness_paths() -> None:
-    codeowners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
-
-    assert "benchbox/core/**/validation.py @joeharris76" in codeowners
-    assert "benchbox/core/equivalence/** @joeharris76" in codeowners
-    assert "benchbox/core/query_plans/parsers/** @joeharris76" in codeowners
-    assert "benchbox/core/expected_results/** @joeharris76" in codeowners
-    assert "benchbox/platforms/base/result_capture.py @joeharris76" in codeowners
-    assert "benchbox/sql_compat/resolver.py @joeharris76" in codeowners
-    assert "benchbox/sql_compat/decision.py @joeharris76" in codeowners
-    assert "benchbox/sql_compat/rules/_registration.py @joeharris76" in codeowners
-    assert "benchbox/core/results/provenance.py @joeharris76" in codeowners
-    assert "benchbox/core/results/status.py @joeharris76" in codeowners
-    assert "benchbox/core/results/query_status.py @joeharris76" in codeowners
-    assert "benchbox/validation/bundle.py @joeharris76" in codeowners
-    assert "benchbox/core/publishing/admission.py @joeharris76" in codeowners
-    assert "benchbox/core/publishing/bundle_publisher.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/models.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/pipeline.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/ranking.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/transformer.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/duckdb_builder.py @joeharris76" in codeowners
-    assert "_project/scripts/explorer_pipeline/compare_math.py @joeharris76" in codeowners
-    assert "_project/scripts/results_explorer_snapshot_invariants.py @joeharris76" in codeowners
-    assert "benchbox/core/results/canonical_json.py @joeharris76" in codeowners
-    assert "benchbox/core/results/schema_policy.py @joeharris76" in codeowners
-    assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
-    assert "scripts/validate_submission.py @joeharris76" in codeowners
-    assert "results-data/bundles/**/*.override.json @joeharris76" in codeowners
-    assert "AGENTS.md @joeharris76" in codeowners
-    assert ".github/CODEOWNERS @joeharris76" in codeowners
-    assert ".github/PULL_REQUEST_TEMPLATE.md @joeharris76" in codeowners
-    assert ".github/soundness-paths.txt @joeharris76" in codeowners
-    assert "_project/scripts/soundness_paths.py @joeharris76" in codeowners
-    assert "_project/scripts/check_soundness_review.py @joeharris76" in codeowners
-    assert "_project/scripts/soundness_merge_digest.py @joeharris76" in codeowners
-    assert ".github/workflows/soundness-merge-digest.yml @joeharris76" in codeowners
-    assert ".github/workflows/ci.yml @joeharris76" in codeowners
-    assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
-    assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
-    assert ".github/ci-units.yml @joeharris76" in codeowners
-    assert "scripts/ci_units.py @joeharris76" in codeowners
-    assert "scripts/ci_unit_result.py @joeharris76" in codeowners
-    assert ".github/workflows/release.yml @joeharris76" in codeowners
-    assert "scripts/check_decision_records.py @joeharris76" in codeowners
-    assert "publication/** @joeharris76" in codeowners
-    assert "scripts/publication/** @joeharris76" in codeowners
-
-
-def test_codeowners_matches_soundness_prefixes_1to1() -> None:
-    """CODEOWNERS must list exactly the same widened path set as
-    SOUNDNESS_PREFIXES -- a mismatch means the documented soundness surface
-    (and its review-request routing) silently diverges from what the
-    auto-merge withholding actually gates."""
-    codeowners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
-    owned_paths = {
-        line.rsplit(" ", 1)[0].strip()
-        for line in codeowners.splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    }
-
-    expected_paths = set()
-    for prefix in soundness.SOUNDNESS_PREFIXES:
-        expected_paths.add(prefix if not prefix.endswith("/") else f"{prefix}**")
-    expected_paths.update(soundness.SOUNDNESS_FILES)
-    expected_paths.add("benchbox/core/**/validation.py")
-
-    assert owned_paths == expected_paths

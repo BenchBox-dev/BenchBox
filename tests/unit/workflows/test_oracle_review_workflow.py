@@ -42,7 +42,7 @@ def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
     triggers = _triggers()
     assert set(triggers) == {"pull_request", "pull_request_review", "merge_group", "workflow_dispatch"}
     assert triggers["merge_group"]["types"] == ["checks_requested"]
-    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "ready_for_review"]
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "edited", "ready_for_review"]
     assert triggers["pull_request_review"]["types"] == ["submitted", "dismissed"]
     assert triggers["workflow_dispatch"]["inputs"]["pr"]["required"] is True
     assert triggers["workflow_dispatch"]["inputs"]["pr"]["type"] == "string"

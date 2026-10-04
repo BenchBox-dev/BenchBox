@@ -271,7 +271,7 @@ BigQuery measurements were retained from 2026-09-20. Snowflake loaded fresh
 data generated with seed 42 and generation algorithm version 1 on 2026-10-03.
 All four bundles execute the complete 38-query set without failures and pass
 strict submission validation with their manifests without overrides. SF 10
-bundles are held until the cohort has a third comparison identity.
+and the Databricks bundles are described in the next section.
 
 At each scale, all sixteen table row counts agree across the two platforms.
 Total rows are 299,864 at SF 0.1 and 1,442,264 at SF 1.
@@ -304,6 +304,88 @@ light queries. Provider queue and execution timings were not recorded, so that
 explanation is an inference. The SF 0.1 and SF 1 bundles carry approved
 timing-plateau overrides, and the SF 0.1 and SF 10 bundles carry approved
 scale-invariant overrides.
+
+## TPC-DI at SF 10 and on Databricks (2026-10-04)
+
+This adds TPC-DI SF 10 on BigQuery and Snowflake, and SF 0.1, SF 1 and SF 10 on
+Databricks, to the four TPC-DI cloud bundles described above. Databricks loaded
+data generated on 2026-10-03 with seed 42 and recorded validated cache-disabled
+receipts. All nine cloud bundles execute the complete 38-query set without
+failures and pass strict submission validation, including combined scale
+validation, without overrides.
+
+At each scale, all sixteen table row counts agree across the three platforms.
+Total rows are 299,864 at SF 0.1, 1,442,264 at SF 1 and 11,891,664 at SF 10.
+QVQ12 and QAQ7 result row counts also agree across the three platforms at every
+scale (100 and 1 at SF 0.1, 32 and 2 at SF 1, 1 and 1 at SF 10). The caveats of
+the section above still apply: these checks do not establish full result-value
+equivalence, and the local TPC-DI bundles return different QVQ12 and QAQ7 counts.
+
+## Cloud TPC-DS bundles (2026-10-04)
+
+Nine TPC-DS SQL bundles cover SF 0.1, SF 1 and SF 10 on BigQuery, Snowflake and
+Databricks. The BigQuery measurements were retained from 2026-09-20. Snowflake
+and Databricks were rerun on 2026-10-03 with validated cache-disabled receipts.
+The earlier Snowflake runs had a 4.2-second per-query floor from a harness
+defect, and the earlier Databricks runs had the result cache on; these runs have
+neither problem. All three platforms load the same row counts at each scale
+(1,176,171 at SF 0.1, 19,557,376 at SF 1 and 191,496,659 at SF 10), and every
+query part succeeds.
+
+Five bundles are unofficial and keep their recorded classifications. The SF 0.1
+bundles on all three platforms are `unofficial_subscale`, and BigQuery SF 1 and
+SF 10 are `unofficial_nonstandard` because they ran without `--official`. They
+make no official TPC-DS claim and are carried in the lenient publication lane.
+Snowflake and Databricks SF 1 and SF 10 ran with `--official --seed 42`.
+
+On Snowflake, scanned bytes grow from 1.047 GB to 51.102 GB between SF 0.1 and
+SF 10 while the geometric mean grows only 1.38x (899 to 1,239 ms). The limited
+scaling is consistent with per-query overhead and warehouse performance at these
+data volumes; provider timings were not recorded, so the cause is not fully
+decomposed. The Snowflake SF 0.1 and SF 10 bundles carry approved
+scale-invariant overrides. Databricks timings grow 1.57x over the same range and
+need no override.
+
+## Cloud ClickBench (2026-10-04)
+
+Seven ClickBench SQL bundles add SF 0.1 and SF 10 on BigQuery and Snowflake, and
+SF 0.1, SF 1 and SF 10 on Databricks, beside the published BigQuery and
+Snowflake SF 1 bundles. ClickBench loads 100,000, 1,000,000 and 10,000,000 rows
+at SF 0.1, 1 and 10. All 43 queries complete at every scale. Caching is recorded
+off on BigQuery and Snowflake, and Databricks records validated cache-disabled
+receipts.
+
+Across the 100x row increase, the BigQuery geometric mean grows 1.45x while
+scanned bytes grow from 0.690 GB to 51.713 GB. The Snowflake geometric mean
+grows 1.33x, and its output row counts match BigQuery for every query at every
+scale. Measured client statement overhead is 364 to 408 ms on BigQuery and 82
+to 90 ms on Snowflake, and the heavier queries grow at least 2x on both. This
+is consistent with fixed job and client overhead dominating the lighter
+queries rather than cached results or a load defect. Provider queue and
+execution phases were not captured. Each BigQuery and Snowflake SF 0.1 and
+SF 10 bundle carries an approved scale-invariant override. The Databricks
+geometric mean grows 1.68x (366 to 616 ms) and needs no override.
+
+Databricks does not return the same results as BigQuery and Snowflake for two
+queries. Q29 returns one row at SF 1 and SF 10, where BigQuery and Snowflake
+return 0 and 6, because the Databricks SQL keeps the `\1` regular-expression
+backreference instead of Spark's `$1`, so every referrer falls into one group.
+Q43 returns one row at every scale, where BigQuery and Snowflake return 2, 22
+and 159; its cause has not been identified. The other 41 queries return the
+same row counts on all three platforms. Q29 and Q43 timings on Databricks
+measure different work and are not comparable with the other platforms.
+
+## Databricks cache-off reruns (2026-10-04)
+
+Ten Databricks SQL bundles add SSB SF 0.1, 1 and 10, AMPLab SF 0.1 and 1,
+JoinOrder SF 1, CoffeeShop SF 0.1 and 1, and H2ODB SF 0.1 and 1 to cohorts that
+already hold BigQuery and Snowflake bundles. The earlier Databricks runs of
+these cells had the result cache on and were not published. These runs on
+2026-10-03 record validated cache-disabled receipts and region us-east-2. Every
+query succeeds in three measurement rounds, each bundle loads the same total row
+count as the Snowflake bundle of its benchmark and scale, and all ten pass
+strict submission validation, including combined scale validation, without
+overrides.
 
 ## Public-path single-pass status (2026-08-05)
 

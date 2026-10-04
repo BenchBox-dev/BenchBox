@@ -60,8 +60,10 @@ Required status checks:
 - oracle-review
 ```
 
-The six unit contexts are always-reporting result jobs in
-`.github/workflows/ci.yml`. The `ci-paths` job maps changed paths to units with
+Six of the required contexts are always-reporting result jobs in
+`.github/workflows/ci.yml`; `oracle-review` comes from
+`.github/workflows/oracle-review.yml` and passes at once for a change outside
+`.github/soundness-paths.txt`. The `ci-paths` job maps changed paths to units with
 `.github/ci-units.yml`; a unit no path touches reports success immediately, and
 a touched unit succeeds only when every job it requires succeeded. A required
 job that was skipped fails the unit, so a path filter or a broken `if:` can
@@ -168,8 +170,8 @@ has reviewed the current head and none of its review threads is unresolved.
 The required `develop-squash-only` policy combines `oracle-review` with
 `required_review_thread_resolution: true`, `required_approving_review_count: 0`
 and no bypass actors. Code-owner review is disabled; CODEOWNERS is retired.
-Verify `oracle-review` is required in the live ruleset before relying on it as a
-merge gate. All review threads must be resolved before merging.
+`oracle-review` is a required status check. All review threads must be
+resolved before merging.
 
 The soundness gate, as operated:
 
@@ -178,6 +180,7 @@ The soundness gate, as operated:
   against the trusted base's predicate, including changes to the gate itself.
   A soundness-path PR needs the Codex connector's review or thumbs-up on its
   current head, with every connector thread resolved.
+- **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without the connector's review. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
 - `make pr-open` does not arm auto-merge when it creates a PR; `make pr-arm`
   (or `make pr-open READY=1`) arms it after a live check of the PR, so a PR
   cannot merge while a follow-up commit is still being written. Arm only when
@@ -192,9 +195,8 @@ The soundness gate, as operated:
   historical `ready_for_review` arm point — which never fired once, drafts
   being unused — was deleted per
   `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
-  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate the durable
-  `no-auto-merge` hold label. Soundness paths are enforced by `oracle-review`,
-  rather than revoking auto-merge on every push.
+  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate the
+  `no-auto-merge` hold label only.
 - Durable holds every layer honours: **draft** (job/sweep skip) and label
   **`no-auto-merge`** (`make pr-arm-auto-merge` / `pr-ready` refuse to arm;
   workflow disables; nightly green-unmerged sweep never enables auto-merge
@@ -210,8 +212,8 @@ The soundness gate, as operated:
   require manual merging under this policy.
 
 `scripts/ruleset_drift_check.py` now imports the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`required_review_thread_resolution` as a **blocking** finding through
+`review_enforcement_findings` predicate and treats missing thread resolution or a missing `oracle-review` required
+check as a **blocking** finding through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`. The daily `release-canary.yml` run and
 `validate-release-pr.yml` bootstrap use the same path. The standalone check is
 available for an immediate live verification:
@@ -520,8 +522,9 @@ The script parses this runbook for
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
 target refs. For `develop-squash-only`, it also applies the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`required_review_thread_resolution` as a blocking finding through
+`review_enforcement_findings` predicate and treats missing thread
+resolution or a missing `oracle-review` required check as a blocking finding
+through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`.
 The hosted checks use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
