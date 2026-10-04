@@ -20821,7 +20821,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "Throughput stream 0 repeats the power stream's ordering; TPC-DS power uses home-grown ordering"
+      "title": "Number throughput streams 1..S so stream 0 no longer repeats the power ordering"
     },
     "tpch-variant-dataframe-seed-binding": {
       "claim": null,

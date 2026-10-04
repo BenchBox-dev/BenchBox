@@ -1,10 +1,10 @@
 {
   "acceptance": [
-    "Throughput streams use spec stream numbers 1..S (and S+1..2S for a second TPC-DS throughput test, if implemented)",
-    "TPC-DS power uses dsqgen stream 0",
-    "Tests assert per-stream ordering against qgen/dsqgen output"
+    "TPC-H and TPC-DS throughput streams use spec stream numbers 1..S",
+    "Tests assert per-stream ordering against qgen/dsqgen output",
+    "Results record the stream numbering basis"
   ],
-  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Reported by two reviewers; ordering confirmed in code.",
+  "context": "Owner decision 2026-10-04: offset throughput streams only. Moving TPC-DS power to dsqgen stream 0 is left to the decision item comment-cleanup-tpcds-stream-decision, because it breaks comparability with existing TPC-DS power bundles. 2026-10-04 throughput adversarial review (develop 8ed0c64e1).",
   "description": "TPC-H throughput streams 0..S-1 use PERMUTATION_MATRIX[stream_id] (tpch/throughput_test.py:253,425; core/throughput/runner.py:262), so throughput stream 0 equals the power stream. TPC-DS throughput uses dsqgen's query_0 (96, 7, 75, 44, 39a, ...), which is the power stream. The specs number throughput streams 1..S, and TPC-DS throughput test 2 uses S+1..2S.\n\nSeparately, the TPC-DS power test does not use dsqgen ordering: tpcds/power_test.py:250-261 uses create_standard_streams plus one seed per stream, while throughput uses dsqgen -STREAMS, so power and throughput get different orderings and parameters.\n\nThe ordering-design choice overlaps the decision item comment-cleanup-tpcds-stream-decision; resolve that decision first or together.",
   "links": [
     "benchbox/core/tpch/throughput_test.py",
@@ -18,6 +18,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "04c450d3a6f6488da38a77f867f58f7a",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:38:16Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8e24f1582792439d8060b469cf639a1d",
       "session_id": "a33f303e25d74b4284982579345d9fdb"
     }
   ]
