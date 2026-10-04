@@ -6,7 +6,7 @@
     "Sphinx and landing keep their current CSS until cutover (no regression on those routes), except the intentional landing restyle used as the rehearsal below",
     "Visual approval rehearsal (moved from astro-site-03, owner decision 2026-10-03): this PR's intentional landing change is merged using the PR-head approval slot (APPROVED_HEAD_SHA/APPROVAL_REASON, set by the owner), with run ids recorded in the ADR's visual-change section. The merge-group slot applies only if develop has a merge queue again (retired 2026-10-03)."
   ],
-  "context": "READY 2026-10-04: commit 2325278b on local wip/astro-21 (stacked on 34's b6afd731, base develop def3036c). Independent Opus review PASS; Medium findings (weak consumer test, link-order test, docstring) fixed. Landing restyle: 5 token values change (light accent-primary #2563eb->#1d4ed8, accent-secondary #1d4ed8->#1e40af; dark text-secondary #8b949e->#a8b3bf, text-muted #6e7681->#8b949e, header text #8b949e->#a8b3bf). Explorer captures byte-identical. PR needs owner visual approval (APPROVED_HEAD_SHA/APPROVAL_REASON).",
+  "context": "2026-10-04: implementation merged in #2606 (b77ccf7c7). One acceptance line is still open: the visual approval rehearsal. #2606 merged with the advisory visual check red and no APPROVED_HEAD_SHA set, so no run ids exist. Needs an owner decision: run the rehearsal on a later PR with an intentional landing change (owner sets APPROVED_HEAD_SHA/APPROVAL_REASON, re-runs the visual job, run ids go into the ADR visual-change section), or waive the line. Dependents (22, 32-36, 40) are blocked on this item in the tracker, though their code is merged.",
   "description": "Today tokens live in landing/shared/site-theme.css, the Furo variables in docs/_static, and the explorer's Tailwind config. scan_explorer_tokens.py, scan_explorer_stale_theme.py and lint-site-theme-tokens police the drift.\n\nCreate one CSS custom-property token file, light and dark, covering color, type, spacing and radius. website/ imports it. results-explorer's Tailwind config reads the same variables, so explorer output does not change visually.\n\nPoint the token lint targets at the new source. Keep the light/dark behaviour and the benchbox:theme key.",
   "links": [
     "landing/shared/site-theme.css",
@@ -54,6 +54,14 @@
       "op": "update",
       "op_id": "8c2ca33f5e0447809717161ee8f93531",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:eab247781550a2228da6f8b3",
+      "at": "2026-10-04T23:53:09Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "886280938c634053a241927f584d6edf",
+      "session_id": "33fc81e6079f4095960e58f09da5ba3c"
     }
   ]
 }
