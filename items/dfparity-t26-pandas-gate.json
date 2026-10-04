@@ -5,7 +5,7 @@
     "The pandas family is enforced in CI with the same repeat-run check as Polars, and its whole-gate time on Ubuntu is measured and within the agreed budget.",
     "A maintainer signs off."
   ],
-  "context": "Owner decision D6 (2026-10-03): the parity goal covers Polars, pandas and DataFusion. The 'or narrow the goal to Polars' option is withdrawn.",
+  "context": "Owner decision D6 (2026-10-03): the parity goal covers Polars, pandas and DataFusion. The 'or narrow the goal to Polars' option is withdrawn.\n\n2026-10-04 closeout: Delivered in #2612 (merged): the pandas TPC-DS gate step is required in the correctness-gate job; hosted runs 26/42/41 s within the maintainer's 45 s budget.",
   "description": "The cross-surface contract names both expression (Polars) and pandas as shipped TPC-DS DataFrame backends (benchbox/core/equivalence/dataframe_surface.py ~47-55), but t20 enforces only Polars. Pandas has four incomplete inventory runs (Q5, Q77, Q80, Q88) and more divergences. Either make pandas a blocking lane with its own measured budget (all 99 queries execute, zero unclassified divergences, repeat-run check), or, if the owner narrows the goal, record the Polars-only scope in t23's docs and in the gate's description. Also record whether the expression family on DataFusion is in or out of scope.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "op": "update",
       "op_id": "b2db145eacf142c69523b85c0b2effff",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:30:45Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "25eaed7891a84d0a9bedb0f74e12f6df",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
