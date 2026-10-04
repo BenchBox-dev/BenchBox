@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Decision recorded (ADR line or item context) on which option applies.",
+    "Test: tuned run whose metadata save fails, then a notuning run on the same database: the database is not reused as a baseline.",
+    "Test: constraints-only and sorted-ingestion-only tuned configs leave a database a notuning run will not reuse."
+  ],
+  "context": "Source: independent review of PR #2626 (2026-10-04). Related: tuning-notuning-db-reuse-gate-20261001 (done).",
+  "description": "## Problem (reproduced on SQLite by an independent reviewer; owner decision needed)\nAfter the notuning reuse gate (`tuning-notuning-db-reuse-gate-20261001`), the guard \"a tuned database is still refused for a notuning run\" depends on finding tuning metadata. A database that was physically tuned but has no metadata is reused as a baseline: `database_was_reused=True`, no error, no warning. Ways to get there: a tuned run whose metadata save fails (it is non-fatal and prints only a warning), a crash between `apply_unified_tuning` and the save, the external-table path (returns before any metadata is saved), and a config with only constraints or platform optimisations whose section-marker save is swallowed. A narrower variant: a wizard config that sets only `sorted_ingestion_mode` collapses to `tuning_enabled=False` while sorted ingestion still applies the config.\nThe result: a later notuning run reports tuned performance as the baseline.\n\n## Change (options; the prior item forbade a baseline marker)\n- Make a failed or skipped tuned metadata save mark or clean the database, or fail the run.\n- Or write an explicit baseline/tuned marker (reverses the earlier \"do not write a marker\" instruction; needs an ADR line).\n- Decide how `infer_runtime_tuning_mode` treats configs that apply tuning without the usual keys.\n\n## Guardrails (must preserve)\n- A tuned database is refused for a notuning run when metadata exists.\n- Baseline databases need no metadata table unless the owner chooses the marker option.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/platforms/base/tuning_config.py",
+    "benchbox/platforms/base/adapter.py",
+    "benchbox/cli/commands/tuning_runtime.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:55:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7c271f6c75394b38bd140a0cf01aa7eb",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
