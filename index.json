@@ -6842,17 +6842,12 @@
       "title": "Render production TPC-DS get_queries at the data's scale (owner decision D1)"
     },
     "dfparity-t23-docs": {
-      "claim": {
-        "expires_at": "2026-10-05T17:34:03Z",
-        "generation": "e62c398f45b94d10968312101f447626",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t20-promote-polars-gate"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Document the two parameter bindings, the two gates, and how to add a TPC-DS query"
     },
     "dfparity-t24-residual-divergences": {
