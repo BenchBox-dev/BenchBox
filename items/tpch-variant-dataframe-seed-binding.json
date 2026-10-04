@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Seeded tpch_skew and tpchavoc DataFrame runs bind the same qgen parameters as the SQL run, with an equal-bindings test at two seeds",
+    "Dry-run with --seed previews the seeded SQL"
+  ],
+  "context": "Listed as follow-ups in tpch-df-seed-parity.",
+  "description": "TPC-H DataFrame runs now bind the parameters qgen draws for a seed (#2595, #2604), but tpch_skew and tpchavoc DataFrame runs still ignore --seed and bind qgen -d defaults, and `benchbox run --dry-run --seed` previews qgen -d SQL. A seeded run of these benchmarks compares SQL and DataFrame results for different parameters.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:09:20Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6552d3547ed24485aaaf2bb1be04e6a0",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

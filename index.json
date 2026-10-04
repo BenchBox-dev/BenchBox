@@ -20567,6 +20567,13 @@
       "status": "done",
       "title": "Fix exported Throughput@Size: driver formula omits the queries-per-stream factor (22x/99x understated)"
     },
+    "tpch-variant-dataframe-seed-binding": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Bind --seed in TPC-H Skew and TPC-Havoc DataFrame runs, and make dry-run previews honor it"
+    },
     "tpchavoc-1v7-array-rewrite": {
       "claim": null,
       "needs": [],
