@@ -1,3 +1,6 @@
+# TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
+# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
+# not cloned per sweep. See _project/specs/uat-framework.md Section 9.
 name: "release-gate-03-docker-oltp"
 description: "Release-gate stage 3: Docker OLTP stacks, scale 0.01"
 

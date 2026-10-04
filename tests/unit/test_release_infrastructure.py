@@ -1330,6 +1330,7 @@ class TestBetaReleaseSurface:
         assert exp_init.exists(), "benchbox/experimental/__init__.py must exist"
         contracts = (self.REPO_ROOT / "docs" / "reference" / "public-contracts.md").read_text(encoding="utf-8")
         row = next((line for line in contracts.splitlines() if "`benchbox.experimental` namespace" in line), "")
+        assert "| `experimental` |" in row
         assert "outside the supported beta product surface" in row, (
             "docs/reference/public-contracts.md must document benchbox.experimental as outside "
             "the supported beta product surface. Do not silently expand the supported product surface."

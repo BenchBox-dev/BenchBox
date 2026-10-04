@@ -1,3 +1,5 @@
+# HISTORICAL — record of the 2026-05-02 sweep. Do not edit; if behaviour
+# drifts from this config, fix the framework OR clone to a dated successor.
 name: "uat-2026-05-02"
 description: "Historical replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
 

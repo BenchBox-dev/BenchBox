@@ -1,3 +1,6 @@
+# TEMPLATE — reusable enablement/compatibility-accounting sweep; edited in
+# place as the enabled-platform set changes. See
+# _project/specs/uat-framework.md Section 9.
 name: "uat-enabled-platforms-enumeration"
 description: "Coverage-sweep shape for enabled platform/benchmark compatibility accounting"
 

@@ -1,3 +1,5 @@
+# TEMPLATE — reusable managed-Docker smoke for PostgreSQL-extension
+# credential propagation. See _project/specs/uat-framework.md Section 9.
 name: "uat-pg-extension-auth-smoke"
 description: "Managed Docker smoke for PostgreSQL-extension UAT credential propagation"
 

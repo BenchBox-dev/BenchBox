@@ -1,3 +1,5 @@
+# TEMPLATE — reusable enablement release-gate sweep; edited in place as the
+# enabled-platform set changes. See _project/specs/uat-framework.md Section 9.
 name: "uat-enabled-platforms-full"
 description: "Release-gate UAT sweep for enabled local SQL platforms"
 

@@ -155,7 +155,16 @@ class TestOfficialFlagReachesTheClassifier:
         assert "compliance_mode_kwargs(config)" in inspect.getsource(benchmark_loader.get_benchmark_instance), (
             "get_benchmark_instance does not apply compliance_mode_kwargs; CLI runs would be unsubmittable"
         )
-        assert "get_benchmark_instance(" in inspect.getsource(orchestrator), (
+        import ast
+
+        tree = ast.parse(inspect.getsource(orchestrator))
+        called = {
+            node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute))
+        }
+        assert "get_benchmark_instance" in called
+        assert not called & {"benchmark_class", "instantiate_benchmark_class"}, (
             "benchbox.cli.orchestrator builds benchmark instances outside get_benchmark_instance; "
             "CLI runs would not carry compliance_mode_kwargs"
         )

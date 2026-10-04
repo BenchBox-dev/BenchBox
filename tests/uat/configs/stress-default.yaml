@@ -1,3 +1,4 @@
+# TEMPLATE — copy and edit for sweep-specific runs.
 name: "stress-default"
 description: "Stress preset — verify 'does it run?' across the (platform, benchmark) matrix"
 

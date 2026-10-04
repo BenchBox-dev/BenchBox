@@ -1,3 +1,4 @@
+# TEMPLATE — bounded native-only UAT matrix loop for routine operator feedback.
 name: "uat-smoke"
 description: "Native TPCH smoke loop: six local platforms at SF 0.01"
 

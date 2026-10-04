@@ -1,3 +1,6 @@
+# TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
+# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
+# not cloned per sweep. See _project/specs/uat-framework.md Section 9.
 name: "release-gate-01-native-dataframe"
 description: "Release-gate stage 1: native SQL + dataframe platforms, scales 0.01/0.1/1"
 

@@ -341,7 +341,7 @@ def test_stress_default_fields_have_reader_or_reserved_contract():
         "phases": ("tests/uat/config.py", '_validate_phases(payload.get("phases")'),
         "platforms.groups": ("tests/uat/phases/enumerate.py", "config.platforms.groups"),
         "benchmarks.groups": ("tests/uat/phases/enumerate.py", "config.benchmarks.groups"),
-        "scales.rungs": ("tests/uat/phases/enumerate.py", "config.scales.rungs"),
+        "scales.rungs": ("tests/uat/config.py", "if self.override is not None else self.rungs"),
         "execute.per_cell_timeout_s": ("tests/uat/phases/execute.py", "config.execute.per_cell_timeout_s"),
         "execute.early_stop_after_s": ("tests/uat/phases/execute.py", "config.execute.early_stop_after_s"),
         "execute.early_stop_on_failure": ("tests/uat/phases/execute.py", "config.execute.early_stop_on_failure"),

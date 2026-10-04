@@ -1,3 +1,6 @@
+# TEMPLATE — canonical nightly-CI throughput config (.github/workflows/nightly.yml);
+# edited in place, not cloned per sweep. See _project/specs/uat-framework.md
+# Section 9.
 name: "uat-throughput-duckdb-nightly"
 description: "Nightly: real multi-stream throughput phase on DuckDB TPC-H SF1 (run-official --streams 3)"
 

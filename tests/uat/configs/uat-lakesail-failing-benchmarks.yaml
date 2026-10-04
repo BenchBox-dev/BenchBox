@@ -1,3 +1,6 @@
+# TEMPLATE — reusable focused-rerun shape for LakeSail failure-cluster
+# triage; edit the benchmarks.include list per investigation. See
+# _project/specs/uat-framework.md Section 9.
 name: "uat-lakesail-failing-benchmarks"
 description: "Focused LakeSail rerun for UAT enabled-platforms remediation failure clusters"
 

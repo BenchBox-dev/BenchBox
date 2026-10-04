@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import os
 import subprocess
 from pathlib import Path
@@ -63,6 +64,20 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/results.py",
     "benchbox/cli/commands/shell.py",
     "benchbox/cli/tuning_runtime.py",
+    "benchbox/cli/cloud_storage.py",
+    "benchbox/cli/commands/auth.py",
+    "benchbox/cli/common_types.py",
+    "benchbox/cli/output.py",
+    "benchbox/cli/platform_checks.py",
+    "benchbox/cli/preferences.py",
+    "benchbox/cli/presentation/__init__.py",
+    "benchbox/cli/presentation/system.py",
+    "benchbox/cli/progress.py",
+    "benchbox/cli/shared.py",
+    "benchbox/cli/submit_auth.py",
+    "benchbox/cli/submit_service.py",
+    "benchbox/cli/system.py",
+    "benchbox/cli/verbose_logging.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/setup.py",
@@ -156,6 +171,57 @@ def submit(
 """
     assert _cli_surface_changed(
         "benchbox/cli/commands/submit.py",
+        base_source=base_source,
+        current_source=current_source,
+    )
+
+
+def test_cli_surface_guard_allows_moving_help_from_docstring_to_decorator():
+    base_source = """import click
+
+@click.command("visualize")
+@click.option("--theme")
+def visualize(theme):
+    \"\"\"Render charts.
+
+    Examples:
+        benchbox visualize
+    \"\"\"
+    return theme
+"""
+    current_source = """import click
+
+@click.command(
+    "visualize",
+    help=("Render charts.\\n\\nExamples:\\n    benchbox visualize"),
+)
+@click.option("--theme")
+def visualize(theme):
+
+    return theme
+"""
+    assert not _cli_surface_changed(
+        "benchbox/cli/commands/visualize.py",
+        base_source=base_source,
+        current_source=current_source,
+    )
+
+
+def test_cli_surface_guard_detects_help_text_changes():
+    base_source = """import click
+
+@click.command("visualize")
+def visualize():
+    \"\"\"Render charts.\"\"\"
+"""
+    current_source = """import click
+
+@click.command("visualize", help="Render all charts.")
+def visualize():
+    pass
+"""
+    assert _cli_surface_changed(
+        "benchbox/cli/commands/visualize.py",
         base_source=base_source,
         current_source=current_source,
     )
@@ -314,7 +380,6 @@ def _cli_surface_snapshot(source: str, path: str) -> tuple[str, ...]:
     except SyntaxError as exc:
         raise AssertionError(f"Could not parse {path} while checking CLI surface drift: {exc}") from exc
 
-    lines = source.splitlines()
     surface = []
     function_name = FORBIDDEN_CLI_SURFACE_FUNCTIONS.get(path)
     functions = sorted(
@@ -323,12 +388,39 @@ def _cli_surface_snapshot(source: str, path: str) -> tuple[str, ...]:
     )
     for node in functions:
         for decorator in node.decorator_list:
-            if _click_surface_decorator_name(decorator) in FORBIDDEN_CLI_SURFACE_DECORATORS:
-                end_lineno = decorator.end_lineno or decorator.lineno
-                surface.extend(lines[decorator.lineno - 1 : end_lineno])
-        if function_name is not None and node.name == function_name and node.body:
-            surface.extend(lines[node.lineno - 1 : node.body[0].lineno - 1])
+            name = _click_surface_decorator_name(decorator)
+            if name in FORBIDDEN_CLI_SURFACE_DECORATORS:
+                surface.append(_decorator_without_help(decorator))
+                if name in {"command", "group"}:
+                    surface.append(f"help={_effective_help(decorator, node)!r}")
+        if function_name is not None and node.name == function_name:
+            returns = ast.unparse(node.returns) if node.returns else ""
+            surface.append(f"def {node.name}({ast.unparse(node.args)}) -> {returns}")
     return tuple(surface)
+
+
+def _decorator_without_help(decorator: ast.expr) -> str:
+    if not isinstance(decorator, ast.Call):
+        return ast.unparse(decorator)
+    call = ast.Call(
+        func=decorator.func,
+        args=decorator.args,
+        keywords=[keyword for keyword in decorator.keywords if keyword.arg != "help"],
+    )
+    return ast.unparse(call)
+
+
+def _effective_help(decorator: ast.expr, node: ast.FunctionDef) -> str | None:
+    if isinstance(decorator, ast.Call):
+        for keyword in decorator.keywords:
+            if keyword.arg == "help":
+                try:
+                    value = ast.literal_eval(keyword.value)
+                except ValueError:
+                    return ast.unparse(keyword.value)
+                return inspect.cleandoc(value) if isinstance(value, str) else repr(value)
+    docstring = ast.get_docstring(node, clean=True)
+    return docstring
 
 
 def _click_surface_decorator_name(decorator: ast.expr) -> str | None:

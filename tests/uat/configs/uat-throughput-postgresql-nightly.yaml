@@ -1,3 +1,5 @@
+# TEMPLATE — canonical nightly-CI PostgreSQL throughput config; edited in
+# place, not cloned per sweep. See _project/specs/uat-framework.md Section 9.
 name: "uat-throughput-postgresql-nightly"
 description: "Nightly: real multi-stream throughput phase on PostgreSQL TPC-H SF1 (run-official --streams 3, INDEPENDENT_CONNECTION)"
 
