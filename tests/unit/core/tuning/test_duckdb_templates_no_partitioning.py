@@ -51,17 +51,38 @@ def test_duckdb_tuned_template_disables_check_constraints(template: Path) -> Non
     assert _load(template).check_constraints.enabled is False
 
 
-def test_default_partitioning_layout_still_resolves_without_a_duckdb_partitioning_template() -> None:
+LEGACY_DEFAULT_PARTITIONING = {
+    "amplab": {"uservisits": ["visitdate"]},
+    "clickbench": {"hits": ["EventDate"]},
+    "h2odb": {},
+    "joinorder": {},
+    "read_primitives": {"LINEITEM": ["L_SHIPDATE"], "ORDERS": ["O_ORDERDATE"]},
+    "ssb": {"lineorder": ["lo_orderdate"]},
+    "tpcds": {
+        "CATALOG_RETURNS": ["CR_RETURNED_DATE_SK"],
+        "CATALOG_SALES": ["CS_SOLD_DATE_SK"],
+        "STORE_RETURNS": ["SR_RETURNED_DATE_SK"],
+        "STORE_SALES": ["SS_SOLD_DATE_SK"],
+        "WEB_RETURNS": ["WR_RETURNED_DATE_SK"],
+        "WEB_SALES": ["WS_SOLD_DATE_SK"],
+    },
+    "tpch": {"LINEITEM": ["L_SHIPDATE"], "ORDERS": ["O_ORDERDATE"]},
+    "tpchavoc": {"LINEITEM": ["L_SHIPDATE"], "ORDERS": ["O_ORDERDATE"]},
+}
+
+
+@pytest.mark.parametrize("benchmark_name", sorted(LEGACY_DEFAULT_PARTITIONING))
+def test_default_partitioning_layout_is_unchanged_without_a_duckdb_partitioning_template(benchmark_name: str) -> None:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
     config = UnifiedTuningConfiguration()
-    config.enable_platform_optimization(TuningType.PARTITIONING, benchmark="tpch")
+    config.enable_platform_optimization(TuningType.PARTITIONING, benchmark=benchmark_name)
 
     partitioned = {
         name: [column.name for column in tuning.get_columns_by_type(TuningType.PARTITIONING)]
         for name, tuning in config.table_tunings.items()
     }
-    assert partitioned == {"LINEITEM": ["L_SHIPDATE"], "ORDERS": ["O_ORDERDATE"]}
+    assert partitioned == LEGACY_DEFAULT_PARTITIONING[benchmark_name]
 
 
 def test_default_layouts_other_than_partitioning_still_come_only_from_the_duckdb_template() -> None:
