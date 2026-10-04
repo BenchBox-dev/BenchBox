@@ -79,7 +79,7 @@ required check can stay pending forever on a change that does not touch it.
 | `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check |
 | `landing` | `landing/`, quickstart inputs | site theme token scan |
 | `tooling` | every event | content guard, skill integrity, and audit checks by path |
-| `oracle-review` | every PR; review required on soundness paths | Codex connector review of the current head and resolved connector threads; other paths report success |
+| `oracle-review` | every PR; review required on soundness paths | Codex connector review of the current head, or the stand-in approval when the connector cannot review, with connector threads resolved; other paths report success |
 
 The public-site visual comparison is advisory and feeds no required context until the site is in production. It runs only when a rendered public-site input changed
 (`render_changed` in the `visual-inputs` job). The site build keeps the broader
@@ -114,9 +114,10 @@ required local-engine cases after each merge. A red run is reverted with
 together is caught there, not before merge. If that happens more than about
 once a week, turn the strict policy back on.
 
-The latest bounded, read-only wall and runner-minute remeasure is recorded in
+The latest bounded, read-only wall and runner-minute remeasure, taken while the
+merge queue was still in use, is recorded in
 [`_project/analysis/ci-waste-remeasure-2026-08-31.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/ci-waste-remeasure-2026-08-31.md).
-It keeps `pull_request` and `merge_group` event evidence separate and does
+It kept `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 
 The strict-base refresh shadow (`develop-refresh-shadow.yml`) and the
@@ -164,6 +165,12 @@ check reports a `merge_queue` rule that reappears.
 The policy requires `oracle-review` (from `.github/workflows/oracle-review.yml`): it
 passes when the change touches no soundness path, or when the Codex connector
 has reviewed the current head and none of its review threads is unresolved.
+It also passes when an account in `STANDIN_ATTESTERS`
+(`_project/scripts/oracle_review_check.py`) has posted
+`Stand-in oracle review: APPROVE <full head SHA>` for the exact head after the
+head commit and any retarget, unedited, with no connector thread unresolved. A
+plain owner comment does not count. See
+[soundness drain](soundness-drain.md).
 
 ### Soundness-path review enforcement
 
