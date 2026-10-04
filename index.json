@@ -21177,6 +21177,13 @@
       "status": "done",
       "title": "Author-facing honesty quickfixes: dry-run preview lookup, misleading displays, CLI footguns"
     },
+    "tuning-bundle-and-console-residue-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Residual tuning-claim gaps: legacy bundle re-export, fresh-database error level, Snowflake drop label, receipt drill-down"
+    },
     "tuning-bundle-provenance-and-config-export-20260712": {
       "claim": null,
       "needs": [],

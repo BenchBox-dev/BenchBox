@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Each bullet is fixed with a test, or recorded as intentionally kept with a reason.",
+    "`npm test` in results-explorer passes if the Explorer is touched."
+  ],
+  "context": "Source: independent reviews of PRs #2628 and #2629 (2026-10-04). Low urgency.",
+  "description": "## Problem (small gaps left deliberately in PRs #2628 and #2629; each from an independent review)\n- A legacy bundle that has only `source: \"auto\"` (no hash, no tuning source) loses its tuning block on re-export, because the loader reconstructs a source file only for `\"yaml\"`; `counts` on an untuned block is not preserved on re-export either. Nothing false is emitted.\n- On a fresh database the console still logs \"Missing tables: ...\" at error level, and `database_empty` is also true when the database holds a different benchmark's tables (`benchbox/platforms/base/connection_lifecycle.py` ~279-286, `validation.py` ~162). The database is recreated either way.\n- Snowflake's \"already present in Snowflake catalog; ALTER skipped\" drop is counted as \"intents not rendered at apply time\" (`benchbox/platforms/snowflake.py` ~2075), though that intent was in effect satisfied.\n- The Explorer's receipt drill-down (`results-explorer/src/components/RunReceipt.tsx`) still renders size-cap and redaction placeholder receipts as it did before.\n- The Explorer's mode filters still say \"Tuned\" for a run whose badge may say \"No tuning applied\" (mode versus outcome).\n\n## Change\nDecide per bullet whether to fix or keep, and fix the ones that mislead.\n\n## Guardrails (must preserve)\n- The Explorer never recomputes verdicts; wording must not imply verification where none happened.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/core/results/loader.py",
+    "benchbox/platforms/base/connection_lifecycle.py",
+    "results-explorer/src/components/RunReceipt.tsx"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:57:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "12b4ef7d44ec49dcb14d44ec7a0ab977",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
