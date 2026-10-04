@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compareVisualManifests,
+  compareVisualManifestsAcrossRenderers,
   hasExactHeadVisualApproval,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualManifest,
@@ -111,5 +112,55 @@ describe("public site visual manifest comparison", () => {
       changed: [],
       approvalApplied: true,
     });
+  });
+});
+
+describe("renderer-aware visual comparison", () => {
+  const sphinx: VisualManifest = { capture_profile: PUBLIC_SITE_CAPTURE_PROFILE, renderer: "sphinx", captures };
+  const astroSame: VisualManifest = { ...sphinx, renderer: "astro" };
+  const exact = { approvedHeadSha: "abc123", currentHeadSha: "abc123", reason: "reviewed" };
+
+  it("keeps the ordinary comparison when the renderer is unchanged", () => {
+    const unchanged = compareVisualManifestsAcrossRenderers(sphinx, sphinx);
+    expect(unchanged).toMatchObject({ rendererChanged: false, changed: [], approvalApplied: false });
+
+    const drifted: VisualManifest = { ...sphinx, captures: [captures[0]!, { ...captures[1]!, digest: "docs-new" }] };
+    expect(compareVisualManifestsAcrossRenderers(sphinx, drifted).changed).toEqual(["/docs/@390"]);
+  });
+
+  it("treats a missing renderer as sphinx", () => {
+    const legacy: VisualManifest = { capture_profile: PUBLIC_SITE_CAPTURE_PROFILE, captures };
+    expect(compareVisualManifestsAcrossRenderers(legacy, sphinx).rendererChanged).toBe(false);
+  });
+
+  it("fails a renderer change without approval and names both renderers", () => {
+    const result = compareVisualManifestsAcrossRenderers(sphinx, astroSame);
+    expect(result.rendererChanged).toBe(true);
+    expect(result.changed).toEqual(["/@390", "/docs/@390"]);
+    expect(result.message).toContain("sphinx");
+    expect(result.message).toContain("astro");
+  });
+
+  it("fails a renderer change approved for a different head", () => {
+    const result = compareVisualManifestsAcrossRenderers(sphinx, astroSame, { ...exact, approvedHeadSha: "def456" });
+    expect(result.approvalApplied).toBe(false);
+    expect(result.changed).toEqual(["/@390", "/docs/@390"]);
+  });
+
+  it("passes a renderer change with exact-head approval and reports every capture as changed", () => {
+    const result = compareVisualManifestsAcrossRenderers(sphinx, astroSame, exact);
+    expect(result).toMatchObject({
+      rendererChanged: true,
+      approvalApplied: true,
+      changed: [],
+      missing: [],
+      unexpected: [],
+      approvedChanged: ["/@390", "/docs/@390"],
+    });
+  });
+
+  it("never lets a renderer approval hide a missing capture", () => {
+    const partial: VisualManifest = { ...astroSame, captures: [captures[0]!] };
+    expect(compareVisualManifestsAcrossRenderers(sphinx, partial, exact).missing).toEqual(["/docs/@390"]);
   });
 });

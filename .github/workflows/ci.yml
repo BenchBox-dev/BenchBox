@@ -2116,7 +2116,7 @@ jobs:
         working-directory: results-explorer
 
       - name: Capture public site from the Astro build
-        run: make site-visual-capture SITE_VISUAL_DIR=${{ runner.temp }}/public-site-visual-astro SITE_PARITY_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+        run: make site-visual-capture SITE_VISUAL_DIR=${{ runner.temp }}/public-site-visual-astro SITE_VISUAL_SOURCE_SHA=${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Upload Astro visual captures
         if: always()

@@ -117,12 +117,13 @@ site-test-built:
 	@npm --prefix website run verify:landing
 
 SITE_VISUAL_DIR ?= site-visual-astro
+SITE_VISUAL_SOURCE_SHA ?= $(SITE_PARITY_SHA)
 
 .PHONY: site-visual-capture
 site-visual-capture:
 	@test -s website/dist/results/index.html
 	@rm -rf "$(SITE_VISUAL_DIR)"
-	@E2E_PAGES_SHAPED=1 E2E_SITE_DIR="$(CURDIR)/website/dist" PUBLIC_SITE_VISUAL_RENDERER=astro PUBLIC_SITE_VISUAL_PHASE=capture PUBLIC_SITE_VISUAL_OUTPUT="$(abspath $(SITE_VISUAL_DIR))" PUBLIC_SITE_VISUAL_SOURCE_SHA="$(SITE_PARITY_SHA)" npm --prefix results-explorer run test:e2e:public-site
+	@E2E_PAGES_SHAPED=1 E2E_SITE_DIR="$(CURDIR)/website/dist" PUBLIC_SITE_VISUAL_RENDERER=astro PUBLIC_SITE_VISUAL_PHASE=capture PUBLIC_SITE_VISUAL_OUTPUT="$(abspath $(SITE_VISUAL_DIR))" PUBLIC_SITE_VISUAL_SOURCE_SHA="$(SITE_VISUAL_SOURCE_SHA)" npm --prefix results-explorer run test:e2e:public-site
 
 SITE_PARITY_DIR ?= site-parity
 SITE_PARITY_SHA ?= $(shell git rev-parse HEAD)

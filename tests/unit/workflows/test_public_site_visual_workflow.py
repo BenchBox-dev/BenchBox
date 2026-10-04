@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,8 +18,26 @@ DOCS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docs.yml"
 CAPTURE_SPEC = REPO_ROOT / "results-explorer" / "e2e" / "captures" / "public-site-pages.spec.ts"
 
 
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+CLASSIFY_STEP = "Classify site inputs and validate recovery source"
+GATE_STEP = "Require comparison for affected develop trees"
+RUNBOOK = REPO_ROOT / "docs" / "development" / "results-explorer-browser-testing.md"
+
+
 def _workflow() -> dict[str, Any]:
     return yaml.safe_load(DOCS_WORKFLOW.read_text(encoding="utf-8"))
+
+
+def _ci() -> dict[str, Any]:
+    return yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
+
+
+def _step(job: dict[str, Any], name: str) -> dict[str, Any]:
+    return next(step for step in job["steps"] if step.get("name") == name)
+
+
+def _classifier(workflow: dict[str, Any]) -> str:
+    return _step(workflow["jobs"]["visual-inputs"], CLASSIFY_STEP)["run"]
 
 
 def test_develop_pushes_produce_a_public_site_visual_baseline() -> None:
@@ -127,7 +146,7 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
     base = _commit(tmp_path, "tests/b.py", "b\n", "another non-site change")
     head = _commit(tmp_path, "tests/c.py", "c\n", "pull request head")
 
-    classifier = _workflow()["jobs"]["visual-inputs"]["steps"][1]["run"]
+    classifier = _classifier(_workflow())
     output = tmp_path / "github-output"
     env = dict(os.environ)
     env.update(
@@ -199,7 +218,7 @@ def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
     assert gate["if"] == "always()"
     assert set(gate["needs"]) == {"visual-inputs", "build", "public-site-visual-regression"}
 
-    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    ci = _ci()
     ci_triggers = ci.get("on", ci.get(True))
     assert "paths" not in ci_triggers["pull_request"]
     assert "merge_group" not in ci_triggers
@@ -221,7 +240,7 @@ def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
 def test_required_gate_fails_closed_for_changed_inputs(
     event: str, base_ref: str, changed: str, build: str, visual: str, expected: int
 ) -> None:
-    step = _workflow()["jobs"]["public-site-visual-required"]["steps"][0]
+    step = _step(_workflow()["jobs"]["public-site-visual-required"], GATE_STEP)
     env = dict(os.environ)
     env.update(
         INPUT_RESULT="success",
@@ -236,7 +255,7 @@ def test_required_gate_fails_closed_for_changed_inputs(
 
 
 def test_required_gate_rejects_failed_input_classification() -> None:
-    step = _workflow()["jobs"]["public-site-visual-required"]["steps"][0]
+    step = _step(_workflow()["jobs"]["public-site-visual-required"], GATE_STEP)
     result = subprocess.run(
         ["bash", "-c", step["run"]],
         env={
@@ -255,7 +274,7 @@ def test_required_gate_rejects_failed_input_classification() -> None:
 
 def test_classification_retains_every_prior_public_site_input() -> None:
     workflow = _workflow()
-    classifier = workflow["jobs"]["visual-inputs"]["steps"][1]["run"]
+    classifier = _classifier(workflow)
     former_inputs = (
         "benchbox/",
         "docs/",
@@ -302,7 +321,7 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
     git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "change")
     head_sha = git("rev-parse", "HEAD")
 
-    classifier = _workflow()["jobs"]["visual-inputs"]["steps"][1]["run"]
+    classifier = _classifier(_workflow())
     output = tmp_path / "github-output"
     env = dict(os.environ)
     env.update(
@@ -320,7 +339,7 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
 
 
 def test_astro_dry_run_captures_without_comparing_or_gating() -> None:
-    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    ci = _ci()
     job = ci["jobs"]["public-site-visual-astro-dry-run"]
     assert job["name"] == "Public-site visual Astro dry run"
     assert "site-needed" in job["if"]
@@ -337,12 +356,39 @@ def test_astro_dry_run_captures_without_comparing_or_gating() -> None:
         needs = [needs] if isinstance(needs, str) else needs
         assert "public-site-visual-astro-dry-run" not in needs, name
 
-    recipe = (REPO_ROOT / "make" / "documentation.mk").read_text(encoding="utf-8")
-    target = recipe.split(".PHONY: site-visual-capture\nsite-visual-capture:")[1].split("\n\n")[0]
-    assert "PUBLIC_SITE_VISUAL_RENDERER=astro" in target
-    assert "PUBLIC_SITE_VISUAL_PHASE=capture" in target
-    assert "website/dist" in target
-    assert "PUBLIC_SITE_VISUAL_BASELINE" not in target
+
+def _capture_recipe(*overrides: str) -> str:
+    result = subprocess.run(
+        ["make", "-n", "-s", "site-visual-capture", *overrides],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def _head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def test_astro_capture_target_captures_dist_for_the_requested_source() -> None:
+    recipe = _capture_recipe("SITE_VISUAL_SOURCE_SHA=" + "a" * 40, "SITE_VISUAL_DIR=out")
+    assert "PUBLIC_SITE_VISUAL_RENDERER=astro" in recipe
+    assert "PUBLIC_SITE_VISUAL_PHASE=capture" in recipe
+    assert f'E2E_SITE_DIR="{REPO_ROOT}/website/dist"' in recipe
+    assert f'PUBLIC_SITE_VISUAL_OUTPUT="{REPO_ROOT}/out"' in recipe
+    assert 'PUBLIC_SITE_VISUAL_SOURCE_SHA="' + "a" * 40 + '"' in recipe
+    assert "PUBLIC_SITE_VISUAL_BASELINE" not in recipe
+    assert "PUBLIC_SITE_VISUAL_REQUIRE_BASELINE" not in recipe
+
+
+def test_astro_capture_target_defaults_to_the_current_commit_and_honours_the_parity_sha() -> None:
+    assert f'PUBLIC_SITE_VISUAL_SOURCE_SHA="{_head()}"' in _capture_recipe()
+    assert 'PUBLIC_SITE_VISUAL_SOURCE_SHA="' + "b" * 40 + '"' in _capture_recipe("SITE_PARITY_SHA=" + "b" * 40)
 
 
 def test_capture_spec_records_the_renderer_and_keeps_the_matrix() -> None:
@@ -354,22 +400,38 @@ def test_capture_spec_records_the_renderer_and_keeps_the_matrix() -> None:
 
 
 def test_visual_inputs_classify_website_in_both_workflows() -> None:
-    for path in (DOCS_WORKFLOW, REPO_ROOT / ".github/workflows/ci.yml"):
+    for path in (DOCS_WORKFLOW, CI_WORKFLOW):
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        classifier = workflow["jobs"]["visual-inputs"]["steps"][1]["run"]
+        classifier = _classifier(workflow)
         site_paths = classifier.split("SITE_PATHS=(")[1].split(")")[0]
         assert "website/" in site_paths, path.name
         assert "landing/" in site_paths, path.name
 
 
-def test_runbook_documents_both_renderer_switch_approval_slots() -> None:
-    runbook = (REPO_ROOT / "docs/development/results-explorer-browser-testing.md").read_text(encoding="utf-8")
+def _step_names(workflow: dict[str, Any]) -> set[str]:
+    return {step["name"] for job in workflow["jobs"].values() for step in job["steps"] if "name" in step}
+
+
+def test_runbook_names_only_approval_controls_that_a_workflow_reads() -> None:
+    runbook = RUNBOOK.read_text(encoding="utf-8")
+    controls = set(re.findall(r"`((?:[A-Z_]*APPROVED[A-Z_]*|[A-Z_]*APPROVAL_REASON))`", runbook))
+    assert {"APPROVED_HEAD_SHA", "APPROVAL_REASON"} <= controls
+    workflow_text = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert [name for name in sorted(controls) if f"vars.{name}" not in workflow_text] == []
+    assert "merge_group" not in _ci().get("on", _ci().get(True))
+
+
+def test_runbook_renderer_switch_section_names_real_jobs_and_steps() -> None:
+    runbook = RUNBOOK.read_text(encoding="utf-8")
     section = runbook.split("### Renderer-switch pull request")[1].split("## What CI gates")[0]
-    for token in (
-        "APPROVED_HEAD_SHA",
-        "APPROVED_MERGE_GROUP_SHA",
-        "MERGE_GROUP_APPROVAL_REASON",
-        "Queue position",
-        '"renderer": "astro"',
-    ):
-        assert token in section
+    docs_workflow, ci = _workflow(), _ci()
+    named = set(re.findall(r"`([^`]+)`", section))
+    for step in ("Assemble public site", "Upload assembled site for visual acceptance", "Capture public site"):
+        assert step in named
+        assert step in _step_names(docs_workflow) and step in _step_names(ci)
+    assert "docs-build" in named and "docs-build" in ci["jobs"]
+    assert "Public-site visual regression" in named
+    assert ci["jobs"]["public-site-visual-regression"]["name"] == "Public-site visual regression"
+    assert "build" in docs_workflow["jobs"]
+    assert "Queue position" in section or "queue position" in section
+    assert '"renderer": "astro"' in section

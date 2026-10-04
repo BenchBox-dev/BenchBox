@@ -111,15 +111,17 @@ maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-
 artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
 head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
 failed workflow. The approval applies only when both values are present and the
-approved SHA exactly equals GitHub's current PR head SHA. For a merge group,
-the maintainer must inspect that group's diagnostics, set
-`APPROVED_MERGE_GROUP_SHA` to its synthetic `merge_group.head_sha`, and set
-`MERGE_GROUP_APPROVAL_REASON` to a nonempty review note. PR approval variables
-cannot approve a merge group. Clear the group variables after the reviewed
-run. It may accept changed
+approved SHA exactly equals GitHub's current PR head SHA. It may accept changed
 digests and unexpected new captures, but it never accepts a capture missing
 from the current matrix. Clear both variables after the approved run so only
 one reviewed head occupies the repository-wide approval slot.
+
+The PR-head slot is the only approval wired today. `ci.yml` triggers only on
+`pull_request`, and its compare step reads only `APPROVED_HEAD_SHA`,
+`APPROVAL_REASON` and the PR head SHA. No workflow or code reads a merge-group
+approval variable, so a merge group cannot be approved, and the PR approval
+never applies to one. Wiring that slot is described under
+[Renderer-switch pull request](#renderer-switch-pull-request).
 
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
@@ -154,24 +156,18 @@ reviewed. The procedure has two phases.
 A change nobody intended is a defect. Fix it in the PR; do not record it as
 expected.
 
-**Gating phase (after the check is required again).** Use the two approval
-slots described above, one per tree:
-
-1. Review the PR run's diagnostics. Set `APPROVED_HEAD_SHA` to the PR head SHA
-   and `APPROVAL_REASON` to the review note, then re-run the failed job.
-2. When the merge group's run fails on the same intended change, review that
-   group's diagnostics. Set `APPROVED_MERGE_GROUP_SHA` to its
-   `merge_group.head_sha` and `MERGE_GROUP_APPROVAL_REASON` to the note, then
-   re-run.
-3. Clear all four variables after the approved runs.
-
-A PR approval never applies to a merge group.
+**Gating phase (after the check is required again).** Review the PR run's
+diagnostics, set `APPROVED_HEAD_SHA` to the PR head SHA and `APPROVAL_REASON` to
+the review note, then re-run the failed job. Clear both variables afterwards.
+This is the only approval slot that exists today. A PR approval never applies
+to a merge group; the merge-group slot is not wired (see
+[Renderer-switch pull request](#renderer-switch-pull-request)).
 
 **When the merge group is re-formed.** A group re-forms when a PR ahead of it
 fails or leaves the queue. The re-formed group has a new `merge_group.head_sha`.
-In the advisory phase, review the new run. In the gating phase, the earlier
-group approval no longer matches, so review the new group's diagnostics and set
-the group slot again.
+In the advisory phase, review the new run. A merge-group approval, once that
+slot is wired, would be bound to one `merge_group.head_sha`, so a re-formed
+group would need a fresh one.
 
 **Stacked groups.** A follower group's base is the head of the group ahead of
 it. That head has a baseline only once the leader's comparison has passed and
@@ -194,24 +190,46 @@ matrix from `website/dist` with `PUBLIC_SITE_VISUAL_RENDERER=astro`, uploads
 Each manifest records its `renderer`. If a route or viewport changes, update
 the matrix in `public-site-pages.spec.ts` in the same change.
 
-The pull request that switches the CI renderer to Astro changes every capture
-against the Sphinx baseline of its exact base. It never skips, disables or
-loosens the comparison. Use the gating-phase slots, one per tree:
+When the baseline and the current capture come from different renderers, the
+comparison reports every capture as changed and passes only through the
+exact-head approval described above. A missing capture still fails. The
+comparison is never skipped, disabled or loosened.
 
-1. Review the PR run's `public-site-visual-diagnostics-*` artifact against the
-   Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head SHA and
-   `APPROVAL_REASON` to the review note, then re-run the failed job.
-2. When the PR enters the merge queue, wait for the group's own run. Review that
-   group's diagnostics, set `APPROVED_MERGE_GROUP_SHA` to its
-   `merge_group.head_sha` and `MERGE_GROUP_APPROVAL_REASON` to the note, then
-   re-run. Queue position, and the PR approval, never substitute for this slot.
-   A re-formed group needs a fresh approval.
+**What the switch pull request changes.**
+
+1. `docs.yml`: the `build` job produces the Astro site instead of assembling
+   the Sphinx site (the `Assemble public site` step and the upload named
+   `Upload assembled site for visual acceptance`), and the
+   `Capture public site` step of `public-site-visual-regression` sets
+   `PUBLIC_SITE_VISUAL_RENDERER: astro`. The push run on `develop` then
+   publishes an Astro baseline for the merge commit.
+2. `ci.yml`: the `docs-build` job and the `Capture public site` step of the
+   `Public-site visual regression` job make the same change, so the pull
+   request captures the Astro build against the Sphinx baseline of its exact
+   base.
+3. `public-site-pages.spec.ts`: lift the guard that restricts
+   `PUBLIC_SITE_VISUAL_RENDERER=astro` to the capture phase.
+
+**Approval slots.** The decision records two separate exact-head approvals, one
+for the PR head and one for the synthetic `merge_group.head_sha`, with queue
+position never substituting for either.
+
+1. PR head, wired today. Review the PR run's `public-site-visual-diagnostics-*`
+   artifact against the Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head
+   SHA and `APPROVAL_REASON` to the review note, then re-run the failed job.
+2. Merge group head, not wired. `ci.yml` has no `merge_group` trigger and no
+   workflow reads a merge-group approval variable. Before the switch pull
+   request enters a merge queue, a separate change must add the `merge_group`
+   trigger and a second approval pair, read only for the group event and
+   compared with `merge_group.head_sha`, that the PR approval cannot satisfy.
+   Until that exists the switch pull request cannot pass a merge group, and
+   queue position or the PR approval must not be treated as approval.
 3. After the merge, the `Documentation` push run on `develop` must capture the
    Astro build and upload `public-site-visual-baseline-<merge commit>`. Confirm
    the artifact exists and that its `manifest.json` has `"renderer": "astro"`.
    If the push was dropped, dispatch Documentation with `baseline_source_sha`
    set to the merge commit.
-4. Clear all four approval variables. Hold other site-changing PRs until step 3
+4. Clear the approval variables. Hold other site-changing PRs until step 3
    is confirmed, because they need the Astro baseline for their exact base.
 
 ## What CI gates

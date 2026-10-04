@@ -5,7 +5,7 @@ import path from "node:path";
 import { type Browser, expect, test } from "@playwright/test";
 
 import {
-  compareVisualManifests,
+  compareVisualManifestsAcrossRenderers,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualCapture,
   type VisualManifest,
@@ -186,7 +186,6 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   }
   const baseline = JSON.parse(await readFile(path.join(BASELINE, "manifest.json"), "utf8")) as typeof manifest;
   expect(baseline.browser).toBe("chromium");
-  expect(baseline.renderer ?? "sphinx", "baseline renderer").toBe(manifest.renderer ?? "sphinx");
   // When comparison is required, the baseline must be bound to a real SHA:
   // an empty BASE_SHA skips this assertion and compares pixels only, which
   // would let a stale or wrong-tree baseline pass unread.
@@ -194,7 +193,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     /^[0-9a-f]{40}$/,
   );
   expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
-  const comparison = compareVisualManifests(
+  const comparison = compareVisualManifestsAcrossRenderers(
     baseline as VisualManifest,
     manifest as VisualManifest,
     {
@@ -208,7 +207,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     { missing, unexpected },
     "visual baseline route/viewport matrix must match exactly",
   ).toEqual({ missing: [], unexpected: [] });
-  expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
+  expect(changed, comparison.message).toEqual([]);
 
   if (comparison.approvalApplied) {
     console.info(
