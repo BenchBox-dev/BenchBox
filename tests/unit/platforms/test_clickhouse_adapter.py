@@ -953,9 +953,8 @@ class TestClickHouseAdapter:
         # Should not raise exception
         adapter.apply_table_tunings(mock_tuning, connection)
 
-        # Should call optimize_table (which calls OPTIMIZE TABLE)
-        expected_calls = [call for call in mock_client.execute.call_args_list if "OPTIMIZE" in str(call)]
-        assert len(expected_calls) > 0
+        optimize_calls = [call for call in mock_client.execute.call_args_list if "OPTIMIZE" in str(call)]
+        assert optimize_calls == []
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_apply_table_tunings_with_clustering(self, mock_client_class):
@@ -994,11 +993,18 @@ class TestClickHouseAdapter:
         # Should not raise exception
         adapter.apply_table_tunings(mock_tuning, connection)
 
-        # Should call OPTIMIZE TABLE FINAL for clustering
         optimize_final_calls = [
             call for call in mock_client.execute.call_args_list if "OPTIMIZE TABLE test_table FINAL" in str(call)
         ]
-        assert len(optimize_final_calls) > 0
+        assert optimize_final_calls == []
+
+        adapter.platform_config["optimize_after_load"] = True
+        adapter.apply_post_load_tunings("test_table", Mock(table_tunings={}), connection)
+
+        post_load_calls = [
+            call for call in mock_client.execute.call_args_list if "OPTIMIZE TABLE test_table FINAL" in str(call)
+        ]
+        assert len(post_load_calls) > 0
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_apply_table_tunings_none(self, mock_client_class):

@@ -583,6 +583,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     ctas_connection = getattr(cursor, "connection", cursor)
                     self.apply_ctas_sort(table_name, effective_tuning, ctas_connection)
+                    self.run_post_load_tunings(table_name, effective_tuning, ctas_connection)
 
                 load_time = elapsed_seconds(load_start)
                 self.logger.info(f"Loaded {row_count:,} rows into {table_name} in {load_time:.2f}s")
@@ -650,6 +651,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     ctas_connection = getattr(cursor, "connection", cursor)
                     self.apply_ctas_sort(table_name, effective_tuning, ctas_connection)
+                    self.run_post_load_tunings(table_name, effective_tuning, ctas_connection)
 
                 load_time = elapsed_seconds(load_start)
                 self.logger.info(f"Loaded {total_rows:,} rows into {table_name} in {load_time:.2f}s")

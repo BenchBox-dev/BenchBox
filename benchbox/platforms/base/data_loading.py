@@ -2805,6 +2805,7 @@ class DataLoader:
             # PlatformAdapter guarantees apply_ctas_sort; unsupported platforms no-op.
             if self.tuning_config:
                 self.adapter.apply_ctas_sort(table_name, self.tuning_config, self.connection)
+                self.adapter.run_post_load_tunings(table_name, self.tuning_config, self.connection)
 
         return table_stats
 

@@ -1535,6 +1535,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         effective_tuning = self.get_effective_tuning_configuration()
         if effective_tuning is not None:
             self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+            self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
         # Get row count
         cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
@@ -1613,6 +1614,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         effective_tuning = self.get_effective_tuning_configuration()
         if effective_tuning is not None:
             self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+            self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
         return total_rows_loaded
 
@@ -2610,13 +2612,30 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         return " ".join(clauses)
 
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+        table_tuning = self.table_tuning_for(effective_config, table_name)
+        if table_tuning is None or not table_tuning.has_any_tuning():
+            return
+        physical_table = self.resolve_physical_table(table_name, connection)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"ANALYZE {physical_table}")
+            self.logger.info(f"Analyzed table statistics for {physical_table}")
+            if self.auto_vacuum:
+                cursor.execute(f"VACUUM {physical_table}")
+                self.logger.info(f"Vacuumed table {physical_table}")
+        except Exception as e:
+            self.logger.warning(f"Failed to perform maintenance operations on {physical_table}: {e}")
+        finally:
+            cursor.close()
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Redshift table.
 
         Redshift tuning approach:
         - DISTRIBUTION: Handled via DISTSTYLE/DISTKEY in CREATE TABLE
         - SORTING: Handled via SORTKEY in CREATE TABLE
-        - Post-creation optimizations via ANALYZE and VACUUM
+        - ANALYZE and VACUUM run after the table loads (apply_post_load_tunings)
 
         Args:
             table_tuning: The tuning configuration to apply
@@ -2699,20 +2718,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     )
             else:
                 self.logger.warning(f"Could not find table configuration for {table_name}")
-
-            # Perform maintenance operations that can help with performance
-            try:
-                # Run ANALYZE to update table statistics
-                cursor.execute(f"ANALYZE {table_name}")
-                self.logger.info(f"Analyzed table statistics for {table_name}")
-
-                # Run VACUUM to reclaim space and re-sort data
-                if self.auto_vacuum:
-                    cursor.execute(f"VACUUM {table_name}")
-                    self.logger.info(f"Vacuumed table {table_name}")
-
-            except Exception as e:
-                self.logger.warning(f"Failed to perform maintenance operations on {table_name}: {e}")
 
             # Handle partitioning strategy
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)

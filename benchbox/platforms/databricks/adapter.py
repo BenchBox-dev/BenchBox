@@ -266,6 +266,7 @@ class DatabricksAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     physical_identifier_case = "lower"
+    post_load_connection_recording = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -2474,6 +2475,7 @@ class DatabricksAdapter(PlatformAdapter):
         effective_tuning = self.get_effective_tuning_configuration()
         if effective_tuning is not None:
             self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
+            self.run_post_load_tunings(table_name_upper, effective_tuning, connection)
 
         optimize_time = 0.0
         if self.table_format == "hudi":
@@ -3501,6 +3503,19 @@ class DatabricksAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+        table_tuning = self.table_tuning_for(effective_config, table_name)
+        if table_tuning is None or not table_tuning.has_any_tuning() or not self.enable_delta_optimization:
+            return
+        physical_table = self.resolve_physical_table(table_name)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"DESCRIBE EXTENDED {physical_table}")
+            if any("DELTA" in str(row).upper() for row in cursor.fetchall()):
+                self._apply_delta_optimize(cursor, physical_table, phase="post_load")
+        finally:
+            cursor.close()
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Databricks Delta Lake table.
 
@@ -3601,9 +3616,6 @@ class DatabricksAdapter(PlatformAdapter):
                 sort_columns,
                 use_liquid,
             )
-            if is_delta_table and self.enable_delta_optimization:
-                self._apply_delta_optimize(cursor, table_name, phase="pre_load")
-
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:

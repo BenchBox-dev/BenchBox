@@ -16,6 +16,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -3202,11 +3203,19 @@ class TestApplyTableTunings:
 
         adapter.apply_table_tunings(mock_table_tuning, mock_conn)
 
-        # ANALYZE should have been called
         executed_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
-        assert any("ANALYZE" in sql for sql in executed_sqls)
-        # VACUUM also called since auto_vacuum=True
-        assert any("VACUUM" in sql for sql in executed_sqls)
+        assert not any("ANALYZE" in sql or "VACUUM" in sql for sql in executed_sqls)
+
+        mock_cursor.execute.reset_mock()
+        adapter.apply_post_load_tunings(
+            mock_table_tuning.table_name,
+            SimpleNamespace(table_tunings={mock_table_tuning.table_name: mock_table_tuning}),
+            mock_conn,
+        )
+
+        post_load_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
+        assert any("ANALYZE" in sql for sql in post_load_sqls)
+        assert any("VACUUM" in sql for sql in post_load_sqls)
 
     def test_table_not_found_logs_warning(self):
         adapter = _make_adapter(auto_vacuum=False)
@@ -3229,7 +3238,18 @@ class TestApplyTableTunings:
         adapter.apply_table_tunings(mock_table_tuning, mock_conn)
 
         executed_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
-        assert any("ANALYZE" in sql for sql in executed_sqls)
+        assert not any("ANALYZE" in sql or "VACUUM" in sql for sql in executed_sqls)
+
+        mock_cursor.execute.reset_mock()
+        adapter.apply_post_load_tunings(
+            mock_table_tuning.table_name,
+            SimpleNamespace(table_tunings={mock_table_tuning.table_name: mock_table_tuning}),
+            mock_conn,
+        )
+
+        post_load_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
+        assert any("ANALYZE" in sql for sql in post_load_sqls)
+        assert not any("VACUUM" in sql for sql in post_load_sqls)
 
     def test_no_tuning_returns_early(self):
         adapter = _make_adapter()

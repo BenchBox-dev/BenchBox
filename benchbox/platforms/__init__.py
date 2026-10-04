@@ -806,6 +806,9 @@ clickhouse-cloud|oauth_token|OAuth token for keyless authentication (alternative
 clickhouse-cloud|s3_staging_url|S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)|{}
 clickhouse-cloud|s3_region|AWS region for the S3 staging bucket|{'default': 'us-east-1'}
 clickhouse-cloud|gcs_staging_url|GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)|{}
+clickhouse-local|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
+clickhouse-server|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
+clickhouse-cloud|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
 starrocks|host|StarRocks FE hostname|{'default': 'localhost'}
 starrocks|port|StarRocks FE MySQL protocol port|{'default': '9030'}
 starrocks|username|StarRocks username|{'default': 'root'}

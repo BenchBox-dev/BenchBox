@@ -478,6 +478,7 @@ class MotherDuckAdapter(PlatformAdapter):
 
             if effective_tuning:
                 self.apply_ctas_sort(table_name, effective_tuning, connection)
+                self.run_post_load_tunings(table_name, effective_tuning, connection)
 
         load_time = time.perf_counter() - start_time
         return row_counts, load_time, None

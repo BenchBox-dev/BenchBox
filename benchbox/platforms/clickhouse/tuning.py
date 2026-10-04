@@ -339,13 +339,24 @@ class ClickHouseTuningMixin:
         """Check if ClickHouse supports a specific tuning type."""
         return supports_named_tuning_type(tuning_type, self._supported_tuning_type_names)
 
+    def _optimize_after_load_enabled(self) -> bool:
+        value = getattr(self, "platform_config", {}).get("optimize_after_load", False)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+        if not self._optimize_after_load_enabled():
+            return
+        self.optimize_table(connection, self.resolve_physical_table(table_name, connection))
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply ClickHouse-specific table tunings.
 
         ClickHouse tuning approach:
         - PARTITIONING: Handled via PARTITION BY in CREATE TABLE
         - SORTING: Handled via ORDER BY in CREATE TABLE
-        - CLUSTERING: Achieved through ORDER BY and OPTIMIZE operations
+        - CLUSTERING: Folded into the ORDER BY key at CREATE TABLE time
         - DISTRIBUTION: Handled via distributed engine settings
 
         Args:
@@ -359,33 +370,25 @@ class ClickHouseTuningMixin:
             return
 
         table_name = table_tuning.table_name
-        physical_table = self.resolve_physical_table(table_name, connection)
         self.logger.info(f"Applying ClickHouse tunings for table: {table_name}")
 
         try:
             # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # ClickHouse doesn't support ALTER TABLE for changing partitioning or ordering
-            # after table creation, but we can optimize existing tables
-
-            # Apply sorting optimization by running OPTIMIZE TABLE
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns:
-                sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                self.logger.info(f"Optimizing table {table_name} for sorting on columns: {', '.join(column_names)}")
-                self.optimize_table(connection, physical_table)
+                column_names = [col.name for col in sorted(sort_columns, key=lambda col: col.order)]
+                self.logger.info(
+                    f"Sorting for table {table_name}: {', '.join(column_names)} (defined at CREATE TABLE time)"
+                )
 
-            # Apply clustering optimization via OPTIMIZE TABLE FINAL
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if cluster_columns:
-                sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
+                column_names = [col.name for col in sorted(cluster_columns, key=lambda col: col.order)]
                 self.logger.info(
-                    f"Applying clustering optimization to table {table_name} on columns: {', '.join(column_names)}"
+                    f"Clustering for table {table_name}: {', '.join(column_names)} (folded into ORDER BY at CREATE TABLE time)"
                 )
-                connection.execute(f"OPTIMIZE TABLE {physical_table} FINAL")
 
             # Log partitioning strategy (must be defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -115,10 +116,9 @@ class TestSnowflakePhysicalIdentifiers:
     def test_clustering_statements_use_the_physical_identifiers(self, snowflake_adapter):
         connection = RecordingConnection()
         snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
-        assert connection.recorder.statements[-2:] == [
-            "ALTER TABLE LINEITEM CLUSTER BY (l_orderkey)",
-            "ALTER TABLE LINEITEM RESUME RECLUSTER",
-        ]
+        assert connection.recorder.statements[-1] == "ALTER TABLE LINEITEM CLUSTER BY (l_orderkey)"
+        snowflake_adapter.apply_post_load_tunings("lineitem", None, connection)
+        assert connection.recorder.statements[-1] == "ALTER TABLE LINEITEM RESUME RECLUSTER"
 
     def test_catalog_probe_binds_the_physical_table(self, snowflake_adapter):
         probes = []
@@ -150,10 +150,15 @@ class TestRedshiftPhysicalIdentifiers:
 
     def test_maintenance_statements_use_the_physical_table(self, redshift_adapter):
         connection = RecordingConnection()
-        redshift_adapter.apply_table_tunings(clustering_tuning("LINEITEM", "L_ORDERKEY"), connection)
+        tuning = clustering_tuning("LINEITEM", "L_ORDERKEY")
+        redshift_adapter.apply_table_tunings(tuning, connection)
         statements = connection.recorder.statements
         assert any("tablename = 'lineitem'" in statement for statement in statements)
-        assert "ANALYZE lineitem" in statements
+        assert "ANALYZE lineitem" not in statements
+        redshift_adapter.apply_post_load_tunings(
+            "LINEITEM", SimpleNamespace(table_tunings={"LINEITEM": tuning}), connection
+        )
+        assert "ANALYZE lineitem" in connection.recorder.statements
 
     def test_existing_keys_compare_against_physical_column_names(self, redshift_adapter, caplog):
         row = ("public", "lineitem", "KEY", "l_orderkey", "l_orderkey", "l_linenumber", None, None)

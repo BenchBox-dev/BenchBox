@@ -82,6 +82,61 @@ class TuningHooksMixin:
     platform_name: str
     _supported_tuning_type_names: Iterable[str] | None = None
     physical_identifier_case: str = "preserve"
+    post_load_connection_recording: bool = True
+
+    @staticmethod
+    def table_tuning_for(effective_config: Any, table_name: str) -> Any:
+        table_tunings = getattr(effective_config, "table_tunings", None) or {}
+        for name, table_tuning in table_tunings.items():
+            if name.lower() == table_name.lower():
+                return table_tuning
+        return None
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+        return None
+
+    def run_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+        if effective_config is None or getattr(self, "dry_run_mode", False):
+            return
+        from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD, recording_connection
+        from benchbox.utils.clock import elapsed_seconds, mono_time
+
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        record = ledger is not None and self.post_load_connection_recording
+        target = recording_connection(connection, ledger, PHASE_POST_LOAD) if record else connection
+        start = mono_time()
+        try:
+            self.apply_post_load_tunings(table_name, effective_config, target)
+        except Exception as exc:
+            self.logger.warning(f"Post-load tuning failed for {table_name}: {exc}")
+        finally:
+            elapsed = elapsed_seconds(start)
+            self._post_load_maintenance_seconds = getattr(self, "_post_load_maintenance_seconds", 0.0) + elapsed
+            tables = getattr(self, "_post_load_maintenance_tables", None)
+            if tables is None:
+                tables = []
+                self._post_load_maintenance_tables = tables
+            tables.append(table_name)
+            by_table = getattr(self, "_post_load_maintenance_by_table", None)
+            if by_table is None:
+                by_table = {}
+                self._post_load_maintenance_by_table = by_table
+            by_table[table_name.lower()] = by_table.get(table_name.lower(), 0.0) + elapsed
+
+    def exclude_post_load_maintenance(self, loading_time: float, per_table_timings: Any) -> tuple[float, Any]:
+        by_table = getattr(self, "_post_load_maintenance_by_table", None) or {}
+        if isinstance(per_table_timings, dict):
+            for key, entry in per_table_timings.items():
+                spent = by_table.get(str(key).lower(), 0.0)
+                if spent and isinstance(entry, dict) and "total_ms" in entry:
+                    entry["total_ms"] = max(0.0, entry["total_ms"] - spent * 1000)
+        return max(loading_time - getattr(self, "_post_load_maintenance_seconds", 0.0), 0.0), per_table_timings
+
+    def get_post_load_maintenance_metadata(self) -> dict[str, Any]:
+        return {
+            "total_apply_seconds": getattr(self, "_post_load_maintenance_seconds", 0.0),
+            "applied_tables": sorted(set(getattr(self, "_post_load_maintenance_tables", []))),
+        }
 
     def resolve_physical_table(self, logical_name: str, connection: Any = None) -> str:
         return _PHYSICAL_IDENTIFIER_FOLDERS[self.physical_identifier_case](logical_name)

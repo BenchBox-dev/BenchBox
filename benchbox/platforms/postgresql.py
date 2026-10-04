@@ -898,6 +898,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
                 if effective_tuning:
                     self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                    self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
                 self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower}")
             except Exception as e:

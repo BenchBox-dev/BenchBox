@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -137,45 +138,51 @@ class TestClickHousePhysicalIdentifiers:
         assert lineitem.startswith("CREATE TABLE lineitem (")
         assert "l_orderkey INTEGER NOT NULL" in lineitem
 
-    def test_sorting_tuning_optimizes_the_physical_table(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, kwargs)
+    def test_apply_table_tunings_never_optimizes(self, clickhouse_factory, adapter_cls, kwargs):
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
         client = RecordingClient()
-        tuning = _lineitem_tuning(sorting=[TuningColumn(name="L_ORDERKEY", type="INTEGER", order=1)])
-
-        adapter.apply_table_tunings(tuning, client)
-
-        assert client.tuning_statements == ["OPTIMIZE TABLE lineitem FINAL"]
-
-    def test_clustering_tuning_optimizes_the_physical_table(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, kwargs)
-        client = RecordingClient()
-        tuning = _lineitem_tuning(clustering=[TuningColumn(name="L_SHIPDATE", type="DATE", order=1)])
-
-        adapter.apply_table_tunings(tuning, client)
-
-        assert client.tuning_statements == ["OPTIMIZE TABLE lineitem FINAL"]
-
-    def test_tuning_statements_name_the_table_the_schema_created(
-        self, clickhouse_factory, adapter_cls, kwargs, tpch_benchmark
-    ):
-        adapter = clickhouse_factory(adapter_cls, kwargs)
-        client = RecordingClient()
-        adapter.create_schema(tpch_benchmark, client)
-        created = _clickhouse_created_tables(client.statements)
         tuning = _lineitem_tuning(
             sorting=[TuningColumn(name="L_ORDERKEY", type="INTEGER", order=1)],
             clustering=[TuningColumn(name="L_SHIPDATE", type="DATE", order=1)],
         )
-        client.statements.clear()
 
         adapter.apply_table_tunings(tuning, client)
+
+        assert client.tuning_statements == []
+
+    def test_post_load_optimize_targets_the_physical_table(self, clickhouse_factory, adapter_cls, kwargs):
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        client = RecordingClient()
+
+        adapter.apply_post_load_tunings("LINEITEM", SimpleNamespace(table_tunings={}), client)
+
+        assert client.tuning_statements == ["OPTIMIZE TABLE lineitem FINAL"]
+
+    def test_post_load_optimize_is_off_by_default(self, clickhouse_factory, adapter_cls, kwargs):
+        adapter = clickhouse_factory(adapter_cls, kwargs)
+        client = RecordingClient()
+
+        adapter.apply_post_load_tunings("LINEITEM", SimpleNamespace(table_tunings={}), client)
+
+        assert client.tuning_statements == []
+
+    def test_post_load_optimize_names_the_table_the_schema_created(
+        self, clickhouse_factory, adapter_cls, kwargs, tpch_benchmark
+    ):
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        client = RecordingClient()
+        adapter.create_schema(tpch_benchmark, client)
+        created = _clickhouse_created_tables(client.statements)
+        client.statements.clear()
+
+        adapter.apply_post_load_tunings("LINEITEM", SimpleNamespace(table_tunings={}), client)
 
         targets = {re.match(r"OPTIMIZE TABLE (\S+) FINAL", s).group(1) for s in client.tuning_statements}
         assert targets
         assert targets <= set(created)
 
     def test_mixed_case_schema_is_resolved_through_the_catalog(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, kwargs)
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
         client = RecordingClient(
             tables=["DimDate", "DimCustomer", "lineitem"],
             columns={"DimCustomer": ["SK_CustomerID", "CustomerID"]},
@@ -186,11 +193,7 @@ class TestClickHousePhysicalIdentifiers:
         assert adapter.resolve_physical_table("LINEITEM", client) == "lineitem"
         assert adapter.resolve_physical_column("DimCustomer", "sk_customerid", client) == "SK_CustomerID"
 
-        tuning = TableTuning(
-            table_name="DimCustomer",
-            sorting=[TuningColumn(name="SK_CustomerID", type="INTEGER", order=1)],
-        )
-        adapter.apply_table_tunings(tuning, client)
+        adapter.apply_post_load_tunings("DimCustomer", SimpleNamespace(table_tunings={}), client)
 
         assert client.tuning_statements == ["OPTIMIZE TABLE DimCustomer FINAL"]
 
