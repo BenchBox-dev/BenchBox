@@ -20442,6 +20442,13 @@
       "status": "done",
       "title": "Make TPC-DI parallel phases fail closed on incomplete or failed work"
     },
+    "tpcdi-parallel-transform-swallows-failures": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DI parallel transform swallows failures; phases with no work report success"
+    },
     "tpcdi-scd2-expire-update-never-runs": {
       "claim": null,
       "needs": [],

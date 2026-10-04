@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A failed parallel transformation marks the pipeline failed and names the failed files, with a test injecting a failure",
+    "A phase with a missing processor or no work is reported incomplete or failed, with a test",
+    "Sequential and parallel paths report the same outcome for the same failure"
+  ],
+  "context": "2026-10-04 concurrency adversarial review. Exception handler verified directly.",
+  "description": "benchbox/core/tpcdi/benchmark.py:1669-1675 (develop 8ed0c64e1) catches each parallel transformation future's exception, prints it and continues. run_etl_pipeline then sets success=True (:1587) with partial staged data. The sequential path (:1621-1634) raises instead. With enable_parallel=True, one bad source file silently drops a table's data and the run is still successful. This is the only TPC-DI concurrent path left after #2222. The unmerged branch origin/fix/tpcdi-parallel-phase-truthful-outcome (closed PR #2217) targeted the deleted parallel_batch_processor.py and does not cover it.\n\nAlso: _run_enhanced_data_processing defaults to success: True (:2496). If a requested processor is None or no files are generated, the phase \"succeeds\" with zero records, contrary to the concurrency outcome ADR section 1 (incomplete/failed).",
+  "links": [
+    "benchbox/core/tpcdi/benchmark.py",
+    "docs/development/adr/adr-concurrency-outcome-and-ownership-contract.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:03:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f80107b23410441493319b78d31ed007",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
