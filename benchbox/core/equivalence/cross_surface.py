@@ -373,7 +373,9 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
     unchanged, so rows that tie on every key may appear in any order. Returns a
     description of the first out-of-order row, or ``None`` when the order holds or
     cannot be checked: no ``ORDER BY``, an unparseable query, duplicate output
-    names, or a term that references a qualified or missing column.
+    names, or a term that references a qualified or missing column. An error
+    while evaluating the sort keys over the returned rows is reported as a
+    violation, so the check fails closed instead of passing unverified.
     """
     import duckdb
     import sqlglot
@@ -400,7 +402,12 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
                 return None
             target = exp.column(f"__c{ordinal - 1}")
         else:
-            for column in list(target.find_all(exp.Column)):
+            references = list(target.find_all(exp.Column))
+            if not references:
+                # A term with no column reference, such as DuckDB's ORDER BY ALL,
+                # cannot be evaluated over the returned columns.
+                return None
+            for column in references:
                 # A qualified reference names an input column, which SQL resolves
                 # before output names, so it cannot be read from the result.
                 position = None if column.table else positions.get(column.name.lower())
@@ -436,8 +443,8 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
         required = connection.execute(
             f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in terms)}, __pos"
         ).fetchall()
-    except duckdb.Error:
-        return None
+    except duckdb.Error as exc:
+        return f"the ORDER BY check could not evaluate the sort keys over the returned rows: {exc}"
     finally:
         connection.close()
     for position, (actual, expected) in enumerate(zip(returned, required, strict=True)):
