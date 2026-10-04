@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "For each listed adapter: a test shows force_recreate either recreates at the first connection or produces a clear user-visible message that it cannot.",
+    "The contract test's exemption list no longer names these adapters, or each remaining exemption states the decision."
+  ],
+  "context": "Source: independent review and author report of PR #2632 (2026-10-04).",
+  "description": "## Problem (observed by reading code and running fakes in the mid-run contract test)\nAt the first connection these adapters do not act on `force_recreate`: Velox defines no existence probe; InfluxDB only logs a warning; Firebolt Core's `drop_database` only logs; Snowpark Connect accepts the option but never acts; MotherDuck's adapter does not read it. A user passing `--force-recreate` gets a silent no-op.\n\n## Change\nPer adapter, decide and implement one of: act on it, or reject/warn loudly that the platform cannot recreate. Record the decision in the contract test's exemption reason so the exemption is explicit.\n\n## Guardrails (must preserve)\n- No live cloud runs without explicit approval stating the command, maximum runtime, log path and stop condition.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "tests/unit/platforms/test_no_midrun_destructive_ops.py",
+    "benchbox/platforms/base/connection_lifecycle.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:55:04Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c736f00569e84016a718c5035ca23fd2",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
