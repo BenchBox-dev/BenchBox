@@ -20342,6 +20342,13 @@
       "status": "open",
       "title": "Give the 26 always-empty TPC-DS statements nonempty coverage in a blocking lane"
     },
+    "tpcds-identity-windows-required": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide whether the Windows TPC-DS identity comparison becomes a failing check"
+    },
     "tpcds-obt-benchmark-implementation": {
       "claim": null,
       "needs": [],
