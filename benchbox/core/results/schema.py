@@ -1671,7 +1671,7 @@ def _derived_validation_status(result: BenchmarkResults) -> str | None:
         return status
     ledger = getattr(result, "applied_tuning_ledger", None)
     ledger_status = ledger.get("status") if isinstance(ledger, dict) else None
-    if isinstance(ledger_status, str) and ledger_status:
+    if isinstance(ledger_status, str) and ledger_status and ledger_status.lower() != NOT_VALIDATED:
         return ledger_status.lower()
     return None
 
@@ -1689,11 +1689,13 @@ def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     tuning_source = getattr(result, "tuning_source", None)
     if tuning_source:
         summary["tuning_source"] = tuning_source
-    if tuning_source or result.tuning_source_file or result.tuning_config_hash:
-        summary["source"] = _legacy_tuning_source_bridge(tuning_source, result.tuning_source_file)
-    if result.tuning_config_hash:
-        summary["requested_config_hash"] = result.tuning_config_hash
-        summary["hash"] = result.tuning_config_hash
+    source_file = getattr(result, "tuning_source_file", None)
+    config_hash = getattr(result, "tuning_config_hash", None)
+    if tuning_source or source_file or config_hash:
+        summary["source"] = _legacy_tuning_source_bridge(tuning_source, source_file)
+    if config_hash:
+        summary["requested_config_hash"] = config_hash
+        summary["hash"] = config_hash
     return summary
 
 

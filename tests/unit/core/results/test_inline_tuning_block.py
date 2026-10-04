@@ -599,3 +599,19 @@ class TestTunedBundleDerivesStatusLikeUntuned:
         tuning_block = self._tuned(tmp_path)
 
         assert "validation_status" not in tuning_block
+
+
+class TestStatusDerivationIgnoresInternalSentinelsAndSparseResults:
+    def test_ledger_status_of_not_validated_is_not_exported(self) -> None:
+        from benchbox.core.results.schema import _derived_validation_status
+
+        result = SimpleNamespace(tuning_validation_status=None, applied_tuning_ledger={"status": "not_validated"})
+
+        assert _derived_validation_status(result) is None
+
+    def test_result_object_without_source_or_hash_attributes_does_not_raise(self) -> None:
+        from benchbox.core.results.schema import _untuned_tuning_summary
+
+        result = SimpleNamespace(tuning_validation_status=None, tuning_source=None, applied_tuning_ledger=None)
+
+        assert _untuned_tuning_summary(result) == {}
