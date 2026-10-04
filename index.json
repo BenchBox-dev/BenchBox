@@ -960,19 +960,14 @@
       "title": "Build the shared site shell: header, footer, docs layout, theme toggle, and docs/blog search"
     },
     "astro-site-30-rst-to-myst-in-place": {
-      "claim": {
-        "expires_at": "2026-10-05T01:03:23Z",
-        "generation": "8f7a497c7458492c91ee6e7fd87bcb9d",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b"
-      },
+      "claim": null,
       "needs": [
         "astro-site-10-spike-and-go-gate",
         "astro-site-02-api-reference-decision",
         "astro-site-03-visual-change-procedure"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Convert the 26 non-autodoc .rst docs pages to MyST Markdown inside the current Sphinx build"
     },
     "astro-site-31-myst-to-mdx-converter": {
