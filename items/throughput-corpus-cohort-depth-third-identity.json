@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "validate_corpus.py counts non-power phase cohorts separately, with a test proving a one-engine throughput cohort fails",
+    "The TPC-H SF1 throughput cohort has at least three genuine engine identities run with matching settings",
+    "#2382 or a replacement PR is refreshed, passes the depth gate and merges, or is closed with the reason recorded"
+  ],
+  "context": "The owner held #2382 on 2026-10-03. It now conflicts with develop because the corpus grew from 357 to 395 bundles; its local refresh commit 938150a4f is stale.",
+  "description": "PR #2382 adds four DuckDB TPC-H SF1 throughput bundles. The inventory puts them in their own `tpch@sf1.0#throughput` cohort, which has one engine identity. But `results-data/validate_corpus.py` keys cohorts by benchmark and scale only, so its depth gate passes that cohort by counting power-phase engines. SEED_CORPUS_SPEC.md requires three identities per cohort.\n\nPrepared, unpublished: a phase-aware validate_corpus.py change and test (uncommitted in worktree ~/Developer/BenchBox.wt-throughput-corpus), and a passing Spark 4.2.0 throughput bundle as the second identity (~/Developer/benchmark_runs/results/tpch_sf1_spark_sql_20261003_184247_2a8045c8.json, official, 3 streams, 66/66 queries, seed 20260709, notuning).\n\nThe third identity is missing. DataFusion, ClickHouse Local and Polars declare throughput unsupported. SQLite is blocked by item sqlite-throughput-dialect-and-stream-isolation, which this item depends on.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T14:00:59Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e2ed21492f3e4e9b9b7c1be44d3e2ed0",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}

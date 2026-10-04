@@ -19658,6 +19658,13 @@
       "status": "done",
       "title": "Define and prove per-stream adapter session capability"
     },
+    "throughput-corpus-cohort-depth-third-identity": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Give the TPC-H SF1 throughput cohort three engine identities and make the depth gate phase-aware"
+    },
     "throughput-executor-nonblocking-shutdown": {
       "claim": null,
       "needs": [],
