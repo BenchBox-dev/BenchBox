@@ -120,6 +120,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
     ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
     ("ci.yml", "site-build", "Typecheck, audit and build website"): "site-check",
+    ("ci.yml", "site-build", "Test built website and not-found fallback"): "site-test-built",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
