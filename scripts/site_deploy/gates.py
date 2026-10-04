@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.site_deploy import mixed_version, routes as routes_module
+from scripts.site_deploy.candidate import SEMVER_TAG
 
 PASS = "pass"
 FAIL = "fail"
@@ -199,7 +200,7 @@ def _release_baseline(
     if inputs.release_tag is not None and inputs.release_tag in recorded:
         return {tuple(entry) for entry in recorded[inputs.release_tag]}, "last deployed receipt"
     baseline = set(release_owned_known)
-    if inputs.release_tag is not None:
+    if inputs.release_tag is not None and SEMVER_TAG.match(inputs.release_tag):
         tag_file = inputs.repo_root / RELEASE_ALLOWANCE_RELATIVE / f"{inputs.release_tag}.json"
         if tag_file.is_file():
             baseline |= {tuple(entry) for entry in json.loads(tag_file.read_text(encoding="utf-8"))}

@@ -177,7 +177,9 @@ jobs:
         working-directory: release
         run: |
           uv sync --group dev
-          make query-docs
+          if [ -f scripts/generate_query_docs.py ]; then
+            uv run -- python scripts/generate_query_docs.py
+          fi
           cd docs
           uv run sphinx-build -b html --keep-going . _build/html
 

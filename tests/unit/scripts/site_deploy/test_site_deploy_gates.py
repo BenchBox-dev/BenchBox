@@ -331,6 +331,15 @@ def test_link_gate_fails_an_entry_outside_the_develop_and_tag_allowances(tmp_pat
     assert "/docs/x.html" in result["detail"]
 
 
+def test_link_gate_tag_allowance_cannot_allow_trunk_breakage(tmp_path: Path) -> None:
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    trunk = ["/blog/p.html", "/x.html", "missing path"]
+    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN, trunk])
+    result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN, trunk]))
+    assert result["status"] == g.FAIL
+    assert "touching trunk routes" in result["detail"]
+
+
 def test_link_gate_fails_new_breakage_whose_source_is_a_trunk_route(tmp_path: Path) -> None:
     runner = _link_runner([RELEASE_BROKEN, ["/blog/p.html", "/x.html", "missing path"]])
     result = g.link_gate(_inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), runner)

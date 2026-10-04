@@ -62,3 +62,36 @@ def test_compat_docs_check_fails_on_seeded_drift(monkeypatch: pytest.MonkeyPatch
     assert gen.main(["--check"]) == 0
     target.write_text("drifted\n", encoding="utf-8")
     assert gen.main(["--check"]) == 1
+
+
+QUERY_DOC_GENERATORS = ("query-docs", "docs-generate", "generate_query_docs.py")
+SPHINX_WORKFLOWS = (
+    "ci.yml",
+    "docs.yml",
+    "nightly-v2.yml",
+    "publication-deploy.yml",
+    "publication-preview-deploy.yml",
+    "site-deploy.yml",
+)
+
+
+def _sphinx_jobs() -> list[tuple[str, str, list[str]]]:
+    import yaml
+
+    jobs = []
+    for name in SPHINX_WORKFLOWS:
+        workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"))
+        for job_id, job in workflow["jobs"].items():
+            runs = [step.get("run", "") for step in job.get("steps", [])]
+            if any("sphinx-build" in run for run in runs):
+                jobs.append((name, job_id, runs))
+    return jobs
+
+
+def test_every_workflow_sphinx_build_generates_query_docs_first() -> None:
+    jobs = _sphinx_jobs()
+    assert {name for name, _, _ in jobs} == set(SPHINX_WORKFLOWS)
+    for name, job_id, runs in jobs:
+        segments = "\n".join(runs).split("sphinx-build")[:-1]
+        for index, segment in enumerate(segments):
+            assert any(marker in segment for marker in QUERY_DOC_GENERATORS), f"{name}:{job_id} build {index}"
