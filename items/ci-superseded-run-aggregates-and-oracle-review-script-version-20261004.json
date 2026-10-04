@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A superseded (cancelled) CI run no longer leaves failed aggregate jobs on the commit.",
+    "oracle-review evaluates a stand-in attestation for a PR whose base predates the mechanism, without a rebase.",
+    "A PR that edits the check script cannot pass its own review with that edit."
+  ],
+  "context": "Source: observed while landing PRs #2625 to #2639 (2026-10-04). Governance workflow files are soundness-adjacent; needs owner review.",
+  "description": "## Problem (observed repeatedly on PRs #2625 to #2639)\n1. Editing a PR body triggers a new CI run, and the concurrency rule cancels the previous run. The cancelled run's aggregate jobs (`tooling`, `core`, `docs`, `landing`, `explorer`) then report failure, so the PR's check list shows red until the new run finishes. Readers, and scripts reading the check rollup by commit, cannot tell a superseded run from a real failure.\n2. `oracle-review` ran the copy of `_project/scripts/oracle_review_check.py` from the PR's own checkout. A PR based on a develop that predates the stand-in attestation mechanism kept failing with \"waiting for the Codex connector's review\" even with a valid `Stand-in oracle review: APPROVE <sha>` comment, until it was rebased. The log message lacked the \"or a stand-in attestation\" wording, which is how it was spotted.\n\n## Change\n- Make aggregate jobs report cancelled/neutral (not failure) when their upstream jobs were cancelled by a newer run.\n- Run the oracle-review check from the base branch's script (or an equivalent pinned version) so a PR cannot be judged by an older rule.\n\n## Guardrails (must preserve)\n- The gate must not become weaker: a PR cannot supply its own check logic that passes itself.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/oracle-review.yml",
+    "_project/scripts/oracle_review_check.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:57:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b28d52410e264629928d4603e51f27e2",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
