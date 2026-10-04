@@ -11521,6 +11521,13 @@
       "status": "done",
       "title": "Single CSV dialect source plus pandas NULL group keys"
     },
+    "loader-empty-source-and-skip-flag-consistency-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Data loading: empty-file-list sources, REQUIRED_LOADED_TABLES = None, and SKIP_DATA_LOADING read inconsistently"
+    },
     "loader-fresh-manifest-invisible": {
       "claim": null,
       "needs": [],

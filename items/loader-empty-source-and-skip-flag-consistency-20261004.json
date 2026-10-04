@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Test: a data source whose tables all have empty file lists fails the load.",
+    "Test: `REQUIRED_LOADED_TABLES = None` with zero rows fails after load.",
+    "SKIP_DATA_LOADING is read through one helper; a mock benchmark does not silently skip the checks.",
+    "Decision recorded on partial loads."
+  ],
+  "context": "Source: independent reviews of PR #2625 (2026-10-04).",
+  "description": "## Problem (observed by independent reviewers of PR #2625; verified by reading)\n- `DataLoader.load` rejects a data source that names no tables but does not look inside each table's file list, so a source whose tables all map to empty file lists passes that check (the manifest writer and validator now reject such manifests).\n- `require_loaded_tables` returns early when a benchmark defines `REQUIRED_LOADED_TABLES = None` (not a tuple/list/set), bypassing the zero-row check.\n- `SKIP_DATA_LOADING` is read from the benchmark instance in `loaded_tables.py` and `data_loading.py` but from the class in `adapter.py` and `spark_execution_mixin.py`; a mock benchmark returns a truthy value for the attribute and silently disables both checks in tests.\n- Partial loads still pass for benchmarks without a pinned table list when at least one table has rows (adapters record 0 rows for a table that failed to load, for example in the Databricks, BigQuery and PostgreSQL adapters).\n\n## Change\nApply the empty-file-list check in the loader, treat a non-collection `REQUIRED_LOADED_TABLES` like the empty case, read `SKIP_DATA_LOADING` one way everywhere, and decide whether partial loads should fail.\n\n## Guardrails (must preserve)\n- Benchmarks that legitimately load nothing (SKIP_DATA_LOADING) are unaffected.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/core/loaded_tables.py",
+    "benchbox/platforms/base/data_loading.py",
+    "benchbox/platforms/base/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:57:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cfadaa8edb31473faf518c3d119800b3",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
