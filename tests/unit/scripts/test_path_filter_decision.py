@@ -591,7 +591,7 @@ def test_site_jobs_run_the_site_gates_on_node_22_only() -> None:
     }
     commands = [step.get("run", "") for step in steps]
 
-    site_jobs = {"site-build", "site-parity"}
+    site_jobs = {"site-build", "site-parity", "public-site-visual-astro-dry-run"}
     assert versions["site-build"] == ["22"]
     assert all(version == ["20"] for name, version in versions.items() if name not in site_jobs and version)
     assert "make site-check site-build" in commands
