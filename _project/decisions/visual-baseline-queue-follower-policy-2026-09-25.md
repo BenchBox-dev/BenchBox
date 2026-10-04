@@ -1,5 +1,7 @@
 # Merge-queue follower visual baseline policy
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-09-25
 Status: Superseded by `visual-baseline-queue-candidate-2026-09-26.md`. The
 option (a) rejection below still stands.

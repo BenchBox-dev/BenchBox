@@ -1,5 +1,7 @@
 # Decision: run the heavy CI tier only in the merge queue (proposal)
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-09-16
 Status: Accepted. Maintainer decision recorded 2026-09-19. No further workflow,
 ruleset, or queue change lands under this

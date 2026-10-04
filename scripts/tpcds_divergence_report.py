@@ -324,7 +324,7 @@ def collect(scale: float, *, queries: Sequence[str] | None = None, repeat: int =
     from benchbox.core.tpcds.dataframe_queries.parameter_adapters import adapter_query_ids
 
     adapted_ids = {str(query_id) for query_id in adapter_query_ids()}
-    gate = dataclasses.replace(xs.STAGED_GATES["tpcds"], scale_factor=scale)
+    gate = dataclasses.replace(xs.get_gate("tpcds"), scale_factor=scale)
 
     def unbound(query_id: str) -> Any:
         return TPCDS_DATAFRAME_QUERIES.get_or_raise(f"Q{query_id}")

@@ -112,9 +112,9 @@ weaken the CI guard itself so a lossier local equivalent can "pass."
 
 Everything above is about the direction "a `ci.yml` guard must also run
 locally." There is a second, separate direction: `make ci-lint` may itself
-run on a real, ephemeral GitHub-hosted runner. No workflow does so today (the
-post-merge workflow that used to was retired with the six-unit CI), but the
-gate below stays in place so the recipe is safe on any runner. Most `ci-lint`
+run on a real, ephemeral GitHub-hosted runner. The trunk workflow invokes its
+own test and artifact jobs rather than `make ci-lint`; the guard below keeps
+the recipe safe when another hosted workflow invokes it. Most `ci-lint`
 guards are equally meaningful there, because they inspect the checked-out
 tree, the installed venv, or a registry the repo ships -- none of which
 differ between a laptop and a runner. A couple of guards instead read state
@@ -211,8 +211,8 @@ The tool pin is fixed independently in
 `scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
 clean preview/apply/check/verify proof and full CI. GitHub classification
 binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
-`develop` advances during the run, strict current-base enforcement may mark
-that correctly certified run BEHIND. Refresh such PRs one at a time.
+`develop` advances during the run, the run still certifies the base it started
+from; the strict up-to-date rule is off, so the PR does not need a refresh.
 
 ### Local preflight
 
@@ -279,7 +279,7 @@ attestation; a manifest consistency check alone does not establish provenance.
 The explicit exceptions cover inputs that only exist in their hosted gate:
 
 - cross-platform binary smoke tests and promoted slow/medium regression nodes;
-- fresh-runner skill-source cloning and PR-base/merge-queue ancestry checks;
+- fresh-runner skill-source cloning and PR-base ancestry checks;
 - release-branch curation and release-artifact reports; and
 - the audit-SHA comparison against the immutable PR event base.
 

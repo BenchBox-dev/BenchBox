@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.tpcds.c_tools import tpcds_option
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 
 pytestmark = [
@@ -49,10 +50,10 @@ class TestTPCDSFileFormatFix:
                 process.stderr = None
 
                 # Check if this is a streaming compression call (has -FILTER Y)
-                if "-FILTER" in cmd and "Y" in cmd:
+                if tpcds_option("filter") in cmd and "Y" in cmd:
                     # Simulate dsdgen behavior: only chunk 1 has data for call_center
-                    if "call_center" in cmd and "-child" in cmd:
-                        chunk_id_idx = cmd.index("-child") + 1
+                    if "call_center" in cmd and tpcds_option("child") in cmd:
+                        chunk_id_idx = cmd.index(tpcds_option("child")) + 1
                         if chunk_id_idx < len(cmd):
                             chunk_id = int(cmd[chunk_id_idx])
                             if chunk_id == 1:

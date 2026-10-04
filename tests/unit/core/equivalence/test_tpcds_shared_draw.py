@@ -175,7 +175,7 @@ def test_staged_preconditions_fail_before_production_loading(draw, monkeypatch):
         cross_surface.run_gate(gate)
 
 
-def test_staged_divergence_is_labeled_and_full_draw_is_emitted(draw, monkeypatch, capsys):
+def test_enforced_divergence_fails_and_full_draw_is_emitted(draw, monkeypatch, capsys):
     data = dataclasses.replace(draw, connection=duckdb.connect())
     gate = dataclasses.replace(cross_surface.get_gate("tpcds"), build=lambda *a: data, backends=("datafusion",))
     monkeypatch.setattr(cross_surface, "build_production_contexts", lambda *a, **k: {"datafusion": None})
@@ -184,10 +184,10 @@ def test_staged_divergence_is_labeled_and_full_draw_is_emitted(draw, monkeypatch
         "find_cross_surface_divergences",
         lambda *a, **k: [SurfaceDivergence(query_id="39b", cell="datafusion", detail="Value mismatch")],
     )
-    assert cross_surface.run_gate(gate, repeats=3) == 0
+    assert cross_surface.run_gate(gate, repeats=3) == 1
     output = capsys.readouterr().out
-    assert "STAGED REPORT ONLY - tpcds comparison not clean; no CI enforcement" in output
-    assert "39b_datafusion" in output
+    assert "STAGED REPORT ONLY" not in output
+    assert "GATE FAILURE - unclassified cross-surface divergences: ['39b_datafusion']" in output
     emitted, _ = json.JSONDecoder().raw_decode(output[output.index("{") :])
     expected = canonical_json_text(draw.query_parameters)
     assert output.startswith(expected)
@@ -223,7 +223,7 @@ def test_cli_passes_explicit_draw_backends_and_repeats(monkeypatch):
     assert gate.build.func is tpcds.build_tpcds_duckdb
     assert gate.build.keywords == {"seed": 42, "stream_id": 1}
     assert options == {"update_baseline": False, "repeats": 3}
-    assert "tpcds" not in cross_surface.GATES
+    assert "tpcds" in cross_surface.GATES
 
 
 def test_other_benchmark_defaults_are_unchanged(monkeypatch):

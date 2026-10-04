@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from benchbox.core.tpcds.c_tools import tpcds_option
 from benchbox.utils.printing import emit
 from benchbox.utils.tpc_compilation import CompilationStatus, ensure_tpc_binaries
 
@@ -169,11 +170,11 @@ class DsdgenRunnerMixin:
         """
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose",  # verbose output
-            "-force",  # force overwrites
-            "-terminate",
+            tpcds_option("verbose"),  # verbose output
+            tpcds_option("force"),  # force overwrites
+            tpcds_option("terminate"),
             "n",  # disable trailing field delimiters
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),  # scale factor
         ]
 
@@ -319,15 +320,15 @@ class DsdgenRunnerMixin:
             """Generate a specific chunk of data."""
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose",  # verbose output
-                "-force",  # force overwrites
-                "-terminate",
+                tpcds_option("verbose"),  # verbose output
+                tpcds_option("force"),  # force overwrites
+                tpcds_option("terminate"),
                 "n",  # disable trailing field delimiters
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),  # scale factor
-                "-child",
+                tpcds_option("child"),
                 str(chunk_id),  # chunk number (1-based)
-                "-parallel",
+                tpcds_option("parallel"),
                 str(self.parallel),  # total number of chunks
             ]
 

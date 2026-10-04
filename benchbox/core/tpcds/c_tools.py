@@ -25,6 +25,22 @@ from benchbox.utils.tpc_compilation import (
 )
 
 
+def _option_prefix() -> str:
+    return "/" if sys.platform == "win32" else "-"
+
+
+def tpcds_option(name: str) -> str:
+    """Return a dsdgen/dsqgen command-line option for the host platform.
+
+    The Windows TPC-DS tools parse only options that start with ``/``; a ``-``
+    prefixed option is ignored there, so ``-scale 0.01`` silently generated the
+    default scale factor 1 and ``-terminate n`` kept trailing separators. Other
+    platforms use ``-``. Option names are matched case-insensitively, so they are
+    passed in upper case everywhere.
+    """
+    return f"{_option_prefix()}{name.upper()}"
+
+
 def _resolve_tpcds_tool_and_template_paths() -> tuple[Path, Path]:
     """Determine the preferred tool and template directories.
 
@@ -331,7 +347,7 @@ class DSQGenBinary:
         streams: Optional[int] = None,
     ) -> tuple[list[str], str]:
         """Build the dsqgen command and return (cmd, opt_prefix)."""
-        _opt = "/" if sys.platform == "win32" else "-"
+        _opt = _option_prefix()
         template_arg = self._resolve_template_arg(query_id, variant, is_multi_part)
 
         cmd = [str(self.dsqgen_path)]

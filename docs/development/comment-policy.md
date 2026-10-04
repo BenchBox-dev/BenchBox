@@ -129,8 +129,7 @@ out, so no candidate file or configuration, such as a `.yarnrc` that names a
 script, can run before the checker or change the interpreter it uses. The pull
 request's own code still runs in the job through those native tests, and its
 text can reach the log through other actions, so a log can be made to read
-differently from what the checker found. It cannot change the exit status. `.github/soundness-paths.txt` and
-`.github/CODEOWNERS` protect these files, and changes to this wiring need the
+differently from what the checker found. It cannot change the exit status. `.github/soundness-paths.txt` protects these files, and changes to this wiring need the
 repository's independent soundness review.
 
 ## Coverage and limits

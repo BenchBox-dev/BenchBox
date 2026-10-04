@@ -337,6 +337,156 @@ reimplemented the stitch.
 Readers still accept both companions, so bundles exported before this keep
 loading unchanged; nothing writes them any more.
 
+## Addendum (2026-10-04): evidence for a physical sort with no catalog footprint
+
+On DuckDB, "sorting" is two separate things: an ART index (`idx_<table>_sort`),
+which `duckdb_indexes()` reports, and a physical rewrite of the table (CTAS or
+the foreign-key-safe in-place sort in
+`benchbox/platforms/base/sorted_ingestion.py`) that orders the rows and leaves
+nothing in the catalog. The ledger records the index. It records only skips and
+failures of the rewrite, never a success, so `corroborate()` can check the index
+alone. An index can exist while the data was never sorted, and MotherDuck sorts
+without creating any index. This addendum decides how a sort is evidenced.
+
+**Decision: record the rewrite and attest it, without widening corroboration.**
+
+- **Recording.** A successful physical rewrite is recorded as an executed ledger
+  statement with phase `post_load` and `mechanism="sorted_ingestion"`.
+  `_classify` gives it a new verdict constant, `ATTESTED = "attested"`.
+- **Receipt entry.** The existing `ReceiptEntry` shape is used, with
+  `verdict: "attested"`, `phase: "post_load"`, `table`, the `statement`, and
+  `reason: "physical sort executed; no catalog footprint"`. No new top-level
+  receipt fields are added.
+- **The trust rule does not change.** `corroborate()` sets `corroborated` only
+  when at least one statement has a verifiable verdict (`corroborated`,
+  `absent`, `mismatch`, `unverifiable`), every such statement is `corroborated`,
+  the state is not degraded or truncated, and the ledger has no dropped intents.
+  `transient` and `maintenance` are non-blocking and never count as
+  corroboration. `attested` joins them as non-blocking, stays out of
+  `_VERIFIABLE_VERDICTS`, and can never satisfy or replace an intent that can be
+  verified against the catalog. Index intents remain catalog-verified.
+- **A requested sort with no executed rewrite is a dropped intent.** The
+  post-load reconciliation records it, and a dropped intent blocks the upgrade.
+  The rule lives in the reconciliation; `corroborate()` stays free of
+  configuration.
+- **Attested evidence alone never reaches `applied_verified`.** A run whose only
+  sort evidence is attested, such as MotherDuck with no index, stays
+  `applied_unverified`. `applied_verified` needs at least one corroborated
+  verifiable statement.
+- **Explorer label** for an attested entry: "Recorded; not catalog-checkable".
+
+Rejected options:
+
+- **Leave sort intents unverifiable without catalog evidence.** Rejected: it
+  would make DuckDB sorting unable to reach `applied_verified` even when the
+  index is corroborated, and it gives no record that the rewrite ran.
+- **Probe the data order.** Rejected: a bounded read of row order would break
+  the rule that introspection never measurably slows a run.
+
+## Addendum (2026-10-04): which constraints are catalog-verifiable
+
+Constraint-bearing `CREATE TABLE` statements are captured as tuning DDL
+(`primary key`, `foreign key`, `unique` and `check` in
+`benchbox/core/tuning/applied_ledger.py`), but `_classify` returns
+`UNVERIFIABLE` for all of them. Every shipped DuckDB template, and the
+`tuned-fallback` and `auto` configurations, enable constraints, so none of those
+runs can verify even though DuckDB reports constraints in `duckdb_constraints()`.
+
+**Decision: verify PRIMARY KEY, UNIQUE and FOREIGN KEY on DuckDB only.**
+
+- **Kind.** Add `KIND_CONSTRAINT = "constraint"` with a `constraint_type`
+  sub-field.
+- **Source.** `duckdb_constraints()`. On the pinned DuckDB (1.5.5, from
+  `uv.lock`) it exposes `constraint_type`, `constraint_column_names`,
+  `referenced_table` and `referenced_column_names`, so foreign keys are
+  verifiable there. Its output also includes `NOT NULL` rows, which are not
+  tuning intents and are ignored. If a later DuckDB drops the referenced
+  columns, foreign keys revert to `unverifiable` on DuckDB.
+- **CHECK stays `unverifiable`, which blocks.** The expression is text, and the
+  decision does not guess. A shipped template or `auto`/`tuned-fallback`
+  configuration that enables CHECK constraints on DuckDB must disable them, and
+  the change is noted in the changelog.
+- **Every other platform:** constraint statements stay `unverifiable`, which
+  blocks. A missing structured source never becomes a guess.
+- **Match rules.** Identifiers are normalized with the existing
+  `normalize_identifier` and `normalize_columns`.
+  - PRIMARY KEY and UNIQUE match when the column lists are equal, in order.
+  - FOREIGN KEY matches only when three things are equal: the child columns in
+    order, the referenced table, and the referenced columns in order. `_Intent`
+    and `IntrospectedObject` gain `referenced_table` and `referenced_columns`,
+    used only by foreign-key intents and facts, so a key pointing at the wrong
+    table cannot corroborate.
+  - A constraint whose fact lacks the referenced fields is `unverifiable`, not
+    `corroborated`.
+
+## Addendum (2026-10-04): ledger outcome and phase vocabulary
+
+Three behaviors blur what the ledger says happened. A deliberate skip, such as a
+Delta-only or Hudi layout operation on Databricks, is folded in as
+`STATEMENT_FAILED`. An intent that DDL already realized, such as a ClickHouse or
+StarRocks sort expressed as `ORDER BY` in `CREATE TABLE`, is recorded as dropped
+because the shared sorted-ingestion hook says it does not support a CTAS sort.
+Phases are unvalidated: Databricks emits `pre_load`, `overall_status` filters on
+`{ddl, post_load}`, and `record()` accepts any string.
+
+**Decision.**
+
+- **Skips are drops.** A deliberate skip is recorded as `dropped(reason)` with
+  the reason `skipped: <cause>`. It blocks the upgrade and never produces
+  `STATEMENT_FAILED` or an overall `failed`.
+- **DDL-realized intents are `satisfied_by`.** An intent realized by DDL is
+  recorded as `{"intent": ..., "satisfied_by": <index of the executed DDL
+  statement in the ledger>, "reason": ...}`, serialized in its own `satisfied`
+  list next to `dropped`. It is non-blocking, is never a verdict, and never
+  counts as corroboration. Only the referenced DDL statement's own verdict
+  counts.
+- **Closed phase set.** The phases are `{ddl, post_load, session}`. `record()`
+  maps known aliases (`pre_load`, `schema` and `create` to `ddl`; `postload`,
+  `post-load` and `maintenance` to `post_load`) and coerces any other value to
+  `ddl` with a warning log. Capture never raises. A unit test asserts that every
+  in-tree producer passes a member of the closed set.
+- **No new status values.** `overall_status` considers every physical phase.
+  Drops never produce `failed`. A ledger whose only physical outcomes are drops
+  returns `noop`. Executed statements together with drops return
+  `applied_unverified`; the drops already block verification in `corroborate()`.
+
+Every requested intent therefore ends as `executed`, `failed`,
+`dropped(reason)` or `satisfied_by(reference)`.
+
+## Addendum (2026-10-04): verification reach beyond DuckDB and ClickHouse
+
+Only DuckDB, ClickHouse and Snowflake have introspectors. Candidates for other
+platforms read structured catalogs (Databricks `DESCRIBE DETAIL`, BigQuery
+`INFORMATION_SCHEMA.COLUMNS`, Redshift `SVV_TABLE_INFO`, PostgreSQL `pg_index`,
+StarRocks `information_schema.tables_config`, Trino and Iceberg `$properties`,
+Firebolt `information_schema.indexes`, Synapse `sys.pdw_*`, MotherDuck
+`duckdb_indexes()`). The published corpus has no tuned bundle on any of them,
+and several render no layout at execution today.
+
+**Decision: no new verdict-producing introspector in this cycle.** Existing
+introspectors for DuckDB, ClickHouse and Snowflake stay as they are. The
+admitted set of additional platforms is empty.
+
+A platform is admitted later only when all three hold:
+
+1. its layout renders at execution (its capability-registry entry is neither
+   `none` nor `:preview_only`);
+2. tuned runs on it are planned (a tuned corpus bundle exists or work is
+   tracked);
+3. the owner approves a live confirmation run.
+
+Any introspector must be bounded (filter inside the SQL `WHERE` and measure
+truncation on the raw row count before filtering), non-raising, and read
+structured catalogs only.
+
+A facts-only presentation of raw catalog facts for platforms without an
+introspector is deferred, not built here. The support matrix lists those
+platforms as having no introspector.
+
+Immediate work under this decision is limited to recording it and fixing
+ClickHouse introspector truncation, so that rows are filtered in the query and
+truncation is measured before filtering.
+
 ## References
 
 - `benchbox/platforms/base/adapter.py:743-747`

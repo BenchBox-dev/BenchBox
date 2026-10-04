@@ -12,7 +12,7 @@ env:
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -76,6 +76,7 @@ jobs:
       - name: Check base branch
         env:
           BASE_REF: ${{ github.base_ref }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           case "$BASE_REF" in
@@ -83,9 +84,13 @@ jobs:
               echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
               ;;
             *)
-              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
-              echo "Retarget this PR at develop, or fold the change into the parent PR."
-              exit 1
+              if [ "$IS_DRAFT" = "true" ]; then
+                echo "Draft PR stacked on '$BASE_REF'; it cannot be armed until it is retargeted at develop."
+              else
+                echo "::error::Ready PR base branch is '$BASE_REF', not develop, release or published-results."
+                echo "Only a draft PR may target a parent branch. After the parent merges, retarget this PR at develop and rebase it onto the squash commit."
+                exit 1
+              fi
               ;;
           esac
 
@@ -1163,6 +1168,14 @@ jobs:
         if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
 
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (Polars and DataFusion)
+        if: matrix.partition == 'b'
+        run: make tpcds-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas)
+        if: matrix.partition == 'a'
+        run: make tpcds-pandas-cross-surface-equivalence-report
+
   required-local-cases:
     name: required-local-cases
     needs: ci-paths
@@ -1304,6 +1317,10 @@ jobs:
           # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
+          # Wheel-truth gate for TPC-DS-OBT templates: the 0.4.1 wheel shipped
+          # without top-level _sources/, so the OBT template dir resolved into
+          # site-packages/_sources and get_queries() raised FileNotFoundError.
+          uv run --isolated --no-project --with "$wheel" -- python -c "from benchbox import TPCDSOBT; benchmark = TPCDSOBT(scale_factor=1.0); queries = benchmark.get_queries(); assert queries, 'expected OBT queries from wheel install'; assert benchmark.get_query(next(iter(queries))); print(f'TPC-DS-OBT wheel smoke: {len(queries)} queries')"
 
   dependency-audit:
     name: dependency-audit

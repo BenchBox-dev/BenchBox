@@ -21,9 +21,10 @@ Classification values:
 
 | Property | Current guard | Replacement guard | Proof | Status |
 | --- | --- | --- | --- | --- |
-| Correctness oracle: digest arming | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py`, `correctness-gate` job in `.github/workflows/pr.yml` |ci.yml `core` | pending | open |
-| Correctness oracle: query discrimination | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py` | ci.yml `core` | pending | open |
-| Correctness oracle: no-skip | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py` | ci.yml `core` | pending | open |
+| Correctness oracle: digest arming | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py`, `correctness-gate` in `ci.yml` | ci.yml `core` on heavy carve-outs; trunk correctness gate on develop pushes | pending | open |
+| Correctness oracle: query discrimination | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py` | ci.yml `core` on heavy carve-outs; trunk correctness gate | pending | open |
+| Correctness oracle: no-skip | `TestCorrectnessGateOracle` in `tests/unit/test_standardized_test_commands.py` | ci.yml `core` on heavy carve-outs; trunk correctness gate | pending | open |
+| Required local-engine cases | `scripts/required_case_evidence.py`, `make test-required-local-cases` | ci.yml `core` on heavy carve-outs and trunk required-local-cases; skipped, deselected, failing and expected-failing required cases fail the check | pending | open |
 | SQL self-binding lint | `_project/scripts/detect_self_binding.py` | ci.yml `tooling` | pending | open |
 | Monotonic-clock policy (wall-clock part) | `_project/scripts/timing_policy_check.py`, `_project/scripts/timing_audit.py` | ci.yml `tooling` | pending | open |
 | Submission validation | `scripts/validate_submission.py`, `.github/workflows/validate-submission.yml`, `.github/workflows/validate-submission-comment.yml`, `tests/unit/workflows/test_validate_submission_changed_bundles.py`, `tests/unit/workflows/test_validate_submission_comment_security.py`, `tests/unit/scripts/test_validate_submission*.py` | ci.yml `results-data` | pending | open |
@@ -31,16 +32,17 @@ Classification values:
 | Artifact privacy (no private paths in published site) | `assemble_public_site.py` privacy scan step in `.github/workflows/docs.yml` build job, `tests/unit/scripts/test_corpus_privacy_invariant.py` | site-deploy pre-deploy gates | pending | open |
 | Publication rollback and transactions | `.github/workflows/publication-transaction.yml`, `.github/workflows/publication-recover.yml`, `.github/workflows/publication-soak-monitor.yml`, `tests/unit/workflows/test_publication_transaction.py`, `tests/unit/workflows/test_publication_recover.py`, `tests/unit/workflows/test_publication_rollback.py` | site-deploy rollback with last-known-good validation | pending | open |
 | Explorer snapshot and UI compatibility | `results-explorer/src/db.ts` read-model version gate, `tests/unit/scripts/test_results_explorer_snapshot_invariants.py` | ci.yml `explorer` | pending | open |
-| Public-site visual acceptance | `Public-site visual acceptance` required check from `.github/workflows/docs.yml` | site-deploy route and digest probes | pending | open |
+| Public-site visual acceptance | Advisory comparison in `ci.yml` and protected baselines from `docs.yml` | Required visual acceptance returns when the site is in production; deployment route and digest probes remain separate | pending | open |
 | Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` hash checks and required macOS/Windows dbgen framing; nightly-v2.yml matrix dbgen framing on all three OS at Python 3.12 | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
-| Shipped bundled generator integrity | `benchbox/_binaries/SHA256MANIFEST.json`, `tests/unit/utils/test_binary_manifest.py` | ci.yml `dist-artifact` verifies source, wheel, and sdist membership and hashes; installed-package verifier for release checks | pending | open |
+| Shipped bundled generator integrity | `benchbox/_binaries/SHA256MANIFEST.json`, `tests/unit/utils/test_binary_manifest.py` | trunk.yml `dist-artifact` verifies source, wheel, and sdist membership and hashes on each push to develop; installed-package verifier for release checks | pending | open |
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
 | Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml`, `scripts/release_flow.py`, `tests/unit/scripts/test_release_flow.py` | ci.yml always-required `ci-paths` selects release identity changes and checks them against the immutable event base; release workflow | pending | open |
-| Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `.github/workflows/develop-ruleset-drift.yml`, `tests/unit/workflows/test_develop_ruleset_drift.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | ci.yml `tooling` | pending | open |
-| Soundness-path owner hold | `_project/scripts/auto_merge_soundness_paths.py`, `tests/unit/test_auto_merge_soundness_paths.py`, `tests/unit/test_auto_merge_hold_is_durable.py` | ci.yml `tooling` soundness flag plus external adversarial review | pending | open |
+| Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | Advisory nightly and manual verification; enforced release-canary and release-PR bootstrap; thread-resolution and tag-protection predicates retained | pending | open |
+| Soundness-path review | `.github/soundness-paths.txt`, `_project/scripts/soundness_paths.py`, `tests/unit/test_auto_merge_soundness_paths.py` | Required oracle-review on the exact head, required thread resolution and post-merge soundness digest; auto-merge-on-open revokes only on the hold label | pending | open |
+| Durable auto-merge hold | `no-auto-merge` label and draft status | Exact-head arming refuses holds; auto-merge-on-open retains hold-label revocation | pending | open |
 | Workflow context validity | `tests/unit/workflows/test_workflow_expression_contexts.py` | ci.yml `tooling` | pending | open |
-| merge_group triggers on required gates | `tests/unit/workflows/test_merge_group_triggers.py` | ci.yml (all six units report on merge_group) | pending | open |
+| Combined-tree validation before merge (retired) | Former merge-group required checks | Required PR checks, then exact-commit trunk validation; composition failures are detected after merge and handled by revert | pending | open |
 | read_primitives cross-surface check | `_project/scripts/rp_scoped_check.py` | nightly T3 per-domain suites | pending | open |
 
 ## Known KEEP traps
@@ -62,7 +64,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
-| `auto-merge-on-open.yml` | pure-process | Auto-merge mechanics; replaced by merge queue |
+| `auto-merge-on-open.yml` | pure-process | Retained hold-label revocation; soundness-path revocation replaced by required oracle-review |
 | `corpus-drift-check.yml` | product-safety | Corpus drift detection |
 | `corpus-event-bridge.yml` | product-safety | Corpus event integrity |
 | `corpus-reconciler.yml` | product-safety | Corpus reconciliation |
@@ -96,8 +98,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
 | `todo-state-validate.yml` | tooling | Tracker state validation |
-| `tpcds-staged-maturation.yml` | tooling | Weekly TPC-DS cross-surface maturation report |
-| `trunk.yml` | product-safety | Post-merge fast lane, medium tier and correctness gate on develop |
+| `trunk.yml` | product-safety | Develop-push fast lane, four-shard medium tier, correctness gate, required-local-cases and verified release artifact; retains pending runs with queue:max |
 | `upload-answers.yml` | product-safety | Answer file publication |
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
@@ -118,7 +119,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the connector-review check |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
-| `test_trunk_workflow.py` | product-safety | Post-merge workflow triggers, per-ref queueing and read-only permissions |
+| `test_trunk_workflow.py` | product-safety | Develop-push triggers, retained pending runs and read-only test permissions |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
 | `test_publication_recover.py` | product-safety | Publication recovery |
@@ -314,7 +315,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
-| `test_auto_merge_soundness_paths.py` | product-safety | Soundness path manifest lockstep |
+| `test_auto_merge_soundness_paths.py` | product-safety | Soundness path classification and compatibility entry point |
 
 ### `tests/unit/test_release_*`
 

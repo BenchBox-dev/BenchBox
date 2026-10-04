@@ -1,5 +1,7 @@
 # Native Merge Queue Canary Rehearsal Runbook
 
+> Historical: the merge queue was retired on 2026-10-03 (see `_project/decisions/merge-queue-retirement-2026-10-03.md`), so this rehearsal no longer applies.
+
 This runbook provides the operational procedure and scenario checklist for conducting an end-to-end rehearsal of the GitHub Native Merge Queue on `BenchBox-dev/BenchBox` prior to production enablement on `refs/heads/develop`.
 
 ---
@@ -45,8 +47,7 @@ This runbook provides the operational procedure and scenario checklist for condu
   1. Attempt to open with auto-merge and exact readiness evidence: `make pr-open READY=1 EVIDENCE=<readiness.json>`
   2. Assert that the readiness transaction reports: `soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge`.
   3. Verify on GitHub that `autoMergeRequest` is `null` (auto-merge withheld).
-  4. If manually armed via API, verify `.github/workflows/auto-merge-on-open.yml` immediately executes and revokes auto-merge.
-  5. Confirm PR **does not enter the merge queue** without maintainer CODEOWNERS review and explicit manual enqueue.
+  4. Confirm PR **does not enter the merge queue** without a passing `oracle-review` check and explicit manual enqueue.
 
 ---
 
@@ -56,7 +57,7 @@ This runbook provides the operational procedure and scenario checklist for condu
 |---|---|---|
 | 1. Workflow YAML Validity | Pass with zero syntax errors | `python -c "import yaml; [yaml.safe_load(open(f)) for f in ['.github/workflows/ci.yml', '.github/workflows/docs.yml', '.github/workflows/nightly.yml']]"` |
 | 2. Unit Tests Passing | All workflow tests green | `uv run -- python -m pytest tests/unit/workflows/ -q` |
-| 3. Soundness Tests Passing | All 38 soundness tests green | `uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q` |
+| 3. Soundness Tests Passing | All soundness tests green | `uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q` |
 | 4. Status Check Match | Exact required check names match ruleset | `rg -n '^  (core|explorer|results-data|docs|landing|tooling):$' .github/workflows/ci.yml` |
 | 5. Trusted Base Drift | Checkout uses `merge_group.base_sha` | `rg -n 'merge_group.base_sha' .github/workflows/ci.yml` |
 

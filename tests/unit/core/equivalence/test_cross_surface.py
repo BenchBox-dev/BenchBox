@@ -1659,6 +1659,15 @@ def test_derived_order_is_not_checked_when_a_key_is_not_in_the_result():
     assert _derived_order_violation(qualified, [("a", "INTEGER")], [(2,), (1,)]) is None
 
 
+def test_derived_order_fails_closed_when_the_sort_keys_cannot_be_evaluated():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a FROM t ORDER BY a / 2"
+    violation = _derived_order_violation(sql, [("a", "VARCHAR")], [("x",), ("y",)])
+    assert violation is not None
+    assert "could not evaluate the sort keys" in violation
+
+
 def test_report_lists_vacuity_without_failing_for_an_unclassified_draw(capsys):
     """A non-default draw reports vacuous and stale emptiness but fails only on divergences."""
     arguments = {
@@ -1675,3 +1684,10 @@ def test_report_lists_vacuity_without_failing_for_an_unclassified_draw(capsys):
     assert "lists it without failing: ['Q1']" in out
     assert "GATE FAILURE" not in out
     assert _report([SurfaceDivergence("Q2", "pandas", "value mismatch")], **arguments) == 1
+
+
+def test_derived_order_is_not_checked_for_order_by_all():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a, b FROM t ORDER BY ALL DESC"
+    assert _derived_order_violation(sql, [("a", "INTEGER"), ("b", "INTEGER")], [(1, 2), (3, 4)]) is None
