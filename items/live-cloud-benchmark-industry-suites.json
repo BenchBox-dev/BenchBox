@@ -7,7 +7,7 @@
     "100% query pass rate across all runs",
     "All 21 result bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal"
   ],
-  "context": "Builds on first-live-cloud-benchmark-run-and-publish, which is done. Ensure GCS/S3/Snowflake staging bucket permissions and table creation scripts handle wide schemas cleanly.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (43 / 11 / 10). The registry lists ClickBench scale_options as [1.0] only, but only min_scale (0.01) is enforced, so SF 0.1 and 10.0 are valid. The earlier statement that ClickBench SF 10 is 100M rows (~15 GB raw) is wrong for BenchBox: core/clickbench/generator.py creates 1,000,000 x scale_factor rows. These suites are not rows of the 84-cell corpus campaign. Rerunning the seven Databricks cells needs an approval that states command, maximum runtime, log path and stop condition, and a check of the 500-table Unity Catalog quota first (the low-scale-factor ClickBench, CoffeeShop and H2ODB schemas were dropped to free quota). Overrides are maintainer decisions.",
+  "context": "Builds on first-live-cloud-benchmark-run-and-publish, which is done. Ensure GCS/S3/Snowflake staging bucket permissions and table creation scripts handle wide schemas cleanly.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (43 / 11 / 10). The registry lists ClickBench scale_options as [1.0] only, but only min_scale (0.01) is enforced, so SF 0.1 and 10.0 are valid. The earlier statement that ClickBench SF 10 is 100M rows (~15 GB raw) is wrong for BenchBox: core/clickbench/generator.py creates 1,000,000 x scale_factor rows. These suites are not rows of the 84-cell corpus campaign. Rerunning the seven Databricks cells needs an approval that states command, maximum runtime, log path and stop condition, and a check of the 500-table Unity Catalog quota first (the low-scale-factor ClickBench, CoffeeShop and H2ODB schemas were dropped to free quota). Overrides are maintainer decisions.\n\nDelivered 2026-10-04. All 21 bundles are published and live:\n- BigQuery and Snowflake CoffeeShop, H2ODB and ClickBench SF 1 in #2587.\n- ClickBench SF 0.1 and SF 10 on BigQuery and Snowflake, plus all seven Databricks reruns (notuning, validated cache-off receipts), in #2615.\n- published-results mirror #2620; site promotion run 37213072128.\nThe ClickBench timing behaviour is recorded in results-data/CORPUS_NOTES.md \"Cloud ClickBench (2026-10-04)\". The four BigQuery and Snowflake SF 0.1 and SF 10 bundles carry owner-approved scale-invariant overrides. The stray BigQuery partial and data-only files were not submitted.\n\nKnown caveat, disclosed by owner decision: Databricks ClickBench Q29 and Q43 return different row counts from BigQuery and Snowflake. Tracked in databricks-clickbench-q29-q43-result-mismatch.\n\nThe unmet needs (tuning-no-midrun-destructive-db-handling-20261001, tuning-portable-metadata-store-20261001) gate tuned runs; every published run used --tuning notuning.",
   "description": "Publish live cloud benchmark results across BigQuery, Databricks, and Snowflake for the Industry benchmark suites:\n- ClickBench: 43 queries on web analytics hits data (SF 0.1, 1.0, 10.0)\n- CoffeeShop: 11 analytical queries on retail/coffee transactional schema (SF 0.1, 1.0)\n- H2ODB: 10 analytical queries for ML data preparation (SF 0.1, 1.0)\n\nRuns from 2026-09-19/20 already exist locally for every cell but none is published. Under the current validator 26 of 41 local bundle files for the six Industry and Academic suites pass; the rest need reruns or overrides (see acceptance). BenchBox's ClickBench generator makes 1M rows per scale factor, so SF 10 is 10M synthetic rows.\nCapture valid result bundles satisfying the cohort gate (results-data/validate_corpus.py and scripts/validate_submission.py).",
   "sessions": [
     {
@@ -33,6 +33,14 @@
       "generation": "694c3a3206cd4965bb9f8b5a46dbf4a0",
       "op": "take",
       "op_id": "ba904ad2ee77483a9e27e2c1b5fbce1f",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T18:43:13Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a955ae3e106f416fa41afcc7208ca4db",
       "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
     }
   ]
