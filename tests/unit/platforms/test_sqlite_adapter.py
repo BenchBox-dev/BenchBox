@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.cli.tuning_runtime import build_baseline_unified_config
 from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 from benchbox.metadata_primitives import MetadataPrimitives
@@ -779,3 +780,61 @@ class TestSaveTuningMetadataMidRunSafety:
             assert "benchbox_tuning_metadata" in tables
         finally:
             adapter.close_connection(connection)
+
+
+class TestNotuningDatabaseReuse:
+    """Notuning runs carry a non-None baseline config, which used to take the
+    tuned-validation branch and demand metadata that is never written, so a
+    second notuning run always recreated its database."""
+
+    def _notuning_adapter(self, db_path):
+        adapter = SQLiteAdapter(database_path=str(db_path), tuning_enabled=False)
+        adapter.unified_tuning_configuration = build_baseline_unified_config()
+        return adapter
+
+    def test_second_notuning_run_reuses_database(self, tmp_path):
+        db_path = tmp_path / "bench.db"
+
+        first = self._notuning_adapter(db_path)
+        connection = first.create_connection(database_path=str(db_path))
+        try:
+            connection.execute("CREATE TABLE t (a INTEGER)")
+            connection.commit()
+        finally:
+            first.close_connection(connection)
+
+        second = self._notuning_adapter(db_path)
+        connection = second.create_connection(database_path=str(db_path))
+        try:
+            assert second.database_was_reused is True
+            tables = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+                ).fetchall()
+            ]
+            assert "t" in tables
+        finally:
+            second.close_connection(connection)
+
+    def test_tuned_database_still_refused_for_notuning_run(self, tmp_path):
+        db_path = tmp_path / "bench.db"
+
+        tuned = SQLiteAdapter(database_path=str(db_path), tuning_enabled=True)
+        tuned.unified_tuning_configuration = UnifiedTuningConfiguration()
+        connection = tuned.create_connection(database_path=str(db_path))
+        try:
+            connection.execute("CREATE TABLE t (a INTEGER)")
+            connection.commit()
+            assert tuned.save_tuning_metadata(connection) is True
+        finally:
+            tuned.close_connection(connection)
+
+        plain = self._notuning_adapter(db_path)
+        connection = plain.create_connection(database_path=str(db_path))
+        try:
+            assert plain.database_was_reused is False
+            assert plain._drift_validation_result is not None
+            assert any("notuning" in error for error in plain._drift_validation_result.errors)
+        finally:
+            plain.close_connection(connection)
