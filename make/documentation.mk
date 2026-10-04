@@ -1,7 +1,7 @@
 ##@ Documentation
 
 # Build Sphinx documentation locally
-docs-build:
+docs-build: docs-generate
 	@echo "Building documentation..."
 	@cd docs && uv run sphinx-build -b html --keep-going . _build/html
 	@echo "✅ Docs built: docs/_build/html/index.html"
@@ -19,7 +19,7 @@ docs-clean:
 	@echo "✅ Documentation artifacts cleaned"
 
 # Check for broken links in documentation
-docs-linkcheck:
+docs-linkcheck: docs-generate
 	@echo "Checking documentation for broken links..."
 	@cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
 	@echo ""
@@ -35,7 +35,7 @@ docs-validate:
 	@uv run -- python scripts/check_example_syntax.py
 	@echo ""
 	@echo "Validating visualization screenshot sync..."
-	@uv run -- python scripts/validate_visualization_images.py
+	@$(MAKE) docs-images-check
 	@echo ""
 	@echo "Generating per-query template pages (link targets, not committed)..."
 	@uv run -- python scripts/generate_query_docs.py
@@ -57,12 +57,13 @@ prompt-quickstarts-write:
 prompt-quickstarts-check:
 	@uv run -- python scripts/generate_landing_quickstarts.py --check
 
-# Regenerate the per-query documentation tree under docs/benchmarks/queries/.
-# The tree is not committed (see docs/conf.py) -- the Sphinx build regenerates
-# it for the building host's platform, since TPC query text is not byte-stable
-# across architectures. This target is for previewing it outside a build.
 query-docs:
 	uv run -- python scripts/generate_query_docs.py
+
+docs-images-check:
+	@uv run -- python scripts/validate_visualization_images.py
+
+docs-generate: query-docs prompt-quickstarts-check compat-docs-check docs-images-check
 
 SITE_DIR ?= site
 SITE_INVENTORY ?= $(SITE_DIR)-inventory
@@ -80,7 +81,7 @@ site-inventory-check: site-inventory
 site-deps:
 	@if [ ! -f website/node_modules/.package-lock.json ] || [ website/package-lock.json -nt website/node_modules/.package-lock.json ]; then npm --prefix website ci; fi
 
-site-build: query-docs site-deps
+site-build: docs-generate site-deps
 	@npm --prefix website run build
 	@test -s website/dist/index.html
 	@echo "Site built: website/dist/index.html"
@@ -88,7 +89,7 @@ site-build: query-docs site-deps
 site-dev: site-deps
 	@npm --prefix website run dev
 
-site-check: query-docs site-deps
+site-check: docs-generate site-deps
 	@npm --prefix website run check
 	@npm --prefix website test
 	@npm --prefix website run audit:high

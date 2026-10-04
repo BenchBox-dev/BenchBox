@@ -166,6 +166,7 @@ jobs:
           )
           npm run --prefix "$WORK/results-explorer" build
           # Mirror docs.yml: the Sphinx HTML build must exist before assembly.
+          make -C "$WORK" query-docs
           (
             cd "$WORK/docs"
             uv run sphinx-build -b html --keep-going . _build/html

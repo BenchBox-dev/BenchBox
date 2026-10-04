@@ -114,6 +114,7 @@ help:
 	@echo "  make docs-clean      Clean documentation build artifacts"
 	@echo "  make docs-linkcheck  Check for broken links in documentation"
 	@echo "  make docs-validate   Validate example references, syntax, and screenshot sync"
+	@echo "  make docs-generate   Regenerate per-query docs and check generated docs inputs (runs before every docs and site build)"
 	@echo "  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies"
 	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
 	@echo "  make site-inventory  Inventory an assembled site (SITE_DIR=site) into SITE_INVENTORY"

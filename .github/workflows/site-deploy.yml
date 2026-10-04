@@ -177,8 +177,14 @@ jobs:
         working-directory: release
         run: |
           uv sync --group dev
+          make query-docs
           cd docs
           uv run sphinx-build -b html --keep-going . _build/html
+
+      - name: Generate trunk documentation inputs
+        if: inputs.mode != 'rollback'
+        working-directory: trunk
+        run: make query-docs
 
       - name: Build trunk documentation
         if: inputs.mode != 'rollback'

@@ -1749,6 +1749,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sphinx-
 
+      - name: Generate documentation inputs
+        run: make docs-generate
+
       - name: Build documentation
         # -W turns every Sphinx warning into a failure, including unknown
         # :doc: targets, so a broken cross-reference fails the docs unit

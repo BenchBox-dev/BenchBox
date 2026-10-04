@@ -1,0 +1,64 @@
+"""The docs generators run as explicit pre-build make steps, not Sphinx hooks."""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+GENERATOR_MARKERS = (
+    "scripts/generate_query_docs.py",
+    "scripts/generate_landing_quickstarts.py --check",
+    "scripts/generate_compat_docs.py --check",
+    "scripts/validate_visualization_images.py",
+)
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make not installed")
+@pytest.mark.parametrize(
+    ("target", "build_marker"),
+    [
+        ("site-build", "npm --prefix website run build"),
+        ("site-check", "npm --prefix website run check"),
+        ("docs-build", "sphinx-build -b html"),
+        ("docs-linkcheck", "sphinx-build -b linkcheck"),
+    ],
+)
+def test_every_generator_runs_before_the_build(target: str, build_marker: str) -> None:
+    result = subprocess.run(["make", "-n", target], cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+    plan = result.stdout
+    build_at = plan.index(build_marker)
+    for marker in GENERATOR_MARKERS:
+        assert marker in plan[:build_at], f"{marker} must run before {build_marker} in {target}"
+
+
+def test_sphinx_conf_has_no_generator_hook() -> None:
+    conf = (REPO_ROOT / "docs" / "conf.py").read_text(encoding="utf-8")
+    assert "config-inited" not in conf
+    assert "generate_query_docs" not in conf
+
+
+def test_compat_docs_check_fails_on_seeded_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "generate_compat_docs", REPO_ROOT / "scripts" / "generate_compat_docs.py"
+    )
+    assert spec is not None and spec.loader is not None
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+
+    target = tmp_path / "matrix.md"
+    target.write_text("expected\n", encoding="utf-8")
+    monkeypatch.setattr(gen, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(gen, "_load_all_rules", lambda: None)
+    monkeypatch.setattr(gen, "_render_all", lambda: {target: "expected\n"})
+    assert gen.main(["--check"]) == 0
+    target.write_text("drifted\n", encoding="utf-8")
+    assert gen.main(["--check"]) == 1
