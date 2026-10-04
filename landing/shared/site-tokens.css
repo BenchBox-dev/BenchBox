@@ -50,6 +50,7 @@
     --bb-fg-primary: #0f172a;
     --bb-fg-muted: #475569;
     --bb-fg-inverse: #ffffff;
+    --bb-fg-on-accent: #ffffff;
     --bb-border-default: #d8e0ea;
     --bb-border-subtle: #e5eaf2;
     --bb-accent: #2563eb;
@@ -163,6 +164,7 @@
     --bb-fg-primary: #f0f6fc;
     --bb-fg-muted: #8b949e;
     --bb-fg-inverse: #0d1117;
+    --bb-fg-on-accent: #ffffff;
     --bb-border-default: #30363d;
     --bb-border-subtle: #21262d;
     --bb-accent: #58a6ff;

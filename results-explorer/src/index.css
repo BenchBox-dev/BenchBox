@@ -14,11 +14,11 @@
         min-height: 100vh;
     }
 
-    .bb-explorer a {
+    :where(.bb-explorer) a {
         color: var(--bb-accent);
     }
 
-    .bb-explorer a:hover {
+    :where(.bb-explorer) a:hover {
         color: var(--bb-accent-hover);
     }
 
@@ -126,7 +126,7 @@
     .btn-primary {
         @apply btn;
         background-color: var(--bb-accent-hover);
-        color: var(--bb-fg-inverse);
+        color: var(--bb-fg-on-accent);
     }
     .btn-primary:hover {
         background-color: var(--bb-accent);
