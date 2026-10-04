@@ -68,6 +68,22 @@ def test_summary_lists_added_removed_and_changed_public_targets(repository: Path
     assert "`test-fast-renamed`" in text and "`probe-target`" in text
 
 
+def test_summary_reports_an_evaluation_change_without_a_public_change(repository: Path, tmp_path_factory) -> None:
+    module = _load_module()
+    makefile = repository / "Makefile"
+    makefile.write_text(makefile.read_text(encoding="utf-8") + "\nPROBE_VARIABLE := probe\n", encoding="utf-8")
+    _git(repository, "commit", "-q", "-am", "head")
+    module.ROOT = repository
+    summary = tmp_path_factory.mktemp("summary") / "summary.md"
+
+    assert module.main(["--base-ref", "HEAD~1", "--summary", str(summary)]) == 0
+
+    text = summary.read_text(encoding="utf-8")
+    assert "`PROBE_VARIABLE`" in text
+    assert "No public target or recipe changed, but Make's evaluation changed." in text
+    assert "Make's evaluation is unchanged." not in text
+
+
 def test_summary_is_empty_when_no_make_file_changed(repository: Path, tmp_path_factory) -> None:
     module = _load_module()
     (repository / "unrelated.txt").write_text("x\n", encoding="utf-8")

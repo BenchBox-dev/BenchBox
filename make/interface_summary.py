@@ -82,8 +82,25 @@ def render(base: dict[str, Any], head: dict[str, Any], paths: list[str]) -> str:
     lines += _listing("Removed public targets", removed)
     lines += _listing("Added public targets", added)
     lines += _listing("Public targets with a changed header or recipe", changed)
-    if not (removed or added or changed):
-        lines += ["No public target or recipe changed.", ""]
+    if base["default_goal"] != head["default_goal"]:
+        lines += [f"Default goal: `{base['default_goal']}` at base, `{head['default_goal']}` at head.", ""]
+    if base["include_order"] != head["include_order"]:
+        lines += ["Include order changed.", ""]
+    private = sorted(
+        target
+        for target in (set(base["rules"]) | set(head["rules"])) - base_public - head_public
+        if base["rules"].get(target) != head["rules"].get(target)
+    )
+    lines += _listing("Other targets added, removed or changed", private)
+    for kind, title in (("variables", "Variables"), ("macros", "Macros")):
+        names = sorted(
+            name for name in set(base[kind]) | set(head[kind]) if base[kind].get(name) != head[kind].get(name)
+        )
+        lines += _listing(f"{title} added, removed or changed", names)
+    if base["semantic_sha256"] == head["semantic_sha256"]:
+        lines += ["Make's evaluation is unchanged.", ""]
+    elif not (removed or added or changed):
+        lines += ["No public target or recipe changed, but Make's evaluation changed.", ""]
     for target in changed[:MAX_DIFFED_TARGETS]:
         diff = list(
             difflib.unified_diff(_rule_text(base, target), _rule_text(head, target), "base", "head", lineterm="", n=1)

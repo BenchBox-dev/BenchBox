@@ -91,6 +91,26 @@ def _cutover_files(directory: Path, *, recursive: bool = True, pattern: str = "*
     return sorted(selected)
 
 
+def test_cutover_lists_every_test_with_a_ledger_row() -> None:
+    sections = _section_rows(_ledger_text())
+    cutover = set(CUTOVER_FILES.read_text(encoding="utf-8").split())
+    enrolled = [
+        ("### `tests/unit/workflows/`", WORKFLOWS_TEST_DIR.glob("test_*.py"), WORKFLOWS_TEST_DIR),
+        ("### `tests/unit/scripts/` (complete)", SCRIPTS_TEST_DIR.rglob("test_*.py"), SCRIPTS_TEST_DIR),
+        ("### `tests/unit/release/`", RELEASE_TEST_DIR.glob("test_*.py"), RELEASE_TEST_DIR),
+        ("### `tests/unit/test_auto_merge_*`", UNIT_DIR.glob("test_auto_merge_*.py"), UNIT_DIR),
+        ("### `tests/unit/test_release_*`", UNIT_DIR.glob("test_release_*.py"), UNIT_DIR),
+    ]
+    missing = [
+        path.relative_to(REPO_ROOT).as_posix()
+        for section, paths, directory in enrolled
+        for path in paths
+        if any(f"`{path.relative_to(directory).as_posix()}`" in row for row in sections.get(section, []))
+        and path.relative_to(REPO_ROOT).as_posix() not in cutover
+    ]
+    assert not missing, f"tests with a ledger row missing from {CUTOVER_FILES.name}: {missing}"
+
+
 def test_ledger_lists_every_workflow() -> None:
     text = _ledger_text()
     missing = [name for name in _workflow_files() if name not in text]
