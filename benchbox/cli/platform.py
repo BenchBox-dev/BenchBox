@@ -60,8 +60,10 @@ def resolve_platform_selector(selector: str) -> str:
 
     A ``<platform>:<deployment>`` selector resolves to the first-class platform
     for ClickHouse and otherwise to the base platform, after confirming the base
-    platform offers that deployment. A selector without a deployment suffix is
-    returned unchanged.
+    platform offers that deployment. A platform that declares no deployment modes
+    accepts only ``local``, matching ``PlatformRegistry.supports_deployment_mode``
+    and the adapter factory. A selector without a deployment suffix is returned
+    unchanged.
 
     Raises:
         ValueError: If the deployment is not offered by the base platform.
@@ -73,9 +75,9 @@ def resolve_platform_selector(selector: str) -> str:
     if not separator:
         return key
     base = normalize_platform_name(base)
-    available = PlatformRegistry.get_available_deployment_modes(base)
-    if deployment in available:
+    if PlatformRegistry.supports_deployment_mode(base, deployment):
         return base
+    available = PlatformRegistry.get_available_deployment_modes(base)
     if available:
         raise ValueError(
             f"Platform '{base}' does not support deployment mode '{deployment}'. Available: {', '.join(available)}"

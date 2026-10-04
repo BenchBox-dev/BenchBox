@@ -631,3 +631,22 @@ class TestInstallCommandDetection:
             cmd = get_install_command("databricks-connect")
 
         assert cmd == 'uv pip install "benchbox[cloud-spark-databricks]"'
+
+    @pytest.mark.parametrize("platform", ["timescaledb", "pg-duckdb", "pg-mooncake", "paradedb", "citus", "cedardb"])
+    def test_get_install_command_psycopg_platforms_use_the_postgresql_extra(self, platform: str):
+        """These platforms only need psycopg and have no extra of their own."""
+        import tomllib
+
+        pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
+        extras = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["optional-dependencies"]
+        assert "postgresql" in extras
+        assert platform not in extras
+
+        with (
+            patch("benchbox.utils.dependencies.is_development_install", return_value=True),
+            patch("benchbox.utils.dependencies.is_uv_tool_environment", return_value=False),
+        ):
+            assert get_install_command(platform) == "uv sync --extra postgresql"
+
+        with patch("benchbox.utils.dependencies.is_development_install", return_value=False):
+            assert get_install_command(platform) == 'uv pip install "benchbox[postgresql]"'
