@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Each listed override and status-deciding site is either in the soundness manifest or moved into a listed module, with a test pinning it.",
+    "Test: `run_enhanced_benchmark` fails the suite if the read-back stops going through the gated module.",
+    "The glob pin test and `any_soundness_path` agree on subdirectory matches; the docs section states the real coverage."
+  ],
+  "context": "Source: independent review of PR #2638 (2026-10-04). Builds on tuning-trust-paths-soundness-manifest-20261001.",
+  "description": "## Problem (observed by an independent reviewer of PR #2638; verified by reading, not by exploit)\nThe trust-paths item moved corroboration into `benchbox/platforms/base/tuning_trust.py` and listed it plus the core tuning files in `.github/soundness-paths.txt`. Remaining trust-relevant code is still outside the manifest:\n- the `get_tuning_introspector` overrides (`benchbox/platforms/duckdb.py` ~547, `benchbox/platforms/clickhouse/adapter.py` ~138, `benchbox/platforms/snowflake.py` ~1913), which choose the introspector and so can decide whether a run earns `applied_verified`;\n- the apply-phase status in `benchbox/platforms/base/adapter.py` (~995, also the read-back's fallback) and the failure-path attach call (~1019);\n- the DataFrame ledger status and attach (`benchbox/platforms/dataframe/tuning_mixin.py` ~249, `benchmark_mixin.py` ~603).\nTwo test gaps: nothing asserts `run_enhanced_benchmark` goes through `tuning_trust.read_back_applied_ledger`, so moving the logic back inline passes every test; and the manifest glob `benchbox/platforms/*_introspection.py` also matches files in subdirectories (`fnmatch` `*` matches `/`), while the pin test uses `Path.glob`, which does not. The docs section reads as if the surface is fully gated.\n\n## Change\n- Extract the remaining status-deciding code into gated modules or list the files, without making all of `adapter.py` a soundness path.\n- Add a test that pins the read-back call site.\n- Make the pin test use the same matcher as the real rule, and say in the docs what is and is not gated.\n\n## Guardrails (must preserve)\n- Behaviour-identical extraction; the existing tuning suites pass unchanged.\n- The PR needs its own external `Soundness review:` (or the stand-in attestation).\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    ".github/soundness-paths.txt",
+    "benchbox/platforms/base/tuning_trust.py",
+    "tests/unit/test_auto_merge_soundness_paths.py",
+    "docs/development/tuning-introspection-receipts.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:55:55Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e2d9d7010fc64dfbbb71539a4ff287af",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}

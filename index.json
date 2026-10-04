@@ -21792,6 +21792,15 @@
       "status": "open",
       "title": "Make the tuning trust-path files soundness-manifest paths (extract corroboration out of adapter.py first)"
     },
+    "tuning-trust-surface-outside-soundness-manifest-20261004": {
+      "claim": null,
+      "needs": [
+        "tuning-trust-paths-soundness-manifest-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Tuning trust code that still sits outside the soundness manifest, and a test gap on the extracted read-back"
+    },
     "tuning-verification-footprint-duckdb-clickhouse-20260722": {
       "claim": null,
       "needs": [],
