@@ -18873,7 +18873,8 @@
     "spark-session-config-runtime": {
       "claim": null,
       "needs": [
-        "spark-session-config-model"
+        "spark-session-config-model",
+        "tuning-ledger-capture-non-dbapi-drivers-20261001"
       ],
       "priority": "medium-high",
       "status": "open",
