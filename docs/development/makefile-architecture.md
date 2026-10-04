@@ -126,8 +126,9 @@ uv run -- python make/check_makefile_inventory.py --write
 ```
 
 The writer validates but never rewrites `monolith-baseline.json` or
-`migration-proof.json`. Its generated `make/inventory.json` is visible as an
-untracked file; remove it after inspection.
+`migration-proof.json`. Its generated `make/inventory.json` is ignored by
+`.gitignore`, so it does not appear in `git status`; leave it in place or
+delete it.
 
 At the introducing split commit, or a checkout reconstructed from it, reproduce
 the historical comparison explicitly:
