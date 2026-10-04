@@ -19770,8 +19770,9 @@
     "throughput-corpus-cohort-depth-third-identity": {
       "claim": null,
       "needs": [
-        "sqlite-throughput-dialect-and-stream-isolation",
-        "corpus-depth-gate-counts-unrankable-bundles"
+        "tpch-throughput-dialect-translation",
+        "corpus-depth-gate-counts-unrankable-bundles",
+        "corpus-identity-and-phase-rule-parity"
       ],
       "priority": "medium",
       "status": "open",
