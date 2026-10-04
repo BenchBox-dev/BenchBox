@@ -5,7 +5,7 @@
     "example-validation and spellcheck run against the canonical docs/ sources and stay green",
     "Drift checks (prompt-quickstarts-check, query-docs, image validation) fail on a seeded drift in tests"
   ],
-  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as 5e7c0c30 + 2060f750 (2026-10-04). docs-generate target; conf.py hook removed; every workflow sphinx-build follows a generator step (pinned by tests/unit/test_docs_generate_wiring.py); release builds guard on scripts/generate_query_docs.py existing. Review round 1 FAIL (High: preview default release SHA lacks query-docs) fixed in 2060f750.",
+  "context": "Done 2026-10-04: merged in #2606 (b77ccf7c7). Evidence on develop d283c46d: make/documentation.mk site-build depends on docs-generate; tests/unit/test_docs_generate_wiring.py (every generator before build, no Sphinx hook, seeded compat drift); test_generate_query_docs.py (check fails after edit, orphan files); landing test_check_fails_on_stale_include; test_main_fails_on_seeded_image_drift. Query pages inventory clean in CI site-parity on #2606 head 083b48d7. example-validation and spellcheck (ci.yml, gating) run on docs/ sources and were green.",
   "description": "Several Python generators feed the current site:\n- scripts/generate_query_docs.py, run from the conf.py config-inited hook into docs/benchmarks/queries/\n- scripts/generate_compat_docs.py\n- scripts/generate_landing_quickstarts.py\n- the prompt-quickstarts write/check targets (landing/prompts/catalog.yaml → catalog.generated.js)\n- scripts/validate_visualization_images.py\n- the CI example-validation and spellcheck jobs\n\nMake each one run as an explicit pre-build step of make site-build, not as a Sphinx hook, and target the Astro inputs. The generators stay in Python. Their check modes must fail on drift exactly as they do today.",
   "links": [
     "scripts/generate_query_docs.py",
@@ -46,6 +46,14 @@
       "generation": "0c97df38f12a46c6a2787ce6f99b488a",
       "op": "take",
       "op_id": "99a9470a9ffd44afa65e914f500fa650",
+      "session_id": "33fc81e6079f4095960e58f09da5ba3c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:eab247781550a2228da6f8b3",
+      "at": "2026-10-04T23:59:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "36fcc878496c493e9a5139ee691272fe",
       "session_id": "33fc81e6079f4095960e58f09da5ba3c"
     }
   ]
