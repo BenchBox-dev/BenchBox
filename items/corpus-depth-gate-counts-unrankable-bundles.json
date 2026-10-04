@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The depth gate counts only identities whose bundles are rankable by the same predicate the explorer uses (shared code or a parity test)",
+    "A test proves a partial/failed bundle does not count toward depth",
+    "The phase-aware cohort change (item throughput-corpus-cohort-depth-third-identity) and this predicate land together or in dependency order"
+  ],
+  "context": "2026-10-04 throughput adversarial review. Reviewed the #2382 branch HEAD 938150a4f, its uncommitted validator change, and develop 8ed0c64e1.",
+  "description": "`cohort_platforms` in results-data/validate_corpus.py (205-224 on the #2382 branch) never looks at summary.queries.failed, summary.validation or throughput_test.status. Adding the SQLite bundle tpch_sf1_sqlite_sql_20261003_184424_5702d960.json (45 of 66 queries failed, throughput_test FAILED) would make the TPC-H SF1 throughput cohort reach 3 identities and pass. The explorer would then exclude that row from ranking (failed_queries and validation_not_clean in _project/scripts/explorer_pipeline/models.py:588-591), leaving 2 rankable engines.\n\nThe same SQLite bundle has phases.validation.status = \"PASSED\" while summary.validation = \"partial\" (verified from the JSON), so a gate reading phases.validation would also accept it. That inconsistency is tracked in result-validation-phase-status-contradicts-summary.",
+  "links": [
+    "results-data/validate_corpus.py",
+    "_project/scripts/explorer_pipeline/models.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:03:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "449137614dce4191a645cbccab0e2dbf",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

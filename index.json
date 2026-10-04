@@ -4726,6 +4726,13 @@
       "status": "done",
       "title": "Corpus bundles carry no EOL attribute, so a CRLF checkout breaks byte identity"
     },
+    "corpus-depth-gate-counts-unrankable-bundles": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Corpus depth gate counts partial or failed bundles as cohort identities"
+    },
     "corpus-drift-canary-direction-and-leak-check": {
       "claim": null,
       "needs": [],
