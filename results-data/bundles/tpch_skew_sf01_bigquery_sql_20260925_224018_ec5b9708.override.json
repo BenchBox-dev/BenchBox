@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "timing-plateau",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "BigQuery's per-job overhead (about 0.8 to 1.3 s) dominates every tpch_skew query at SF 0.1, so per-query means sit on a plateau (max/min 1.53, CV 0.12). This is a property of the engine at this scale, not a measurement fault; the override was planned in the corpus run plan.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/5a7e9146aca358bab3fb4c7a9ab156ef1d9834f5/results-data/CORPUS_NOTES.md#live-cloud-corpus-2026-10-02",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "tpch_skew_sf01_bigquery_sql_20260925_224018_ec5b9708"
+  ]
+}
