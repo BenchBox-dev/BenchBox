@@ -21113,10 +21113,15 @@
       "title": "Tuning nits: dead ALTER branch, conditional DuckDB re-create recording, ClickHouse truncation reason"
     },
     "tuning-no-midrun-destructive-db-handling-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T11:39:59Z",
+        "generation": "19ad11659d4647f9acbb099f19e65fff",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2b0080b85042aeae675a52ec"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Stop mid-run destructive database handling (metadata temp connections drop/delete the run's own database)"
     },
     "tuning-notuning-db-reuse-gate-20261001": {
