@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Any
 
-from scripts.publication.assembler import compute_tree_digest
+from scripts.publication.assembler import compute_file_sha256, compute_tree_digest
 
 RESULTS_DIR = "results"
 SNAPSHOT_DIR = "data"
 RESULTS_FALLBACK = "404.html"
+SNAPSHOT_FILE = f"{SNAPSHOT_DIR}/results.duckdb"
 
 
 class ArtifactError(RuntimeError):
@@ -21,6 +23,25 @@ def verify_tree(tree: Path, expected_sha256: str) -> dict[str, str]:
     if digest != expected_sha256:
         raise ArtifactError(f"artifact digest {digest} does not match recorded {expected_sha256}")
     return manifest
+
+
+def explorer_pins(explorer_tree: Path, scratch: Path, source_sha: str | None) -> dict[str, Any]:
+    snapshot = explorer_tree / SNAPSHOT_FILE
+    if not snapshot.is_file():
+        raise ArtifactError(f"explorer tree has no snapshot to pin: {snapshot}")
+    if scratch.exists():
+        shutil.rmtree(scratch)
+    shutil.copytree(
+        explorer_tree,
+        scratch,
+        ignore=lambda directory, names: {SNAPSHOT_DIR} if Path(directory) == explorer_tree else set(),
+    )
+    ui_digest, _, _ = compute_tree_digest(scratch)
+    shutil.rmtree(scratch)
+    return {
+        "ui": {"source_sha": source_sha, "sha256": ui_digest},
+        "snapshot": {"path": SNAPSHOT_FILE, "sha256": compute_file_sha256(snapshot)},
+    }
 
 
 def compose_ui_first(current_tree: Path, restored_tree: Path, destination: Path) -> str:

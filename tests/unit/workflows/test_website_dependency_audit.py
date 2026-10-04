@@ -70,7 +70,7 @@ def test_website_package_is_pinned_exactly_on_node_22() -> None:
 
 
 def test_only_the_website_jobs_use_node_22() -> None:
-    website_jobs = {"site-build", "site-parity", "website-audit"}
+    website_jobs = {"site-build", "site-parity", "website-audit", "public-site-visual-astro-dry-run"}
     for workflow in ("ci.yml", "nightly.yml"):
         for name, job in _jobs(workflow).items():
             versions = {

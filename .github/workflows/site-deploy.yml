@@ -55,6 +55,8 @@ jobs:
       trunk_sha: ${{ steps.resolve.outputs.trunk_sha }}
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       release_sha: ${{ steps.resolve.outputs.release_sha }}
+      renderer: ${{ steps.resolve.outputs.renderer }}
+      visual_required: ${{ steps.resolve.outputs.visual_required }}
       resolved_artifact: site-deploy-resolved-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Require develop for production modes
@@ -72,6 +74,8 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Resolve candidate and generation
         id: resolve
@@ -97,7 +101,7 @@ jobs:
           if [ "$CURRENT_UNKNOWN" = "true" ]; then
             args+=(--current-unknown)
           fi
-          python -m scripts.site_deploy resolve "${args[@]}"
+          uv run --no-project --with "pyyaml==6.0.3" -- python -m scripts.site_deploy resolve "${args[@]}"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         if: always()
@@ -122,6 +126,7 @@ jobs:
       MODE: ${{ inputs.mode }}
       ROLLBACK_RUN_ID: ${{ inputs.rollback_receipt_run_id }}
       ROLLBACK_PHASE: ${{ inputs.rollback_phase }}
+      RENDERER: ${{ needs.resolve.outputs.renderer }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -157,11 +162,20 @@ jobs:
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        if: inputs.mode != 'rollback'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx'
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: trunk/results-explorer/package-lock.json
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'astro'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            trunk/results-explorer/package-lock.json
+            trunk/website/package-lock.json
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
@@ -173,7 +187,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Build release documentation
-        if: inputs.mode != 'rollback'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx'
         working-directory: release
         run: |
           uv sync --group dev
@@ -184,12 +198,12 @@ jobs:
           uv run sphinx-build -b html --keep-going . _build/html
 
       - name: Generate trunk documentation inputs
-        if: inputs.mode != 'rollback'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx'
         working-directory: trunk
         run: make query-docs
 
       - name: Build trunk documentation
-        if: inputs.mode != 'rollback'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx'
         working-directory: trunk/docs
         run: uv run sphinx-build -b html --keep-going . _build/html
 
@@ -204,10 +218,30 @@ jobs:
           uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
           (cd results-explorer && npm run build)
 
+      - name: Build the release site with Astro
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'astro'
+        working-directory: release
+        run: |
+          set -euo pipefail
+          uv sync --group dev
+          (cd results-explorer && npm ci && npm run build)
+          make site-build
+
+      - name: Build the trunk site with Astro
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'astro'
+        working-directory: trunk
+        run: make site-build
+
       - name: Assemble the single-ref site for the preview comparison
         if: inputs.mode == 'preview'
         working-directory: trunk
-        run: uv run -- python scripts/assemble_public_site.py --site-dir ../site-legacy
+        run: |
+          set -euo pipefail
+          if [ "$RENDERER" = "astro" ]; then
+            cp -a website/dist ../site-legacy
+          else
+            uv run -- python scripts/assemble_public_site.py --site-dir ../site-legacy
+          fi
 
       - name: Assemble routes
         if: inputs.mode != 'rollback'
@@ -219,6 +253,7 @@ jobs:
           --ref-root trunk=.
           --site-dir ../site-build
           --work-dir ../routes-work
+          --renderer "$RENDERER"
           --receipt-out ../out/route-assembly.json
 
       - name: Restore the retained generation
@@ -289,9 +324,127 @@ jobs:
           path: site-build
           include-hidden-files: true
 
-  deploy:
+  visual:
+    name: Pre-deploy visual comparison
     needs: [resolve, build]
-    if: inputs.mode != 'preview' && needs.resolve.outputs.action == 'deploy'
+    if: needs.resolve.outputs.visual_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      PUBLIC_SITE_VISUAL_ROUTES: landing,getting-started
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: ${{ needs.build.outputs.build_artifact }}
+          path: out
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: ${{ needs.build.outputs.site_artifact }}
+          path: candidate
+
+      - name: Fetch the last production artifact
+        id: production
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id=$(jq -r '.deployed.run_id // empty' out/resolved.json)
+          receipt_sha=$(jq -r '.deployed.receipt_sha256 // empty' out/resolved.json)
+          if [ -z "$run_id" ] || [ -z "$receipt_sha" ]; then
+            echo "::error::no receipted production generation to compare the candidate with; the visual comparison cannot pass"
+            exit 1
+          fi
+          python -m scripts.site_deploy fetch-run --run-id "$run_id" --receipt-sha256 "$receipt_sha" --receipt-dir production/receipt --tree-dir production/tree --verify-tree
+          {
+            echo "trunk_sha=$(jq -r '.deployed.trunk_sha' out/resolved.json)"
+            echo "renderer=$(jq -r '.deployed_renderer' out/resolved.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Bind the approval to the release, candidate and baseline
+        id: binding
+        run: python -m scripts.site_deploy visual-binding --out-dir out --candidate candidate --baseline production/tree
+
+      - name: Install explorer dependencies
+        working-directory: results-explorer
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: results-explorer
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture the last production artifact
+        working-directory: results-explorer
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/production/tree
+          PUBLIC_SITE_VISUAL_RENDERER: ${{ steps.production.outputs.renderer }}
+          PUBLIC_SITE_VISUAL_PHASE: capture
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/site-deploy-visual-production
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ steps.production.outputs.trunk_sha }}
+        run: npm run test:e2e:public-site
+
+      - name: Capture the candidate artifact
+        working-directory: results-explorer
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/candidate
+          PUBLIC_SITE_VISUAL_RENDERER: ${{ needs.resolve.outputs.renderer }}
+          PUBLIC_SITE_VISUAL_PHASE: capture
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/site-deploy-visual-candidate
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.resolve.outputs.trunk_sha }}
+        run: npm run test:e2e:public-site
+
+      - name: Compare the candidate with the last production artifact
+        working-directory: results-explorer
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/candidate
+          PUBLIC_SITE_VISUAL_PHASE: compare
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/site-deploy-visual-candidate
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/site-deploy-visual-production
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.production.outputs.trunk_sha }}
+          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.resolve.outputs.trunk_sha }}
+          PR_HEAD_SHA: ${{ steps.binding.outputs.binding }}
+          APPROVED_HEAD_SHA: ${{ vars.SITE_DEPLOY_VISUAL_APPROVED_BINDING }}
+          APPROVAL_REASON: ${{ vars.SITE_DEPLOY_VISUAL_APPROVAL_REASON }}
+        run: npm run test:e2e:public-site
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: always()
+        with:
+          name: site-deploy-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            out/visual-binding.json
+            ${{ runner.temp }}/site-deploy-visual-production
+            ${{ runner.temp }}/site-deploy-visual-candidate
+          if-no-files-found: ignore
+          retention-days: 90
+
+  deploy:
+    needs: [resolve, build, visual]
+    if: >-
+      ${{ !cancelled() && inputs.mode != 'preview' && needs.resolve.outputs.action == 'deploy' &&
+      needs.build.result == 'success' &&
+      (needs.visual.result == 'success' || (needs.visual.result == 'skipped' && needs.resolve.outputs.visual_required != 'true')) }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -329,7 +482,7 @@ jobs:
 
   probe:
     needs: [resolve, build, deploy]
-    if: needs.deploy.result == 'success'
+    if: ${{ !cancelled() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

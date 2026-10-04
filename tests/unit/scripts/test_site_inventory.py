@@ -64,7 +64,7 @@ def test_inventory_extracts_page_fields(tmp_path: Path) -> None:
     page = inventory["pages"]["/index.html"]
     assert page["title"] == "Home Page"
     assert page["description"] == "The home"
-    assert page["canonical"] == "/"
+    assert page["canonical"] == "https://benchbox.dev/"
     assert page["h1"] == ["Home"]
     assert page["headings"] == [["h2", "Intro"], ["h3", "Detail"], ["h2", "Outro"]]
     assert page["links"] == [
@@ -409,7 +409,7 @@ def test_canonical_loss_fails_but_description_change_is_informational(tmp_path: 
 
     _write(candidate_site, "index.html", INDEX.replace('<link rel="canonical" href="https://benchbox.dev/">', ""))
     report = site_inventory.diff_inventories(baseline, _build(candidate_site))
-    assert report["canonical loss"] == ["/index.html [canonical]: '/' -> ''"]
+    assert report["canonical loss"] == ["/index.html [canonical]: 'https://benchbox.dev/' -> ''"]
     assert site_inventory.exit_code(report, strict=False) == 1
 
 
@@ -623,3 +623,29 @@ def test_heading_changes_are_reported_one_heading_at_a_time(tmp_path: Path) -> N
         '/docs/guide.html [headings]: added ["h2", "Setup steps"]',
         '/docs/guide.html [headings]: removed ["h2", "Setup"]',
     ]
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "http://benchbox.dev/docs/a.html",
+        "https://www.benchbox.dev/docs/a.html",
+        "https://benchbox.dev/docs/a.html?x=1",
+        "/docs/a.html",
+    ],
+)
+def test_canonical_is_recorded_exactly_as_written(href: str) -> None:
+    page, _, _ = site_inventory.parse_page("/docs/a.html", f'<link rel="canonical" href="{href}">')
+
+    assert page["canonical"] == href
+
+
+def test_links_still_resolve_every_site_host_and_scheme() -> None:
+    markup = (
+        '<a href="http://www.benchbox.dev/docs/a.html?x=1#top">a</a><a href="/docs/b.html">b</a>'
+        '<a href="https://example.com/c.html">c</a>'
+    )
+
+    page, _, _ = site_inventory.parse_page("/docs/p.html", markup)
+
+    assert page["links"] == ["/docs/a.html#top", "/docs/b.html"]

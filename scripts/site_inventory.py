@@ -126,8 +126,7 @@ class _PageParser(HTMLParser):
         elif tag == "link":
             rels = (values.get("rel") or "").lower().split()
             if "canonical" in rels:
-                target = internal_target(values.get("href") or "", self.page_path)
-                self.canonical = _target_key(target) if target else (values.get("href") or "").strip()
+                self.canonical = (values.get("href") or "").strip()
             elif "stylesheet" in rels:
                 self._add(self.assets, values.get("href"))
         elif tag == "script":

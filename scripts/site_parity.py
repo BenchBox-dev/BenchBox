@@ -9,6 +9,7 @@ import zlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin, urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -28,6 +29,7 @@ REPORT_JSON = "url-compatibility-report.json"
 REPORT_MARKDOWN = "url-compatibility-report.md"
 SAME_TREE = "same-tree Sphinx build"
 PUBLISHED = "published baseline"
+SITE_ORIGIN = "https://benchbox.dev"
 PENDING = "pending"
 PASS = "PASS"
 FAIL = "FAIL"
@@ -334,22 +336,95 @@ def load_inventory_losses(path: Path) -> list[dict[str, str]]:
     return _check_entries(path, _read_json(path), ("id", "reason"))
 
 
+OFF_SITE = "\0off-site"
+
+
+def _resolved(uri: str, name: str) -> tuple[str, str]:
+    parts = urlsplit(urljoin(f"{SITE_ORIGIN}/docs/", uri.replace("$", name)))
+    if f"{parts.scheme}://{parts.netloc}" != SITE_ORIGIN:
+        return OFF_SITE, ""
+    return parts.path, parts.fragment
+
+
+def _blog_mapping(before: tuple[str, str], target: tuple[str, str], name: str) -> bool:
+    path, _ = before
+    return (
+        path.startswith("/docs/blog/")
+        and target[0] == path.replace("/docs/blog/", "/blog/", 1)
+        and target[1] in ("", name)
+    )
+
+
+def _dangling(path: str, fragment: str, inventory: dict[str, Any]) -> bool:
+    served = frozenset(inventory["paths"])
+    resolved = inventory_tool.resolve_path(path, served)
+    if resolved is None:
+        return True
+    page = inventory["pages"].get(resolved)
+    if not fragment:
+        return False
+    return page is None or fragment not in page["ids"]
+
+
 def inventory_check(
-    baseline_site: Path | None, candidate_site: Path, allowed: list[dict[str, str]] | None = None
+    baseline_site: Path | None,
+    candidate_site: Path,
+    baseline: dict[str, Any] | None = None,
+    candidate: dict[str, Any] | None = None,
+    allowed: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    if baseline_site is None:
-        return {"baseline": 0, "candidate": 0, "lost": [], "allowed": [], "added": 0}
-    baseline = parse_inventory(baseline_site / "docs" / "objects.inv")
-    candidate = parse_inventory(candidate_site / "docs" / "objects.inv")
-    lost = [f"{role} {name}" for role, name in sorted(set(baseline) - set(candidate))]
+    if baseline_site is None or baseline is None or candidate is None:
+        return {
+            "baseline": 0,
+            "candidate": 0,
+            "lost": [],
+            "allowed": [],
+            "added": 0,
+            "uri_problems": [],
+            "validity_only": 0,
+        }
+    old = parse_inventory(baseline_site / "docs" / "objects.inv")
+    new = parse_inventory(candidate_site / "docs" / "objects.inv")
+    lost = [f"{role} {name}" for role, name in sorted(set(old) - set(new))]
     permitted = {entry["id"] for entry in allowed or []}
+    problems = []
+    validity_only = 0
+    for (role, name), uri in sorted(new.items()):
+        target = _resolved(uri, name)
+        if _dangling(*target, candidate):
+            problems.append(f"{role} {name}: {uri} does not resolve in the Astro site")
+            continue
+        if (role, name) in old:
+            before = _resolved(old[(role, name)], name)
+            if _dangling(*before, baseline) and _blog_mapping(before, target, name):
+                validity_only += 1
+            elif before != target:
+                problems.append(f"{role} {name}: {old[(role, name)]} in Sphinx, {uri} in Astro")
     return {
-        "baseline": len(baseline),
-        "candidate": len(candidate),
+        "baseline": len(old),
+        "candidate": len(new),
         "lost": [entry for entry in lost if entry not in permitted],
         "allowed": [entry for entry in lost if entry in permitted],
-        "added": len(set(candidate) - set(baseline)),
+        "added": len(set(new) - set(old)),
+        "uri_problems": problems,
+        "validity_only": validity_only,
     }
+
+
+def canonical_check(candidate: dict[str, Any], redirects: dict[str, str]) -> list[str]:
+    problems = []
+    for path, page in sorted(candidate["pages"].items()):
+        if path == "/results/index.html":
+            expected = f"{SITE_ORIGIN}/results/"
+        elif path in redirects:
+            expected = f"{SITE_ORIGIN}{redirects[path]}"
+        elif path == "/index.html":
+            expected = f"{SITE_ORIGIN}/"
+        else:
+            expected = f"{SITE_ORIGIN}{path}"
+        if page["canonical"] != expected:
+            problems.append(f"{path}: canonical {page['canonical']!r}, expected {expected!r}")
+    return problems
 
 
 def e2e_summary(paths: Sequence[Path]) -> list[dict[str, Any]]:
@@ -428,7 +503,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     e2e = e2e_summary(args.e2e_report or [])
     steps = step_summary(args.step_result or [])
     inventory_losses = load_inventory_losses(args.allowed_inventory_losses)
-    inventory = inventory_check(args.baseline_site, args.candidate_site, inventory_losses)
+    baseline_inventory = inventory_tool.load_inventory(args.baseline)
+    inventory = inventory_check(
+        args.baseline_site, args.candidate_site, baseline_inventory, candidate, inventory_losses
+    )
+    meta_redirects = {
+        row["path"]: row["target"] for row in redirects["pages"] if row["path"] != "/404.html" and row["declared"]
+    }
+    canonicals = canonical_check(candidate, meta_redirects)
     allowed = _merge_allowed(comparisons, added_rules)
     allowed.extend(
         {
@@ -467,7 +549,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         + [f"declared but not built: {path}" for path in redirects["declared_missing"]]
         + [f"present in the Sphinx site and gone: {path}" for path in redirects["baseline_redirects_lost"]],
         "unreviewed_added_paths": [path for comparison in gated for path in comparison["added_paths"]["unreviewed"]],
-        "objects_inventory": inventory["lost"],
+        "objects_inventory": inventory["lost"] + inventory["uri_problems"],
+        "canonical_links": canonicals,
         "gate_steps": [failure for row in steps for failure in row["failures"]],
         "browser_checks": [f"{row['report']}: {failure}" for row in e2e for failure in row["failures"]],
     }
@@ -493,7 +576,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "steps": steps,
         "objects_inventory": inventory,
         "allowed_differences": allowed,
-        "unused_allowances": sorted(row["id"] for row in allowed if row["kind"] != "added path" and not row["count"]),
+        "unused_allowances": sorted(row["id"] for row in allowed if not row["count"]),
     }
 
 
@@ -621,6 +704,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             ["Sphinx entries", inventory["baseline"]],
             ["Astro entries", inventory["candidate"]],
             ["Sphinx entries lost", len(inventory["lost"])],
+            ["Entries whose address does not resolve or differs from Sphinx", len(inventory["uri_problems"])],
+            ["Entries checked for validity only (blog pages moved out of docs)", inventory["validity_only"]],
         ],
     )
     if report["steps"]:
@@ -644,6 +729,13 @@ def render_markdown(report: dict[str, Any]) -> str:
             for row in report["allowed_differences"]
         ],
     )
+    added_rows = [row for row in report["allowed_differences"] if row["kind"] == "added path"]
+    if added_rows:
+        lines += ["## Added paths by rule", ""]
+        lines += _table(
+            ["Rule", "Paths matched", "Examples"],
+            [[row["id"], row["count"], ", ".join(row["samples"])] for row in added_rows],
+        )
     if report["unused_allowances"]:
         lines += ["## Warnings: allowances that matched nothing", ""]
         lines += [f"- {identifier}" for identifier in report["unused_allowances"]] + [""]
