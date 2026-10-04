@@ -26,17 +26,32 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-DESTRUCTIVE_SQL = re.compile(r"(?:^|;)\s*(?:--[^\n]*\n\s*)*(?:DROP|DELETE|TRUNCATE)\b", re.IGNORECASE)
-TUNING_METADATA_REWRITE = re.compile(r"^\s*DELETE\s+FROM\s+\S*benchbox_tuning_metadata\b", re.IGNORECASE)
+RUN_NAMESPACES = frozenset({"benchdb", "bench-project"})
+NAME_SEGMENT = r"""(?:[\w#$]+|"[^"]*"|`[^`]*`|\[[^\]]*\])"""
+QUALIFIED_NAME = NAME_SEGMENT + r"(?:\." + NAME_SEGMENT + ")*"
+DESTRUCTIVE_STATEMENT = re.compile(r"(?:DROP|DELETE|TRUNCATE)\b", re.IGNORECASE)
+TABLE_REPLACE = re.compile(r"CREATE\s+OR\s+REPLACE\s+(?:\w+\s+){0,3}?TABLE\b", re.IGNORECASE)
+PARTITION_DROP = re.compile(r"ALTER\s+TABLE\s+.+?\s+DROP\s+(?:IF\s+EXISTS\s+)?PARTITION\b", re.IGNORECASE)
 TABLE_RESET = re.compile(
-    r"^\s*(?:DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?|TRUNCATE\s+(?:TABLE\s+)?|DELETE\s+FROM\s+)([\w.#\"`\[\]]+)",
+    r"(?:DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?|TRUNCATE\s+(?:TABLE\s+)?|DELETE\s+FROM\s+)("
+    + QUALIFIED_NAME
+    + r")(?:\s+(?:CASCADE|PURGE|RESTRICT)|\s+WHERE\s+.*)?",
     re.IGNORECASE,
 )
-BENCHMARK_TABLE = "region"
 TABLE_CREATE = re.compile(
-    r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:\w+\s+)*?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w.#\"`\[\]]+)", re.IGNORECASE
+    r"CREATE\s+(?:OR\s+REPLACE\s+)?(?:\w+\s+){0,3}?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(" + QUALIFIED_NAME + ")",
+    re.IGNORECASE,
 )
-DESTRUCTIVE_CALL = re.compile(r"^(?:drop|delete|truncate|remove|rmtree|unlink|destroy|purge)(?:_|$)", re.IGNORECASE)
+DESTRUCTIVE_CALL = re.compile(
+    r"^(?i:drop|delete|truncate|remove|rmtree|rmdir|rm|unlink|destroy|purge)(?:_|[A-Z]|$)",
+)
+RECREATING_STAGES = frozenset({"create_schema", "load_data"})
+SQL_VERB = re.compile(
+    r"(?:SELECT|WITH|CREATE|INSERT|ALTER|USE|SET|SHOW|DESCRIBE|COPY|MERGE|DROP|DELETE|TRUNCATE|EXPLAIN|CALL|OPTIMIZE|"
+    r"ANALYZE|MSCK|REFRESH)\b",
+    re.IGNORECASE,
+)
+EMBEDDED_SQL = re.compile(r"""\bsql\(\s*[fFrR]?(\"{3}|'{3}|\"|')(.*?)\1\s*[,)]""", re.DOTALL)
 SQL_CALLS = frozenset(
     {
         "execute",
@@ -61,6 +76,7 @@ FETCH_ALL = frozenset({"fetchall", "fetchmany", "fetch_all", "fetch"})
 FETCH_ONE = frozenset({"fetchone", "fetch_one"})
 TEXT_ATTRIBUTES = frozenset({"token", "access_token"})
 FAR_FUTURE_ATTRIBUTES = frozenset({"expires_on"})
+CLASS_ATTRIBUTES = frozenset({"DataFrame", "LazyFrame"})
 COUNT_QUERY = re.compile(r"\bCOUNT\s*\(", re.IGNORECASE)
 CONNECTION_PROBE = re.compile(r"^\s*SELECT\s+1(?:\s+AS\s+\w+)?\s*;?\s*$", re.IGNORECASE)
 FAKE_VERSION = "9.9.9"
@@ -68,8 +84,115 @@ FAKE_VERSIONS = {"duckdb": "1.4.0"}
 CATALOG_NAME = "benchdb"
 
 
+def split_statements(sql: str) -> list[str]:
+    statements: list[str] = []
+    current: list[str] = []
+    quote = ""
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        pair = sql[index : index + 2]
+        if quote:
+            current.append(char)
+            quote = "" if char == quote else quote
+        elif pair == "--":
+            end = sql.find("\n", index)
+            index = len(sql) if end < 0 else end
+            current.append(" ")
+            continue
+        elif pair == "/*":
+            end = sql.find("*/", index + 2)
+            index = len(sql) if end < 0 else end + 2
+            current.append(" ")
+            continue
+        elif char in "'\"`":
+            quote = char
+            current.append(char)
+        elif char == ";":
+            statements.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+        index += 1
+    statements.append("".join(current))
+    return [" ".join(statement.split()) for statement in statements if statement.strip()]
+
+
+def is_destructive_statement(statement: str) -> bool:
+    return any(pattern.match(statement) for pattern in (DESTRUCTIVE_STATEMENT, TABLE_REPLACE, PARTITION_DROP))
+
+
+def has_destructive_statement(sql: str) -> bool:
+    return any(is_destructive_statement(statement) for statement in split_statements(sql))
+
+
 def table_key(identifier: str) -> str:
-    return re.sub(r"[\"`\[\]]", "", identifier).rsplit(".", 1)[-1].lower()
+    segments = [
+        segment.strip('"`[]').lower() for segment in re.findall(r"\"[^\"]*\"|`[^`]*`|\[[^\]]*\]|[\w#$]+", identifier)
+    ]
+    while len(segments) > 1 and segments[0] in RUN_NAMESPACES:
+        segments.pop(0)
+    return ".".join(segments)
+
+
+@dataclass(frozen=True)
+class Allowance:
+    adapter: str | None
+    stage: str
+    statement: re.Pattern[str]
+    reason: str
+    after_creation: bool = False
+
+    def permits(self, adapter: str, stage: str, statement: str) -> bool:
+        return self.adapter in (None, adapter) and self.stage == stage and bool(self.statement.fullmatch(statement))
+
+
+TUNING_METADATA_TABLE = (
+    r"[`\"]?(?:(?:" + "|".join(map(re.escape, sorted(RUN_NAMESPACES))) + r")\.){0,2}benchbox_tuning_metadata[`\"]?"
+)
+TUNING_METADATA_DELETE = re.compile(r"DELETE FROM " + TUNING_METADATA_TABLE + r"(?: WHERE TRUE)?", re.IGNORECASE)
+TUNING_METADATA_REPLACE = re.compile(r"CREATE OR REPLACE TABLE " + TUNING_METADATA_TABLE + r" \(.*\)", re.IGNORECASE)
+ALLOWANCES = (
+    Allowance(
+        None,
+        "save_tuning_metadata",
+        TUNING_METADATA_DELETE,
+        "the tuning-metadata table is rewritten as one statement while saving the run's tuning",
+    ),
+    Allowance(
+        "bigquery",
+        "save_tuning_metadata",
+        TUNING_METADATA_REPLACE,
+        "BigQuery rewrites the metadata table's CREATE TABLE as CREATE OR REPLACE TABLE before the rows are saved",
+    ),
+    Allowance(
+        "snowflake",
+        "load_data",
+        re.compile(r"TRUNCATE TABLE REGION", re.IGNORECASE),
+        "Snowflake empties the benchmark table, created earlier in the run, before COPY INTO",
+        after_creation=True,
+    ),
+    Allowance(
+        "snowpark-connect",
+        "load_data",
+        re.compile(r"TRUNCATE TABLE region", re.IGNORECASE),
+        "Snowpark Connect empties the benchmark table before loading it; its DDL step runs outside create_schema",
+    ),
+    Allowance(
+        "athena",
+        "load_data",
+        re.compile(r"DROP TABLE IF EXISTS region_staging", re.IGNORECASE),
+        "Athena drops the external staging table, created earlier in the run, once the data is converted",
+        after_creation=True,
+    ),
+    Allowance(
+        "fabric_dw",
+        "test_connection",
+        re.compile(r"DROP TABLE #benchbox_test_temp", re.IGNORECASE),
+        "the write probe drops the session temporary table it created a statement earlier",
+        after_creation=True,
+    ),
+)
 
 
 class CatalogRow(tuple):
@@ -105,9 +228,42 @@ class Event:
         return f"[{self.phase}/{self.stage}] {self.kind}: {self.detail}"
 
 
+def nested_strings(*values: Any) -> Iterator[str]:
+    for value in values:
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, bytes):
+            yield value.decode("utf-8", "replace")
+        elif isinstance(value, dict):
+            yield from nested_strings(*value.values())
+        elif isinstance(value, (list, tuple, set)):
+            yield from nested_strings(*value)
+
+
+def sql_texts(*values: Any) -> Iterator[str]:
+    for text in nested_strings(*values):
+        yield text
+        for match in EMBEDDED_SQL.finditer(text):
+            yield match.group(2).replace("\\n", "\n").replace("\\t", "\t")
+
+
+def looks_like_sql(text: str) -> bool:
+    statements = split_statements(text)
+    return bool(statements) and bool(SQL_VERB.match(statements[0]))
+
+
+def temp_root() -> Path:
+    return Path(tempfile.gettempdir()).resolve()
+
+
+def temp_entries() -> frozenset[str]:
+    return frozenset(entry.name for entry in temp_root().iterdir())
+
+
 @dataclass
 class Ledger:
     world: Path
+    adapter: str = ""
     phase: str = "decision"
     stage: str = "first_connection"
     events: list[Event] = field(default_factory=list)
@@ -115,7 +271,9 @@ class Ledger:
     rows: list[Any] = field(default_factory=lambda: [CatalogRow((CATALOG_NAME,) * 4)])
     scripted: list[tuple[re.Pattern[str], list[Any]]] = field(default_factory=list)
     last_sql: str = ""
-    deletable_roots: tuple[Path, ...] = ()
+    temp_entries_at_start: frozenset[str] = field(default_factory=temp_entries)
+    driver_calls: dict[str, int] = field(default_factory=dict)
+    statements_seen: dict[str, int] = field(default_factory=dict)
 
     def rows_now(self) -> list[Any]:
         for pattern, rows in self.scripted:
@@ -128,22 +286,35 @@ class Ledger:
 
     def record_sql(self, origin: str, statement: str) -> None:
         self.last_sql = statement
-        self.record("sql", f"{origin}: {statement}", bool(DESTRUCTIVE_SQL.search(statement)), statement)
+        self.statements_seen[self.phase] = self.statements_seen.get(self.phase, 0) + 1
+        self.record("sql", f"{origin}: {statement}", has_destructive_statement(statement), statement)
 
     def record_call(self, name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
         leaf = name.rsplit(".", 1)[-1]
         statements = [value for value in (*args, *kwargs.values()) if isinstance(value, str)]
+        self.driver_calls[self.phase] = self.driver_calls.get(self.phase, 0) + 1
         if leaf in SQL_CALLS and statements:
             self.record_sql(name, statements[0])
-        elif any(DESTRUCTIVE_SQL.search(statement) for statement in statements):
-            self.record_sql(name, next(statement for statement in statements if DESTRUCTIVE_SQL.search(statement)))
-        elif DESTRUCTIVE_CALL.match(leaf):
+            return
+        texts = [text for text in sql_texts(args, kwargs) if looks_like_sql(text)]
+        if destructive := next((text for text in texts if has_destructive_statement(text)), None):
+            self.record_sql(name, destructive)
+        elif texts:
+            self.statements_seen[self.phase] = self.statements_seen.get(self.phase, 0) + len(texts)
+        if not destructive and DESTRUCTIVE_CALL.match(leaf):
             self.record("call", name, True)
 
     def may_delete_for_real(self, target: Path) -> bool:
         resolved = target.resolve()
-        return not self.removes_protected_path(resolved) and any(
-            resolved.is_relative_to(root) for root in self.deletable_roots
+        if self.removes_protected_path(resolved):
+            return False
+        if resolved.is_relative_to(self.world.resolve()):
+            return True
+        root = temp_root()
+        return (
+            resolved.is_relative_to(root)
+            and resolved != root
+            and resolved.relative_to(root).parts[0] not in self.temp_entries_at_start
         )
 
     def protect_current_files(self) -> None:
@@ -154,28 +325,52 @@ class Ledger:
         return any(path == resolved or path.startswith(resolved + os.sep) for path in self.protected)
 
     def violations(self) -> list[Event]:
-        post = [event for event in self.events if event.phase == "post"]
-        recreated = {
-            (event.stage, table_key(match.group(1)))
-            for event in post
-            if event.kind == "sql"
-            for match in TABLE_CREATE.finditer(event.target)
-        }
-        return [event for event in post if event.destructive and not self._is_sanctioned(event, recreated)]
+        creations = self._creations()
+        found: list[Event] = []
+        for position, event in enumerate(self.events):
+            if event.phase != "post" or not event.destructive:
+                continue
+            if event.kind != "sql":
+                found.append(event)
+                continue
+            for offset, statement in enumerate(split_statements(event.target)):
+                if is_destructive_statement(statement) and not self._is_sanctioned(
+                    event.stage, statement, (position, offset), creations
+                ):
+                    found.append(Event(event.phase, event.stage, "sql", statement[:240], True, statement))
+        return found
 
-    @staticmethod
-    def _is_sanctioned(event: Event, recreated: set[tuple[str, str]]) -> bool:
-        if event.kind != "sql":
+    def _creations(self) -> list[tuple[tuple[int, int], str, str]]:
+        return [
+            ((position, offset), event.stage, table_key(match.group(1)))
+            for position, event in enumerate(self.events)
+            if event.phase == "post" and event.kind == "sql"
+            for offset, statement in enumerate(split_statements(event.target))
+            for match in [TABLE_CREATE.match(statement)]
+            if match
+        ]
+
+    def _is_sanctioned(
+        self,
+        stage: str,
+        statement: str,
+        position: tuple[int, int],
+        creations: list[tuple[tuple[int, int], str, str]],
+    ) -> bool:
+        reset = TABLE_RESET.fullmatch(statement)
+        table = table_key(reset.group(1)) if reset else None
+        for allowance in ALLOWANCES:
+            if allowance.permits(self.adapter, stage, statement):
+                return not allowance.after_creation or any(
+                    created_at < position and name == table for created_at, _, name in creations
+                )
+        if stage not in RECREATING_STAGES:
             return False
-        if event.stage == "save_tuning_metadata" and TUNING_METADATA_REWRITE.match(event.target):
+        if TABLE_REPLACE.match(statement):
             return True
-        reset = TABLE_RESET.match(event.target)
-        if not reset:
-            return False
-        table = table_key(reset.group(1))
-        if (event.stage, table) in recreated:
-            return True
-        return event.stage == "load_data" and table.startswith(BENCHMARK_TABLE)
+        return table is not None and any(
+            created_stage == stage and name == table for _, created_stage, name in creations
+        )
 
     def in_phase(self, phase: str, *, destructive: bool | None = None, kind: str | None = None) -> list[Event]:
         return [
@@ -196,6 +391,13 @@ def exception_type(name: str) -> type[Exception]:
     return _EXCEPTION_TYPES[name]
 
 
+def fake_class(ledger: Ledger, name: str) -> type:
+    def construct(cls: type, *args: Any, **kwargs: Any) -> Any:
+        return Fake(ledger, name)(*args, **kwargs)
+
+    return type(name.rsplit(".", 1)[-1], (), {"__new__": construct})
+
+
 class Fake:
     def __init__(self, ledger: Ledger, name: str) -> None:
         object.__setattr__(self, "_ledger", ledger)
@@ -210,6 +412,8 @@ class Fake:
             return "fake-" + attribute
         if attribute in FAR_FUTURE_ATTRIBUTES:
             return time.time() + 10**9
+        if attribute in CLASS_ATTRIBUTES:
+            return fake_class(self._ledger, f"{self._name}.{attribute}")
         if attribute == "status_code":
             return 200
         return Fake(self._ledger, f"{self._name}.{attribute}")
@@ -274,6 +478,11 @@ class Fake:
 
     __le__ = __gt__ = __ge__ = __lt__
 
+    def __add__(self, other: Any) -> Any:
+        return other + 1 if isinstance(other, (int, float)) else NotImplemented
+
+    __radd__ = __add__
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -291,6 +500,8 @@ class FakeModule(types.ModuleType):
             raise AttributeError(attribute)
         if attribute.endswith(("Error", "Exception", "Warning")):
             return exception_type(attribute)
+        if attribute in CLASS_ATTRIBUTES:
+            return fake_class(self._ledger, f"{self.__name__}.{attribute}")
         return Fake(self._ledger, f"{self.__name__}.{attribute}")
 
 
@@ -381,13 +592,8 @@ class FakeServiceNeverCompletes(Exception):
     pass
 
 
-class PollingClock:
-    def __getattr__(self, attribute: str) -> Any:
-        return getattr(time, attribute)
-
-    @staticmethod
-    def sleep(seconds: float) -> None:
-        raise FakeServiceNeverCompletes(f"fake service cannot complete a {seconds}s poll")
+def sleep_never_completes(seconds: float) -> None:
+    raise FakeServiceNeverCompletes(f"fake service cannot complete a {seconds}s poll")
 
 
 class FakeFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
@@ -481,9 +687,15 @@ SPECS: dict[str, Spec] = {
     "dataproc": Spec(config=GCP),
     "dataproc-serverless": Spec(config=GCP),
     "ducklake": Spec(config=DUCKLAKE, scripted={r"version\(\)": [("v1.4.0",)]}),
-    "emr-serverless": Spec(config={**AWS, "execution_role_arn": ROLE_ARN, "application_id": "app-1"}),
+    "emr-serverless": Spec(
+        config={**AWS, "execution_role_arn": ROLE_ARN, "application_id": "app-1"},
+        patches={"_ensure_application_started": lambda *a, **k: None},
+    ),
     "fabric-lakehouse": Spec(config=FABRIC, connection_sites=("get_platform_info",)),
-    "fabric-spark": Spec(config={"workspace_id": FABRIC["workspace"], "lakehouse_id": FABRIC["workspace"]}),
+    "fabric-spark": Spec(
+        config={"workspace_id": FABRIC["workspace"], "lakehouse_id": FABRIC["workspace"]},
+        patches={"_ensure_session": lambda *a, **k: 1},
+    ),
     "fabric_dw": Spec(
         config=FABRIC, connection_sites=("test_connection", "check_server_database_exists", "get_platform_info")
     ),
@@ -511,7 +723,8 @@ SPECS: dict[str, Spec] = {
             "spark_pool_name": "pool",
             "storage_account": "acct",
             "storage_container": "bench",
-        }
+        },
+        patches={"_ensure_session": lambda *a, **k: 1},
     ),
     "velox": Spec(
         config={"gluten_jar_path": "{world}/db/bench.db"},
@@ -556,6 +769,76 @@ REQUIRED_ADAPTERS = frozenset(
         "motherduck",
     }
 )
+DEFAULT_SPEC_ADAPTERS = frozenset(
+    {
+        "cedardb",
+        "citus",
+        "clickhouse",
+        "clickhouse-local",
+        "clickhouse-server",
+        "doris",
+        "duckdb",
+        "lakesail",
+        "paradedb",
+        "pg-duckdb",
+        "pg-mooncake",
+        "postgresql",
+        "presto",
+        "questdb",
+        "redshift",
+        "singlestore",
+        "spark",
+        "sqlite",
+        "starburst",
+        "timescaledb",
+        "trino",
+    }
+)
+REQUIRED_STAGES = frozenset(
+    {"create_schema", "apply_unified_tuning", "save_tuning_metadata", "load_data", "second_connection"}
+)
+REMOTE_SPARK_NAMESPACE = (
+    "the database is a namespace in a remote Spark service that create_schema creates with IF NOT EXISTS, "
+    "and create_connection never calls handle_existing_database"
+)
+NO_FIRST_CONNECTION_CHECK: dict[str, str] = {
+    "athena-spark": REMOTE_SPARK_NAMESPACE,
+    "dataproc": REMOTE_SPARK_NAMESPACE,
+    "dataproc-serverless": REMOTE_SPARK_NAMESPACE,
+    "emr-serverless": REMOTE_SPARK_NAMESPACE,
+    "fabric-spark": REMOTE_SPARK_NAMESPACE,
+    "glue": REMOTE_SPARK_NAMESPACE,
+    "quanton": REMOTE_SPARK_NAMESPACE,
+    "synapse-spark": REMOTE_SPARK_NAMESPACE,
+    "fabric-lakehouse": "the SQL analytics endpoint is read-only and create_connection only opens an ODBC "
+    "connection; it never calls handle_existing_database",
+    "fabric_dw": "create_connection only opens an ODBC connection and never calls handle_existing_database; a "
+    "warehouse is created in the Fabric portal, so there is no database to drop on connect and "
+    "check_server_database_exists only tests that a connection opens. Tables are dropped and re-created in "
+    "create_schema, which the re-create allowance covers",
+    "motherduck": "create_connection opens md:<database> and never calls handle_existing_database, and the adapter "
+    "does not read force_recreate; the database lives in the MotherDuck service",
+    "snowpark-connect": "create_connection only opens a Snowpark session and never calls handle_existing_database; "
+    "force_recreate is forwarded to the base class but nothing acts on it, and create_schema only issues "
+    "CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
+}
+FAKE_POLL = "the fake service never reports the remote job or session as finished, so the polling loop raises"
+INCOMPLETE_STAGES: dict[str, tuple[frozenset[str], str]] = {
+    "athena-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
+    "fabric-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
+    "synapse-spark": (
+        frozenset({"create_schema", "apply_unified_tuning", "load_data"}),
+        f"create_schema and load_data: {FAKE_POLL}; apply_unified_tuning takes one argument but the setup phase "
+        "passes two, which is a defect in the adapter",
+    ),
+    "fabric-lakehouse": (
+        frozenset({"create_schema", "load_data"}),
+        "the SQL analytics endpoint is read-only, so create_schema and load_data raise ReadOnlyPlatformError by design",
+    ),
+}
+NO_SQL_OBSERVED: dict[str, str] = {
+    "polars": "the DataFrame adapter issues no SQL; only driver calls and file removals are observable",
+}
 
 
 @dataclass(frozen=True)
@@ -615,9 +898,32 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
+def holds_driver_fakes(name: str, module: Any) -> bool:
+    return isinstance(module, types.ModuleType) and (
+        isinstance(module, FakeModule)
+        or name.split(".")[0] in DRIVER_ROOTS
+        or (
+            name.startswith("benchbox.")
+            and any(isinstance(value, (Fake, FakeModule)) for value in list(vars(module).values()))
+        )
+    )
+
+
+def restore_modules(before: dict[str, Any]) -> None:
+    for name in [name for name in sys.modules if name not in before and holds_driver_fakes(name, sys.modules[name])]:
+        module = sys.modules.pop(name)
+        parent, _, child = name.rpartition(".")
+        if parent in sys.modules and vars(sys.modules[parent]).get(child) is module:
+            delattr(sys.modules[parent], child)
+    for name, module in before.items():
+        if sys.modules.get(name) is not module:
+            sys.modules[name] = module
+
+
 @pytest.fixture
 def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
-    ledger = Ledger(world=world, deletable_roots=(world.resolve(), Path(tempfile.gettempdir()).resolve()))
+    modules_before = dict(sys.modules)
+    ledger = Ledger(world=world)
     ledger.scripted.append((CONNECTION_PROBE, [(1,)]))
     ledger.scripted.append((COUNT_QUERY, [(1,)]))
     ledger.protect_current_files()
@@ -647,6 +953,7 @@ def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
     for module_name in [name for name in sys.modules if name.split(".")[0] in DRIVER_ROOTS]:
         monkeypatch.delitem(sys.modules, module_name)
     monkeypatch.setattr(sys, "meta_path", [FakeFinder(ledger), *sys.meta_path])
+    monkeypatch.setattr(time, "sleep", sleep_never_completes)
     for module_name, module in list(sys.modules.items()):
         if not module_name.startswith("benchbox.") or module is None:
             continue
@@ -654,14 +961,11 @@ def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
             replacement = driver_replacement(ledger, module_name, name, value)
             if replacement is not None:
                 monkeypatch.setattr(module, name, replacement)
-        if vars(module).get("time") is time:
-            monkeypatch.setattr(module, "time", PollingClock())
         for name, stand_in in NETWORK_STAND_INS.items():
             if name in vars(module):
                 monkeypatch.setattr(module, name, stand_in)
     yield ledger
-    for module_name in [name for name, module in sys.modules.items() if isinstance(module, FakeModule)]:
-        del sys.modules[module_name]
+    restore_modules(modules_before)
 
 
 NETWORK_STAND_INS: dict[str, Callable[..., Any]] = {
@@ -688,6 +992,7 @@ def make_adapter(case: Case, world: Path, ledger: Ledger, *, force_recreate: boo
         {key: value.format(world=world) if isinstance(value, str) else value for key, value in case.spec.config.items()}
     )
     ledger.scripted[:0] = [(re.compile(pattern, re.IGNORECASE), rows) for pattern, rows in case.spec.scripted.items()]
+    ledger.adapter = case.key
     adapter = PlatformRegistry.get_adapter_class(case.key)(**config)
     for attribute, replacement in case.spec.patches.items():
         setattr(adapter, attribute, replacement)
@@ -711,6 +1016,7 @@ def make_benchmark(world: Path) -> Any:
 @dataclass
 class Outcome:
     stage_errors: dict[str, str] = field(default_factory=dict)
+    stages_ran: list[str] = field(default_factory=list)
     connections: dict[str, int] = field(default_factory=dict)
     decision_calls: int = 0
     metadata_saved: bool | None = None
@@ -756,10 +1062,12 @@ def instrument(adapter: Any, ledger: Ledger, outcome: Outcome) -> Callable[..., 
 def run_stage(ledger: Ledger, outcome: Outcome, name: str, call: Callable[[], Any]) -> Any:
     ledger.stage = name
     try:
-        return call()
+        result = call()
     except Exception as exc:
         outcome.stage_errors[name] = f"{type(exc).__name__}: {exc}"
         return None
+    outcome.stages_ran.append(name)
+    return result
 
 
 def drive_lifecycle(adapter: Any, benchmark: Any, ledger: Ledger) -> Outcome:
@@ -796,15 +1104,37 @@ def drive_lifecycle(adapter: Any, benchmark: Any, ledger: Ledger) -> Outcome:
     return outcome
 
 
+@dataclass(frozen=True)
+class Reach:
+    stages_ran: tuple[str, ...]
+    stages_failed: tuple[str, ...]
+    statements: int
+    driver_calls: int
+    reached_decision: bool
+
+
+def reach_of(outcome: Outcome, ledger: Ledger) -> Reach:
+    return Reach(
+        stages_ran=tuple(outcome.stages_ran),
+        stages_failed=tuple(outcome.stage_errors),
+        statements=ledger.statements_seen.get("post", 0),
+        driver_calls=ledger.driver_calls.get("post", 0),
+        reached_decision=bool(outcome.decision_calls),
+    )
+
+
 def describe(events: list[Event]) -> str:
     return "\n".join(str(event) for event in events)
 
 
+def run_case(case: Case, world: Path, ledger: Ledger) -> tuple[Any, Outcome]:
+    adapter = make_adapter(case, world, ledger, force_recreate=True)
+    return adapter, drive_lifecycle(adapter, make_benchmark(world), ledger)
+
+
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_no_destructive_ops_after_first_connection_decision(case, world, ledger):
-    adapter = make_adapter(case, world, ledger, force_recreate=True)
-
-    outcome = drive_lifecycle(adapter, make_benchmark(world), ledger)
+    _, outcome = run_case(case, world, ledger)
 
     assert not ledger.violations(), describe(ledger.violations())
     assert "save_tuning_metadata" not in outcome.stage_errors, outcome.stage_errors
@@ -815,9 +1145,7 @@ def test_no_destructive_ops_after_first_connection_decision(case, world, ledger)
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
-    adapter = make_adapter(case, world, ledger, force_recreate=True)
-
-    outcome = drive_lifecycle(adapter, make_benchmark(world), ledger)
+    adapter, outcome = run_case(case, world, ledger)
 
     if not outcome.decision_calls or getattr(adapter, "skip_database_management", False):
         assert not case.spec.no_positive_control, "stale exemption: adapter makes no first-connection decision"
@@ -829,11 +1157,81 @@ def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
         assert acted, "force_recreate did not remove anything at the first connection"
 
 
-def test_every_registered_adapter_has_a_case():
-    covered = {case.key for case in CASES}
+@pytest.mark.parametrize("case", CASE_PARAMS)
+def test_case_is_not_silently_vacuous(case, world, ledger):
+    _, outcome = run_case(case, world, ledger)
+    reach = reach_of(outcome, ledger)
 
-    assert covered == set(PlatformRegistry.get_available_platforms())
-    assert covered >= REQUIRED_ADAPTERS
+    expected_failures, _ = INCOMPLETE_STAGES.get(case.key, (frozenset(), ""))
+    assert set(REQUIRED_STAGES) - set(reach.stages_ran) == set(expected_failures), (
+        f"stages that did not run {sorted(set(REQUIRED_STAGES) - set(reach.stages_ran))} differ from the exempt "
+        f"{sorted(expected_failures)}: {outcome.stage_errors}"
+    )
+    assert reach.driver_calls >= 1, "no driver call was observed after the first connection"
+    assert (reach.statements >= 1) == (case.key not in NO_SQL_OBSERVED), (
+        f"statements observed after the first connection: {reach.statements}; "
+        f"exemption: {NO_SQL_OBSERVED.get(case.key, 'none')}"
+    )
+    assert reach.reached_decision == (case.key not in NO_FIRST_CONNECTION_CHECK), (
+        f"existing-database check reached: {reach.reached_decision}; "
+        f"exemption: {NO_FIRST_CONNECTION_CHECK.get(case.key, 'none')}"
+    )
+
+
+def spec_coverage_problems(
+    registered: set[str],
+    specs: dict[str, Any],
+    variants: dict[str, Any],
+    defaults: frozenset[str],
+    required: frozenset[str],
+) -> list[str]:
+    return [
+        *(f"SPECS names an unregistered adapter: {name}" for name in sorted(set(specs) - registered)),
+        *(f"VARIANTS names an unregistered adapter: {name}" for name in sorted(set(variants) - registered)),
+        *(f"default-spec list names an unregistered adapter: {name}" for name in sorted(defaults - registered)),
+        *(f"{name} has a spec and is also on the default-spec list" for name in sorted(set(specs) & defaults)),
+        *(
+            f"{name} is registered but has no spec and is not a default-spec adapter"
+            for name in sorted(registered - set(specs) - defaults)
+        ),
+        *(f"required adapter is not registered: {name}" for name in sorted(required - registered)),
+    ]
+
+
+def test_every_registered_adapter_has_a_case():
+    registered = set(PlatformRegistry.get_available_platforms())
+
+    assert not spec_coverage_problems(registered, SPECS, VARIANTS, DEFAULT_SPEC_ADAPTERS, REQUIRED_ADAPTERS)
+    assert {case.key for case in CASES} == registered
+
+
+def test_exemptions_name_registered_adapters():
+    registered = set(PlatformRegistry.get_available_platforms())
+
+    for table in (NO_FIRST_CONNECTION_CHECK, INCOMPLETE_STAGES, NO_SQL_OBSERVED):
+        assert set(table) <= registered
+    assert all(stages <= REQUIRED_STAGES for stages, _ in INCOMPLETE_STAGES.values())
+
+
+def test_spec_coverage_rejects_stale_misspelled_and_missing_entries():
+    registered = {"alpha", "beta", "gamma"}
+
+    assert not spec_coverage_problems(registered, {"alpha": 1}, {"beta": 1}, frozenset({"beta", "gamma"}), frozenset())
+    problems = spec_coverage_problems(
+        registered,
+        {"alpha": 1, "alpha_renamed": 1},
+        {"removed": 1},
+        frozenset({"beta", "alpha", "ghost"}),
+        frozenset({"delta"}),
+    )
+    assert problems == [
+        "SPECS names an unregistered adapter: alpha_renamed",
+        "VARIANTS names an unregistered adapter: removed",
+        "default-spec list names an unregistered adapter: ghost",
+        "alpha has a spec and is also on the default-spec list",
+        "gamma is registered but has no spec and is not a default-spec adapter",
+        "required adapter is not registered: delta",
+    ]
 
 
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "clickhouse-server", "duckdb"])
@@ -850,3 +1248,203 @@ def test_harness_flags_a_repeated_decision(name, world, ledger):
     create_connection()
 
     assert ledger.violations()
+
+
+CREATE_REGION = ("CREATE TABLE region (r_regionkey INTEGER)",)
+UNSAFE_SEQUENCES = {
+    "reset-in-second-connection": (
+        "",
+        [("second_connection", ["DROP TABLE IF EXISTS benchdb.region", *CREATE_REGION])],
+    ),
+    "same-table-name-in-other-schema": (
+        "",
+        [("new_stream_connection", ["DROP TABLE prod.lineitem", "CREATE TABLE scratch.lineitem (l INTEGER)"])],
+    ),
+    "other-schema-in-create-schema": (
+        "",
+        [("create_schema", ["DROP TABLE prod.lineitem", "CREATE TABLE scratch.lineitem (l INTEGER)"])],
+    ),
+    "second-statement-after-table-reset": (
+        "",
+        [("create_schema", [*CREATE_REGION, "DROP TABLE region; DROP DATABASE benchdb"])],
+    ),
+    "second-statement-after-metadata-delete": (
+        "",
+        [("save_tuning_metadata", ["DELETE FROM benchbox_tuning_metadata; DROP DATABASE benchdb"])],
+    ),
+    "metadata-delete-with-filter": (
+        "",
+        [("save_tuning_metadata", ["DELETE FROM benchbox_tuning_metadata WHERE table_name = 'region'"])],
+    ),
+    "metadata-delete-in-load": ("", [("load_data", ["DELETE FROM benchbox_tuning_metadata WHERE TRUE"])]),
+    "metadata-delete-in-other-schema": ("", [("save_tuning_metadata", ["DELETE FROM prod.benchbox_tuning_metadata"])]),
+    "several-tables-in-one-drop": (
+        "",
+        [("create_schema", [*CREATE_REGION, "DROP TABLE region, prod.customer"])],
+    ),
+    "block-comment-before-drop": ("", [("second_connection", ["/* cleanup */ DROP DATABASE benchdb"])]),
+    "line-comment-before-drop": ("", [("second_connection", ["-- cleanup\nDROP DATABASE benchdb"])]),
+    "drop-after-quoted-semicolon": ("", [("second_connection", ["SELECT ';' ; DROP DATABASE benchdb"])]),
+    "replace-table-outside-load": ("", [("apply_unified_tuning", ["CREATE OR REPLACE TABLE region AS SELECT 1"])]),
+    "drop-partition": ("", [("second_connection", ["ALTER TABLE region DROP PARTITION (p = 1)"])]),
+    "drop-partition-if-exists": ("", [("second_connection", ["ALTER TABLE region DROP IF EXISTS PARTITION p1"])]),
+    "named-allowance-for-another-adapter": (
+        "postgresql",
+        [("create_schema", list(CREATE_REGION)), ("load_data", ["TRUNCATE TABLE REGION"])],
+    ),
+    "named-allowance-in-another-stage": (
+        "snowflake",
+        [("create_schema", list(CREATE_REGION)), ("second_connection", ["TRUNCATE TABLE REGION"])],
+    ),
+    "named-allowance-without-creation": ("fabric_dw", [("test_connection", ["DROP TABLE #benchbox_test_temp"])]),
+    "creation-in-another-stage": (
+        "",
+        [("create_schema", list(CREATE_REGION)), ("load_data", ["DROP TABLE region"])],
+    ),
+}
+SAFE_SEQUENCES = {
+    "recreate-in-create-schema": (
+        "",
+        [("create_schema", ["DROP TABLE IF EXISTS [benchdb].[region]", "CREATE TABLE [region] (r_regionkey INTEGER)"])],
+    ),
+    "recreate-in-load-data": (
+        "",
+        [("load_data", ["DROP TABLE IF EXISTS region", "CREATE TABLE region AS SELECT 1"])],
+    ),
+    "replace-in-create-schema": ("", [("create_schema", ["CREATE OR REPLACE TABLE region (r_regionkey INTEGER)"])]),
+    "commented-recreate": (
+        "",
+        [("create_schema", ["/* reset */ DROP TABLE region;", "-- rebuild\nCREATE TABLE region (r INTEGER)"])],
+    ),
+    "metadata-delete-in-save": ("", [("save_tuning_metadata", ["DELETE FROM benchbox_tuning_metadata WHERE TRUE"])]),
+    "metadata-delete-with-quoted-qualifier": (
+        "",
+        [("save_tuning_metadata", ["DELETE FROM `bench-project.benchdb.BENCHBOX_TUNING_METADATA` WHERE TRUE"])],
+    ),
+    "snowflake-truncates-the-table-it-created": (
+        "snowflake",
+        [("create_schema", ["CREATE OR REPLACE TABLE region (r INTEGER)"]), ("load_data", ["TRUNCATE TABLE REGION"])],
+    ),
+    "athena-drops-its-staging-table": (
+        "athena",
+        [
+            ("create_schema", ["CREATE EXTERNAL TABLE IF NOT EXISTS region_staging (r STRING)"]),
+            ("load_data", ["DROP TABLE IF EXISTS region_staging"]),
+        ],
+    ),
+    "fabric-write-probe": (
+        "fabric_dw",
+        [("test_connection", ["CREATE TABLE #benchbox_test_temp (id INT)", "DROP TABLE #benchbox_test_temp"])],
+    ),
+}
+
+
+def ledger_with(tmp_path: Path, adapter: str, steps: list[tuple[str, list[str]]]) -> Ledger:
+    world_dir = tmp_path / "world"
+    world_dir.mkdir()
+    probe = Ledger(world=world_dir, adapter=adapter, phase="post")
+    for stage, statements in steps:
+        probe.stage = stage
+        for statement in statements:
+            probe.record_sql("probe", statement)
+    return probe
+
+
+@pytest.mark.parametrize("name", UNSAFE_SEQUENCES)
+def test_ledger_rejects_unsafe_sequence(name, tmp_path):
+    adapter, steps = UNSAFE_SEQUENCES[name]
+
+    assert ledger_with(tmp_path, adapter, steps).violations()
+
+
+@pytest.mark.parametrize("name", SAFE_SEQUENCES)
+def test_ledger_allows_run_owned_rewrite(name, tmp_path):
+    adapter, steps = SAFE_SEQUENCES[name]
+
+    assert not ledger_with(tmp_path, adapter, steps).violations()
+
+
+def test_ledger_names_the_offending_statement_of_a_script(tmp_path):
+    found = ledger_with(tmp_path, "", [("create_schema", [*CREATE_REGION, "DROP TABLE region; DROP DATABASE benchdb"])])
+
+    assert [event.target for event in found.violations()] == ["DROP DATABASE benchdb"]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "client.dropTable",
+        "bucket.deleteObject",
+        "fs.rm",
+        "fs.rm_file",
+        "blob.delete",
+        "shutil.rmtree",
+        "client.purge_table",
+    ],
+)
+def test_ledger_flags_destructive_driver_calls(call, tmp_path):
+    probe = ledger_with(tmp_path, "", [])
+    probe.stage = "second_connection"
+    probe.record_call(call, ("target",), {})
+
+    assert probe.violations()
+
+
+@pytest.mark.parametrize("call", ["client.deleted", "frame.dropna", "text.removeprefix", "client.get_table"])
+def test_ledger_ignores_harmless_driver_calls(call, tmp_path):
+    probe = ledger_with(tmp_path, "", [])
+    probe.record_call(call, ("target",), {})
+
+    assert not probe.violations()
+
+
+def test_ledger_reads_destructive_sql_inside_job_payloads(tmp_path):
+    probe = ledger_with(tmp_path, "", [])
+    probe.stage = "second_connection"
+    probe.record_call("requests.post", (), {"json": {"code": 'spark.sql("DROP TABLE region")'}})
+    probe.record_call("client.submit", ({"statements": ["SELECT 1", "DROP DATABASE benchdb"]},), {})
+
+    assert [event.target for event in probe.violations()] == ["DROP TABLE region", "DROP DATABASE benchdb"]
+
+
+def test_files_are_removed_for_real_only_when_created_during_the_run(tmp_path):
+    existing_temp = Path(tempfile.mkdtemp())
+    world_dir = tmp_path / "world"
+    world_dir.mkdir()
+    (world_dir / "kept.db").write_bytes(b"stub")
+    probe = Ledger(world=world_dir)
+    probe.protect_current_files()
+    new_temp = Path(tempfile.mkdtemp())
+    (world_dir / "scratch.tmp").write_bytes(b"stub")
+    try:
+        assert probe.may_delete_for_real(world_dir / "scratch.tmp")
+        assert probe.may_delete_for_real(new_temp)
+        assert probe.may_delete_for_real(new_temp / "staging" / "part-0")
+        assert not probe.may_delete_for_real(world_dir / "kept.db")
+        assert not probe.may_delete_for_real(world_dir)
+        assert not probe.may_delete_for_real(existing_temp)
+        assert not probe.may_delete_for_real(existing_temp / "child")
+        assert not probe.may_delete_for_real(temp_root())
+        assert not probe.may_delete_for_real(Path.home())
+    finally:
+        shutil.rmtree(existing_temp)
+        shutil.rmtree(new_temp)
+
+
+def test_restore_modules_drops_modules_that_hold_fakes(ledger):
+    before = dict(sys.modules)
+    leaked = types.ModuleType("benchbox._leak_probe")
+    leaked.driver = Fake(ledger, "requests")
+    unrelated = types.ModuleType("benchbox._plain_probe")
+    sys.modules.update(
+        {"benchbox._leak_probe": leaked, "benchbox._plain_probe": unrelated, "pyodbc": FakeModule(ledger, "pyodbc")}
+    )
+    sys.modules.pop("sqlite3", None)
+
+    restore_modules(before)
+
+    assert "benchbox._leak_probe" not in sys.modules
+    assert sys.modules["benchbox._plain_probe"] is unrelated
+    assert sys.modules.get("pyodbc") is before.get("pyodbc")
+    assert sys.modules["sqlite3"] is before["sqlite3"]
+    del sys.modules["benchbox._plain_probe"]
