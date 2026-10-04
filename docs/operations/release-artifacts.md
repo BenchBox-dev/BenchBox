@@ -1,12 +1,12 @@
 # Release artifact contract
 
 Release admission consumes the exact wheel and sdist from a successful
-merge-queue CI attempt. It never rebuilds or publishes packages.
+push-triggered trunk run on `develop`. It never rebuilds or publishes packages.
 
 ## Producer
 
-The `dist-artifact` job of `.github/workflows/ci.yml` runs only on
-`merge_group`. Its artifact name is
+The `dist-artifact` job of `.github/workflows/trunk.yml` runs on each push to
+`develop`. Its artifact name is
 `dist-<full head SHA>-attempt-<positive run attempt>`.
 
 The artifact contains exactly four regular files at its root:
@@ -38,9 +38,9 @@ uv run -- python scripts/release_artifact_consumer.py admit \
 ```
 
 The command fetches `develop`, checks tag/version agreement and ancestry, and
-selects the latest exact-SHA CI run. The run must belong to
-`BenchBox-dev/BenchBox`, use `.github/workflows/ci.yml`, and have completed
-successfully on `merge_group`. Its exact attempt must have one successful
+selects the latest exact-SHA trunk run. The run must belong to
+`BenchBox-dev/BenchBox`, use `.github/workflows/trunk.yml`, and have completed
+successfully on a `push` to `develop`. Its exact attempt must have one successful
 `dist-artifact` job and one unexpired attempt-qualified artifact.
 
 Admission verifies the API ZIP digest before reading any archive member. It
