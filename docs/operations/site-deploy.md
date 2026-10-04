@@ -97,6 +97,14 @@ run fails closed until `bootstrap` is set.
    swapping fixed links for new ones fails, while a pure reduction passes and
    becomes the next baseline. A newer tag that adds broken links therefore fails
    until the allowance file is updated.
+
+   When a release tag has no receipt baseline yet, the gate also reads
+   `_project/design/site-inventory/release-known-broken/<tag>.json`, a reviewed
+   list of `[source, target, reason]` entries with paths as served on the routed
+   site (for example `/docs/...`), and adds it to the release-owned develop
+   entries for that tag only. Add a file when a new release tag's pages break
+   links that develop no longer lists; list exactly the release-owned broken
+   links the gate reports for that tag, never trunk-owned ones.
 3. Approve the pending deployment with the reviewer's own credentials, never with
    the workflow token:
 
