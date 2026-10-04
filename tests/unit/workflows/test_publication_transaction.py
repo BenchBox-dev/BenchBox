@@ -128,6 +128,7 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
         "docs.yml",  # Path 3 (legacy release)
         "publication-deploy.yml",  # Path 4 (legacy recovery)
         "publication-preview-deploy.yml",  # Path 5 (preview, disabled in code)
+        "site-deploy.yml",
     }
 
     assert workflow_names == expected_workflow_names, (

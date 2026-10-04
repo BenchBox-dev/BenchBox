@@ -14,6 +14,7 @@ lib/
 lib64/
 # TypeScript source lib dirs are not Python lib artifacts
 !results-explorer/src/lib/
+!/website/src/lib/
 parts/
 sdist/
 var/
@@ -248,3 +249,5 @@ node_modules/
 /.claude/skills/.system/
 /.claude/skills/blog/
 /site-inventory/
+/website/.astro/
+/website/e2e-output/

@@ -132,6 +132,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
     ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
+    ("ci.yml", "site-build", "Typecheck, audit and build website"): "site-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
@@ -361,6 +362,9 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("ci.yml", "docs-build", "Validate explorer snapshot invariants"): (
         "Hosted snapshot check; covered locally by the explorer-pipeline contract tests."
+    ),
+    ("ci.yml", "site-build", "Scan website output for privacy leaks"): (
+        "Hosted build-output scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
     ),
     ("ci.yml", "docs-build", "Scan assembled site for privacy leaks"): (
         "Hosted site-assembly scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."

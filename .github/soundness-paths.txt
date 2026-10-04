@@ -10,6 +10,8 @@ prefix	benchbox/core/query_plans/parsers/
 prefix	benchbox/core/expected_results/
 prefix	publication/
 prefix	scripts/publication/
+prefix	scripts/site_deploy/
+prefix	deploy/
 
 file	scripts/heavy_tier_needed.py
 file	benchbox/platforms/base/result_capture.py
@@ -48,6 +50,7 @@ file	.github/workflows/publication-corpus-cutover.yml
 file	.github/workflows/publication-transaction.yml
 file	.github/workflows/publication-recover.yml
 file	.github/workflows/publication-canaries.yml
+file	.github/workflows/site-deploy.yml
 file	scripts/publication/verify_lane_isolation.py
 file	_project/scripts/auto_merge_soundness_paths.py
 file	_project/scripts/soundness_paths.py

@@ -77,6 +77,21 @@ SITE_INVENTORY_KNOWN_BROKEN ?= _project/design/site-inventory/known-broken-links
 site-inventory-check: site-inventory
 	@uv run -- python scripts/site_inventory.py check --inventory "$(SITE_INVENTORY)" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)"
 
+site-deps:
+	@if [ ! -f website/node_modules/.package-lock.json ] || [ website/package-lock.json -nt website/node_modules/.package-lock.json ]; then npm --prefix website ci; fi
+
+site-build: query-docs site-deps
+	@npm --prefix website run build
+	@test -s website/dist/index.html
+	@echo "Site built: website/dist/index.html"
+
+site-dev: site-deps
+	@npm --prefix website run dev
+
+site-check: query-docs site-deps
+	@npm --prefix website run check
+	@npm --prefix website run audit:high
+
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build
 	@echo ""

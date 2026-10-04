@@ -121,6 +121,8 @@ need Node 22, the spike's follow-up moves CI and `website/` to 22 in one PR with
 its drift guard. An exact lockfile. No root `package.json` unless the spike
 shows workspaces are needed.
 
+Node 22 for `website/` and the `site-build` job (spike finding). `website/` ships in release tags, like `docs/` and `landing/`, and stays out of the Python sdist and wheel.
+
 ### D11 Blog drafts: decided
 
 `_blog/` (109 Markdown files: research, outlines and archives) stays outside

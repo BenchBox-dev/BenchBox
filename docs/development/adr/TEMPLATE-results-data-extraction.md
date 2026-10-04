@@ -5,7 +5,7 @@
 > in when an extraction trigger fires (see
 > [`_project/analysis/results-data-extraction-trigger.md`][trigger]).
 
-[trigger]: ../../../_project/analysis/results-data-extraction-trigger.md
+[trigger]: https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/results-data-extraction-trigger.md
 
 ## Status
 
