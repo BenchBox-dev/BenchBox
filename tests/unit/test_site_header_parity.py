@@ -364,7 +364,9 @@ def test_explorer_global_rules_are_scoped_to_the_explorer_root() -> None:
     unscoped = [
         selector
         for selector in selectors
-        if not selector.startswith((".bb-explorer", "body.bb-explorer-page", ".site-footer__link", "["))
+        if not selector.startswith(
+            (".bb-explorer", ":where(.bb-explorer)", "body.bb-explorer-page", ".site-footer__link", "[")
+        )
     ]
     assert unscoped == []
     assert 'class="bb-explorer-page"' in _read("results-explorer/index.html")
