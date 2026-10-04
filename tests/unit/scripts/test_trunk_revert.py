@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -13,6 +14,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 ROOT = Path(__file__).resolve().parents[3]
 OID = "b" * 40
 NOW = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
+RUN_URL = "https://github.com/BenchBox-dev/BenchBox/actions/runs/123"
 
 
 def _load():
@@ -38,10 +40,12 @@ class FakeRun:
         pr_view: dict | None = None,
         fail: dict[str, int] | None = None,
         origin: str = "git@github.com:BenchBox-dev/BenchBox.git",
+        runs: list[dict] | None = None,
     ):
         self.origin = origin
         self.pr_view = pr_view
         self.fail = fail or {}
+        self.runs = _runs(("completed", "failure", timedelta(minutes=31))) if runs is None else runs
         self.calls: list[list[str]] = []
 
     def __call__(self, cmd: list[str]) -> tuple[int, str]:
@@ -57,6 +61,8 @@ class FakeRun:
         for prefix, code in self.fail.items():
             if " ".join(cmd).startswith(prefix):
                 return code, "boom"
+        if cmd[:3] == ["gh", "run", "list"]:
+            return 0, json.dumps(self.runs)
         return 0, ""
 
 
@@ -76,6 +82,21 @@ def test_builds_the_expected_worktree_revert_and_pr_commands(capsys: pytest.Capt
     assert trunk_revert.revert(12, run=run) == 0
     assert run.calls == [
         ["gh", "pr", "view", "12", "--repo", trunk_revert.REPOSITORY, "--json", "state,mergeCommit,title"],
+        [
+            "gh",
+            "run",
+            "list",
+            "--repo",
+            trunk_revert.REPOSITORY,
+            "--workflow",
+            "trunk.yml",
+            "--branch",
+            "develop",
+            "--limit",
+            "30",
+            "--json",
+            trunk_revert.RUN_FIELDS,
+        ],
         ["git", "remote", "get-url", "--push", "origin"],
         ["git", "rev-parse", "--show-toplevel"],
         ["git", "fetch", "origin", "develop", "--quiet"],
@@ -104,7 +125,10 @@ def test_builds_the_expected_worktree_revert_and_pr_commands(capsys: pytest.Capt
             "develop",
             "--head",
             "fix/revert-12",
-            "--fill",
+            "--title",
+            'Revert "fix(x): thing" (#12)',
+            "--body",
+            f"Reverts #12 to address the failed trunk.yml run: {RUN_URL}",
         ],
     ]
     out = capsys.readouterr().out
@@ -135,6 +159,9 @@ def test_title_with_quotes_and_command_substitution_stays_one_argument() -> None
     assert trunk_revert.revert(5, run=run) == 0
     amend = next(call for call in run.calls if "--amend" in call)
     assert amend[amend.index("-m") + 1] == f'Revert "{title}" (#5)'
+    create = next(call for call in run.calls if call[:3] == ["gh", "pr", "create"])
+    assert create[create.index("--title") + 1] == f'Revert "{title}" (#5)'
+    assert create[create.index("--body") + 1].endswith(RUN_URL)
     assert all(isinstance(part, str) for call in run.calls for part in call)
     assert not any(call[0] == "sh" or "-c" in call[:2] for call in run.calls)
 
@@ -159,10 +186,16 @@ def test_removes_the_new_worktree_when_the_push_fails() -> None:
 def test_keeps_the_pushed_branch_and_says_how_to_finish_when_pr_creation_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    run = FakeRun(pr_view=_merged(), fail={"gh pr create": 1})
+    runs = _runs(("completed", "failure", timedelta(minutes=31)))
+    runs[0]["url"] = RUN_URL + "?label='quoted'&value=$(touch /tmp/pwned)"
+    run = FakeRun(pr_view=_merged('fix: "quoted" $(touch /tmp/pwned)'), fail={"gh pr create": 1}, runs=runs)
     assert trunk_revert.revert(12, run=run) == 1
     assert ["git", "branch", "-D", "fix/revert-12"] not in run.calls
-    assert "gh pr create --repo" in capsys.readouterr().err
+    recovery = capsys.readouterr().err.split("open it with: ", 1)[1].strip()
+    create = next(call for call in run.calls if call[:3] == ["gh", "pr", "create"])
+    assert shlex.split(recovery) == create
+    assert create[create.index("--body") + 1].endswith(runs[0]["url"])
+    assert "--fill" not in create
 
 
 def test_does_not_create_a_worktree_when_worktree_create_refuses() -> None:
@@ -178,10 +211,51 @@ def test_refuses_a_merge_commit_that_is_not_on_develop() -> None:
     assert not any(call[:1] == ["make"] for call in run.calls)
 
 
+@pytest.mark.parametrize("runs", [[], [{"status": "completed", "conclusion": "failure"}]])
+def test_refuses_missing_run_evidence_before_mutating(runs: list[dict], capsys: pytest.CaptureFixture[str]) -> None:
+    run = FakeRun(pr_view=_merged(), runs=runs)
+    assert trunk_revert.revert(12, run=run) == 1
+    assert "trunk-revert: refusing:" in capsys.readouterr().err
+    assert all(call[:1] == ["gh"] for call in run.calls)
+
+
+def test_refuses_when_run_lookup_fails_before_mutating() -> None:
+    run = FakeRun(pr_view=_merged(), fail={"gh run list": 1})
+    assert trunk_revert.revert(12, run=run) == 1
+    assert all(call[:1] == ["gh"] for call in run.calls)
+
+
+def test_refuses_when_there_is_no_failed_run_before_mutating(capsys: pytest.CaptureFixture[str]) -> None:
+    run = FakeRun(pr_view=_merged(), runs=_runs(("completed", "success", timedelta(hours=1))))
+    assert trunk_revert.revert(12, run=run) == 1
+    assert "no failed trunk.yml run" in capsys.readouterr().err
+    assert all(call[:1] == ["gh"] for call in run.calls)
+
+
+def test_revert_names_the_newest_failed_run_by_creation_with_a_pending_run() -> None:
+    runs = _runs(
+        ("completed", "failure", timedelta(hours=1)),
+        ("in_progress", None, timedelta(minutes=1)),
+        ("completed", "failure", timedelta(hours=3)),
+    )
+    runs[2]["updatedAt"] = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+    run = FakeRun(pr_view=_merged(), runs=runs)
+    assert trunk_revert.revert(12, run=run) == 0
+    create = next(call for call in run.calls if call[:3] == ["gh", "pr", "create"])
+    assert create[create.index("--body") + 1].endswith(runs[0]["url"])
+
+
 def _runs(*items: tuple[str, str | None, timedelta]) -> list[dict]:
     return [
-        {"status": status, "conclusion": conclusion, "updatedAt": (NOW - age).strftime("%Y-%m-%dT%H:%M:%SZ")}
-        for status, conclusion, age in items
+        {
+            "status": status,
+            "conclusion": conclusion,
+            "createdAt": (NOW - age - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "updatedAt": (NOW - age).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "databaseId": 123 + index,
+            "url": f"https://github.com/BenchBox-dev/BenchBox/actions/runs/{123 + index}",
+        }
+        for index, (status, conclusion, age) in enumerate(items)
     ]
 
 
@@ -190,17 +264,15 @@ def _gate(runs: list[dict] | None, branch: str = "fix/thing", *, code: int = 0, 
 
     def run(cmd: list[str]) -> tuple[int, str]:
         assert cmd[:3] == ["gh", "run", "list"]
-        assert cmd[cmd.index("--workflow") :][:8] == [
+        assert cmd[cmd.index("--workflow") :][:6] == [
             "--workflow",
             "trunk.yml",
             "--branch",
             "develop",
-            "--status",
-            "completed",
             "--limit",
             "30",
         ]
-        assert cmd[-2:] == ["--json", "conclusion,status,updatedAt"]
+        assert cmd[-2:] == ["--json", "conclusion,status,createdAt,updatedAt,databaseId,url"]
         return code, payload
 
     return trunk_revert.trunk_gate(branch, run=run, now=NOW)
@@ -216,6 +288,12 @@ def test_gate_allows_when_gh_errors(capsys: pytest.CaptureFixture[str]) -> None:
     assert capsys.readouterr().err.count("warning") == 1
 
 
+@pytest.mark.parametrize("out", ["invalid JSON", "{}", '[{"status": "completed"}]'])
+def test_gate_keeps_malformed_run_metadata_advisory(out: str, capsys: pytest.CaptureFixture[str]) -> None:
+    assert _gate(None, out=out) is None
+    assert capsys.readouterr().err.count("warning") == 1
+
+
 def test_gate_allows_when_the_newest_run_is_green() -> None:
     assert (
         _gate(_runs(("completed", "success", timedelta(minutes=5)), ("completed", "failure", timedelta(hours=3))))
@@ -227,11 +305,43 @@ def test_gate_allows_a_red_run_under_thirty_minutes() -> None:
     assert _gate(_runs(("completed", "failure", timedelta(minutes=29)))) is None
 
 
-def test_gate_refuses_a_red_run_over_thirty_minutes() -> None:
-    refusal = _gate(_runs(("completed", "failure", timedelta(minutes=31))))
+def test_gate_allows_a_red_run_at_thirty_minutes() -> None:
+    assert _gate(_runs(("completed", "failure", timedelta(minutes=30)))) is None
+
+
+@pytest.mark.parametrize("conclusion", ["failure", "timed_out", "startup_failure"])
+def test_gate_refuses_a_red_run_over_thirty_minutes(conclusion: str) -> None:
+    refusal = _gate(_runs(("completed", conclusion, timedelta(minutes=31))))
     assert refusal is not None
     assert "red for 31 minutes" in refusal
     assert "make trunk-revert" in refusal
+    assert RUN_URL in refusal
+
+
+@pytest.mark.parametrize("conclusion", ["cancelled", "neutral", "skipped", "action_required", "stale"])
+def test_gate_allows_when_the_newest_completed_run_is_not_red(conclusion: str) -> None:
+    assert _gate(_runs(("completed", conclusion, timedelta(hours=1)))) is None
+
+
+def test_gate_orders_by_creation_even_when_an_older_run_finishes_later() -> None:
+    runs = _runs(
+        ("completed", "failure", timedelta(hours=3)),
+        ("completed", "failure", timedelta(minutes=40)),
+    )
+    runs[0]["updatedAt"] = NOW.strftime("%Y-%m-%dT%H:%M:%SZ")
+    refusal = _gate(runs)
+    assert refusal is not None
+    assert "red for 40 minutes" in refusal
+    assert runs[1]["url"] in refusal
+    assert runs[0]["url"] not in refusal
+
+
+def test_gate_orders_runs_created_in_the_same_second_by_run_id() -> None:
+    runs = _runs(
+        ("completed", "failure", timedelta(hours=1)),
+        ("completed", "success", timedelta(hours=1)),
+    )
+    assert _gate(runs) is None
 
 
 def test_gate_allows_red_then_green() -> None:
@@ -242,15 +352,13 @@ def test_gate_allows_red_then_green() -> None:
     assert _gate(runs) is None
 
 
-def test_gate_ages_the_first_failure_of_the_continuous_red_interval() -> None:
+def test_gate_ages_only_the_newest_failure() -> None:
     runs = _runs(
         ("completed", "failure", timedelta(minutes=10)),
         ("completed", "failure", timedelta(minutes=50)),
         ("completed", "success", timedelta(hours=3)),
     )
-    refusal = _gate(runs)
-    assert refusal is not None
-    assert "red for 50 minutes" in refusal
+    assert _gate(runs) is None
 
 
 def test_gate_does_not_look_past_a_success() -> None:
@@ -262,12 +370,13 @@ def test_gate_does_not_look_past_a_success() -> None:
     assert _gate(runs) is None
 
 
-def test_gate_ignores_a_run_still_in_progress() -> None:
+@pytest.mark.parametrize("status", ["queued", "in_progress", "waiting", "pending", "requested"])
+def test_gate_allows_when_the_newest_run_is_pending(status: str) -> None:
     runs = _runs(
-        ("in_progress", None, timedelta(minutes=1)),
+        (status, None, timedelta(minutes=1)),
         ("completed", "failure", timedelta(hours=1)),
     )
-    assert _gate(runs) is not None
+    assert _gate(runs) is None
 
 
 def test_gate_exempts_revert_branches() -> None:
