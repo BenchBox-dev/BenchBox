@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The Documentation workflow linkcheck job passes on develop",
+    "The blog index links either point at pages Sphinx builds or are excluded with a documented reason"
+  ],
+  "context": "Found while checking documentation outcomes after the live-cloud corpus merges. None of those merges touched the blog. The Astro migration items (astro-site-33-blog-collection-and-feed, astro-site-54-retire-sphinx-and-legacy-site) may make the links obsolete, but the Sphinx linkcheck is red until then.",
+  "description": "The Documentation workflow's linkcheck job fails on every recent develop run with the same three broken links in `docs/blog/index.rst`: `archive.html`, `tag.html` and `author.html`. These are relative `.html` targets that Sphinx does not build. Build, spellcheck, example validation and visual checks pass, so the red runs hide any new docs failure.\n\nSeen in runs 37138879947 (`3428753dc`), 37163832053 (`c373a1a54`), 37163873730 (`7a3dc8355`) and 37202138826 (`058f664da`), and in every run checked between them. The links sit at lines 25-27, or 28-30 after #2597 edited the file.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:53:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0752cf5f205849fc91d37363fdb00d45",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}

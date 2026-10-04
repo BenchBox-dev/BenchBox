@@ -7262,6 +7262,13 @@
       "status": "done",
       "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
     },
+    "docs-blog-index-broken-html-links": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Documentation workflow fails on every develop push: three broken blog index links"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],
