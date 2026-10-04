@@ -82,6 +82,7 @@ class PullCommit:
     sha: str
     arrived_at: str
     is_refresh: bool
+    committed_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -138,7 +139,11 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     def in_window(at: str) -> bool:
         return cutoff <= at <= evidence.merged_at
 
-    standin_after = max(evidence.commits[-1].arrived_at, evidence.base_changed_at) if evidence.commits else ""
+    standin_after = (
+        max(evidence.commits[-1].committed_at, evidence.commits[-1].arrived_at, evidence.base_changed_at)
+        if evidence.commits
+        else ""
+    )
     signals: list[str] = []
     if any(
         r.login in CONNECTOR_LOGINS
@@ -366,6 +371,7 @@ def collect_commits(
             c["sha"],
             c["commit"]["committer"]["date"],
             len(c["parents"]) > 1 and not merge_adds_content(c["sha"], base, cwd=cwd),
+            c["commit"]["committer"]["date"],
         )
         for c in commits
     ]

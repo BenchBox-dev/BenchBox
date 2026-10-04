@@ -180,6 +180,12 @@ def test_a_standin_approval_posted_at_the_head_arrival_instant_is_not_a_signal()
     assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ()
 
 
+def test_a_standin_approval_between_arrival_and_a_later_committer_date_is_not_a_signal():
+    head = digest.PullCommit(HEAD, PUSHED, False, AFTER)
+    pull = evidence(commits=(commit(OLD, BEFORE), head), comments=(standin(HEAD, at="2026-10-02T10:30:00Z"),))
+    assert digest.review_signals(pull) == ()
+
+
 def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
     comments = (standin(HEAD, at=AFTER),)
     assert digest.review_signals(evidence(comments=comments, base_changed_at=AFTER)) == ()
