@@ -11710,6 +11710,13 @@
       "status": "done",
       "title": "Represent long-running MCP benchmarks as durable explicit job handles"
     },
+    "mcp-durable-job-outcome-and-capacity-gaps": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "MCP durable jobs: outstanding work holds capacity forever, failed runs publish as completed, recovery deletes live staging"
+    },
     "mcp-error-scrub-prose-precision-v1": {
       "claim": null,
       "needs": [

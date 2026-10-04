@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The worker attests quiescence when leaked futures finish, or an evidence-gated operator release exists; documented in the proof matrix",
+    "Jobs store and expose a shared outcome (failed/incomplete/completed) derived from the result",
+    "Staging cleanup waits for quiescence or purge",
+    "Outstanding-work detection reads the result object, with a test using the real export shape"
+  ],
+  "context": "2026-10-04 concurrency adversarial review. MCP claim/fence/publish transactions were checked and found sound; these are outcome and capacity gaps around them.",
+  "description": "Findings in benchbox/mcp/jobs.py (develop 8ed0c64e1):\n1. Capacity leak (confirmed): when a job has outstanding throughput work, jobs.py:1174-1182 calls mark_unknown_outstanding and skips quiescence attestation. Nothing later calls attest_quiescence for that job (only :1152 and :1222). Each throughput timeout permanently uses up a running slot: with defaults (max_running_per_principal=2, max_running=8), two timeouts lock out a tenant and eight stop the server. No operator release path exists. The proof matrix covers only a dead worker.\n2. Outcome (confirmed by code): jobs.py:1183 checks only top-level response[\"status\"] == \"failed\". The success path (mcp/tools/benchmark.py:516-526) never sets it, and mcp_metadata.status=\"no_results\" is ignored. Runs with failed queries, contained throughput or a None result publish as completed. _public_status (:1374) does not expose the ADR's shared outcome.\n3. Staging (plausible): lease recovery (jobs.py:1141-1146) deletes staging {execution_id}-{attempts}, the directory a fenced old attempt may still write to, contrary to ADR section 4. A recreated directory is never purged.\n4. Detection (plausible): if both result exports fail (mcp/tools/benchmark.py:318-324), the response is {} plus metadata, so _response_has_outstanding_work finds nothing and the job publishes as completed while threads run. The proof test uses a synthetic {\"outstanding_stream_ids\"} shape, not the real phases.*.outstanding_work export.",
+  "links": [
+    "benchbox/mcp/jobs.py",
+    "benchbox/mcp/tools/benchmark.py",
+    "docs/operations/concurrency-proof-matrix.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:03:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3b2b5f8853d14a86bd2e4f0caa38a46c",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
