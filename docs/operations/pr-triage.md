@@ -106,8 +106,8 @@ a PR's mergeability — both only alert.
   armed by `opened`, `reopened`, or `synchronize` (a re-push will not flip it
   on). The intentional arm paths are:
 
-  - `make pr-arm` on a finished branch (enqueues the exact local head after a
-    live check of the PR)
+  - `make pr-arm` on a finished branch (arms auto-merge on the exact local head
+    after a live check of the PR)
   - `make pr-open READY=1` to open or reuse the PR and arm it in one step
   - `make pr-ready PR=<n> HEAD=<sha>`, which arms through `make pr-arm`; with
     `EVIDENCE=<path>` or `BATCH=1` it runs the evidence transaction instead,
@@ -118,7 +118,39 @@ a PR's mergeability — both only alert.
   and never arms (its draft→ready arm point never fired once and was deleted
   — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
   D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
-  label; the evidence transaction also refuses for soundness paths.
+  label. The workflow revokes on that label, not on soundness paths; the
+  evidence transaction also refuses for soundness paths.
+  Soundness-path PRs require `oracle-review` on the current head and resolved
+  threads. After any push or refresh, rerun CI and obtain the connector's
+  review or thumbs-up (or the stand-in approval) on that head before arming.
+  Withdraw readiness before editing an armed PR.
+
+  To rerun `oracle-review`, first read the current PR:
+
+  ```bash
+  gh pr view <pr> --repo BenchBox-dev/BenchBox \
+    --json state,baseRefName,headRefName,headRefOid,isCrossRepository
+  ```
+
+  Confirm the PR is open, targets `develop`, and still has the reviewed head.
+  For a same-repository PR, select its current feature branch:
+
+  ```bash
+  gh workflow run oracle-review.yml --repo BenchBox-dev/BenchBox \
+    --ref <current-feature-branch> -f pr=<pr>
+  ```
+
+  Both `develop` and the selected feature branch must contain the dispatch
+  workflow. Review changes to that workflow before dispatch; checking out the
+  trusted base protects the checker and manifest, but does not authenticate
+  the candidate workflow.
+
+  Verify the resulting run's `headSha` and its `oracle-review` check against
+  the PR's still-current head before assessing readiness. For a fork PR,
+  rerun an existing `oracle-review` job from a PR run on that exact head;
+  parent-repository dispatch cannot select the fork's branch. If no eligible
+  current-head run exists, obtain one first. A successful rerun does not arm
+  the PR.
 
   **Classifier (arm intent):** a PR is stranded only when auto-merge is off
   *and* the issue/PR timeline includes at least one of
@@ -167,8 +199,14 @@ once when it drains — never a per-run flood of new issues.
 
 ## Red develop tip
 
-There is no post-merge workflow: the merge queue runs the six required units
-on the exact tree that lands, so a red develop tip means something reached
-develop outside the queue or a queue certification was wrong. Treat it as
-**same-day fix-forward priority**, because every PR opened after a red tip
-inherits the breakage. The green-unmerged sweep no longer reports it.
+`.github/workflows/trunk.yml` tests `develop` on pushes (fast lane,
+four-shard medium tier, correctness gate and required-local-cases), and builds
+the verified release distribution artifact. Pending runs are retained with
+`concurrency.queue: max`, so results can lag during merge bursts; a missing
+push event still needs separate recovery. A red develop tip is a trunk
+failure that the PR's own checks did not catch. Revert first: run
+`make trunk-revert PR=<n>` for the culprit and fix it afterwards. While trunk has
+been red for more than 30 minutes, `make pr-open` refuses any PR that is not a
+revert, because every PR opened on a red tip inherits the breakage. The
+green-unmerged sweep does not report it.
+See [Merge and trunk governance](merge-queue-governance.md).
