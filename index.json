@@ -11426,10 +11426,10 @@
     },
     "live-cloud-benchmark-tpcds-tpcdi": {
       "claim": {
-        "expires_at": "2026-09-20T11:54:52Z",
-        "generation": "d80ba3dd3c1f445eb06600dffe1a5e2f",
+        "expires_at": "2026-10-05T18:41:32Z",
+        "generation": "54e48a1431384c8fb5ca48029a3585d7",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2152d1a549aa2ceb28fbbf4c"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64"
       },
       "needs": [
         "first-live-cloud-benchmark-run-and-publish"
