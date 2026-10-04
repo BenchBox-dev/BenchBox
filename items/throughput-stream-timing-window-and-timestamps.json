@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Decision recorded on whether connection setup belongs in Ts (spec-justified), and the timing window matches it",
+    "Exported per-stream timestamps are wall-clock times, with durations still from the monotonic clock",
+    "Phase start/end and duration describe the same interval",
+    "Tests assert plausible exported timestamps"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Timestamp conversion confirmed by two reviewers.",
+  "description": "Stream start_time is taken before `connection_factory()` (connect, SET statements, configure_for_benchmark) and end_time after `close()` (tpch/throughput_test.py:401,419,557-568; tpcds/throughput_test.py:655,670,725-728). Independent-connection setup therefore inflates Total Test Time and deflates Throughput@Size.\n\nPer-stream start/end times are perf_counter() values, which result_capture.py:1661-1662 and :1748-1755 pass to datetime.fromtimestamp, producing dates like 1970-01-02. The phase-level start time also includes pre-generation, while duration_ms does not.",
+  "links": [
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/core/tpcds/throughput_test.py",
+    "benchbox/platforms/base/result_capture.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:00:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6b6c71a438f1435fb8d8ffbc0127a7e2",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

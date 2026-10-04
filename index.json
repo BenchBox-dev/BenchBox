@@ -19815,6 +19815,13 @@
       "status": "done",
       "title": "Propagate per-stream success into exported throughput results; make dead streams fatal outside the UAT lane"
     },
+    "throughput-stream-timing-window-and-timestamps": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Throughput stream timing includes connection setup, and per-stream timestamps export as 1970 dates"
+    },
     "throughput-timeout-leak-and-success-gates": {
       "claim": null,
       "needs": [],
