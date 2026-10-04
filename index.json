@@ -6650,7 +6650,12 @@
       "title": "Parameter adapters for the 27 TPC-DS queries the inventory heuristic missed"
     },
     "dfparity-t06-literal-fallback-lint": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:06:07Z",
+        "generation": "95c1dc4cf24248a6a9234b42b1f2d8a5",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t05-adapter-batches",
         "dfparity-t05a-adapters-batch-a",
@@ -6662,7 +6667,7 @@
         "dfparity-t05g-adapters-hard-coded"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Add an AST lint banning params.get(\"k\", literal) fallbacks for unmapped TPC-DS keys"
     },
     "dfparity-t07-per-query-enablement": {
