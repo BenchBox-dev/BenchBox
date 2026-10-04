@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Test: generating TPC-DS with default compression produces all 25 tables' files and a manifest listing them (smallest scale that works).",
+    "e2e: `benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --tuning notuning --phases generate,load,power --queries 3 --non-interactive` exits 0 with all 25 tables non-empty, with default compression and with `--compression none`.",
+    "A generation that cannot produce all chunks fails with an error naming the cause, not an empty manifest."
+  ],
+  "context": "Source: found by an agent reproducing the TPC-DS maintenance regression (PR #2643, 2026-10-04). Related: datagen-empty-manifest-vacuous-validation-20261001 (done; PR #2625, follow-ups #2637 and the all-generators guard).",
+  "description": "## Problem (reproduced once, by an agent on macOS arm64; not re-run by a second person)\n`benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --phases generate,load` with the default compression wrote only chunk 1 of the 10 data files, recorded a `_datagen_manifest.json` that lists no tables, and loaded zero rows. With `--compression none` the same command works. This is the most likely origin of the stale zero-table manifest behind the vacuous-validation incident (`datagen-empty-manifest-vacuous-validation-20261001`, whose guards now make the run fail loudly instead of passing). The run still cannot complete with default compression.\n\n## Change\n- Find why generation stops after the first chunk under default compression (start in `benchbox/core/tpcds/generator/` streaming, compression and manifest-writing code; the zstd path counts rows and swallows exceptions at `filesystem.py` `_write_manifest`).\n- Fix generation so every chunk is written and recorded, or fail generation with an actionable error.\n- Keep the zero-table and zero-row guards from the datagen item.\n\n## Guardrails (must preserve)\n- Uncompressed generation and the `--compression` options keep working.\n- Do not weaken the zero-table manifest checks.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/core/tpcds/generator/filesystem.py",
+    "benchbox/core/tpcds/generator/streaming.py",
+    "benchbox/core/tpcds/generator/manager.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:53:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0b233d41e1c3436bba3217094d72fc1e",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
