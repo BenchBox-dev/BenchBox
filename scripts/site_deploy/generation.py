@@ -15,6 +15,7 @@ from scripts.site_deploy.receipt import (
     receipt_sha256,
     validate_receipt,
 )
+from scripts.site_deploy.renderer import SPHINX
 
 DEPLOY = "deploy"
 NOOP = "noop"
@@ -39,6 +40,7 @@ class Deployed:
     snapshot_version: int
     newer_unreceipted: bool = False
     link_baseline: dict[str, list[list[str]]] = field(default_factory=dict)
+    renderer: str = SPHINX
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ def deployed_from_receipt(receipt: dict[str, Any], receipt_sha: str, newer_unrec
         snapshot_version=int(receipt["versions"]["snapshot"]),
         newer_unreceipted=newer_unreceipted,
         link_baseline=link_baseline,
+        renderer=str(receipt.get("renderer") or SPHINX),
     )
 
 

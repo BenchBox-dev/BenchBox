@@ -10,7 +10,9 @@ from typing import Any
 
 import yaml
 
-from scripts.publication.assembler import LaneArtifact, SiteAssembler, compute_tree_digest
+from scripts.publication.assembler import LaneArtifact, SiteAssembler, compute_file_sha256, compute_tree_digest
+from scripts.site_deploy import mixed_version
+from scripts.site_deploy.renderer import ASTRO, POLICIES, RENDERERS, SPHINX
 
 REF_KINDS = ("release-tag", "trunk")
 BUILDERS = ("landing", "docs", "blog", "explorer")
@@ -18,6 +20,10 @@ ROOT_FILE_NAMES = ("CNAME", ".nojekyll", "404.html")
 LANDING_EXCLUDES = ("docs", "blog", "results", "_static", "_images", *ROOT_FILE_NAMES)
 BLOG_ASSET_DIRS = ("_static", "_images")
 FULL_STAGE_BUILDERS = ("explorer",)
+ASTRO_SHARED_ASSET_DIRS = ("_astro", "_images")
+ASTRO_LANDING_EXCLUDES = ("docs", "blog", "results", *ROOT_FILE_NAMES)
+EXPLORER_SNAPSHOT = "data/results.duckdb"
+EXPLORER_SNAPSHOT_DIR = "data"
 SCHEMA = "site-deploy-route-assembly/v1"
 
 
@@ -34,11 +40,20 @@ class Route:
 
 
 @dataclass(frozen=True)
+class Mount:
+    relative: str
+    prefix: str
+    excludes: tuple[str, ...] = ()
+    shared: bool = False
+
+
+@dataclass(frozen=True)
 class RouteManifest:
     refs: dict[str, str]
     routes: tuple[Route, ...]
     root_files_ref: str
     root_files: tuple[str, ...]
+    renderer_policy: str = SPHINX
 
     def ref_names(self) -> set[str]:
         return {route.ref for route in self.routes} | {self.root_files_ref}
@@ -88,7 +103,18 @@ def parse_manifest(data: Mapping[str, Any]) -> RouteManifest:
     unknown = sorted(set(root_files) - set(ROOT_FILE_NAMES))
     if unknown:
         raise RouteManifestError(f"root_files names unsupported files: {unknown}")
-    return RouteManifest(refs=refs, routes=tuple(routes), root_files_ref=root_ref, root_files=root_files)
+    policy = str(data.get("renderer", SPHINX))
+    if policy not in POLICIES:
+        raise RouteManifestError(f"renderer policy {policy!r} is not one of {POLICIES}")
+    if sorted(set(refs.values())) != sorted(REF_KINDS):
+        raise RouteManifestError(f"routes manifest needs exactly one ref of each kind {REF_KINDS}")
+    return RouteManifest(
+        refs=refs, routes=tuple(routes), root_files_ref=root_ref, root_files=root_files, renderer_policy=policy
+    )
+
+
+def release_ref(manifest: RouteManifest) -> str:
+    return next(name for name, kind in manifest.refs.items() if kind == "release-tag")
 
 
 def load_manifest(path: Path) -> RouteManifest:
@@ -116,32 +142,33 @@ def _extract(stage: Path, relative: str, destination: Path, excludes: tuple[str,
     return destination
 
 
-def _mounts(route: Route) -> list[tuple[str, str, tuple[str, ...]]]:
+def _mounts(route: Route, renderer: str = SPHINX) -> list[Mount]:
+    astro = renderer == ASTRO
     if route.builder == "landing":
-        return [("", route.path, LANDING_EXCLUDES)]
+        return [Mount("", route.path, ASTRO_LANDING_EXCLUDES if astro else LANDING_EXCLUDES)]
     if route.builder == "docs":
-        return [("docs", route.path, ())]
+        return [Mount("docs", route.path)]
     if route.builder == "blog":
-        mounts: list[tuple[str, str, tuple[str, ...]]] = [("blog", route.path, ())]
-        mounts.extend((name, f"/{name}/", ()) for name in BLOG_ASSET_DIRS)
-        return mounts
-    return [("results", route.path, ())]
+        assets = ASTRO_SHARED_ASSET_DIRS if astro else BLOG_ASSET_DIRS
+        return [Mount("blog", route.path), *(Mount(name, f"/{name}/", shared=astro) for name in assets)]
+    return [Mount("results", route.path)]
 
 
-def owner_ref(manifest: RouteManifest, path: str) -> str | None:
+def owner_ref(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> str | None:
     clean = path.split("#", 1)[0].split("?", 1)[0]
     if any(clean == f"/{name}" for name in manifest.root_files):
         return manifest.root_files_ref
     best: tuple[int, str] | None = None
     for route in manifest.routes:
-        for _, prefix, _ in _mounts(route):
+        for mount in _mounts(route, renderer):
+            prefix = mount.prefix
             if (clean.startswith(prefix) or clean == prefix.rstrip("/")) and (best is None or len(prefix) > best[0]):
                 best = (len(prefix), route.ref)
     return best[1] if best else None
 
 
-def is_trunk_owned(manifest: RouteManifest, path: str) -> bool:
-    ref = owner_ref(manifest, path)
+def is_trunk_owned(manifest: RouteManifest, path: str, renderer: str = SPHINX) -> bool:
+    ref = owner_ref(manifest, path, renderer)
     return ref is not None and manifest.refs[ref] == "trunk"
 
 
@@ -163,6 +190,45 @@ def _stage_requires_full(manifest: RouteManifest, ref: str) -> bool:
     return manifest.root_files_ref == ref and "404.html" in manifest.root_files
 
 
+def _check_stage(ref: str, stage: Path, renderer: str) -> None:
+    if renderer == ASTRO and not (stage / mixed_version.ASTRO_ASSET_DIR).is_dir():
+        raise RouteManifestError(f"ref {ref} did not produce an astro build: no {mixed_version.ASTRO_ASSET_DIR}/")
+    foreign = sorted(kind for kind in mixed_version.tree_renderers(stage) if kind != renderer)
+    if foreign:
+        raise RouteManifestError(f"ref {ref} stage for {renderer} carries {', '.join(foreign)} output")
+
+
+def _drop_shared_duplicates(extracted: Path, prefix: str, claimed: Mapping[str, str], lane: str) -> bool:
+    _, _, files = compute_tree_digest(extracted)
+    for relative, sha in files.items():
+        final = f"{prefix.strip('/')}/{relative}"
+        if final not in claimed:
+            continue
+        if claimed[final] != sha:
+            raise RouteManifestError(f"{lane} and an earlier route ship different bytes at shared path {final}")
+        (extracted / relative).unlink()
+    remaining = [path for path in extracted.rglob("*") if path.is_file()]
+    return bool(remaining)
+
+
+def _explorer_pins(extracted: Path, scratch: Path, source_sha: str) -> dict[str, Any]:
+    ui = scratch / "ui"
+    shutil.copytree(
+        extracted,
+        ui,
+        ignore=lambda directory, names: {EXPLORER_SNAPSHOT_DIR} if Path(directory) == extracted else set(),
+    )
+    ui_digest, _, _ = compute_tree_digest(ui)
+    snapshot = extracted / EXPLORER_SNAPSHOT
+    return {
+        "ui": {"source_sha": source_sha, "sha256": ui_digest},
+        "snapshot": {
+            "path": EXPLORER_SNAPSHOT,
+            "sha256": compute_file_sha256(snapshot) if snapshot.is_file() else None,
+        },
+    }
+
+
 def assemble_routes(
     *,
     manifest: RouteManifest,
@@ -171,7 +237,10 @@ def assemble_routes(
     work_dir: Path,
     stage_builder: Callable[..., None],
     resolve_sha: Callable[[Path], str] = git_head_sha,
+    renderer: str = SPHINX,
 ) -> dict[str, Any]:
+    if renderer not in RENDERERS:
+        raise RouteManifestError(f"unknown renderer {renderer!r}; expected one of {RENDERERS}")
     wanted = manifest.ref_names()
     if set(ref_roots) != wanted:
         raise RouteManifestError(f"ref roots {sorted(ref_roots)} do not match manifest refs {sorted(wanted)}")
@@ -182,24 +251,42 @@ def assemble_routes(
     for ref in sorted(wanted):
         stage = work_dir / "stage" / ref
         stage_builder(repo_root=ref_roots[ref], site_dir=stage, prose_only=not _stage_requires_full(manifest, ref))
+        _check_stage(ref, stage, renderer)
         stages[ref] = stage
+    shas = {ref: resolve_sha(ref_roots[ref]) for ref in sorted(wanted)}
+    planned = [
+        (index, mount_index, route, mount)
+        for index, route in enumerate(manifest.routes)
+        for mount_index, mount in enumerate(_mounts(route, renderer))
+    ]
+    planned.sort(key=lambda item: item[3].shared)
     lanes: list[tuple[LaneArtifact, Path]] = []
     lane_routes: dict[str, str] = {}
     lane_digests: dict[str, str] = {}
-    for index, route in enumerate(manifest.routes):
-        if route.builder == "landing" and not (ref_roots[route.ref] / "landing").is_dir():
+    claimed: dict[str, str] = {}
+    pins: dict[str, dict[str, Any]] = {}
+    for index, mount_index, route, mount in planned:
+        if route.builder == "landing" and renderer == SPHINX and not (ref_roots[route.ref] / "landing").is_dir():
             raise RouteManifestError(f"route {route.path} needs landing/ in ref {route.ref}")
-        for mount_index, (relative, prefix, excludes) in enumerate(_mounts(route)):
-            extracted = _extract(stages[route.ref], relative, work_dir / "lanes" / f"{index}-{mount_index}", excludes)
-            if extracted is None:
-                raise RouteManifestError(
-                    f"route {route.path} ({route.builder}) found no {relative!r} in ref {route.ref}"
-                )
-            name = f"{route.path}:{relative or '.'}"
-            lane = _lane(name, prefix, extracted)
-            lanes.append((lane, extracted))
-            lane_routes[name] = route.path
-            lane_digests[name] = lane.digest
+        destination = work_dir / "lanes" / f"{index}-{mount_index}"
+        extracted = _extract(stages[route.ref], mount.relative, destination, mount.excludes)
+        if extracted is None:
+            if mount.shared:
+                continue
+            raise RouteManifestError(
+                f"route {route.path} ({route.builder}) found no {mount.relative!r} in ref {route.ref}"
+            )
+        name = f"{route.path}:{mount.relative or '.'}"
+        if mount.shared and not _drop_shared_duplicates(extracted, mount.prefix, claimed, name):
+            continue
+        lane = _lane(name, mount.prefix, extracted)
+        lanes.append((lane, extracted))
+        lane_routes[name] = route.path
+        lane_digests[name] = lane.digest
+        base = mount.prefix.strip("/")
+        claimed.update({f"{base}/{rel}" if base else rel: sha for rel, sha in lane.file_manifest.items()})
+        if route.builder == "explorer":
+            pins[route.path] = _explorer_pins(extracted, work_dir / "pins" / str(index), shas[route.ref])
     for index, filename in enumerate(manifest.root_files):
         extracted = _extract(stages[manifest.root_files_ref], filename, work_dir / "lanes" / f"root-{index}")
         if extracted is None:
@@ -207,28 +294,37 @@ def assemble_routes(
         lanes.append((_lane(f"root:{filename}", "/", extracted), extracted))
     assembler = SiteAssembler(site_dir, receipt_path=work_dir / "assembly.json")
     receipt, _ = assembler.assemble(lanes)
+    try:
+        renderer_pages = mixed_version.require_single_renderer(site_dir, renderer)
+    except mixed_version.RendererMixError as exc:
+        shutil.rmtree(site_dir, ignore_errors=True)
+        raise RouteManifestError(f"refusing a mixed-renderer artifact: {exc}") from exc
     owners = assembler.claimed_paths
-    shas = {ref: resolve_sha(ref_roots[ref]) for ref in sorted(wanted)}
     routes_out = []
     for route in manifest.routes:
         owned = sorted(path for path, lane in owners.items() if lane_routes.get(lane) == route.path)
-        routes_out.append(
-            {
-                "path": route.path,
-                "ref": route.ref,
-                "ref_kind": manifest.refs[route.ref],
-                "builder": route.builder,
-                "source_sha": shas[route.ref],
-                "corpus": route.corpus,
-                "owned_files": len(owned),
-                "lane_sha256": {
-                    name: lane_digests[name] for name in sorted(lane_digests) if lane_routes[name] == route.path
-                },
-            }
-        )
+        entry = {
+            "path": route.path,
+            "ref": route.ref,
+            "ref_kind": manifest.refs[route.ref],
+            "builder": route.builder,
+            "renderer": renderer,
+            "source_sha": shas[route.ref],
+            "corpus": route.corpus,
+            "owned_files": len(owned),
+            "lane_sha256": {
+                name: lane_digests[name] for name in sorted(lane_digests) if lane_routes[name] == route.path
+            },
+        }
+        if route.path in pins:
+            entry["pins"] = pins[route.path]
+        routes_out.append(entry)
     root_owned = sorted(path for path, lane in owners.items() if lane.startswith("root:"))
     return {
         "schema": SCHEMA,
+        "renderer": renderer,
+        "renderer_policy": manifest.renderer_policy,
+        "renderer_pages": renderer_pages,
         "refs": {ref: {"kind": manifest.refs[ref], "source_sha": shas[ref]} for ref in sorted(wanted)},
         "routes": routes_out,
         "root_files": root_owned,

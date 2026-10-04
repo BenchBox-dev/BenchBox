@@ -19,7 +19,9 @@ from scripts.site_deploy import (
     generation,
     mixed_version,
     receipt as receipt_module,
+    renderer as renderer_module,
     rollback as rollback_module,
+    routes as routes_module,
 )
 from scripts.site_deploy.githubapi import ApiError, GitHubClient
 
@@ -27,6 +29,7 @@ RESOLVED_SCHEMA = "site-deploy-resolved/v1"
 RECEIPT_ARTIFACT_PATTERN = re.compile(r"^site-deploy-receipt-(?P<run>\d+)-(?P<attempt>\d+)$")
 RECEIPT_FILE = "receipt.json"
 SITE_URL = "https://benchbox.dev"
+ROUTES_MANIFEST = Path("deploy/routes.yml")
 
 
 def _client() -> GitHubClient:
@@ -160,7 +163,13 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
         "phase": args.rollback_phase,
         "receipt_sha256": receipt_module.receipt_sha256(raw),
     }
+    restored_renderer = receipt_module.renderer_of(target)
     outcome = {
+        "selection": {
+            "renderer": restored_renderer,
+            "policy": "receipt",
+            "reason": f"rollback restores the {restored_renderer} artifact recorded in the target receipt",
+        },
         "trunk_sha": target["trunk_sha"],
         "release_tag": target["release_tag"],
         "release_sha": target["release_sha"],
@@ -189,6 +198,11 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
             "newest_deployment_id": unknown["newest_deployment_id"],
         }
     deployed = generation.read_deployed(client, loader, allow_bootstrap=False, require_good=False)
+    if args.rollback_phase == "ui-first" and deployed is not None and deployed.renderer != restored_renderer:
+        raise rollback_module.RollbackError(
+            f"ui-first would put the {restored_renderer} root 404.html into the deployed {deployed.renderer} "
+            "artifact; roll back with the full phase"
+        )
     decision = generation.generation_gate(
         candidate_trunk=target["trunk_sha"],
         candidate_tag=target["release_tag"],
@@ -204,6 +218,11 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
 def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any) -> dict[str, Any]:
     tag = candidate_module.latest_release_tag(candidate_module.release_tags(args.repo_dir))
     release_sha = candidate_module.tag_commit(args.repo_dir, tag)
+    manifest = routes_module.load_manifest(args.repo_dir / ROUTES_MANIFEST)
+    try:
+        selection = renderer_module.select_for_commit(manifest.renderer_policy, args.repo_dir, release_sha)
+    except renderer_module.RendererError as exc:
+        raise candidate_module.CandidateError(f"renderer selection for {tag} failed: {exc}") from exc
     shas = candidate_module.first_parent_shas(args.repo_dir, "HEAD")
     found = candidate_module.find_candidate(client, shas, tag)
     bootstrap = args.bootstrap or args.mode == "preview"
@@ -216,6 +235,7 @@ def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any
         is_ancestor=_ancestry(args.repo_dir),
     )
     return {
+        "selection": selection.to_dict(),
         "decision": decision,
         "deployed": deployed,
         "trunk_sha": found.trunk_sha,
@@ -239,6 +259,11 @@ def command_resolve(args: argparse.Namespace) -> int:
     )
     decision = outcome["decision"]
     deployed = outcome["deployed"]
+    selected = outcome["selection"]["renderer"]
+    deployed_renderer = deployed.renderer if deployed else None
+    visual_required = args.mode != "rollback" and (
+        selected == renderer_module.ASTRO or (deployed_renderer is not None and deployed_renderer != selected)
+    )
     resolved = {
         "schema": RESOLVED_SCHEMA,
         "mode": args.mode,
@@ -256,6 +281,10 @@ def command_resolve(args: argparse.Namespace) -> int:
         "rollback": outcome["rollback"],
         "current_unknown": outcome["current_unknown"],
         "newest_deployment_id": outcome["newest_deployment_id"],
+        "renderer": selected,
+        "renderer_selection": outcome["selection"],
+        "deployed_renderer": deployed_renderer,
+        "visual_required": visual_required,
     }
     _write_json(args.output, resolved)
     _github_output(
@@ -264,9 +293,12 @@ def command_resolve(args: argparse.Namespace) -> int:
             "trunk_sha": resolved["trunk_sha"],
             "release_tag": resolved["release_tag"],
             "release_sha": resolved["release_sha"],
+            "renderer": selected,
+            "visual_required": "true" if visual_required else "false",
         }
     )
     print(f"{decision.action}: {decision.reason}")
+    print(f"renderer {selected}: {outcome['selection']['reason']}")
     return 1 if decision.action == generation.REFUSE else 0
 
 
@@ -311,6 +343,11 @@ def command_gates(args: argparse.Namespace) -> int:
 
     resolved = _read_json(args.resolved)
     assembly = _read_json(args.assembly)
+    renderer = receipt_module.renderer_of(assembly)
+    if renderer != receipt_module.renderer_of(resolved):
+        raise renderer_module.RendererError(
+            f"the assembly renderer {renderer} differs from the resolved {receipt_module.renderer_of(resolved)}"
+        )
     corpus_sha = args.corpus_sha or gates_module.corpus_tree_sha(args.repo_root, resolved["trunk_sha"])
     deployed = resolved["deployed"]
     live_version = None
@@ -331,6 +368,7 @@ def command_gates(args: argparse.Namespace) -> int:
         rollback_phase=(resolved["rollback"] or {}).get("phase", "full"),
         ui_version=args.ui_version,
         release_tag=resolved["release_tag"],
+        renderer=renderer,
     )
     gates = gates_module.run_gates(inputs)
     if live_version is not None:
@@ -421,6 +459,8 @@ def command_fetch_run(args: argparse.Namespace) -> int:
     (args.receipt_dir / RECEIPT_FILE).write_bytes(raw)
     if args.tree_dir is not None:
         gh_download(repo, args.run_id, built["artifact"]["name"], args.tree_dir)
+        if args.verify_tree:
+            artifacts.verify_tree(args.tree_dir, built["artifact"]["sha256"])
     print(f"fetched run {args.run_id} receipt sha256 {receipt_module.receipt_sha256(raw)}")
     return 0
 
@@ -458,7 +498,16 @@ def command_rollback_prepare(args: argparse.Namespace) -> int:
     corpus_sha = restore.receipt["corpus_sha"]
     if args.phase == "ui-first":
         corpus_sha = resolved["deployed"]["corpus_sha"]
-    assembly = {"routes": routes, "tree_sha256": digest, "total_bytes": total, "total_files": files}
+    renderers = {receipt_module.renderer_of(route) for route in routes}
+    if len(renderers) != 1:
+        raise rollback_module.RollbackError(f"the restored routes mix renderers {sorted(renderers)}")
+    assembly = {
+        "renderer": renderers.pop(),
+        "routes": routes,
+        "tree_sha256": digest,
+        "total_bytes": total,
+        "total_files": files,
+    }
     _write_json(args.out_dir / "route-assembly.json", assembly)
     _write_json(
         args.out_dir / "restore.json",
@@ -558,6 +607,7 @@ def build_parser() -> argparse.ArgumentParser:
     fetch.add_argument("--receipt-sha256")
     fetch.add_argument("--receipt-dir", type=Path, required=True)
     fetch.add_argument("--tree-dir", type=Path)
+    fetch.add_argument("--verify-tree", action="store_true")
     fetch.set_defaults(handler=command_fetch_run)
 
     prepare = commands.add_parser("rollback-prepare")
@@ -593,6 +643,7 @@ def main(argv: list[str] | None = None) -> int:
         mixed_version.VersionError,
         receipt_module.ReceiptError,
         rollback_module.RollbackError,
+        renderer_module.RendererError,
         OSError,
         subprocess.CalledProcessError,
     ) as exc:

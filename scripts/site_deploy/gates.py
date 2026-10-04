@@ -11,6 +11,7 @@ from typing import Any
 
 from scripts.site_deploy import mixed_version, routes as routes_module
 from scripts.site_deploy.candidate import SEMVER_TAG
+from scripts.site_deploy.renderer import SPHINX
 from scripts.site_inventory import INFO_KINDS
 
 PASS = "pass"
@@ -36,6 +37,7 @@ class GateInputs:
     ui_version: int | None = None
     release_tag: str | None = None
     routes_manifest: Path | None = None
+    renderer: str = SPHINX
 
 
 Runner = Callable[[list[str], Path], tuple[int, str]]
@@ -82,6 +84,12 @@ def explorer_compat_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
 def mixed_version_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     del runner
     try:
+        renderer_pages = mixed_version.require_single_renderer(inputs.site_dir, inputs.renderer)
+    except mixed_version.RendererMixError as exc:
+        result = _result(FAIL, str(exc))
+        result["renderer"] = inputs.renderer
+        return result
+    try:
         candidate = mixed_version.Versions(
             ui=inputs.ui_version
             if inputs.ui_version is not None
@@ -100,6 +108,8 @@ def mixed_version_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     result = _result(PASS if evaluation.ok else FAIL, evaluation.reason)
     result["evaluation"] = evaluation.to_dict()
     result["versions"] = {"ui_expected": candidate.ui, "snapshot": candidate.snapshot}
+    result["renderer"] = inputs.renderer
+    result["renderer_pages"] = renderer_pages
     return result
 
 
@@ -240,7 +250,7 @@ def link_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     allowed = {tuple(entry) for entry in known}
 
     def trunk_involved(entry: tuple[str, ...]) -> bool:
-        return any(routes_module.is_trunk_owned(manifest, endpoint) for endpoint in entry[:2])
+        return any(routes_module.is_trunk_owned(manifest, endpoint, inputs.renderer) for endpoint in entry[:2])
 
     fresh_trunk = [entry for entry in listing if entry not in allowed and trunk_involved(entry)]
     if fresh_trunk:
