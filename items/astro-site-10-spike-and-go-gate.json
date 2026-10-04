@@ -7,7 +7,7 @@
     "Owner decision recorded: GO with D6 resolved, or NO-GO (drop downstream astro-site-* items)",
     "Spike not wired into required CI"
   ],
-  "context": "Go criteria: exact URL preservation achievable; zero axe serious or critical violations; build time no worse than the current Sphinx docs-build step; Explorer integration needs only shell extraction and config edits, no logic changes. Any miss means NO-GO, or a documented mitigation the owner explicitly accepts. Time box: stop and report once the scope builds, even if the report is negative.",
+  "context": "Go criteria: exact URL preservation achievable; zero axe serious or critical violations; build time no worse than the current Sphinx docs-build step; Explorer integration needs only shell extraction and config edits, no logic changes. Any miss means NO-GO, or a documented mitigation the owner explicitly accepts. Time box: stop and report once the scope builds, even if the report is negative.\n\nDONE 2026-10-04: merged in https://github.com/BenchBox-dev/BenchBox/pull/2597 (develop def3036c). Report _project/decisions/astro-spike-report.md: GO under S1, D6 resolved (Starlight in custom shell). Deviation: site-build feeds the required landing unit result (review finding on #2597: an ungated build could rot); the spike itself has no dedicated required check.",
   "description": "Build a spike under website/ with no required CI. Build Starlight inside the shared shell first. Build a custom docs layout only if the Starlight overrides prove brittle; record which overrides those were.\n\nRepresentative scope, all required:\n1. One complex RST page with toctree and :doc: roles, e.g. docs/benchmarks/industry-benchmarks.rst\n2. One MyST page, docs/usage/getting-started.md\n3. One real blog post, 2026-05-18-v0-3-0-release-overview, at its current .html URL\n4. One authored API contract page using the astro-site-02 template\n5. One generated query docs page from scripts/generate_query_docs.py\n6. Landing hero\n7. Explorer at /results/ with working deep links (direct load of a nested /results/... route and of a query-string state URL)\n8. Shared header and theme, using localStorage key benchbox:theme\n9. Browser back/forward navigation, and DuckDB worker/WASM loading verified in Chromium\n10. Pagefind over docs and blog\n\nMeasure on the same CI runner class:\n- build time vs the current docs-build step\n- HTML+JS bytes per page\n- that docs and blog pages load zero Explorer/DuckDB bytes\n- axe results\n- exact URL output\n\nWrite _project/decisions/astro-spike-report.md with the numbers and a go/no-go recommendation.",
   "sessions": [
     {
@@ -41,6 +41,14 @@
       "generation": "6c73b638263d484b80001bfd479b17fc",
       "op": "take",
       "op_id": "be31a48c0cfe427ea4e298967e5a924b",
+      "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b",
+      "at": "2026-10-04T01:01:07Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "17b597608c644a64867ecff24796da5c",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
     }
   ]
