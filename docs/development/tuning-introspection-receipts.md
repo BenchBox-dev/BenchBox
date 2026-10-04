@@ -47,6 +47,29 @@ The earlier name `verifiable_total` was removed because a count that includes
 consumers of this additive receipt-summary key; the upgrade decision continues
 to use the entry verdicts directly.
 
+## Where the trust code lives
+
+The adapter-side corroboration, drift-check routing, layout-operation fold, and
+ledger read-back live in `benchbox/platforms/base/tuning_trust.py`.
+`PlatformAdapter._corroborate_applied_ledger`,
+`_attach_applied_ledger_payload`, `_build_drift_check_payload`, and
+`_fold_layout_operations_into_ledger` remain as one-line delegates, so callers
+and subclasses keep their existing entry points. `applied_verified` is still
+emitted only by `corroborate_applied_ledger`, whose behavior is unchanged: it
+returns the status untouched unless the derived status is `applied_unverified`,
+and any introspector or corroboration error leaves the status as it was and
+logs at debug level.
+
+These files are soundness-manifest paths (`.github/soundness-paths.txt`), so a
+change to any of them needs the external soundness review before it is armed:
+`benchbox/platforms/base/tuning_trust.py`,
+`benchbox/core/tuning/introspection.py`, `applied_ledger.py`,
+`capability_registry.py`, `metadata.py`,
+`benchbox/platforms/*_introspection.py`, and
+`benchbox/platforms/clickhouse/introspection.py`. The manifest cannot name a
+region of a file, which is why the logic sits in its own module instead of
+making all of `adapter.py` a soundness path.
+
 ## Statement classes (per phase x mechanism)
 
 `corroborate()` gates every ledger statement by recorded status and phase,
