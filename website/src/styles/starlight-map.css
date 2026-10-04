@@ -6,7 +6,7 @@
   --sl-color-accent-high: var(--accent-primary);
   --sl-color-accent-low: var(--bg-tertiary);
   --sl-color-bg: var(--bg-primary);
-  --sl-color-bg-nav: var(--header-bg);
+  --sl-color-bg-nav: var(--bb-site-header-bg);
   --sl-color-bg-sidebar: var(--bg-primary);
   --sl-color-hairline: var(--border-primary);
   --sl-color-hairline-light: var(--border-primary);

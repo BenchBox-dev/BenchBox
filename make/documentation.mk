@@ -90,6 +90,7 @@ site-dev: site-deps
 
 site-check: query-docs site-deps
 	@npm --prefix website run check
+	@npm --prefix website test
 	@npm --prefix website run audit:high
 
 # Run all documentation checks (build, linkcheck, validate)

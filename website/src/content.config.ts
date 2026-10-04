@@ -1,32 +1,47 @@
 import { docsSchema } from "@astrojs/starlight/schema";
+import { glob } from "astro/loaders";
 import { z } from "astro/zod";
 import { defineCollection } from "astro:content";
-import { docsLoader } from "./loaders/docs-loader.ts";
+
+const generatedContent = (pattern: string | string[]) =>
+  glob({
+    pattern,
+    base: "./.generated/content",
+    generateId: ({ entry }) => entry.replace(/\.mdx?$/, ""),
+  });
+
+const docsSchemaExtended = () =>
+  docsSchema({
+    extend: z.looseObject({
+      sourcePath: z.string().optional(),
+      titleId: z.string().optional(),
+      headingIds: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+    }),
+  });
 
 const docs = defineCollection({
-  loader: docsLoader([
-    { id: "docs/usage/getting-started", file: "docs/usage/getting-started.md" },
-    { id: "docs/benchmarks/industry-benchmarks", file: "docs/benchmarks/industry-benchmarks.md" },
-    { id: "docs/benchmarks/queries/tpch/q1", file: "docs/benchmarks/queries/tpch/q1.md" },
-    {
-      id: "docs/reference/python-api/additional-utilities",
-      file: "website/spike-content/additional-utilities.md",
-      summary: "Authored contract for format_scale_factor, written to the API reference page template.",
-    },
-  ]),
-  schema: docsSchema({ extend: z.object({ sourcePath: z.string().optional() }) }),
+  loader: generatedContent(["docs/**/*.{md,mdx}", "!docs/**/index.{md,mdx}"]),
+  schema: docsSchemaExtended(),
+});
+
+const docsIndex = defineCollection({
+  loader: generatedContent("docs/**/index.{md,mdx}"),
+  schema: docsSchemaExtended(),
 });
 
 const blog = defineCollection({
-  loader: docsLoader([{ id: "blog/2026-05-18-v0-3-0-release-overview", file: "docs/blog/2026-05-18-v0-3-0-release-overview.md" }]),
+  loader: generatedContent("blog/**/*.{md,mdx}"),
   schema: z.looseObject({
     title: z.string(),
-    date: z.string(),
+    date: z.string().optional(),
     author: z.string().optional(),
-    tags: z.string().optional(),
+    tags: z.array(z.string()).optional(),
     description: z.string().optional(),
     sourcePath: z.string().optional(),
+    titleId: z.string().optional(),
+    headingIds: z.array(z.string()).optional(),
   }),
 });
 
-export const collections = { docs, blog };
+export const collections = { docs, docsIndex, blog };

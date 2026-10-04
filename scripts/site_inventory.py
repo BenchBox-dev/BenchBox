@@ -546,7 +546,9 @@ def _parser() -> argparse.ArgumentParser:
     diff.add_argument("--baseline", type=Path, required=True)
     diff.add_argument("--candidate", type=Path, required=True)
     diff.add_argument("--strict", action="store_true", help="also fail on informational changes")
-    diff.add_argument("--expected-removals", type=Path, help="reviewed JSON list of allowed removals")
+    diff.add_argument(
+        "--expected-removals", type=Path, action="append", help="reviewed JSON list of allowed removals; repeatable"
+    )
     check = commands.add_parser("check", help="report broken internal links and images in one inventory")
     check.add_argument("--inventory", type=Path, required=True)
     check.add_argument("--known-broken", type=Path)
@@ -570,7 +572,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"wrote {destination_label}: {inventory['path_count']} paths, {inventory['page_count']} pages")
             return 0
         if args.command == "diff":
-            removals = load_expected_removals(args.expected_removals) if args.expected_removals else None
+            removals = (
+                [entry for path in args.expected_removals for entry in load_expected_removals(path)]
+                if args.expected_removals
+                else None
+            )
             diff_report = diff_inventories(load_inventory(args.baseline), load_inventory(args.candidate), removals)
             sys.stdout.write(format_report(diff_report))
             return exit_code(diff_report, strict=args.strict)

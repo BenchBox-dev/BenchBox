@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "47a63df3708b9b1465418b2c44111d555283ef996827f12c2f2270d46a4d6888",
+  "contract_sha256": "657256df71e43c4d7f7598e30cd4d4bc66739d50ca9c18c5d0abbac0bdf97380",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1019,8 +1019,8 @@
       },
       {
         "header": "lint-explorer-tokens:",
-        "recipe": "\tpython3 _project/scripts/scan_explorer_tokens.py",
-        "recipe_sha256": "a256e665905b0a2bb2be784e78ad1fa0e10b9706f394aeb429893af58141677d"
+        "recipe": "\tpython3 _project/scripts/scan_explorer_tokens.py results-explorer/src landing/shared/site-tokens.css",
+        "recipe_sha256": "1f799743a31e4041a828e4294e05d9875a57c1d557d3ed0562bf6d5b15b96a65"
       }
     ],
     "lint-imports": [
@@ -2307,7 +2307,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "723dd29d01da50b30515ff00b63682b97383ce02d84f8be368dc574a1280cdc0",
+  "semantic_sha256": "99235d3d35ef722806bedca3918f326aa00bb12237df443174bbcfe019e6e475",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3490,9 +3490,9 @@
       ]
     },
     {
-      "body": "lint-explorer-tokens:\n\tpython3 _project/scripts/scan_explorer_tokens.py",
+      "body": "lint-explorer-tokens:\n\tpython3 _project/scripts/scan_explorer_tokens.py results-explorer/src landing/shared/site-tokens.css",
       "kind": "rule",
-      "sha256": "d6d8e292fb8acf9ca389852539e528df2a5f27f25652bd3d59125c95804dc5ac",
+      "sha256": "6599e8fbda19862cc85ba7c5717ce1379dbb1c3278b2b29a3f412ec3ee7844d7",
       "targets": [
         "lint-explorer-tokens"
       ]

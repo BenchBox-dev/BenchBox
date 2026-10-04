@@ -14,7 +14,7 @@ const samplePages = [
   "/docs/usage/getting-started.html",
   "/docs/benchmarks/industry-benchmarks.html",
   "/docs/benchmarks/queries/tpch/q1.html",
-  "/docs/reference/python-api/additional-utilities.html",
+  "/docs/reference/api-reference.html",
   "/blog/2026-05-18-v0-3-0-release-overview.html",
 ];
 

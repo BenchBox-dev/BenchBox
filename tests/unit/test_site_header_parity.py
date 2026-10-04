@@ -1,5 +1,3 @@
-"""Static parity checks for the public BenchBox global header."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -95,7 +93,6 @@ def test_results_footer_radiogroup_binds_the_shared_aria_label() -> None:
     contract = _read("results-explorer/src/components/headerContract.ts")
 
     assert 'role="radiogroup"' in layout, "results footer should expose a theme radiogroup"
-    # Results renders the accessible name from a shared constant rather than a literal string.
     assert "aria-label={FOOTER_THEME_ARIA_LABEL}" in layout, "results radiogroup missing accessible name binding"
     assert 'FOOTER_THEME_ARIA_LABEL = "Color theme"' in contract, "results theme aria label contract drifted"
     for option in ("system", "light", "dark"):
@@ -178,9 +175,9 @@ def test_landing_section_navigation_is_sticky_colored_and_tracks_the_current_sec
 
     landing = _read("landing/index.html")
     prompts = _read("landing/prompts/index.html")
-    assert 'href="style.css?v=6"' in landing
+    assert 'href="style.css?v=7"' in landing
     assert 'src="script.js?v=1"' in landing
-    assert 'href="../style.css?v=6"' in prompts
+    assert 'href="../style.css?v=7"' in prompts
 
 
 def test_landing_introduces_results_explorer_with_public_compare_and_local_workflows() -> None:
@@ -210,8 +207,6 @@ def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     assert 'export const HEADER_NAV_ARIA_LABEL = "BenchBox"' in contract
     assert "aria-label={HEADER_NAV_ARIA_LABEL}" in layout
     assert 'aria-label="Results Explorer"' in layout
-    # The secondary-nav labels live in the declared section table in
-    # resultsNav.ts; Layout.tsx renders that table instead of hardcoding them.
     assert "RESULTS_NAV_SECTIONS" in layout
     for label in ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]:
         assert f'label: "{label}"' in nav
