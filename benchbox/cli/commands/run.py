@@ -1142,7 +1142,12 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
     if not s.platform_key or not s.benchmark:
         return
 
-    block_reason = PlatformRegistry.get_benchmark_block_reason(s.platform_key, s.benchmark)
+    try:
+        gated_platform = resolve_platform_selector(s.platform_key)
+    except ValueError:
+        gated_platform = s.platform_key
+
+    block_reason = PlatformRegistry.get_benchmark_block_reason(gated_platform, s.benchmark)
 
     if block_reason is None:
         return

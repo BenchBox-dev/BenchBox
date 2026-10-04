@@ -1150,3 +1150,12 @@ class TestPlatformDeploymentSelectorAvailability:
     def test_unknown_deployment_mode_lists_available_modes(self):
         _s, _exited, output = self._resolve("firebolt:bogus", {})
         assert "core, cloud" in output
+
+    @pytest.mark.parametrize("platform_key", ["clickhouse-local", "clickhouse:local"])
+    def test_benchmark_gate_applies_to_the_resolved_platform(self, platform_key: str):
+        """A selector must not slip past the registry's benchmark block for its platform."""
+        s = SimpleNamespace(platform_key=platform_key, benchmark="metadata_primitives", logger=None, ctx=MagicMock())
+        printed = MagicMock()
+        with patch.object(_run_module, "console", printed):
+            _run_module._check_benchmark_platform_compatibility(s)
+        s.ctx.exit.assert_called_once_with(1)
