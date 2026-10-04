@@ -192,7 +192,8 @@ def test_job_graph_orders_resolve_build_deploy_probe() -> None:
     jobs = _jobs()
     assert "needs" not in jobs["resolve"]
     assert jobs["build"]["needs"] == "resolve"
-    assert jobs["deploy"]["needs"] == ["resolve", "build"]
+    assert jobs["deploy"]["needs"] == ["resolve", "build", "visual"]
+    assert jobs["visual"]["needs"] == ["resolve", "build"]
     assert jobs["preview"]["needs"] == ["resolve", "build"]
 
 
@@ -232,3 +233,75 @@ def test_build_refuses_a_candidate_whose_control_plane_differs_from_the_dispatch
     for path in ("deploy", "scripts/site_deploy", "scripts/publication", "scripts/assemble_public_site.py"):
         assert path in guard["run"]
     assert names.index("Refuse a control plane that differs from the dispatched revision") < names.index("Run gates")
+
+
+def _step(job: str, name: str) -> dict[str, Any]:
+    return next(step for step in _steps(job) if step.get("name") == name)
+
+
+def test_resolve_exposes_the_renderer_and_whether_the_visual_comparison_runs() -> None:
+    outputs = _jobs()["resolve"]["outputs"]
+    assert outputs["renderer"] == "${{ steps.resolve.outputs.renderer }}"
+    assert outputs["visual_required"] == "${{ steps.resolve.outputs.visual_required }}"
+
+
+def test_each_renderer_builds_only_its_own_site() -> None:
+    build = _jobs()["build"]
+    assert build["env"]["RENDERER"] == "${{ needs.resolve.outputs.renderer }}"
+    for name in ("Build release documentation", "Generate trunk documentation inputs", "Build trunk documentation"):
+        assert "needs.resolve.outputs.renderer == 'sphinx'" in _step("build", name)["if"], name
+    for name in ("Build the release site with Astro", "Build the trunk site with Astro"):
+        step = _step("build", name)
+        assert "needs.resolve.outputs.renderer == 'astro'" in step["if"], name
+        assert "make site-build" in step["run"]
+    assert _step("build", "Build the release site with Astro")["working-directory"] == "release"
+    nodes = [step for step in _steps("build") if "setup-node" in step.get("uses", "")]
+    assert {step["with"]["node-version"] for step in nodes} == {"20", "22"}
+    assemble = _step("build", "Assemble routes")
+    assert '--renderer "$RENDERER"' in assemble["run"]
+
+
+def test_visual_comparison_runs_only_when_resolve_requires_it_and_reuses_the_capture_spec() -> None:
+    visual = _jobs()["visual"]
+    assert visual["if"] == "needs.resolve.outputs.visual_required == 'true'"
+    assert visual["permissions"] == {"contents": "read", "actions": "read"}
+    assert "environment" not in visual
+    fetch = _step("visual", "Fetch the last production artifact")
+    assert "scripts.site_deploy fetch-run" in fetch["run"]
+    assert "--verify-tree" in fetch["run"]
+    assert "--receipt-sha256" in fetch["run"]
+    runs = [step for step in visual["steps"] if step.get("run") == "npm run test:e2e:public-site"]
+    assert [step["name"] for step in runs] == [
+        "Capture the last production artifact",
+        "Capture the candidate artifact",
+        "Compare the candidate with the last production artifact",
+    ]
+    production, candidate, compare = (step["env"] for step in runs)
+    assert production["PUBLIC_SITE_VISUAL_PHASE"] == candidate["PUBLIC_SITE_VISUAL_PHASE"] == "capture"
+    assert production["E2E_SITE_DIR"].endswith("/production/tree")
+    assert production["PUBLIC_SITE_VISUAL_RENDERER"] == "${{ steps.production.outputs.renderer }}"
+    assert candidate["PUBLIC_SITE_VISUAL_RENDERER"] == "${{ needs.resolve.outputs.renderer }}"
+    assert compare["PUBLIC_SITE_VISUAL_PHASE"] == "compare"
+    assert "PUBLIC_SITE_VISUAL_RENDERER" not in compare
+    assert compare["PUBLIC_SITE_VISUAL_REQUIRE_BASELINE"] == "1"
+    assert compare["PUBLIC_SITE_VISUAL_BASELINE"] == production["PUBLIC_SITE_VISUAL_OUTPUT"]
+    assert compare["PUBLIC_SITE_VISUAL_OUTPUT"] == candidate["PUBLIC_SITE_VISUAL_OUTPUT"]
+    assert compare["PUBLIC_SITE_VISUAL_BASE_SHA"] == production["PUBLIC_SITE_VISUAL_SOURCE_SHA"]
+    assert (
+        compare["PR_HEAD_SHA"] == compare["PUBLIC_SITE_VISUAL_SOURCE_SHA"] == "${{ needs.resolve.outputs.trunk_sha }}"
+    )
+    assert compare["APPROVED_HEAD_SHA"] == "${{ vars.SITE_DEPLOY_VISUAL_APPROVED_SHA }}"
+    assert compare["APPROVAL_REASON"] == "${{ vars.SITE_DEPLOY_VISUAL_APPROVAL_REASON }}"
+    assert "vars.APPROVED_HEAD_SHA" not in SITE_DEPLOY_PATH.read_text(encoding="utf-8")
+    package = (ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8")
+    assert "e2e/captures/public-site-pages.spec.ts" in package
+
+
+def test_deploy_waits_for_a_required_visual_comparison_and_probe_survives_its_skip() -> None:
+    condition = _jobs()["deploy"]["if"]
+    assert condition.startswith("${{ !cancelled()")
+    assert condition.endswith("}}")
+    assert "needs.build.result == 'success'" in condition
+    assert "needs.visual.result == 'success'" in condition
+    assert "needs.visual.result == 'skipped' && needs.resolve.outputs.visual_required != 'true'" in condition
+    assert _jobs()["probe"]["if"] == "${{ !cancelled() && needs.deploy.result == 'success' }}"
