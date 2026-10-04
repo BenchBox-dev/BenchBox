@@ -19633,6 +19633,13 @@
       "status": "done",
       "title": "Switch TPC-DS Base Dialect from ANSI to Netezza ✅"
     },
+    "synapse-spark-apply-unified-tuning-signature-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Synapse Spark: apply_unified_tuning takes one argument but the setup phase passes two, so tuned runs raise TypeError"
+    },
     "synapse-spark-platform": {
       "claim": null,
       "needs": [

@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Test: every registered adapter's `apply_unified_tuning` accepts the arguments the base setup phase passes.",
+    "Synapse Spark with tuning enabled gets past the apply step against a fake service."
+  ],
+  "context": "Source: PR #2632 contract-test author report (2026-10-04). File path of the Synapse Spark adapter is a best guess; confirm with `grep -rn \"class SynapseSparkAdapter\" benchbox`.",
+  "description": "## Problem (observed by the contract-test author; reproduced against fakes, not a real Synapse workspace)\n`SynapseSparkAdapter.apply_unified_tuning(unified_config)` takes one argument. The base setup phase calls `apply_unified_tuning(config, connection)`. With tuning enabled the call raises `TypeError`.\n\n## Change\n- Align the signature with the base method (`unified_config, connection`) and check the other cloud Spark adapters (EMR Serverless, Dataproc Serverless, Fabric Spark, Athena Spark, Glue, Quanton) for the same drift.\n- Add a signature-conformance test over every adapter's `apply_unified_tuning` against the base method.\n\n## Guardrails (must preserve)\n- No live cloud runs without explicit approval stating the command, maximum runtime, log path and stop condition.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/platforms/azure/synapse_spark.py",
+    "benchbox/platforms/base/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:54:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1b14933336a44dd6a6a86eedde553fe2",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
