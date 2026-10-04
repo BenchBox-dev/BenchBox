@@ -21147,10 +21147,15 @@
       "title": "DECISION GATE (D-6): ledger outcome and phase vocabulary (dropped for skips, satisfied_by, closed phase set)"
     },
     "tuning-gate-load-only-semantics-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T16:26:38Z",
+        "generation": "86c710c5077a461092b7cfc64e756e5b",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "DECISION GATE (D-4): what --tuning means for load-only runs (--phases generate,load)"
     },
     "tuning-gate-local-result-anonymization-20261001": {
