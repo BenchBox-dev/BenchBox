@@ -1451,8 +1451,9 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     payload["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
     # Validation status
-    if result.tuning_validation_status:
-        payload["validation_status"] = result.tuning_validation_status.lower()
+    validation_status = _derived_validation_status(result)
+    if validation_status:
+        payload["validation_status"] = validation_status
 
     tuning_profile = _extract_tuning_profile_metadata(result)
     if tuning_profile:

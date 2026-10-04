@@ -535,7 +535,8 @@ def _reexport_legacy_bundle(tmp_path: Path, tuning_block: dict | None) -> dict:
     (source_dir / "run.json").write_text(json.dumps(bundle), encoding="utf-8")
 
     result, _raw = load_result_file(source_dir / "run.json")
-    assert result.tuning_validation_status == (tuning_block or {}).get("validation_status")
+    recorded = (tuning_block or {}).get("validation_status")
+    assert result.tuning_validation_status == (None if recorded == "not_validated" else recorded)
 
     again_dir = tmp_path / "again"
     again_dir.mkdir()
@@ -561,6 +562,23 @@ class TestReexportedLegacyBundleInventsNoStatus:
 
     def test_bundle_with_an_empty_tuning_block_gains_no_status(self, tmp_path: Path) -> None:
         again = _reexport_legacy_bundle(tmp_path, {})
+
+        assert "validation_status" not in again["platform"].get("tuning", {})
+
+    def test_bundle_that_recorded_not_validated_keeps_its_evidence_and_gains_no_status(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(
+            tmp_path,
+            {"source": "yaml", "hash": "a" * 64, "validation_status": "not_validated", "counts": {"tables_tuned": 1}},
+        )
+
+        tuning_block = again["platform"]["tuning"]
+        assert "validation_status" not in tuning_block
+        assert tuning_block["source"] == "yaml"
+        assert tuning_block["hash"] == "a" * 64
+        assert tuning_block["requested_config_hash"] == "a" * 64
+
+    def test_bundle_that_recorded_only_not_validated_gains_no_status(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, {"validation_status": "not_validated"})
 
         assert "validation_status" not in again["platform"].get("tuning", {})
 
@@ -615,3 +633,19 @@ class TestStatusDerivationIgnoresInternalSentinelsAndSparseResults:
         result = SimpleNamespace(tuning_validation_status=None, tuning_source=None, applied_tuning_ledger=None)
 
         assert _untuned_tuning_summary(result) == {}
+
+    def test_tuning_companion_payload_omits_the_sentinel_status(self) -> None:
+        from benchbox.core.results.schema import build_tuning_payload
+
+        result = build_enhanced_benchmark_result(
+            benchmark=SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None),
+            platform="duckdb",
+            query_results=[],
+            tunings_applied=dict(_REQUESTED_TUNING),
+            tuning_config_hash="a" * 64,
+        )
+
+        payload = build_tuning_payload(result)
+
+        assert payload is not None
+        assert "validation_status" not in payload
