@@ -47,11 +47,12 @@ This command checks the committed value inventory, sampled specification values,
 
 ## Comparison commands and lane boundaries
 
-The TPC-DS cross-surface gate is enforced. It builds SF 0.01 data on the default Power draw and compares all 103 statements on DuckDB with the Polars Expression, Pandas and native DataFusion implementations. CI runs it in two steps of the correctness-gate job:
+The TPC-DS cross-surface gate is enforced. It builds SF 0.01 data on the default Power draw and compares all 103 statements on DuckDB with the Polars Expression, Pandas and native DataFusion implementations. CI runs it in three steps of the correctness-gate job. `--shard K/N` compares every Nth statement after the full inventory is built and validated, so the two pandas shards together cover all 103:
 
 ```bash
 make tpcds-cross-surface-equivalence-report         # Polars and DataFusion
-make tpcds-pandas-cross-surface-equivalence-report  # Pandas
+make tpcds-pandas-1-cross-surface-equivalence-report  # Pandas, alternate statements from the first
+make tpcds-pandas-2-cross-surface-equivalence-report  # Pandas, alternate statements from the second
 ```
 
 The direct entry point is equivalent:

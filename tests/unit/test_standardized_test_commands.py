@@ -49,7 +49,9 @@ def _makefile_target_body(makefile_content: str, target_name: str) -> str:
 
 
 # Gates whose backends run as more than one Make target and CI step to stay within budget.
-_SPLIT_CROSS_SURFACE_TARGETS = {"tpcds": ("tpcds-pandas-cross-surface-equivalence-report",)}
+_SPLIT_CROSS_SURFACE_TARGETS = {
+    "tpcds": ("tpcds-pandas-1-cross-surface-equivalence-report", "tpcds-pandas-2-cross-surface-equivalence-report")
+}
 
 
 def _cross_surface_make_target(gate_name: str) -> str:
@@ -619,14 +621,23 @@ class TestMakefileCommands:
         run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "ci.yml", "correctness-gate")
         for gate_name, extra_targets in _SPLIT_CROSS_SURFACE_TARGETS.items():
             covered: set[str] = set()
+            shards: dict[str, set[str]] = {}
             for target in (_cross_surface_make_target(gate_name), *extra_targets):
                 body = _makefile_target_body(makefile_content, target)
                 assert f"--benchmark {gate_name}" in body, f"{target} must run --benchmark {gate_name}"
                 assert f"make {target}" in run_text, f"correctness-gate CI is missing make {target}"
-                covered.update(re.findall(r"--backend (\S+)", body))
+                backends = re.findall(r"--backend (\S+)", body)
+                covered.update(backends)
+                shard = re.search(r"--shard (\d+)/(\d+)", body)
+                if shard:
+                    for backend in backends:
+                        shards.setdefault(f"{backend}/{shard.group(2)}", set()).add(shard.group(1))
             assert covered == set(GATES[gate_name].backends), (
                 f"{gate_name} Make targets run {sorted(covered)}, gate backends are {sorted(GATES[gate_name].backends)}"
             )
+            for key, indexes in shards.items():
+                count = int(key.split("/")[1])
+                assert indexes == {str(index) for index in range(1, count + 1)}, f"{gate_name} {key} shards {indexes}"
 
     def test_main_release_required_includes_bounded_correctness_gate(self):
         repo_root = Path(__file__).resolve().parent.parent.parent

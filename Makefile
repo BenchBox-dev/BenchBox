@@ -359,14 +359,19 @@ tpch-cross-surface-equivalence-report:
 
 # Enforced gate: all 103 TPC-DS statements on the default Power draw at
 # SF=0.01. This target runs the expression family on Polars and native
-# DataFusion; pandas runs as its own target so each CI step stays within
-# budget. Exits non-zero on any unclassified divergence or vacuity change.
+# DataFusion; pandas runs as two half-size targets (alternate statements of the
+# validated 103-statement inventory) so each CI step stays within budget.
+# Exits non-zero on any unclassified divergence or vacuity change.
 tpcds-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend expression --backend datafusion
 
-.PHONY: tpcds-pandas-cross-surface-equivalence-report
-tpcds-pandas-cross-surface-equivalence-report:
-	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend pandas
+.PHONY: tpcds-pandas-1-cross-surface-equivalence-report
+tpcds-pandas-1-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend pandas --shard 1/2
+
+.PHONY: tpcds-pandas-2-cross-surface-equivalence-report
+tpcds-pandas-2-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend pandas --shard 2/2
 
 # Post-merge check (trunk.yml): every backend twice on three other Power draws, failing on a
 # divergence or a cell whose outcome changes between runs. Vacuity is listed

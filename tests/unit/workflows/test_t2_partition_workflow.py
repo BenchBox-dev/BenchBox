@@ -32,8 +32,10 @@ def test_correctness_partitions_preserve_each_gate_once() -> None:
         if gate == "joinorder":
             target = "joinorder-synthetic"
         expected.add(f"make {target}-cross-surface-equivalence-report")
-    # TPC-DS runs its pandas backend as a second step so each step stays within the gate budget.
-    expected.add("make tpcds-pandas-cross-surface-equivalence-report")
+    # TPC-DS runs its pandas backend as two shard steps so each step stays within the gate budget.
+    expected.update(
+        {"make tpcds-pandas-1-cross-surface-equivalence-report", "make tpcds-pandas-2-cross-surface-equivalence-report"}
+    )
     steps = [step for step in job["steps"] if str(step.get("run", "")).startswith("make ")]
     assert Counter(step["run"] for step in steps) == Counter(dict.fromkeys(expected, 1))
     groups = {

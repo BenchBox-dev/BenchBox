@@ -276,9 +276,13 @@ jobs:
         if: matrix.partition == 'b'
         run: make tpcds-cross-surface-equivalence-report
 
-      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas)
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas, shard 1 of 2)
         if: matrix.partition == 'a'
-        run: make tpcds-pandas-cross-surface-equivalence-report
+        run: make tpcds-pandas-1-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas, shard 2 of 2)
+        if: matrix.partition == 'b'
+        run: make tpcds-pandas-2-cross-surface-equivalence-report
 
   tpcds-parity-draws:
     name: tpcds-parity-draws
