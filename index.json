@@ -6643,10 +6643,15 @@
       "title": "Close the Q44 and Q49 inventory gap and make the inventory count adapter bindings"
     },
     "dfparity-t05i-adapters-remaining": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T17:00:40Z",
+        "generation": "49ed81748b9e455785f056f1178f24e4",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Parameter adapters for the 27 TPC-DS queries the inventory heuristic missed"
     },
     "dfparity-t06-literal-fallback-lint": {
