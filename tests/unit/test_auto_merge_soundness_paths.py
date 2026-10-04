@@ -25,6 +25,25 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
     "path",
     [
         "benchbox/core/tpchavoc/validation.py",
+        "benchbox/core/validation/engines.py",
+        "benchbox/utils/data_validation.py",
+        "benchbox/core/tpcdi/query_validation.py",
+        "benchbox/core/tpchavoc/dataframe_equivalence.py",
+        "benchbox/core/tpchavoc/equivalence.py",
+        "benchbox/core/results/result_digest.py",
+        "_project/scripts/regenerate_correctness_gate_digests.py",
+        "benchbox/core/dataframe/query_validation.py",
+        "benchbox/core/datavault/validation_specs.yaml",
+        "benchbox/core/validation/cross_platform.py",
+        "benchbox/core/validation/query_validation.py",
+        "benchbox/core/validation/data.py",
+        "benchbox/platforms/base/validation.py",
+        "benchbox/core/tpc_validation.py",
+        "_project/scripts/build_joinorder_data.py",
+        "_project/joinorder/reference_cardinalities.json",
+        "_project/joinorder/tiny_reference_cardinalities.json",
+        "_sources/tpc-h/dbgen/answers/q1.out",
+        "_sources/tpc-ds/answer_sets/1.ans",
         "benchbox/core/results/validation.py",
         "benchbox/core/equivalence/cross_surface.py",
         "benchbox/core/equivalence/nested/module.py",
@@ -84,6 +103,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
         "_project/scripts/auto_merge_soundness_paths.py",
         ".github/workflows/release.yml",
+        ".github/workflows/pr.yml",
+        ".github/workflows/release-canary.yml",
+        ".github/workflows/trunk.yml",
+        ".github/workflows/nightly.yml",
+        ".github/workflows/new-example.yml",
+        "scripts/pr_arm.py",
+        "_project/decisions/single-repo-migration.md",
         "scripts/check_decision_records.py",
     ],
 )
@@ -108,12 +134,11 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "docs/reference/hosted-results-contract.md",
         "docs/reference/threat-model.md",
         "tests/unit/test_auto_merge_soundness_paths.py",
-        # pr.yml stays outside the soundness surface by decision (high churn;
-        # its ci-required-result contract is pinned by the develop ruleset +
-        # ruleset-drift canary, not by owner review).
-        ".github/workflows/pr.yml",
-        # Not a prefix-collision false positive for .github/workflows/release.yml.
-        ".github/workflows/release-canary.yml",
+        "AGENTS.md",
+        ".github/workflowsx/new-example.yml",
+        "scripts/pr_arm.py.bak",
+        "_sources/tpc-h/dbgen/answersx/q1.out",
+        "_sources/tpc-ds/answer_sets_backup/1.ans",
         "",
         # sql_compat/ is deliberately narrow: only the rule-dispatch core is
         # a soundness path, not the whole (high-churn) tree.

@@ -12,8 +12,29 @@ prefix	publication/
 prefix	scripts/publication/
 prefix	scripts/site_deploy/
 prefix	deploy/
+prefix	.github/workflows/
+prefix	_sources/tpc-h/dbgen/answers/
+prefix	_sources/tpc-ds/answer_sets/
 
 file	scripts/heavy_tier_needed.py
+file	scripts/pr_arm.py
+file	benchbox/core/validation/engines.py
+file	benchbox/utils/data_validation.py
+file	benchbox/core/tpcdi/query_validation.py
+file	benchbox/core/tpchavoc/dataframe_equivalence.py
+file	benchbox/core/tpchavoc/equivalence.py
+file	benchbox/core/results/result_digest.py
+file	_project/scripts/regenerate_correctness_gate_digests.py
+file	benchbox/core/dataframe/query_validation.py
+file	benchbox/core/datavault/validation_specs.yaml
+file	benchbox/core/validation/cross_platform.py
+file	benchbox/core/validation/query_validation.py
+file	benchbox/core/validation/data.py
+file	benchbox/platforms/base/validation.py
+file	benchbox/core/tpc_validation.py
+file	_project/scripts/build_joinorder_data.py
+file	_project/joinorder/reference_cardinalities.json
+file	_project/joinorder/tiny_reference_cardinalities.json
 file	benchbox/platforms/base/result_capture.py
 file	benchbox/sql_compat/resolver.py
 file	benchbox/sql_compat/decision.py
@@ -59,7 +80,6 @@ file	.github/workflows/oracle-review.yml
 file	_project/scripts/check_soundness_review.py
 file	.github/soundness-paths.txt
 file	.github/PULL_REQUEST_TEMPLATE.md
-file	AGENTS.md
 file	.github/workflows/ci.yml
 file	.github/ci-units.yml
 file	scripts/ci_units.py
