@@ -39,6 +39,15 @@
       "op": "update",
       "op_id": "79c25c8bb7d5402ba9f1ba2ad63f328d",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b",
+      "at": "2026-10-04T01:03:01Z",
+      "client": "claude-code",
+      "generation": "1484425ce40b446ebe256afa009188a3",
+      "op": "finish",
+      "op_id": "83949b8c818f4691a1503f15224c49b5",
+      "session_id": "8bc6380f11ef418691917c994cf8845c"
     }
   ]
 }
