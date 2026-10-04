@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Measured plan and result comparison for Redshift TPC-DS with and without declared keys, recorded in the registry notes.",
+    "Measured effect (or documented absence) of RELY on Snowflake and Databricks, recorded in the registry notes."
+  ],
+  "context": "Source: tpcds-composite-primary-keys-20261001 audit remainder, PR #2631 (2026-10-04). Blocked on live approval from the owner.",
+  "description": "## Problem (unmeasured; documented as a limit in PR #2631)\nThe TPC-DS composite-key item recorded audit notes in `capability_registry.py` from vendor documentation and code reading only: Redshift's planner is documented to use informational keys and assume they are valid, so a wrong key can return wrong results; Snowflake and Databricks emit no `RELY` today. Whether the keys change plans or results for the TPC-DS queries on those platforms was not measured, because that needs live clusters.\n\n## Change\nWith explicit owner approval for each live run (command, maximum runtime, log path, stop condition), compare TPC-DS plans and results with and without the keys on Redshift, and test the effect of `RELY` on Snowflake and Databricks. Update the capability-registry notes with measured facts.\n\n## Guardrails (must preserve)\n- No live cloud runs without explicit approval stating the command, maximum runtime, log path and stop condition.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/core/tuning/capability_registry.py",
+    "benchbox/platforms/snowflake.py",
+    "benchbox/platforms/databricks/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:56:38Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "52982e23fdd9455cabcb6c9f61d7426b",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}

@@ -20588,6 +20588,13 @@
       "status": "open",
       "title": "Decide whether the Windows TPC-DS identity comparison becomes a failing check"
     },
+    "tpcds-informational-key-audit-redshift-snowflake-databricks-20261004": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Audit whether Redshift, Snowflake and Databricks planners exploit the TPC-DS informational keys (needs live-cloud approval)"
+    },
     "tpcds-maintenance-delete-limit-syntax-error-swallowed-20261004": {
       "claim": null,
       "needs": [],
