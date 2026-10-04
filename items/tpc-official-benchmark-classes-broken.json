@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Each class either works end to end with tests at a non-1 scale factor, or is removed/deprecated with a clear error pointing to the supported path",
+    "No official metric is computed from a failed or partial phase"
+  ],
+  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). TPC-H missing methods and TPC-DS missing scale_factor verified directly.",
+  "description": "TPC-DS: `tpcds/official_benchmark.py:169-174` and :189-195 build the power and throughput tests without `scale_factor`, so both default to 1.0. At SF=100, dsqgen renders `-SCALE 1` parameters and Throughput@Size uses SF=1. Line 178 extracts power_at_size without checking success, and the power test counts 70% success as success (power_test.py:418), so QphDS can be published with up to 30% of power queries failed.\n\nTPC-H: `benchbox/tpch.py:216` calls `TPCHOfficialBenchmark(self)`, which raises \"scale_factor must be a number, got TPCH\". Even when built correctly, `core/tpch/official_benchmark.py:148-176` calls run_power_test/run_throughput_test/run_maintenance_test on TPCHBenchmark, which has none of them (verified: hasattr(TPCHBenchmark, \"run_throughput_test\") is False). The errors are swallowed and QphH is computed without checking power success.\n\nBoth are public APIs.",
+  "links": [
+    "benchbox/core/tpcds/official_benchmark.py",
+    "benchbox/core/tpch/official_benchmark.py",
+    "benchbox/tpch.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T19:59:01Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "52fada330d0947b5bc38e651f09b4d0a",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}

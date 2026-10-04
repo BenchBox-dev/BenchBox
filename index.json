@@ -20303,6 +20303,13 @@
       "status": "done",
       "title": "✅ TPC-Havoc Variant Modularization"
     },
+    "tpc-official-benchmark-classes-broken": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "TPCHOfficialBenchmark and TPCDSOfficialBenchmark produce wrong or no throughput results"
+    },
     "tpc-specification-compliance-issues-completed": {
       "claim": null,
       "needs": [],
