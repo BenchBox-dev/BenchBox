@@ -21,7 +21,6 @@ from scripts.site_deploy import (
     receipt as receipt_module,
     renderer as renderer_module,
     rollback as rollback_module,
-    routes as routes_module,
 )
 from scripts.site_deploy.githubapi import ApiError, GitHubClient
 
@@ -218,6 +217,8 @@ def _resolve_rollback(args: argparse.Namespace, client: GitHubClient, loader: An
 def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any) -> dict[str, Any]:
     tag = candidate_module.latest_release_tag(candidate_module.release_tags(args.repo_dir))
     release_sha = candidate_module.tag_commit(args.repo_dir, tag)
+    from scripts.site_deploy import routes as routes_module
+
     manifest = routes_module.load_manifest(args.repo_dir / ROUTES_MANIFEST)
     try:
         selection = renderer_module.select_for_commit(manifest.renderer_policy, args.repo_dir, release_sha)

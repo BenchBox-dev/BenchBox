@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -305,3 +307,22 @@ def test_deploy_waits_for_a_required_visual_comparison_and_probe_survives_its_sk
     assert "needs.visual.result == 'success'" in condition
     assert "needs.visual.result == 'skipped' && needs.resolve.outputs.visual_required != 'true'" in condition
     assert _jobs()["probe"]["if"] == "${{ !cancelled() && needs.deploy.result == 'success' }}"
+
+
+def test_resolve_runs_from_the_locked_environment_because_it_reads_the_routes_manifest() -> None:
+    run = _step("resolve", "Resolve candidate and generation")["run"]
+    assert "uv sync --frozen --no-dev --no-install-project" in run
+    assert "uv run --no-sync -- python -m scripts.site_deploy resolve" in run
+
+
+def test_plain_python_jobs_can_import_the_cli_without_third_party_packages() -> None:
+    plain = [
+        step["run"]
+        for job in ("deploy", "probe", "visual")
+        for step in _steps(job)
+        if "python -m scripts.site_deploy" in str(step.get("run", ""))
+    ]
+    assert plain and not any("uv run" in run for run in plain)
+    code = "import sys; sys.modules.update(yaml=None, duckdb=None); import scripts.site_deploy.cli"
+    result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr

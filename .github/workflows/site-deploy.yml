@@ -75,6 +75,8 @@ jobs:
         with:
           python-version: "3.11"
 
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
       - name: Resolve candidate and generation
         id: resolve
         env:
@@ -99,7 +101,8 @@ jobs:
           if [ "$CURRENT_UNKNOWN" = "true" ]; then
             args+=(--current-unknown)
           fi
-          python -m scripts.site_deploy resolve "${args[@]}"
+          uv sync --frozen --no-dev --no-install-project
+          uv run --no-sync -- python -m scripts.site_deploy resolve "${args[@]}"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         if: always()
