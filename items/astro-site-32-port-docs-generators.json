@@ -5,6 +5,7 @@
     "example-validation and spellcheck run against the canonical docs/ sources and stay green",
     "Drift checks (prompt-quickstarts-check, query-docs, image validation) fail on a seeded drift in tests"
   ],
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as 5e7c0c30 + 2060f750 (2026-10-04). docs-generate target; conf.py hook removed; every workflow sphinx-build follows a generator step (pinned by tests/unit/test_docs_generate_wiring.py); release builds guard on scripts/generate_query_docs.py existing. Review round 1 FAIL (High: preview default release SHA lacks query-docs) fixed in 2060f750.",
   "description": "Several Python generators feed the current site:\n- scripts/generate_query_docs.py, run from the conf.py config-inited hook into docs/benchmarks/queries/\n- scripts/generate_compat_docs.py\n- scripts/generate_landing_quickstarts.py\n- the prompt-quickstarts write/check targets (landing/prompts/catalog.yaml → catalog.generated.js)\n- scripts/validate_visualization_images.py\n- the CI example-validation and spellcheck jobs\n\nMake each one run as an explicit pre-build step of make site-build, not as a Sphinx hook, and target the Astro inputs. The generators stay in Python. Their check modes must fail on drift exactly as they do today.",
   "links": [
     "scripts/generate_query_docs.py",
@@ -29,6 +30,14 @@
       "op": "update",
       "op_id": "c03035f60b8140b68df6a3dcc2437fbf",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:68b7195f0100c1252912a115",
+      "at": "2026-10-04T03:52:59Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "bccad8d0922d42bfa58652485ee8d440",
+      "session_id": "2d370a7de0824103affe317bc26fbae9"
     }
   ]
 }
