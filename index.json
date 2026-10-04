@@ -20337,6 +20337,13 @@
       "status": "done",
       "title": "Add regression tests for TPC-DS stdout data generation"
     },
+    "tpcds-stream-label-literal-newline": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Fix TPC-DS stream query labels that turn each query into a SQL comment line"
+    },
     "tpcds-throughput-permutation-compliance": {
       "claim": null,
       "needs": [],

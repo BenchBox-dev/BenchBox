@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Stream query SQL places the label and the query on separate lines (real newline), or the label moves outside the SQL text",
+    "A test executes or parses a generated TPC-DS stream query and proves the query body is not commented out",
+    "The comment-policy fixture for the stream label in quality/comment-policy.json matches the new emitted text or is removed",
+    "Throughput/stream tests pass"
+  ],
+  "context": "Discovered on branch feat/comment-cleanup-program (comment cleanup effort, 2026-10-03). Do not change benchmark algorithms beyond the label/newline fix without review.",
+  "description": "benchbox/core/tpcds/streams.py (TPCDSStreamManager._generate_single_stream) builds stream SQL as f\"-- Query {query_id}{variant}\\\\n{base_query}\" and the failure path as f\"-- Query ... (generation failed: {e})\\\\nSELECT 1 AS placeholder_query;\". The source uses a literal backslash-n (\"\\\\n\"), not a newline, so the label and the whole query form one SQL comment line. Any consumer that executes stream_query.sql would run nothing. The pattern is on develop (present at ad79a381d and origin/develop), so it predates the comment cleanup. Found during the comment cleanup; the label is kept and registered as an emitted-output fixture there, so changing it needs that fixture updated too.",
+  "links": [
+    "benchbox/core/tpcds/streams.py",
+    "quality/comment-policy.json"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:72be6b07390c920c896b0830",
+      "at": "2026-10-04T01:00:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d8d1ac9eed3a45b686ee07b3466b44fe",
+      "session_id": "72fc14732fe344b4aa75947453e916a8"
+    }
+  ]
+}
