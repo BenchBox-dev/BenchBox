@@ -7,6 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from benchbox.core.tpcds.c_tools import tpcds_option
 from benchbox.utils.printing import emit
 
 
@@ -42,13 +43,13 @@ class StreamingGenerationMixin:
         """Generate a single table to .dat then compress (robust path)."""
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose" if self.verbose else "-quiet",
-            "-force",
-            "-terminate",
+            tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+            tpcds_option("force"),
+            tpcds_option("terminate"),
             "n",
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),
-            "-table",
+            tpcds_option("table"),
             table_name,
         ]
         expected_filename = f"{table_name}.dat"
@@ -135,13 +136,13 @@ class StreamingGenerationMixin:
             # We need to generate to files first, then compress them to maintain data integrity
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose" if self.verbose else "-quiet",
-                "-force",  # force overwrites
-                "-terminate",
+                tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+                tpcds_option("force"),  # force overwrites
+                tpcds_option("terminate"),
                 "n",  # disable trailing field delimiters
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),
-                "-table",
+                tpcds_option("table"),
                 parent_table,  # generate parent table (and children automatically)
             ]
 
@@ -217,19 +218,19 @@ class StreamingGenerationMixin:
         """
         cmd = [
             str(self.dsdgen_exe),
-            "-verbose" if self.verbose else "-quiet",
-            "-force",
-            "-terminate",
+            tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+            tpcds_option("force"),
+            tpcds_option("terminate"),
             "n",
-            "-scale",
+            tpcds_option("scale"),
             str(self.scale_factor),
-            "-table",
+            tpcds_option("table"),
             table_name,
-            "-child",
+            tpcds_option("child"),
             str(chunk_id),
-            "-parallel",
+            tpcds_option("parallel"),
             str(self.parallel),
-            "-FILTER",
+            tpcds_option("filter"),
             "Y",
         ]
 
@@ -381,17 +382,17 @@ class StreamingGenerationMixin:
             # Generate parent table chunk (which automatically creates child tables)
             cmd = [
                 str(self.dsdgen_exe),
-                "-verbose" if self.verbose else "-quiet",
-                "-force",  # force overwrites
-                "-terminate",
+                tpcds_option("verbose") if self.verbose else tpcds_option("quiet"),
+                tpcds_option("force"),  # force overwrites
+                tpcds_option("terminate"),
                 "n",  # disable trailing field delimiters
-                "-scale",
+                tpcds_option("scale"),
                 str(self.scale_factor),
-                "-table",
+                tpcds_option("table"),
                 parent_table,  # generate parent table (creates children automatically)
-                "-child",
+                tpcds_option("child"),
                 str(chunk_id),  # chunk number (1-based)
-                "-parallel",
+                tpcds_option("parallel"),
                 str(self.parallel),
             ]
 

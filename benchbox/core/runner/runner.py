@@ -551,6 +551,11 @@ def _execute_load_only_mode(
     postload_result: ValidationResult | None = None
 
     connection_lifecycle = as_connection_lifecycle(adapter)
+    # New run: allow the existing-database decision to be made once below.
+    # Without this reset, a reused adapter instance would skip first-connection
+    # reuse/recreate handling for the load-only run.
+    # adapter is typed as object, so direct assignment would fail type checking.
+    setattr(adapter, "_existing_db_decided", False)  # noqa: B010
     try:
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
 

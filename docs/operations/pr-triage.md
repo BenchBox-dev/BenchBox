@@ -118,7 +118,8 @@ a PR's mergeability — both only alert.
   and never arms (its draft→ready arm point never fired once and was deleted
   — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
   D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
-  label. The workflow revokes on that label, not on soundness paths.
+  label. The workflow revokes on that label, not on soundness paths; the
+  evidence transaction also refuses for soundness paths.
   Soundness-path PRs require `oracle-review` on the current head and resolved
   threads. After any push or refresh, rerun CI and obtain the connector's
   review or thumbs-up on that head before arming. Withdraw readiness before

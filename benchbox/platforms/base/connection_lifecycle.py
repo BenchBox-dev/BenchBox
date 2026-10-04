@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from benchbox.utils.printing import quiet_console
 
@@ -184,6 +185,23 @@ class ConnectionLifecycleMixin:
         """
         return None
 
+    @contextmanager
+    def non_destructive_connection_context(self) -> Iterator[None]:
+        """Guard extra mid-run connections against create/drop handling.
+
+        Helpers that must open their own connection mid-run (metadata capture,
+        introspection, link probe, statistics) wrap the open in this context so
+        the resulting `handle_existing_database` call takes the validation
+        early-return instead of validating an unfinished database and removing
+        it. Restores the prior flag value on exit; safe to nest.
+        """
+        prior = getattr(self, "_validating_database", False)
+        self._validating_database = True
+        try:
+            yield
+        finally:
+            self._validating_database = prior
+
     def handle_existing_database(self, **connection_config) -> None:
         """Handle existing database non-interactively for core/programmatic usage.
 
@@ -217,6 +235,16 @@ class ConnectionLifecycleMixin:
         if getattr(self, "_validating_database", False):
             self.log_very_verbose("Inside validation context - skipping reuse/recreate logic.")
             return
+
+        # Once-per-run decision: the first call above decides reuse/recreate for
+        # the whole run. Any later connection (metadata, introspection, link
+        # probe, statistics helpers) must not re-validate an empty database and
+        # drop the run's own database mid-run. Reset per run (see
+        # _reset_run_scoped_state and _execute_load_only_mode).
+        if getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("Existing-database decision already made for this run - skipping.")
+            return
+        self._existing_db_decided = True
 
         self.log_very_verbose("Checking if database exists...")
         if not self.check_database_exists(**connection_config):
