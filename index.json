@@ -6624,13 +6624,18 @@
       "title": "Parameter adapters, batch F: Q84, Q86, Q87, Q90, Q91, Q92, Q97, Q98, Q99"
     },
     "dfparity-t05g-adapters-hard-coded": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T16:54:16Z",
+        "generation": "74cad4412684446a869a1f80702a81ee",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t04-adapter-prototype",
         "dfparity-t02-parameter-inventory-test"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Parameter adapters, category (c) rewrites: Q16, Q24, Q41, Q73, Q74, Q85, Q88, Q89"
     },
     "dfparity-t05h-adapters-q44-q49-inventory": {
