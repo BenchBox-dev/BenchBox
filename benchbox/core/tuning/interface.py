@@ -1383,12 +1383,14 @@ class UnifiedTuningConfiguration:
                 resolved.append(TuningColumn(name=str(column), type="UNKNOWN", order=position))
         return resolved
 
+    _PARTITIONING_REFERENCE_PLATFORMS = ("duckdb", "databricks")
+
     @staticmethod
-    def _read_template_table_tunings(benchmark: str) -> dict[str, Any]:
-        """Load the packaged duckdb tuned template's table tunings for a benchmark."""
+    def _read_template_table_tunings(benchmark: str, platform: str = "duckdb") -> dict[str, Any]:
+        """Load a packaged tuned template's table tunings for a benchmark."""
         from benchbox.core.tuning.packaged_templates import packaged_template_path
 
-        template = packaged_template_path("duckdb", benchmark.lower())
+        template = packaged_template_path(platform, benchmark.lower())
         if not template.exists():
             return {}
         try:
@@ -1445,10 +1447,30 @@ class UnifiedTuningConfiguration:
 
         Applies the choice to every benchmark-template table carrying the
         slot (not just the first), so a global TPC-H sorting choice reaches
-        all six tuned tables. Benchmarks with no packaged template resolve
-        to no targets, declining to substitute another benchmark's schema.
+        all six tuned tables. The DuckDB template is the reference for every
+        slot except partitioning, which it never applies and so does not
+        carry; partitioning resolves from the next reference template.
+        Benchmarks with no packaged template resolve to no targets,
+        declining to substitute another benchmark's schema.
         """
-        table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark.lower())
+        reference_platforms = (
+            UnifiedTuningConfiguration._PARTITIONING_REFERENCE_PLATFORMS
+            if layout_type == TuningType.PARTITIONING
+            else ("duckdb",)
+        )
+        for platform in reference_platforms:
+            table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark.lower(), platform)
+            targets = UnifiedTuningConfiguration._layout_targets_from(table_tunings, layout_type, table_name)
+            if targets:
+                return targets
+        return {}
+
+    @staticmethod
+    def _layout_targets_from(
+        table_tunings: dict[str, Any],
+        layout_type: TuningType,
+        table_name: Optional[str],
+    ) -> dict[str, list[TuningColumn]]:
         if not table_tunings:
             return {}
         ordered_tables = sorted(table_tunings)

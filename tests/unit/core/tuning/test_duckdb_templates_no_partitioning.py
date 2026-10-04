@@ -49,3 +49,26 @@ def test_duckdb_tuned_template_requests_no_partitioning(template: Path) -> None:
 @pytest.mark.parametrize("template", TUNED_TEMPLATES, ids=_template_id)
 def test_duckdb_tuned_template_disables_check_constraints(template: Path) -> None:
     assert _load(template).check_constraints.enabled is False
+
+
+def test_default_partitioning_layout_still_resolves_without_a_duckdb_partitioning_template() -> None:
+    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.PARTITIONING, benchmark="tpch")
+
+    partitioned = {
+        name: [column.name for column in tuning.get_columns_by_type(TuningType.PARTITIONING)]
+        for name, tuning in config.table_tunings.items()
+    }
+    assert partitioned == {"LINEITEM": ["L_SHIPDATE"], "ORDERS": ["O_ORDERDATE"]}
+
+
+def test_default_layouts_other_than_partitioning_still_come_only_from_the_duckdb_template() -> None:
+    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.DISTRIBUTION, benchmark="tpch")
+    config.enable_platform_optimization(TuningType.CLUSTERING, benchmark="tpch")
+
+    assert config.table_tunings == {}
