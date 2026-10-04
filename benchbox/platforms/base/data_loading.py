@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -2588,8 +2589,19 @@ class FileFormatRegistry:
 
         Returns:
             CompressionHandler instance (NoCompressionHandler if not compressed)
+
+        Raises:
+            DataLoadingError: If the file needs the ``zstd`` CLI and it is not
+                installed. Reported here -- before any table loads -- instead
+                of surfacing later as an empty load that validates vacuously.
         """
         suffix = file_path.suffix
+        if suffix == ".zst" and shutil.which("zstd") is None:
+            raise DataLoadingError(
+                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
+                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
+                "uncompressed data."
+            )
         handler_class = cls._compression_handlers.get(suffix, NoCompressionHandler)
         return handler_class()
 
@@ -2705,11 +2717,17 @@ class DataLoader:
 
         table_stats = {}
 
-        # Resolve data source
+        # Resolve data source. A missing source -- or a source naming zero
+        # tables, such as a stale empty datagen manifest -- fails the run for
+        # benchmarks that expect data instead of loading nothing and
+        # validating vacuously. Benchmarks that legitimately skip data
+        # loading keep the previous empty result.
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
-        if not data_source:
-            self.adapter.log_very_verbose("No data source found")
-            return table_stats, elapsed_seconds(start_time)
+        if not data_source or not data_source.tables:
+            if getattr(self.benchmark, "SKIP_DATA_LOADING", False):
+                self.adapter.log_very_verbose("No data source found (data loading skipped)")
+                return table_stats, elapsed_seconds(start_time)
+            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
 
         table_stats = self._load_file_based_data(data_source)
 

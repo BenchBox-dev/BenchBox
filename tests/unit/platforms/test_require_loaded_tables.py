@@ -25,9 +25,18 @@ def test_fails_when_required_table_is_empty():
         require_loaded_tables(OBT, {"tpcds_sales_returns_obt": 0})
 
 
-def test_benchmarks_without_requirements_are_not_checked():
-    require_loaded_tables(SimpleNamespace(), {})
-    require_loaded_tables(object(), None)
+def test_benchmarks_without_requirements_reject_vacuous_loads():
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), {})
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), {"t": 0})
+    require_loaded_tables(SimpleNamespace(), {"t": 3})
+
+
+def test_benchmarks_skipping_data_loading_are_not_checked():
+    skipped = SimpleNamespace(SKIP_DATA_LOADING=True)
+    require_loaded_tables(skipped, {})
+    require_loaded_tables(skipped, None)
 
 
 def test_public_obt_wrapper_exposes_the_contract():
