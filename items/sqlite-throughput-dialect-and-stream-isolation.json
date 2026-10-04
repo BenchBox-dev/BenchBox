@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The SQLite throughput path renders the same dialect-translated SQL as the power path for every TPC-H query",
+    "Concurrent SQLite throughput streams either use isolated connections (INDEPENDENT_CONNECTION with new_stream_connection) or SQLite declares throughput unsupported, with no shared-cursor errors",
+    "A TPC-H SF1 throughput run on SQLite with 3 streams completes with all 66 queries successful and passes strict submission validation, or is refused before stream submission",
+    "A regression test covers dialect translation in the throughput path"
+  ],
+  "context": "Found while looking for a third local engine identity for the TPC-H SF1 throughput cohort (PR #2382). DataFusion, ClickHouse Local and Polars declare throughput unsupported, so SQLite is the only independent local engine that should run throughput without a server.",
+  "description": "A TPC-H SF1 throughput run on SQLite 3.53.1 (`--phases generate,load,throughput --streams 3 --official --seed 20260709 --tuning notuning`) failed 45 of 66 queries in 48 seconds, so the bundle is PARTIAL and unpublishable. Two separate defects show in the log:\n\n1. The throughput path sends SQL that is not translated to the SQLite dialect. Queries fail with `near \"'1 YEAR'\": syntax error`, `near \"'1 MONTH'\": syntax error` and `near \"FROM\": syntax error`, from `INTERVAL` date arithmetic that the power path handles.\n2. SQLite declares `stream_connection_capability = SHARED_CURSOR`, and concurrent streams raise `sqlite3.OperationalError: not an error` on the shared connection.\n\nEvidence: `~/Developer/benchmark_runs/logs/throughput-identities-20261003/sqlite-sf1-throughput.log` and bundle `~/Developer/benchmark_runs/results/tpch_sf1_sqlite_sql_20261003_184424_5702d960.json`, run at develop `061fac04d`.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T13:50:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b7cc60594725485699f837e0ecd83840",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    }
+  ]
+}
