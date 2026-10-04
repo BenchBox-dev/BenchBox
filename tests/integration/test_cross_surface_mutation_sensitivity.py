@@ -132,6 +132,10 @@ _TARGETS: dict[str, str] = {
     # ORDER BY with NO trailing LIMIT, so the strict comparator path sees a
     # discriminating order key.
     "tpch": "9",
+    # tpcds targets 7 (56 rows x 5 cols at SF=0.01, below its LIMIT 100, so
+    # the strict comparator path applies): a five-table join with GROUP BY and
+    # ORDER BY i_item_id.
+    "tpcds": "7",
 }
 
 
