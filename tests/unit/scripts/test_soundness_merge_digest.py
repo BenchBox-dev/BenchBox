@@ -31,6 +31,7 @@ BEFORE = "2026-10-02T09:00:00Z"
 AFTER = "2026-10-02T11:00:00Z"
 MERGED_AT = "2026-10-02T12:00:00Z"
 LATER = "2026-10-02T13:00:00Z"
+AFTER_REFRESH = "2026-10-02T11:30:00Z"
 CONNECTOR = "chatgpt-codex-connector[bot]"
 
 
@@ -166,8 +167,27 @@ def test_an_unedited_standin_with_a_matching_updated_at_is_a_signal():
 
 
 def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
-    assert digest.review_signals(refreshed(comments=(standin(REFRESH),))) == ("stand-in",)
-    assert digest.review_signals(refreshed(comments=(standin(HEAD),))) == ()
+    assert digest.review_signals(refreshed(comments=(standin(REFRESH, at=AFTER_REFRESH),))) == ("stand-in",)
+    assert digest.review_signals(refreshed(comments=(standin(HEAD, at=AFTER_REFRESH),))) == ()
+
+
+def test_a_standin_approval_posted_before_the_refresh_head_arrived_is_not_a_signal():
+    pull = refreshed(comments=(standin(REFRESH, at="2026-10-02T10:30:00Z"),))
+    assert digest.review_signals(pull) == ()
+
+
+def test_a_standin_approval_posted_at_the_head_arrival_instant_is_not_a_signal():
+    assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ()
+
+
+def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
+    comments = (standin(HEAD, at=AFTER),)
+    assert digest.review_signals(evidence(comments=comments, base_changed_at=AFTER)) == ()
+    assert digest.review_signals(evidence(comments=comments, base_changed_at=PUSHED)) == ("stand-in",)
+
+
+def test_a_standin_approval_posted_after_the_merge_is_not_a_signal():
+    assert digest.review_signals(evidence(comments=(standin(HEAD, at=LATER),))) == ()
 
 
 @pytest.mark.parametrize(
@@ -852,6 +872,7 @@ def test_collect_pull_carries_the_comment_author_type_and_update_time(monkeypatc
     rest = {
         "reviews": [],
         "reactions": [],
+        "timeline": [{"event": "labeled", "created_at": BEFORE}, {"event": "base_ref_changed", "created_at": AFTER}],
         "comments": [
             {
                 "user": {"login": "joeharris76", "type": "User"},
@@ -868,3 +889,4 @@ def test_collect_pull_carries_the_comment_author_type_and_update_time(monkeypatc
     monkeypatch.setattr(digest, "gh_pages", lambda endpoint: rest[endpoint.rsplit("/", 1)[1]])
     pull = digest.collect_pull("o/r", MERGED)
     assert pull.comments == (digest.Comment("joeharris76", "text", AFTER, "User", LATER),)
+    assert pull.base_changed_at == AFTER

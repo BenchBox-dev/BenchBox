@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from oracle_review_check import STANDIN_ATTESTERS, _attested_shas
+from oracle_review_check import STANDIN_ATTESTERS, _attested_shas, latest_base_change
 
 MANIFEST_PATH = ".github/soundness-paths.txt"
 PREDICATE_PATH = "_project/scripts/soundness_paths.py"
@@ -94,6 +94,7 @@ class PullEvidence:
     reactions: tuple[Reaction, ...] = ()
     comments: tuple[Comment, ...] = ()
     threads: tuple[Thread, ...] = ()
+    base_changed_at: str = ""
 
     @property
     def content_cutoff(self) -> str:
@@ -137,6 +138,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     def in_window(at: str) -> bool:
         return cutoff <= at <= evidence.merged_at
 
+    standin_after = max(evidence.commits[-1].arrived_at, evidence.base_changed_at) if evidence.commits else ""
     signals: list[str] = []
     if any(
         r.login in CONNECTOR_LOGINS
@@ -156,7 +158,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             comment.login in STANDIN_ATTESTERS
             and comment.user_type == "User"
             and comment.updated_at in (None, comment.created_at)
-            and in_window(comment.created_at)
+            and standin_after < comment.created_at <= evidence.merged_at
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
             signals.append("stand-in")
@@ -412,6 +414,7 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
             for c in gh_pages(f"repos/{repo}/issues/{number}/comments")
         ),
         threads=collect_threads(repo, number),
+        base_changed_at=latest_base_change(gh_pages(f"repos/{repo}/issues/{number}/timeline")) or "",
     )
 
 
