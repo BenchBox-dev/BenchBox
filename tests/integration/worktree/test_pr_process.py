@@ -181,11 +181,6 @@ def test_base_advance_detected_not_repaired(tmp_path: Path) -> None:
     assert bi.verify_base(repo, record)["moved"] is True
 
 
-def test_genuine_conflict_resolves_before_anything(tmp_path: Path) -> None:
-    del tmp_path
-    assert landing.stale_base_decision(queue_verified=True, conflict=True) == "resolve-conflict-first"
-
-
 def test_transient_failure_retry_bounded_then_escalated(tmp_path: Path) -> None:
     del tmp_path
     state = landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD)

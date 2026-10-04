@@ -50,12 +50,57 @@ def test_reset_truncates_every_table_and_never_drops(adapter):
     connection.close.assert_called_once()
 
 
-def test_reset_declines_when_a_table_cannot_be_truncated(adapter):
+def test_reset_raises_when_a_table_cannot_be_truncated(adapter):
     connection, executed = _connection([("sch", "v_orders", False)], fail_on="TRUNCATE")
     with patch.object(adapter, "_create_admin_connection", return_value=connection):
-        assert adapter.reset_database_in_place(catalog="cat", schema="sch") is False
+        with pytest.raises(RuntimeError, match="boom"):
+            adapter.reset_database_in_place(catalog="cat", schema="sch")
 
     assert not any(sql.startswith("DROP") for sql in executed)
+
+
+@pytest.mark.parametrize(
+    ("tables", "fail_on"),
+    [
+        ([], "SHOW TABLES"),
+        ([("sch", "orders", False), ("sch", "lineitem", False)], "`lineitem`"),
+    ],
+)
+def test_remove_database_never_drops_after_reset_error(adapter, tables, fail_on):
+    connection, executed = _connection(tables, fail_on=fail_on)
+    adapter.drop_database = MagicMock()
+
+    with (
+        patch.object(adapter, "_create_admin_connection", return_value=connection),
+        pytest.raises(RuntimeError, match="Could not remove existing database: boom"),
+    ):
+        adapter._remove_database(False, "", catalog="cat", schema="sch")
+
+    adapter.drop_database.assert_not_called()
+    assert not any(sql.startswith("DROP") for sql in executed)
+
+
+def test_remove_database_never_drops_after_reset_connection_error(adapter):
+    adapter.drop_database = MagicMock()
+
+    with (
+        patch.object(adapter, "_create_admin_connection", side_effect=RuntimeError("offline")),
+        pytest.raises(RuntimeError, match="Could not remove existing database: offline"),
+    ):
+        adapter._remove_database(False, "", catalog="cat", schema="sch")
+
+    adapter.drop_database.assert_not_called()
+
+
+def test_handle_existing_database_preserves_known_absent_schema(adapter):
+    adapter.check_database_exists = MagicMock(return_value=False)
+    adapter.reset_database_in_place = MagicMock()
+    adapter.drop_database = MagicMock()
+
+    adapter.handle_existing_database(catalog="cat", schema="sch")
+
+    adapter.reset_database_in_place.assert_not_called()
+    adapter.drop_database.assert_not_called()
 
 
 def test_if_not_exists_tables_are_replaced_only_after_reset(adapter):

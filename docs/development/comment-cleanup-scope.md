@@ -80,9 +80,8 @@ uv run -- python scripts/check_comment_cleanup_scope.py \
 The output includes every classified maintained path, its owner, state, rule,
 and blocking disposition with a digest. Freeze that ignored output before
 parallel work. Run it again after integration and allow only authorized path or
-dependency changes. The policy, validator, focused test, dispatch page, index
-link, and the one development-loop ledger row that lists the test are a
-singleton scope-policy slice. The pre-change base proves the
+dependency changes. The policy, validator, focused test, dispatch page, and
+index link are a singleton scope-policy slice. The pre-change base proves the
 starting tree; run a second immutable snapshot after that slice is committed so
 those artifacts receive the same ownership check before dispatch.
 

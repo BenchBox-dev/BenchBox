@@ -64,6 +64,34 @@ prompt-quickstarts-check:
 query-docs:
 	uv run -- python scripts/generate_query_docs.py
 
+SITE_DIR ?= site
+SITE_INVENTORY ?= $(SITE_DIR)-inventory
+site-inventory:
+	@uv run -- python scripts/site_inventory.py build --site-dir "$(SITE_DIR)" --output-dir "$(SITE_INVENTORY)" --source-sha "$$(git rev-parse HEAD)"
+
+SITE_INVENTORY_BASELINE ?= _project/design/site-inventory/baseline-develop
+site-inventory-diff: site-inventory
+	@uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_INVENTORY)"
+
+SITE_INVENTORY_KNOWN_BROKEN ?= _project/design/site-inventory/known-broken-links.json
+site-inventory-check: site-inventory
+	@uv run -- python scripts/site_inventory.py check --inventory "$(SITE_INVENTORY)" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)"
+
+site-deps:
+	@if [ ! -f website/node_modules/.package-lock.json ] || [ website/package-lock.json -nt website/node_modules/.package-lock.json ]; then npm --prefix website ci; fi
+
+site-build: query-docs site-deps
+	@npm --prefix website run build
+	@test -s website/dist/index.html
+	@echo "Site built: website/dist/index.html"
+
+site-dev: site-deps
+	@npm --prefix website run dev
+
+site-check: query-docs site-deps
+	@npm --prefix website run check
+	@npm --prefix website run audit:high
+
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build
 	@echo ""

@@ -396,6 +396,12 @@ def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
     assert notice_files <= listed
 
 
+def test_committed_payloads_and_edges_validate_at_immutable_head() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    head = scope.git(ROOT, "rev-parse", "HEAD").decode().strip()
+    scope.validate_payloads_and_edges(policy, set(scope.tracked_paths(ROOT, head)))
+
+
 def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers() -> None:
     policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
     tracked = set(scope.git(ROOT, "ls-files", "-z").decode().split("\0"))

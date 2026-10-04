@@ -24,10 +24,13 @@ def test_runs_after_each_push_to_develop_and_on_demand() -> None:
     assert "pull_request" not in triggers and "merge_group" not in triggers
 
 
-def test_runs_queue_per_ref_without_cancelling() -> None:
+def test_every_push_gets_its_own_queued_run() -> None:
     concurrency = _workflow()["concurrency"]
     assert "github.ref" in concurrency["group"], "a manual run on another ref would replace the pending run for develop"
     assert concurrency["cancel-in-progress"] is False
+    assert concurrency["queue"] == "max", (
+        "without a queue a newer push replaces the pending run, so intermediate commits get no result"
+    )
 
 
 def test_is_read_only() -> None:
@@ -53,6 +56,17 @@ def test_fast_job_enforces_the_ungraced_fast_lane_ceiling() -> None:
     assert len(ceiling) == 1
     assert "--strict" in ceiling[0]
     assert "--ceiling-grace" not in ceiling[0]
+
+
+def test_required_local_cases_run_after_each_merge() -> None:
+    job = _workflow()["jobs"]["required-local-cases"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 20
+    assert "needs" not in job and "if" not in job and "strategy" not in job
+    runs = [step["run"] for step in job["steps"] if "run" in step]
+    assert runs.count("make test-required-local-cases") == 1
+    assert not job.get("continue-on-error")
+    assert not any(step.get("continue-on-error") for step in job["steps"])
 
 
 def test_builds_the_release_distribution_on_each_push_to_develop() -> None:
