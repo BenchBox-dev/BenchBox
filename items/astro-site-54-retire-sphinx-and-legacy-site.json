@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "Evidence pack: observation window dates, per-route-class deploy receipts with green probes, fresh rollback drill, all-Astro receipt",
+    "Evidence pack: per-route-class production deploy receipts with green probes since cutover, fresh rollback drill, all-Astro receipt",
     "Last Sphinx artifact and receipt retained and proven redeployable after source removal",
     "Sweep: no remaining references to sphinx, furo, ablog, myst_parser, landing/shared, docs/_build in maintained code, workflows or Makefiles (grep output in PR)",
     "Dependency audit and inventory drift checks green; all required checks green; visual acceptance passes with no baseline change",
     "dev-loop-property-ledger rows touched by the site updated"
   ],
-  "description": "Start only when there is evidence, not just elapsed time or a deploy count:\n- a minimum observation window of 5 working days since the astro-site-53 production cutover\n- in that window, at least one successful production deploy for each route class (stable docs from a release tag, dev docs, blog, and a results/corpus update), each with green public probes on every route\n- the exact-artifact rollback drill evidence from astro-site-53 is on record, and a fresh drill on the current artifact passes\n- the latest receipt shows every actively served route rendered by Astro\n- the D14 agreements on overlapping items are honoured\n\nKeep a deployable rollback target: the last Sphinx-rendered artifact and its receipt stay retained and redeployable after the source tooling is deleted, at least until the next release after retirement; the owner may extend this.\n\nThen remove:\n- docs/conf.py, docs/_extensions, docs/_templates, docs/Makefile, make.bat, the Sphinx-only parts of docs/_static\n- landing/ and landing/shared\n- Sphinx targets in make/documentation.mk and Makefile ci-docs, plus make/inventory.json entries\n- the pyproject docs extra and the docs entries in the dev group (sphinx, furo, myst-parser, sphinxcontrib-mermaid, sphinx-tags, sphinx-design, ablog and its git source override)\n- the Sphinx build from required CI, with its drift guard updated in the same PR\n- redundant token-drift scripts\n- Sphinx-specific tests, each replaced by its Astro equivalent\n\ndocs/ stays the content directory. Separately decide whether to rewrite the remaining MyST constructs to plain Markdown and retire the converter; if yes, record it as a follow-up item.",
+  "description": "Start only when there is evidence (owner decision 2026-10-04: no elapsed-time window):\n- at least one successful production deploy since the astro-site-53 cutover for each route class (stable docs from a release tag, dev docs, blog, and a results/corpus update), each with green public probes on every route\n- the exact-artifact rollback drill evidence from astro-site-53 is on record, and a fresh drill on the current artifact passes\n- the latest receipt shows every actively served route rendered by Astro\n- the D14 agreements on overlapping items are honoured\n\nKeep a deployable rollback target: the last Sphinx-rendered artifact and its receipt stay retained and redeployable after the source tooling is deleted, at least until the next release after retirement; the owner may extend this.\n\nThen remove:\n- docs/conf.py, docs/_extensions, docs/_templates, docs/Makefile, make.bat, the Sphinx-only parts of docs/_static\n- landing/ and landing/shared\n- Sphinx targets in make/documentation.mk and Makefile ci-docs, plus make/inventory.json entries\n- the pyproject docs extra and the docs entries in the dev group (sphinx, furo, myst-parser, sphinxcontrib-mermaid, sphinx-tags, sphinx-design, ablog and its git source override)\n- the Sphinx build from required CI, with its drift guard updated in the same PR\n- redundant token-drift scripts\n- Sphinx-specific tests, each replaced by its Astro equivalent\n\ndocs/ stays the content directory. Separately decide whether to rewrite the remaining MyST constructs to plain Markdown and retire the converter; if yes, record it as a follow-up item.",
   "links": [
     "dlv2-61-retire-docs-yml-pages-fallback",
     "pyproject.toml",
@@ -29,6 +29,14 @@
       "op": "update",
       "op_id": "6a67d0fbfad54c57bb242fb672506390",
       "session_id": "0a04fc269d824c6d94e653994f36dbcb"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b",
+      "at": "2026-10-04T00:48:48Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6c9f877ca2f9415783d58b6b93b90c6f",
+      "session_id": "8bc6380f11ef418691917c994cf8845c"
     }
   ]
 }
