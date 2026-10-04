@@ -6,7 +6,7 @@
     "100% query pass rate across all runs, including all 113 JoinOrder queries translating and executing on each warehouse without dialect parse errors",
     "All 18 result bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal"
   ],
-  "context": "JoinOrder tests deep optimizer join-enumeration with up to 16 joins per query, while SSB provides standard star-schema comparison against TPC-H. AMPLab stresses group-by and regex filtering performance.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (13 / 8 / 113) and the scales are within each benchmark's min_scale. On 2026-10-01 the validator passed all BigQuery and Snowflake bundles for these suites and failed all six Databricks bundles on the missing result-cache receipt. These suites are not rows of the 84-cell corpus campaign. Rerunning the six Databricks cells needs an approval that states command, maximum runtime, log path and stop condition, and a check of the 500-table Unity Catalog quota first (the low-scale-factor SSB and AMPLab schemas were dropped to free quota). Overrides are maintainer decisions.",
+  "context": "JoinOrder tests deep optimizer join-enumeration with up to 16 joins per query, while SSB provides standard star-schema comparison against TPC-H. AMPLab stresses group-by and regex filtering performance.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (13 / 8 / 113) and the scales are within each benchmark's min_scale. On 2026-10-01 the validator passed all BigQuery and Snowflake bundles for these suites and failed all six Databricks bundles on the missing result-cache receipt. These suites are not rows of the 84-cell corpus campaign. Rerunning the six Databricks cells needs an approval that states command, maximum runtime, log path and stop condition, and a check of the 500-table Unity Catalog quota first (the low-scale-factor SSB and AMPLab schemas were dropped to free quota). Overrides are maintainer decisions.\n\nDelivered 2026-10-04. All 18 bundles are published and live:\n- Snowflake SSB, and AMPLab and JoinOrder on BigQuery and Snowflake, in #2587.\n- BigQuery SSB SF 0.1, 1 and 10 in #2602, with owner-approved timing-plateau (SF 0.1, SF 1) and scale-invariant (SF 0.1, SF 10) overrides.\n- The six Databricks reruns (notuning, validated cache-off receipts) in #2615. They needed no overrides, and all 113 JoinOrder queries succeeded.\n- published-results mirror #2620; site promotion run 37213072128.\nSee results-data/CORPUS_NOTES.md \"BigQuery SSB timing (2026-10-03)\" and \"Databricks cache-off reruns (2026-10-04)\".\n\nThe unmet needs (tuning-no-midrun-destructive-db-handling-20261001, tuning-portable-metadata-store-20261001) gate tuned runs; every published run used --tuning notuning.",
   "description": "Publish live cloud benchmark results across BigQuery, Databricks, and Snowflake for the Academic benchmark suites:\n- SSB (Star Schema Benchmark): 13 star-schema queries (SF 0.1, 1.0, 10.0)\n- AMPLab: 8 big data aggregation and scan queries (SF 0.1, 1.0)\n- JoinOrder (JOB): 113 complex multi-way join queries on IMDB schema (SF 1.0)\n\nRuns from 2026-09-19/20 already exist locally for every cell but none is published. Under the current validator the Databricks bundles fail and several BigQuery bundles need overrides (see acceptance).\nVerify all bundles pass benchbox.validation.bundle.validate_bundles and scripts/validate_submission.py.",
   "sessions": [
     {
@@ -50,6 +50,14 @@
       "generation": "08c3c96c81e6411e8a0d71af4fb0757a",
       "op": "take",
       "op_id": "ac7f6875760147e4a2b60ed70898a401",
+      "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:bee5b41124e3031e24a64d64",
+      "at": "2026-10-04T18:44:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "45f7560ee46c458aafe396c97e5caf6e",
       "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
     }
   ]
