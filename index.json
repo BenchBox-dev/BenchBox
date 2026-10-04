@@ -4533,6 +4533,13 @@
       "status": "done",
       "title": "Prove concurrency contracts at unit, integration, adapter, and operator boundaries"
     },
+    "concurrency-docs-adr-and-proof-matrix-drift": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Concurrency ADR, proof matrix and load-testing executor drift from the implementation"
+    },
     "concurrency-docs-alignment": {
       "claim": null,
       "needs": [

@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Outcome ADR carries a superseded-in-part note",
+    "Proof matrix rows added for containment, deferred close and session isolation; the overclaimed caps row is narrowed or backed by a cross-process per-principal test",
+    "Load-testing executor enforces or removes the timeout, bounds its waits, and uses mono_time/elapsed_seconds"
+  ],
+  "context": "2026-10-04 concurrency adversarial review.",
+  "description": "Findings (develop 8ed0c64e1):\n- ADR: adr-concurrency-outcome-and-ownership-contract.md section 2 still says the two executors remain quarantined and removal must preserve their public surface. #2224 removed them with no shim (adr-concurrency-public-api-reconciliation.md). Its context table still lists parallel_batch_processor.py.\n- Proof matrix (docs/operations/concurrency-proof-matrix.md): phase containment and resource non-reuse have no row, though TestPhaseBoundaryGate and TestAwaitQuiescence exist. Nothing proves deferred close. Session isolation (tests/integration/test_throughput_session_isolation.py) is not cited. The row claiming durable queue and per-principal caps survive concurrent processes is backed only by a global running-cap test (tests/integration/mcp/test_durable_jobs.py:377).\n- Load-testing executor (experimental/load_testing/executor.py): query_timeout_seconds (:102) is declared but never enforced; as_completed at :404 and :448 has no timeout, so one hung writer blocks the run forever; run() measures duration with time.time() (:212, :235), contrary to the monotonic-clock invariant.",
+  "links": [
+    "docs/development/adr/adr-concurrency-outcome-and-ownership-contract.md",
+    "docs/operations/concurrency-proof-matrix.md",
+    "benchbox/experimental/load_testing/executor.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:04:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "aac2777d07db433e9e475dacf8bbcbdb",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
