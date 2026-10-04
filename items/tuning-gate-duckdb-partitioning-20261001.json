@@ -2,7 +2,7 @@
   "acceptance": [
     "Decision recorded (template README or ADR-003 addendum) selecting (A) or (B)."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-7 / task P1.5 (re-review R-1b).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda (PR #2634); do not claim.\n\nDECISION (option A, owner-endorsed 2026-10-04; ADR-003 addendum \"DuckDB partitioning\"):\n- Remove partitioning from every examples/tunings/duckdb/*_tuned.yaml and from the packaged mirrors in benchbox/core/tuning/templates/duckdb/.\n- Register DuckDB partitioning as rendered_via=\"none\".\n- Keep TestPackagedTemplatesParity green.\n- CHANGELOG: the requested-config hash for DuckDB tuned templates changes.\n- Option B (Hive-partitioned Parquet, external-table mode only) considered and not chosen.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-7 / task P1.5 (re-review R-1b).\n\nClosed by PR #2634 (squash-merged 2026-10-04, merge SHA 16ceaa48fe9c821d48697df4c0846422f57fda1b): ADR-003 addendum \"DuckDB partitioning\" in docs/development/tuning-adr-003-baseline-and-single-renderer.md.\n\nDECISION (option A, owner-endorsed 2026-10-04):\n- Remove partitioning from every examples/tunings/duckdb/*_tuned.yaml and from the packaged mirrors in benchbox/core/tuning/templates/duckdb/.\n- Register DuckDB partitioning as rendered_via=\"none\".\n- Keep TestPackagedTemplatesParity green.\n- CHANGELOG: the requested-config hash for DuckDB tuned templates changes.\n- Option B (Hive-partitioned Parquet, external-table mode only) considered and not chosen.",
   "description": "## Problem\nEvery shipped DuckDB tuned template requests partitioning: TPC-H (LINEITEM, ORDERS), SSB (LINEORDER) and TPC-DS (6 fact tables). DuckDB always drops it (`benchbox/platforms/duckdb.py:1453-1472`), and dropped intents veto the upgrade (`benchbox/core/tuning/introspection.py:678`). The curated templates defeat their own verification.\n\n## Options\n- **(A) Recommended.** Remove partitioning from `examples/tunings/duckdb/*_tuned.yaml` and the packaged mirrors under `benchbox/core/tuning/templates/duckdb/`, and mark DuckDB partitioning `rendered_via=\"none\"`.\n- **(B)** Hive-partitioned Parquet in external-table mode only.\n\n## Guardrails\n- Keep the `TestPackagedTemplatesParity` test green.\n- The requested-config hash changes; record that in release notes.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "examples/tunings/duckdb",
@@ -41,6 +41,14 @@
       "generation": "cb82da74387f4f888dba3f1e6fe210c4",
       "op": "take",
       "op_id": "b988c52676804ca0ae73ee5ee2e2e101",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:23:32Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "24431432b727433c89aa85a427d6620f",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
