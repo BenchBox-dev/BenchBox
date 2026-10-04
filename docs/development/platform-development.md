@@ -10,6 +10,7 @@ Guides for adding new database platforms and extending platform capabilities.
 
 adding-new-platforms
 adding-dataframe-platform
+tpcds-dataframe-parity
 runtime-modules
 db-api-2
 ```

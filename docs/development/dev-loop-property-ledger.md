@@ -102,6 +102,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
+| `tpcds-official-qualification.yml` | product-safety | Weekly advisory SF 1 TPC-DS qualification diagnostic |
 | `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
 
 ### `tests/unit/workflows/`

@@ -148,6 +148,138 @@
       "alternative": "Replacing execution with a text assertion would miss a condition that silently skips the guard. Literal duplication would stop testing the actual recipe.",
       "owner": "BenchBox maintainers",
       "removal": "Remove when the Make recipe extraction can be reconstructed by the executable-payload adapter without granting arbitrary input."
+    },
+    {
+      "path": "benchbox/core/tpcds/dataframe_queries/production_binding.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "benchbox/core/tpcds/dataframe_queries/production_binding.py",
+      "symbol": "",
+      "text": "# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "benchbox/core/tpcds/dataframe_queries/production_binding.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_literal_fallback_lint.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_literal_fallback_lint.py",
+      "symbol": "",
+      "text": "# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_literal_fallback_lint.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_parameter_name_completeness.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_parameter_name_completeness.py",
+      "symbol": "",
+      "text": "# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_parameter_name_completeness.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_production_binding.py",
+      "symbol": "",
+      "text": "# Copyright 2026 Joe Harris / BenchBox Project",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_production_binding.py",
+      "symbol": "",
+      "text": "# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/core/tpcds/test_production_binding.py",
+      "symbol": "",
+      "text": "# Licensed under the MIT License. See LICENSE file in the project root for details.",
+      "kind": "notice",
+      "consumer": "LICENSE",
+      "necessity": "Retain copyright and license attribution.",
+      "alternative": "Removing the notice would discard attribution.",
+      "owner": "Joe Harris",
+      "removal": "Retain while this source remains licensed."
     }
   ]
 }

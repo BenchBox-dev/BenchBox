@@ -9,10 +9,10 @@
   manufact_id: 436
   month: 12
 4:
+  select_one: t_s_secyear.customer_preferred_cust_flag
   year: 2001
 5:
   sales_date: '1998-08-04'
-  year: 2000
 6:
   month: 2
   year: 2000
@@ -31,6 +31,8 @@
   - '87816'
   - '83926'
 9:
+  agg_else: ss_net_profit
+  agg_then: ss_ext_discount_amt
   quantity_ranges:
   - - 1
     - 20
@@ -58,6 +60,7 @@
   month: 2
   year: 2002
 11:
+  select_one: t_s_secyear.customer_preferred_cust_flag
   year: 2001
 12:
   item_categories:
@@ -86,30 +89,19 @@
   - MI
   year: 2001
 14:
+  day: 16
   year: 1998
 15:
-  min_price: 500
   quarter: 2
-  states:
-  - CA
-  - WA
-  - GA
   year: 2000
-  zip_codes:
-  - '85669'
-  - '86197'
-  - '88274'
-  - '83405'
-  - '86475'
-  - '85392'
-  - '85460'
-  - '80348'
-  - '81792'
 16:
-  call_center: Bill Bowden
-  county: Williamson County
-  months:
-  - 2
+  counties:
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  month: 2
   state: IL
   year: 1999
 17:
@@ -153,8 +145,10 @@
   top_percent: 95
   year: 1999
 24:
-  color: chiffon
-  market_id: 8
+  amount_column: ss_sales_price
+  color: orchid
+  market_id: 7
+  second_color: chiffon
 25:
   agg: sum
   year: 2000
@@ -190,19 +184,6 @@
   - 142
   - 135
   - 28
-  quantity_ranges:
-  - - 0
-    - 5
-  - - 6
-    - 10
-  - - 11
-    - 15
-  - - 16
-    - 20
-  - - 21
-    - 25
-  - - 26
-    - 30
   wholesale_costs:
   - 14
   - 32
@@ -211,10 +192,8 @@
   - 38
   - 42
 29:
-  months:
-  - 4
-  - 5
-  - 6
+  agg: sum
+  month: 4
   year: 1999
 30:
   state: IL
@@ -278,11 +257,48 @@
 40:
   sales_date: '1998-04-08'
 41:
-  manufact_ids:
-  - 738
-  - 129
-  - 830
-  - 540
+  colors:
+  - orchid
+  - papaya
+  - burlywood
+  - navy
+  - bisque
+  - azure
+  - chocolate
+  - cornflower
+  - salmon
+  - midnight
+  - snow
+  - steel
+  - purple
+  - gainsboro
+  - metallic
+  - forest
+  manufact: 742
+  sizes:
+  - petite
+  - medium
+  - N/A
+  - extra large
+  - small
+  - large
+  units:
+  - Pound
+  - Lb
+  - Bundle
+  - Each
+  - N/A
+  - Tsp
+  - Bunch
+  - Gross
+  - Oz
+  - Box
+  - Carton
+  - Tbl
+  - Dram
+  - Unknown
+  - Gram
+  - Ounce
 42:
   month: 12
   year: 1998
@@ -314,6 +330,9 @@
   - 1
   - 2
 47:
+  order_by: nsum
+  select_one: v1.i_category, v1.i_brand
+  select_two: ',v1.d_year, v1.d_moy'
   year: 2000
 48:
   demo1_education: 4 yr Degree
@@ -366,6 +385,9 @@
   month: 1
   year: 2000
 57:
+  order_by: nsum
+  select_one: v1.cc_name
+  select_two: ',v1.d_year, v1.d_moy'
   year: 2000
 58:
   sales_date: '1998-02-19'
@@ -437,14 +459,20 @@
   marital_status: M
   year: 2001
 73:
-  county: Williamson County
-  state: TN
+  buy_potential_1: '>10000'
+  buy_potential_2: Unknown
+  counties:
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
   year: 1998
-  year_offsets:
-  - 0
-  - 1
-  - 2
 74:
+  aggone: max
+  order_by:
+  - 2
+  - 1
+  - 3
   year: 2001
 75:
   category: Sports
@@ -454,10 +482,9 @@
   null_col_ss: ss_addr_sk
   null_col_ws: ws_web_page_sk
 77:
-  channel_type: store channel
   sales_date: '1998-08-04'
-  year: 2001
 78:
+  select_columns: ss_sold_year, ss_item_sk, ss_customer_sk
   year: 2000
 79:
   dep_count: 8
@@ -465,7 +492,6 @@
   year: 1998
 80:
   sales_date: '1998-08-04'
-  year: 2000
 81:
   state: IL
   year: 1998
@@ -487,16 +513,49 @@
   city: Hopewell
   income_band: 32287
 85:
+  education_statuses:
+  - 4 yr Degree
+  - Primary
+  - Advanced Degree
+  marital_statuses:
+  - M
+  - D
+  - U
+  states:
+  - KY
+  - GA
+  - NM
+  - MT
+  - OR
+  - IN
+  - WI
+  - MO
+  - WV
   year: 1998
 86:
   dms: 1212
 87:
   dms: 1212
 88:
-  year: 1998
+  dep_counts:
+  - 3
+  - 0
+  - 1
 89:
-  category_id: 1
-  class_id: 1
+  categories:
+  - Home
+  - Books
+  - Electronics
+  - Shoes
+  - Jewelry
+  - Men
+  classes:
+  - wallpaper
+  - parenting
+  - musical
+  - womens
+  - birdal
+  - pants
   year: 2000
 90:
   dep_count: 8
@@ -524,10 +583,7 @@
   year: 1999
 96:
   dep_count: 5
-  hours:
-  - - 8
-    - 9
-  store_name: ese
+  hour: 8
 97:
   dms: 1212
 98:
