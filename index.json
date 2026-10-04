@@ -20214,6 +20214,13 @@
       "status": "done",
       "title": "Make TPC-DI parallel phases fail closed on incomplete or failed work"
     },
+    "tpcdi-scd2-expire-update-never-runs": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the TPC-DI SCD Type 2 expire step actually update expired rows"
+    },
     "tpcds-can-never-be-published-official-flag-not-wired": {
       "claim": null,
       "needs": [],
