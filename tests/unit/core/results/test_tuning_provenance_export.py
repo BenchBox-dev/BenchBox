@@ -283,11 +283,11 @@ def test_requested_block_reports_platform_optimizations_non_defaults_only():
     assert "sorted_ingestion_mode" not in platform_optimizations
 
 
-def test_no_tuning_returns_no_platform_tuning_block_or_companion():
+def test_no_tuning_returns_only_the_validation_status_and_no_companion():
     result = _make_result(tunings_applied=None)
 
     assert build_tuning_payload(result) is None
-    assert build_result_payload(result)["platform"].get("tuning") is None
+    assert build_result_payload(result)["platform"]["tuning"] == {"validation_status": "not_applicable"}
 
 
 def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
@@ -308,7 +308,7 @@ def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
 def test_no_tuning_omits_tuning_policy_generation_marker():
     result = _make_result(tunings_applied=None)
 
-    assert build_result_payload(result)["platform"].get("tuning") is None
+    assert "tuning_policy_generation" not in build_result_payload(result)["platform"]["tuning"]
     assert build_tuning_payload(result) is None
 
 

@@ -363,6 +363,15 @@ describe("RunReceipt", () => {
     expect(within(region).queryByText("Applied; no live-database check recorded")).toBeNull();
   });
 
+  it("shows an untuned run's not_applicable state as a recorded row, not a missing field", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: "not_applicable" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
+    expect(within(receipt).getByText("Not applicable")).toBeTruthy();
+    expect(within(receipt).queryByText("Verified")).toBeNull();
+  });
+
   it("marks an unrecorded tuning verification state as not-recorded, not verified", () => {
     render(<RunReceipt detail={makeDetail({ tuning_validation_status: null })} />);
 

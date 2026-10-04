@@ -1173,8 +1173,9 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 
     payload["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
-    if result.tuning_validation_status:
-        payload["validation_status"] = result.tuning_validation_status.lower()
+    validation_status = _derived_validation_status(result)
+    if validation_status:
+        payload["validation_status"] = validation_status
 
     tuning_profile = _extract_tuning_profile_metadata(result)
     if tuning_profile:
@@ -1327,9 +1328,45 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
     return metrics if metrics else None
 
 
-def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
+def _derived_validation_status(result: BenchmarkResults) -> str | None:
+    from benchbox.core.tuning.applied_ledger import NOT_VALIDATED
+
+    status = (getattr(result, "tuning_validation_status", None) or "").lower()
+    if status and status != NOT_VALIDATED:
+        return status
+    ledger = getattr(result, "applied_tuning_ledger", None)
+    ledger_status = ledger.get("status") if isinstance(ledger, dict) else None
+    if isinstance(ledger_status, str) and ledger_status and ledger_status.lower() != NOT_VALIDATED:
+        return ledger_status.lower()
+    return None
+
+
+def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
+    from benchbox.core.tuning.applied_ledger import NOT_APPLICABLE
+
+    status = _derived_validation_status(result)
+    if status:
+        return {"validation_status": status}
+    if getattr(result, "tuning_validation_status", None) is not None:
+        return {"validation_status": NOT_APPLICABLE}
+
+    summary: dict[str, Any] = {}
+    tuning_source = getattr(result, "tuning_source", None)
+    if tuning_source:
+        summary["tuning_source"] = tuning_source
+    source_file = getattr(result, "tuning_source_file", None)
+    config_hash = getattr(result, "tuning_config_hash", None)
+    if tuning_source or source_file or config_hash:
+        summary["source"] = _legacy_tuning_source_bridge(tuning_source, source_file)
+    if config_hash:
+        summary["requested_config_hash"] = config_hash
+        summary["hash"] = config_hash
+    return summary
+
+
+def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     if not result.tunings_applied:
-        return None
+        return _untuned_tuning_summary(result)
 
     tuning_applied = result.tunings_applied or {}
     summary: dict[str, Any] = {}
@@ -1347,8 +1384,9 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if applied_ledger_hash:
         summary["applied_ledger_hash"] = applied_ledger_hash
 
-    if result.tuning_validation_status:
-        summary["validation_status"] = result.tuning_validation_status.lower()
+    validation_status = _derived_validation_status(result)
+    if validation_status:
+        summary["validation_status"] = validation_status
 
     from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
 
@@ -1376,7 +1414,7 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
             logical_profile["coverage"] = coverage
         summary["logical_profile"] = {key: value for key, value in logical_profile.items() if value}
 
-    return summary if summary else None
+    return summary
 
 
 def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any] | None:

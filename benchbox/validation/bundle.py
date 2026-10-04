@@ -1341,6 +1341,9 @@ def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> No
         vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
+_TUNING_EVIDENCE_KEYS = ("requested", "tuning_source", "requested_config_hash", "hash", "source")
+
+
 def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     platform = data.get("platform")
     if not isinstance(platform, dict):
@@ -1353,7 +1356,7 @@ def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     if config.get("databricks_clustering_strategy") != "z_order":
         return
     tuning = platform.get("tuning")
-    if isinstance(tuning, dict) and tuning:
+    if isinstance(tuning, dict) and any(tuning.get(key) for key in _TUNING_EVIDENCE_KEYS):
         return
     export = data.get("export")
     if isinstance(export, dict) and export.get("benchbox_version"):

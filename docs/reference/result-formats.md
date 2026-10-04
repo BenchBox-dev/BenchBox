@@ -149,7 +149,7 @@ Consumer policy is intentionally split by use case:
 | `deployment` | object | Optional normalized deployment metadata |
 | `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
 | `config` | object | Optional adapter configuration flattened out of `platform_info` (e.g. Databricks clustering strategy below) |
-| `tuning` | object | Optional requested-tuning summary (see `platform.tuning`) |
+| `tuning` | object | Tuning summary, present on bundles for runs executed by this version except a tuned run that recorded neither a status nor a ledger (see `platform.tuning`) |
 
 Platform-specific extensions should stay inside the existing schema-v2 blocks
 where possible. Current canonical locations are `platform.*` for platform
@@ -165,31 +165,52 @@ resolved clustering strategy here as `databricks_clustering_strategy`:
 for untuned runs. Bundles predating this field omit it. (`platform.tuning`
 carries the requested-tuning summary and never holds this key.)
 
-##### `platform.tuning` (optional)
+##### `platform.tuning`
 
-Present only when a run resolved a tuning configuration (`--tuning` other than
-`notuning` producing an empty baseline). All values are **self-attested** -
-they describe what was *requested*, not an independently verified record of
-what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-semantics.md`).
+Present on bundles for runs executed by this version. An untuned run
+(`--tuning notuning`) carries `validation_status`, normally `not_applicable`,
+and nothing else unless the run recorded session settings or a drift check; in
+that case the block also carries `applied` and `applied_ledger_hash`. A run
+that resolved a tuning configuration adds the fields below. A tuned run whose
+status was never derived and that has no applied ledger omits the block's
+`validation_status`. Bundles from older runs omit the block, or hold a block
+without `validation_status`, and re-exporting one (for example with
+`benchbox export`) keeps it that way: the exporter never states a status the
+original run did not record, and a stored `not_validated` placeholder counts as
+not recorded. The one exception is a bundle with no block that still has an
+`.applied.json` companion: re-exporting it adds `validation_status` from the
+status recorded in that ledger. Consumers must treat a missing block or a
+missing `validation_status` as "not recorded". All requested-configuration
+values are **self-attested** - they describe what was *requested*, not an
+independently verified record of what physically applied (see
+`docs/development/tuning-adr-001-trust-and-hash-semantics.md`).
 
 | Field | Type | Description |
 | ------- | ------ | ------------- |
 | `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
 | `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
-| `validation_status` | string | ADR-1 honest execution-derived tuning verified-state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself rides in the `.applied.json` companion). Mirrors the `.tuning.json` companion's field; surfaced here so main-bundle consumers (e.g. the explorer) can display it. Omitted for bundles predating the applied ledger. |
+| `validation_status` | string | ADR-1 honest execution-derived tuning verified-state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself is recorded in `platform.tuning.applied.receipt`). When `platform.tuning.applied` is present, its `status` equals this field. Emitted for runs executed by this version: an untuned run reports `not_applicable`, as does a DataFrame run whose configuration is empty or all defaults; a run that requested tuning and applied nothing reports `noop`; a tuned run reports the status its execution path derived, or the applied ledger's status when none was, and omits the field when it has neither. Absent from bundles whose run never recorded it, and a re-export of such a bundle keeps it absent (apart from the `.applied.json` case described above). |
 | `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
 | `source`, `hash` | string | **Legacy bridge keys**, kept for one schema generation so any external consumer of these documented keys keeps working (this is not the explorer ingest pipeline, which reads tuning facets from `data["config"]`, never from `platform.tuning`). `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
 
-The `.tuning.json` companion file (same base filename, `.tuning.json` suffix)
-carries the full detail: `requested.constraints` (primary/foreign key, unique,
-and check constraint settings), `requested.platform_optimizations`
-(non-default values only), `requested.table_tunings` (complete per-table
-tuning structure), plus `requested_config_hash`, `tuning_policy_generation`,
-`tuning_source`, and `source_file` (a repo-relative path or
-`"<basename>:<content-hash>"` - never a raw local filesystem path).
+The full detail lives in the same block, so a bundle needs no companion file
+to answer what a run requested and what it applied:
+
+- `platform.tuning.requested` holds `constraints` (primary/foreign key, unique,
+  and check constraint settings), `platform_optimizations` (non-default values
+  only), and `table_tunings` (complete per-table tuning structure).
+- `platform.tuning.source_file` is a repo-relative path or
+  `"<basename>:<content-hash>"` - never a raw local filesystem path.
+- `platform.tuning.applied` holds the applied ledger: `status`, `statements`,
+  `dropped`, and the introspection `receipt` when one was taken.
+  `applied_ledger_hash` stays on `platform.tuning` itself.
+
+Bundles exported before this were accompanied by `<result>.tuning.json` and
+`<result>.applied.json` files carrying the same content. Nothing writes them
+now; readers still accept them where they exist.
 
 The `.plans.json` companion file (same base filename, `.plans.json` suffix)
 carries captured query plans keyed by query id. Tree depth is bounded by the

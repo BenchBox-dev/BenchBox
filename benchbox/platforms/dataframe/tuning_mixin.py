@@ -138,7 +138,8 @@ class TuningConfigurableMixin(ABC):
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is None:
             return None
-        has_config = getattr(self, "_tuning_config", None) is not None
+        config = getattr(self, "_tuning_config", None)
+        has_config = bool(ledger.statements) or (config is not None and not config.is_default())
         return ledger.overall_status(tuning_enabled=has_config, has_config=has_config)
 
     def _write_applied_tuning_ledger(self, builder: Any) -> None:
