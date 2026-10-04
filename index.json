@@ -6781,12 +6781,7 @@
       "title": "Add a scheduled, non-blocking SF=1 qualification oracle lane for both families"
     },
     "dfparity-t19-emptiness-rebaseline": {
-      "claim": {
-        "expires_at": "2026-10-05T17:09:23Z",
-        "generation": "b9ed7eb76f284dd1837c652ee8ff24d7",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t05-adapter-batches",
         "dfparity-t03-gate-scale-threading",
@@ -6801,7 +6796,7 @@
         "dfparity-t05h-adapters-q44-q49-inventory"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Re-baseline TPC-DS legitimately-empty classification with scale-scoped criteria"
     },
     "dfparity-t20-promote-polars-gate": {
