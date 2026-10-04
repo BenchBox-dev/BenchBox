@@ -126,11 +126,12 @@ def test_region_tables_render_every_observed_region():
     assert "synapse_serverless_price_per_tb: 5.0" not in serverless
 
 
-def test_committed_file_marks_every_generated_section():
-    text = PRICING_PATH.read_text(encoding="utf-8")
-    for section in GENERATED_SECTIONS:
-        assert text.count(f"# BEGIN GENERATED {section} ") == 1, section
-        assert text.count(f"# END GENERATED {section}") == 1, section
+def test_committed_file_has_one_key_for_every_generated_section():
+    lines = PRICING_PATH.read_text(encoding="utf-8").split("\n")
+    assert set(generator.SECTION_PATHS) == set(GENERATED_SECTIONS)
+    for path, _ in generator.SECTION_PATHS.values():
+        generator._key_line(lines, path)
+    assert "GENERATED" not in PRICING_PATH.read_text(encoding="utf-8")
 
 
 def test_dwu_levels_scale_linearly_from_base_rates():
@@ -215,19 +216,25 @@ def test_apply_evidence_updates_is_line_local(scratch_copy):
         generator.apply_evidence_updates(revised, [stale])
 
 
-def test_splice_rejects_unknown_and_duplicate_markers():
+def test_splice_rejects_unknown_sections_and_missing_or_duplicate_keys():
     evidence = generator.load_evidence()
     rendered = generator.render_all_sections(evidence)
     original = PRICING_PATH.read_text(encoding="utf-8")
     with pytest.raises(generator.PricingGeneratorError):
-        generator.splice_sections(original + "# BEGIN GENERATED phantom -- x\n", rendered)
-    doubled = original.replace(
-        "# END GENERATED fabric_cu_prices",
-        "# END GENERATED fabric_cu_prices\n  # BEGIN GENERATED fabric_cu_prices -- x",
-        1,
-    )
+        generator.splice_sections(original, {**rendered, "phantom": ["x: 1"]})
     with pytest.raises(generator.PricingGeneratorError):
-        generator.splice_sections(doubled, rendered)
+        generator.splice_sections(original.replace("\nfabric_cu_prices:", "\nfabric_cu_prices_renamed:", 1), rendered)
+    with pytest.raises(generator.PricingGeneratorError):
+        generator.splice_sections(original + "\nathena_price_per_tb:\n  us-east-1: 5.0\n", rendered)
+
+
+def test_splice_replaces_only_the_keyed_block():
+    original = "a:\n  x: 1\nfabric_cu_prices:\n  us: 0.10\nb:\n  y: 2\n"
+    rendered = {"fabric_cu_prices": ["us: 0.18"]}
+    paths = {"fabric_cu_prices": (("fabric_cu_prices",), False)}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(generator, "SECTION_PATHS", paths)
+        assert generator.splice_sections(original, rendered) == original.replace("us: 0.10", "us: 0.18")
 
 
 def test_extract_aws_prices_indexes_by_attribute():

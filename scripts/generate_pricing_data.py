@@ -346,46 +346,69 @@ def require_observed_regions(section: dict, table: str) -> list[str]:
     return list(regions)
 
 
-BEGIN_PREFIX = "# BEGIN GENERATED "
-END_PREFIX = "# END GENERATED "
+SECTION_PATHS: dict[str, tuple[tuple[str, ...], bool]] = {
+    "redshift_node_prices": (("redshift_node_prices",), False),
+    "athena_price_per_tb": (("athena_price_per_tb",), True),
+    "synapse_dedicated_dwu_prices": (("synapse_dedicated_dwu_prices",), False),
+    "synapse_serverless_price_per_tb": (("synapse_serverless_price_per_tb",), True),
+    "fabric_cu_prices": (("fabric_cu_prices",), False),
+    "databricks.azure": (("databricks_dbu_prices", "azure"), False),
+    "provenance.redshift_node_prices": (("provenance", "redshift_node_prices"), True),
+    "provenance.athena_price_per_tb": (("provenance", "athena_price_per_tb"), True),
+    "provenance.synapse_dedicated_dwu_prices": (("provenance", "synapse_dedicated_dwu_prices"), True),
+    "provenance.synapse_serverless_price_per_tb": (("provenance", "synapse_serverless_price_per_tb"), True),
+    "provenance.fabric_cu_prices": (("provenance", "fabric_cu_prices"), True),
+}
+_KEY_LINE = re.compile(r"^(?P<indent> *)(?P<key>[A-Za-z0-9_.-]+):(?:\s|$)")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _key_line(lines: list[str], path: tuple[str, ...]) -> int:
+    stack: list[tuple[int, str]] = []
+    found = []
+    for index, line in enumerate(lines):
+        match = _KEY_LINE.match(line)
+        if not match:
+            continue
+        indent = len(match.group("indent"))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, match.group("key")))
+        if tuple(key for _, key in stack) == path:
+            found.append(index)
+    if len(found) != 1:
+        raise PricingGeneratorError(f"expected one key for {'.'.join(path)}, found {len(found)}")
+    return found[0]
+
+
+def _block_end(lines: list[str], start: int) -> int:
+    indent = _indent(lines[start])
+    end = start + 1
+    while end < len(lines) and (not lines[end].strip() or _indent(lines[end]) > indent):
+        end += 1
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return end
 
 
 def splice_sections(original_text: str, rendered: dict[str, list[str]]) -> str:
-    lines = original_text.split("\n")
-    begins: dict[str, int] = {}
-    ends: dict[str, int] = {}
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith(BEGIN_PREFIX):
-            section = stripped[len(BEGIN_PREFIX) :].split()[0]
-            if section in begins:
-                raise PricingGeneratorError(f"duplicate BEGIN marker for {section}")
-            begins[section] = index
-        elif stripped.startswith(END_PREFIX):
-            section = stripped[len(END_PREFIX) :].split()[0]
-            if section in ends:
-                raise PricingGeneratorError(f"duplicate END marker for {section}")
-            ends[section] = index
-    unknown = (set(begins) | set(ends)) - set(rendered)
+    unknown = set(rendered) - set(SECTION_PATHS)
     if unknown:
-        raise PricingGeneratorError(f"markers without a renderer: {sorted(unknown)}")
-    missing = set(rendered) - set(begins)
+        raise PricingGeneratorError(f"rendered sections without a key path: {sorted(unknown)}")
+    missing = set(SECTION_PATHS) - set(rendered)
     if missing:
-        raise PricingGeneratorError(f"rendered sections without markers: {sorted(missing)}")
-    for section in rendered:
-        if begins[section] > ends[section]:
-            raise PricingGeneratorError(f"END marker precedes BEGIN for {section}")
+        raise PricingGeneratorError(f"key paths without a renderer: {sorted(missing)}")
+    lines = original_text.split("\n")
     for section, block in rendered.items():
-        indent = lines[begins[section]][: len(lines[begins[section]]) - len(lines[begins[section]].lstrip())]
-        body = [(indent + text) if text else "" for text in block]
-        lines[begins[section] + 1 : ends[section]] = body
-        shift = len(body) - (ends[section] - begins[section] - 1)
-        for other in begins:
-            if begins[other] > begins[section]:
-                begins[other] += shift
-        for other in ends:
-            if ends[other] > begins[section]:
-                ends[other] += shift
+        path, whole = SECTION_PATHS[section]
+        key = _key_line(lines, path)
+        end = _block_end(lines, key)
+        first = key if whole else key + 1
+        indent = " " * (_indent(lines[key]) if whole else _indent(lines[key]) + 2)
+        lines[first:end] = [(indent + text) if text else "" for text in block]
     return "\n".join(lines)
 
 

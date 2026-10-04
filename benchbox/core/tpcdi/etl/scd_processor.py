@@ -446,13 +446,6 @@ class EnhancedSCDType2Processor:
         if current_sk_col in scd_changes.columns:
             surrogate_keys = scd_changes[current_sk_col].tolist()
 
-            f"""
-            UPDATE {table_name}
-            SET {self.config.is_current_column} = 0,
-                {self.config.end_date_column} = ?
-            WHERE {sk_column} IN ({",".join(["?"] * len(surrogate_keys))})
-            """
-
             logger.debug(f"Generated expire query for {len(surrogate_keys)} records in {table_name}")
             records_updated += len(surrogate_keys)
 
@@ -523,12 +516,6 @@ class EnhancedSCDType2Processor:
             return {"records_updated": 0}
 
         surrogate_keys = non_scd_updates[current_sk_col].tolist()
-
-        f"""
-        UPDATE {table_name}
-        SET {self.config.batch_id_column} = ?
-        WHERE {sk_column} IN ({",".join(["?"] * len(surrogate_keys))})
-        """
 
         logger.debug(f"Generated non-SCD update query for {len(surrogate_keys)} records in {table_name}")
 
