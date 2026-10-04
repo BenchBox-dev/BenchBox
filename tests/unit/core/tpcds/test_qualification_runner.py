@@ -526,3 +526,23 @@ def test_display_rounding_leaves_rows_unpaired_when_counts_differ():
     answer = {"columns": ["ratio"], "rows": [["0.5"], ["0.25"]], "null_tokens": []}
     actual = [(0.50001,)]
     assert runner.display_rounded(actual, answer, ["DOUBLE"]) == actual
+
+
+def test_kill_worker_tolerates_a_worker_that_already_exited(monkeypatch):
+    class ExitedProcess:
+        pid = 4242
+        waited = False
+
+        def kill(self):
+            raise ProcessLookupError
+
+        def wait(self):
+            self.waited = True
+
+    def vanished(pid, sig):
+        raise ProcessLookupError
+
+    monkeypatch.setattr(runner.os, "killpg", vanished, raising=False)
+    process = ExitedProcess()
+    runner._kill_worker(process)
+    assert process.waited

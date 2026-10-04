@@ -189,7 +189,10 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
                 return None
             target = exp.column(f"__c{ordinal - 1}")
         else:
-            for column in list(target.find_all(exp.Column)):
+            references = list(target.find_all(exp.Column))
+            if not references:
+                return None
+            for column in references:
                 position = None if column.table else positions.get(column.name.lower())
                 if position is None:
                     return None
@@ -223,8 +226,8 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
         required = connection.execute(
             f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in terms)}, __pos"
         ).fetchall()
-    except duckdb.Error:
-        return None
+    except duckdb.Error as exc:
+        return f"the ORDER BY check could not evaluate the sort keys over the returned rows: {exc}"
     finally:
         connection.close()
     for position, (actual, expected) in enumerate(zip(returned, required, strict=True)):
@@ -1207,6 +1210,17 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_DATAVAULT_SCALE,
     ),
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
+        backends=("expression", "pandas", "datafusion"),
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
+    ),
     "tpch": CrossSurfaceGate(
         name="tpch",
         build=build_tpch_duckdb,
@@ -1259,18 +1273,7 @@ GATES: dict[str, CrossSurfaceGate] = {
 }
 
 
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    "tpcds": CrossSurfaceGate(
-        name="tpcds",
-        build=build_tpcds_duckdb,
-        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCDS_SCALE,
-    ),
-}
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
@@ -1363,10 +1366,6 @@ def _report_flaky(name: str, flaky: list[tuple[str, str, list[str | None]]], rep
 def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: int = 1) -> int:
     import tempfile
 
-    from rich.text import Text
-
-    from benchbox.utils.printing import emit
-
     with tempfile.TemporaryDirectory() as tmp:
         data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
@@ -1449,10 +1448,6 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
         _report_flaky(gate.name, flaky, repeats, enforced=enforced)
         if enforced:
             return exit_code or 1
-    if gate.name == "tpcds" and gate.name in STAGED_GATES:
-        outcome = "clean" if exit_code == 0 and not flaky else "not clean"
-        emit(Text(f"STAGED REPORT ONLY - tpcds comparison {outcome}; no CI enforcement"), quiet=False)
-        return 0
     return exit_code
 
 

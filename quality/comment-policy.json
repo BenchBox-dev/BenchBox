@@ -37680,7 +37680,7 @@
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": "tests/unit/scripts/test_release_flow.py",
-      "necessity": "In `html-output:root / 'landing' / 'index.html'` the test starts a subprocess whose program or inline source (unresolved HTML output source) is assembled at runtime, so the checker cannot read it statically. The test exercises that runtime-built command; the fixture is bound to the test's complete AST digest.",
+      "necessity": "The test writes the LANDING test template, formatted with a version string, into a temporary candidate tree; the template is a string literal in the same file and holds no comment.",
       "alternative": "Rewrite the subprocess input as a static literal the checker can parse; that changes the test and was not taken in the cleanup.",
       "owner": "comment-cleanup-unit-tests-cli-scripts-rest",
       "removal": "Remove when the test's subprocess input becomes a static literal or the executable-payload adapter can reconstruct it."
@@ -37692,8 +37692,8 @@
       "payload": "sha256:fed7c49bc9da238eb778a5f96fba6293adca816635cd73b83f14d13663e3544c",
       "finding_kind": "payload-error",
       "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_release_flow.py",
-      "necessity": "In `test_candidate_selection_cli_is_stdlib_only_and_preserves_lock` the test starts a subprocess whose program or inline source (sys.executable) is assembled at runtime, so the checker cannot read it statically. The test exercises that runtime-built command; the fixture is bound to the test's complete AST digest.",
+      "consumer": "scripts/release_flow.py",
+      "necessity": "The test runs the tracked scripts/release_flow.py, copied into a temporary candidate tree, under sys.executable -I -S; the script is scanned in place.",
       "alternative": "Rewrite the subprocess input as a static literal the checker can parse; that changes the test and was not taken in the cleanup.",
       "owner": "comment-cleanup-unit-tests-cli-scripts-rest",
       "removal": "Remove when the test's subprocess input becomes a static literal or the executable-payload adapter can reconstruct it."
@@ -37899,7 +37899,7 @@
       "path": "tests/unit/test_standardized_test_commands.py",
       "symbol": "TestMakefileCommands.test_pr_preflight_fast_tests_creates_classifier_artifacts_when_absent",
       "text": "unresolved executable source: make",
-      "payload": "sha256:03360c0e07a3f752ea2b2febd1fc49e90b02ae2a7fb7d10f1ea60f6d82ceda9f",
+      "payload": "sha256:297e9756101a67c5a9d092f95fa8934570fc537d6fa0fe7c78083603afad3770",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": "tests/unit/test_standardized_test_commands.py",
@@ -38642,19 +38642,6 @@
       "removal": "Remove when the executable-payload adapter can resolve this source statically."
     },
     {
-      "path": "tests/unit/test_standardized_test_commands.py",
-      "symbol": "TestMakefileCommands.test_pr_preflight_fast_tests_creates_classifier_artifacts_when_absent",
-      "text": "unresolved executable source: make",
-      "payload": "sha256:d86ba9522f317d62fda7754db96c91df09820bc159c8b92dbfcb2fe0b65ccffb",
-      "finding_kind": "payload-error",
-      "kind": "fixture",
-      "consumer": "Makefile",
-      "necessity": "The test runs the checked Makefile target with a fake make that records its arguments; the recipe is scanned in place in the Makefile.",
-      "alternative": "Inlining the executed or written text as a literal would stop the test from exercising the checked source it targets.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the executable-payload adapter can resolve this source statically."
-    },
-    {
       "path": "tests/unit/workflows/test_public_site_visual_workflow.py",
       "symbol": "test_baseline_candidates_stop_at_the_first_site_input_change",
       "text": "unresolved executable source: classifier",
@@ -38884,7 +38871,7 @@
       "consumer": "COPYRIGHT.md",
       "necessity": "The repository contribution rule in COPYRIGHT.md requires appropriate copyright headers. Retain this existing authored notice payload unchanged in a source header.",
       "alternative": "Removing or replacing this payload would lose existing notice wording. A runtime docstring is unnecessary; an exact source comment retains the notice without carrying explanatory prose.",
-      "owner": "comment-cleanup-amplab",
+      "owner": "comment-cleanup-unit-tests-core",
       "removal": "Remove or change only after the owner records the governing notice requirement and confirms that the exact existing notice may be changed."
     },
     {
@@ -38895,7 +38882,7 @@
       "consumer": "LICENSE",
       "necessity": "Preserve the existing per-file MIT-license reference conservatively while individual-file notice obligations are adjudicated. LICENSE requires copyright and permission notices in distributed copies; no claim is made that this abbreviated reference is legally required.",
       "alternative": "Removing or replacing this payload would lose existing notice wording. A runtime docstring is unnecessary; an exact source comment retains the notice without carrying explanatory prose.",
-      "owner": "comment-cleanup-amplab",
+      "owner": "comment-cleanup-unit-tests-core",
       "removal": "Remove or change only after the owner records the governing notice requirement and confirms that the exact existing notice may be changed."
     },
     {

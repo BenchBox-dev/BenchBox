@@ -46,6 +46,7 @@ _TARGETS: dict[str, str] = {
     "tsbs_devops": "double-groupby-1-hr",
     "tpch_skew": "9",
     "tpch": "9",
+    "tpcds": "7",
 }
 
 

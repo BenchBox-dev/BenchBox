@@ -46,6 +46,9 @@ def _makefile_target_body(makefile_content: str, target_name: str) -> str:
     return "".join(body)
 
 
+_SPLIT_CROSS_SURFACE_TARGETS = {"tpcds": ("tpcds-pandas-cross-surface-equivalence-report",)}
+
+
 def _cross_surface_make_target(gate_name: str) -> str:
     return f"{gate_name.replace('_', '-')}-cross-surface-equivalence-report"
 
@@ -542,6 +545,23 @@ class TestMakefileCommands:
 
         assert not missing_make_targets, f"GATES entries missing Make targets: {missing_make_targets}"
         assert not missing_ci_steps, f"GATES entries missing correctness-gate CI steps: {missing_ci_steps}"
+
+    def test_split_cross_surface_targets_cover_every_gate_backend(self):
+        from benchbox.core.equivalence.cross_surface import GATES
+
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        makefile_content = (repo_root / "Makefile").read_text()
+        run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "ci.yml", "correctness-gate")
+        for gate_name, extra_targets in _SPLIT_CROSS_SURFACE_TARGETS.items():
+            covered: set[str] = set()
+            for target in (_cross_surface_make_target(gate_name), *extra_targets):
+                body = _makefile_target_body(makefile_content, target)
+                assert f"--benchmark {gate_name}" in body, f"{target} must run --benchmark {gate_name}"
+                assert f"make {target}" in run_text, f"correctness-gate CI is missing make {target}"
+                covered.update(re.findall(r"--backend (\S+)", body))
+            assert covered == set(GATES[gate_name].backends), (
+                f"{gate_name} Make targets run {sorted(covered)}, gate backends are {sorted(GATES[gate_name].backends)}"
+            )
 
     def test_main_release_required_includes_bounded_correctness_gate(self):
         repo_root = Path(__file__).resolve().parent.parent.parent

@@ -44,6 +44,26 @@ def tmp_gen(tmp_path):
     return gen
 
 
+def test_write_manifest_refuses_to_record_zero_tables(tmp_gen, tmp_path):
+    tmp_gen.compress_data = False
+    tmp_gen.compression_type = "none"
+    with pytest.raises(RuntimeError, match="produced no table files"):
+        tmp_gen._write_manifest(tmp_path, {})
+
+    assert not (tmp_path / "_datagen_manifest.json").exists()
+
+
+def test_write_manifest_records_generated_tables(tmp_gen, tmp_path):
+    tmp_gen.compress_data = False
+    tmp_gen.compression_type = "none"
+    data_file = tmp_path / "item.dat"
+    data_file.write_text("1|a|\n2|b|\n")
+    tmp_gen._write_manifest(tmp_path, {"item": [data_file]})
+
+    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
+    assert manifest["tables"]["item"][0]["row_count"] == 2
+
+
 class TestValidateParameters:
     def test_negative_scale_factor_raises(self, tmp_path):
         with pytest.raises(ValueError, match="positive"):

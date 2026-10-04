@@ -309,3 +309,29 @@ class TestFormatBytes:
         v = BenchmarkDataValidator("tpch")
         formatted = v._format_bytes(1073741824)
         assert "GB" in formatted
+
+
+class TestEmptyManifestIsNotReusable:
+    @staticmethod
+    def _write_empty_manifest(data_dir: Path, benchmark: str) -> None:
+        import json
+
+        from benchbox.utils.datagen_version import current_datagen_stamp
+
+        manifest = {
+            "benchmark": benchmark,
+            "scale_factor": 1.0,
+            "tables": {},
+            **current_datagen_stamp(benchmark),
+        }
+        (data_dir / "_datagen_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    @pytest.mark.parametrize("benchmark_name", ["tpch", "tpcds", "custom_bench"])
+    def test_empty_manifest_with_data_files_is_invalid(self, tmp_path, benchmark_name):
+        (tmp_path / "customer.tbl.zst").write_bytes(b"\x28\xb5\x2f\xfd" + b"x" * 64)
+        self._write_empty_manifest(tmp_path, benchmark_name)
+
+        result = BenchmarkDataValidator(benchmark_name, scale_factor=1.0).validate_data_directory(tmp_path)
+
+        assert result.valid is False
+        assert any("manifest" in issue.lower() for issue in result.issues), result.issues

@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -589,6 +590,13 @@ class ZstdHandler(CompressionHandler):
 
     @contextmanager
     def open(self, file_path: Path) -> Iterator[Any]:
+        if shutil.which("zstd") is None:
+            raise DataLoadingError(
+                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
+                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
+                "uncompressed data."
+            )
+
         if self.adapter and hasattr(self.adapter, "log_verbose"):
             self.adapter.log_verbose(f"Decompressing {file_path.name} using system zstd command...")
 
@@ -1848,9 +1856,11 @@ class DataLoader:
         table_stats = {}
 
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
-        if not data_source:
-            self.adapter.log_very_verbose("No data source found")
-            return table_stats, elapsed_seconds(start_time)
+        if not data_source or not data_source.tables:
+            if getattr(self.benchmark, "SKIP_DATA_LOADING", False):
+                self.adapter.log_very_verbose("No data source found (data loading skipped)")
+                return table_stats, elapsed_seconds(start_time)
+            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
 
         table_stats = self._load_file_based_data(data_source)
 

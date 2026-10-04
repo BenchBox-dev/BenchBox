@@ -214,7 +214,20 @@ tpch-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch
 
 tpcds-cross-surface-equivalence-report:
-	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend expression --backend datafusion
+
+.PHONY: tpcds-pandas-cross-surface-equivalence-report
+tpcds-pandas-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend pandas
+
+.PHONY: tpcds-cross-surface-draws-report
+tpcds-cross-surface-draws-report:
+	@status=0; \
+	for draw in "--power-stream 1" "--seed 42" "--seed 42 --power-stream 1"; do \
+		uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds \
+			--backend expression --backend pandas --backend datafusion --repeats 2 $$draw || status=1; \
+	done; \
+	exit $$status
 
 .PHONY: cross-surface-update-baseline
 cross-surface-update-baseline:

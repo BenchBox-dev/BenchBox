@@ -1587,3 +1587,70 @@ class TestPrepareLocalLoadFile:
         conn = MagicMock()
         count = InMemoryDataHandler.load_table("mytable", None, conn)
         assert count == 0
+
+
+class TestEmptySourceFailsClosed:
+    @staticmethod
+    def _loader(tmp_path: Path, benchmark: object, resolved: object) -> DataLoader:
+        loader = DataLoader.__new__(DataLoader)
+        loader.adapter = MagicMock()
+        loader.benchmark = benchmark
+        loader.connection = MagicMock()
+        loader.data_dir = tmp_path
+        loader.tuning_config = None
+        loader.resolver = MagicMock()
+        loader.resolver.resolve = MagicMock(return_value=resolved)
+        return loader
+
+    def test_load_raises_when_no_source_resolves(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        loader = self._loader(tmp_path, SimpleNamespace(), None)
+        with pytest.raises(ValueError, match="No data files found"):
+            loader.load()
+
+    def test_load_raises_when_source_names_zero_tables(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        empty = DataSource(source_type="manifest", tables={})
+        loader = self._loader(tmp_path, SimpleNamespace(), empty)
+        with pytest.raises(ValueError, match="No data files found"):
+            loader.load()
+
+    def test_load_stays_empty_when_benchmark_skips_loading(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        skipped = SimpleNamespace(SKIP_DATA_LOADING=True)
+        loader = self._loader(tmp_path, skipped, None)
+        stats, _ = loader.load()
+        assert stats == {}
+
+
+class TestManifestMissingFiles:
+    @staticmethod
+    def _write_manifest(data_dir: Path, tables: dict) -> None:
+        (data_dir / "_datagen_manifest.json").write_text(json.dumps({"tables": tables}), encoding="utf-8")
+
+    def test_empty_tables_manifest_resolves_to_no_source(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        (tmp_path / "call_center.dat").write_text("1|\n", encoding="utf-8")
+        self._write_manifest(tmp_path, {})
+        assert ManifestFileSource().get_data_source(SimpleNamespace(), tmp_path) is None
+
+
+class TestZstdToolProbe:
+    def test_missing_zstd_cli_raises_actionable_error_on_open(self, tmp_path: Path, monkeypatch) -> None:
+        from benchbox.platforms.base import data_loading
+
+        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
+        handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        with pytest.raises(DataLoadingError, match="zstd.*command was not found"), handler.open(tmp_path / "x.dat.zst"):
+            pass
+
+    def test_handler_selection_does_not_require_the_zstd_cli(self, tmp_path: Path, monkeypatch) -> None:
+        from benchbox.platforms.base import data_loading
+
+        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
+        handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        assert isinstance(handler, ZstdHandler)

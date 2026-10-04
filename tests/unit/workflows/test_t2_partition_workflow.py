@@ -30,6 +30,7 @@ def test_correctness_partitions_preserve_each_gate_once() -> None:
         if gate == "joinorder":
             target = "joinorder-synthetic"
         expected.add(f"make {target}-cross-surface-equivalence-report")
+    expected.add("make tpcds-pandas-cross-surface-equivalence-report")
     steps = [step for step in job["steps"] if str(step.get("run", "")).startswith("make ")]
     assert Counter(step["run"] for step in steps) == Counter(dict.fromkeys(expected, 1))
     groups = {

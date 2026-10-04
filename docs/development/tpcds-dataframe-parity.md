@@ -47,11 +47,14 @@ This command checks the committed value inventory, sampled specification values,
 
 ## Comparison commands and lane boundaries
 
-The current TPC-DS cross-surface entry is staged and report-only. It builds SF 0.01 data and compares DuckDB with the Polars Expression and Pandas implementations by default:
+The TPC-DS cross-surface gate is enforced. It builds SF 0.01 data on the default Power draw and compares all 103 statements on DuckDB with the Polars Expression, Pandas and native DataFusion implementations. CI runs it in two steps of the correctness-gate job:
 
 ```bash
 make tpcds-cross-surface-equivalence-report
+make tpcds-pandas-cross-surface-equivalence-report
 ```
+
+Each of the two CI steps has a 45 s budget on hosted Ubuntu runners, including the data build and parameter binding (about 10 s). That figure was set from hosted runs, where the pandas step took 26-39 s and the Polars and DataFusion step 14-16 s.
 
 The direct entry point is equivalent:
 
@@ -59,7 +62,7 @@ The direct entry point is equivalent:
 uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
 ```
 
-The CLI accepts `--seed`, `--power-stream`, repeated `--backend` options, and `--repeats`. The defaults compare Polars Expression and Pandas at SF 0.01 with one repeat and Power stream 0. DataFusion uses the production loader when selected explicitly:
+The CLI accepts `--seed`, `--power-stream`, repeated `--backend` options, and `--repeats`. The defaults compare all three backends at SF 0.01 with one repeat and Power stream 0. DataFusion uses the production loader:
 
 ```bash
 uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds \
@@ -67,11 +70,17 @@ uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds \
   --seed 42 --power-stream 1 --repeats 3
 ```
 
-All 99 base queries and the four `b` statements are required. Missing statements, adapters, implementations, or captured bindings fail before comparison, including in staged mode. Both statements of each multipart query use the same captured dsqgen substitution log. The report records all canonical bindings, the requested seed and Power stream, effective RNG seed, native dsqgen stream, scale, binary digest, and all 103 SQL digests.
+All 99 base queries and the four `b` statements are required. Missing statements, adapters, implementations, or captured bindings fail before comparison. Both statements of each multipart query use the same captured dsqgen substitution log. The report records all canonical bindings, the requested seed and Power stream, effective RNG seed, native dsqgen stream, scale, binary digest, and all 103 SQL digests.
 
 The Power draw uses an effective RNG seed of `(seed or 1) + power_stream + 1000` and native dsqgen stream 0. A repeat reruns comparison against the same generated files and captured draw; it does not draw new parameters. To test another draw, run another command with a different seed or Power stream. Seed and Power stream options are rejected for other benchmarks. The CLI does not expose a scale option; use a programmatic comparison for other scales and record its binding and data identity.
 
-TPC-DS remains staged. Comparison divergences and inconsistent repeat outcomes are labeled `STAGED REPORT ONLY` and do not make the report command fail. That exit status is not a parity certificate. Preconditions still fail. Explicit baseline maintenance retains its refusal rules and rejects combinations with explicit backend or draw overrides. The command does not install a required CI check or establish the Ubuntu run budget or SF 1 qualification oracle.
+The gate fails on any unclassified divergence, on a vacuous statement without a classification, and on a classification whose statement now returns rows. The classifications describe the default draw only. A run with `--seed` or a nonzero `--power-stream` still fails on divergences and on cells whose outcome changes between repeats, but lists vacuous statements without failing on them. Explicit baseline maintenance retains its refusal rules and rejects combinations with explicit backend or draw overrides.
+
+After each merge to `develop`, the trunk workflow runs every backend twice on three other draws:
+
+```bash
+make tpcds-cross-surface-draws-report
+```
 
 Native DataFusion wrapper regressions can be checked with:
 
@@ -81,7 +90,7 @@ uv run -- python -m pytest tests/unit/platforms/dataframe/test_unified_frame_dat
 
 Those regressions cover wrapper behavior; they do not certify the complete TPC-DS workload.
 
-A blocking Polars comparison, a parallel Pandas comparison, repeat runs with different seeds or streams, and a scheduled SF 1 qualification oracle are separate acceptance lanes. Their existence and enforcement must be verified in the current workflow configuration. The report command alone does not establish that those lanes are installed or passing.
+The pull-request gate, the post-merge draw job and the scheduled SF 1 qualification diagnostic are separate lanes. A passing local command does not show that the hosted lanes are installed or passing; check the workflow runs.
 
 ## Empty results and coverage
 

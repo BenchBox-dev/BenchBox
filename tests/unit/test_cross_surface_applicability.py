@@ -39,7 +39,7 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
     assert no_surface == _W2_FALLBACK_BENCHMARKS, f"w2-fallback set changed: {sorted(no_surface)}"
 
 
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpcds"}
+_CANDIDATE_UNVERIFIED_BENCHMARKS: set[str] = set()
 
 _NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder"}
 
@@ -100,8 +100,9 @@ def test_staged_gates_are_marked_not_unguarded(rows):
     by_id = {r["benchmark"]: r for r in rows}
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
+    assert "tpcds" not in by_id
     staged = {r["benchmark"] for r in rows if r.get("staged")}
-    assert staged == {"tpcds"}, f"staged set changed: {sorted(staged)}"
+    assert staged == set(), f"staged set changed: {sorted(staged)}"
     assert by_id["joinorder"].get("staged") is False
 
 
