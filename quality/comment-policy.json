@@ -38863,6 +38863,44 @@
       "alternative": "Removing the notice would discard attribution.",
       "owner": "Joe Harris",
       "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "benchbox/core/runner/runner.py",
+      "symbol": "_execute_load_only_mode",
+      "text": "# noqa: B010",
+      "kind": "directive",
+      "consumer": "pyproject.toml",
+      "necessity": "Ruff B010 reports setattr with a constant attribute name; the call sets an attribute the adapter class does not declare, so plain assignment would fail the type check. Ruff RUF100 confirms the suppression is used.",
+      "alternative": "Declare the attribute on the adapter base class and assign it directly, then delete the suppression.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the attribute is declared on the adapter class.",
+      "expires": "2027-01-04"
+    },
+    {
+      "path": "tests/unit/workflows/test_oracle_review_workflow.py",
+      "symbol": "_run_step",
+      "text": "unresolved executable source: 'bash'",
+      "payload": "sha256:8db4224e812fbdd8c4a8e7130d4aee8dd3a9ed2ad18852e7e6a3c422ae4b2e5c",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": ".github/workflows/oracle-review.yml",
+      "necessity": "The test executes the run script that it extracts from the checked oracle-review workflow. The checker scans that script in place in the workflow, so the extracted copy carries no comment the policy has not seen.",
+      "alternative": "Inlining the script as a literal would stop the test from exercising the checked workflow it targets.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the executable-payload adapter can resolve this source statically."
+    },
+    {
+      "path": "tests/unit/workflows/test_stacked_pr_base_guard.py",
+      "symbol": "_run_guard",
+      "text": "unresolved executable source: 'bash'",
+      "payload": "sha256:6693a021eaf39e2e7b37462a22e7c732439e502adfb7a2717df4b6e9d9f4bbaa",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": ".github/workflows/ci.yml",
+      "necessity": "The test executes the run script that it extracts from the base-guard job in the checked CI workflow. The checker scans that script in place in the workflow, so the extracted copy carries no comment the policy has not seen.",
+      "alternative": "Inlining the script as a literal would stop the test from exercising the checked workflow it targets.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the executable-payload adapter can resolve this source statically."
     }
   ]
 }

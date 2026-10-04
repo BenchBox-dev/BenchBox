@@ -63,17 +63,20 @@ def decide(
     reactions: Iterable[dict[str, Any]],
     threads: Iterable[dict[str, Any]],
     paths: Callable[[Iterable[str]], bool],
+    base_date: str | None = None,
 ) -> tuple[int, str]:
     if not paths(files):
         return PASS, "oracle-review: not a soundness path change"
 
+    base_time = _parse_time(base_date) if base_date else None
     review_signal = any(
         _is_connector(review.get("login"))
         and review.get("commit_id") == head_sha
         and review.get("state") not in {"PENDING", "DISMISSED"}
+        and (base_time is None or (review.get("submitted_at") and _parse_time(review["submitted_at"]) > base_time))
         for review in reviews
     )
-    head_time = _parse_time(head_date)
+    head_time = max(_parse_time(head_date), base_time) if base_time else _parse_time(head_date)
     reaction_signal = any(
         _is_connector(reaction.get("login"))
         and reaction.get("content") == "+1"
@@ -182,6 +185,7 @@ def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
             "login": (item.get("user") or {}).get("login"),
             "commit_id": item.get("commit_id"),
             "state": item.get("state"),
+            "submitted_at": item.get("submitted_at"),
         }
         for item in _paginate(token, f"/repos/{repo}/pulls/{pr}/reviews")
     ]
@@ -196,6 +200,15 @@ def fetch_reactions(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
         }
         for item in _paginate(token, f"/repos/{repo}/issues/{pr}/reactions")
     ]
+
+
+def latest_base_change(events: Iterable[dict[str, Any]]) -> str | None:
+    dates = [event["created_at"] for event in events if event.get("event") == "base_ref_changed"]
+    return max(dates, key=_parse_time) if dates else None
+
+
+def fetch_base_change_date(token: str, repo: str, pr: int) -> str | None:
+    return latest_base_change(_paginate(token, f"/repos/{repo}/issues/{pr}/timeline"))
 
 
 def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
@@ -255,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             fetch_reactions(token, args.repo, args.pr),
             fetch_threads(token, args.repo, args.pr),
             matcher,
+            fetch_base_change_date(token, args.repo, args.pr),
         )
     except (CheckError, KeyError, ValueError) as exc:
         print(f"oracle-review: error: {exc}", file=sys.stderr)

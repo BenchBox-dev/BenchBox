@@ -476,6 +476,7 @@ def _execute_load_only_mode(
     postload_result: ValidationResult | None = None
 
     connection_lifecycle = as_connection_lifecycle(adapter)
+    setattr(adapter, "_existing_db_decided", False)  # noqa: B010
     try:
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
 

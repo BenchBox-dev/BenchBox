@@ -653,3 +653,41 @@ class TestSQLiteAdapter:
             assert res["rows_returned"] == 0
         finally:
             conn.close()
+
+
+class TestSaveTuningMetadataMidRunSafety:
+    def test_save_reuses_run_connection_and_keeps_run_tables(self, tmp_path):
+        db_path = tmp_path / "bench.db"
+        adapter = SQLiteAdapter(
+            database_path=str(db_path),
+            tuning_enabled=True,
+            unified_tuning_configuration=UnifiedTuningConfiguration(),
+        )
+        opens = []
+        raw_create = adapter.create_connection
+
+        def counting_create(**kwargs):
+            opens.append(kwargs)
+            return raw_create(**kwargs)
+
+        adapter.create_connection = counting_create
+
+        connection = adapter.create_connection(database_path=str(db_path))
+        try:
+            connection.execute("CREATE TABLE t (a INTEGER)")
+            connection.execute("INSERT INTO t VALUES (1)")
+            connection.commit()
+
+            assert adapter.save_tuning_metadata(connection) is True
+
+            assert len(opens) == 1
+            tables = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+                ).fetchall()
+            ]
+            assert "t" in tables
+            assert "benchbox_tuning_metadata" in tables
+        finally:
+            adapter.close_connection(connection)

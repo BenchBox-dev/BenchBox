@@ -101,12 +101,18 @@ class ResultValidator:
                 final_key_tied_beyond_limit=final_key_tied_beyond_limit,
             )
 
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
 
         detail = self._first_positional_mismatch(original_sorted, variant_sorted, query_id, variant_id)
         if detail is None:
             return True
+
+        paired_variant = self._pair_variant_rows(original_sorted, variant_sorted)
+        if paired_variant is not None:
+            detail = self._first_positional_mismatch(original_sorted, paired_variant, query_id, variant_id)
+            if detail is None:
+                return True
 
         if tie_aware and self._is_boundary_tie_equivalent(original_results, variant_results, query_id, variant_id):
             return True
@@ -180,8 +186,8 @@ class ResultValidator:
             if i == last_index and tie_aware and final_key_tied_beyond_limit:
                 continue
             detail = self._first_positional_mismatch(
-                sorted(orig_rows, key=self._row_sort_key),
-                sorted(var_rows, key=self._row_sort_key),
+                sorted(orig_rows, key=self._pairing_sort_key),
+                sorted(var_rows, key=self._pairing_sort_key),
                 query_id,
                 variant_id,
             )
@@ -212,14 +218,19 @@ class ResultValidator:
     def _multisets_equal(self, left: list[tuple[Any, ...]], right: list[tuple[Any, ...]]) -> bool:
         if len(left) != len(right):
             return False
-        left_sorted = sorted(left, key=self._row_sort_key)
-        right_sorted = sorted(right, key=self._row_sort_key)
-        return all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted))
+        left_sorted = sorted(left, key=self._pairing_sort_key)
+        right_sorted = sorted(right, key=self._pairing_sort_key)
+        if all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted)):
+            return True
+        return self._pair_variant_rows(left_sorted, right_sorted) is not None
 
     def _row_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
         if self.treat_nan_as_null:
             return tuple(self._cell_sort_key(value) for value in row)
         return _row_sort_key(row)
+
+    def _pairing_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
+        return self._row_sort_key(row)
 
     def _cell_sort_key(self, value: Any) -> tuple[Any, ...]:
         if self.treat_nan_as_null and isinstance(value, float) and math.isnan(value):
@@ -250,6 +261,92 @@ class ResultValidator:
     def _also_columns_suffix(mismatched: list[int]) -> str:
         extra = mismatched[1:]
         return f"; also columns {extra}" if extra else ""
+
+    def _rows_match(
+        self,
+        orig_row: tuple[Any, ...],
+        var_row: tuple[Any, ...],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> bool:
+        if len(orig_row) != len(var_row):
+            return False
+        return not self._row_value_mismatch_columns(orig_row, var_row, aggregation_columns)
+
+    def _pair_variant_rows(
+        self,
+        original_sorted: list[tuple[Any, ...]],
+        variant_sorted: list[tuple[Any, ...]],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> list[tuple[Any, ...]] | None:
+        n = len(original_sorted)
+        if n != len(variant_sorted):
+            return None
+        if n == 0:
+            return []
+
+        if all(self._rows_match(original_sorted[i], variant_sorted[i], aggregation_columns) for i in range(n)):
+            return variant_sorted
+
+        var_match = [-1] * n
+
+        for u in range(n):
+            if var_match[u] == -1 and self._rows_match(original_sorted[u], variant_sorted[u], aggregation_columns):
+                var_match[u] = u
+                continue
+            matched = False
+            for offset in (1, -1, 2, -2, 3, -3, 4, -4, 5, -5):
+                v = u + offset
+                if (
+                    0 <= v < n
+                    and var_match[v] == -1
+                    and self._rows_match(original_sorted[u], variant_sorted[v], aggregation_columns)
+                ):
+                    var_match[v] = u
+                    matched = True
+                    break
+            if matched:
+                continue
+            for v in range(n):
+                if var_match[v] == -1 and self._rows_match(original_sorted[u], variant_sorted[v], aggregation_columns):
+                    var_match[v] = u
+                    break
+
+        if not self._augmenting_path_match(original_sorted, variant_sorted, var_match, aggregation_columns):
+            return None
+
+        paired: list[Optional[tuple[Any, ...]]] = [None] * n
+        for v, u in enumerate(var_match):
+            paired[u] = variant_sorted[v]
+        return paired
+
+    def _augmenting_path_match(
+        self,
+        original_sorted: list[tuple[Any, ...]],
+        variant_sorted: list[tuple[Any, ...]],
+        var_match: list[int],
+        aggregation_columns: Optional[Sequence[int]] = None,
+    ) -> bool:
+        n = len(original_sorted)
+        matched_u = {u for u in var_match if u != -1}
+        for u in range(n):
+            if u in matched_u:
+                continue
+            visited = [False] * n
+
+            def dfs(curr_u: int) -> bool:
+                for v in range(n):
+                    if visited[v]:
+                        continue
+                    if self._rows_match(original_sorted[curr_u], variant_sorted[v], aggregation_columns):
+                        visited[v] = True
+                        if var_match[v] == -1 or dfs(var_match[v]):
+                            var_match[v] = curr_u
+                            return True
+                return False
+
+            if not dfs(u):
+                return False
+        return True
 
     def _first_positional_mismatch(
         self,
@@ -388,8 +485,11 @@ class ResultValidator:
                 f"Original: {len(original_results)}, Variant: {len(variant_results)}"
             )
 
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
+        paired_variant = self._pair_variant_rows(original_sorted, variant_sorted, aggregation_columns)
+        if paired_variant is not None:
+            variant_sorted = paired_variant
 
         agg_columns = set(aggregation_columns or ())
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):

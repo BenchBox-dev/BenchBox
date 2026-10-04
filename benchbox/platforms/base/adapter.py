@@ -185,6 +185,7 @@ class PlatformAdapter(
 
     def _reset_run_scoped_state(self) -> None:
         self.database_was_reused = False
+        self._existing_db_decided = False
         self._last_power_test_result = None
         self._last_throughput_test_result = None
         self._last_power_workload_timing = None

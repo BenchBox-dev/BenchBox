@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +52,16 @@ def test_stacked_pr_base_guard_reevaluates_when_a_pr_is_retargeted() -> None:
     assert "opened" in types
 
 
-def test_stacked_pr_base_guard_accepts_only_integration_branches() -> None:
+def test_stacked_pr_base_guard_reevaluates_when_draft_status_changes() -> None:
+    types = (_triggers(_load())["pull_request"] or {}).get("types", [])
+    assert "ready_for_review" in types, "guard does not re-evaluate when a draft becomes ready"
+    assert "converted_to_draft" in types, "guard does not re-evaluate when a ready PR becomes a draft"
+    assert sorted(types) == sorted(
+        ["opened", "synchronize", "reopened", "edited", "ready_for_review", "converted_to_draft"]
+    ), "ci.yml pull_request types changed; every listed event re-runs the guard and the CI lanes"
+
+
+def test_stacked_pr_base_guard_names_integration_branches_and_can_fail() -> None:
     job = _job()
     assert job.get("if") == "${{ github.event_name == 'pull_request' }}", (
         "base-guard must run on every PR event so a stacked base always reports"
@@ -76,3 +86,57 @@ def test_stacked_pr_base_guard_feeds_the_tooling_result() -> None:
     assert "base-guard" in run_text, (
         "tooling result never evaluates base-guard; a stacked-PR failure would not gate merge"
     )
+
+
+def _run_guard(tmp_path: Path, base_ref: str, *, draft: bool) -> subprocess.CompletedProcess[str]:
+    step = next(s for s in _job()["steps"] if s.get("name") == STEP_NAME)
+    env = step.get("env", {})
+    assert env.get("BASE_REF") == "${{ github.base_ref }}"
+    assert env.get("IS_DRAFT") == "${{ github.event.pull_request.draft }}"
+    script = tmp_path / "base-guard.sh"
+    script.write_text(step["run"], encoding="utf-8")
+    return subprocess.run(
+        ["bash", str(script)],
+        env={"PATH": "/usr/bin:/bin", "BASE_REF": base_ref, "IS_DRAFT": "true" if draft else "false"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize("draft", [True, False])
+@pytest.mark.parametrize("base", sorted(INTEGRATION_BRANCHES))
+def test_stacked_pr_base_guard_passes_integration_bases(tmp_path: Path, base: str, draft: bool) -> None:
+    assert _run_guard(tmp_path, base, draft=draft).returncode == 0
+
+
+def test_stacked_pr_base_guard_passes_a_draft_on_a_feature_base(tmp_path: Path) -> None:
+    result = _run_guard(tmp_path, "fix/parent-branch", draft=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "::error::" not in result.stdout
+
+
+def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base(tmp_path: Path) -> None:
+    result = _run_guard(tmp_path, "fix/parent-branch", draft=False)
+    assert result.returncode != 0
+    assert "::error::" in result.stdout
+    assert "fix/parent-branch" in result.stdout
+    assert "retarget this PR at develop" in result.stdout
+
+
+def test_stacking_rule_is_stated_consistently_in_agent_and_policy_docs() -> None:
+    policy = (REPO_ROOT / "docs" / "development" / "pr-base-branch-policy.md").read_text(encoding="utf-8")
+    agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    index = (REPO_ROOT / "docs" / "development" / "index.md").read_text(encoding="utf-8")
+    assert "unsupported" not in index.lower()
+    assert "do not support" not in policy.lower()
+    assert "never open a pr with `--base`" not in policy.lower()
+    for text in (policy, agents):
+        assert "git rebase --onto origin/develop <old parent tip>" in text
+    assert "converted_to_draft" in policy
+    assert "gh pr ready" in policy
+    assert "git rebase --onto <new B tip> <old B tip>" in policy
+    assert "mark ready" in agents
+    allowed = policy.split("## Allowed bases")[1].split("\n## ")[0]
+    assert "draft PR in a stack" in allowed
+    assert "connector review" in policy

@@ -5,9 +5,10 @@
 import hashlib
 import json
 import logging
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from benchbox.core.primitives_benchmark_utils import failed_platform_error
 
@@ -119,15 +120,30 @@ class TuningMetadataManager:
         platform_adapter,
         database_name: Optional[str] = None,
         connection_config: Optional[dict[str, Any]] = None,
+        connection: Any = None,
     ):
         self.platform_adapter = platform_adapter
         self.database_name = database_name
         self.connection_config = dict(connection_config or {})
+        self._shared_connection = connection
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None
         self.last_load_error: str | None = None
         self.marker_save_failed = False
+
+    @contextmanager
+    def _managed_connection(self) -> Iterator[Any]:
+        if self._shared_connection is not None:
+            yield self._shared_connection
+            return
+        guard = getattr(self.platform_adapter, "non_destructive_connection_context", None)
+        with ExitStack() as stack:
+            if guard is not None:
+                stack.enter_context(guard())
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
+            stack.callback(self.platform_adapter.close_connection, temp_conn)
+            yield temp_conn
 
     def _connection_kwargs(self) -> dict[str, Any]:
         config = dict(self.platform_adapter.platform_config)
@@ -273,11 +289,8 @@ class TuningMetadataManager:
         FROM {self._metadata_table_name}
         WHERE table_name = '{self._SECTION_MARKER_TABLE}'
         """
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            rows = self._fetch_all(temp_conn, query_sql)
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+        with self._managed_connection() as conn:
+            rows = self._fetch_all(conn, query_sql)
 
         return dict(rows)
 
@@ -365,15 +378,12 @@ class TuningMetadataManager:
 
             self.logger.info(f"Creating tuning metadata table: {self._metadata_table_name}")
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, create_sql)
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, create_sql)
 
                 index_sql = self._get_create_index_sql()
                 if index_sql:
-                    self._execute_sql(temp_conn, index_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+                    self._execute_sql(conn, index_sql)
 
             self._table_exists = True
             return True
@@ -551,9 +561,8 @@ class TuningMetadataManager:
                 ]
             )
 
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            if not hasattr(temp_conn, "cursor"):
+        with self._managed_connection() as conn:
+            if not hasattr(conn, "cursor"):
                 for params in param_lists:
                     values = ", ".join(self._format_literal(value) for value in params)
                     insert_sql = f"""
@@ -562,17 +571,15 @@ class TuningMetadataManager:
          configuration_hash, created_at, platform)
         VALUES ({values})
         """
-                    self._execute_sql(temp_conn, insert_sql)
+                    self._execute_sql(conn, insert_sql)
                 return
-            cursor = temp_conn.cursor()
+            cursor = conn.cursor()
             for params in param_lists:
                 res = cursor.execute(insert_sql, params)
                 target = res if res is not None else cursor
                 if (err := failed_platform_error(target)) is not None:
                     raise RuntimeError(f"Failed to insert tuning metadata: {err}")
-            temp_conn.commit()
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+            conn.commit()
 
     def load_tunings(self, benchmark_name: Optional[str] = None) -> Optional[BenchmarkTunings]:
         try:
@@ -587,11 +594,8 @@ class TuningMetadataManager:
             ORDER BY table_name, tuning_type, column_order
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                results = self._fetch_all(temp_conn, query_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                results = self._fetch_all(conn, query_sql)
             if not results:
                 return None
 
@@ -608,13 +612,10 @@ class TuningMetadataManager:
 
         try:
             query_sql = f"SELECT COUNT(*) FROM {self._metadata_table_name} LIMIT 1"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._fetch_one(temp_conn, query_sql)
+            with self._managed_connection() as conn:
+                self._fetch_one(conn, query_sql)
                 self._table_exists = True
                 return True
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
         except Exception as exc:
             if not self._is_missing_metadata_table_error(exc):
                 self.last_load_error = str(exc)
@@ -762,11 +763,8 @@ class TuningMetadataManager:
                 return True
 
             delete_sql = f"DELETE FROM {self._metadata_table_name} WHERE TRUE"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, delete_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, delete_sql)
 
             self.logger.info("Cleared tuning metadata")
             return True
@@ -792,11 +790,8 @@ class TuningMetadataManager:
             WHERE table_name != '{self._SECTION_MARKER_TABLE}'
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                result = self._fetch_one(temp_conn, summary_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                result = self._fetch_one(conn, summary_sql)
             if result:
                 return {
                     "table_exists": True,

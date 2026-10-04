@@ -5,7 +5,7 @@ env:
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -67,6 +67,7 @@ jobs:
       - name: Check base branch
         env:
           BASE_REF: ${{ github.base_ref }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           case "$BASE_REF" in
@@ -74,9 +75,13 @@ jobs:
               echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
               ;;
             *)
-              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
-              echo "Retarget this PR at develop, or fold the change into the parent PR."
-              exit 1
+              if [ "$IS_DRAFT" = "true" ]; then
+                echo "Draft PR stacked on '$BASE_REF'; it cannot be armed until it is retargeted at develop."
+              else
+                echo "::error::Ready PR base branch is '$BASE_REF', not develop, release or published-results."
+                echo "Only a draft PR may target a parent branch. After the parent merges, retarget this PR at develop and rebase it onto the squash commit."
+                exit 1
+              fi
               ;;
           esac
 

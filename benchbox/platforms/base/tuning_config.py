@@ -66,7 +66,9 @@ class TuningConfigMixin:
                 temp_connection = self.create_connection(**connection_config)
 
             try:
-                metadata_manager = TuningMetadataManager(self, connection_config=connection_config)
+                metadata_manager = TuningMetadataManager(
+                    self, connection_config=connection_config, connection=temp_connection
+                )
 
                 effective_config = self.get_effective_tuning_configuration()
                 if effective_config:
@@ -106,7 +108,7 @@ class TuningConfigMixin:
         try:
             from benchbox.core.tuning.metadata import TuningMetadataManager
 
-            metadata_manager = TuningMetadataManager(self)
+            metadata_manager = TuningMetadataManager(self, connection=connection)
             saved = metadata_manager.save_unified_tunings(effective_config)
             if metadata_manager.marker_save_failed:
                 from benchbox.core.tuning.metadata import MetadataValidationResult

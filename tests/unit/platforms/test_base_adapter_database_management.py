@@ -594,7 +594,7 @@ class TestAdapterValidationGaps:
         adapter.logger = logging.getLogger("tests.base_adapter")
 
         class FakeMetadataManager:
-            def __init__(self, adapter):
+            def __init__(self, adapter, **_kwargs):
                 pass
 
             def save_unified_tunings(self, config):
@@ -615,7 +615,7 @@ class TestAdapterValidationGaps:
         class FakeMetadataManager:
             marker_save_failed = True
 
-            def __init__(self, adapter):
+            def __init__(self, adapter, **_kwargs):
                 pass
 
             def save_unified_tunings(self, config):
@@ -831,3 +831,52 @@ def test_remove_database_drops_when_in_place_reset_declines(adapter):
     adapter._remove_database(False, "", schema="s")
 
     adapter.drop_database.assert_called_once_with(schema="s")
+
+
+class TestOncePerRunExistingDatabaseDecision:
+    def _invalid_adapter(self):
+        adapter = _TrackingAdapter(server_exists=True)
+        adapter._validate_database_compatibility = Mock(
+            return_value=SimpleNamespace(is_valid=False, can_reuse=False, warnings=[], issues=[])
+        )
+        return adapter
+
+    def test_second_call_skips_recreate_decision(self):
+        adapter = self._invalid_adapter()
+
+        adapter.handle_existing_database()
+        assert len(adapter.drop_calls) == 1
+
+        adapter.handle_existing_database()
+        assert len(adapter.drop_calls) == 1
+
+    def test_run_reset_reenables_decision(self):
+        adapter = self._invalid_adapter()
+
+        adapter.handle_existing_database()
+        adapter._reset_run_scoped_state()
+        adapter.handle_existing_database()
+
+        assert len(adapter.drop_calls) == 2
+
+    def test_validation_context_calls_do_not_consume_the_decision(self):
+        adapter = self._invalid_adapter()
+
+        with adapter.non_destructive_connection_context():
+            adapter.handle_existing_database()
+        assert adapter.drop_calls == []
+
+        adapter.handle_existing_database()
+        assert len(adapter.drop_calls) == 1
+
+    def test_non_destructive_context_guards_and_restores(self):
+        adapter = _TrackingAdapter()
+        adapter._validating_database = False
+
+        with adapter.non_destructive_connection_context():
+            assert adapter._validating_database is True
+            with adapter.non_destructive_connection_context():
+                pass
+            assert adapter._validating_database is True
+
+        assert adapter._validating_database is False

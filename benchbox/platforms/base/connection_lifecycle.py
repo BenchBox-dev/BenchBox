@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from benchbox.utils.printing import quiet_console
 
@@ -112,6 +113,15 @@ class ConnectionLifecycleMixin:
     def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
         return None
 
+    @contextmanager
+    def non_destructive_connection_context(self) -> Iterator[None]:
+        prior = getattr(self, "_validating_database", False)
+        self._validating_database = True
+        try:
+            yield
+        finally:
+            self._validating_database = prior
+
     def handle_existing_database(self, **connection_config) -> None:
         self.log_operation_start("Database validation", "Checking existing database compatibility")
 
@@ -134,6 +144,11 @@ class ConnectionLifecycleMixin:
         if getattr(self, "_validating_database", False):
             self.log_very_verbose("Inside validation context - skipping reuse/recreate logic.")
             return
+
+        if getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("Existing-database decision already made for this run - skipping.")
+            return
+        self._existing_db_decided = True
 
         self.log_very_verbose("Checking if database exists...")
         if not self.check_database_exists(**connection_config):

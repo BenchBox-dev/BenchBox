@@ -59,3 +59,45 @@ def test_required_local_cases_run_after_each_merge() -> None:
     assert runs.count("make test-required-local-cases") == 1
     assert not job.get("continue-on-error")
     assert not any(step.get("continue-on-error") for step in job["steps"])
+
+
+def test_builds_the_release_distribution_on_each_push_to_develop() -> None:
+    job = _workflow()["jobs"]["dist-artifact"]
+    assert job["name"] == "dist-artifact"
+    assert job["if"] == "${{ github.event_name == 'push' }}"
+    assert "needs" not in job
+    upload = next(step for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@"))
+    assert upload["with"]["name"] == "dist-${{ github.sha }}-attempt-${{ github.run_attempt }}"
+    assert upload["with"]["retention-days"] == 90
+    assert upload["with"]["if-no-files-found"] == "error"
+
+
+def test_distribution_job_alone_reads_actions_and_holds_no_write_permission() -> None:
+    workflow = _workflow()
+    assert workflow["jobs"]["dist-artifact"]["permissions"] == {"contents": "read", "actions": "read"}
+    for name, job in workflow["jobs"].items():
+        if name != "dist-artifact":
+            assert "permissions" not in job
+    granted = [permission for job in workflow["jobs"].values() for permission in job.get("permissions", {}).values()]
+    assert set(granted) == {"read"}
+
+
+def test_distribution_job_verifies_exact_distributions_before_binding_and_upload() -> None:
+    steps = _workflow()["jobs"]["dist-artifact"]["steps"]
+    runs = [step.get("run", "") for step in steps]
+    source = next(index for index, run in enumerate(runs) if "bundled_binary_manifest.py" in run)
+    build = next(index for index, run in enumerate(runs) if "uv build" in run)
+    bind = next(index for index, run in enumerate(runs) if "release_artifact_consumer.py producer --dist dist" in run)
+    upload = next(
+        index for index, step in enumerate(steps) if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert source < build < bind < upload
+    assert "scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz" in runs[build]
+    assert runs[build].index("verify_distribution_binaries.py") < runs[build].index("sha256sum")
+    assert "sha256sum -- *.whl *.tar.gz > SHA256SUMS" in runs[build]
+    assert runs[bind].startswith("python -I -S ")
+    assert steps[bind]["env"] == {"GH_TOKEN": "${{ github.token }}"}
+    assert [index for index, step in enumerate(steps) if "GH_TOKEN" in str(step.get("env", {}))] == [bind]
+    path = steps[upload]["with"]["path"]
+    for entry in ("dist/producer-receipt.json", "dist/SHA256SUMS", "dist/*.whl", "dist/*.tar.gz"):
+        assert entry in path
