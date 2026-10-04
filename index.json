@@ -988,17 +988,12 @@
       "title": "Write a build-time MyST-to-Markdown converter for Astro that fails closed on unknown constructs"
     },
     "astro-site-32-port-docs-generators": {
-      "claim": {
-        "expires_at": "2026-10-05T23:58:36Z",
-        "generation": "0c97df38f12a46c6a2787ce6f99b488a",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:eab247781550a2228da6f8b3"
-      },
+      "claim": null,
       "needs": [
         "astro-site-31-myst-to-mdx-converter"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Repoint the docs content generators and validators at the Astro build"
     },
     "astro-site-33-blog-collection-and-feed": {
