@@ -153,12 +153,16 @@ def test_a_comment_naming_an_unapproved_reviewer_is_not_a_signal():
     assert digest.review_signals(pull) == ()
 
 
-def standin(sha, login="joeharris76", at=AFTER, prefix=""):
-    return digest.Comment(login, f"{prefix}Stand-in oracle review: APPROVE {sha}", at)
+def standin(sha, login="joeharris76", at=AFTER, prefix="", user_type="User", updated_at=None):
+    return digest.Comment(login, f"{prefix}Stand-in oracle review: APPROVE {sha}", at, user_type, updated_at)
 
 
 def test_a_standin_approval_of_the_merged_head_from_a_listed_attester_is_a_signal():
     assert digest.review_signals(evidence(comments=(standin(HEAD),))) == ("stand-in",)
+
+
+def test_an_unedited_standin_with_a_matching_updated_at_is_a_signal():
+    assert digest.review_signals(evidence(comments=(standin(HEAD, updated_at=AFTER),))) == ("stand-in",)
 
 
 def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
@@ -172,10 +176,13 @@ def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
         standin(OLD),
         standin(HEAD, login="dev"),
         standin(HEAD, at=BEFORE),
-        digest.Comment("joeharris76", f"```\nStand-in oracle review: APPROVE {HEAD}\n```", AFTER),
+        digest.Comment("joeharris76", f"```\nStand-in oracle review: APPROVE {HEAD}\n```", AFTER, "User"),
         standin(HEAD, prefix="Looks fine. "),
+        standin(HEAD, user_type="Bot"),
+        standin(HEAD, user_type=""),
+        standin(HEAD, updated_at=LATER),
     ],
-    ids=["wrong-sha", "non-attester", "before-last-commit", "fenced", "mid-line"],
+    ids=["wrong-sha", "non-attester", "before-last-commit", "fenced", "mid-line", "bot", "no-type", "edited"],
 )
 def test_a_standin_approval_that_does_not_qualify_is_not_a_signal(comment):
     assert digest.review_signals(evidence(comments=(comment,))) == ()
@@ -839,3 +846,25 @@ def test_commit_listing_follows_first_parents_in_order(monkeypatch):
     assert digest.merged_commits("origin/develop", "abc") == ["x", "y"]
     assert seen["args"][:5] == ["git", "log", "--first-parent", "--reverse", "--format=%H"]
     assert seen["args"][-1] == "abc..origin/develop"
+
+
+def test_collect_pull_carries_the_comment_author_type_and_update_time(monkeypatch):
+    rest = {
+        "reviews": [],
+        "reactions": [],
+        "comments": [
+            {
+                "user": {"login": "joeharris76", "type": "User"},
+                "body": "text",
+                "created_at": AFTER,
+                "updated_at": LATER,
+            }
+        ],
+    }
+    monkeypatch.setattr(digest, "merged_pull_number", lambda repo, sha: 7)
+    monkeypatch.setattr(digest, "gh_json", lambda *args: {"user": {"login": "dev"}, "merged_at": MERGED_AT})
+    monkeypatch.setattr(digest, "collect_commits", lambda *args, **kwargs: ())
+    monkeypatch.setattr(digest, "collect_threads", lambda repo, number: ())
+    monkeypatch.setattr(digest, "gh_pages", lambda endpoint: rest[endpoint.rsplit("/", 1)[1]])
+    pull = digest.collect_pull("o/r", MERGED)
+    assert pull.comments == (digest.Comment("joeharris76", "text", AFTER, "User", LATER),)

@@ -66,6 +66,8 @@ class Comment:
     login: str
     body: str
     created_at: str
+    user_type: str = ""
+    updated_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -152,6 +154,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             signals.append(f"external-review:{match.group(1).lower()}")
         if (
             comment.login in STANDIN_ATTESTERS
+            and comment.user_type == "User"
+            and comment.updated_at in (None, comment.created_at)
             and in_window(comment.created_at)
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
@@ -398,7 +402,13 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
             for r in gh_pages(f"repos/{repo}/issues/{number}/reactions")
         ),
         comments=tuple(
-            Comment((c.get("user") or {}).get("login", ""), c.get("body") or "", c["created_at"])
+            Comment(
+                (c.get("user") or {}).get("login", ""),
+                c.get("body") or "",
+                c["created_at"],
+                (c.get("user") or {}).get("type", ""),
+                c.get("updated_at"),
+            )
             for c in gh_pages(f"repos/{repo}/issues/{number}/comments")
         ),
         threads=collect_threads(repo, number),
