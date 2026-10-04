@@ -6,7 +6,7 @@
     "Disagreements are reported with the classifier output (dfparity-t14) where available",
     "It covers the queries t19 classifies as empty at the gate scale, so each of them is exercised on non-empty data somewhere"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T18). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nEarlier history (rev5 and before): weekly advisory workflow and pinned runner integrated; first complete diagnostic at 7ad934752 (strict printed 66/64/66 of 103); corrections integrated through f52ad24f4; corrected run at f52ad24f4 interrupted by the user stop (Polars 103/103 DataFrame-to-SQL; pandas and DataFusion not run), preserved at /Users/joe/Developer/benchmark_runs/dfparity-official-qualification-sf1-final-f52ad24-20261003.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): two complete fresh runs. At 5c988116e: 309/309 cells, 362 s, DataFrame-to-SQL 103/103 on all three engines. At 94a6ab351 (after the Q36/Q86 order fix, unmapped-ORDER-BY check and display-rounding label): 309/309 cells, 469 s, peak RSS 5.2 GB, zero timeouts, identical table data across engines, DataFrame-to-SQL 103/103 on Polars, pandas and DataFusion; strict printed 72/73/72. Of the strict failures, 22 (21 pandas) are display precision only, Q17 is the malformed official file, and eight (39a, 39b, 66, 77, 78, 84, 85, 93) are classified in evidence/resume-20261003/sf1-94a6ab351-printed-classification.md (floating detail, half-boundary rounding, NULL-order file variant, CHAR padding, and Q85/Q93 returns rows consistent with a reason_sk data difference). SQL and DataFrame agree in every case. No zero-row statement at SF 1. Remaining: publication after D7 and an actual scheduled hosted run.",
+  "context": "Source: DataFrame query parity proposal v3 (item T18). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nEarlier history (rev5 and before): weekly advisory workflow and pinned runner integrated; first complete diagnostic at 7ad934752 (strict printed 66/64/66 of 103); corrections integrated through f52ad24f4; corrected run at f52ad24f4 interrupted by the user stop (Polars 103/103 DataFrame-to-SQL; pandas and DataFusion not run), preserved at /Users/joe/Developer/benchmark_runs/dfparity-official-qualification-sf1-final-f52ad24-20261003.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): two complete fresh runs. At 5c988116e: 309/309 cells, 362 s, DataFrame-to-SQL 103/103 on all three engines. At 94a6ab351 (after the Q36/Q86 order fix, unmapped-ORDER-BY check and display-rounding label): 309/309 cells, 469 s, peak RSS 5.2 GB, zero timeouts, identical table data across engines, DataFrame-to-SQL 103/103 on Polars, pandas and DataFusion; strict printed 72/73/72. Of the strict failures, 22 (21 pandas) are display precision only, Q17 is the malformed official file, and eight (39a, 39b, 66, 77, 78, 84, 85, 93) are classified in evidence/resume-20261003/sf1-94a6ab351-printed-classification.md (floating detail, half-boundary rounding, NULL-order file variant, CHAR padding, and Q85/Q93 returns rows consistent with a reason_sk data difference). SQL and DataFrame agree in every case. No zero-row statement at SF 1. Remaining: publication after D7 and an actual scheduled hosted run.\n\n2026-10-04 closeout: Delivered in #2605: weekly advisory SF1 qualification workflow; dispatched on develop 2026-10-04 (run 37202305764, success). Follow-ups: tpcds-qualification-actionable-signal, tpcds-qualification-q85-q93-returns-data, tpcds-qualification-q17-malformed-answer.",
   "description": "Run both DataFrame families and the SQL surface at SF=1 under the qualification binding and compare their results value by value to the official answer sets, an oracle independent of DuckDB. Scheduled lane only, never blocking. SF=1 is heavy (a full probe took about 450 s and 3.5 GB peak RSS on the author's Mac, with pandas Q78 timing out at 180 s), so it needs the Q78 fix and explicit approval for the resource use.",
   "sessions": [
     {
@@ -47,6 +47,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "bcccf6faa2184af189de121c45d725f7",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T17:29:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "525ca84ec7d444a0800e1b676d9da3cb",
       "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
