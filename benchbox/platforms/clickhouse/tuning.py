@@ -59,6 +59,12 @@ class ClickHouseTuningMixin:
                 return found
         return super().resolve_physical_column(table_name, logical_column, connection)
 
+    @staticmethod
+    def _has_tuned_sort_key(config: UnifiedTuningConfiguration) -> bool:
+        from benchbox.core.tuning.generators.clickhouse import clickhouse_sort_key_columns
+
+        return any(clickhouse_sort_key_columns(table_tuning) for table_tuning in config.table_tunings.values())
+
     def get_effective_tuning_configuration(
         self,
     ) -> UnifiedTuningConfiguration | None:
@@ -69,11 +75,10 @@ class ClickHouseTuningMixin:
         """
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-        # Get base configuration if it exists
         base_config = super().get_effective_tuning_configuration()
         if base_config:
-            # Ensure primary keys are always enabled for ClickHouse
-            base_config.primary_keys.enabled = True
+            if not self._has_tuned_sort_key(base_config):
+                base_config.primary_keys.enabled = True
             return base_config
 
         # Create ClickHouse-specific configuration
