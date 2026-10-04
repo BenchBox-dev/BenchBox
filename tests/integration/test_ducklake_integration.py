@@ -256,7 +256,10 @@ class TestDuckLakeLiveConnection:
         assert metadata_path.exists()
         assert data_path.exists()
 
-        # Directly exercise the force-recreate removal path.
+        # Directly exercise the force-recreate removal path as a new run would:
+        # a run entry point resets the once-per-run decision made by the
+        # connection above before the existing-database decision is taken.
+        adapter._reset_run_scoped_state()
         adapter.force_recreate = True
         adapter.handle_existing_database()
 
