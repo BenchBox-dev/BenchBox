@@ -221,12 +221,14 @@ def _resolve_forward(args: argparse.Namespace, client: GitHubClient, loader: Any
     from scripts.site_deploy import routes as routes_module
 
     manifest = routes_module.load_manifest(args.repo_dir / ROUTES_MANIFEST)
-    try:
-        selection = renderer_module.select_for_commit(manifest.renderer_policy, args.repo_dir, release_sha)
-    except renderer_module.RendererError as exc:
-        raise candidate_module.CandidateError(f"renderer selection for {tag} failed: {exc}") from exc
     shas = candidate_module.first_parent_shas(args.repo_dir, "HEAD")
     found = candidate_module.find_candidate(client, shas, tag)
+    try:
+        selection = renderer_module.select_for_commits(
+            manifest.renderer_policy, args.repo_dir, release_sha, found.trunk_sha
+        )
+    except renderer_module.RendererError as exc:
+        raise candidate_module.CandidateError(f"renderer selection for {tag} failed: {exc}") from exc
     bootstrap = args.bootstrap or args.mode == "preview"
     deployed = generation.read_deployed(client, loader, allow_bootstrap=bootstrap)
     decision = generation.generation_gate(

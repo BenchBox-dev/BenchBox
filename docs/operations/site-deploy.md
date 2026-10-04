@@ -51,6 +51,14 @@ While the selection is Sphinx, `/docs/dev/`, `/blog/` and the root files come
 from a Sphinx build of trunk, so trunk must keep building with Sphinx until the
 switch has been deployed.
 
+Trunk routes are built with the same renderer, so when `auto` selects Astro from
+the release tag, the resolve step also checks the trunk commit it deploys against
+the same list. A ready release with a trunk that is not ready fails the resolve
+step (`the release tree is ready for astro but trunk <sha> is not`) rather than
+publishing Astro release routes beside Sphinx trunk routes, and
+`assemble_public_site.py --routes` applies the same check to its trunk ref root.
+Restore trunk's readiness or set `renderer: sphinx`.
+
 ### Cutover
 
 1. Cut a release from a tree that meets the list above. With the committed

@@ -179,6 +179,39 @@ def test_auto_selects_astro_only_from_a_ready_release_tag(tmp_path: Path) -> Non
     assert renderer.select_for_commit(renderer.POLICY_AUTO, repo, "v0.5.0").renderer == renderer.ASTRO
 
 
+def _git_run(repo: Path, *args: str) -> str:
+    env = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"]
+    return subprocess.run(["git", "-C", str(repo), *env, *args], check=True, capture_output=True, text=True).stdout
+
+
+def _trunk_regresses(repo: Path, extra: dict[str, str] | None = None) -> str:
+    _write(repo / "docs" / "usage" / "legacy.rst", "x")
+    for name, content in (extra or {}).items():
+        _write(repo / name, content)
+    _git_run(repo, "add", "-A")
+    _git_run(repo, "commit", "-q", "-m", "trunk")
+    return _git_run(repo, "rev-parse", "HEAD").strip()
+
+
+def test_auto_refuses_a_ready_release_when_trunk_is_not_ready(tmp_path: Path) -> None:
+    repo = _release_repo(tmp_path)
+    trunk = _trunk_regresses(repo)
+    with pytest.raises(renderer.RendererError, match="ready for astro but trunk .* is not .*legacy.rst"):
+        renderer.select_for_commits(renderer.POLICY_AUTO, repo, "v0.5.0", trunk)
+
+
+def test_auto_selects_astro_only_when_release_and_trunk_are_both_ready(tmp_path: Path) -> None:
+    repo = _release_repo(tmp_path)
+    assert renderer.select_for_commits(renderer.POLICY_AUTO, repo, "v0.5.0", "HEAD").renderer == renderer.ASTRO
+
+
+def test_a_sphinx_selection_does_not_depend_on_trunk_readiness(tmp_path: Path) -> None:
+    repo = _release_repo(tmp_path)
+    trunk = _trunk_regresses(repo)
+    assert renderer.select_for_commits(renderer.SPHINX, repo, "v0.5.0", trunk).renderer == renderer.SPHINX
+    assert renderer.select_for_commits(renderer.POLICY_AUTO, repo, "v0.4.1", trunk).renderer == renderer.SPHINX
+
+
 def test_trunk_still_satisfies_the_astro_release_definition() -> None:
     readiness = renderer.readiness_at(REPO_ROOT, "HEAD")
     assert readiness.ready, readiness.summary()
@@ -438,6 +471,19 @@ def test_cli_refuses_a_renderer_that_differs_from_the_release_selection(tmp_path
     assert set(STAGE_BUILDERS) == set(renderer.RENDERERS)
 
 
+def test_cli_refuses_an_astro_release_root_beside_a_trunk_root_that_needs_sphinx(tmp_path: Path) -> None:
+    release = tmp_path / "release"
+    _commit_tree(release, {name: _ready_text(name) or "x" for name in _ready_paths()})
+    trunk = tmp_path / "trunk"
+    _commit_tree(trunk, dict.fromkeys(V041_SHAPE, "x"))
+    args = ["--routes", str(_auto_repo(tmp_path) / "deploy" / "routes.yml")]
+    args += ["--ref-root", f"release={release}", "--ref-root", f"trunk={trunk}"]
+    args += ["--site-dir", str(tmp_path / "out"), "--work-dir", str(tmp_path / "work")]
+    with pytest.raises(SystemExit, match="ready for astro but trunk ref root .* is not"):
+        main(args)
+    assert not (tmp_path / "out").exists()
+
+
 DEPLOYED_RELEASE = "9" * 40
 
 
@@ -602,6 +648,39 @@ def test_resolve_fails_closed_when_the_tag_tree_is_unreadable(
     assert code == 1
     assert resolved == {}
     assert "renderer selection for v0.5.0 failed" in capsys.readouterr().err
+
+
+def test_resolve_refuses_an_astro_release_while_trunk_still_needs_sphinx(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = _release_repo(tmp_path)
+    release_sha = _git_run(repo, "rev-parse", "v0.5.0^{commit}").strip()
+    manifest = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+    manifest["renderer"] = renderer.POLICY_AUTO
+    trunk = _trunk_regresses(repo, {"deploy/routes.yml": yaml.safe_dump(manifest)})
+    api = FakeGitHub()
+    api.record_deployment(10, make_receipt(run_id=1, trunk=SHA_A), "2026-01-01T00:00:01Z")
+    api.runs.append(
+        {
+            "id": 5,
+            "head_sha": trunk,
+            "head_branch": "develop",
+            "event": "push",
+            "conclusion": "success",
+            "path": TRUNK_PATH,
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+    )
+    monkeypatch.setattr(cli, "_client", api.client)
+    monkeypatch.setattr(cli, "gh_receipt_loader", lambda repo_dir: api.load_receipt)
+    monkeypatch.setattr(candidate, "is_ancestor", lambda repo_dir, ancestor, descendant: ancestor == SHA_A)
+    code, resolved = _resolve(tmp_path, "--mode", "deploy", repo_dir=repo)
+    assert code == 1
+    assert resolved == {}
+    err = capsys.readouterr().err
+    assert "renderer selection for v0.5.0 failed" in err
+    assert f"trunk {trunk} is not" in err
+    assert release_sha != trunk
 
 
 def test_rollback_restores_the_target_renderer_without_the_visual_guard(
