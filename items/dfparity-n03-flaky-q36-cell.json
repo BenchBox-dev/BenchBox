@@ -4,7 +4,7 @@
     "Q36 is stable over 40 repeats or classified with the reason",
     "The classifier and the promotion gate fail or flag a cell that differs between repeated runs"
   ],
-  "context": "Owner decision D7 (2026-10-03): soundness-path PRs (#2547, the n03b branch) wait until #2567 retires the merge queue. Do not open or arm them before then.",
+  "context": "Owner decision D7 (2026-10-03): soundness-path PRs (#2547, the n03b branch) wait until #2567 retires the merge queue. Do not open or arm them before then.\n\n2026-10-04 closeout: D7 was lifted. Flaky-cell detection is delivered: the cross-surface gate's --repeats flags cells whose outcome changes between runs (#2605), the Q36 tie pairing landed in #2547, and Q36/Q86 subtotal order was fixed (#2605). trunk.yml runs tpcds-parity-draws (every backend twice on three other Power draws, #2612); its first run on develop (trunk run 37217347814, head a4e1a817a) passed in 143 s.",
   "description": "Q36 on the expression family at SF 0.03 diverges in some runs of identical code (40 repeats in one process: 2 divergent without the #2502 changes, 1 with them; detail: Value mismatch at row 4, column 3. Original: 0, Variant: 1). Q36 uses none of the changed code. Find the cause (likely a tie or an unstable aggregation order). A cell that flips between runs cannot be a stable gate, so the classifier (t14) and the promotion gate (t20) need repeat-run detection.",
   "sessions": [
     {
@@ -38,6 +38,14 @@
       "op": "update",
       "op_id": "223db6642e814a2abdaf921f8794a27c",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T19:55:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3c127015157049d19f0e94560bda7a06",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
