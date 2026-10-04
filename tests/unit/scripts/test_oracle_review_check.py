@@ -276,7 +276,7 @@ def _attestation(
     user_type: str = "User",
     body: str | None = None,
 ) -> dict[str, Any]:
-    text = body or f"Stand-in review by agy: no P0/P1 findings.\n\n{prefix}Stand-in oracle review: APPROVE {sha}\n"
+    text = body or f"{prefix}Stand-in oracle review: APPROVE {sha}\n"
     return {
         "login": login,
         "user_type": user_type,
@@ -309,6 +309,11 @@ def test_standin_attestation_for_the_head_passes() -> None:
         _attestation(body=f"~~~\nStand-in oracle review: APPROVE {HEAD}\n~~~\n"),
         _attestation(body=f"<!--\nStand-in oracle review: APPROVE {HEAD}\n-->\n"),
         _attestation(body=f"<PRE>\nStand-in oracle review: APPROVE {HEAD}\n</PRE>\n"),
+        _attestation(body=f"see `\nStand-in oracle review: APPROVE {HEAD}\n`\n"),
+        _attestation(body=f'[a]: /u "\nStand-in oracle review: APPROVE {HEAD}\n"\n'),
+        _attestation(body=f"<details>\nStand-in oracle review: APPROVE {HEAD}\n</details>\n"),
+        _attestation(body=f"<code>\nStand-in oracle review: APPROVE {HEAD}\n</code>\n"),
+        _attestation(body=f"No P0/P1 findings.\n\nStand-in oracle review: APPROVE {HEAD}\n"),
         _attestation(body=f"I would write Stand-in oracle review: APPROVE {HEAD} here"),
         _attestation(sha=HEAD.upper()),
     ],
@@ -327,6 +332,11 @@ def test_standin_attestation_for_the_head_passes() -> None:
         "tilde-fence",
         "html-comment",
         "pre-block",
+        "inline-code",
+        "link-title",
+        "details-block",
+        "code-block",
+        "extra-text",
         "mid-line",
         "uppercase-sha",
     ],
