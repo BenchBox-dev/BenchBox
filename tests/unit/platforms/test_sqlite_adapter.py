@@ -695,10 +695,6 @@ class TestSaveTuningMetadataMidRunSafety:
 
 
 class TestNotuningDatabaseReuse:
-    """Notuning runs carry a non-None baseline config, which used to take the
-    tuned-validation branch and demand metadata that is never written, so a
-    second notuning run always recreated its database."""
-
     def _notuning_adapter(self, db_path):
         adapter = SQLiteAdapter(database_path=str(db_path), tuning_enabled=False)
         adapter.unified_tuning_configuration = build_baseline_unified_config()
