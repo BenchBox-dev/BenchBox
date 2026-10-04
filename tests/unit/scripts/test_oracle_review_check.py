@@ -34,6 +34,7 @@ def _decide(
     reactions: list[dict[str, Any]] | None = None,
     threads: list[dict[str, Any]] | None = None,
     base_date: str | None = None,
+    comments: list[dict[str, Any]] | None = None,
 ) -> tuple[int, str]:
     return oracle_review_check.decide(
         HEAD,
@@ -44,6 +45,7 @@ def _decide(
         threads or [],
         oracle_review_check.any_soundness_path,
         base_date,
+        comments or [],
     )
 
 
@@ -78,7 +80,8 @@ def test_review_on_older_commit_waits() -> None:
     status, message = _decide(reviews=[_review(commit_id=OLDER)])
     assert status == 1
     assert message == (
-        f"oracle-review: waiting for the Codex connector's review of {HEAD}; rerun this check after it lands"
+        f"oracle-review: waiting for the Codex connector's review of {HEAD}, or a stand-in attestation "
+        f"'Stand-in oracle review: APPROVE {HEAD}' from a listed attester; rerun this check after it lands"
     )
 
 
@@ -262,3 +265,102 @@ def test_latest_base_change_picks_the_newest_retarget() -> None:
     ]
     assert oracle_review_check.latest_base_change(events) == RETARGETED
     assert oracle_review_check.latest_base_change([{"event": "commented", "created_at": RETARGETED}]) is None
+
+
+def _attestation(
+    sha: str = HEAD,
+    login: str = "joeharris76",
+    created_at: str = AFTER_HEAD,
+    prefix: str = "",
+    updated_at: str | None = None,
+    user_type: str = "User",
+    body: str | None = None,
+) -> dict[str, Any]:
+    text = body or f"Stand-in review by agy: no P0/P1 findings.\n\n{prefix}Stand-in oracle review: APPROVE {sha}\n"
+    return {
+        "login": login,
+        "user_type": user_type,
+        "body": text,
+        "created_at": created_at,
+        "updated_at": updated_at or created_at,
+    }
+
+
+def test_standin_attestation_for_the_head_passes() -> None:
+    status, message = _decide(comments=[_attestation()])
+    assert status == oracle_review_check.PASS
+    assert "stand-in review attested by joeharris76" in message
+
+
+@pytest.mark.parametrize(
+    "comment",
+    [
+        _attestation(sha=OLDER),
+        _attestation(created_at=BEFORE_HEAD),
+        _attestation(login="someone-else"),
+        _attestation(prefix="> "),
+        _attestation(body="Looks good to me"),
+        _attestation(updated_at="2026-10-01T14:00:00Z"),
+        _attestation(login="joeharris76[bot]", user_type="Bot"),
+        _attestation(user_type="Bot"),
+        _attestation(body=f"```\nStand-in oracle review: APPROVE {HEAD}\n```\n"),
+        _attestation(body=f"I would write Stand-in oracle review: APPROVE {HEAD} here"),
+        _attestation(sha=HEAD.upper()),
+    ],
+    ids=[
+        "older-commit",
+        "before-head",
+        "not-an-attester",
+        "quoted",
+        "no-marker",
+        "edited",
+        "bot-suffix",
+        "bot-account",
+        "fenced",
+        "mid-line",
+        "uppercase-sha",
+    ],
+)
+def test_standin_attestation_must_be_exact_current_and_authorized(comment: dict[str, Any]) -> None:
+    status, _ = _decide(comments=[comment])
+    assert status == oracle_review_check.WAITING
+
+
+def test_standin_attestation_does_not_override_open_connector_threads() -> None:
+    status, message = _decide(comments=[_attestation()], threads=[_thread(resolved=False)])
+    assert status == oracle_review_check.WAITING
+    assert "unresolved Codex connector review thread" in message
+
+
+def test_standin_attestation_before_a_retarget_waits() -> None:
+    status, _ = _decide(comments=[_attestation(created_at=AFTER_HEAD)], base_date="2026-10-01T14:00:00Z")
+    assert status == oracle_review_check.WAITING
+
+
+def test_a_later_valid_attestation_counts_after_an_earlier_invalid_one() -> None:
+    status, _ = _decide(comments=[_attestation(sha=OLDER), _attestation()])
+    assert status == oracle_review_check.PASS
+
+
+def test_connector_review_message_wins_over_a_standin() -> None:
+    status, message = _decide(reviews=[_review()], comments=[_attestation()])
+    assert status == oracle_review_check.PASS
+    assert "Codex connector review" in message
+
+
+def test_waiting_message_names_the_standin_marker() -> None:
+    _, message = _decide()
+    assert f"Stand-in oracle review: APPROVE {HEAD}" in message
+
+
+def test_fetch_comments_maps_author_type_and_edit_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    item = {
+        "user": {"login": "joeharris76", "type": "User"},
+        "body": "x",
+        "created_at": AFTER_HEAD,
+        "updated_at": AFTER_HEAD,
+    }
+    monkeypatch.setattr(oracle_review_check, "_paginate", lambda _token, _path: [item])
+    assert oracle_review_check.fetch_comments("t", "o/r", 1) == [
+        {"login": "joeharris76", "user_type": "User", "body": "x", "created_at": AFTER_HEAD, "updated_at": AFTER_HEAD}
+    ]
