@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Hosted pandas step time measured over three runs with at least 10 s headroom under the budget, without dropping statements",
+    "The change is measured before and after on hosted runners"
+  ],
+  "context": "Timings recorded on PR #2612. A two-shard split was tried and made each shard slower (39 s and 30 s) because setup repeats per step.",
+  "description": "On hosted Ubuntu runners the pandas TPC-DS gate step took 26, 42 and 41 s against the 45 s per-step budget; the Polars and DataFusion step took 14-18 s. About 10 s of each step is data generation, 99 dsqgen binding calls and SQL rendering, repeated in every step, and pandas loading plus comparison dominates the rest. Runner variance can push the pandas step over budget.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-04T14:03:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "520fc8e051f943d68ddfb1ab4a689ce1",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
+    }
+  ]
+}

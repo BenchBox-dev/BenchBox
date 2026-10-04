@@ -20314,6 +20314,13 @@
       "status": "open",
       "title": "Correct TPC-DS composite primary keys and pin every benchmark's PK sets with a conformance test"
     },
+    "tpcds-gate-setup-time": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Cut the TPC-DS cross-surface gate's setup time so the pandas step keeps budget headroom"
+    },
     "tpcds-obt-benchmark-implementation": {
       "claim": null,
       "needs": [],
