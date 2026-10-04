@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,10 @@ ASTRO_HEADER = "website/src/components/SiteHeader.astro"
 ASTRO_LINKS = "website/src/lib/header-links.ts"
 ASTRO_THEME_TOGGLE = "website/src/components/ThemeToggle.astro"
 ASTRO_FOOTER = "website/src/components/SiteFooter.astro"
-CONTRACT_IMPORT = "results-explorer/src/components/headerContract.ts"
+CONTRACT_IMPORT = "results-explorer/src/components/shellModel.ts"
+SHELL_MODEL = "results-explorer/src/components/shellModel.ts"
+PREACT_SHELL = "results-explorer/src/components/SiteShell.tsx"
+SHARED_SHELL_CSS = "landing/shared/site-shell.css"
 
 EXPECTED_LINKS = [
     ("Home", "https://benchbox.dev/"),
@@ -99,9 +103,11 @@ def test_global_header_has_no_header_theme_control(path: str, surface: str) -> N
 def test_astro_header_renders_the_explorer_header_contract() -> None:
     header = _read(ASTRO_HEADER)
     links = _read(ASTRO_LINKS)
+    model = _read(SHELL_MODEL)
     contract = _read("results-explorer/src/components/headerContract.ts")
 
-    assert CONTRACT_IMPORT in links, "astro shell must import the contract the Explorer renders"
+    assert CONTRACT_IMPORT in links, "astro shell must import the model the Explorer renders"
+    assert "./headerContract.ts" in model, "shell model must derive from the header contract"
     for name in (
         "HEADER_BRAND",
         "HEADER_CTA",
@@ -109,7 +115,7 @@ def test_astro_header_renders_the_explorer_header_contract() -> None:
         "HEADER_NAV_ARIA_LABEL",
         "HEADER_TOGGLE_ARIA_LABEL",
     ):
-        assert name in links, f"astro shell does not consume {name}"
+        assert name in model, f"shell model does not consume {name}"
     for label, href in EXPECTED_LINKS:
         assert label in contract, f"contract missing label {label!r}"
         assert href in contract, f"contract missing href {href!r}"
@@ -124,16 +130,16 @@ def test_astro_header_renders_the_explorer_header_contract() -> None:
 
 
 def test_astro_header_links_resolve_to_site_paths_in_contract_order() -> None:
-    links = _read(ASTRO_LINKS)
+    model = _read(SHELL_MODEL)
     contract = _read("results-explorer/src/components/headerContract.ts")
 
-    assert 'SITE_ORIGIN = "https://benchbox.dev"' in links
-    assert "HEADER_LINKS.map(" in links
+    assert 'SITE_ORIGIN = "https://benchbox.dev"' in model
+    assert "HEADER_LINKS.map(" in model
     labels = [label for label, _ in EXPECTED_LINKS if label != "Run benchmark"]
     positions = [contract.find(f'label: "{label}"') for label in labels]
     assert all(position >= 0 for position in positions)
     assert positions == sorted(positions)
-    assert "activeOnSurface" in links
+    assert "activeOnSurface" in model
 
 
 def test_astro_header_has_no_theme_toggle_component() -> None:
@@ -154,21 +160,25 @@ def test_astro_footer_radiogroup_binds_the_shared_theme_labels() -> None:
     assert toggle.count('role="radiogroup"') == 1
     assert "aria-label={shellLabels.theme}" in toggle
     assert "aria-label={option.label}" in toggle
-    for option in ("system", "light", "dark"):
-        assert f"shellLabels.themeOptions.{option}" in toggle
+    assert "THEME_OPTIONS.map(" in toggle
+    assert "THEME_ICON_SHAPES" in toggle
     assert "data-theme-option" in toggle
     assert "data-pagefind-ignore" in footer
 
 
 def test_results_footer_radiogroup_binds_the_shared_aria_label() -> None:
-    layout = _read("results-explorer/src/components/Layout.tsx")
+    shell = _read(PREACT_SHELL)
+    model = _read(SHELL_MODEL)
     contract = _read("results-explorer/src/components/headerContract.ts")
 
-    assert 'role="radiogroup"' in layout, "results footer should expose a theme radiogroup"
-    assert "aria-label={FOOTER_THEME_ARIA_LABEL}" in layout, "results radiogroup missing accessible name binding"
+    assert 'role="radiogroup"' in shell, "results footer should expose a theme radiogroup"
+    assert "aria-label={shellLabels.theme}" in shell, "results radiogroup missing accessible name binding"
+    assert "THEME_OPTIONS.map(" in shell
+    assert "THEME_ICON_SHAPES" in shell
     assert 'FOOTER_THEME_ARIA_LABEL = "Color theme"' in contract, "results theme aria label contract drifted"
+    assert "theme: FOOTER_THEME_ARIA_LABEL" in model
     for option in ("system", "light", "dark"):
-        assert f'"{option}"' in layout, f"results missing {option} theme option"
+        assert f'"{option}"' in model, f"shell model missing {option} theme option"
 
 
 @pytest.mark.parametrize(
@@ -273,12 +283,88 @@ def test_landing_introduces_results_explorer_with_public_compare_and_local_workf
 
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     layout = _read("results-explorer/src/components/Layout.tsx")
+    shell = _read(PREACT_SHELL)
     nav = _read("results-explorer/src/components/resultsNav.ts")
     contract = _read("results-explorer/src/components/headerContract.ts")
 
     assert 'export const HEADER_NAV_ARIA_LABEL = "BenchBox"' in contract
-    assert "aria-label={HEADER_NAV_ARIA_LABEL}" in layout
+    assert "aria-label={shellLabels.nav}" in shell
     assert 'aria-label="Results Explorer"' in layout
     assert "RESULTS_NAV_SECTIONS" in layout
     for label in ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]:
         assert f'label: "{label}"' in nav
+
+
+def _classes(source: str, prefixes: tuple[str, ...]) -> set[str]:
+    found = set(re.findall(r"[A-Za-z0-9_-]+", " ".join(re.findall(r'class(?:Name)?="([^"]*)"', source))))
+    return {name for name in found if name.startswith(prefixes)}
+
+
+SHELL_CLASS_PREFIXES = ("site-header", "site-footer", "theme-toggle")
+
+
+def test_astro_and_preact_shells_render_the_same_class_vocabulary() -> None:
+    astro = "".join(_read(path) for path in (ASTRO_HEADER, ASTRO_FOOTER, ASTRO_THEME_TOGGLE))
+    preact = _read(PREACT_SHELL)
+
+    astro_classes = _classes(astro, SHELL_CLASS_PREFIXES)
+    preact_classes = _classes(preact, SHELL_CLASS_PREFIXES)
+
+    assert astro_classes - preact_classes == set()
+    assert preact_classes - astro_classes == set()
+    assert {"site-header__link", "site-header__cta", "site-footer__link", "theme-toggle"} <= preact_classes
+
+
+def test_astro_and_preact_shells_share_ids_and_hooks() -> None:
+    astro = _read(ASTRO_HEADER) + _read(ASTRO_FOOTER) + _read(ASTRO_THEME_TOGGLE)
+    preact = _read(PREACT_SHELL)
+
+    for token in (
+        'id="site-header-panel"',
+        'id="benchbox-site-header-nav"',
+        'aria-controls="site-header-panel"',
+        "data-site-header-toggle",
+        "data-site-header-panel",
+        "data-site-header-nav",
+        "data-site-footer",
+        "data-theme-option",
+        'role="radiogroup"',
+        'role="radio"',
+    ):
+        assert token in astro, f"astro shell missing {token}"
+        assert token in preact, f"preact shell missing {token}"
+
+
+def test_shell_styles_have_one_source_consumed_by_site_and_explorer() -> None:
+    shared = _read(SHARED_SHELL_CSS)
+    site = _read("website/src/styles/shell.css")
+    explorer = _read("results-explorer/src/index.css")
+
+    assert "landing/shared/site-shell.css" in _read("website/src/layouts/Shell.astro")
+    assert "../landing/shared/site-shell.css" in _read("website/astro.config.ts")
+    assert "../../landing/shared/site-shell.css" in explorer
+    for selector in (".site-header {", ".site-header__link", ".theme-toggle {", ".site-footer {"):
+        assert selector in shared
+        assert selector not in site
+    assert re.search(r"\bsite-header|\bsite-footer|\btheme-toggle", re.sub(r"\.search-[\w-]+", "", site)) is None
+
+
+def test_explorer_global_rules_are_scoped_to_the_explorer_root() -> None:
+    explorer = _read("results-explorer/src/index.css")
+    base = explorer[explorer.index("@layer base") : explorer.index("@layer components")]
+
+    base = re.sub(r"/\*.*?\*/", "", base, flags=re.DOTALL)
+    selectors = [
+        selector.strip()
+        for block in re.findall(r"(?<![^{}])\s*([^{}]+)\{", base)
+        for selector in block.split(",")
+        if selector.strip() and not selector.strip().startswith("@")
+    ]
+    assert len(selectors) > 5
+    unscoped = [
+        selector
+        for selector in selectors
+        if not selector.startswith((".bb-explorer", "body.bb-explorer-page", ".site-footer__link", "["))
+    ]
+    assert unscoped == []
+    assert 'class="bb-explorer-page"' in _read("results-explorer/index.html")

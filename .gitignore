@@ -250,4 +250,5 @@ node_modules/
 /site-inventory/
 /website/.astro/
 /website/.generated/
+/website/.receipts/
 /website/e2e-output/

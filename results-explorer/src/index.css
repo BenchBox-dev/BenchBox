@@ -1,41 +1,39 @@
 @import "../../landing/shared/site-tokens.css";
+@import "../../landing/shared/site-shell.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-    html,
-    body {
+    body.bb-explorer-page {
         overflow-x: hidden;
-    }
-
-    html {
         font-family: var(--bb-font-sans);
-    }
-
-    body {
         background-color: var(--bb-surface-app);
         color: var(--bb-data-fg-primary);
         min-height: 100vh;
     }
 
-    a {
+    .bb-explorer a {
         color: var(--bb-accent);
     }
 
-    a:hover {
+    .bb-explorer a:hover {
         color: var(--bb-accent-hover);
     }
 
-    *:focus-visible {
+    .bb-explorer *:focus-visible {
         outline: 2px solid var(--bb-focus-ring);
         outline-offset: 2px;
     }
 
-    .surface-hero *:focus-visible,
-    [data-surface="hero"] *:focus-visible {
+    .bb-explorer .surface-hero *:focus-visible,
+    .bb-explorer [data-surface="hero"] *:focus-visible {
         outline-color: var(--bb-focus-ring-on-dark);
+    }
+
+    .site-footer__link {
+        color: var(--accent-primary);
     }
 
     /* Keep the leaderboard display controls inside the viewport when browser

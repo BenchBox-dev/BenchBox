@@ -11,6 +11,7 @@ import type { SidebarManifest } from "./src/converter/sidebar.ts";
 import { toStarlightSidebar } from "./src/converter/sidebar.ts";
 import { renderRobots, renderSitemap, sitemapPathForFile } from "./src/lib/page-meta.ts";
 import { docutilsQuotes, SMARTYPANTS } from "./src/lib/smartypants.ts";
+import { explorerReceipt, treeDigest } from "./src/lib/tree-digest.ts";
 import { headingIds } from "./src/plugins/heading-ids.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,7 +42,14 @@ const publishStatic = (): AstroIntegration => ({
       const out = fileURLToPath(dir);
       const explorerDist = path.join(repoRoot, "results-explorer", "dist");
       if (!existsSync(explorerDist)) throw new Error(`Results Explorer build is missing: ${explorerDist}`);
+      const sourceDigest = treeDigest(explorerDist);
       cpSync(explorerDist, path.join(out, "results"), { recursive: true });
+      const receipts = path.join(repoRoot, "website", ".receipts");
+      mkdirSync(receipts, { recursive: true });
+      writeFileSync(
+        path.join(receipts, "explorer-artifact.json"),
+        `${JSON.stringify(explorerReceipt(sourceDigest, treeDigest(path.join(out, "results"))), null, 2)}\n`,
+      );
       cpSync(path.join(repoRoot, "landing", "hero.png"), path.join(out, "hero.png"));
       const images = path.join(repoRoot, "docs", "blog", "images");
       mkdirSync(path.join(out, "_images"), { recursive: true });
@@ -69,7 +77,7 @@ export default defineConfig({
       disable404Route: true,
       lastUpdated: false,
       routeMiddleware: "./src/starlight-route.ts",
-      customCss: ["../landing/shared/site-tokens.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
+      customCss: ["../landing/shared/site-tokens.css", "../landing/shared/site-shell.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
       components: {
         Header: "./src/components/starlight/Header.astro",
         PageTitle: "./src/components/starlight/PageTitle.astro",

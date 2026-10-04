@@ -1,20 +1,19 @@
 ---
 import ThemeToggle from "./ThemeToggle.astro";
-import { shellBrand, shellLinks } from "../lib/header-links.ts";
+import { SHELL_FOOTER_LEGAL, shellLabels, shellLinks } from "../lib/header-links.ts";
 
 interface Props {
   wrapper?: "footer" | "div";
 }
 
 const { wrapper: Wrapper = "footer" } = Astro.props;
-const brand = shellBrand();
 const links = shellLinks(Astro.url.pathname);
 ---
 
 <Wrapper class="site-footer" data-site-footer data-pagefind-ignore>
   <div class="site-footer__inner">
-    <p class="site-footer__legal">{brand.label} is open source under the MIT License.</p>
-    <nav class="site-footer__nav" aria-label="Footer">
+    <p class="site-footer__legal">{SHELL_FOOTER_LEGAL}</p>
+    <nav class="site-footer__nav" aria-label={shellLabels.footerNav}>
       {
         links.map((link) => (
           <a

@@ -136,6 +136,16 @@ tree sha256 of the published artifact, UI and snapshot read-model versions, gate
 results, probe results, and the parent generation. A receipt is last-known-good
 only when its gates and probes both passed.
 
+Each route also records `lane_sha256`, the digest of every tree it contributes to the
+artifact, and the receipt carries an `explorer` block with the Results Explorer's
+digest (`sha256`), source SHA and corpus. The Explorer is pinned by that digest on
+its own, apart from the whole-site `artifact.sha256`, so a change to prose never
+reads as an Explorer change. The site build writes
+`website/.receipts/explorer-artifact.json` with the digest of `results-explorer/dist`
+as consumed (`source_sha256`) and of the `/results/` tree as published
+(`mounted_sha256`, which differs because the build adds page metadata to the entry
+document). The build copies the Explorer build output and never rebuilds its source.
+
 ## Rollback
 
 `gh workflow run site-deploy.yml --ref develop -f mode=rollback -f rollback_receipt_run_id=<run_id>`

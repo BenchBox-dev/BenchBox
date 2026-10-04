@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from scripts.assemble_public_site import REPO_ROOT, assemble_public_site, main
-from scripts.publication.assembler import PathOwnershipError
+from scripts.publication.assembler import PathOwnershipError, compute_tree_digest
 from scripts.site_deploy import routes
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
@@ -148,6 +148,11 @@ def test_routes_mode_mounts_each_route_from_its_own_ref(tmp_path: Path) -> None:
     }
     assert receipt["refs"]["release"]["kind"] == "release-tag"
     assert len(receipt["tree_sha256"]) == 64
+    lanes = {route["path"]: route["lane_sha256"] for route in receipt["routes"]}
+    explorer_digest, _, _ = compute_tree_digest(site / "results")
+    assert lanes["/results/"] == {"/results/:results": explorer_digest}
+    assert explorer_digest != receipt["tree_sha256"]
+    assert set(lanes["/blog/"]) == {"/blog/:blog", "/blog/:_static", "/blog/:_images"}
     owners = receipt["file_owners"]
     assert owners["_static/theme.css"].startswith("/blog/")
     assert owners["docs/_static/theme.css"].startswith("/docs/:")
