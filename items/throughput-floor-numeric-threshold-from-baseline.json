@@ -1,5 +1,5 @@
 {
-  "context": "Batch D investigation 2026-09-26: only 4 retained green DuckDB TPC-H SF1 throughput observations exist (2026-08-11/12/22, values 154k-349k, wide spread, 5+ weeks stale, local runs not nightly). No nightly has retained throughput_at_size yet. Per the item's own data-first rule, setting THROUGHPUT_FLOOR_MEDIAN now would manufacture false failures. Blocked on nightly baseline accumulation.",
+  "context": "Batch D investigation 2026-09-26: only 4 retained green DuckDB TPC-H SF1 throughput observations exist (2026-08-11/12/22, values 154k-349k, wide spread, 5+ weeks stale, local runs not nightly). No nightly has retained throughput_at_size yet. Per the item's own data-first rule, setting THROUGHPUT_FLOOR_MEDIAN now would manufacture false failures. Blocked on nightly baseline accumulation.\n\n2026-10-04 adversarial review: the premise changed. Nightly values are retained as check-run annotations (10 values 09-25 to 10-04, 73.6k-98.1k, in two runner-hardware groups), so a baseline exists but a single fixed median would let a fast-runner run drop ~37% unnoticed. Also, the fixed THROUGHPUT_FLOOR_MEDIAN variable contradicts the documented rolling-median model. Moved from blocked to open, with a dependency on throughput-floor-baseline-retention-per-runner (artifact retention and per-runner-class rolling median); activate the floor after that lands.",
   "description": "Set the numeric Throughput@Size floor: configure THROUGHPUT_FLOOR_MEDIAN and sign off THROUGHPUT_FLOOR_MAX_DROP_FRACTION (default 20%) from the retained rolling-median spread of green DuckDB TPC-H SF1 runs. Wiring, observe-only default, and policy docs merged in #2302 (plus hardening in #2309).",
   "sessions": [
     {
@@ -35,6 +35,14 @@
       "op": "update",
       "op_id": "18308a088ec94b7a84fa661f1317898e",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:05:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "58bd24f6752148568adf553259a6a628",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
     }
   ]
 }

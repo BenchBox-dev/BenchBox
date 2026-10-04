@@ -19806,9 +19806,11 @@
     },
     "throughput-floor-numeric-threshold-from-baseline": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "throughput-floor-baseline-retention-per-runner"
+      ],
       "priority": "medium",
-      "status": "blocked",
+      "status": "open",
       "title": "Throughput UAT gate: activate numeric Throughput@Size floor from baseline"
     },
     "throughput-independent-sessions-per-stream": {
