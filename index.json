@@ -6425,12 +6425,17 @@
       "title": "Diagnose the Q20 mismatch at SF 0.03 and the Q78 mismatch"
     },
     "dfparity-n03-flaky-q36-cell": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-05T19:55:38Z",
+        "generation": "47dfe7fe0c7c41f6ac73c70af1b8a8e3",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Stabilize or classify the flaky Q36 expression cell and detect flaky cells in the gate"
     },
     "dfparity-n04-dask-cudf-null-limits": {
