@@ -2,7 +2,7 @@
   "acceptance": [
     "ADR-002 addendum or decision note recording the resolution rule and facet semantics."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-8 / task P5.1 (re-review R-9).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda; do not claim.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-8 / task P5.1 (re-review R-9).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda (PR #2634); do not claim.\n\nDECISION (owner-endorsed 2026-10-04; ADR-002 addendum \"--tuning tuned on DataFrame platforms\"):\n- Resolution order in benchbox/cli/tuning_resolver.py get_tuning_template_paths: (1) <platform>/<benchmark>_tuned.yaml; (2) examples/tunings/dataframe/<platform>_optimized.yaml (and a packaged mirror if one exists; none exists today); (3) tuned-fallback. A platform with no <platform>_optimized.yaml (e.g. Dask) continues to step 3.\n- Facet: a curated-profile resolution reports mode \"tuned\", with the resolved file recorded as the tuning source.\n- tuned-fallback keeps its distinct ADR-002 fallback facet and never facet-matches a curated run; test both directions.\n- Fallback console text comes from the capability registry per platform (e.g. \"basic constraints\", \"engine runtime defaults (streaming)\", \"OLAP session pack\"); fixed text such as \"using basic constraints\" is not allowed.",
   "description": "## Problem\nCurated profiles exist (`examples/tunings/dataframe/polars_optimized.yaml`, `pandas_optimized.yaml`, `cudf_optimized.yaml`, `dask_distributed.yaml`, …). But `--tuning tuned` searches `<platform>/<benchmark>_tuned.yaml` (`benchbox/cli/tuning_resolver.py` `get_tuning_template_paths`), so it always resolves `tuned-fallback`. On Polars that fallback applied three streaming-runtime settings, while the console said \"using basic constraints\".\n\n## Must decide\n- The resolution rule and its precedence.\n- The ADR-002 facet: does such a resolution report `tuned` or a distinct facet?\n\n## Guardrails\n- A fallback must never facet-match a curated run (ADR-002).\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "benchbox/cli/tuning_resolver.py",
@@ -24,6 +24,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "52274fa773794852a0d1defb914550b0",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T16:07:48Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1bdde4eb682e47b789440d3dc125ff5b",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
