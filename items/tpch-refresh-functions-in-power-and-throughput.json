@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Power@Size includes RF1 and RF2 times per spec, with tests",
+    "The throughput test runs a concurrent refresh stream of S RF pairs inside Ts, with tests",
+    "Official QphH@Size export is re-enabled only when both are present",
+    "Docs describe the spec-conformant metric"
+  ],
+  "description": "Scope moved here from tpch-qphh-missing-refresh-functions by owner decision on 2026-10-04: suppress the official QphH label first, and implement the spec later. Per the TPC-H spec, Power@Size uses the 24th root over the 22 query times plus RF1 and RF2, and the throughput test runs a refresh stream of S RF1/RF2 pairs concurrently with the S query streams, inside Ts. Currently neither test runs refresh functions (tpch/power_test.py, tpch/throughput_test.py), and maintenance runs afterwards with concurrent_with_queries=False (execution.py:692-698).",
+  "links": [
+    "benchbox/core/tpch/power_test.py",
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/platforms/base/execution.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:37:20Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2fdd6fc7a5e1490aada004bdf9387209",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
+    }
+  ]
+}
