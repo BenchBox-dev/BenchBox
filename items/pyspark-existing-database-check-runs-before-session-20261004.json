@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Test: with an existing database and force_recreate, the PySpark adapter recreates it at the first connection and not afterwards.",
+    "The PySpark contract-test case asserts force_recreate acts."
+  ],
+  "context": "Source: independent review and author report of PR #2632 (2026-10-04). The file path is a best guess; confirm with grep.",
+  "description": "## Problem (observed by a reviewer and the contract-test author reading code and running fakes)\nIn the PySpark adapter, `create_connection` runs the existing-database check before the Spark session is created. The check therefore always reports no database, and `--force-recreate` does nothing at the first connection.\n\n## Change\n- Create the session first (or run the check against the session once it exists), then decide reuse or recreate once per run.\n- Add a PySpark case to the contract test that exercises force_recreate (the current case only records that it never acts).\n\n## Guardrails (must preserve)\n- The once-per-run decision guard from the mid-run item; reuse behaviour for existing databases.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
+  "links": [
+    "benchbox/platforms/pyspark.py",
+    "tests/unit/platforms/test_no_midrun_destructive_ops.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T20:55:33Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "963bc7096b1942f0a636fc92c9b94188",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    }
+  ]
+}
