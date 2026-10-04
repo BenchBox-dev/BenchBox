@@ -83,3 +83,31 @@ def test_q78_drops_a_returned_sale_even_when_the_return_date_is_null_and_rounds_
 
     # (year, item, customer, ratio, store_qty, store_wholesale_cost, store_sales_price, other qty/cost/price)
     assert rows == [(2000, 1, 1, 0.63, 30, 10.0, 11.0, 48, 4.0, 6.0)]
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+@pytest.mark.parametrize(
+    "select_columns,expected_keys",
+    [
+        ("ss_sold_year", (2000,)),
+        ("ss_item_sk", (1,)),
+        ("ss_customer_sk", (1,)),
+        ("ss_sold_year, ss_item_sk, ss_customer_sk", (2000, 1, 1)),
+    ],
+)
+def test_q78_projects_the_drawn_columns_in_template_order(family, select_columns, expected_keys, monkeypatch):
+    from benchbox.core.equivalence.dataframe_surface import materialize_rows
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    monkeypatch.setattr(queries, "get_parameters", lambda _: {"year": 2000, "select_columns": select_columns})
+    impl = queries.q78_expression_impl if family == "expression" else queries.q78_pandas_impl
+
+    assert materialize_rows(impl(_context(family, _tables()))) == [(*expected_keys, 0.63, 30, 10.0, 11.0, 48, 4.0, 6.0)]
+
+
+@pytest.mark.parametrize("select_columns", ["", "ss_unknown", "ss_item_sk, ss_unknown"])
+def test_q78_refuses_unknown_drawn_columns(select_columns):
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    with pytest.raises(ValueError, match="Q78 select_columns"):
+        queries._q78_select_columns({"select_columns": select_columns})
