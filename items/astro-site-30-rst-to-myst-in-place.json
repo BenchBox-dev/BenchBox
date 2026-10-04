@@ -5,6 +5,7 @@
     "Navigation order per section identical to before (inventory sidebar/toctree comparison)",
     "Public-site visual acceptance passes without baseline approval, or every diff is explained and approved via the ci-dedupe-11 path"
   ],
+  "context": "DONE 2026-10-04: merged in https://github.com/BenchBox-dev/BenchBox/pull/2597 (develop def3036c). 0 non-autodoc .rst remain (27 .rst left, all autodoc, owned by item 34). Sphinx -W build: same paths, anchors, headings and nav order (inventory diff clean). Public-site visual check green on the PR head.",
   "description": "This is a semantic migration, carried out while Sphinx is still the oracle. The scope is the .rst files in docs/ that do not contain autodoc directives: 53 .rst total minus the 27 autodoc files, which astro-site-34 handles.\n\nPreserve everything the RST carries:\n- toctree navigation (39 toctrees across all .rst) and :doc: references (236 across docs/)\n- labels and anchors, tables (list-table, csv-table), captions, sphinx_design blocks, tag pages\n\nEach output keeps its URL: same stem, same .html. Use MyST forms the Astro converter supports, preferring plain Markdown.\n\nThe existing Sphinx -W build, spellcheck and public-site visual acceptance must stay green, so this ships value even if the migration stops. Splitting into several PRs by docs section is fine.",
   "links": [
     "docs/index.rst",
@@ -51,6 +52,14 @@
       "generation": "8f7a497c7458492c91ee6e7fd87bcb9d",
       "op": "take",
       "op_id": "1e7c013ac90844a2a1ccfc3acd1d654f",
+      "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:d22de72a24caf6398d3a8b3b",
+      "at": "2026-10-04T01:03:49Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f91a7d0fba8649c7a0ec33e6a79f8240",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
     }
   ]
