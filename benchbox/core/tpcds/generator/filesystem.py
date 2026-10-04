@@ -378,6 +378,13 @@ class FileArtifactMixin:
                     }
                 )
 
+        # A manifest naming no tables would be reused by later runs and load
+        # nothing, so generation fails instead of recording it.
+        if not manifest["tables"]:
+            raise RuntimeError(
+                f"TPC-DS data generation produced no table files in {output_dir}; refusing to write a manifest that lists no tables"
+            )
+
         out = output_dir / "_datagen_manifest.json"
 
         with open(out, "w", encoding="utf-8") as f:

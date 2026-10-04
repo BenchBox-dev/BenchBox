@@ -257,6 +257,11 @@ class DataValidationEngine:
                 warnings=warnings,
             )
 
+        # A manifest that lists no tables is invalid for every benchmark, with or
+        # without table-count expectations: nothing can load from it.
+        if not manifest.get("tables"):
+            errors.append("Manifest lists no tables; data generation produced no usable output")
+
         # Get benchmark expectations
         benchmark_type = manifest.get("benchmark", "").lower()
         expectations = self.BENCHMARK_EXPECTATIONS.get(benchmark_type)

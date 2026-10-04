@@ -197,6 +197,17 @@ class TestDataValidationEngine:
         # May have warnings due to missing tables, but should not error on file validation
         assert result.details["benchmark_type"] == "tpcds"
 
+    @pytest.mark.parametrize("benchmark_name", ["tpcds", "unlisted_benchmark"])
+    def test_validate_generated_data_rejects_manifest_without_tables(self, tmp_path, benchmark_name):
+        """A manifest listing no tables is invalid even without table-count expectations."""
+        manifest_path = tmp_path / "_datagen_manifest.json"
+        manifest_path.write_text(json.dumps({"benchmark": benchmark_name, "scale_factor": 1.0, "tables": {}}))
+
+        result = self.engine.validate_generated_data(manifest_path)
+
+        assert not result.is_valid
+        assert any("lists no tables" in error for error in result.errors)
+
     def test_validate_generated_data_missing_manifest(self, tmp_path):
         """Test data validation with missing manifest file."""
         missing_manifest = tmp_path / "missing_manifest.json"

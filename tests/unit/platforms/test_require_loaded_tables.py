@@ -59,3 +59,26 @@ def test_manifest_reuse_rejects_the_source_manifest_for_own_output_benchmarks():
 
     assert _resolve_manifest_allowed_names(obt, config) == {"tpcds_obt"}
     assert "tpch" in _resolve_manifest_allowed_names(sharer, config)
+
+
+def test_duckdb_run_over_an_empty_manifest_fails_instead_of_validating_vacuously(tmp_path):
+    """A stale manifest listing no tables must not produce a passing, empty run."""
+    import json
+
+    pytest.importorskip("duckdb")
+    from benchbox import TPCH
+    from benchbox.platforms.duckdb import DuckDBAdapter
+    from benchbox.utils.datagen_version import current_datagen_stamp
+
+    (tmp_path / "customer.tbl.zst").write_bytes(b"\x28\xb5\x2f\xfd" + b"x" * 64)
+    manifest = {"benchmark": "tpch", "scale_factor": 0.01, "tables": {}, **current_datagen_stamp("tpch")}
+    (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    benchmark = TPCH(scale_factor=0.01, output_dir=tmp_path)
+    adapter = DuckDBAdapter(database_path=":memory:")
+    connection = adapter.create_connection()
+    try:
+        with pytest.raises((RuntimeError, ValueError), match="No data files found|no rows were loaded"):
+            adapter._setup_fresh_database_phases(benchmark, connection, None)
+    finally:
+        adapter.close_connection(connection)
