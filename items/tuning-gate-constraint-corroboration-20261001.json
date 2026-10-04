@@ -2,7 +2,7 @@
   "acceptance": [
     "ADR-001 addendum merged listing verifiable constraint kinds, per-platform structured sources and exact match rules (FK compares referenced table and columns)."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-2 / task P1.7. Evidence: DuckDB tuned TPC-H receipt had 8 unverifiable entries, all constraint CREATE TABLE statements.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-2 / task P1.7. Evidence: DuckDB tuned TPC-H receipt had 8 unverifiable entries, all constraint CREATE TABLE statements.\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch docs/tuning-decision-addenda; do not claim.",
   "description": "## Problem\nConstraint-bearing `CREATE TABLE` statements are recorded as tuning DDL. The capture footprint includes `primary key`, `foreign key`, `unique` and `check` (`benchbox/core/tuning/applied_ledger.py:119-147`). But `_classify` returns `UNVERIFIABLE` for them (`benchbox/core/tuning/introspection.py:492-496`). Every shipped DuckDB template, plus `tuned-fallback` and `auto`, enables constraints, so none of those runs can verify, even though DuckDB exposes `duckdb_constraints()`.\n\n## Must decide\n- The verifiable kinds: PK, UNIQUE, FK, CHECK. CHECK expressions are text and probably stay unverifiable.\n- The structured source per platform: DuckDB first; others stay unverifiable, i.e. blocking.\n- The FK rule. It must require equal child columns **and** referenced table **and** referenced columns. `_Intent` (`introspection.py:230`) and `IntrospectedObject` currently lack referenced fields, so an FK to the wrong table would corroborate (plan review F6).\n- Column-order rules for composite keys.\n\n## Guardrails\n- A missing structured source means `unverifiable`, never a guess.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
   "links": [
     "docs/development/tuning-adr-001-trust-and-hash-semantics.md",
@@ -17,6 +17,14 @@
       "op": "create",
       "op_id": "a1cce33e97a242e491cdef487b14254e",
       "session_id": "953b286e7ca64e218aede0ba11665923"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T15:29:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "16694f1822c147649bc86df78b660d13",
+      "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
 }
