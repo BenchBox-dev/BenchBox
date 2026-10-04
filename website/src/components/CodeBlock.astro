@@ -1,0 +1,31 @@
+---
+import { codeToHtml } from "shiki";
+import cobalt2 from "../lib/cobalt2-theme.json";
+
+interface Props {
+  code: string;
+  lang: "bash" | "python";
+  id?: string;
+}
+
+const { code, lang, id } = Astro.props;
+
+const html = await codeToHtml(code, {
+  lang,
+  theme: cobalt2 as never,
+  transformers: [
+    {
+      pre(node) {
+        delete node.properties.style;
+        node.properties.class = "shiki";
+      },
+      code(node) {
+        node.properties.class = `language-${lang}`;
+        if (id) node.properties.id = id;
+      },
+    },
+  ],
+});
+---
+
+<Fragment set:html={html} />

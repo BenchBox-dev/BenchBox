@@ -19,20 +19,24 @@
     "serve": "node scripts/serve-dist.mjs",
     "verify": "node e2e/verify.mjs",
     "verify:shell": "node e2e/shell.mjs",
-    "verify:not-found": "node e2e/not-found.mjs"
+    "verify:not-found": "node e2e/not-found.mjs",
+    "verify:landing": "node e2e/landing.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.1",
+    "@astrojs/preact": "6.0.5",
     "@astrojs/starlight": "0.42.5",
     "astro": "7.3.5",
     "mermaid": "12.1.0",
     "pagefind": "1.5.2",
+    "preact": "10.29.8",
     "remark-frontmatter": "5.0.0",
     "remark-gfm": "4.0.1",
     "remark-mdx": "3.1.1",
     "remark-parse": "11.0.0",
     "remark-smartypants": "3.0.3",
     "remark-stringify": "11.0.0",
+    "shiki": "4.5.0",
     "unified": "11.0.5",
     "unist-util-visit": "5.1.0",
     "yaml": "2.9.1"
@@ -44,7 +48,6 @@
     "@types/mdast": "4.0.4",
     "@types/node": "22.20.2",
     "fast-xml-parser": "5.11.2",
-    "shiki": "4.5.0",
     "typescript": "6.0.3",
     "vitest": "5.0.3"
   }

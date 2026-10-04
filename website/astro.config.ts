@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { unified } from "@astrojs/markdown-remark";
+import preact from "@astrojs/preact";
 import starlight from "@astrojs/starlight";
 import { ExpressiveCodeTheme } from "@astrojs/starlight/expressive-code";
 import type { AstroIntegration } from "astro";
@@ -61,6 +62,7 @@ export default defineConfig({
   markdown: { processor: unified({ remarkPlugins: [headingIds, docutilsQuotes], smartypants: SMARTYPANTS }) },
   integrations: [
     sitemapOwnedByPublishStatic,
+    preact(),
     starlight({
       title: "BenchBox",
       pagefind: false,

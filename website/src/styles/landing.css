@@ -1,0 +1,24 @@
+.landing {
+  overflow-x: clip;
+}
+
+html:has(.landing) {
+  scroll-behavior: smooth;
+}
+
+.landing .results-example-card__label,
+.landing .results-example-card figcaption,
+.landing .results-chart-legend,
+.landing .benchmark-origin a,
+.landing .benchmark-meta,
+.landing .footer-bottom,
+.landing .results-example-stats dt,
+.landing .results-example-table thead th {
+  color: var(--text-secondary);
+}
+
+.landing .code-block pre {
+  font-family: monospace;
+  font-size: inherit;
+  line-height: inherit;
+}
