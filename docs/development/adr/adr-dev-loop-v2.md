@@ -80,8 +80,8 @@ Soundness paths are classified by `.github/soundness-paths.txt`. The required
 `oracle-review` check binds the Codex connector's review to the current head,
 required thread resolution binds disposition of findings, and the scheduled
 digest checks the merged evidence. Code-owner review and PR-body attestation
-are retired. The soundness-path revocation is removed only after the replacement
-check is required in the live ruleset; explicit hold-label revocation remains.
+are retired. The soundness-path revocation is removed and the replacement check
+is required in the live ruleset; explicit hold-label revocation remains.
 
 Amended 2026-10-02, updated 2026-10-03: the external review stays, but a PR-body
 attestation checked by CI no longer binds it. The author writes its own attestation, so the check

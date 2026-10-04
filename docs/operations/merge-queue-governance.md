@@ -8,7 +8,7 @@ This document defines how a change reaches `refs/heads/develop` and how `develop
 
 1. **Squash Integration Only:** All pull requests targeting `develop` must be integrated via squash merge. Merge commits and rebase-and-merge remain forbidden.
 2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history or required thread resolution through that ruleset. Code-owner review is disabled.
-3. **Soundness Review Boundary:** A result-affecting pull request (a path in `.github/soundness-paths.txt`) needs a completed external adversarial review of its current head. The required `oracle-review` check passes only when the Codex connector app has reviewed that head. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. A scheduled digest lists the soundness-path commits that merged and the review signal each had, and opens a tracker item for any with none. There is no attestation in the PR body: the author of a change can write that text, so it cannot bind, and the `soundness-flag` check that tested for it is deleted.
+3. **Soundness Review Boundary:** A result-affecting pull request (a path in `.github/soundness-paths.txt`) needs a completed external adversarial review of its current head. The required `oracle-review` check passes only when the Codex connector app has reviewed or thumbed up that head. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. A scheduled digest lists the soundness-path commits that merged and the review signal each had, and opens a tracker item for any with none. There is no attestation in the PR body: the author of a change can write that text, so it cannot bind, and the `soundness-flag` check that tested for it is deleted.
 4. **Fail-Closed Execution:** A required check that cannot establish its result must report failure, not success.
 
 ---
@@ -24,8 +24,8 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 | `results-data` | `.github/workflows/ci.yml` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
 | `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
 | `landing` | `.github/workflows/ci.yml` | Site theme token scan on landing changes. |
-| `tooling` | `.github/workflows/ci.yml` | Every event. Content guard, skill integrity, and audit checks by path. |
-| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes when no soundness path changes, or when the Codex connector app has reviewed the current head and none of its threads is unresolved. A new push needs a new review. If no reviewer can run (all four tried on the head with recorded quota or unavailability evidence, and four hours without a connector signal), the owner reviews the exact head and follows the one-merge recovery window in the dev-loop ADR, D4. An owner comment does not satisfy the check, because every human and agent posts as the owner account. |
+| `tooling` | `.github/workflows/ci.yml` | Every event. Base-branch guard, comment policy, content guard, skill integrity, and audit checks by path. |
+| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes when no soundness path changes, or when the Codex connector app has reviewed or thumbed up the current head and none of its threads is unresolved. A new push needs a new review. If no reviewer can run (all four tried on the head with recorded quota or unavailability evidence, and four hours without a connector signal), the owner reviews the exact head and follows the one-merge recovery window in the dev-loop ADR, D4. An owner comment does not satisfy the check, because every human and agent posts as the owner account. |
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
@@ -53,7 +53,7 @@ make pr-open
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` opens or reuses the pull request. It refuses a branch that is not a revert when the newest completed `trunk.yml` run on `develop` failed more than 30 minutes ago (see section 5).
+- `make pr-open` opens or reuses the pull request. It refuses a branch that is not a revert when the newest `trunk.yml` run on `develop` finished red more than 30 minutes ago (see section 5).
 - `make pr-ready` verifies the exact checkout, live PR identity, review state, required checks, holds, and readiness evidence before arming auto-merge.
 - Once the required checks are green on the head, GitHub merges the pull request.
 
@@ -80,7 +80,7 @@ When a trunk run fails, the culprit is reverted first and fixed afterwards:
 make trunk-revert PR=<number>
 ```
 
-`make pr-open` refuses a branch that is not a revert when the newest completed `trunk.yml` run on `develop` failed more than 30 minutes ago (`scripts/trunk_revert.py gate`), so nothing new stacks on a broken tip. That rule is enforced. A trunk that stays red for more than two hours with no revert pull request open is a risk signal for the owner, who should revert the culprit; nothing enforces the two-hour figure.
+`make pr-open` refuses a branch that is not a revert when the newest `trunk.yml` run on `develop` finished red more than 30 minutes ago (`scripts/trunk_revert.py gate`), so nothing new stacks on a broken tip. It does not block while a newer run is still in progress, or when `gh` cannot read the runs; it warns instead. A trunk that stays red for more than two hours with no revert pull request open is a risk signal for the owner, who should revert the culprit; nothing enforces the two-hour figure.
 
 More than one medium-tier shard kill a day means the shard's memory sampler output should be read for the test that is growing a worker.
 
