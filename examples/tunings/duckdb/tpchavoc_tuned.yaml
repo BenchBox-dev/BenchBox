@@ -14,7 +14,7 @@ unique_constraints:
   ignore_nulls: false
 
 check_constraints:
-  enabled: true
+  enabled: false
   enforce_on_insert: true
   enforce_on_update: true
 
@@ -30,10 +30,6 @@ platform_optimizations:
 table_tunings:
   LINEITEM:
     table_name: LINEITEM
-    partitioning:
-    - name: L_SHIPDATE
-      type: DATE
-      order: 1
     sorting:
     - name: L_ORDERKEY
       type: INTEGER
@@ -44,10 +40,6 @@ table_tunings:
 
   ORDERS:
     table_name: ORDERS
-    partitioning:
-    - name: O_ORDERDATE
-      type: DATE
-      order: 1
     sorting:
     - name: O_ORDERKEY
       type: INTEGER

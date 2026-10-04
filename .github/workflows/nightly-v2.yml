@@ -693,6 +693,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Generate documentation inputs
+        run: make query-docs
+
       - name: Check documentation links
         run: uv run -- sphinx-build -b linkcheck docs docs/_build/linkcheck
 

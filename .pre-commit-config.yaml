@@ -73,7 +73,7 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-commit]
-        files: ^results-explorer/src/.*\.(tsx|ts|jsx|js|css|html)$
+        files: ^(results-explorer/src/.*\.(tsx|ts|jsx|js|css|html)|landing/shared/site-tokens\.css)$
 
       - id: duplicate-code-warn
         name: pylint duplicate-code (warn-only)

@@ -90,3 +90,53 @@ def test_last_known_good_requires_passing_probes_gates_and_matching_target() -> 
     bad_gates = make_receipt(run_id=1, trunk=SHA_A)
     bad_gates["gates"]["ok"] = False
     assert not r.is_last_known_good(bad_gates)
+
+
+def test_receipt_records_the_explorer_digest_apart_from_the_site_artifact() -> None:
+    lane = {"/results/:results": "e" * 64}
+    routes = [
+        {"path": "/", "builder": "landing", "source_sha": SHA_A, "lane_sha256": {"/:.": "1" * 64}},
+        {
+            "path": "/results/",
+            "builder": "explorer",
+            "source_sha": SHA_A,
+            "corpus": "results-data",
+            "lane_sha256": lane,
+        },
+    ]
+    built = r.build_receipt(
+        mode="deploy",
+        target="github-pages",
+        run_id=9,
+        deployment_id=1,
+        trunk_sha=SHA_A,
+        release_tag="v0.4.1",
+        release_sha=SHA_A,
+        corpus_sha=SHA_A,
+        assembly={"routes": routes, "tree_sha256": "a" * 64, "total_bytes": 1, "total_files": 1},
+        artifact_name="x",
+        versions={},
+        gates={"ok": True, "results": {}},
+        probes={"ok": True},
+        parent=None,
+        certifying_run_id=None,
+    )
+    assert built["explorer"] == {
+        "path": "/results/",
+        "source_sha": SHA_A,
+        "corpus": "results-data",
+        "sha256": "e" * 64,
+        "lane_sha256": lane,
+    }
+    assert built["explorer"]["sha256"] != built["artifact"]["sha256"]
+    assert r.validate_receipt(built) is built
+
+
+def test_receipt_without_an_explorer_route_records_none() -> None:
+    assert r.explorer_artifact([{"path": "/", "builder": "landing"}]) is None
+
+
+def test_receipt_refuses_an_explorer_route_with_several_lanes() -> None:
+    route = {"path": "/results/", "builder": "explorer", "lane_sha256": {"a": "1" * 64, "b": "2" * 64}}
+    with pytest.raises(r.ReceiptError):
+        r.explorer_artifact([route])

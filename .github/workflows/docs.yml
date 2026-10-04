@@ -123,6 +123,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sphinx-
 
+      - name: Generate documentation inputs
+        run: make docs-generate
+
       - name: Build documentation
         run: |
           cd docs
@@ -524,6 +527,9 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --group dev
+
+      - name: Generate documentation inputs
+        run: make query-docs
 
       - name: Check documentation links
         run: |

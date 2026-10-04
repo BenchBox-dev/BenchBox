@@ -142,19 +142,39 @@ that itself reaches the cap remains explicitly truncated.
   bounded query, filtered to the ledger's tables. Corroborates each
   `CREATE INDEX` ledger entry against its `index` row.
 
-  DuckDB sorting is verification-eligible end to end. The initial tuned
-  `CREATE INDEX` is dropped by the loader's
-  `CREATE OR REPLACE TABLE ... ORDER BY` CTAS, so
-  `DuckDBAdapter.apply_ctas_sort` re-creates that same index after CTAS using
-  the shared `_duckdb_sort_index_sql` helper (the generator renders the CTAS
-  `ORDER BY`, not this index statement). `_record_sort_index_layout_op` records
-  the successful or
-  failed re-creation as a `post_load` layout operation, and
-  `PlatformAdapter._fold_layout_operations_into_ledger` folds it into the
-  ledger before corroboration. The live full-flow test
-  `tests/unit/platforms/test_duckdb_introspection.py::TestDuckDBCtasIndexRecreation::test_full_flow_reaches_applied_verified`
-  pins the surviving catalog index and verified outcome. Dry runs capture SQL
-  but neither execute nor record the re-creation.
+  DuckDB index statements are corroborated against the physical identifiers
+  `create_schema` produced. The tuning builder resolves each logical table and
+  column through `duckdb_tables()` / `duckdb_columns()` (case-insensitive,
+  returning the catalog's stored spelling) and emits the index DDL with those
+  names quoted, for example `ON "lineitem" ("l_orderkey", "l_linenumber")`.
+  Quoting matters: an index written against a differently-cased name
+  (`ON LINEITEM (L_ORDERKEY)` over a table created as `lineitem`) is stored by
+  DuckDB as the bound expression `(LINEITEM.L_ORDERKEY)`. That fact still
+  produces a `mismatch`, and its diff states that the catalog stored a bound
+  expression because the identifier case in the DDL differs from the catalog.
+  `normalize_columns` is deliberately unchanged, so a bound form is never
+  unwrapped into a match.
+
+  The loader's `CREATE OR REPLACE TABLE ... ORDER BY` CTAS drops the initial
+  index, so `DuckDBAdapter.apply_ctas_sort` re-creates the same index after the
+  CTAS using the shared `_duckdb_sort_index_sql` helper.
+  `_record_sort_index_layout_op` records the re-creation as a `post_load`
+  layout operation, and `PlatformAdapter._fold_layout_operations_into_ledger`
+  folds it into the ledger before corroboration. Dry runs capture SQL but
+  neither execute nor record the re-creation.
+
+  A corroborated index is evidence of the index, not of row order: an index can
+  exist when the data was never sorted. Reaching `applied_verified` also needs
+  every other statement in the ledger to corroborate, so a run that also
+  requests constraints, partitioning or CHECK constraints stays
+  `applied_unverified` until those have catalog rules. A sort-only
+  configuration built through the real `create_schema` is pinned by
+  `tests/unit/platforms/test_physical_identifier_resolution.py::TestDuckDBPhysicalIdentifiers::test_sort_only_config_reaches_applied_verified_without_mismatch`.
+
+  DuckLake cannot build indexes (`CREATE INDEX` raises `DuckLake does not
+  support indexes`). Its adapter records each requested sort or clustering
+  index as a dropped intent with the reason `ducklake: CREATE INDEX
+  unsupported`, issues no `CREATE INDEX`, and does not use this introspector.
 
 - **Snowflake** (`benchbox/platforms/snowflake_introspection.py`): reads
   `INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY` with bound, normalized schema

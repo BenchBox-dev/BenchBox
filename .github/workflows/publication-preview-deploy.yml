@@ -134,6 +134,9 @@ jobs:
               results-explorer/public/data/results.duckdb
           )
           npm run --prefix "$WORK/results-explorer" build
+          if [ -f "$WORK/scripts/generate_query_docs.py" ]; then
+            (cd "$WORK" && uv run -- python scripts/generate_query_docs.py)
+          fi
           (
             cd "$WORK/docs"
             uv run sphinx-build -b html --keep-going . _build/html

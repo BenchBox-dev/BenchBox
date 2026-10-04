@@ -283,21 +283,3 @@ html_sidebars = {
         "sidebar/scroll-end.html",
     ],
 }
-
-
-def _generate_query_docs(app, config):
-    import subprocess
-
-    script = DOCS_ROOT.parent / "scripts" / "generate_query_docs.py"
-    result = subprocess.run(
-        [sys.executable, str(script)],
-        capture_output=True,
-        text=True,
-        cwd=DOCS_ROOT.parent,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("generate_query_docs.py failed:\n" + result.stdout + result.stderr)
-
-
-def setup(app):
-    app.connect("config-inited", _generate_query_docs)

@@ -10,11 +10,13 @@ Practical code examples for common BenchBox usage patterns, database integration
 > ⚠️ **IMPORTANT: Documentation Snippets vs. Runnable Examples**
 >
 > **This page contains *simplified code snippets* for documentation and explanation purposes.**
+>
 > - These snippets may be incomplete or use simplified APIs for clarity
 > - They are intended to illustrate concepts, not necessarily run as-is
 > - Copy-pasting may require adjustments
 >
 > **For *complete, tested, runnable code*, use the Examples Directory:**
+>
 > - **[Examples Directory Guide](examples-directory.md)** - 40+ runnable examples organized by difficulty
 > - **[Getting Started Examples](../../examples/getting_started/README.md)** - Zero to working in 5 minutes
 > - **[Feature Examples](../../examples/features/README.md)** - Learn specific capabilities
@@ -24,12 +26,13 @@ Practical code examples for common BenchBox usage patterns, database integration
 > - **[Workflow Patterns](../../examples/programmatic/README.md)** - 8 proven patterns
 >
 > **Quick Decision:**
+>
 > - Need to **understand a concept**? → Read snippets on this page
 > - Need to **run working code**? → Use files in `examples/` directory
 
 ---
 
-##  Basic Usage Examples
+## Basic Usage Examples
 
 ### Getting Started Scripts
 
@@ -853,6 +856,7 @@ if __name__ == "__main__":
 > **📁 Complete, tested example:** See [`examples/getting_started/local/duckdb_tpch_power.py`](../../examples/getting_started/local/duckdb_tpch_power.py) for a production-ready DuckDB example with CLI support and error handling.
 >
 > **📁 Additional benchmark examples:**
+>
 > - [`examples/getting_started/local/duckdb_nyctaxi.py`](../../examples/getting_started/local/duckdb_nyctaxi.py) - NYC Taxi trip analytics (real-world data patterns)
 > - [`examples/getting_started/local/duckdb_tsbs_devops.py`](../../examples/getting_started/local/duckdb_tsbs_devops.py) - TSBS DevOps time-series benchmark
 
@@ -1022,7 +1026,7 @@ if __name__ == "__main__":
 
 ---
 
-##  Performance Testing Examples
+## Performance Testing Examples
 
 ### Comprehensive Performance Analysis
 
@@ -1349,14 +1353,21 @@ if __name__ == "__main__":
 ### Custom Query Analysis
 
 ```python
-from benchbox import TPCDS, QueryAnalyzer
+from benchbox import TPCDS
 import re
+
+FEATURE_PATTERNS = {
+    "window": r'\bOVER\s*\(',
+    "rollup": r'\bROLLUP\b',
+    "cte": r'\bWITH\s+\w+\s+AS\b',
+    "union": r'\bUNION\b',
+    "case": r'\bCASE\b',
+}
 
 def analyze_tpcds_queries():
 
     tpcds = TPCDS(scale_factor=0.01)
-    analyzer = QueryAnalyzer()
-
+    # Get all queries
     queries = tpcds.get_queries()
 
     analysis_results = {}
@@ -1364,13 +1375,15 @@ def analyze_tpcds_queries():
     for query_id, query_sql in queries.items():
         print(f"Analyzing Query {query_id}...")
 
-        features = analyzer.extract_features(query_sql)
-        complexity = analyzer.calculate_complexity(query_sql)
-
+        features = [
+            name for name, pattern in FEATURE_PATTERNS.items()
+            if re.search(pattern, query_sql, re.IGNORECASE)
+        ]
         line_count = len(query_sql.split('\n'))
         table_count = len(re.findall(r'\bFROM\s+(\w+)', query_sql, re.IGNORECASE))
         join_count = len(re.findall(r'\bJOIN\b', query_sql, re.IGNORECASE))
         subquery_count = len(re.findall(r'\(\s*SELECT', query_sql, re.IGNORECASE))
+        complexity = join_count + 2 * subquery_count + len(features)
 
         analysis_results[query_id] = {
             "features": features,

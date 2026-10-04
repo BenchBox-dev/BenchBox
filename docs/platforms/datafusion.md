@@ -39,6 +39,7 @@ uv add benchbox datafusion
 ```
 
 **Version Compatibility**: BenchBox supports DataFusion 0.x through latest versions. The adapter automatically handles API differences between versions:
+
 - **Older versions**: Uses `RuntimeEnv` class
 - **Newer versions**: Uses `RuntimeEnvBuilder` class
 - **Recommendation**: Install latest version with `pip install datafusion` for best performance and features
@@ -98,7 +99,7 @@ DataFusionAdapter(
 Pass these with `--platform-option KEY=VALUE`.
 
 | Key | Python Parameter | Type | Default | Description |
-|-----|------------------|------|---------|-------------|
+| ----- | ------------------ | ------ | --------- | ------------- |
 | `memory_limit` | `memory_limit` | str | "16G" | Memory limit (e.g., '16G', '8GB', '4096MB') |
 | `target_partitions` | `target_partitions` | int | CPU count | Number of parallel partitions |
 | `temp_dir` | `temp_dir` | str | None | Temporary directory for disk spilling |
@@ -175,6 +176,7 @@ adapter = DataFusionAdapter(
 The first example is the default, recommended for most workloads. Smaller batches (4096) give lower latency and lower memory use, which suits memory-constrained environments, interactive queries, and low-latency requirements. Larger batches (16384) give higher throughput and higher memory use, which suits batch processing, maximum throughput, and ample memory.
 
 **Batch Size Guidelines**:
+
 - **4096**: Best for interactive queries and memory-constrained environments
 - **8192** (default): Good balance for most analytical workloads
 - **16384**: Optimal for high-throughput batch processing with sufficient RAM
@@ -183,6 +185,7 @@ The first example is the default, recommended for most workloads. Smaller batche
 #### Data Format Selection
 
 **Parquet Format (Recommended)**:
+
 - Better query performance due to columnar format
 - Automatic columnar compression
 - Predicate pushdown optimization
@@ -198,6 +201,7 @@ adapter = DataFusionAdapter(
 The working directory holds the converted files, so it should be on fast storage.
 
 **CSV Format**:
+
 - Direct loading (no conversion step)
 - Lower memory footprint
 - Slower query execution
@@ -246,6 +250,7 @@ adapter = DataFusionAdapter(data_format="csv")
 ```
 
 **Characteristics**:
+
 - Fast initial load
 - Lower memory usage
 - Slower query performance
@@ -260,6 +265,7 @@ adapter = DataFusionAdapter(data_format="parquet")
 ```
 
 **Characteristics**:
+
 - One-time conversion overhead
 - Better query performance due to columnar format
 - Higher initial memory usage
@@ -269,7 +275,7 @@ adapter = DataFusionAdapter(data_format="parquet")
 **Format Comparison**:
 
 | Aspect | CSV Mode | Parquet Mode |
-|--------|----------|--------------|
+| -------- | ---------- | -------------- |
 | Initial Load | Faster (streaming) | Slower (conversion required) |
 | Query Execution | Row-by-row parsing | Columnar with pushdown |
 | Memory Usage | Lower | Higher |
@@ -297,6 +303,7 @@ results = benchmark.run_with_platform(adapter)
 ```
 
 **Recommended Configuration**:
+
 - Scale Factor 0.1-1: 8G memory, 4-8 partitions
 - Scale Factor 1-10: 16G memory, 8-16 partitions
 - Scale Factor 10+: 32G+ memory, 16+ partitions
@@ -319,6 +326,7 @@ results = benchmark.run_with_platform(adapter)
 ```
 
 **Known Limitations**:
+
 - Some window function edge cases
 - Complex correlated subqueries
 - Advanced SQL features (platform will validate before execution)
@@ -326,6 +334,7 @@ results = benchmark.run_with_platform(adapter)
 ### Other Benchmarks
 
 DataFusion supports:
+
 - **SSB (Star Schema Benchmark)**: Full support
 - **ClickBench**: Full support
 - **H2ODB**: Full support
@@ -358,6 +367,7 @@ result2 = connection.sql(query2).collect()
 Both queries run on the same connection. The connection is cleaned up automatically when the adapter is garbage collected, or you can close it explicitly.
 
 **When to use manual connection management**:
+
 - Executing multiple custom queries without benchmark overhead
 - Testing individual queries during development
 - Building custom benchmark workflows
@@ -414,22 +424,26 @@ This validates platform capabilities before running.
 ### Best Practices
 
 1. **Use Parquet format** for repeated query execution:
+
    ```python
    adapter = DataFusionAdapter(data_format="parquet")
    ```
 
 2. **Set appropriate memory limits** to prevent OOM:
+
    ```python
    adapter = DataFusionAdapter(memory_limit="16G")
    ```
 
 3. **Match partitions to CPU cores**:
+
    ```python
    import os
    adapter = DataFusionAdapter(target_partitions=os.cpu_count())
    ```
 
 4. **Use fast storage** for working directory:
+
    ```python
    adapter = DataFusionAdapter(working_dir="/fast/nvme/datafusion")
    ```
@@ -443,6 +457,7 @@ This validates platform capabilities before running.
 ### Performance Tuning by Scale Factor
 
 **Small Scale (SF < 1)**:
+
 ```python
 adapter = DataFusionAdapter(
     memory_limit="4G",
@@ -454,6 +469,7 @@ adapter = DataFusionAdapter(
 CSV is fine for small datasets.
 
 **Medium Scale (SF 1-10)**:
+
 ```python
 adapter = DataFusionAdapter(
     memory_limit="16G",
@@ -463,6 +479,7 @@ adapter = DataFusionAdapter(
 ```
 
 **Large Scale (SF 10+)**:
+
 ```python
 adapter = DataFusionAdapter(
     memory_limit="64G",
@@ -478,7 +495,7 @@ adapter = DataFusionAdapter(
 ### DataFusion vs DuckDB
 
 | Feature | DataFusion | DuckDB |
-|---------|-----------|--------|
+| --------- | ----------- | -------- |
 | Architecture | Python bindings to Rust engine | Embedded C++ database |
 | Query Performance | Excellent | Excellent |
 | Data Format | In-memory tables | Persistent/in-memory |
@@ -488,12 +505,14 @@ adapter = DataFusionAdapter(
 | Persistence | None (working directory only) | Native database files |
 
 **When to use DataFusion**:
+
 - Testing Rust-based query engine
 - PyArrow-centric workflows
 - In-memory analytics only
 - Rapid prototyping
 
 **When to use DuckDB**:
+
 - Production analytics workloads
 - Persistent database required
 - Mature feature set needed
@@ -502,7 +521,7 @@ adapter = DataFusionAdapter(
 ### DataFusion vs ClickHouse
 
 | Feature | DataFusion | ClickHouse |
-|---------|-----------|------------|
+| --------- | ----------- | ------------ |
 | Deployment | Embedded | Client-server |
 | Scale | Single-node in-memory | Distributed clusters |
 | Setup Complexity | Minimal | Moderate |
@@ -518,6 +537,7 @@ adapter = DataFusionAdapter(
 **Problem**: Query fails with OOM error
 
 **Solution**:
+
 ```python
 adapter = DataFusionAdapter(
     memory_limit="8G",
@@ -533,6 +553,7 @@ Reduce the memory limit or use CSV format. CSV has a lower memory footprint.
 **Problem**: CSV loading takes too long
 
 **Solution**:
+
 ```python
 adapter = DataFusionAdapter(
     data_format="parquet",
@@ -547,6 +568,7 @@ Parquet gives better query performance, and fast storage for the working directo
 **Problem**: Some queries fail with SQL errors
 
 **Solution**:
+
 ```python
 validation = adapter.validate_platform_capabilities("tpcds")
 if validation.warnings:
@@ -584,21 +606,25 @@ DataFusion has some limitations compared to full database systems:
 ## See Also
 
 ### Platform Documentation
+
 - [Platform Selection Guide](platform-selection-guide.md) - Choosing the right platform
 - [Quick Reference](quick-reference.md) - Multi-platform quick start
 - [Comparison Matrix](comparison-matrix.md) - Detailed platform comparison
-- [DuckDB Platform Guide](../reference/python-api/platforms/duckdb.rst) - Similar in-process analytics
+- [DuckDB Platform Guide](../reference/python-api/platforms/duckdb.md) - Similar in-process analytics
 
 ### API Reference
-- [DataFusion Adapter API](../reference/python-api/platforms/datafusion.rst) - Complete API documentation
+
+- [DataFusion Adapter API](../reference/python-api/platforms/datafusion.md) - Complete API documentation
 - [Platform Base API](../reference/python-api/platforms.md) - Platform adapter interface
 
 ### Benchmark Guides
+
 - [TPC-H Benchmark](../benchmarks/tpc-h.md) - TPC-H on DataFusion
 - [TPC-DS Benchmark](../benchmarks/tpc-ds.md) - TPC-DS on DataFusion
 - [Benchmark Catalog](../benchmarks/index.md) - All available benchmarks
 
 ### External Resources
+
 - [Apache DataFusion Documentation](https://datafusion.apache.org/) - Official DataFusion docs
 - [DataFusion Python Bindings](https://datafusion.apache.org/python/) - Python API reference
 - [Apache Arrow](https://arrow.apache.org/) - Arrow columnar format

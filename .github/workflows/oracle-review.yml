@@ -7,8 +7,6 @@ on:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   pull_request_review:
     types: [submitted, dismissed]
-  merge_group:
-    types: [checks_requested]
   workflow_dispatch:
     inputs:
       pr:
@@ -23,7 +21,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: oracle-review-${{ github.event.pull_request.number || inputs.pr || github.event.merge_group.head_sha }}
+  group: oracle-review-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
 
 jobs:
@@ -61,7 +59,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ steps.dispatch-pr.outputs.base_sha || github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'develop' }}
+          ref: ${{ steps.dispatch-pr.outputs.base_sha || github.event.pull_request.base.sha || 'develop' }}
           persist-credentials: false
 
       - name: Set up Python
@@ -79,7 +77,6 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
           PR_SNAPSHOT: ${{ steps.dispatch-pr.outputs.snapshot }}
-          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -90,10 +87,6 @@ jobs:
               exit 2
             }
           }
-          if [ -z "$PR_NUMBER" ]; then
-            [[ "$MERGE_GROUP_REF" =~ /pr-([0-9]+)- ]] || { echo "oracle-review: error: no pull request number in '$MERGE_GROUP_REF'" >&2; exit 2; }
-            PR_NUMBER="${BASH_REMATCH[1]}"
-          fi
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             check_dispatch_head
           fi

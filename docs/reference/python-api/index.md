@@ -39,11 +39,13 @@ print(f"Average time: {results.average_query_time:.3f}s")
 :maxdepth: 1
 
 base
+core
 benchmarks
 dataframe-query
 dataframe-runtime
 results
 result-analysis
+dataframe
 ```
 
 ### Platform Adapters
@@ -60,6 +62,7 @@ platforms/databricks
 platforms/bigquery
 platforms/snowflake
 platforms/redshift
+platforms/polars
 ```
 
 ### Utilities

@@ -232,6 +232,7 @@ class DatabricksAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "lower"
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -2949,7 +2950,7 @@ class DatabricksAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.upper()
+        table_name = self.resolve_physical_table(table_tuning.table_name)
         self.logger.info(f"Applying Databricks tunings for table: {table_name}")
 
         cursor = connection.cursor()
@@ -2969,14 +2970,20 @@ class DatabricksAdapter(PlatformAdapter):
             platform_opts = getattr(effective_config, "platform_optimizations", None)
             clustering_strategy = self._resolve_databricks_clustering_strategy()
             liquid_enabled = bool(getattr(platform_opts, "liquid_clustering_enabled", False))
-            liquid_columns = list(getattr(platform_opts, "liquid_clustering_columns", []))
+            liquid_columns = [
+                self.resolve_physical_column(table_name, column)
+                for column in getattr(platform_opts, "liquid_clustering_columns", [])
+            ]
 
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
 
-            zorder_columns = self._build_zorder_columns(cluster_columns, distribution_columns)
+            zorder_columns = [
+                self.resolve_physical_column(table_name, column)
+                for column in self._build_zorder_columns(cluster_columns, distribution_columns)
+            ]
             use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"} or liquid_enabled
             if self.table_format == "hudi":
                 self._record_hudi_tuning_skips(
@@ -3061,7 +3068,10 @@ class DatabricksAdapter(PlatformAdapter):
         if use_liquid:
             effective = list(liquid_columns) or list(zorder_columns)
             if not effective and sort_columns:
-                effective = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+                effective = [
+                    self.resolve_physical_column(table_name, col.name)
+                    for col in sorted(sort_columns, key=lambda c: c.order)
+                ]
             if effective:
                 clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(effective)})"
                 self._record_layout_operation(
@@ -3152,7 +3162,10 @@ class DatabricksAdapter(PlatformAdapter):
         if not liquid_columns:
             liquid_columns = list(zorder_columns)
         if not liquid_columns and sort_columns:
-            liquid_columns = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+            liquid_columns = [
+                self.resolve_physical_column(table_name, col.name)
+                for col in sorted(sort_columns, key=lambda c: c.order)
+            ]
         if liquid_columns and is_delta_table:
             clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(liquid_columns)})"
             try:

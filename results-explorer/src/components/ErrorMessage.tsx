@@ -1,3 +1,4 @@
+import { useId } from "preact/hooks";
 import { resetDuckDbInitializationFailures } from "@/db";
 
 interface ErrorMessageProps {
@@ -7,9 +8,10 @@ interface ErrorMessageProps {
 }
 
 export function ErrorMessage({ title = "Something went wrong", message, onRetry }: ErrorMessageProps) {
+  const titleId = useId();
   return (
-    <div role="alert" class="rounded-lg p-6 tone-danger">
-      <h3 class="mb-1 text-sm font-semibold">{title}</h3>
+    <div role="alert" aria-labelledby={titleId} class="rounded-lg p-6 tone-danger">
+      <h3 id={titleId} class="mb-1 text-sm font-semibold">{title}</h3>
       <p class="text-sm">{message}</p>
       {onRetry && (
         <button type="button" class="btn btn-secondary mt-3" onClick={() => {

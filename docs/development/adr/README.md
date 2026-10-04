@@ -1,4 +1,4 @@
-Architecture Decision Records
+# Architecture decision records
 
 - [ADR-0001: Unified Platform Registration Architecture](0001-unified-platform-registration.md)
 - [ADR: Extract ASCII Charting into `textcharts` Standalone Library](adr-textcharts-extraction.md)

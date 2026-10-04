@@ -119,9 +119,8 @@ class SortedIngestionMixin:
             raise
 
         if ctas_sort_sql is None:
-            reason = f"{self.platform_name} does not support CTAS sort"
-            self._record_sorted_ingestion_skip(validated_table, sorted_columns, reason)
-            self.logger.debug(f"{reason} for {table_name}; skipping")
+            self._record_unrealized_sorted_ingestion(validated_table, sorted_columns)
+            self.logger.debug(f"{self.platform_name} did not run a CTAS sort for {table_name}; skipping")
             return False
 
         statements = ctas_sort_sql if isinstance(ctas_sort_sql, list) else [ctas_sort_sql]
@@ -338,6 +337,57 @@ class SortedIngestionMixin:
             table=table,
             error=error,
         )
+
+    def _sort_rendered_via_ddl(self) -> bool:
+        from benchbox.core.tuning.capability_registry import get_capability
+
+        if TuningType is None:
+            return False
+        platform_key = getattr(self, "canonical_platform_type", self.platform_name)
+        capability = get_capability(platform_key, TuningType.SORTING)
+        return capability is not None and capability.rendered_via == "ddl"
+
+    def _unrealized_sorted_ingestion_reason(self) -> str:
+        try:
+            mode, _method = self.resolve_sorted_ingestion_strategy()
+        except ValueError:
+            mode = None
+        if mode == "off":
+            return "sorted_ingestion_mode=off"
+        return f"{self.platform_name} does not support CTAS sort"
+
+    def _record_unrealized_sorted_ingestion(self, table: str, sorted_columns: list) -> None:
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None:
+            return
+        intent = self._sorted_ingestion_intent(table, sorted_columns)
+        if not self._sort_rendered_via_ddl():
+            ledger.record_dropped(intent, self._unrealized_sorted_ingestion_reason())
+            return
+        from benchbox.core.tuning.applied_ledger import PHASE_DDL
+        from benchbox.core.tuning.introspection import (
+            normalize_identifier,
+            statement_order_by_columns,
+            statement_table,
+        )
+
+        target = normalize_identifier(table)
+        requested = tuple(normalize_identifier(column.name) for column in sorted_columns)
+
+        def realizes_sort(statement: Any) -> bool:
+            if statement.phase != PHASE_DDL or statement_table(statement) != target:
+                return False
+            ordered = statement_order_by_columns(statement) or ()
+            width = len(requested)
+            return any(ordered[start : start + width] == requested for start in range(len(ordered) - width + 1))
+
+        index = ledger.executed_statement_index(realizes_sort)
+        if index is None:
+            ledger.record_dropped(
+                intent, "sort is realized by DDL but no executed CREATE TABLE ... ORDER BY was recorded"
+            )
+            return
+        ledger.record_satisfied(intent, index, "sort realized by ORDER BY in CREATE TABLE")
 
     def _record_sorted_ingestion_skip(self, table: str, sorted_columns: list, reason: str) -> None:
         ledger = getattr(self, "_applied_tuning_ledger", None)

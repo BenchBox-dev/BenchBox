@@ -197,5 +197,7 @@ node_modules/
 /.claude/skills/.system/
 /.claude/skills/blog/
 /site-inventory/
+/site-parity/
 /website/.astro/
+/website/.generated/
 /website/e2e-output/

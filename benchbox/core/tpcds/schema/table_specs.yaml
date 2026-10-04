@@ -1625,7 +1625,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - ss_customer_sk
@@ -1775,7 +1775,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - sr_customer_sk
@@ -1825,8 +1825,7 @@ tables:
     - null
     - false
     - true
-    - - store_sales
-      - ss_ticket_number
+    - null
   - - sr_return_quantity
     - INTEGER
     - null
@@ -1915,7 +1914,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - ws_bill_customer_sk
@@ -2132,7 +2131,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - wr_refunded_customer_sk
@@ -2210,8 +2209,7 @@ tables:
     - null
     - false
     - true
-    - - web_sales
-      - ws_order_number
+    - null
   - - wr_return_quantity
     - INTEGER
     - null
@@ -2384,7 +2382,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - cs_promo_sk
@@ -2517,7 +2515,7 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - cr_refunded_customer_sk
@@ -2616,8 +2614,7 @@ tables:
     - null
     - false
     - true
-    - - catalog_sales
-      - cs_order_number
+    - null
   - - cr_return_quantity
     - INTEGER
     - null
@@ -2685,21 +2682,21 @@ tables:
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - date_dim
       - d_date_sk
   - - inv_item_sk
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - item
       - i_item_sk
   - - inv_warehouse_sk
     - INTEGER
     - null
     - false
-    - false
+    - true
     - - warehouse
       - w_warehouse_sk
   - - inv_quantity_on_hand

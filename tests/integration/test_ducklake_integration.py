@@ -147,6 +147,7 @@ class TestDuckLakeLiveConnection:
         assert metadata_path.exists()
         assert data_path.exists()
 
+        adapter._reset_run_scoped_state()
         adapter.force_recreate = True
         adapter.handle_existing_database()
 

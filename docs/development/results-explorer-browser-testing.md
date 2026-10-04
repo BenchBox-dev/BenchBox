@@ -68,6 +68,8 @@ and are both gitignored.
 
 ## Public-site visual baseline policy
 
+> Historical for merge groups: the merge queue was retired on 2026-10-03 (see `_project/decisions/merge-queue-retirement-2026-10-03.md`). No workflow uses merge-group baselines or `APPROVED_MERGE_GROUP_SHA`, so the merge-group steps below no longer apply.
+
 The public-site visual comparison is advisory until the public site is in
 production and feeds no required status context.
 

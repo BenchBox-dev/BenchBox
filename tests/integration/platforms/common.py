@@ -104,7 +104,7 @@ class _DatabricksCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover
+    def close(self) -> None:  # pragma: no cover - simple stub
         return None
 
 
@@ -167,7 +167,7 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
 
         adapter_module.databricks_sql = sql_module
         adapter_module.DatabricksConnection = _DatabricksConnection
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -389,7 +389,7 @@ def install_google_cloud_stubs(
         monkeypatch.setattr(adapter_module, "NotFound", NotFound)
         monkeypatch.setattr(adapter_module, "Conflict", Conflict, raising=False)
         monkeypatch.setattr(adapter_module, "google_auth", auth_module)
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return client.state
@@ -438,7 +438,7 @@ class _RedshiftCursor:
     def fetchall(self) -> list[tuple[Any, ...]]:
         return list(self._results)
 
-    def close(self) -> None:  # pragma: no cover
+    def close(self) -> None:  # pragma: no cover - trivial stub
         return None
 
 
@@ -513,7 +513,7 @@ def install_redshift_stubs(
         adapter_module.redshift_connector = redshift_module
         adapter_module.psycopg = psycopg_module
         adapter_module.boto3 = boto3_module
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -560,7 +560,7 @@ class _SnowflakeCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover
+    def close(self) -> None:  # pragma: no cover - trivial stub
         return None
 
 
@@ -604,7 +604,7 @@ def install_snowflake_stub(monkeypatch) -> SnowflakeStubState:
         adapter_module.snowflake = root_module
         adapter_module.DictCursor = None
         adapter_module.SnowflakeError = errors_module.Error
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -667,7 +667,7 @@ class _AthenaCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover
+    def close(self) -> None:  # pragma: no cover - trivial stub
         return None
 
 
@@ -784,7 +784,7 @@ def install_athena_stubs(
         adapter_module.boto3 = boto3_module
         adapter_module.athena_connect = athena_connect
         adapter_module.AthenaCursor = _AthenaCursor
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -888,16 +888,16 @@ def install_clickhouse_stub(
     try:
         import benchbox.platforms.clickhouse._dependencies as deps_module
 
-        deps_module.ClickHouseClient = StubClient
-        deps_module.ClickHouseError = ClickHouseError
-    except ImportError:  # pragma: no cover
+        monkeypatch.setattr(deps_module, "ClickHouseClient", StubClient)
+        monkeypatch.setattr(deps_module, "ClickHouseError", ClickHouseError)
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     try:
         import benchbox.platforms.clickhouse.setup as setup_module
 
-        setup_module.ClickHouseClient = StubClient
-    except ImportError:  # pragma: no cover
+        monkeypatch.setattr(setup_module, "ClickHouseClient", StubClient)
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -1000,7 +1000,7 @@ def install_trino_stub(
 
         adapter_module.trino = trino_module
         adapter_module.BasicAuthentication = BasicAuthentication
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -1103,7 +1103,7 @@ def install_presto_stub(
 
         adapter_module.prestodb = prestodb_module
         adapter_module.PrestoBasicAuthentication = PrestoBasicAuthentication
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -1205,7 +1205,7 @@ def install_postgresql_stub(
         import benchbox.platforms.postgresql as adapter_module
 
         adapter_module.psycopg = psycopg_module
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -2120,7 +2120,7 @@ def install_doris_stub(
 
         adapter_module.pymysql = pymysql_module
         adapter_module._requests = None
-    except ImportError:  # pragma: no cover
+    except ImportError:  # pragma: no cover - defensive
         pass
 
     return state
@@ -2374,7 +2374,7 @@ def install_lakesail_stub(
     try:
         import benchbox.platforms.lakesail as adapter_module
 
-        adapter_module.SparkSession = StubSparkSession
+        monkeypatch.setattr(adapter_module, "SparkSession", StubSparkSession)
         for type_name in [
             "StructType",
             "StructField",
@@ -2385,7 +2385,7 @@ def install_lakesail_stub(
             "DecimalType",
             "DateType",
         ]:
-            setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
+            monkeypatch.setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name), raising=False)
 
         monkeypatch.setattr(
             adapter_module,

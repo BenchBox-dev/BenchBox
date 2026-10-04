@@ -77,7 +77,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
-| `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal |
+| `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal, or a stand-in approval comment from an attester account when the connector cannot review; that account is also the one local automation uses, so the stand-in records who vouched, not that a human read it |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -202,7 +202,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_local_validation.py` | pure-process |
 | `test_migrate_clickhouse_labels.py` | product-safety |
 | `test_mirror_partial_validation_policy.py` | pure-process |
-| `test_oracle_review_check.py` | product-safety | Connector review decision for soundness-path changes |
+| `test_oracle_review_check.py` | product-safety | Connector review or stand-in approval decision for soundness-path changes |
 | `test_path_filter_decision.py` | tooling |
 | `test_preflight_targets.py` | pure-process |
 | `test_phase2_metrics.py` | pure-process |
@@ -364,7 +364,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
 | `fast_lane_ceiling_check.py` | pure-process | Fast-lane marker and path guards; retires with the fast lane |
 | `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
-| `oracle_review_check.py` | product-safety | Connector review check for soundness-path changes |
+| `oracle_review_check.py` | product-safety | Connector review or stand-in approval check for soundness-path changes; the attester account is the one local automation also uses |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
 | `soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |

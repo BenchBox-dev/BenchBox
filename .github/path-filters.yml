@@ -114,11 +114,13 @@ framing:
 
 viz:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "tests/parity/**"
   - "_project/scripts/explorer_pipeline/**"
 
 explorer-vitest:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "_project/scripts/explorer_pipeline/**"
   - "_project/scripts/explorer_publish.py"
   - "results-data/**"
@@ -132,6 +134,7 @@ explorer-vitest:
 
 explorer-tokens:
   - "results-explorer/src/**"
+  - "landing/shared/site-tokens.css"
 
 site-theme:
   - "landing/shared/**"
@@ -159,3 +162,18 @@ site:
   - "uv.lock"
   - ".github/workflows/ci.yml"
   - ".github/path-filters.yml"
+
+site-parity:
+  - "docs/**"
+  - "website/**"
+  - "landing/**"
+  - "results-explorer/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "_project/design/site-inventory/**"
+  - "scripts/site_inventory.py"
+  - "scripts/site_parity.py"
+  - "scripts/assemble_public_site.py"
+  - "scripts/publication/check_artifact_privacy.py"
+  - "make/documentation.mk"
+  - ".github/workflows/ci.yml"

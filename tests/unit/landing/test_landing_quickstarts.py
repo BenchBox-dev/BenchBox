@@ -106,6 +106,12 @@ def test_check_passes_against_committed_include(gen):
     assert rc == 0
 
 
+def test_check_fails_on_stale_include(gen, monkeypatch):
+    drifted = gen.render_js
+    monkeypatch.setattr(gen, "render_js", lambda catalog: drifted(catalog) + "// drift\n")
+    assert gen.main(["--check"]) == 3
+
+
 def test_platform_inclusion_list_is_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
     bad["platforms"] = [{"id": "duckdb", "deployments": ["local"], "interfaces": ["sql"]}]

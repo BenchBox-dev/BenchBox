@@ -51,6 +51,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "upper"
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1561,8 +1562,9 @@ class SnowflakeAdapter(PlatformAdapter):
     def analyze_table(self, connection: Any, table_name: str) -> None:
         cursor = connection.cursor()
         try:
-            cursor.execute(f"ALTER TABLE {table_name.upper()} RECLUSTER")
-            self.logger.info(f"Triggered reclustering for table {table_name.upper()}")
+            physical_table = self.resolve_physical_table(table_name, connection)
+            cursor.execute(f"ALTER TABLE {physical_table} RECLUSTER")
+            self.logger.info(f"Triggered reclustering for table {physical_table}")
         finally:
             cursor.close()
 
@@ -1614,7 +1616,7 @@ class SnowflakeAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.upper()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Snowflake tunings for table: {table_name}")
 
         cursor = connection.cursor()

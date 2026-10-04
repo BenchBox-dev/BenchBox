@@ -49,7 +49,7 @@ The tracker `needs` edges are authoritative. Waves below mark points where work 
 | H | 50 (G2) | Needs 33, 34, 35, 36, 40. |
 | I | 51, 52 | 52 also needs dlv2-62. |
 | J | 53 (G3) | Release-driven atomic cutover; owner triggers the PyPI release (S3). |
-| K | 54 | Evidence-based retirement; needs ≥5 working days of observation after 53. |
+| K | 54 | Evidence-based retirement after 53: one green production deploy per route class, a fresh rollback drill, and a redeployable last Sphinx artifact. No elapsed-time window (owner decision 2026-10-04). |
 | L | 60, 61 | Post-cutover features; start under S1. |
 
 ## 5. Roles, delegation and model use
@@ -147,7 +147,7 @@ Keep a local ledger at `.todo-batch/astro-unified-site.txt` (git-ignored via `.g
   - a production probe failure that rollback does not fix
   - S4 NO-GO, which is terminal: report and end
 
-  The PyPI release is not a stop (S3): notify the owner once with the TestPyPI evidence, keep working ready items, and schedule wake-ups with `send_later` / `ScheduleWakeup`. Waiting windows (the ≥5 working days before 54, dlv2 shadow/observe windows) are handled the same way: set `not_before` on the item, work elsewhere, wake up later.
+  The PyPI release is not a stop (S3): notify the owner once with the TestPyPI evidence, keep working ready items, and schedule wake-ups with `send_later` / `ScheduleWakeup`. Waiting on evidence (production deploys before 54 and dlv2-62, the dlv2 shadow run) is handled the same way: set `not_before` on the item, work elsewhere, wake up later.
 - Prohibited:
   - weakening, skipping or disabling a required or visual check
   - an empty commit or close/reopen to kick CI

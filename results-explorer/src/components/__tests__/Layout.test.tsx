@@ -214,18 +214,18 @@ describe("Layout", () => {
     expect(within(explorerNav).getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
   });
 
-  it("global and Results nav links use the theme-aware focus-visible outline token", () => {
+  it("global nav links use the shared shell classes and Results nav links use the theme-aware focus-visible outline token", () => {
     renderAt("/results/");
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
 
-    for (const link of [
-      ...within(explorerNav).getAllByRole("link"),
-      ...within(globalNav).getAllByRole("link"),
-    ]) {
+    for (const link of within(explorerNav).getAllByRole("link")) {
       const cls = link.getAttribute("class") ?? "";
       expect(cls).toMatch(/focus-visible:outline\b/);
       expect(cls).toMatch(/focus-visible:outline-\[var\(--bb-focus-ring-on-dark\)\]/);
+    }
+    for (const link of within(globalNav).getAllByRole("link")) {
+      expect(link.getAttribute("class") ?? "").toMatch(/\bsite-header__(link|cta)\b/);
     }
   });
 });

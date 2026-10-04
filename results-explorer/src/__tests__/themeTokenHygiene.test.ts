@@ -7,13 +7,22 @@ import { describe, expect, it } from "vitest";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const srcRoot = resolve(here, "..");
-const themeCss = readFileSync(join(srcRoot, "index.css"), "utf8");
+const themeCss = readFileSync(resolve(srcRoot, "../../landing/shared/site-tokens.css"), "utf8");
 
 const THEME_INVARIANT_TOKENS = new Set([
   "--bb-bp-desktop",
+  "--bb-brand-50",
+  "--bb-brand-100",
+  "--bb-brand-200",
+  "--bb-brand-300",
+  "--bb-brand-500",
+  "--bb-brand-600",
+  "--bb-brand-700",
+  "--bb-brand-900",
   "--bb-bp-mobile",
   "--bb-bp-tablet",
   "--bb-font-mono",
+  "--bb-font-mono-system",
   "--bb-font-sans",
   "--bb-inset-bottom",
   "--bb-inset-left",
@@ -72,6 +81,12 @@ describe("theme token hygiene", () => {
     const lightOnly = [...light].filter((token) => !dark.has(token)).sort();
 
     expect(lightOnly).toEqual([...THEME_INVARIANT_TOKENS].sort());
+  });
+
+  it("does not use opacity modifiers on variable-backed brand colors", () => {
+    const runtimeSource = collectRuntimeSources(srcRoot).join("\n");
+
+    expect(runtimeSource.match(/brand-\d+\//g) ?? []).toEqual([]);
   });
 
   it("reports a deliberately undeclared token", () => {

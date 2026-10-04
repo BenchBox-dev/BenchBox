@@ -38,10 +38,10 @@ def test_job_id_and_name_are_the_required_check_name() -> None:
     assert workflow["jobs"]["oracle-review"]["name"] == "oracle-review"
 
 
-def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
+def test_triggers_cover_pushes_reviews_and_dispatch() -> None:
     triggers = _triggers()
-    assert set(triggers) == {"pull_request", "pull_request_review", "merge_group", "workflow_dispatch"}
-    assert triggers["merge_group"]["types"] == ["checks_requested"]
+    assert set(triggers) == {"pull_request", "pull_request_review", "workflow_dispatch"}
+    assert "merge_group" not in triggers
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "edited", "ready_for_review"]
     assert triggers["pull_request_review"]["types"] == ["submitted", "dismissed"]
     assert triggers["workflow_dispatch"]["inputs"]["pr"]["required"] is True
@@ -58,7 +58,7 @@ def test_concurrency_cancels_superseded_runs_per_pull_request() -> None:
     assert concurrency["cancel-in-progress"] is True
     assert "github.event.pull_request.number" in concurrency["group"]
     assert "inputs.pr" in concurrency["group"]
-    assert "github.event.merge_group.head_sha" in concurrency["group"], "queued groups must not share one slot"
+    assert "merge_group" not in concurrency["group"]
 
 
 def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None:
@@ -70,7 +70,8 @@ def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None
     assert "github.event.pull_request.number" in step["env"]["PR_NUMBER"]
     assert "inputs.pr" in step["env"]["PR_NUMBER"]
     assert "--pr" in step["run"]
-    assert "merge_group.head_ref" in step["env"]["MERGE_GROUP_REF"]
+    assert "MERGE_GROUP_REF" not in step["env"]
+    assert "MERGE_GROUP_REF" not in step["run"]
 
 
 def test_actions_are_pinned_to_full_commit_shas() -> None:
@@ -87,7 +88,7 @@ def test_checkout_uses_the_base_checker_and_manifest() -> None:
     assert len(checkouts) == 1
     ref = checkouts[0]["with"]["ref"]
     assert "github.event.pull_request.base.sha" in ref
-    assert "github.event.merge_group.base_sha" in ref
+    assert "merge_group" not in ref
     assert "steps.dispatch-pr.outputs.base_sha" in ref
     assert "head" not in ref
     assert checkouts[0]["with"]["persist-credentials"] is False
@@ -164,7 +165,6 @@ def _environment(tmp_path: Path, pulls: list[Any], checker_exit: int, checker_me
         "REPO": REPO,
         "EXPECTED_HEAD": HEAD,
         "CURRENT_REF": "refs/heads/fix/example",
-        "MERGE_GROUP_REF": "",
         "PR_SNAPSHOT": "",
     }
 
@@ -304,13 +304,9 @@ def test_dispatch_does_not_require_develop_to_stop_advancing(tmp_path: Path) -> 
     assert outputs["base_sha"] == BASE
 
 
-@pytest.mark.parametrize(
-    ("event", "pr", "merge_ref"),
-    [("pull_request", "7", ""), ("merge_group", "", "refs/heads/gh-readonly-queue/develop/pr-7-example")],
-)
-def test_automatic_events_do_not_use_dispatch_guards(tmp_path: Path, event: str, pr: str, merge_ref: str) -> None:
+def test_pull_request_events_do_not_use_dispatch_guards(tmp_path: Path) -> None:
     env = _environment(tmp_path, [], 0, "oracle-review: not a soundness path change")
-    env.update(EVENT_NAME=event, PR_NUMBER=pr, MERGE_GROUP_REF=merge_ref)
+    env.update(EVENT_NAME="pull_request", PR_NUMBER="7")
     check = next(step for step in _load()["jobs"]["oracle-review"]["steps"] if SCRIPT in step.get("run", ""))
     result = _run_step(tmp_path, check, env)
     assert result.returncode == 0, result.stderr

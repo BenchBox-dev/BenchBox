@@ -14,17 +14,20 @@ BenchBox provides powerful SQL dialect translation capabilities via SQLGlot, all
 **What it is**: The ability to convert SQL queries from one dialect to another using SQLGlot.
 
 **What it does**:
+
 - Translates SQL syntax between dialects (e.g., `::DATE` in PostgreSQL to `CAST(... AS DATE)` in BigQuery)
 - Handles dialect-specific functions and operators
 - Converts data type syntax
 - Adapts query structure for target database
 
 **Supported dialects** (via SQLGlot):
+
 - postgres, mysql, sqlite, oracle, mssql (SQL Server)
 - duckdb, clickhouse, databricks, snowflake, bigquery, redshift
 - athena, trino, hive, presto, and many more
 
 **Example**:
+
 ```python
 from benchbox import TPCH
 
@@ -42,6 +45,7 @@ Both translations work even though PostgreSQL and MySQL adapters do not exist ye
 **What it is**: Complete integration with a specific database platform, including connection management, data loading, query execution, and result collection.
 
 **What it provides**:
+
 - Database connection handling
 - Authentication and credential management
 - Data loading optimizations
@@ -52,12 +56,14 @@ Both translations work even though PostgreSQL and MySQL adapters do not exist ye
 **Currently supported platforms** (adapters available):
 
 *Local/Embedded*:
+
 - ✅ DuckDB - Built-in, no extra dependencies
 - ✅ SQLite - Built-in, no extra dependencies
 - ✅ DataFusion - Requires `datafusion`
 - ✅ ClickHouse - Requires `clickhouse-driver` or `chdb`
 
 *Cloud Data Warehouses*:
+
 - ✅ Snowflake - Requires `snowflake-connector-python`
 - ✅ Databricks - Requires `databricks-sql-connector`
 - ✅ BigQuery - Requires `google-cloud-bigquery`
@@ -65,6 +71,7 @@ Both translations work even though PostgreSQL and MySQL adapters do not exist ye
 - ✅ MotherDuck - Requires `duckdb` (serverless DuckDB)
 
 *Self-Hosted/Federated*:
+
 - ✅ PostgreSQL - Requires `psycopg2`
 - ✅ Trino - Requires `trino`
 - ✅ Starburst - Requires `trino` (managed Trino)
@@ -72,18 +79,21 @@ Both translations work even though PostgreSQL and MySQL adapters do not exist ye
 - ✅ TimescaleDB - Requires `psycopg2`
 
 *Spark Platforms*:
+
 - ✅ Apache Spark SQL - Requires `pyspark`
 - ✅ AWS Glue - Requires `boto3`
 - ✅ EMR Serverless - Requires `boto3`
 - ✅ Google Cloud Dataproc - Requires `google-cloud-dataproc`
 
 *Azure Platforms*:
+
 - ✅ Azure Synapse Analytics - Requires `pyodbc` + `azure-identity`
 - ✅ Microsoft Fabric Warehouse - Requires `pyodbc` + `azure-identity`
 - ✅ Athena - Requires `pyathena`
 - ✅ Firebolt - Requires `firebolt-sdk`
 
 **Planned platforms** (see [Development Roadmap](../development/roadmap.md)):
+
 - 🔄 MySQL
 - 🔄 LakeSail Spark
 - 🔄 Apache Doris
@@ -208,6 +218,7 @@ print(f"Completed {results.successful_queries}/{results.total_queries} queries")
 ```
 
 **Advantages of platform adapters**:
+
 - ✅ Automatic connection management
 - ✅ Optimized data loading
 - ✅ Built-in error handling
@@ -244,6 +255,7 @@ except Exception as e:
 ```
 
 **Best practices**:
+
 - Always test translated queries on the target platform
 - Be aware of platform-specific limitations
 - Use fallback dialects for complex cases
@@ -251,14 +263,16 @@ except Exception as e:
 
 ## When to Use Each Approach
 
-### Use Dialect Translation When:
+### Use Dialect Translation When
+
 - ✅ You have your own database connection
 - ✅ The platform adapter doesn't exist yet
 - ✅ You need custom control over execution
 - ✅ You're analyzing SQL portability
 - ✅ You're testing query compatibility
 
-### Use Platform Adapters When:
+### Use Platform Adapters When
+
 - ✅ The adapter exists for your database
 - ✅ You want automated data loading
 - ✅ You need comprehensive benchmarking
@@ -295,13 +309,13 @@ assert query1 == query2
 
 - [Development Roadmap](../development/roadmap.md) - Planned platform and benchmark additions
 - [API Reference](../reference/api-reference.md) - Complete API documentation
-- [Utilities](../reference/python-api/utilities.rst) - Dialect translation utilities
+- [Utilities](../reference/python-api/utilities.md) - Dialect translation utilities
 - [Adding New Platforms](../development/adding-new-platforms.md) - Build custom adapters
 
 ## Summary
 
-| Capability                | Dialect Translation        | Platform Adapters     |
-| ------------------------- | -------------------------- | --------------------- |
+| Capability                | Dialect Translation         | Platform Adapters      |
+| ------------------------- | --------------------------- | ---------------------- |
 | **SQL Syntax Conversion** | ✅ Yes                      | ✅ Yes (automatic)     |
 | **Database Connection**   | ❌ No (you provide)         | ✅ Yes (built-in)      |
 | **Data Loading**          | ❌ No (manual)              | ✅ Yes (optimized)     |

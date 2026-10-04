@@ -1,147 +1,61 @@
 import type { ComponentChildren } from "preact";
-import { useRef, useState } from "preact/hooks";
 import { getCurrentUrl, useRouter } from "preact-router";
-import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
-import {
-  FOOTER_THEME_ARIA_LABEL,
-  FOOTER_THEME_OPTION_LABELS,
-  HEADER_BRAND,
-  HEADER_CTA,
-  HEADER_LINKS,
-  HEADER_NAV_ARIA_LABEL,
-  HEADER_TOGGLE_ARIA_LABEL,
-} from "@/components/headerContract";
 import { LocalResultPicker } from "@/components/LocalResultPicker";
 import { RESULTS_NAV_SECTIONS, activeResultsNavSection, isLocalResultPath } from "@/components/resultsNav";
+import { SiteFooter, SiteHeader } from "@/components/SiteShell";
 
 interface LayoutProps {
   children: ComponentChildren;
 }
 
+const RESULTS_SURFACE_PATH = "/results/";
+
 export function Layout({ children }: LayoutProps) {
   return (
     <div class="bb-app-shell flex min-h-screen flex-col" data-testid="app-shell">
-      <Header />
-      <main class="flex-1">{children}</main>
-      <Footer />
+      <SiteHeader pathname={RESULTS_SURFACE_PATH} testId="benchbox-global-header" />
+      <ExplorerNav />
+      <main class="bb-explorer flex-1">{children}</main>
+      <SiteFooter pathname={RESULTS_SURFACE_PATH}>
+        <p class="site-footer__legal">
+          Maintainers review every result before publishing it. You can reproduce a run with{" "}
+          <code class="rounded bg-[var(--bb-bg-elevated)] px-1 py-0.5 text-xs text-[var(--bb-fg-primary)]">benchbox run</code>.
+        </p>
+      </SiteFooter>
     </div>
   );
 }
 
-function Header() {
+function ExplorerNav() {
   useRouter();
-  const rawUrl = typeof window === "undefined" ? "/results/" : getCurrentUrl();
+  const rawUrl = typeof window === "undefined" ? RESULTS_SURFACE_PATH : getCurrentUrl();
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
-  const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
   const activeSection = activeResultsNavSection(currentPath);
   const inLocalResult = isLocalResultPath(currentPath);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header class="surface-hero" data-surface="hero">
-      <div
-        data-testid="benchbox-global-header"
-        class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[var(--bb-site-header-bg)] text-[var(--bb-fg-primary)] backdrop-blur"
-      >
-        <div class="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
-          <a
-            href={HEADER_BRAND.href}
-            class="font-mono text-xl font-bold leading-none no-underline text-[var(--bb-accent)]"
-          >
-            {HEADER_BRAND.label}
-          </a>
-          <button
-            type="button"
-            aria-label={HEADER_TOGGLE_ARIA_LABEL}
-            aria-controls="benchbox-site-header-nav"
-            aria-expanded={menuOpen ? "true" : "false"}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--bb-border-default)] text-[var(--bb-fg-primary)] min-[901px]:hidden"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <span aria-hidden="true" class="flex h-4 w-4 flex-col items-center justify-center gap-1">
-              <span class={`${menuOpen ? "translate-y-[6px] rotate-45" : ""} block h-0.5 w-4 rounded bg-current`} />
-              <span class={`${menuOpen ? "opacity-0" : ""} block h-0.5 w-4 rounded bg-current`} />
-              <span class={`${menuOpen ? "-translate-y-[6px] -rotate-45" : ""} block h-0.5 w-4 rounded bg-current`} />
-            </span>
-          </button>
-          <nav
-            id="benchbox-site-header-nav"
-            aria-label={HEADER_NAV_ARIA_LABEL}
-            class={`${menuOpen ? "flex" : "hidden"} w-full flex-col items-start gap-3 pb-4 text-[0.9375rem] min-[901px]:flex min-[901px]:w-auto min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-end min-[901px]:gap-6 min-[901px]:pb-0`}
-            onClick={(event) => {
-              if (event.target instanceof Element && event.target.closest("a")) {
-                setMenuOpen(false);
-              }
-            }}
-          >
-            {HEADER_LINKS.map((link) => (
-              <GlobalNavLink
-                key={link.label}
-                href={link.href}
-                external={link.external}
-                active={link.activeOnSurface === "results" && inResults}
-              >
-                {link.label}
-              </GlobalNavLink>
-            ))}
-            <a
-              href={HEADER_CTA.href}
-              class="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded bg-[var(--bb-accent)] px-3 py-1.5 font-bold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-inverse)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
-            >
-              {HEADER_CTA.label}
-            </a>
-          </nav>
-        </div>
+    <div class="bb-explorer surface-hero-muted">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <nav
+          aria-label="Results Explorer"
+          data-testid="results-explorer-nav"
+          class="flex min-w-0 min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm"
+        >
+          {RESULTS_NAV_SECTIONS.map((section) => (
+            <ExplorerNavLink key={section.id} href={section.href} active={activeSection?.id === section.id}>
+              {section.label}
+            </ExplorerNavLink>
+          ))}
+          <LocalResultPicker
+            className={`whitespace-nowrap rounded-sm border-b-2 bg-transparent py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
+              inLocalResult
+                ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
+                : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
+            }`}
+          />
+        </nav>
       </div>
-      <div class="border-t border-[var(--bb-border-default)] bg-[var(--bb-surface-hero-muted)] text-[var(--bb-fg-primary)]">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <nav
-            aria-label="Results Explorer"
-            data-testid="results-explorer-nav"
-            class="flex min-w-0 min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm"
-          >
-            {RESULTS_NAV_SECTIONS.map((section) => (
-              <ExplorerNavLink key={section.id} href={section.href} active={activeSection?.id === section.id}>
-                {section.label}
-              </ExplorerNavLink>
-            ))}
-            <LocalResultPicker
-              className={`whitespace-nowrap rounded-sm border-b-2 bg-transparent py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
-                inLocalResult
-                  ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
-                  : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
-              }`}
-            />
-          </nav>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function GlobalNavLink({
-  href,
-  active = false,
-  external = false,
-  children,
-}: {
-  href: string;
-  active?: boolean;
-  external?: boolean;
-  children: ComponentChildren;
-}) {
-  return (
-    <a
-      href={href}
-      target={external ? "_blank" : undefined}
-      rel={external ? "noopener" : undefined}
-      aria-current={active ? "page" : undefined}
-      class={`rounded-sm font-medium no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
-        active ? "text-[var(--bb-fg-primary)]" : "text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]"
-      }`}
-    >
-      {children}
-    </a>
+    </div>
   );
 }
 
@@ -166,139 +80,5 @@ function ExplorerNavLink({
     >
       {children}
     </a>
-  );
-}
-
-function Footer() {
-  return (
-    <footer class="surface-hero border-t border-[var(--bb-border-default)] py-8" data-surface="hero">
-      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <p class="text-sm text-[var(--bb-fg-muted)]">
-            &copy; {new Date().getFullYear()} BenchBox. Maintainers review every result before publishing it. You can reproduce a run with{" "}
-            <code class="rounded bg-[var(--bb-bg-elevated)] px-1 py-0.5 text-xs text-[var(--bb-fg-primary)]">benchbox run</code>.
-          </p>
-          <div class="flex items-center gap-4">
-            <nav class="flex items-center gap-4">
-              <a href="https://benchbox.dev" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
-                benchbox.dev
-              </a>
-              <a href="https://github.com/BenchBox-dev/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
-                GitHub
-              </a>
-            </nav>
-            <span class="h-4 w-px bg-[var(--bb-border-default)]" aria-hidden="true" />
-            <ThemeFooterControl />
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-const THEME_CHOICES_ORDER: readonly ThemeChoice[] = ["system", "light", "dark"];
-
-function ThemeIcon({ option }: { option: ThemeChoice }) {
-  switch (option) {
-    case "system":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="8" cy="8" r="2.75" />
-          <path d="M8 2.25v1M8 12.75v1M2.25 8h1M12.75 8h1M3.93 3.93l.7.7M3.93 12.07l.7-.7M12.07 3.93l-.7.7" />
-          <path d="M21.5 17.2A5.6 5.6 0 1 1 14.8 10.5a5 5 0 0 0 6.7 6.7z" />
-        </svg>
-      );
-    case "light":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-        </svg>
-      );
-    case "dark":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M20.5 14.1A8.5 8.5 0 1 1 9.9 3.5a7.6 7.6 0 0 0 10.6 10.6z" />
-        </svg>
-      );
-  }
-}
-
-function ThemeFooterControl() {
-  const { choice, setChoice } = useThemeChoice();
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  function selectAt(index: number, focus: boolean) {
-    const option = THEME_CHOICES_ORDER[index];
-    if (!option) return;
-    setChoice(option);
-    if (focus) optionRefs.current[index]?.focus();
-  }
-
-  function handleKeyDown(event: KeyboardEvent, index: number) {
-    const count = THEME_CHOICES_ORDER.length;
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        event.preventDefault();
-        selectAt((index + 1) % count, true);
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        event.preventDefault();
-        selectAt((index - 1 + count) % count, true);
-        break;
-      case "Home":
-        event.preventDefault();
-        selectAt(0, true);
-        break;
-      case "End":
-        event.preventDefault();
-        selectAt(count - 1, true);
-        break;
-      case " ":
-      case "Enter":
-        event.preventDefault();
-        selectAt(index, true);
-        break;
-      default:
-        break;
-    }
-  }
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label={FOOTER_THEME_ARIA_LABEL}
-      class="flex items-center gap-0.5 rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-hero)] p-0.5"
-    >
-      {THEME_CHOICES_ORDER.map((option, index) => {
-        const selected = choice === option;
-        const label = FOOTER_THEME_OPTION_LABELS[option];
-        return (
-          <button
-            key={option}
-            ref={(el) => {
-              optionRefs.current[index] = el;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={label}
-            title={label}
-            tabIndex={selected ? 0 : -1}
-            class={`flex h-6 w-7 items-center justify-center rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
-              selected
-                ? "border-[var(--bb-accent)] bg-[var(--bb-site-header-control-bg)] text-[var(--bb-accent)]"
-                : "border-transparent bg-transparent text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]"
-            }`}
-            onClick={() => selectAt(index, true)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-          >
-            <ThemeIcon option={option} />
-          </button>
-        );
-      })}
-    </div>
   );
 }

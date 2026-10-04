@@ -1,4 +1,6 @@
 :root {
+  --sl-nav-pad-y: 0;
+  --sl-menu-button-size: 2.75rem;
   --sl-font: var(--font-sans);
   --sl-font-mono: var(--font-mono);
   --sl-nav-height: var(--header-height);
@@ -6,7 +8,7 @@
   --sl-color-accent-high: var(--accent-primary);
   --sl-color-accent-low: var(--bg-tertiary);
   --sl-color-bg: var(--bg-primary);
-  --sl-color-bg-nav: var(--header-bg);
+  --sl-color-bg-nav: var(--bb-site-header-bg);
   --sl-color-bg-sidebar: var(--bg-primary);
   --sl-color-hairline: var(--border-primary);
   --sl-color-hairline-light: var(--border-primary);
@@ -59,4 +61,10 @@
 .sl-markdown-content table,
 .sl-markdown-content table * {
   overflow-wrap: anywhere;
+}
+
+.sl-markdown-content .site-footer,
+main > .site-footer {
+  margin-top: 2rem;
+  padding-inline: 0;
 }

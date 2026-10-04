@@ -151,9 +151,10 @@ def _map_duckdb(roles: set[str]) -> PlatformTuningMapping:
     if TEMPORAL_PARTITION in roles:
         return PlatformTuningMapping(
             platform="duckdb",
-            tuning_types=(PARTITIONING,),
-            physical_mechanisms=(PARTITIONING,),
-            reason="Date locality remains a partitioning hint for DuckDB exports.",
+            tuning_types=(),
+            physical_mechanisms=(),
+            decision=UNSUPPORTED,
+            reason="DuckDB never applies partitioning, so temporal locality has no DuckDB template mapping.",
         )
     if roles & {
         JOIN_LOCALITY,

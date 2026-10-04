@@ -1,211 +1,43 @@
+@import "../../landing/shared/site-tokens.css";
+@import "../../landing/shared/site-shell.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-    html,
-    body {
+    body.bb-explorer-page {
         overflow-x: hidden;
-    }
-
-    :root {
-        color-scheme: light dark;
-
-        --bb-bg-primary: #f5f7fb;
-        --bb-bg-panel: #ffffff;
-        --bb-bg-elevated: #eef2f7;
-        --bb-fg-primary: #0f172a;
-        --bb-fg-muted: #475569;
-        --bb-fg-inverse: #ffffff;
-        --bb-border-default: #d8e0ea;
-        --bb-border-subtle: #e5eaf2;
-        --bb-accent: #2563eb;
-        --bb-accent-hover: #1d4ed8;
-        --bb-status-success: #15803d;
-        --bb-status-warning: #b45309;
-        --bb-status-danger: #dc2626;
-        --bb-status-danger-hover: #b91c1c;
-        --bb-code-bg: #0f172a;
-        --bb-code-fg: #f8fafc;
-
-        --bb-surface-app: #f5f6f8;
-        --bb-surface-data: #ffffff;
-        --bb-surface-data-muted: #f8fafc;
-        --bb-surface-elevated: #ffffff;
-        --bb-surface-hero: #ffffff;
-        --bb-surface-hero-muted: #f1f5f9;
-        --bb-surface-sticky: #f1f5f9;
-        --bb-data-fg-primary: #0f172a;
-        --bb-data-fg-muted: #475569;
-        --bb-data-fg-subtle: #64748b;
-        --bb-data-border: #e2e8f0;
-        --bb-data-border-strong: #cbd5e1;
-        --bb-focus-ring: #2563eb;
-        --bb-focus-ring-on-dark: #2563eb;
-
-        --bb-tone-info-bg: #dbeafe;
-        --bb-tone-info-fg: #1e3a8a;
-        --bb-tone-success-bg: #dcfce7;
-        --bb-tone-success-fg: #14532d;
-        --bb-tone-warning-bg: #fef3c7;
-        --bb-tone-warning-border: #b45309;
-        --bb-tone-warning-fg: #78350f;
-        --bb-tone-danger-bg: #fee2e2;
-        --bb-tone-danger-fg: #7f1d1d;
-        --bb-tone-neutral-bg: #e2e8f0;
-        --bb-tone-neutral-fg: #1f2937;
-
-        --bb-chart-cat-1: #2563eb;
-        --bb-chart-cat-2: #0d9488;
-        --bb-chart-cat-3: #b45309;
-        --bb-chart-cat-4: #7c3aed;
-        --bb-chart-cat-5: #be123c;
-        --bb-chart-cat-6: #475569;
-        --bb-chart-success: #15803d;
-        --bb-chart-warning: #b45309;
-        --bb-chart-danger: #b91c1c;
-        --bb-chart-sequential-from: #eff6ff;
-        --bb-chart-sequential-to: #1d4ed8;
-        --bb-chart-diverging-low: #b91c1c;
-        --bb-chart-diverging-mid: #f1f5f9;
-        --bb-chart-diverging-high: #1d4ed8;
-        --bb-chart-axis: #64748b;
-        --bb-chart-axis-strong: #334155;
-        --bb-chart-grid: #e2e8f0;
-        --bb-chart-grid-muted: #f1f5f9;
-        --bb-chart-label: #334155;
-        --bb-chart-label-muted: #64748b;
-        --bb-chart-tooltip-bg: #ffffff;
-        --bb-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
-        --bb-font-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Fira Code", monospace;
-        --bb-text-xs: 0.75rem;
-        --bb-text-sm: 0.875rem;
-        --bb-text-base: 1rem;
-        --bb-text-lg: 1.125rem;
-        --bb-text-xl: 1.25rem;
-        --bb-text-2xl: 1.5rem;
-        --bb-bp-mobile: 48rem;
-        --bb-bp-tablet: 64rem;
-        --bb-bp-desktop: 80rem;
-        --bb-skeleton-surface: #e5e7eb;
-        --bb-skeleton-highlight: #f9fafb;
-        --bb-skeleton-dark-surface: #21262d;
-        --bb-skeleton-dark-highlight: #30363d;
-        --bb-skeleton-radius-sm: 0.25rem;
-        --bb-skeleton-radius-md: 0.375rem;
-        --bb-skeleton-row-height: 2.75rem;
-        --bb-inset-top: max(0px, env(safe-area-inset-top, 0px));
-        --bb-inset-right: max(0px, env(safe-area-inset-right, 0px));
-        --bb-inset-bottom: max(0px, env(safe-area-inset-bottom, 0px));
-        --bb-inset-left: max(0px, env(safe-area-inset-left, 0px));
-
-        --bb-site-header-bg: rgba(255, 255, 255, 0.95);
-        --bb-site-header-bg-scrolled: rgba(255, 255, 255, 0.98);
-        --bb-site-header-control-bg: rgba(37, 99, 235, 0.08);
-        --bb-site-header-control-hover-bg: rgba(37, 99, 235, 0.14);
-    }
-
-    :root[data-bb-theme="dark"] {
-        --bb-bg-primary: #0d1117;
-        --bb-bg-panel: #161b22;
-        --bb-bg-elevated: #21262d;
-        --bb-fg-primary: #f0f6fc;
-        --bb-fg-muted: #8b949e;
-        --bb-fg-inverse: #0d1117;
-        --bb-border-default: #30363d;
-        --bb-border-subtle: #21262d;
-        --bb-accent: #58a6ff;
-        --bb-accent-hover: #1f6feb;
-        --bb-status-success: #238636;
-        --bb-status-warning: #d29922;
-        --bb-status-danger: #f85149;
-        --bb-status-danger-hover: #b91c1c;
-        --bb-code-bg: #161b22;
-        --bb-code-fg: #f0f6fc;
-        --bb-surface-app: #0d1117;
-        --bb-surface-data: #161b22;
-        --bb-surface-data-muted: #21262d;
-        --bb-surface-elevated: #21262d;
-        --bb-surface-hero: #0d1117;
-        --bb-surface-hero-muted: #161b22;
-        --bb-surface-sticky: #1c2128;
-        --bb-data-fg-primary: #f0f6fc;
-        --bb-data-fg-muted: #c9d1d9;
-        --bb-data-fg-subtle: #8b949e;
-        --bb-data-border: #30363d;
-        --bb-data-border-strong: #3d444d;
-        --bb-focus-ring: #93c5fd;
-        --bb-focus-ring-on-dark: #93c5fd;
-        --bb-tone-info-bg: #0b2d54;
-        --bb-tone-info-fg: #bfdbfe;
-        --bb-tone-success-bg: #0f2f1d;
-        --bb-tone-success-fg: #bbf7d0;
-        --bb-tone-warning-bg: #3a2a08;
-        --bb-tone-warning-border: #d29922;
-        --bb-tone-warning-fg: #fde68a;
-        --bb-tone-danger-bg: #3b1014;
-        --bb-tone-danger-fg: #fecaca;
-        --bb-tone-neutral-bg: #30363d;
-        --bb-tone-neutral-fg: #d1d5db;
-        --bb-chart-axis: #8b949e;
-        --bb-chart-axis-strong: #c9d1d9;
-        --bb-chart-cat-1: #58a6ff;
-        --bb-chart-cat-2: #2dd4bf;
-        --bb-chart-cat-3: #fbbf24;
-        --bb-chart-cat-4: #c084fc;
-        --bb-chart-cat-5: #fb7185;
-        --bb-chart-cat-6: #c9d1d9;
-        --bb-chart-success: #3fb950;
-        --bb-chart-warning: #f2cc60;
-        --bb-chart-danger: #ff7b72;
-        --bb-chart-sequential-from: #0b2d54;
-        --bb-chart-sequential-to: #58a6ff;
-        --bb-chart-diverging-low: #ff7b72;
-        --bb-chart-diverging-mid: #30363d;
-        --bb-chart-diverging-high: #58a6ff;
-        --bb-chart-grid: #30363d;
-        --bb-chart-grid-muted: #21262d;
-        --bb-chart-label: #f0f6fc;
-        --bb-chart-label-muted: #8b949e;
-        --bb-chart-tooltip-bg: #161b22;
-        --bb-skeleton-surface: #21262d;
-        --bb-skeleton-highlight: #30363d;
-        --bb-skeleton-dark-surface: #21262d;
-        --bb-skeleton-dark-highlight: #30363d;
-        --bb-site-header-bg: rgba(13, 17, 23, 0.95);
-        --bb-site-header-bg-scrolled: rgba(13, 17, 23, 0.98);
-        --bb-site-header-control-bg: rgba(88, 166, 255, 0.08);
-        --bb-site-header-control-hover-bg: rgba(88, 166, 255, 0.14);
-    }
-
-    html {
         font-family: var(--bb-font-sans);
-    }
-
-    body {
         background-color: var(--bb-surface-app);
         color: var(--bb-data-fg-primary);
         min-height: 100vh;
     }
 
-    a {
+    :where(.bb-explorer) a {
         color: var(--bb-accent);
     }
 
-    a:hover {
+    :where(.bb-explorer) a:hover {
         color: var(--bb-accent-hover);
     }
 
-    *:focus-visible {
+    .bb-explorer *:focus-visible {
         outline: 2px solid var(--bb-focus-ring);
         outline-offset: 2px;
     }
 
-    .surface-hero *:focus-visible,
-    [data-surface="hero"] *:focus-visible {
+    .bb-explorer .surface-hero *:focus-visible,
+    .bb-explorer [data-surface="hero"] *:focus-visible {
         outline-color: var(--bb-focus-ring-on-dark);
     }
 
+    .bb-explorer-page .site-header {
+        position: static;
+    }
+
+    /* Keep the leaderboard display controls inside the viewport when browser
+       zoom makes their compact button group wider than the wrapping header. */
     [aria-labelledby="meta-leaderboard-title"] > .mb-4.flex > div[role="group"] {
         min-width: 0;
         max-width: 100%;
@@ -246,6 +78,8 @@
         }
     }
 
+    /* ---- Surfaces ---- */
+
     .surface-app {
         background-color: var(--bb-surface-app);
         color: var(--bb-data-fg-primary);
@@ -283,6 +117,8 @@
         box-shadow: 0 1px 2px color-mix(in srgb, var(--bb-data-fg-primary) 10%, transparent);
     }
 
+    /* ---- Buttons ---- */
+
     .btn {
         @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
     }
@@ -290,7 +126,7 @@
     .btn-primary {
         @apply btn;
         background-color: var(--bb-accent-hover);
-        color: var(--bb-fg-inverse);
+        color: var(--bb-fg-on-accent);
     }
     .btn-primary:hover {
         background-color: var(--bb-accent);
@@ -326,6 +162,8 @@
         background-color: var(--bb-status-danger-hover);
     }
 
+    /* ---- Badges (legacy aliases, retained for incremental migration) ---- */
+
     .badge {
         @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
     }
@@ -355,6 +193,8 @@
         color: var(--bb-tone-neutral-fg);
     }
 
+    /* ---- Status badge tones (semantic) ---- */
+
     .tone-info {
         background-color: var(--bb-tone-info-bg);
         color: var(--bb-tone-info-fg);
@@ -380,6 +220,8 @@
         color: var(--bb-tone-neutral-fg);
     }
 
+    /* ---- Card / table ---- */
+
     .card {
         @apply panel p-6;
     }
@@ -394,6 +236,9 @@
         color: var(--bb-data-fg-primary);
     }
 
+    /* Dense variants for wide evidence tables (the benchmark matrix and the
+       per-query compare grid), where row height multiplied across dozens of
+       rows is the dominant cost of reading the page. */
     .table-th-dense {
         @apply px-2.5 py-2 text-left text-xs font-semibold uppercase tracking-wide;
         color: var(--bb-data-fg-subtle);
@@ -404,6 +249,9 @@
         color: var(--bb-data-fg-primary);
     }
 
+    /* Metadata chip: a short scalar value (a run date, a version) that must
+       read as one atom and never wrap mid-value. Button variants toggle to a
+       second reading of the same value. */
     .bb-meta-chip {
         @apply inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-xs leading-tight;
         border-color: var(--bb-data-border);
@@ -447,6 +295,12 @@
         min-height: var(--bb-skeleton-row-height);
     }
 
+    /* SVG charts must not exceed their container at narrow viewports.
+       Chart components own the inner layout (axes, ticks, value labels);
+       this rule only constrains the outer box to prevent horizontal
+       overflow at 390px / 768px. Cells that legitimately need horizontal
+       scrolling (heatmaps, sparkline tables) wrap themselves in
+       `.overflow-x-auto`. */
     .bb-chart-svg,
     .card svg[role="img"],
     .panel svg[role="img"],
@@ -455,6 +309,9 @@
         height: auto;
     }
 
+    /* The summary overview keeps metric values in their own row above a
+       short fill track. This prevents labels and bars from competing for the
+       same pixels at narrow widths while preserving a real table model. */
     .summary-metric-track {
         position: relative;
         height: 0.45rem;
@@ -503,6 +360,10 @@
             min-width: 0 !important;
         }
 
+        /* Give the preview cards a portrait canvas on phones. The full
+           charts use the same orientation change through their measured
+           narrow-container layouts below; previews should communicate that
+           shape before a reader opens one. */
         .summary-chart-thumbnail {
             min-height: 12rem;
             padding: 0.75rem;
@@ -529,6 +390,7 @@
         }
     }
 
+    /* Compact "←/→ scroll" cue for measured overflow containers. */
     .bb-scroll-affordance {
         display: inline-flex;
         align-items: center;
@@ -537,6 +399,9 @@
         color: var(--bb-data-fg-subtle);
     }
 
+    /* Heatmap cells use a single-hue sequential palette by default.
+     Components still emit --cell-hue for chart-math parity, while
+     --cell-lightness drives a color-blind-safer light-to-dark scale. */
     .heatmap-cell,
     .meta-heatmap-cell {
         background-color: hsl(205 80% var(--cell-lightness, 92%) / 0.38);
@@ -555,6 +420,12 @@
         background-color: hsl(var(--cell-hue, 205) 45% var(--cell-dark-lightness, 22%));
     }
 
+    /* Reduced-color / high-contrast mode switches to grayscale lightness steps.
+     Activated by the .heatmap-reduced-color class where an explicit user toggle
+     exists, or automatically by the prefers-contrast: more media query.
+     Note: must be two separate rules - a class selector cannot be comma-joined
+     with an @media at-rule in a single rule block. Keep these rules after the
+     dark-mode rule so high-contrast users do not lose the reduced-color path. */
     .heatmap-reduced-color .heatmap-cell,
     .heatmap-reduced-color .meta-heatmap-cell {
         background-color: hsl(0 0% var(--cell-lightness, 95%) / 0.62);
@@ -581,6 +452,7 @@
         }
     }
 
+    /* Screen-reader only utility */
     .sr-only {
         position: absolute;
         width: 1px;
@@ -687,6 +559,8 @@
         display: none !important;
     }
 
+    /* Removing the Query facet rail must also release its reserved grid
+       column, otherwise the printable results keep an empty 18rem gutter. */
     .grid:has(> [data-testid="query-desktop-filters"]) {
         display: block !important;
     }
@@ -695,6 +569,10 @@
         overflow: visible !important;
     }
 
+    /* Grouped query charts keep a scroll floor on screen so dense query sets
+       remain readable. Printed pages have a fixed landscape width instead;
+       let the SVG viewBox scale to that page rather than widening the whole
+       document past the printable area. */
     [data-chart-container] .bb-chart-svg {
         min-width: 0 !important;
         max-width: 100% !important;
@@ -719,6 +597,8 @@
         overflow-wrap: anywhere;
     }
 
+    /* Dense benchmark grids need a second compacting step: TPC-H alone has
+       22 query columns in addition to its identity and score columns. */
     table[role="grid"] {
         font-size: 6pt;
         zoom: 0.85;

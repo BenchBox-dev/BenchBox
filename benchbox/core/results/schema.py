@@ -1252,7 +1252,12 @@ def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | N
     payload = getattr(result, "applied_tuning_ledger", None)
     if not payload:
         return None
-    if not payload.get("statements") and not payload.get("dropped") and not payload.get("drift_check"):
+    if (
+        not payload.get("statements")
+        and not payload.get("dropped")
+        and not payload.get("satisfied")
+        and not payload.get("drift_check")
+    ):
         return None
     return payload
 

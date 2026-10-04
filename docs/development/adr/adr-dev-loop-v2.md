@@ -121,7 +121,7 @@ with its own quota; on their own they do not satisfy the check.
 When the connector cannot review, for example at its usage limit, a stand-in review
 replaces it. An independent reviewer reviews the exact current head, and an account listed
 in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`) then posts a PR comment
-containing the line `Stand-in oracle review: APPROVE <full head SHA>`. The check accepts
+whose whole text is `Stand-in oracle review: APPROVE <full head SHA>`. The check accepts
 that comment only for the exact head, only when it was posted after the head commit and any
 retarget and never edited, and never while a connector review thread is unresolved. A new
 push needs a new stand-in comment. A plain owner review, thumbs-up or unmarked comment does
@@ -299,7 +299,7 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 
 3. **Live cloud platform testing in PR or merge queue:**
    Rejected due to network flakiness, credential exposure risks, high API costs, and
-   long runtimes that would violate the merge queue's 30-minute target. Live cloud testing
+   long runtimes that would violate the 30-minute pre-merge target. Live cloud testing
    is isolated to scheduled nightly T3 execution.
 
 4. **CODEOWNERS-only hold for soundness paths:**

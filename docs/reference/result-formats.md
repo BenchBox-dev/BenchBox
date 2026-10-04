@@ -52,7 +52,7 @@ bundles written before the rename keep loading.
 Consumer policy is intentionally split by use case:
 
 | Consumer | Accepted versions | Behavior |
-|---|---|---|
+| --- | --- | --- |
 | Producer/exporter | `"2.2"` | New bundles are written with the current producer version. |
 | Runtime loader and exporter listing | `"2.0"`, `"2.1"`, `"2.2"` | Unknown versions fail closed and should be re-exported. |
 | Normalizer | `"2.0"`, `"2.1"`, `"2.2"` as v2; other shapes as legacy | Known v2 bundles use exact v2 field mapping; v1.x and unknown shapes use legacy best-effort extraction. |
@@ -124,23 +124,26 @@ Consumer policy is intentionally split by use case:
 ### Field Reference
 
 #### Version
+
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
 | `version` | string | Compatibility alias emitted with `result_schema_version` during the schema-v2 transition; accepted as a fallback when the new key is absent. If both keys are present, they must match. |
 | `schema_version` | string | Oldest key, accepted as a last-resort fallback for pre-rename bundles. |
 
 #### Benchmark Block
+
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `id` | string | Benchmark identifier (tpch, tpcds, ssb, etc.) |
 | `name` | string | Display name |
 | `scale_factor` | float | Data scale factor |
 | `test_type` | string | Optional run/test classification |
 
 #### Platform Block
+
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `name` | string | Platform identifier |
 | `version` | string | Platform/driver version |
 | `deployment` | object | Optional normalized deployment metadata |
@@ -170,7 +173,7 @@ they describe what was *requested*, not an independently verified record of
 what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-semantics.md`).
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
 | `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
 | `validation_status` | string | ADR-1 honest execution-derived tuning verified-state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself rides in the `.applied.json` companion). Mirrors the `.tuning.json` companion's field; surfaced here so main-bundle consumers (e.g. the explorer) can display it. Omitted for bundles predating the applied ledger. |
@@ -196,8 +199,9 @@ payload top level always records the applied `max_depth` plus a `truncated`
 flag telling consumers whether any node was depth-truncated.
 
 #### Run Block
+
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `timestamp` | string | Run start time (ISO 8601) |
 | `id` | string | Run identifier |
 | `total_duration_ms` | number | Total benchmark duration |
@@ -234,8 +238,9 @@ duration, counts, and stage-specific metadata.
 ```
 
 #### Summary Block
+
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `queries.total` | int | Total query records represented in the bundle |
 | `queries.passed` | int | Count of passed queries |
 | `queries.failed` | int | Count of failed queries |
@@ -249,7 +254,7 @@ duration, counts, and stage-specific metadata.
 The top-level `environment` block contains execution environment metadata for the BenchBox client runner, including host operating system, architecture, CPU details, and memory. It also supports optional structured subsections for container isolation and client-to-platform connectivity.
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `os` | string | Operating system name (e.g., `macOS`, `Linux`, `Windows`) |
 | `arch` | string | Host architecture (e.g., `arm64`, `x86_64`) |
 | `cpu_count` | int | Logical CPU count |
@@ -265,7 +270,7 @@ The top-level `environment` block contains execution environment metadata for th
 Discloses the client execution location and connectivity characteristics relative to remote and cloud data warehouses. Because client-to-platform distance (such as cross-region network latency or WAN round trips) can dominate small query execution times, `client_link` provides standardized, non-identifying locality metrics without publishing private network identifiers (such as raw IP addresses, hostnames, or ports).
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `collection_status` | string | Locality probe lifecycle status: `"available"` (region and probe recorded), `"partial"` (region or probe recorded, but not both), `"unavailable"` (neither recorded), or `"not_requested"` (collection disabled or skipped). |
 | `source` | string | Provenance of client cloud/region metadata: `"observed"` (detected via link-local cloud instance metadata service / IMDS), `"cli_option"` (attested via CLI options `--client-cloud` / `--client-region`), or `"unavailable"`. |
 | `client_region` | string \| null | Cloud region where the BenchBox client runner is executing (e.g., `"us-east-1"`, `"eu-west-2"`). Omitted or `null` when running outside known clouds or unavailable. |
@@ -324,9 +329,9 @@ A developer running BenchBox on a local workstation or laptop against a remote d
 The optional top-level `tables` block records per-table load outcomes keyed
 by table name.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `tables.{table}.rows` | number | Rows loaded into the table. |
+| Field                    | Type   | Description                                         |
+| ------------------------ | ------ | --------------------------------------------------- |
+| `tables.{table}.rows`    | number | Rows loaded into the table.                         |
 | `tables.{table}.load_ms` | number | Wall-clock load time for the table in milliseconds. |
 
 Absence of `load_ms` means "not measured" and is always accepted; an
@@ -341,7 +346,7 @@ lands.
 The `export` block records how and when the bundle file was written.
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `timestamp` | string | Export time (ISO 8601). |
 | `tool` | string | Exporter name. |
 | `benchbox_version` | string | BenchBox package version that wrote the bundle. Useful as a provenance marker when bundle semantics change across releases. |
@@ -403,6 +408,7 @@ benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json -
 ```
 
 The HTML report includes:
+
 - Summary metrics card
 - Query results table with timing data
 - Phase duration breakdown
@@ -530,7 +536,7 @@ compatibility path.
 ### Version History
 
 | Version | Changes |
-|---------|---------|
+| --------- | --------- |
 | 2.2 | Added bounded per-query `row_count_validation` evidence; top-level version key renamed to `result_schema_version` with `version`/`schema_version` fallback reads |
 | 2.1 | Added typed result and companion metadata used by the previous producer |
 | 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |
@@ -688,5 +694,5 @@ print(f'PASS: Power@Size {power}')
 ## Related Documentation
 
 - [Getting Started](../usage/getting-started.md)
-- [Python API](python-api/results.rst)
+- [Python API](python-api/results.md)
 - [Understanding Results](../tutorials/understanding-results.md)

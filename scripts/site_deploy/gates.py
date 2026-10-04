@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from scripts.site_deploy import mixed_version, routes as routes_module
+from scripts.site_deploy.candidate import SEMVER_TAG
+from scripts.site_inventory import INFO_KINDS
 
 PASS = "pass"
 FAIL = "fail"
@@ -186,7 +188,11 @@ def _only_broken_links(summary: str) -> bool:
         if not number.isdigit():
             return False
         counts[kind] = int(number)
-    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in LINK_KINDS)
+    tolerated = LINK_KINDS + INFO_KINDS
+    return bool(counts) and all(count == 0 for kind, count in counts.items() if kind not in tolerated)
+
+
+RELEASE_ALLOWANCE_RELATIVE = Path("_project/design/site-inventory/release-known-broken")
 
 
 def _release_baseline(
@@ -195,7 +201,13 @@ def _release_baseline(
     recorded = (inputs.deployed or {}).get("link_baseline") or {}
     if inputs.release_tag is not None and inputs.release_tag in recorded:
         return {tuple(entry) for entry in recorded[inputs.release_tag]}, "last deployed receipt"
-    return set(release_owned_known), "allowance file"
+    baseline = set(release_owned_known)
+    if inputs.release_tag is not None and SEMVER_TAG.match(inputs.release_tag):
+        tag_file = inputs.repo_root / RELEASE_ALLOWANCE_RELATIVE / f"{inputs.release_tag}.json"
+        if tag_file.is_file():
+            baseline |= {tuple(entry) for entry in json.loads(tag_file.read_text(encoding="utf-8"))}
+            return baseline, f"allowance files (develop and {tag_file.name})"
+    return baseline, "allowance file"
 
 
 def link_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:

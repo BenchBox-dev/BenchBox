@@ -1158,8 +1158,9 @@ class TestApplyQuerySubsetNormalization:
 class TestConsolidatedFunctionality:
     def test_tpc_methods_consolidation(self):
         adapter = MockPlatformAdapter()
-        mock_benchmark = Mock()
+        mock_benchmark = Mock(spec=[])
         mock_connection = Mock()
+        assert not hasattr(mock_benchmark, "run_throughput_test")
 
         assert hasattr(adapter, "run_power_test")
         assert hasattr(adapter, "run_throughput_test")
@@ -1168,10 +1169,9 @@ class TestConsolidatedFunctionality:
         with patch.object(adapter, "run_power_test") as mock_run_power_test:
             mock_run_power_test.return_value = {"test": "throughput"}
 
-            with patch("builtins.hasattr", return_value=False):
-                result = adapter.run_throughput_test(mock_benchmark, connection=mock_connection, test_param="value")
-                mock_run_power_test.assert_called_with(mock_benchmark, connection=mock_connection, test_param="value")
-                assert result == {"test": "throughput"}
+            result = adapter.run_throughput_test(mock_benchmark, connection=mock_connection, test_param="value")
+            mock_run_power_test.assert_called_with(mock_benchmark, connection=mock_connection, test_param="value")
+            assert result == {"test": "throughput"}
 
     def test_create_schema_with_tuning_helper(self):
         adapter = MockPlatformAdapterWithDialect()

@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD024 -->
+
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
 # Multi-Platform Database Support
@@ -13,31 +15,31 @@ Looking ahead? See the [Development Roadmap](../development/roadmap.md) for plan
 
 ### SQL Platforms
 
-| Platform            | Status    | Description                                                  | Installation                                        |
-| ------------------- | --------- | ------------------------------------------------------------ | --------------------------------------------------- |
-| **DuckDB**          | Built-in  | In-process analytical database                               | `uv add duckdb`                                     |
-| **DataFusion**      | Available | In-memory query engine (Apache Arrow)                        | `uv add datafusion`                                 |
-| **ClickHouse Local**  | Available | Embedded ClickHouse via chDB (zero-config)                 | `uv add benchbox --extra clickhouse-local`          |
-| **ClickHouse Server** | Available | Self-hosted ClickHouse (clickhouse-driver)                 | `uv add benchbox --extra clickhouse-server`         |
-| **ClickHouse Cloud**  | Available | Managed ClickHouse service (HTTPS)                         | `uv add benchbox --extra clickhouse-cloud`          |
-| **Databricks SQL**  | Available | Data Intelligence Platform (lakehouse)                       | `uv add databricks-sql-connector`                   |
-| **BigQuery**        | Available | Serverless data warehouse (Google Cloud)                     | `uv add google-cloud-bigquery google-cloud-storage` |
-| **Redshift**        | Available | Cloud data warehouse (AWS)                                   | `uv add redshift-connector boto3`                   |
-| **Snowflake**       | Available | Data Cloud / Multi-cloud data warehouse                      | `uv add snowflake-connector-python`                 |
-| **Trino**           | Available | Distributed SQL (Trino/Starburst)                            | `uv add benchbox[trino]`                            |
-| **PrestoDB**        | Available | Distributed SQL (Meta's Presto)                              | `uv add benchbox[presto]`                           |
-| **LakeSail Sail**   | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect) | `uv add benchbox --extra lakesail`            |
-| **Apache Gluten + Velox** | Available | Native C++ acceleration for Spark SQL (Linux-only local; Docker on macOS/Windows) | `uv add benchbox --extra velox`       |
-| **SQLite**          | Built-in  | Embedded transactional database                              | (built-in)                                          |
-| **Azure Platforms** | Available | Microsoft Fabric Warehouse, Azure Synapse Analytics, Microsoft Fabric Spark, Azure Synapse Analytics Spark | See [Azure Platforms](azure-platforms.md)           |
+| Platform                  | Status    | Description                                                                                                | Installation                                        |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **DuckDB**                | Built-in  | In-process analytical database                                                                             | `uv add duckdb`                                     |
+| **DataFusion**            | Available | In-memory query engine (Apache Arrow)                                                                      | `uv add datafusion`                                 |
+| **ClickHouse Local**      | Available | Embedded ClickHouse via chDB (zero-config)                                                                 | `uv add benchbox --extra clickhouse-local`          |
+| **ClickHouse Server**     | Available | Self-hosted ClickHouse (clickhouse-driver)                                                                 | `uv add benchbox --extra clickhouse-server`         |
+| **ClickHouse Cloud**      | Available | Managed ClickHouse service (HTTPS)                                                                         | `uv add benchbox --extra clickhouse-cloud`          |
+| **Databricks SQL**        | Available | Data Intelligence Platform (lakehouse)                                                                     | `uv add databricks-sql-connector`                   |
+| **BigQuery**              | Available | Serverless data warehouse (Google Cloud)                                                                   | `uv add google-cloud-bigquery google-cloud-storage` |
+| **Redshift**              | Available | Cloud data warehouse (AWS)                                                                                 | `uv add redshift-connector boto3`                   |
+| **Snowflake**             | Available | Data Cloud / Multi-cloud data warehouse                                                                    | `uv add snowflake-connector-python`                 |
+| **Trino**                 | Available | Distributed SQL (Trino/Starburst)                                                                          | `uv add benchbox[trino]`                            |
+| **PrestoDB**              | Available | Distributed SQL (Meta's Presto)                                                                            | `uv add benchbox[presto]`                           |
+| **LakeSail Sail**         | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect)                                         | `uv add benchbox --extra lakesail`                  |
+| **Apache Gluten + Velox** | Available | Native C++ acceleration for Spark SQL (Linux-only local; Docker on macOS/Windows)                          | `uv add benchbox --extra velox`                     |
+| **SQLite**                | Built-in  | Embedded transactional database                                                                            | (built-in)                                          |
+| **Azure Platforms**       | Available | Microsoft Fabric Warehouse, Azure Synapse Analytics, Microsoft Fabric Spark, Azure Synapse Analytics Spark | See [Azure Platforms](azure-platforms.md)           |
 
 ### DataFrame Platforms (Native API)
 
 BenchBox supports benchmarking DataFrame libraries using their native APIs instead of SQL. This enables direct performance comparison between SQL and DataFrame paradigms on identical workloads. See [DataFrame Platforms](dataframe.md) for full details.
 
-| Platform       | CLI Name        | Status    | Family     | Description                                            | Installation                                   |
-| -------------- | --------------- | --------- | ---------- | ------------------------------------------------------ | ---------------------------------------------- |
-| **Polars**     | `polars-df`     | Available | Expression | Fast Rust-based DataFrame library with lazy evaluation | (core dependency)                              |
+| Platform       | CLI Name        | Status    | Family     | Description                                            | Installation                         |
+| -------------- | --------------- | --------- | ---------- | ------------------------------------------------------ | ------------------------------------ |
+| **Polars**     | `polars-df`     | Available | Expression | Fast Rust-based DataFrame library with lazy evaluation | (core dependency)                    |
 | **Pandas**     | `pandas-df`     | Available | Pandas     | Reference Pandas implementation                        | `uv add benchbox --extra pandas`     |
 | **PySpark**    | `pyspark-df`    | Available | Expression | Apache Spark DataFrame API (distributed)               | `uv add benchbox --extra pyspark`    |
 | **DataFusion** | `datafusion-df` | Available | Expression | Arrow-native query engine                              | `uv add benchbox --extra datafusion` |
@@ -46,6 +48,7 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | cuDF           | `cudf-df`       | Available | Pandas     | NVIDIA GPU-accelerated DataFrames                      | `uv add benchbox --extra cudf`       |
 
 **Quick Start:**
+
 ```bash
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1
@@ -59,11 +62,13 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 0.1
 ### 1. Install Dependencies
 
 Install all cloud platforms at once:
+
 ```bash
 uv add benchbox[cloud]
 ```
 
 Or install individual platforms:
+
 ```bash
 uv add benchbox[clickhouse-local]
 
@@ -81,16 +86,19 @@ The extras install ClickHouse Local (chDB, zero-config), ClickHouse Server (self
 BenchBox now includes a dedicated CLI for managing database platforms. This simplifies installation, configuration, and validation.
 
 **List all available platforms and their status:**
+
 ```bash
 benchbox platforms list
 ```
 
 **Check the status of a specific platform (e.g., Databricks SQL):**
+
 ```bash
 benchbox platforms status databricks
 ```
 
 **Check local provisioning readiness before a run:**
+
 ```bash
 benchbox platforms check clickhouse-server trino lakesail-df dask-df
 benchbox platforms status lakesail-df
@@ -101,17 +109,20 @@ backend packages as environment readiness gaps. It does not start services, init
 databases.
 
 **Install missing libraries for a platform (guided):**
+
 ```bash
 benchbox platforms install bigquery
 ```
 
 **Enable or disable a platform:**
+
 ```bash
 benchbox platforms enable snowflake
 benchbox platforms disable sqlite
 ```
 
 **Run an interactive setup wizard:**
+
 ```bash
 benchbox platforms setup
 ```
@@ -380,6 +391,7 @@ See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) f
 **Solutions by Platform**:
 
 **DuckDB**:
+
 ```python
 import os
 os.access("benchmark.duckdb", os.W_OK)
@@ -390,6 +402,7 @@ adapter = DuckDBAdapter(database_path="/full/path/to/benchmark.duckdb")
 Check that the file is writable, then use an absolute path.
 
 **ClickHouse**:
+
 ```python
 import socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -406,6 +419,7 @@ adapter = ClickHouseAdapter(
 ```
 
 **Cloud Platforms (Databricks SQL, BigQuery, Snowflake, Redshift)**:
+
 ```python
 import os
 print(f"DATABRICKS_TOKEN: {'SET' if os.getenv('DATABRICKS_TOKEN') else 'NOT SET'}")
@@ -425,6 +439,7 @@ Verify the environment variables, then test the connection before running the be
 #### Authentication Issues
 
 **BigQuery**:
+
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
@@ -434,6 +449,7 @@ gcloud auth application-default login
 Set the credentials with the service account key, or use application default credentials with `gcloud auth application-default login`.
 
 **Databricks SQL**:
+
 ```bash
 export DATABRICKS_TOKEN="dapi..."
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
@@ -444,6 +460,7 @@ databricks configure --token
 Use a personal access token, or configure credentials through the Databricks CLI with `databricks configure --token`.
 
 **Snowflake**:
+
 ```python
 from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
@@ -457,6 +474,7 @@ adapter = SnowflakeAdapter(
 #### Out of Memory Errors
 
 **DuckDB**:
+
 ```python
 adapter = DuckDBAdapter(memory_limit="4GB")
 
@@ -469,6 +487,7 @@ adapter = DuckDBAdapter(
 Set a memory limit, and use a persistent database for large datasets.
 
 **ClickHouse**:
+
 ```python
 adapter = ClickHouseAdapter(
     host="localhost",
@@ -482,6 +501,7 @@ adapter = ClickHouseAdapter(
 Increase the memory limits. The `max_memory_usage` value of 10000000000 is 10 GB.
 
 **Cloud Platforms**:
+
 ```python
 from benchbox.platforms.bigquery import BigQueryAdapter
 adapter = BigQueryAdapter(
@@ -503,6 +523,7 @@ Snowflake: increase the warehouse size. Besides `LARGE_WH`, use `X-LARGE` or `2X
 #### Slow Query Performance
 
 **General Debugging**:
+
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -517,6 +538,7 @@ Enable verbose logging, run with profiling, and test with a smaller scale factor
 **Platform-Specific Optimizations**:
 
 **DuckDB**:
+
 ```python
 adapter = DuckDBAdapter(thread_limit=8)
 
@@ -526,6 +548,7 @@ adapter = DuckDBAdapter(database_path="cached.duckdb")
 Increase the thread count, and use a persistent database.
 
 **ClickHouse**:
+
 ```python
 adapter = ClickHouseAdapter(
     host="localhost",
@@ -538,6 +561,7 @@ adapter = ClickHouseAdapter(
 ```
 
 **Cloud Platforms**:
+
 ```python
 adapter = DatabricksAdapter(
     http_path="/sql/1.0/warehouses/large-warehouse"
@@ -556,6 +580,7 @@ BigQuery: use batch priority, which is slower but cheaper.
 #### Data Loading Failures
 
 **Check file format**:
+
 ```python
 conn.execute("""
     CREATE TABLE test AS
@@ -574,6 +599,7 @@ conn.execute("""
 DuckDB reads multiple formats. The first query reads Parquet. The second reads CSV with an explicit delimiter and schema detection.
 
 **Verify file paths**:
+
 ```python
 from pathlib import Path
 
@@ -590,6 +616,7 @@ else:
 #### DuckDB
 
 **Issue**: Database file is locked
+
 ```python
 adapter1 = DuckDBAdapter(database_path="db1.duckdb")
 adapter2 = DuckDBAdapter(database_path="db2.duckdb")
@@ -600,6 +627,7 @@ Ensure no other process is using the file, or use separate database files as sho
 #### ClickHouse
 
 **Issue**: "Memory limit exceeded" errors
+
 ```python
 adapter = ClickHouseAdapter(
     settings={
@@ -615,6 +643,7 @@ Increase the limits or enable external operations (spilling group-by and sort to
 #### Databricks SQL
 
 **Issue**: "Cluster not found" or "Warehouse not available"
+
 ```python
 from benchbox.platforms.databricks import DatabricksAdapter
 
@@ -632,6 +661,7 @@ Verify the HTTP path: list the available warehouses (`list_warehouses` may not b
 #### BigQuery
 
 **Issue**: "Exceeded quota" or billing errors
+
 ```python
 from benchbox.platforms.bigquery import BigQueryAdapter
 
@@ -648,6 +678,7 @@ Set cost controls. The 5000000000 limit is 5 GB, `BATCH` priority lowers cost, `
 #### Snowflake
 
 **Issue**: Warehouse auto-suspended
+
 ```python
 from benchbox.platforms.snowflake import SnowflakeAdapter
 
@@ -688,8 +719,8 @@ If you encounter issues not covered here:
 ### API Reference
 
 - **[Python API Overview](../reference/python-api/index.md)** - Complete Python API documentation
-- **[DuckDB Adapter API](../reference/python-api/platforms/duckdb.rst)** - DuckDB adapter reference
-- **[Base Benchmark API](../reference/python-api/base.rst)** - Core benchmark interface
+- **[DuckDB Adapter API](../reference/python-api/platforms/duckdb.md)** - DuckDB adapter reference
+- **[Base Benchmark API](../reference/python-api/base.md)** - Core benchmark interface
 
 ### Getting Started
 
