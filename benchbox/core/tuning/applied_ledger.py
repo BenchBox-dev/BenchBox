@@ -230,6 +230,16 @@ class DroppedIntent:
 
 
 @dataclass
+class SatisfiedIntent:
+    intent: str
+    satisfied_by: int
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"intent": self.intent, "satisfied_by": self.satisfied_by, "reason": self.reason}
+
+
+@dataclass
 class AppliedTuningLedger:
     """Ordered record of executed tuning statements + dropped intents.
 
@@ -240,6 +250,7 @@ class AppliedTuningLedger:
 
     statements: list[AppliedStatement] = field(default_factory=list)
     dropped: list[DroppedIntent] = field(default_factory=list)
+    satisfied: list[SatisfiedIntent] = field(default_factory=list)
 
     # -- population (execution path) ---------------------------------------
     def record(
@@ -273,6 +284,20 @@ class AppliedTuningLedger:
             self.dropped.append(DroppedIntent(intent=str(intent), reason=str(reason)))
         except Exception as exc:
             logger.debug("applied-ledger dropped-record degraded: %s", exc)
+
+    def record_satisfied(self, intent: str, satisfied_by: int, reason: str) -> None:
+        try:
+            self.satisfied.append(
+                SatisfiedIntent(intent=str(intent), satisfied_by=int(satisfied_by), reason=str(reason))
+            )
+        except Exception as exc:
+            logger.debug("applied-ledger satisfied-record degraded: %s", exc)
+
+    def executed_statement_index(self, predicate: Callable[[AppliedStatement], bool]) -> int | None:
+        for index, statement in enumerate(self.statements):
+            if statement.status == EXECUTED and predicate(statement):
+                return index
+        return None
 
     # -- read back (result construction) -----------------------------------
     @property
@@ -366,6 +391,8 @@ class AppliedTuningLedger:
             "statements": [s.to_dict() for s in self.statements],
             "dropped": [d.to_dict() for d in self.dropped],
         }
+        if self.satisfied:
+            payload["satisfied"] = [item.to_dict() for item in self.satisfied]
         if receipt is not None:
             payload["receipt"] = receipt
         if drift_check is not None:
@@ -373,7 +400,7 @@ class AppliedTuningLedger:
         return payload
 
     def is_empty(self) -> bool:
-        return not self.statements and not self.dropped
+        return not self.statements and not self.dropped and not self.satisfied
 
 
 class _RecordingProxy:

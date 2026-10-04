@@ -77,6 +77,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     plan_capture_phase_eligible = True
+    physical_identifier_case = "lower"
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -2627,7 +2628,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Redshift tunings for table: {table_name}")
 
         cursor = connection.cursor()
@@ -2651,7 +2652,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     sortkey4
                 FROM pg_table_def
                 WHERE schemaname = 'public'
-                AND tablename = '{table_name.lower()}'
+                AND tablename = '{table_name}'
             """)
             result = cursor.fetchone()
 
@@ -2674,7 +2675,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 # Check distribution configuration
                 if distribution_columns:
                     sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
-                    desired_distkey = sorted_cols[0].name
+                    desired_distkey = self.resolve_physical_column(table_name, sorted_cols[0].name, connection)
                     if current_distkey != desired_distkey or current_diststyle != "KEY":
                         needs_recreation = True
                         self.logger.info(
@@ -2684,7 +2685,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 # Check sort key configuration
                 if sort_columns:
                     sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-                    desired_sortkeys = [col.name for col in sorted_cols]
+                    desired_sortkeys = [
+                        self.resolve_physical_column(table_name, col.name, connection) for col in sorted_cols
+                    ]
                     if current_sortkeys != desired_sortkeys:
                         needs_recreation = True
                         self.logger.info(f"Sort keys mismatch: current={current_sortkeys}, desired={desired_sortkeys}")

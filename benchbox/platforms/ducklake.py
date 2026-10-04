@@ -317,10 +317,14 @@ class DuckLakeAdapter(DuckDBAdapter):
     # DuckDBAdapter's EXPLAIN-based plan capture unchanged, so this mirrors
     # DuckDBAdapter's value.
     plan_capture_phase_eligible = True
+    index_ddl_unsupported_reason = "ducklake: CREATE INDEX unsupported"
 
     @property
     def platform_name(self) -> str:
         return "DuckLake"
+
+    def get_tuning_introspector(self) -> None:
+        return None
 
     @staticmethod
     def add_cli_arguments(parser) -> None:

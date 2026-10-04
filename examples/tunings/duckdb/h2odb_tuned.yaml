@@ -18,7 +18,7 @@ unique_constraints:
   ignore_nulls: false
 
 check_constraints:
-  enabled: true
+  enabled: false
   enforce_on_insert: true
   enforce_on_update: true
 

@@ -1445,10 +1445,42 @@ class UnifiedTuningConfiguration:
 
         Applies the choice to every benchmark-template table carrying the
         slot (not just the first), so a global TPC-H sorting choice reaches
-        all six tuned tables. Benchmarks with no packaged template resolve
-        to no targets, declining to substitute another benchmark's schema.
+        all six tuned tables. The DuckDB template is the reference for every
+        slot except partitioning, which it never applies and so does not
+        carry; partitioning resolves from ``profiles/default_partitioning.yaml``.
+        Benchmarks with no reference resolve to no targets, declining to
+        substitute another benchmark's schema.
         """
-        table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark.lower())
+        if layout_type == TuningType.PARTITIONING:
+            table_tunings = UnifiedTuningConfiguration._read_default_partitioning(benchmark)
+        else:
+            table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark.lower())
+        return UnifiedTuningConfiguration._layout_targets_from(table_tunings, layout_type, table_name)
+
+    @staticmethod
+    def _read_default_partitioning(benchmark: str) -> dict[str, Any]:
+        from pathlib import Path
+
+        try:
+            import yaml
+        except ImportError:
+            return {}
+        path = Path(__file__).resolve().parent / "profiles" / "default_partitioning.yaml"
+        try:
+            payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return {}
+        tables = payload.get(benchmark.lower())
+        if not isinstance(tables, dict):
+            return {}
+        return {name: {"partitioning": columns} for name, columns in tables.items()}
+
+    @staticmethod
+    def _layout_targets_from(
+        table_tunings: dict[str, Any],
+        layout_type: TuningType,
+        table_name: Optional[str],
+    ) -> dict[str, list[TuningColumn]]:
         if not table_tunings:
             return {}
         ordered_tables = sorted(table_tunings)

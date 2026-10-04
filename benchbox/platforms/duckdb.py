@@ -144,16 +144,22 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
     )
 
 
-def _duckdb_sort_index_sql(table_name_upper: str, column_names: list[str]) -> str:
-    """CREATE INDEX DDL for a DuckDB sort index.
+def _quote_duckdb_identifier(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
 
-    Shared by the pre-load tuning path (``apply_table_tunings``) and the
-    post-CTAS re-creation (``_recreate_sort_index_after_ctas``) so both land the
-    SAME ``idx_<table>_sort`` footprint -- the one ``duckdb_indexes()`` (and thus
-    the introspection receipt) corroborates.
-    """
-    index_name = f"idx_{table_name_upper.lower()}_sort"
-    return f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
+
+def _duckdb_index_sql(table_name: str, column_names: list[str], suffix: str) -> str:
+    index_name = f"idx_{table_name.lower()}_{suffix}"
+    columns = ", ".join(_quote_duckdb_identifier(column) for column in column_names)
+    return f"CREATE INDEX IF NOT EXISTS {index_name} ON {_quote_duckdb_identifier(table_name)} ({columns})"
+
+
+def _duckdb_sort_index_sql(table_name: str, column_names: list[str]) -> str:
+    return _duckdb_index_sql(table_name, column_names, "sort")
+
+
+def _duckdb_cluster_index_sql(table_name: str, column_names: list[str]) -> str:
+    return _duckdb_index_sql(table_name, column_names, "cluster")
 
 
 def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:
@@ -539,10 +545,50 @@ class DuckDBAdapter(PlatformAdapter):
     # forbids for embedded DuckDB). Proven by
     # tests/integration/test_throughput_session_isolation.py.
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
+    physical_identifier_case = "lower"
+    index_ddl_unsupported_reason: str | None = None
 
     @property
     def platform_name(self) -> str:
         return "DuckDB"
+
+    def _drop_unsupported_index_intent(self, kind: str, table_name: str) -> None:
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is not None and self.index_ddl_unsupported_reason is not None:
+            ledger.record_dropped(f"{kind}:{table_name}", self.index_ddl_unsupported_reason)
+
+    def _catalog_identifier(self, connection: Any, sql: str, params: list[str], logical: str) -> str | None:
+        target = connection if connection is not None else self.connection
+        if target is None:
+            return None
+        try:
+            names = [row[0] for row in target.execute(sql, params).fetchall()]
+        except Exception:
+            return None
+        if logical in names:
+            return logical
+        return names[0] if names else None
+
+    def resolve_physical_table(self, logical_name: str, connection: Any = None) -> str:
+        found = self._catalog_identifier(
+            connection,
+            "SELECT table_name FROM duckdb_tables() WHERE database_name = current_database() "
+            "AND schema_name = current_schema() AND lower(table_name) = lower(?) ORDER BY table_name",
+            [logical_name],
+            logical_name,
+        )
+        return found if found is not None else super().resolve_physical_table(logical_name, connection)
+
+    def resolve_physical_column(self, table_name: str, logical_column: str, connection: Any = None) -> str:
+        found = self._catalog_identifier(
+            connection,
+            "SELECT column_name FROM duckdb_columns() WHERE database_name = current_database() "
+            "AND schema_name = current_schema() AND lower(table_name) = lower(?) "
+            "AND lower(column_name) = lower(?) ORDER BY column_name",
+            [table_name, logical_column],
+            logical_column,
+        )
+        return found if found is not None else super().resolve_physical_column(table_name, logical_column, connection)
 
     def get_tuning_introspector(self):
         """Corroborate the applied ledger against ``duckdb_indexes()``.
@@ -1070,19 +1116,20 @@ class DuckDBAdapter(PlatformAdapter):
         and recorded as a failed op, and the load continues.
         """
         sort_columns = self._resolve_ctas_sort_columns(table_name, tuning_config)
-        if not sort_columns:
+        if not sort_columns or self.index_ddl_unsupported_reason is not None:
             return
         sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-        table_name_upper = table_name.upper()
-        index_sql = _duckdb_sort_index_sql(table_name_upper, [col.name for col in sorted_cols])
+        physical_table = self.resolve_physical_table(table_name, connection)
+        physical_columns = [self.resolve_physical_column(table_name, col.name, connection) for col in sorted_cols]
+        index_sql = _duckdb_sort_index_sql(physical_table, physical_columns)
         try:
             connection.execute(index_sql)
-            self.log_verbose(f"Re-created sort index on {table_name_upper} after CTAS sort")
+            self.log_verbose(f"Re-created sort index on {physical_table} after CTAS sort")
         except Exception as exc:  # capture never breaks a run
-            self.logger.warning(f"Failed to re-create sort index on {table_name_upper} after CTAS: {exc}")
-            self._record_sort_index_layout_op(index_sql, table_name_upper, status="failed", error=exc)
+            self.logger.warning(f"Failed to re-create sort index on {physical_table} after CTAS: {exc}")
+            self._record_sort_index_layout_op(index_sql, physical_table, status="failed", error=exc)
             return
-        self._record_sort_index_layout_op(index_sql, table_name_upper, status="applied")
+        self._record_sort_index_layout_op(index_sql, physical_table, status="applied")
 
     def _record_sort_index_layout_op(
         self, statement: str, table: str, *, status: str, error: Exception | None = None
@@ -1418,14 +1465,19 @@ class DuckDBAdapter(PlatformAdapter):
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
-                # Create index for sort optimization
-                index_sql = _duckdb_sort_index_sql(table_name_upper, column_names)
+                if self.index_ddl_unsupported_reason is not None:
+                    self._drop_unsupported_index_intent("sorting", table_name_upper)
+                else:
+                    index_sql = _duckdb_sort_index_sql(
+                        self.resolve_physical_table(table_name, connection),
+                        [self.resolve_physical_column(table_name, name, connection) for name in column_names],
+                    )
 
-                try:
-                    connection.execute(index_sql)
-                    self.logger.info(f"Created sort index on {table_name_upper}: {', '.join(column_names)}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to create sort index on {table_name_upper}: {e}")
+                    try:
+                        connection.execute(index_sql)
+                        self.logger.info(f"Created sort index on {table_name_upper}: {', '.join(column_names)}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to create sort index on {table_name_upper}: {e}")
 
             # Handle clustering as additional index optimization
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -1434,15 +1486,19 @@ class DuckDBAdapter(PlatformAdapter):
                 sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
-                # Create index for clustering optimization
-                index_name = f"idx_{table_name_upper.lower()}_cluster"
-                index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
+                if self.index_ddl_unsupported_reason is not None:
+                    self._drop_unsupported_index_intent("clustering", table_name_upper)
+                else:
+                    index_sql = _duckdb_cluster_index_sql(
+                        self.resolve_physical_table(table_name, connection),
+                        [self.resolve_physical_column(table_name, name, connection) for name in column_names],
+                    )
 
-                try:
-                    connection.execute(index_sql)
-                    self.logger.info(f"Created cluster index on {table_name_upper}: {', '.join(column_names)}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to create cluster index on {table_name_upper}: {e}")
+                    try:
+                        connection.execute(index_sql)
+                        self.logger.info(f"Created cluster index on {table_name_upper}: {', '.join(column_names)}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to create cluster index on {table_name_upper}: {e}")
 
             # Handle partitioning - log strategy but implementation depends on data loading
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)

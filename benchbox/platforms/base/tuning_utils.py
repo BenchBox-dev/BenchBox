@@ -25,7 +25,7 @@ def log_partition_tunings(
     if not table_tuning or not table_tuning.has_any_tuning():
         return
 
-    table_name = table_tuning.table_name.lower()
+    table_name = table_tuning.table_name
     logger.info(f"Applying {platform_name} tunings for table: {table_name}")
 
     try:

@@ -99,6 +99,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Withdrawn cloud results.** Nine TPC-H results from the first BigQuery,
   Databricks, and Snowflake runs were incorrect. They are removed from
   Results Explorer and comparisons.
+- **The DuckDB tuned templates changed, so their config hash changed.** The
+  shipped DuckDB tuned templates no longer request partitioning, which DuckDB
+  never applied, or CHECK constraints, which cannot be verified against
+  DuckDB's catalog. DuckDB tuned results recorded before this change carry a
+  different `requested_config_hash`, so don't compare the hashes directly.
 
 ### Added
 
