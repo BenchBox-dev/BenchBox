@@ -49,6 +49,7 @@ def evidence(**overrides):
         "author": "dev",
         "merged_at": MERGED_AT,
         "commits": (commit(OLD, BEFORE), commit(HEAD, PUSHED)),
+        "head_date": PUSHED,
     }
     fields.update(overrides)
     return digest.PullEvidence(**fields)
@@ -56,7 +57,7 @@ def evidence(**overrides):
 
 def refreshed(**overrides):
     commits = (commit(OLD, BEFORE), commit(HEAD, PUSHED), commit(REFRESH, AFTER, refresh=True))
-    return evidence(commits=commits, **overrides)
+    return evidence(commits=commits, **{"head_date": AFTER, **overrides})
 
 
 def test_connector_review_of_the_last_content_commit_is_a_signal():
@@ -171,19 +172,12 @@ def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
     assert digest.review_signals(refreshed(comments=(standin(HEAD, at=AFTER_REFRESH),))) == ()
 
 
-def test_a_standin_approval_posted_before_the_refresh_head_arrived_is_not_a_signal():
-    pull = refreshed(comments=(standin(REFRESH, at="2026-10-02T10:30:00Z"),))
-    assert digest.review_signals(pull) == ()
-
-
 def test_a_standin_approval_posted_at_the_head_arrival_instant_is_not_a_signal():
     assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ()
 
 
-def test_a_standin_approval_between_arrival_and_a_later_committer_date_is_not_a_signal():
-    head = digest.PullCommit(HEAD, PUSHED, False, AFTER)
-    pull = evidence(commits=(commit(OLD, BEFORE), head), comments=(standin(HEAD, at="2026-10-02T10:30:00Z"),))
-    assert digest.review_signals(pull) == ()
+def test_a_standin_approval_with_no_established_head_date_is_not_a_signal():
+    assert digest.review_signals(evidence(comments=(standin(HEAD),), head_date="")) == ()
 
 
 def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
@@ -896,3 +890,90 @@ def test_collect_pull_carries_the_comment_author_type_and_update_time(monkeypatc
     pull = digest.collect_pull("o/r", MERGED)
     assert pull.comments == (digest.Comment("joeharris76", "text", AFTER, "User", LATER),)
     assert pull.base_changed_at == AFTER
+
+
+ORACLE_PATH = ".github/workflows/oracle-review.yml@refs/pull/7/merge"
+
+
+def oracle_run(at, event="synchronize"):
+    return {
+        "path": ORACLE_PATH,
+        "created_at": at,
+        "display_title": f"feat: change ({event})",
+        "event": "pull_request",
+        "pull_requests": [{"number": 7}],
+    }
+
+
+def collected_pull(monkeypatch, commits, head, head_runs, comments, *, runs_error=None):
+    pull = {**pull_of(head, len(commits)), "user": {"login": "dev"}}
+
+    def fake_json(*args):
+        endpoint = args[1]
+        if endpoint.endswith("/pulls/7"):
+            return pull
+        return {"workflow_runs": head_runs}
+
+    def fake_pages(endpoint):
+        if endpoint.endswith("/pulls/7/commits"):
+            return commits
+        if "actions/runs?head_sha=" in endpoint:
+            if runs_error:
+                raise runs_error
+            return [{"workflow_runs": head_runs}]
+        if endpoint.endswith("/comments"):
+            return comments
+        return []
+
+    monkeypatch.setattr(digest, "merged_pull_number", lambda repo, sha: 7)
+    monkeypatch.setattr(digest, "gh_json", fake_json)
+    monkeypatch.setattr(digest, "gh_pages", fake_pages)
+    monkeypatch.setattr(digest, "collect_threads", lambda repo, number: ())
+    monkeypatch.setattr(digest, "merge_adds_content", lambda sha, base, cwd=None: False)
+    monkeypatch.setattr(digest, "run", lambda args, **_: head + "\n")
+    return digest.collect_pull("o/r", MERGED)
+
+
+def rest_comment(sha, at):
+    return {
+        "user": {"login": "joeharris76", "type": "User"},
+        "body": f"Stand-in oracle review: APPROVE {sha}",
+        "created_at": at,
+        "updated_at": at,
+    }
+
+
+@pytest.mark.parametrize(
+    ("approved_at", "expected"),
+    [("2026-10-02T10:05:00Z", ()), ("2026-10-02T10:10:00Z", ()), ("2026-10-02T10:15:00Z", ("stand-in",))],
+)
+def test_a_standin_for_a_refresh_head_must_follow_the_run_that_pushed_it(monkeypatch, approved_at, expected):
+    commits = [api_commit(OLD, BEFORE), api_commit(REFRESH, "2026-10-02T10:00:00Z", 2)]
+    pull = collected_pull(
+        monkeypatch,
+        commits,
+        REFRESH,
+        [oracle_run("2026-10-02T10:10:00Z", "opened")],
+        [rest_comment(REFRESH, approved_at)],
+    )
+    assert pull.commits[-1].is_refresh
+    assert digest.review_signals(pull) == expected
+
+
+@pytest.mark.parametrize(
+    ("approved_at", "expected"),
+    [("2026-10-02T10:30:00Z", ()), ("2026-10-02T11:30:00Z", ("stand-in",))],
+)
+def test_a_standin_must_follow_the_latest_run_when_the_head_moved_away_and_back(monkeypatch, approved_at, expected):
+    commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
+    runs = [oracle_run("2026-10-02T10:00:00Z", "opened"), oracle_run("2026-10-02T11:00:00Z")]
+    pull = collected_pull(monkeypatch, commits, HEAD, runs, [rest_comment(HEAD, approved_at)])
+    assert digest.review_signals(pull) == expected
+
+
+def test_a_failing_head_runs_fetch_fails_closed(monkeypatch):
+    commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
+    with pytest.raises(digest.ReadError):
+        collected_pull(
+            monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
+        )

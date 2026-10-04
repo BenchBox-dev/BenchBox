@@ -12,7 +12,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from oracle_review_check import STANDIN_ATTESTERS, _attested_shas, latest_base_change
+from oracle_review_check import (
+    STANDIN_ATTESTERS,
+    _attested_shas,
+    head_transition_date,
+    latest_base_change,
+    own_run_dates,
+)
 
 MANIFEST_PATH = ".github/soundness-paths.txt"
 PREDICATE_PATH = "_project/scripts/soundness_paths.py"
@@ -96,6 +102,7 @@ class PullEvidence:
     comments: tuple[Comment, ...] = ()
     threads: tuple[Thread, ...] = ()
     base_changed_at: str = ""
+    head_date: str = ""
 
     @property
     def content_cutoff(self) -> str:
@@ -139,11 +146,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     def in_window(at: str) -> bool:
         return cutoff <= at <= evidence.merged_at
 
-    standin_after = (
-        max(evidence.commits[-1].committed_at, evidence.commits[-1].arrived_at, evidence.base_changed_at)
-        if evidence.commits
-        else ""
-    )
+    standin_after = max(evidence.head_date, evidence.base_changed_at)
     signals: list[str] = []
     if any(
         r.login in CONNECTOR_LOGINS
@@ -163,6 +166,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             comment.login in STANDIN_ATTESTERS
             and comment.user_type == "User"
             and comment.updated_at in (None, comment.created_at)
+            and evidence.head_date
             and standin_after < comment.created_at <= evidence.merged_at
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
@@ -386,16 +390,26 @@ def collect_commits(
     return tuple(built)
 
 
+def collect_head_date(repo: str, head: PullCommit) -> str:
+    runs = [
+        run_
+        for page in gh_pages(f"repos/{repo}/actions/runs?head_sha={head.sha}&event=pull_request&per_page=100")
+        for run_ in page["workflow_runs"]
+    ]
+    return head_transition_date(head.committed_at, own_run_dates(runs))
+
+
 def collect_pull(repo: str, sha: str) -> PullEvidence | None:
     number = merged_pull_number(repo, sha)
     if number is None:
         return None
     pull = gh_json("api", f"repos/{repo}/pulls/{number}")
+    commits = collect_commits(repo, number, pull, f"{sha}~1")
     return PullEvidence(
         number=number,
         author=pull["user"]["login"],
         merged_at=pull["merged_at"],
-        commits=collect_commits(repo, number, pull, f"{sha}~1"),
+        commits=commits,
         reviews=tuple(
             Review(
                 (r.get("user") or {}).get("login", ""),
@@ -421,6 +435,7 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
         ),
         threads=collect_threads(repo, number),
         base_changed_at=latest_base_change(gh_pages(f"repos/{repo}/issues/{number}/timeline")) or "",
+        head_date=collect_head_date(repo, commits[-1]) if commits else "",
     )
 
 
