@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import duckdb
 import pytest
 
+from benchbox.cli.config import ConfigManager
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
@@ -11,7 +15,7 @@ from benchbox.core.tuning.applied_ledger import (
     AppliedTuningLedger,
     recording_connection,
 )
-from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
+from benchbox.core.tuning.interface import TableTuning, TuningColumn, TuningType, UnifiedTuningConfiguration
 from benchbox.core.tuning.introspection import (
     BOUND_EXPRESSION_DIFF_NOTE,
     CORROBORATED,
@@ -22,6 +26,11 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "tuning"
+SORT_ONLY_FIXTURE = FIXTURES / "duckdb_sort_only.yaml"
+CLICKHOUSE_FIXTURE = FIXTURES / "clickhouse_sort_partition.yaml"
+PLATFORMS_ROOT = Path(__file__).resolve().parents[3] / "benchbox" / "platforms"
 
 
 @pytest.fixture
@@ -125,3 +134,42 @@ class TestDuckDBPhysicalIdentifiers:
         [entry] = receipt.entries
         assert entry.verdict == MISMATCH
         assert BOUND_EXPRESSION_DIFF_NOTE not in entry.diff
+
+
+def test_sort_only_fixture_config_reaches_applied_verified_through_the_real_schema(schema_connection):
+    adapter, connection = schema_connection
+    config = ConfigManager().load_unified_tuning_config(SORT_ONLY_FIXTURE, platform="duckdb")
+    ledger = adapter._applied_tuning_ledger
+
+    adapter.apply_unified_tuning(config, recording_connection(connection, ledger, PHASE_DDL))
+    status, payload = adapter._corroborate_applied_ledger(connection, APPLIED_UNVERIFIED)
+
+    assert status == APPLIED_VERIFIED
+    assert payload["corroborated"] is True
+    assert {entry["verdict"] for entry in payload["entries"]} == {CORROBORATED}
+
+
+def test_no_tuning_builder_derives_a_table_identifier_by_casing_the_logical_name():
+    offenders = [
+        f"{path.relative_to(PLATFORMS_ROOT)}:{number}"
+        for path in sorted(PLATFORMS_ROOT.rglob("*.py"))
+        for number, line in enumerate(path.read_text().splitlines(), start=1)
+        if re.search(r"table_tuning\.table_name\.(upper|lower)\(\)", line)
+    ]
+
+    assert offenders == []
+
+
+def test_clickhouse_fixture_requests_sort_and_partition_without_constraints():
+    config = ConfigManager().load_unified_tuning_config(CLICKHOUSE_FIXTURE, platform="clickhouse")
+
+    lineitem = config.table_tunings["LINEITEM"]
+    orders = config.table_tunings["ORDERS"]
+    assert [column.name for column in lineitem.get_columns_by_type(TuningType.SORTING)] == [
+        "L_ORDERKEY",
+        "L_LINENUMBER",
+    ]
+    assert [column.name for column in lineitem.get_columns_by_type(TuningType.PARTITIONING)] == ["L_SHIPDATE"]
+    assert [column.name for column in orders.get_columns_by_type(TuningType.SORTING)] == ["O_ORDERKEY", "O_ORDERDATE"]
+    assert not config.primary_keys.enabled
+    assert not config.foreign_keys.enabled

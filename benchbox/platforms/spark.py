@@ -202,6 +202,8 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     - Catalyst optimizer for query planning
     """
 
+    physical_identifier_case = "lower"
+
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
@@ -775,7 +777,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Spark tunings for table: {table_name}")
 
         spark = connection

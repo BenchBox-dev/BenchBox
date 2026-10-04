@@ -73,6 +73,8 @@ class AthenaAdapter(PlatformAdapter):
     - Workgroup-based resource management and cost controls
     """
 
+    physical_identifier_case = "lower"
+
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -1409,7 +1411,7 @@ class AthenaAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Athena tunings for {table_name} applied at table creation time")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
