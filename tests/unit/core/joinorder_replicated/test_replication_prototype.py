@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from benchbox.core.joinorder_replicated.replicator import (
@@ -319,6 +321,13 @@ def test_lookup_fk_values_never_shift():
     assert ("movie_companies", "company_type_id", "company_type") in LOOKUP_FK_COLUMNS
 
 
+_PROJECT_DIR = Path(__file__).resolve().parents[4] / "_project"
+_NO_PROJECT_DIR = pytest.mark.skipif(
+    not _PROJECT_DIR.is_dir(), reason="_project is not in this checkout (release tree)"
+)
+
+
+@_NO_PROJECT_DIR
 def test_prototype_stays_deferred_until_reapproval():
     import re
     from pathlib import Path
@@ -363,6 +372,7 @@ def test_manifest_provenance_matches_canonical_vocabulary():
     assert "source_archive_hash" not in body
 
 
+@_NO_PROJECT_DIR
 def test_expected_cardinality_scaling_against_oracle():
     import json
     from pathlib import Path

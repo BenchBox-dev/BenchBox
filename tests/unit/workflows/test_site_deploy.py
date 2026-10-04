@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -192,7 +194,8 @@ def test_job_graph_orders_resolve_build_deploy_probe() -> None:
     jobs = _jobs()
     assert "needs" not in jobs["resolve"]
     assert jobs["build"]["needs"] == "resolve"
-    assert jobs["deploy"]["needs"] == ["resolve", "build"]
+    assert jobs["deploy"]["needs"] == ["resolve", "build", "visual"]
+    assert jobs["visual"]["needs"] == ["resolve", "build"]
     assert jobs["preview"]["needs"] == ["resolve", "build"]
 
 
@@ -232,3 +235,145 @@ def test_build_refuses_a_candidate_whose_control_plane_differs_from_the_dispatch
     for path in ("deploy", "scripts/site_deploy", "scripts/publication", "scripts/assemble_public_site.py"):
         assert path in guard["run"]
     assert names.index("Refuse a control plane that differs from the dispatched revision") < names.index("Run gates")
+
+
+def _step(job: str, name: str) -> dict[str, Any]:
+    return next(step for step in _steps(job) if step.get("name") == name)
+
+
+def test_resolve_exposes_the_renderer_and_whether_the_visual_comparison_runs() -> None:
+    outputs = _jobs()["resolve"]["outputs"]
+    assert outputs["renderer"] == "${{ steps.resolve.outputs.renderer }}"
+    assert outputs["visual_required"] == "${{ steps.resolve.outputs.visual_required }}"
+
+
+def test_each_renderer_builds_only_its_own_site() -> None:
+    build = _jobs()["build"]
+    assert build["env"]["RENDERER"] == "${{ needs.resolve.outputs.renderer }}"
+    for name in ("Build release documentation", "Generate trunk documentation inputs", "Build trunk documentation"):
+        assert "needs.resolve.outputs.renderer == 'sphinx'" in _step("build", name)["if"], name
+    for name in ("Build the release site with Astro", "Build the trunk site with Astro"):
+        step = _step("build", name)
+        assert "needs.resolve.outputs.renderer == 'astro'" in step["if"], name
+        assert "make site-build" in step["run"]
+    assert _step("build", "Build the release site with Astro")["working-directory"] == "release"
+    nodes = [step for step in _steps("build") if "setup-node" in step.get("uses", "")]
+    assert {step["with"]["node-version"] for step in nodes} == {"20", "22"}
+    assemble = _step("build", "Assemble routes")
+    assert '--renderer "$RENDERER"' in assemble["run"]
+
+
+def test_visual_comparison_runs_only_when_resolve_requires_it_and_reuses_the_capture_spec() -> None:
+    visual = _jobs()["visual"]
+    assert visual["if"] == "needs.resolve.outputs.visual_required == 'true'"
+    assert visual["permissions"] == {"contents": "read", "actions": "read"}
+    assert "environment" not in visual
+    fetch = _step("visual", "Fetch the last production artifact")
+    assert "scripts.site_deploy fetch-run" in fetch["run"]
+    assert "--verify-tree" in fetch["run"]
+    assert "--receipt-sha256" in fetch["run"]
+    runs = [step for step in visual["steps"] if step.get("run") == "npm run test:e2e:public-site"]
+    assert [step["name"] for step in runs] == [
+        "Capture the last production artifact",
+        "Capture the candidate artifact",
+        "Compare the candidate with the last production artifact",
+    ]
+    production, candidate, compare = (step["env"] for step in runs)
+    assert production["PUBLIC_SITE_VISUAL_PHASE"] == candidate["PUBLIC_SITE_VISUAL_PHASE"] == "capture"
+    assert production["E2E_SITE_DIR"].endswith("/production/tree")
+    assert production["PUBLIC_SITE_VISUAL_RENDERER"] == "${{ steps.production.outputs.renderer }}"
+    assert candidate["PUBLIC_SITE_VISUAL_RENDERER"] == "${{ needs.resolve.outputs.renderer }}"
+    assert compare["PUBLIC_SITE_VISUAL_PHASE"] == "compare"
+    assert "PUBLIC_SITE_VISUAL_RENDERER" not in compare
+    assert compare["PUBLIC_SITE_VISUAL_REQUIRE_BASELINE"] == "1"
+    assert compare["PUBLIC_SITE_VISUAL_BASELINE"] == production["PUBLIC_SITE_VISUAL_OUTPUT"]
+    assert compare["PUBLIC_SITE_VISUAL_OUTPUT"] == candidate["PUBLIC_SITE_VISUAL_OUTPUT"]
+    assert compare["PUBLIC_SITE_VISUAL_BASE_SHA"] == production["PUBLIC_SITE_VISUAL_SOURCE_SHA"]
+    assert compare["PUBLIC_SITE_VISUAL_SOURCE_SHA"] == "${{ needs.resolve.outputs.trunk_sha }}"
+    assert compare["PR_HEAD_SHA"] == "${{ steps.binding.outputs.binding }}"
+    assert compare["APPROVED_HEAD_SHA"] == "${{ vars.SITE_DEPLOY_VISUAL_APPROVED_BINDING }}"
+    binding = _step("visual", "Bind the approval to the release, candidate and baseline")
+    assert binding["id"] == "binding"
+    assert "scripts.site_deploy visual-binding" in binding["run"]
+    assert "--candidate candidate --baseline production/tree" in binding["run"]
+    names = [step.get("name") for step in visual["steps"]]
+    assert (
+        names.index("Fetch the last production artifact") < names.index(binding["name"]) < names.index(runs[0]["name"])
+    )
+    assert compare["APPROVAL_REASON"] == "${{ vars.SITE_DEPLOY_VISUAL_APPROVAL_REASON }}"
+    assert "vars.APPROVED_HEAD_SHA" not in SITE_DEPLOY_PATH.read_text(encoding="utf-8")
+    package = (ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8")
+    assert "e2e/captures/public-site-pages.spec.ts" in package
+
+
+def test_deploy_waits_for_a_required_visual_comparison_and_probe_survives_its_skip() -> None:
+    condition = _jobs()["deploy"]["if"]
+    assert condition.startswith("${{ !cancelled()")
+    assert condition.endswith("}}")
+    assert "needs.build.result == 'success'" in condition
+    assert "needs.visual.result == 'success'" in condition
+    assert "needs.visual.result == 'skipped' && needs.resolve.outputs.visual_required != 'true'" in condition
+    assert _jobs()["probe"]["if"] == "${{ !cancelled() && needs.deploy.result == 'success' }}"
+
+
+def test_resolve_pins_the_locked_yaml_reader_without_the_project() -> None:
+    run = _step("resolve", "Resolve candidate and generation")["run"]
+    lock = (ROOT / "uv.lock").read_text(encoding="utf-8")
+    locked = re.search(r'name = "pyyaml"\nversion = "([^"]+)"', lock)
+    assert locked
+    assert f'uv run --no-project --with "pyyaml=={locked.group(1)}" -- python -m scripts.site_deploy resolve' in run
+    assert "uv sync" not in run
+
+
+def test_plain_python_jobs_can_import_the_cli_without_third_party_packages() -> None:
+    plain = [
+        step["run"]
+        for job in ("deploy", "probe", "visual")
+        for step in _steps(job)
+        if "python -m scripts.site_deploy" in str(step.get("run", ""))
+    ]
+    assert plain and not any("uv run" in run for run in plain)
+    code = "import sys; sys.modules.update(yaml=None, duckdb=None); import scripts.site_deploy.cli"
+    result = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_visual_comparison_covers_exactly_the_release_sourced_capture_routes() -> None:
+    from scripts.site_deploy import routes
+    from scripts.site_deploy.renderer import RENDERERS
+
+    spec = (ROOT / "results-explorer" / "e2e" / "captures" / "public-site-pages.spec.ts").read_text(encoding="utf-8")
+    captured = dict(re.findall(r'slug:\s*"([^"]+)",\s*path:\s*"([^"]+)"', spec))
+    assert len(captured) >= 6
+    selected = _jobs()["visual"]["env"]["PUBLIC_SITE_VISUAL_ROUTES"].split(",")
+    manifest = routes.load_manifest(ROOT / "deploy" / "routes.yml")
+    for renderer in RENDERERS:
+        release_owned = sorted(
+            slug
+            for slug, path in captured.items()
+            if manifest.refs[routes.owner_ref(manifest, path, renderer)] == "release-tag"
+        )
+        assert sorted(selected) == release_owned, renderer
+    assert "PUBLIC_SITE_VISUAL_ROUTES" in spec
+
+
+def test_visual_comparison_is_required_on_a_release_or_renderer_change() -> None:
+    from scripts.site_deploy import cli
+    from scripts.site_deploy.generation import Deployed
+
+    deployed = Deployed(
+        generation=1,
+        trunk_sha="a" * 40,
+        release_tag="v0.4.1",
+        corpus_sha="1" * 40,
+        run_id=1,
+        receipt_sha256="0" * 64,
+        artifact_sha256="f" * 64,
+        ui_version=11,
+        snapshot_version=11,
+        renderer="sphinx",
+        release_sha="9" * 40,
+    )
+    assert cli.visual_comparison_required(deployed, "sphinx", "9" * 40) is False
+    assert cli.visual_comparison_required(deployed, "sphinx", "8" * 40) is True
+    assert cli.visual_comparison_required(deployed, "astro", "9" * 40) is True

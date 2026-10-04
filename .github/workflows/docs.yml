@@ -72,7 +72,7 @@ jobs:
             exit 1
           }
           SITE_PATHS=(
-            benchbox/ docs/ examples/ landing/
+            benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py

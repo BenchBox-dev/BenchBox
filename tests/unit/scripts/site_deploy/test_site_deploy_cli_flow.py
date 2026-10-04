@@ -8,7 +8,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from scripts.site_deploy import candidate, checksums, cli, generation, receipt
+from scripts.site_deploy import candidate, checksums, cli, generation, receipt, renderer
 from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, SHA_B, FakeGitHub, make_receipt
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
@@ -23,6 +23,7 @@ def _use(monkeypatch: pytest.MonkeyPatch, api: FakeGitHub) -> None:
     monkeypatch.setattr(candidate, "tag_commit", lambda repo_dir, tag: SHA_A)
     monkeypatch.setattr(candidate, "first_parent_shas", lambda repo_dir, ref, limit=50: [SHA_B])
     monkeypatch.setattr(candidate, "is_ancestor", lambda repo_dir, ancestor, descendant: ancestor == SHA_A)
+    monkeypatch.setattr(renderer, "tree_paths", lambda repo_dir, commit: ["docs/index.rst", "landing/index.html"])
 
 
 def _green(api: FakeGitHub) -> None:

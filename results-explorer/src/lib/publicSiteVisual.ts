@@ -7,8 +7,11 @@ export type VisualCapture = {
   viewport_width: number;
 };
 
+export const DEFAULT_VISUAL_RENDERER = "sphinx";
+
 export type VisualManifest = {
   capture_profile?: string;
+  renderer?: string;
   captures: VisualCapture[];
 };
 
@@ -61,5 +64,42 @@ export function compareVisualManifests(
     approvedUnexpected: approvalApplied ? unexpected : [],
     approvedChanged: approvalApplied ? changed : [],
     approvalApplied,
+  };
+}
+
+export type RendererAwareComparison = VisualComparison & {
+  baselineRenderer: string;
+  currentRenderer: string;
+  rendererChanged: boolean;
+  message: string;
+};
+
+export function compareVisualManifestsAcrossRenderers(
+  baseline: VisualManifest,
+  current: VisualManifest,
+  approval?: VisualApproval,
+): RendererAwareComparison {
+  const baselineRenderer = baseline.renderer ?? DEFAULT_VISUAL_RENDERER;
+  const currentRenderer = current.renderer ?? DEFAULT_VISUAL_RENDERER;
+  const rendererChanged = baselineRenderer !== currentRenderer;
+  const labels = { baselineRenderer, currentRenderer, rendererChanged };
+  if (!rendererChanged) {
+    const comparison = compareVisualManifests(baseline, current, approval);
+    return { ...comparison, ...labels, message: `visual baseline mismatch; changed captures: ${comparison.changed.join(", ")}` };
+  }
+  const key = (capture: VisualCapture) => `${capture.route}@${capture.viewport_width}`;
+  const baselineKeys = new Set(baseline.captures.map(key));
+  const unmatched = compareVisualManifests(baseline, current, approval);
+  const everyCapture = current.captures.map(key).filter((captureKey) => baselineKeys.has(captureKey));
+  const approvalApplied = hasExactHeadVisualApproval(approval);
+  return {
+    missing: unmatched.missing,
+    unexpected: unmatched.unexpected,
+    changed: approvalApplied ? [] : everyCapture,
+    approvedUnexpected: unmatched.approvedUnexpected,
+    approvedChanged: approvalApplied ? everyCapture : [],
+    approvalApplied,
+    ...labels,
+    message: `renderer changed from ${baselineRenderer} to ${currentRenderer}; every capture differs and needs an exact-head approval (APPROVED_HEAD_SHA equal to the PR head and a nonempty APPROVAL_REASON)`,
   };
 }

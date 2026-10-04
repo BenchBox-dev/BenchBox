@@ -21,6 +21,122 @@ root-relative paths; docs pages use their own `_static`, so the two Sphinx
 builds never collide. The assembler refuses any path claimed twice. The corpus
 SHA in a receipt is the git tree hash of `results-data/` at the trunk SHA.
 
+## Renderer
+
+One renderer builds every route of an artifact. `deploy/routes.yml` names the
+policy:
+
+- `renderer: sphinx`, the committed value, holds every route on Sphinx whatever
+  the release tag contains.
+- `renderer: auto` selects the renderer from the tree of the newest release
+  tag's commit, never from the working tree. It selects Astro when that tree
+  contains every one of `website/package.json`, `website/package-lock.json`,
+  `website/astro.config.ts`, `website/src/converter/cli.ts`,
+  `website/src/pages/index.astro`, `website/src/pages/404.astro`,
+  `website/src/pages/blog.astro`, at least one file under each of
+  `website/src/pages/docs/`, `website/src/pages/blog/` and
+  `website/src/pages/prompts/`, a `site-build:` target in
+  `make/documentation.mk`, and no `.rst` file under `docs/` (every page has been
+  migrated to MyST). This is what "the release tag contains `website/` and all
+  migrated content" means. Any tag that misses one item selects Sphinx.
+
+No policy forces Astro. `scripts/site_deploy/renderer.py` holds the list, and the
+resolve step writes the selection and its reasons to `resolved.json`.
+`test_the_committed_policy_selects_sphinx_for_any_release_tag` shows that the
+committed policy keeps Sphinx even for a ready tag, and
+`test_auto_selects_astro_only_from_a_ready_release_tag` covers `auto` on
+synthetic release trees.
+
+While the selection is Sphinx, `/docs/dev/`, `/blog/` and the root files come
+from a Sphinx build of trunk, so trunk must keep building with Sphinx until the
+switch has been deployed.
+
+### Cutover
+
+1. Cut a release from a tree that meets the list above. With the committed
+   `sphinx` policy this deploys as Sphinx, like any other release.
+2. Record the parity sign-off for that release (URL compatibility report and
+   reviewed visual changes) in the cutover pull request.
+3. The owner's cutover pull request changes `renderer: sphinx` to
+   `renderer: auto` in `deploy/routes.yml`. Merge it only after step 2.
+4. Dispatch `mode=preview`, then `mode=deploy`. The resolve step selects Astro,
+   the pre-deploy visual comparison runs and fails until its approval is set
+   (see below), and the deploy publishes every route with Astro in one run.
+5. To return to Sphinx, roll back with the `full` phase to a Sphinx receipt and
+   set `renderer: sphinx` again before the next forward deploy.
+
+### Astro layout
+
+With Astro, both refs run `make site-build`, which needs the ref's own
+`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap)
+and `/docs/`, including the API reference, come from the release tag's
+`website/dist`; `/docs/dev/`, `/blog/` and `/_images/` (the blog's images) from
+trunk's; `/results/` is trunk's Explorer build and snapshot, and the root
+`404.html`, `CNAME` and `.nojekyll` come from trunk. Each docs and blog route
+mounts the content-hashed assets of its own build under `/_astro/`: a file both
+builds produce byte for byte is kept once, and the same path with different
+bytes fails the assembly.
+
+Trunk's docs are built for `/docs/`, so assembly rewrites their root-relative
+and `https://benchbox.dev` URLs that start with `/docs/` in `href`, `src`,
+`srcset`, `action`, `poster`, `content` and `data-*` attributes to start with
+`/docs/dev/`. Sidebar, header and in-page links, images, downloads, canonical
+URLs and redirect pages therefore stay inside `/docs/dev/`; prose and
+scripts are not rewritten. The search box on every page loads the release
+tag's `/pagefind/` index, so search results always point to the release pages.
+
+Assembly refuses a mixed-renderer artifact. Each ref's stage must be the
+selected renderer's output (an Astro stage must contain `_astro/`), and every
+HTML page outside `/results/` is classified by its markers: a Sphinx page loads
+`_static/documentation_options.js`, an Astro page loads `/_astro/` assets or
+carries Astro's generator meta. A page or asset of the other renderer fails the
+assembly and removes the partial tree; the `mixed_version` gate repeats the
+check on the final tree in deploy, preview and rollback runs. `assemble_public_site.py
+--renderer` must equal the selection it recomputes from the release checkout.
+A `ui-first` rollback across renderers is refused, because it would put one
+renderer's root `404.html` into the other's artifact; use the `full` phase.
+
+Each receipt records `renderer` at the top and on every route, and the Explorer
+block adds `pins`: the UI digest (the Explorer tree without `data/`) with its
+trunk SHA, and the snapshot's sha256 with the corpus SHA. An Explorer tree
+without `data/results.duckdb` fails the assembly, and a `ui-first` rollback pins
+the snapshot that the composed tree actually serves.
+
+## Visual comparison before deploy
+
+Route and digest probes prove that the served bytes are the artifact's bytes,
+not that the layout is right. Trunk-sourced pages (`/docs/dev/`, `/blog/`,
+`/results/`) are compared on every render change by the `Public-site visual
+regression` job in `ci.yml`. Release-sourced pages are compared at deploy time by
+the `Pre-deploy visual comparison` job of this workflow. It runs when the resolve
+step reports `visual_required`: the candidate's release commit or renderer
+differs from the deployed receipt's, or a first deploy would publish Astro. It is
+skipped for rollback, which restores an artifact that was compared when it was
+first deployed.
+
+The job fetches the deployed generation's artifact through `fetch-run
+--verify-tree` (digest checked against its receipt), captures it and the
+candidate with `results-explorer/e2e/captures/public-site-pages.spec.ts`
+restricted by `PUBLIC_SITE_VISUAL_ROUTES` to the release-sourced captures
+(`landing` and `getting-started`), and compares the manifests with
+`compareVisualManifestsAcrossRenderers`. A missing capture always fails. A
+renderer change reports every capture as changed; with the same renderer, any
+changed capture fails until approved. The deploy job waits for this job and
+publishes only when it passed, or when it was skipped because it was not
+required. A deploy with no receipted production generation cannot pass it.
+
+Approval follows the exact-match rule of
+[the visual-change runbook](../development/results-explorer-browser-testing.md),
+bound to what was compared. The job verifies both trees against their digests and
+writes `visual-binding.json` into the `site-deploy-visual-<run_id>-<attempt>`
+artifact, with the binding `<release_sha>+<candidate artifact sha256>+<baseline
+artifact sha256>`. After reviewing the captures, set the repository variable
+`SITE_DEPLOY_VISUAL_APPROVED_BINDING` to that exact binding and
+`SITE_DEPLOY_VISUAL_APPROVAL_REASON` to the review note, re-run the failed jobs,
+and clear both afterwards. A binding recorded for another release, candidate
+artifact or production baseline does not apply. The pull request slot
+(`APPROVED_HEAD_SHA`) is never read here.
+
 ## Candidate and generation
 
 The merge queue is retired on `develop`, so `ci.yml` no longer certifies a trunk

@@ -35,6 +35,16 @@ def test_parity_job_is_gated_on_its_own_path_filter_and_never_required() -> None
     assert [name for name, job in jobs.items() if JOB in _needs(job)] == []
 
 
+def test_parity_job_builds_the_commit_it_records() -> None:
+    steps = _jobs()[JOB]["steps"]
+    expression = "${{ github.event.pull_request.head.sha || github.sha }}"
+    checkout = next(step for step in steps if "actions/checkout" in step.get("uses", ""))
+    run = next(step["run"] for step in steps if step.get("run", "").startswith("make site-parity"))
+
+    assert checkout["with"]["ref"] == expression
+    assert f"SITE_PARITY_SHA={expression}" in run
+
+
 def test_parity_job_builds_explorer_first_and_runs_the_make_target_on_node_22() -> None:
     steps = _jobs()[JOB]["steps"]
     runs = [step.get("run", "") for step in steps]
@@ -93,11 +103,12 @@ def test_gate_steps_leave_results_for_the_report_and_clear_stale_ones() -> None:
         ("site-parity-privacy", "privacy-result.json"),
         ("site-parity-browser", "explorer-result.json"),
         ("site-parity-browser", "browser-report.json"),
+        ("site-parity-browser", "parity-result.json"),
     ):
         recipe = _recipe(target)
         assert "rm -f" in recipe and result in recipe
     report = _recipe("site-parity-report")
     assert "rm -rf" in report
-    for flag in ("--e2e-report", "--step-result"):
+    for flag in ("--e2e-report", "--step-result", "parity-result.json", "explorer-result.json", "privacy-result.json"):
         assert flag in report
     assert "wildcard" not in report

@@ -105,6 +105,15 @@ site-test-built:
 	@npm --prefix website run verify:not-found
 	@npm --prefix website run verify:landing
 
+SITE_VISUAL_DIR ?= site-visual-astro
+SITE_VISUAL_SOURCE_SHA ?= $(SITE_PARITY_SHA)
+
+.PHONY: site-visual-capture
+site-visual-capture:
+	@test -s website/dist/results/index.html
+	@rm -rf "$(SITE_VISUAL_DIR)"
+	@E2E_PAGES_SHAPED=1 E2E_SITE_DIR="$(CURDIR)/website/dist" PUBLIC_SITE_VISUAL_RENDERER=astro PUBLIC_SITE_VISUAL_PHASE=capture PUBLIC_SITE_VISUAL_OUTPUT="$(abspath $(SITE_VISUAL_DIR))" PUBLIC_SITE_VISUAL_SOURCE_SHA="$(SITE_VISUAL_SOURCE_SHA)" npm --prefix results-explorer run test:e2e:public-site
+
 SITE_PARITY_DIR ?= site-parity
 SITE_PARITY_SHA ?= $(shell git rev-parse HEAD)
 SITE_PARITY_DESIGN ?= _project/design/site-inventory
@@ -124,12 +133,14 @@ site-parity-inventory:
 .PHONY: site-parity-browser
 site-parity-browser:
 	@mkdir -p "$(SITE_PARITY_DIR)"
-	@rm -f "$(SITE_PARITY_DIR)/browser-report.json" "$(SITE_PARITY_DIR)/explorer-result.json"
+	@rm -f "$(SITE_PARITY_DIR)/browser-report.json" "$(SITE_PARITY_DIR)/explorer-result.json" "$(SITE_PARITY_DIR)/parity-result.json"
 	@status=0; \
 	npm --prefix website run verify:explorer; code=$$?; \
 	printf '{"check": "explorer e2e", "exit": %s}\n' "$$code" > "$(SITE_PARITY_DIR)/explorer-result.json"; \
 	[ "$$code" -eq 0 ] || status=1; \
-	PARITY_E2E_REPORT="$(CURDIR)/$(SITE_PARITY_DIR)/browser-report.json" npm --prefix website run verify:parity || status=1; \
+	PARITY_E2E_REPORT="$(CURDIR)/$(SITE_PARITY_DIR)/browser-report.json" npm --prefix website run verify:parity; code=$$?; \
+	printf '{"check": "template axe and search", "exit": %s}\n' "$$code" > "$(SITE_PARITY_DIR)/parity-result.json"; \
+	[ "$$code" -eq 0 ] || status=1; \
 	exit $$status
 
 .PHONY: site-parity-privacy
@@ -155,7 +166,7 @@ site-parity-diff: site-parity-inventory
 site-parity-report: site-parity-inventory
 	@rm -rf "$(SITE_PARITY_DIR)/report"
 	@status=0; \
-	uv run -- python scripts/site_parity.py --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --published-baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" --baseline-site "$(SITE_PARITY_DIR)/sphinx" --candidate-site website/dist --output-dir "$(SITE_PARITY_DIR)/report" --e2e-report "$(SITE_PARITY_DIR)/browser-report.json" --step-result "$(SITE_PARITY_DIR)/explorer-result.json" --step-result "$(SITE_PARITY_DIR)/privacy-result.json" || status=$$?; \
+	uv run -- python scripts/site_parity.py --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --published-baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" --baseline-site "$(SITE_PARITY_DIR)/sphinx" --candidate-site website/dist --output-dir "$(SITE_PARITY_DIR)/report" --e2e-report "$(SITE_PARITY_DIR)/browser-report.json" --step-result "$(SITE_PARITY_DIR)/explorer-result.json" --step-result "$(SITE_PARITY_DIR)/parity-result.json" --step-result "$(SITE_PARITY_DIR)/privacy-result.json" || status=$$?; \
 	if [ -n "$$GITHUB_STEP_SUMMARY" ] && [ -f "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" ]; then cat "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" >> "$$GITHUB_STEP_SUMMARY"; fi; \
 	exit $$status
 

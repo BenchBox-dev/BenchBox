@@ -48,21 +48,36 @@ def _write(root: Path, name: str, content: str = "x") -> None:
 
 def _objects_inv(entries: list[str]) -> bytes:
     header = b"# Sphinx inventory version 2\n# Project: BenchBox\n# Version: 1\n# The remainder of this file is compressed using zlib.\n"
-    return header + zlib.compress("".join(f"{entry} -1 x.html Title\n" for entry in entries).encode())
+    return header + zlib.compress("".join(f"{entry} -1 api.html Title\n" for entry in entries).encode())
+
+
+def _page(root: Path, name: str, body: str, canonical: str | None = "") -> None:
+    path = "/" + name
+    default = "https://benchbox.dev/" if path == "/index.html" else f"https://benchbox.dev{path}"
+    link = f'<link rel="canonical" href="{default if canonical == "" else canonical}">' if canonical is not None else ""
+    _write(root, name, f"<title>T</title>{link}{body}")
 
 
 def _site(
     root: Path, *, theme: bool, feed_link: str, tag: bool = True, inventory: tuple[str, ...] = ("a std:doc",)
 ) -> Path:
     toc = '<div id="__toc"></div><svg id="svg-sun"></svg>' if theme else ""
-    _write(root, "index.html", "<title>Home</title><h1>Home</h1>")
-    _write(root, "docs/api.html", f'<title>API</title><h1 id="api">API</h1><dt id="benchbox.TPCH"></dt>{toc}')
-    _write(root, "blog/a.html", "<title>A</title><h1>A</h1>")
+    _page(root, "index.html", "<h1>Home</h1>")
+    _page(root, "docs/api.html", f'<h1 id="api">API</h1><dt id="benchbox.TPCH"></dt>{toc}')
+    _page(root, "blog/a.html", "<h1>A</h1>")
     _write(root, "blog/atom.xml", ATOM.format(link=feed_link))
     if tag:
-        _write(root, "blog/tag/duckdb.html", "<title>duckdb</title><h1>duckdb</h1>")
-    _write(root, "results/index.html", "<title>Results</title><h1>Results</h1>")
-    _write(root, "404.html", RESULTS_FALLBACK)
+        _page(root, "blog/tag/duckdb.html", "<h1>duckdb</h1>")
+    _write(
+        root,
+        "results/index.html",
+        '<title>Results</title><link rel="canonical" href="https://benchbox.dev/results/"><h1>Results</h1>',
+    )
+    _write(
+        root,
+        "404.html",
+        RESULTS_FALLBACK.replace("<head>", '<head><link rel="canonical" href="https://benchbox.dev/404.html">'),
+    )
     (root / "docs" / "objects.inv").write_bytes(_objects_inv(list(inventory)))
     return root
 
@@ -252,7 +267,7 @@ def test_unreviewed_additions_fail_the_report_and_are_listed(tmp_path: Path) -> 
     assert added["by_rule"] == {"/sitemap.xml": ["/sitemap.xml"]}
 
 
-def test_committed_policy_files_carry_reasons_and_pending_approval() -> None:
+def test_committed_policy_files_carry_reasons_and_only_the_signed_approvals() -> None:
     rules = site_inventory.load_allowed_differences(site_parity.DEFAULT_ALLOWED)
     redirects = site_parity.load_redirect_pages(site_parity.DEFAULT_REDIRECTS)
     added = site_parity.load_added_paths(site_parity.DEFAULT_ADDED)
@@ -261,7 +276,17 @@ def test_committed_policy_files_carry_reasons_and_pending_approval() -> None:
 
     everything = rules + redirects + added + entries + losses
     assert redirects and added and all(entry["reason"].strip() for entry in everything)
-    assert {entry["owner_approval"] for entry in everything} == {"pending"}
+    assert {entry["owner_approval"] for entry in everything} <= {"pending", "approved"}
+    approved = {entry.get("id") or entry.get("path") for entry in everything if entry["owner_approval"] == "approved"}
+    assert approved == {
+        "/_static/",
+        "/docs/_static/",
+        "/docs/_sphinx_design_static/",
+        "/docs/.buildinfo",
+        "/docs/searchindex.js",
+        "sphinx-page-sources",
+        "sphinx-doctrees",
+    }
 
 
 CANONICAL_RULES = [
@@ -272,28 +297,36 @@ CANONICAL_RULES = [
 
 
 def _canonical_page(site: Path, name: str, canonical: str | None) -> None:
-    link = "" if canonical is None else f'<link rel="canonical" href="https://benchbox.dev{canonical}">'
-    _write(site, name, f"<title>T</title>{link}<h1>T</h1>")
+    _page(site, name, "<h1>T</h1>", canonical)
 
 
 def test_canonical_rules_accept_only_the_pages_own_url(tmp_path: Path) -> None:
     baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
     candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
-    for name, canonical in (
-        ("docs/usage/a.html", "/docs/usage/a.html"),
-        ("docs/usage/index.html", "/docs/usage/"),
-        ("docs/usage/b.html", "/docs/usage/b.html"),
-    ):
+    for name in ("docs/usage/a.html", "docs/usage/index.html", "docs/usage/b.html", "docs/usage/tag-index.html"):
         _canonical_page(baseline, name, None)
-        _canonical_page(candidate, name, canonical)
+        _canonical_page(candidate, name, "")
 
     code, report = _run(tmp_path, baseline, candidate, rules=CANONICAL_RULES)
 
     assert code == 0
     assert report["comparisons"][0]["by_kind"]["changed metadata"]["remaining"] == 0
+    assert report["real_breakage"]["canonical_links"] == []
 
 
-@pytest.mark.parametrize("wrong", ["/", "/docs/usage/other.html", "/results/"])
+@pytest.mark.parametrize(
+    "wrong",
+    [
+        "https://benchbox.dev/",
+        "https://benchbox.dev/docs/usage/other.html",
+        "https://benchbox.dev/results/",
+        "http://benchbox.dev/docs/usage/a.html",
+        "https://www.benchbox.dev/docs/usage/a.html",
+        "https://benchbox.dev/docs/usage/a.html?x=1",
+        "/docs/usage/a.html",
+        "https://benchbox.dev/docs/usage/",
+    ],
+)
 def test_a_canonical_that_names_another_page_stays_remaining(tmp_path: Path, wrong: str) -> None:
     baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
     candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
@@ -305,6 +338,139 @@ def test_a_canonical_that_names_another_page_stays_remaining(tmp_path: Path, wro
     assert code == 1
     finding = f"changed metadata: /docs/usage/a.html [canonical]: '' -> '{wrong}'"
     assert [row["finding"] for row in report["real_breakage"]["differences"]] == [finding]
+    assert report["real_breakage"]["canonical_links"] == [
+        f"/docs/usage/a.html: canonical '{wrong}', expected 'https://benchbox.dev/docs/usage/a.html'"
+    ]
+
+
+def test_every_built_page_must_carry_its_own_canonical_even_without_a_baseline_page(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    _canonical_page(candidate, "blog.html", "https://benchbox.dev/blog/")
+    _canonical_page(candidate, "docs/bare.html", None)
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 1
+    assert report["real_breakage"]["canonical_links"] == [
+        "/blog.html: canonical 'https://benchbox.dev/blog/', expected 'https://benchbox.dev/blog.html'",
+        "/docs/bare.html: canonical '', expected 'https://benchbox.dev/docs/bare.html'",
+    ]
+
+
+def test_inventory_addresses_must_resolve_and_match_sphinx(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    elsewhere = "# Sphinx inventory version 2\n# Project: B\n# Version: 1\n# The remainder of this file is compressed using zlib.\n"
+    lines = "a std:doc -1 missing.html T\nb std:label -1 api.html#nope T\n"
+    (candidate / "docs" / "objects.inv").write_bytes(elsewhere.encode() + zlib.compress(lines.encode()))
+    (baseline / "docs" / "objects.inv").write_bytes(
+        elsewhere.encode() + zlib.compress(b"a std:doc -1 api.html T\nb std:label -1 api.html#$ T\n")
+    )
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [
+        "std:doc a: missing.html does not resolve in the Astro site",
+        "std:label b: api.html#nope does not resolve in the Astro site",
+    ]
+
+
+def test_inventory_address_that_differs_from_a_valid_sphinx_one_fails(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    header = "# Sphinx inventory version 2\n# Project: B\n# Version: 1\n# The remainder of this file is compressed using zlib.\n"
+    _page(baseline, "docs/other.html", "<h1>O</h1>")
+    _page(candidate, "docs/other.html", "<h1>O</h1>")
+    (baseline / "docs" / "objects.inv").write_bytes(header.encode() + zlib.compress(b"a std:doc -1 api.html T\n"))
+    (candidate / "docs" / "objects.inv").write_bytes(header.encode() + zlib.compress(b"a std:doc -1 other.html T\n"))
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == ["std:doc a: api.html in Sphinx, other.html in Astro"]
+
+
+HEADER = (
+    "# Sphinx inventory version 2\n# Project: B\n# Version: 1\n# The remainder of this file is compressed using zlib.\n"
+)
+
+
+def _inventory_run(tmp_path: Path, before: bytes, after: bytes) -> tuple[int, dict]:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    (baseline / "docs" / "objects.inv").write_bytes(HEADER.encode() + zlib.compress(before))
+    (candidate / "docs" / "objects.inv").write_bytes(HEADER.encode() + zlib.compress(after))
+    return _run(tmp_path, baseline, candidate)
+
+
+def test_a_dangling_sphinx_blog_label_may_move_to_the_matching_blog_page(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 blog/a.html#$ T\n", b"p std:label -1 ../blog/a.html T\n")
+
+    assert code == 0
+    assert report["objects_inventory"]["validity_only"] == 1
+
+
+def test_a_dangling_sphinx_blog_label_mapped_elsewhere_fails(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 blog/a.html#$ T\n", b"p std:label -1 ../index.html T\n")
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [
+        "std:label p: blog/a.html#$ in Sphinx, ../index.html in Astro"
+    ]
+
+
+def test_a_dangling_sphinx_address_outside_the_blog_still_compares(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"p std:label -1 gone.html T\n", b"p std:label -1 api.html T\n")
+
+    assert code == 1
+    assert report["objects_inventory"]["validity_only"] == 0
+
+
+@pytest.mark.parametrize("uri", ["https://example.com/docs/api.html", "http://benchbox.dev/docs/api.html"])
+def test_an_inventory_address_off_the_site_fails(tmp_path: Path, uri: str) -> None:
+    code, report = _inventory_run(tmp_path, b"a std:doc -1 api.html T\n", f"a std:doc -1 {uri} T\n".encode())
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [f"std:doc a: {uri} does not resolve in the Astro site"]
+
+
+def test_a_fragment_on_a_file_that_is_not_a_page_fails(tmp_path: Path) -> None:
+    code, report = _inventory_run(tmp_path, b"a std:doc -1 api.html T\n", b"a std:doc -1 objects.inv#x T\n")
+
+    assert code == 1
+    assert report["real_breakage"]["objects_inventory"] == [
+        "std:doc a: objects.inv#x does not resolve in the Astro site"
+    ]
+
+
+def test_the_results_page_canonical_is_checked(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 0
+    assert report["real_breakage"]["canonical_links"] == []
+
+
+def test_a_wrong_results_page_canonical_fails(tmp_path: Path) -> None:
+    baseline = _site(tmp_path / "base", theme=False, feed_link="/blog/a.html")
+    candidate = _site(tmp_path / "cand", theme=False, feed_link="/blog/a.html")
+    wrong = "https://benchbox.dev/results/index.html"
+    _write(
+        candidate,
+        "results/index.html",
+        f'<title>Results</title><link rel="canonical" href="{wrong}"><h1>Results</h1>',
+    )
+
+    code, report = _run(tmp_path, baseline, candidate)
+
+    assert code == 1
+    assert report["real_breakage"]["canonical_links"] == [
+        f"/results/index.html: canonical '{wrong}', expected 'https://benchbox.dev/results/'"
+    ]
 
 
 def test_lost_inventory_entries_fail_unless_allowed(tmp_path: Path) -> None:

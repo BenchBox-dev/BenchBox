@@ -366,6 +366,12 @@ def test_digest_gate_rejects_bad_snapshot_before_cli(
         matrix.test_local_platform_benchmark_matrix(tmp_path, monkeypatch, "duckdb", "tpch")
 
 
+@pytest.mark.skipif(
+    not (
+        Path(__file__).resolve().parents[2] / "_project" / "scripts" / "regenerate_correctness_gate_digests.py"
+    ).exists(),
+    reason="_project scripts are not in this checkout (release tree)",
+)
 @pytest.mark.parametrize("seed", [31, None, True])
 def test_digest_regeneration_binds_validated_snapshot_seed(
     monkeypatch: pytest.MonkeyPatch, digest_reference_path: Path, seed: object
