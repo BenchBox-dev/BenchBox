@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { builtSite } from "./built-site.ts";
+import { REDIRECT_PAGES } from "../src/lib/legacy-assets.ts";
 import { canonicalPath, pageMeta, renderRobots, renderSitemap, sitemapPathForFile } from "../src/lib/page-meta.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -86,7 +87,7 @@ function content(markup: string, attribute: "name" | "property", value: string):
 
 describe.skipIf(!dist)("built site", () => {
   const site = dist as string;
-  const pages = dist ? inventoryPages(site) : [];
+  const pages = dist ? inventoryPages(site).filter((file) => !Object.hasOwn(REDIRECT_PAGES, file)) : [];
 
   it("gives every html page canonical, description, Open Graph and Twitter tags", () => {
     const missing: string[] = [];

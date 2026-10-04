@@ -109,6 +109,8 @@ class DocumentConverter implements ConvertContext {
   extensions: ReadonlySet<string> = new Set();
   readonly errors: ConverterError[] = [];
   readonly components = new Set<ComponentName>();
+  private readonly downloads = new Set<string>();
+  private readonly images = new Set<string>();
   readonly pageData = new Map<string, unknown>();
   readonly tags: string[] = [];
   readonly toctrees: ToctreeBlock[] = [];
@@ -258,6 +260,14 @@ class DocumentConverter implements ConvertContext {
 
   useComponent(name: ComponentName): void {
     this.components.add(name);
+  }
+
+  recordDownload(relative: string): void {
+    this.downloads.add(relative);
+  }
+
+  recordImage(name: string): void {
+    this.images.add(name);
   }
 
   flushLabels(title: TitleNode[] | undefined): { id: string; node: Html }[] {
@@ -567,6 +577,8 @@ class DocumentConverter implements ConvertContext {
       toc: this.toc,
       tags: [...tags],
       orphan: this.pageData.get("orphan") === true,
+      downloads: [...this.downloads].sort(),
+      images: [...this.images].sort(),
     };
     return {
       path: this.file,

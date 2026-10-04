@@ -10,6 +10,7 @@ import { defineConfig } from "astro/config";
 import type { SidebarManifest } from "./src/converter/sidebar.ts";
 import { toStarlightSidebar } from "./src/converter/sidebar.ts";
 import { renderRobots, renderSitemap, sitemapPathForFile } from "./src/lib/page-meta.ts";
+import { publishLegacyFiles, renderObjectsInventory, REDIRECT_PAGES, type InventoryEntry, type LegacyFiles } from "./src/lib/legacy-assets.ts";
 import { docutilsQuotes, SMARTYPANTS } from "./src/lib/smartypants.ts";
 import { treeDigest } from "./src/lib/tree-digest.ts";
 import { headingIds } from "./src/plugins/heading-ids.ts";
@@ -52,9 +53,14 @@ const publishStatic = (): AstroIntegration => ({
       cpSync(path.join(repoRoot, "docs", "CNAME"), path.join(out, "CNAME"));
       writeFileSync(path.join(out, ".nojekyll"), "");
       writeFileSync(path.join(out, "robots.txt"), renderRobots());
-      const pages = htmlFiles(out).filter((file) => file !== "404.html");
+      const pages = htmlFiles(out).filter((file) => file !== "404.html" && !Object.hasOwn(REDIRECT_PAGES, file));
       writeFileSync(path.join(out, "sitemap.xml"), renderSitemap(pages.map(sitemapPathForFile)));
       for (const name of readdirSync(images)) cpSync(path.join(images, name), path.join(out, "_images", name));
+      const legacy = JSON.parse(readFileSync(path.join(repoRoot, "website", ".generated", "manifest", "legacy-files.json"), "utf-8")) as LegacyFiles;
+      publishLegacyFiles(legacy, path.join(repoRoot, "docs"), out);
+      const entries = JSON.parse(readFileSync(path.join(repoRoot, "website", ".generated", "manifest", "inventory-entries.json"), "utf-8")) as InventoryEntry[];
+      const version = /^version = "([^"]+)"/m.exec(readFileSync(path.join(repoRoot, "pyproject.toml"), "utf-8"))?.[1] ?? "";
+      writeFileSync(path.join(out, "docs", "objects.inv"), renderObjectsInventory(entries, "BenchBox", version));
     },
   },
 });

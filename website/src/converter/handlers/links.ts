@@ -46,13 +46,16 @@ export const BLOG_PAGES: Readonly<Record<string, string>> = {
   "blog/author.html": "/blog/author.html",
 };
 
-type Resolution = { url: string; title?: TitleNode[]; blogPage?: string };
+type Resolution = { url: string; title?: TitleNode[]; blogPage?: string; download?: string };
 
 function resolveTarget(target: string, context: ConvertContext, at: SourcePosition, fragment: string): Resolution {
   const unresolved = (detail: string): UnresolvedReferenceError => new UnresolvedReferenceError(at.file, at.line, `link:${withFragment(target, fragment)}`, detail);
   const absolute = target.startsWith("/") ? path.join(context.docsRoot, target) : path.resolve(context.docsRoot, path.dirname(context.file), target);
   const insideDocs = path.relative(context.docsRoot, absolute);
-  if (insideDocs.startsWith("..") || path.isAbsolute(insideDocs)) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
+  if (insideDocs.startsWith("..") || path.isAbsolute(insideDocs)) {
+    const url = repositoryTarget(absolute, context.docsRoot, fragment, unresolved);
+    return DOC_SUFFIX.test(target) || !statOf(absolute)?.isFile() ? { url } : { url, download: insideDocs.split(path.sep).join("/") };
+  }
   const relative = insideDocs.split(path.sep).join("/");
   if (Object.hasOwn(BLOG_PAGES, relative)) {
     if (fragment !== "") throw unresolved(`${relative} has no anchors`);
@@ -69,7 +72,7 @@ function resolveTarget(target: string, context: ConvertContext, at: SourcePositi
     return { url: doc.route, title: doc.titleNodes };
   }
   const stats = statOf(absolute);
-  if (stats?.isFile()) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
+  if (stats?.isFile()) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved), download: relative };
   const index = stats?.isDirectory() ? context.findDoc(`${target.replace(/\/+$/, "")}/index`) : undefined;
   if (index && fragment === "") return { url: index.route, title: index.titleNodes };
   throw unresolved("does not match a document or file under docs/");
@@ -127,6 +130,7 @@ export const linkSyntax: SyntaxHandler<"link"> = {
       if (resolution.title === undefined) throw emptyText(link, at, "MyST fills empty text only for a whole page that this site builds");
       link.children = resolution.title;
     }
+    if (resolution.download !== undefined) context.recordDownload(resolution.download);
     node.url = resolution.url;
     return [node];
   },

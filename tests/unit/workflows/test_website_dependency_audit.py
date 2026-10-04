@@ -69,8 +69,8 @@ def test_website_package_is_pinned_exactly_on_node_22() -> None:
     assert package["scripts"]["check"] == "BENCHBOX_ALLOW_EMPTY_SIDEBAR=1 astro check"
 
 
-def test_only_the_site_build_job_and_website_audit_use_node_22() -> None:
-    website_jobs = {"site-build", "website-audit"}
+def test_only_the_website_jobs_use_node_22() -> None:
+    website_jobs = {"site-build", "site-parity", "website-audit"}
     for workflow in ("ci.yml", "nightly.yml"):
         for name, job in _jobs(workflow).items():
             versions = {

@@ -4,6 +4,7 @@ import { convertDocument, type ConvertedDocument } from "./document.ts";
 import { DocsIndex, placeholderInfo } from "./docs-index.ts";
 import { ConverterError, ConversionFailedError } from "./errors.ts";
 import { createDefaultRegistry } from "./handlers/index.ts";
+import type { InventoryEntry } from "../lib/legacy-assets.ts";
 import type { DocInfo } from "./model.ts";
 import type { HandlerRegistry } from "./registry.ts";
 import { findMdxProblem, serializeDocument } from "./serialize.ts";
@@ -16,6 +17,19 @@ export type BuildOptions = { docsRoot: string; registry?: HandlerRegistry; known
 export type BuildSummary = { pages: number; md: number; mdx: number; mdxPages: string[] };
 
 export type BuildResult = { files: Map<string, string>; errors: ConverterError[]; summary: BuildSummary; infos: DocInfo[] };
+
+export function inventoryEntries(infos: readonly DocInfo[]): InventoryEntry[] {
+  const entries: InventoryEntry[] = [];
+  for (const info of infos) {
+    if (info.collection !== "docs") continue;
+    const uri = info.route.replace(/^\/docs\//, "");
+    entries.push({ name: info.path.replace(/\.(md|rst)$/, ""), role: "doc", uri, title: info.title });
+    for (const label of info.labels.values()) {
+      entries.push({ name: label.label, role: "label", uri: `${uri}#${label.id}`, title: label.title === undefined ? info.title : label.title.map((node) => node.value).join("") });
+    }
+  }
+  return entries.sort((a, b) => (a.role + a.name < b.role + b.name ? -1 : a.role + a.name > b.role + b.name ? 1 : 0));
+}
 
 function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -91,6 +105,14 @@ export function buildSite(options: BuildOptions): BuildResult {
   files.set("manifest/sidebar.json", json(sidebar));
   files.set("manifest/tags.json", json(Object.fromEntries([...tags.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)))));
   files.set("manifest/summary.json", json(summary));
+  files.set("manifest/inventory-entries.json", json(inventoryEntries(infos)));
+  files.set(
+    "manifest/legacy-files.json",
+    json({
+      downloads: [...new Set(infos.flatMap((info) => info.downloads))].sort(),
+      images: [...new Set(infos.flatMap((info) => info.images))].sort(),
+    }),
+  );
   if (errors.length > 0) return { files: new Map(), errors, summary, infos };
   return { files, errors, summary, infos };
 }

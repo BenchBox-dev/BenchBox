@@ -37,6 +37,8 @@ export type DocInfo = {
   toc: TocNode[];
   tags: string[];
   orphan: boolean;
+  downloads: string[];
+  images: string[];
 };
 
 export type ResolvedDoc = { path: string; route: string; title: string; titleNodes: TitleNode[] };

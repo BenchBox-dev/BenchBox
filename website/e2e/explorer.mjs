@@ -1,27 +1,15 @@
-import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
-import { createServer } from "node:http";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
+import { firstTagRoute, startSiteServer } from "./site-server.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 const siteDir = path.resolve(process.env.SITE_DIR ?? path.join(repoRoot, "website", "dist"));
 const dataDir = path.resolve(process.env.EXPLORER_DATA_DIR ?? path.join(repoRoot, "results-explorer", "test-fixtures", ".generated", "data"));
 const ids = JSON.parse(readFileSync(path.join(dataDir, "fixture-ids.json"), "utf-8"));
-
-const types = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json",
-  ".wasm": "application/wasm",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".txt": "text/plain; charset=utf-8",
-  ".xml": "application/xml",
-};
 
 const explorerAsset = /^\/results\/|duckdb|\.wasm$/i;
 const failures = [];
@@ -31,49 +19,11 @@ function fail(message) {
   failures.push(message);
 }
 
-function resolveFile(urlPath) {
-  const clean = path.normalize(decodeURIComponent(urlPath)).replace(/^(\.\.[/\\])+/, "");
-  const underData = urlPath.startsWith("/results/data/");
-  const root = underData ? dataDir : siteDir;
-  const relative = underData ? clean.slice("/results/data/".length) : clean;
-  const candidates = urlPath.endsWith("/") ? [path.join(relative, "index.html")] : [relative, `${relative}.html`, path.join(relative, "index.html")];
-  for (const candidate of candidates) {
-    const full = path.join(root, candidate);
-    if (full.startsWith(root) && existsSync(full) && statSync(full).isFile()) return full;
-  }
-  return undefined;
-}
-
-function startServer() {
-  const served = [];
-  const server = createServer((request, response) => {
-    const url = new URL(request.url ?? "/", "http://localhost");
-    const file = resolveFile(url.pathname);
-    const target = file ?? path.join(siteDir, "404.html");
-    const status = file ? 200 : 404;
-    const size = statSync(target).size;
-    const headers = { "content-type": types[path.extname(target)] ?? "application/octet-stream", "accept-ranges": "bytes" };
-    const range = /^bytes=(\d+)-(\d+)?$/.exec(request.headers.range ?? "");
-    if (file && range) {
-      const start = Number(range[1]);
-      const end = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
-      response.writeHead(206, { ...headers, "content-range": `bytes ${start}-${end}/${size}`, "content-length": String(end - start + 1) });
-      served.push({ path: url.pathname, status: 206, bytes: end - start + 1 });
-      createReadStream(target, { start, end }).pipe(response);
-      return;
-    }
-    response.writeHead(status, { ...headers, "content-length": String(size) });
-    served.push({ path: url.pathname, status, bytes: size });
-    createReadStream(target).pipe(response);
-  });
-  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve({ server, served })));
-}
-
 for (const required of [path.join(siteDir, "404.html"), path.join(siteDir, "results", "index.html"), path.join(dataDir, "results.duckdb")]) {
   if (!existsSync(required)) throw new Error(`missing e2e input: ${required}`);
 }
 
-const { server, served } = await startServer();
+const { server, served } = await startSiteServer(siteDir, dataDir);
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 
@@ -106,11 +56,14 @@ async function blocking(page) {
 
 const nonExplorerPages = [
   "/",
+  "/docs/",
   "/docs/usage/getting-started.html",
   "/docs/benchmarks/industry-benchmarks.html",
   "/docs/reference/api-reference.html",
   "/blog/",
   "/blog/2026-05-18-v0-3-0-release-overview.html",
+  firstTagRoute(siteDir),
+  "/prompts/",
   "/docs/no-such-page.html",
 ];
 

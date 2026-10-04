@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import re
 import sys
@@ -39,6 +40,7 @@ INFO_KINDS = ("changed heading", "changed metadata", "unreferenced image", "stal
 REPORT_KINDS = FAILING_KINDS + INFO_KINDS
 HEADING_TAGS = frozenset({"h1", "h2", "h3"})
 CHROME_TAGS = frozenset({"aside", "nav", "header", "footer"})
+CONTENT_ASIDE_CLASS = "starlight-aside"
 SKIPPED_HEADING_TEXT = "¶"
 WHITESPACE_RE = re.compile(r"\s+")
 
@@ -83,6 +85,7 @@ class _PageParser(HTMLParser):
         self.links: set[str] = set()
         self.chrome_links: set[str] = set()
         self._chrome_depth = 0
+        self._chrome_stack: list[bool] = []
         self.images: set[str] = set()
         self.assets: set[str] = set()
         self.ids: set[str] = set()
@@ -107,7 +110,9 @@ class _PageParser(HTMLParser):
         if tag == "a" and values.get("name"):
             self.ids.add(values["name"] or "")
         if tag in CHROME_TAGS:
-            self._chrome_depth += 1
+            is_chrome = not (tag == "aside" and CONTENT_ASIDE_CLASS in (values.get("class") or "").split())
+            self._chrome_stack.append(is_chrome)
+            self._chrome_depth += is_chrome
         if tag == "svg":
             self._svg_depth += 1
         elif tag == "body":
@@ -136,8 +141,8 @@ class _PageParser(HTMLParser):
             self._heading_parts = []
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in CHROME_TAGS and self._chrome_depth:
-            self._chrome_depth -= 1
+        if tag in CHROME_TAGS and self._chrome_stack:
+            self._chrome_depth -= self._chrome_stack.pop()
         if tag == "svg" and self._svg_depth:
             self._svg_depth -= 1
         if tag == "title":
@@ -437,18 +442,39 @@ class _Allowances:
         return sorted(set(self.patterns) - self.used)
 
 
+def _heading_changes(page_path: str, before: list[list[str]], after: list[list[str]]) -> list[str]:
+    old = [tuple(heading) for heading in before]
+    new = [tuple(heading) for heading in after]
+    changes = []
+    for operation, old_start, old_end, new_start, new_end in difflib.SequenceMatcher(
+        None, old, new, autojunk=False
+    ).get_opcodes():
+        if operation == "equal":
+            continue
+        changes.extend(
+            f"{page_path} [headings]: removed {json.dumps(list(heading), ensure_ascii=False)}"
+            for heading in old[old_start:old_end]
+        )
+        changes.extend(
+            f"{page_path} [headings]: added {json.dumps(list(heading), ensure_ascii=False)}"
+            for heading in new[new_start:new_end]
+        )
+    return changes
+
+
 def _compare_pages(baseline: dict[str, Any], candidate: dict[str, Any], allow: _Allowances) -> dict[str, list[str]]:
     found: dict[str, list[str]] = {kind: [] for kind in REPORT_KINDS}
     base_pages: dict[str, dict[str, Any]] = baseline["pages"]
     cand_pages: dict[str, dict[str, Any]] = candidate["pages"]
     for page_path in sorted(base_pages.keys() & cand_pages.keys()):
         before, after = base_pages[page_path], cand_pages[page_path]
-        for field in ("title", "h1", "headings"):
+        for field in ("title", "h1"):
             if before[field] != after[field]:
                 found["changed heading"].append(
                     f"{page_path} [{field}]: {json.dumps(before[field], ensure_ascii=False)}"
                     f" -> {json.dumps(after[field], ensure_ascii=False)}"
                 )
+        found["changed heading"].extend(_heading_changes(page_path, before["headings"], after["headings"]))
         if before["description"] != after["description"]:
             found["changed metadata"].append(
                 f"{page_path} [description]: {json.dumps(before['description'], ensure_ascii=False)}"
@@ -522,6 +548,59 @@ def diff_inventories(
     return {kind: sorted(report[kind]) if kind != "broken internal link" else report[kind] for kind in REPORT_KINDS}
 
 
+APPROVAL_STATES = ("pending", "approved")
+
+
+def load_allowed_differences(path: Path) -> list[dict[str, str]]:
+    return validate_allowed_differences(_read_json(path), str(path))
+
+
+def validate_allowed_differences(rules: Any, path: str) -> list[dict[str, str]]:
+    if not isinstance(rules, list):
+        raise ValueError(f"{path}: expected a JSON list of allowed differences")
+    seen: set[str] = set()
+    for position, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            raise ValueError(f"{path}: rule {position} must be an object")
+        label = f"{path}: rule {position}"
+        for field in ("id", "kind", "match", "reason"):
+            if not isinstance(rule.get(field), str) or not rule[field].strip():
+                raise ValueError(f"{label} needs a nonempty '{field}'")
+        if rule["id"] in seen:
+            raise ValueError(f"{label} repeats the id {rule['id']!r}")
+        seen.add(rule["id"])
+        if rule["kind"] not in REPORT_KINDS:
+            raise ValueError(f"{label} ({rule['id']}) has the unknown kind {rule['kind']!r}")
+        if rule.get("owner_approval") not in APPROVAL_STATES:
+            raise ValueError(f"{label} ({rule['id']}) needs 'owner_approval' set to one of {APPROVAL_STATES}")
+        try:
+            re.compile(rule["match"])
+        except re.error as exc:
+            raise ValueError(f"{label} ({rule['id']}) has an invalid match pattern: {exc}") from exc
+    return rules
+
+
+def apply_allowed_differences(
+    report: dict[str, list[str]], rules: list[dict[str, str]]
+) -> tuple[dict[str, list[str]], dict[str, list[tuple[str, str]]]]:
+    remaining: dict[str, list[str]] = {kind: [] for kind in REPORT_KINDS}
+    allowed: dict[str, list[tuple[str, str]]] = {rule["id"]: [] for rule in rules}
+    compiled = [(rule, re.compile(rule["match"])) for rule in rules]
+    for kind in REPORT_KINDS:
+        for item in report[kind]:
+            owner = next((rule for rule, pattern in compiled if rule["kind"] == kind and pattern.fullmatch(item)), None)
+            if owner is None:
+                remaining[kind].append(item)
+            else:
+                allowed[owner["id"]].append((kind, item))
+    remaining["stale allowance"].extend(
+        f"{rule['id']} (matched nothing)"
+        for rule in rules
+        if not allowed[rule["id"]] and rule["kind"] != "stale allowance"
+    )
+    return remaining, allowed
+
+
 def format_report(report: dict[str, list[str]]) -> str:
     lines = [f"{kind}: {item}" for kind in REPORT_KINDS for item in report[kind]]
     lines.append("summary: " + ", ".join(f"{len(report[kind])} {kind}" for kind in REPORT_KINDS))
@@ -548,6 +627,12 @@ def _parser() -> argparse.ArgumentParser:
     diff.add_argument("--strict", action="store_true", help="also fail on informational changes")
     diff.add_argument(
         "--expected-removals", type=Path, action="append", help="reviewed JSON list of allowed removals; repeatable"
+    )
+    diff.add_argument(
+        "--allowed-differences",
+        type=Path,
+        action="append",
+        help="reviewed JSON list of pattern rules for allowed differences; repeatable",
     )
     check = commands.add_parser("check", help="report broken internal links and images in one inventory")
     check.add_argument("--inventory", type=Path, required=True)
@@ -578,6 +663,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 else None
             )
             diff_report = diff_inventories(load_inventory(args.baseline), load_inventory(args.candidate), removals)
+            if args.allowed_differences:
+                rules = [rule for path in args.allowed_differences for rule in load_allowed_differences(path)]
+                diff_report, _ = apply_allowed_differences(diff_report, rules)
             sys.stdout.write(format_report(diff_report))
             return exit_code(diff_report, strict=args.strict)
         inventory = load_inventory(args.inventory)

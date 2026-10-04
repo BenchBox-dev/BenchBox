@@ -19,7 +19,9 @@ let indexed = 0;
 for (const section of ["docs", "blog"]) {
   for (const file of htmlFiles(path.join(site, section))) {
     const url = `/${path.relative(site, file).split(path.sep).join("/")}`;
-    const { errors } = await index.addHTMLFile({ sourcePath: path.relative(site, file), url, content: readFileSync(file, "utf-8") });
+    const content = readFileSync(file, "utf-8");
+    if (/http-equiv="refresh"/i.test(content)) continue;
+    const { errors } = await index.addHTMLFile({ sourcePath: path.relative(site, file), url, content });
     if (errors.length > 0) throw new Error(`pagefind failed on ${url}: ${errors.join("; ")}`);
     indexed += 1;
   }

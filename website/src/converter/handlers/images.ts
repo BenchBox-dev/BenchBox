@@ -20,6 +20,7 @@ export const imageSyntax: SyntaxHandler<"image"> = {
     if (path.posix.dirname(relative) !== IMAGE_DIRECTORY) {
       throw new ConverterError(at.file, at.line, `image ${node.url} is not published: images must live directly in docs/${IMAGE_DIRECTORY}/`);
     }
+    context.recordImage(path.posix.basename(relative));
     return [{ ...node, url: `${IMAGE_URL_PREFIX}/${encodeURI(path.posix.basename(relative))}` }];
   },
 };

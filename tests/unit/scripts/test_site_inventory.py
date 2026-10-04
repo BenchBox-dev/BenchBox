@@ -538,3 +538,88 @@ def test_known_broken_allows_listed_links_only(tmp_path: Path, capsys: pytest.Ca
     capsys.readouterr()
     assert site_inventory.main(check) == 1
     assert "/docs/guide.html#setup (missing fragment)" in capsys.readouterr().out
+
+
+def _rule(**overrides: str) -> dict[str, str]:
+    return {
+        "id": "theme",
+        "kind": "missing fragment",
+        "match": r".*#(__toc|svg-[a-z]+)",
+        "reason": "theme ids belong to the retired theme",
+        "owner_approval": "pending",
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"kind": "no such kind"},
+        {"match": "("},
+        {"reason": " "},
+        {"owner_approval": "maybe"},
+    ],
+)
+def test_allowed_differences_reject_malformed_rules(tmp_path: Path, broken: dict[str, str]) -> None:
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps([_rule(**broken)]), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        site_inventory.load_allowed_differences(path)
+
+
+def test_allowed_differences_reject_repeated_ids(tmp_path: Path) -> None:
+    path = tmp_path / "rules.json"
+    path.write_text(json.dumps([_rule(), _rule()]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="repeats the id"):
+        site_inventory.load_allowed_differences(path)
+
+
+def test_cli_diff_applies_allowed_differences(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    base_site = _fixture(tmp_path / "base")
+    _write(base_site, "docs/guide.html", GUIDE.replace("</body>", '<div id="__toc"></div></body>'))
+    cand_site = _fixture(tmp_path / "cand")
+    base_json, cand_json = tmp_path / "base.json", tmp_path / "cand.json"
+    site_inventory.main(["build", "--site-dir", str(base_site), "--output", str(base_json)])
+    site_inventory.main(["build", "--site-dir", str(cand_site), "--output", str(cand_json)])
+    args = ["diff", "--baseline", str(base_json), "--candidate", str(cand_json)]
+    rules = tmp_path / "rules.json"
+    rules.write_text(json.dumps([_rule(), _rule(id="unused", match="nothing")]), encoding="utf-8")
+
+    assert site_inventory.main(args) == 1
+    capsys.readouterr()
+    assert site_inventory.main([*args, "--allowed-differences", str(rules)]) == 0
+    out = capsys.readouterr().out
+    assert "missing fragment" not in out.splitlines()[0]
+    assert "stale allowance: unused (matched nothing)" in out
+
+
+def test_admonition_asides_keep_their_links_on_the_page_but_nav_asides_stay_chrome() -> None:
+    markup = (
+        '<aside class="starlight-aside"><a href="/docs/x.html">note</a></aside>'
+        '<aside class="sidebar"><a href="/docs/y.html">menu</a></aside><a href="/docs/z.html">after</a>'
+    )
+
+    page, chrome, _ = site_inventory.parse_page("/docs/p.html", markup)
+
+    assert page["links"] == ["/docs/x.html", "/docs/z.html"]
+    assert chrome == {"/docs/y.html"}
+
+
+def test_heading_changes_are_reported_one_heading_at_a_time(tmp_path: Path) -> None:
+    baseline = _build(_fixture(tmp_path / "base"))
+    candidate_site = _fixture(tmp_path / "cand")
+    _write(
+        candidate_site,
+        "docs/guide.html",
+        GUIDE.replace("</body>", "<h2>On this page</h2></body>").replace("Setup", "Setup steps"),
+    )
+
+    report = site_inventory.diff_inventories(baseline, _build(candidate_site))
+
+    assert report["changed heading"] == [
+        '/docs/guide.html [headings]: added ["h2", "On this page"]',
+        '/docs/guide.html [headings]: added ["h2", "Setup steps"]',
+        '/docs/guide.html [headings]: removed ["h2", "Setup"]',
+    ]

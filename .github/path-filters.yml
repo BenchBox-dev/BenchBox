@@ -214,3 +214,15 @@ site:
   - "uv.lock"
   - ".github/workflows/ci.yml"
   - ".github/path-filters.yml"
+
+site-parity:
+  - "docs/**"
+  - "website/**"
+  - "landing/**"
+  - "_project/design/site-inventory/**"
+  - "scripts/site_inventory.py"
+  - "scripts/site_parity.py"
+  - "scripts/assemble_public_site.py"
+  - "scripts/publication/check_artifact_privacy.py"
+  - "make/documentation.mk"
+  - ".github/workflows/ci.yml"

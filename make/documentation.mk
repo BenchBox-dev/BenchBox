@@ -116,6 +116,55 @@ site-test-built:
 	@npm --prefix website run verify:not-found
 	@npm --prefix website run verify:landing
 
+SITE_PARITY_DIR ?= site-parity
+SITE_PARITY_SHA ?= $(shell git rev-parse HEAD)
+SITE_PARITY_DESIGN ?= _project/design/site-inventory
+SITE_PARITY_REMOVALS = $(foreach file,$(sort $(wildcard $(SITE_PARITY_DESIGN)/expected-removals-*.json)),--expected-removals $(file))
+
+.PHONY: site-parity-sphinx
+site-parity-sphinx: docs-build
+	@uv run -- python scripts/assemble_public_site.py --site-dir "$(SITE_PARITY_DIR)/sphinx"
+
+.PHONY: site-parity-inventory
+site-parity-inventory:
+	@uv run -- python scripts/site_inventory.py build --site-dir "$(SITE_PARITY_DIR)/sphinx" --output-dir "$(SITE_PARITY_DIR)/inventory-sphinx" --source-sha "$(SITE_PARITY_SHA)"
+	@uv run -- python scripts/site_inventory.py build --site-dir website/dist --output-dir "$(SITE_PARITY_DIR)/inventory-astro" --source-sha "$(SITE_PARITY_SHA)"
+
+.PHONY: site-parity-browser
+site-parity-browser:
+	@mkdir -p "$(SITE_PARITY_DIR)"
+	@npm --prefix website run verify:explorer
+	@PARITY_E2E_REPORT="$(CURDIR)/$(SITE_PARITY_DIR)/browser-report.json" npm --prefix website run verify:parity
+
+.PHONY: site-parity-privacy
+site-parity-privacy:
+	@uv run -- python scripts/publication/check_artifact_privacy.py website/dist
+
+.PHONY: site-parity-diff
+site-parity-diff: site-parity-inventory
+	@status=0; \
+	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" || status=1; \
+	uv run -- python scripts/site_inventory.py check --inventory "$(SITE_PARITY_DIR)/inventory-astro" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)" || status=1; \
+	echo "site_inventory diff against the published baseline (informational)"; \
+	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" > "$(SITE_PARITY_DIR)/published-diff.txt" || true; \
+	tail -n 1 "$(SITE_PARITY_DIR)/published-diff.txt"; \
+	exit $$status
+
+.PHONY: site-parity-report
+site-parity-report: site-parity-inventory
+	@status=0; \
+	uv run -- python scripts/site_parity.py --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --published-baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" --baseline-site "$(SITE_PARITY_DIR)/sphinx" --candidate-site website/dist --output-dir "$(SITE_PARITY_DIR)/report" $(if $(wildcard $(SITE_PARITY_DIR)/browser-report.json),--e2e-report "$(SITE_PARITY_DIR)/browser-report.json") || status=$$?; \
+	if [ -n "$$GITHUB_STEP_SUMMARY" ] && [ -f "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" ]; then cat "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" >> "$$GITHUB_STEP_SUMMARY"; fi; \
+	exit $$status
+
+.PHONY: site-parity
+site-parity:
+	@failed=""; \
+	for target in site-parity-sphinx site-build site-parity-browser site-parity-privacy site-parity-diff site-parity-report; do \
+		$(MAKE) $$target || failed="$$failed $$target"; \
+	done; \
+	if [ -n "$$failed" ]; then echo "site-parity failed in:$$failed" >&2; exit 1; fi
+
 # Run all documentation checks (build, linkcheck, validate)
 .PHONY: docs-check
 docs-check: docs-validate docs-linkcheck docs-build

@@ -1,0 +1,114 @@
+[
+ {
+  "id": "furo-theme-fragments",
+  "kind": "missing fragment",
+  "match": ".*#(svg-[a-z-]+|toctree-checkbox-\\d+|__navigation|__toc|searchbox|furo-main-content|benchbox-site-header-nav)",
+  "reason": "ids that belong to the retired Furo theme chrome: the icon sprite, the collapsible navigation checkboxes, the navigation and contents toggles, the search box and the main-content skip target; the shared site shell has its own chrome",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "ablog-post-meta-fragment",
+  "kind": "missing fragment",
+  "match": ".*#post-meta-data",
+  "reason": "the id of the ablog post metadata block; blog posts now render their date, author and tags in the shared blog layout",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "sphinx-page-sources",
+  "kind": "missing path",
+  "match": "/docs/_sources/.*",
+  "reason": "Sphinx publishes every page source under _sources; the Astro build converts the Markdown and does not publish sources",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "sphinx-doctrees",
+  "kind": "missing path",
+  "match": "/docs/\\.doctrees/.*",
+  "reason": "the Sphinx build cache is copied into the assembled site; it is not a public page and the Astro build has no equivalent",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "title-suffix-docs",
+  "kind": "changed heading",
+  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox 0\\.4\\.1 documentation\" -> \"(?P=t) \\| BenchBox\"",
+  "reason": "Sphinx titled every page with the project name and release; Astro titles docs pages with the site name only, and the page title itself is unchanged",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "title-suffix-blog",
+  "kind": "changed heading",
+  "match": "\\S+ \\[title\\]: \"(?P<t>.*) - BenchBox 0\\.4\\.1 documentation\" -> \"(?P=t) - BenchBox Blog\"",
+  "reason": "Sphinx titled every page with the project name and release; Astro titles blog pages with the blog name, and the page title itself is unchanged",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "docs-index-title",
+  "kind": "changed heading",
+  "match": "/docs/index\\.html \\[title\\]: \"BenchBox 0\\.4\\.1 documentation\" -> \"Welcome to BenchBox’s documentation! \\| BenchBox\"",
+  "reason": "the Sphinx documentation root has no page title, so its title was only the project name and release; Astro uses the page heading",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "ablog-sidebar-headings",
+  "kind": "changed heading",
+  "match": "\\S+ \\[headings\\]: removed \\[\"h3\", \"(Recent Posts|Tags|Archives)\"\\]",
+  "reason": "the ablog sidebar widgets are gone; posts, tags and archives have their own blog pages",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "shell-search-dialog-heading",
+  "kind": "changed heading",
+  "match": "\\S+ \\[headings\\]: added \\[\"h2\", \"Search docs and blog\"\\]",
+  "reason": "the shared site header carries a search dialog whose heading is part of the page outline",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "starlight-contents-heading",
+  "kind": "changed heading",
+  "match": "\\S+ \\[headings\\]: added \\[\"h2\", \"On this page\"\\]",
+  "reason": "Starlight labels the page table of contents with a heading",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "footnotes-heading",
+  "kind": "changed heading",
+  "match": "\\S+ \\[headings\\]: added \\[\"h2\", \"Footnotes\"\\]",
+  "reason": "the converted Markdown footnote list is introduced by a visible Footnotes heading that Sphinx did not render",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "generated-index-page-headings",
+  "kind": "changed heading",
+  "match": "/(404|blog/archive|blog/author|blog/tag)\\.html \\[h1\\]: \\[\\] -> \\[\"(Page not found|All posts|Authors|Tags)\"\\]",
+  "reason": "these Sphinx-generated pages had no top-level heading; the Astro pages give each one",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "canonical-link-added",
+  "kind": "changed metadata",
+  "match": "\\S+ \\[canonical\\]: '' -> '/\\S*'",
+  "reason": "Sphinx wrote no canonical link; the Astro build writes one on every page",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "description-added",
+  "kind": "changed metadata",
+  "match": "\\S+ \\[description\\]: \"\" -> \".+\"",
+  "reason": "Sphinx wrote no meta description on these pages; the Astro build writes one on every page",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "retired-page-redirect-headings",
+  "kind": "changed heading",
+  "match": "/docs/(blog|genindex|search)\\.html \\[(title|h1)\\]: .* -> (\\[\\]|\"This page has moved\")",
+  "reason": "these retired Sphinx pages are now redirect pages with a placeholder title and no heading",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "retired-page-redirect-fragments",
+  "kind": "missing fragment",
+  "match": "/docs/(genindex|search)\\.html#(index|search-results)",
+  "reason": "the anchors of the retired Sphinx index and search pages vanish with the pages, which are now redirect pages",
+  "owner_approval": "pending"
+ }
+]
