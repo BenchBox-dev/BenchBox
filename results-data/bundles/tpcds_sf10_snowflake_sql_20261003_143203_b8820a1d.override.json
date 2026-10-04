@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "scale-invariant",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "Snowflake TPC-DS spans SF 0.1 to SF 10, with loaded rows increasing from 1,176,171 to 191,496,659 and scanned bytes from 1.047 GB to 51.102 GB. The geometric mean grows only 1.38x (899 to 1,239 ms) and the median per-query mean grows 1.34x. All 103 query parts succeed in three measurement rounds at each scale. Each run has a validated cache-disabled receipt, and median measurement/warmup ratios span 0.87 to 0.98. The previous 4.2-second timing floor is absent. The limited scaling is consistent with per-query overhead and warehouse performance at these data volumes; provider queue and execution timings were not recorded, so the cause is not fully decomposed. SF 0.1 remains explicitly unofficial_subscale.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/09e1aaf8d856535f569da4be96d7b4412f243063/results-data/CORPUS_NOTES.md#cloud-tpc-ds-bundles-2026-10-04",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "tpcds_sf10_snowflake_sql_20261003_143203_b8820a1d"
+  ]
+}
