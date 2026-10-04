@@ -2,7 +2,7 @@
   "acceptance": [
     "Each listed item updated (needs edge or explicit restriction note) and each closure annotated, with links to evidence."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan Phase 6 (A1.13). The live-cloud restriction is the urgent part; do it in Wave 0.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan Phase 6 (A1.13).\n\nCompleted 2026-10-04 (tracker-only, no PR):\n- needs edges added (existing edges kept): live-cloud-benchmark-{industry,academic,real-world,tpc-variants-experimental,primitives-timeseries-ai}-suites -> tuning-no-midrun-destructive-db-handling-20261001 and tuning-portable-metadata-store-20261001; databricks-liquid-clustering-tuning-review-20260526 -> mid-run item, tuning-layout-op-skip-vs-fail-20261001, tuning-post-load-seam-20261001; spark-session-config-runtime -> tuning-ledger-capture-non-dbapi-drivers-20261001; spark-tuned-template-measured -> that item and tuning-requested-vs-rendered-reconciliation-20261001; snowpark-tuning-surface-warehouse-and-session-params -> the reconciliation item.\n- Annotated (done items cannot be reopened): tuning-verification-footprint-duckdb-clickhouse-20260722 -> superseded by tuning-liveness-e2e-gates-20261001; snowflake-clustering-key-live-verification-20260730 -> superseded by snowflake-tuned-live-certification-20261001.\n- simplify-tuning-ledger-writer-dispatch-20260811 left untouched; the owner decides it later.\n- All referenced IDs exist. One update_item call (spark-tuned-template-measured) hit a 60 s state-clone timeout with no effect and was retried once successfully.",
   "description": "## Problem\n- Open live-cloud items will run on Snowflake, BigQuery and Databricks. A tuned or `auto` run there risks dropping its own database mid-run until `tuning-no-midrun-destructive-db-handling-20261001` lands. Affected items:\n  - `live-cloud-benchmark-industry-suites`\n  - `live-cloud-benchmark-academic-suites`\n  - `live-cloud-benchmark-real-world-suites`\n  - `live-cloud-benchmark-tpc-variants-experimental`\n  - `live-cloud-benchmark-primitives-timeseries-ai`\n  - `databricks-liquid-clustering-tuning-review-20260526`, step w4\n- Two items are marked done without delivering:\n  - `tuning-verification-footprint-duckdb-clickhouse-20260722`: neither platform verifies end to end;\n  - `snowflake-clustering-key-live-verification-20260730`: the description says it was deferred for lack of credentials, and no live evidence is recorded.\n- Open Spark/Snowpark items depend on ledger capture.\n\n## Change (tracker writes; maintainer approves each)\n- **Add `needs` edges:**\n  - the five `live-cloud-benchmark-*` items → the mid-run-safety and metadata-portability items, **or** a description note restricting them to `--tuning notuning` until those land;\n  - `databricks-liquid-clustering-tuning-review-20260526` → the mid-run-safety, skip-vs-fail and post-load-seam items;\n  - `spark-session-config-runtime` and `spark-tuned-template-measured` → the non-DB-API capture item;\n  - `snowpark-tuning-surface-warehouse-and-session-params` → the reconciliation item.\n- **Annotate or reopen** the two prematurely closed items, with evidence.\n- **Supersede** `simplify-tuning-ledger-writer-dispatch-20260811` if the capture item rewrites that dispatch.\n\n## Guardrails (must preserve)\n- Only the maintainer decides drops and reopenings. Record the evidence in each item's context.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "sessions": [
     {
@@ -20,6 +20,14 @@
       "generation": "8a4177e880f745a8b0436701149c7a23",
       "op": "take",
       "op_id": "7382c7c5a3314a4580d531be4b897297",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-04T15:25:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f4c05cca8a9c409696344b97d3314e04",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
