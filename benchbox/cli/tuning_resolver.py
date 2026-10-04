@@ -172,6 +172,19 @@ class TuningResolution:
         return descriptions.get(self.source, "Unknown source")
 
 
+_TEMPLATE_PLATFORM_KEYS = {
+    "clickhouse-local": "clickhouse",
+    "clickhouse-server": "clickhouse",
+    "clickhouse-cloud": "clickhouse",
+    "chdb": "clickhouse",
+}
+
+
+def _template_platform_key(platform: str) -> str:
+    base = platform.lower().split(":", 1)[0]
+    return _TEMPLATE_PLATFORM_KEYS.get(base, platform.lower())
+
+
 def _dataframe_profile_path(platform: str) -> Path | None:
     base = platform.lower().split(":", 1)[0]
     if base.endswith("-df"):
@@ -212,24 +225,25 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
         List of paths in search order (first match wins)
     """
     paths = []
+    template_platform = _template_platform_key(platform)
 
     # 1. Environment variable override path (highest priority)
     env_path = os.environ.get("BENCHBOX_TUNING_PATH")
     if env_path:
-        env_template = Path(env_path) / f"{platform.lower()}" / f"{benchmark.lower()}_tuned.yaml"
+        env_template = Path(env_path) / f"{template_platform}" / f"{benchmark.lower()}_tuned.yaml"
         paths.append(env_template)
 
     # 2. Project-relative path (standard location)
-    primary = Path(f"examples/tunings/{platform.lower()}/{benchmark.lower()}_tuned.yaml")
+    primary = Path(f"examples/tunings/{template_platform}/{benchmark.lower()}_tuned.yaml")
     paths.append(primary)
 
     # 3. Current working directory fallback
-    cwd_template = Path(f"{platform.lower()}/{benchmark.lower()}_tuned.yaml")
+    cwd_template = Path(f"{template_platform}/{benchmark.lower()}_tuned.yaml")
     if cwd_template != primary:  # Avoid duplicate if cwd is project root
         paths.append(cwd_template)
 
     # 4. Packaged resource (last resort; see docstring above)
-    paths.append(packaged_template_path(platform, benchmark))
+    paths.append(packaged_template_path(template_platform, benchmark))
 
     dataframe_profile = _dataframe_profile_path(platform)
     if dataframe_profile is not None:

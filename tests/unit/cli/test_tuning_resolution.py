@@ -845,7 +845,7 @@ class TestPackagedTemplatesParity:
     # get_tuning_template_paths auto-discovers, and are therefore expected to
     # have a packaged counterpart for every such file (see
     # test_every_auto_discoverable_examples_template_is_packaged below).
-    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks", "snowflake")
+    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks", "snowflake", "clickhouse")
 
     # (platform, filename) pairs that textually match the `*_tuned.yaml` glob
     # but are deliberately NOT packaged, each with a reason so future
