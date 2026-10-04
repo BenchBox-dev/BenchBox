@@ -3,7 +3,7 @@
     "Test: an empty manifest with data files present triggers failure or regeneration; a DuckDB run with 0 loaded rows fails validation with a non-zero exit code.",
     "Missing zstd produces an actionable error before generation."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Incidental finding I1 from the re-review (outside tuning scope; affects result integrity).",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Incidental finding I1 from the re-review (outside tuning scope; affects result integrity).\n\nResumption notes (2026-10-04): shipped in PR #2625 (merged as 767d8f72c): the loader fails on a missing or empty data source, require_loaded_tables fails on zero tables/rows for benchmarks that expect data, the TPC-DS writer refuses to record a zero-table manifest, the manifest validator rejects one, and a missing zstd command is reported when ZstdHandler opens the first .zst file. Interpretation to confirm: the item says \"before generation\", but generation compresses with the zstandard Python package; the command is only needed to load, so the check runs at load time. Follow-up hardening (tables whose file lists are empty; positive-row-total check) is PR #2637, not required for this item.",
   "description": "## Problem (reproduced)\nWith the `zstd` CLI missing, TPC-DS datagen wrote `.dat.zst` files but a `_datagen_manifest.json` with 0 tables, and later runs reused that manifest. One DuckDB run then:\n- loaded 0 rows into every table;\n- printed \"✅ Data validation passed\";\n- computed Power@Size;\n- exited 0 with an exported bundle.\n\nSQLite's validator caught the same condition; DuckDB's passed it vacuously.\n\n## Change\n- Datagen fails, or regenerates, when the manifest table count is 0 while data files exist, or when the expected tables are missing.\n- Post-load validation fails when zero tables or zero rows were loaded for a benchmark that expects data.\n- Report a missing compression tool up front.\n\n## Guardrails (must preserve)\n- Benchmarks that legitimately skip data loading (`SKIP_DATA_LOADING`) are unaffected.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/platforms/base/data_loading.py",
@@ -25,6 +25,14 @@
       "generation": "b464c64a409547a6896fff898f8e00b9",
       "op": "take",
       "op_id": "bdee08fc8ea742dc9f968f8f43aa6906",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-04T17:46:11Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d91c6dac9f5f41ecaab3b83100782faf",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
