@@ -21638,15 +21638,10 @@
       "title": "Extend rendered-SQL clause contract to partition_by/order_by previews"
     },
     "tuning-physical-identifier-resolution-20261001": {
-      "claim": {
-        "expires_at": "2026-10-05T20:57:50Z",
-        "generation": "5ee7560d1c894443a3ee46c8913fbd26",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Add a physical identifier resolution helper and use it in every tuning statement builder"
     },
     "tuning-platform-identity-canonical-keys-20260712": {
