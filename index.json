@@ -19202,7 +19202,9 @@
     },
     "sqlite-throughput-dialect-and-stream-isolation": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "tpch-throughput-dialect-translation"
+      ],
       "priority": "medium-high",
       "status": "open",
       "title": "SQLite throughput runs fail: untranslated INTERVAL syntax and shared-cursor errors across streams"

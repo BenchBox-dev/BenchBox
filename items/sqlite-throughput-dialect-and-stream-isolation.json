@@ -5,7 +5,7 @@
     "A TPC-H SF1 throughput run on SQLite with 3 streams completes with all 66 queries successful and passes strict submission validation, or is refused before stream submission",
     "A regression test covers dialect translation in the throughput path"
   ],
-  "context": "Found while looking for a third local engine identity for the TPC-H SF1 throughput cohort (PR #2382). DataFusion, ClickHouse Local and Polars declare throughput unsupported, so SQLite is the only independent local engine that should run throughput without a server.",
+  "context": "Found while looking for a third local engine identity for the TPC-H SF1 throughput cohort (PR #2382). DataFusion, ClickHouse Local and Polars declare throughput unsupported, so SQLite is the only independent local engine that should run throughput without a server.\n\n2026-10-04 adversarial review (develop 8ed0c64e1): defect 1 (untranslated INTERVAL syntax) is a generic TPC-H throughput defect affecting duckdb, spark, mysql, doris, singlestore, sqlite and questdb. It is now tracked in tpch-throughput-dialect-translation, which this item needs; here, only verify SQLite after that fix. Defect 2 is confirmed: 4 threads on one sqlite3.Connection (check_same_thread=False, sqlite.py:204,409-412) return cross-contaminated error messages (\"not an error\", \"another row available\", \"column index out of range\", SystemError returned NULL), because SQLite's error state is per connection, and the connection mutex serializes execution anyway. Recommended: INDEPENDENT_CONNECTION (one sqlite3.connect(path) per stream) for file databases, UNSUPPORTED for :memory:. Update the capability snapshot and manifest. Do not use the existing partial SQLite bundle as a corpus identity.",
   "description": "A TPC-H SF1 throughput run on SQLite 3.53.1 (`--phases generate,load,throughput --streams 3 --official --seed 20260709 --tuning notuning`) failed 45 of 66 queries in 48 seconds, so the bundle is PARTIAL and unpublishable. Two separate defects show in the log:\n\n1. The throughput path sends SQL that is not translated to the SQLite dialect. Queries fail with `near \"'1 YEAR'\": syntax error`, `near \"'1 MONTH'\": syntax error` and `near \"FROM\": syntax error`, from `INTERVAL` date arithmetic that the power path handles.\n2. SQLite declares `stream_connection_capability = SHARED_CURSOR`, and concurrent streams raise `sqlite3.OperationalError: not an error` on the shared connection.\n\nEvidence: `~/Developer/benchmark_runs/logs/throughput-identities-20261003/sqlite-sf1-throughput.log` and bundle `~/Developer/benchmark_runs/results/tpch_sf1_sqlite_sql_20261003_184424_5702d960.json`, run at develop `061fac04d`.",
   "sessions": [
     {
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "b7cc60594725485699f837e0ecd83840",
       "session_id": "eca48ccc01f7446f928d4c59ebb0e177"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
+      "at": "2026-10-04T20:04:41Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "58fcffb57d4748dd842bf45176b24368",
+      "session_id": "a33f303e25d74b4284982579345d9fdb"
     }
   ]
 }
