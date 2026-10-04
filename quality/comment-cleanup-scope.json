@@ -1049,7 +1049,7 @@
       "state": "blocked",
       "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
       "priority": 10,
-      "selectors": [{"prefix": "landing/"}, {"prefix": "docker/"}, {"path": "index.html"}]
+      "selectors": [{"prefix": "landing/"}, {"prefix": "website/"}, {"prefix": "deploy/"}, {"prefix": "docker/"}, {"path": "index.html"}]
     },
     {
       "id": "shared-infrastructure-config",

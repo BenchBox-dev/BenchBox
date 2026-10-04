@@ -1,0 +1,49 @@
+---
+---
+
+<button type="button" class="search-button" data-search-open aria-haspopup="dialog">
+  <span>Search</span>
+</button>
+<dialog class="search-dialog" data-search-dialog aria-label="Search docs and blog">
+  <form method="dialog"><button class="search-close" aria-label="Close search">Close</button></form>
+  <div data-search-mount></div>
+</dialog>
+
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>("[data-search-dialog]");
+  const opener = document.querySelector<HTMLButtonElement>("[data-search-open]");
+  let ready: Promise<void> | undefined;
+
+  function load(): Promise<void> {
+    ready ??= new Promise((resolve, reject) => {
+      const styles = document.createElement("link");
+      styles.rel = "stylesheet";
+      styles.href = "/pagefind/pagefind-ui.css";
+      document.head.append(styles);
+      const script = document.createElement("script");
+      script.src = "/pagefind/pagefind-ui.js";
+      script.onload = () => {
+        const mount = dialog?.querySelector("[data-search-mount]");
+        const Ui = (window as unknown as { PagefindUI: new (options: object) => unknown }).PagefindUI;
+        new Ui({ element: mount, showSubResults: true, showImages: false });
+        resolve();
+      };
+      script.onerror = () => reject(new Error("pagefind unavailable"));
+      document.head.append(script);
+    });
+    return ready;
+  }
+
+  opener?.addEventListener("click", async () => {
+    dialog?.showModal();
+    try {
+      await load();
+      dialog?.querySelector<HTMLInputElement>("input")?.focus();
+    } catch {
+      ready = undefined;
+    }
+  });
+  dialog?.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+</script>

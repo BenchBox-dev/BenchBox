@@ -113,7 +113,7 @@ merged in sequence. The tradeoff is deliberate: when `develop` advances, an
 otherwise-green PR must refresh its required checks before it can merge.
 
 The latest bounded, read-only wall and runner-minute remeasure is recorded in
-[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/ci-waste-remeasure-2026-08-31.md).
 It keeps `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 

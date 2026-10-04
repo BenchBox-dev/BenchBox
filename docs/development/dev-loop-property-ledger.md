@@ -91,6 +91,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `release.yml` | product-safety | Release publishing |
 | `release-canary.yml` | product-safety | Release canary protection |
 | `seed-corpus.yml` | product-safety | Corpus seeding |
+| `site-deploy.yml` | product-safety | Single-writer site deployment |
 | `soundness-merge-digest.yml` | product-safety | Post-merge soundness review digest |
 | `submission-validator-drift-check.yml` | product-safety | Submission validator sync |
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
@@ -129,8 +130,10 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_release_isolation.py` | product-safety | Release isolation |
 | `test_release_uat_charter_guard.py` | product-safety | Release charter guard |
 | `test_results_explorer_dependency_audit.py` | product-safety | Explorer dependency audit |
+| `test_website_dependency_audit.py` | product-safety | Website dependency audit |
 | `test_results_explorer_publication.py` | product-safety | Explorer publication |
 | `test_seed_corpus_pr_base.py` | product-safety | Corpus seeding |
+| `test_site_deploy.py` | product-safety | Site-deploy workflow contract |
 | `test_stacked_pr_base_guard.py` | pure-process | Stacked-PR base mechanics |
 | `test_validate_submission_changed_bundles.py` | product-safety | Submission validation |
 | `test_validate_submission_comment_security.py` | product-safety | Submission comment security |
@@ -286,6 +289,16 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `site_deploy/test_site_deploy_candidate.py` | product-safety |
+| `site_deploy/test_site_deploy_cli.py` | product-safety |
+| `site_deploy/test_site_deploy_cli_flow.py` | product-safety |
+| `site_deploy/test_site_deploy_gates.py` | product-safety |
+| `site_deploy/test_site_deploy_generation.py` | product-safety |
+| `site_deploy/test_site_deploy_githubapi.py` | product-safety |
+| `site_deploy/test_site_deploy_mixed_version.py` | product-safety |
+| `site_deploy/test_site_deploy_publish.py` | product-safety |
+| `site_deploy/test_site_deploy_receipt.py` | product-safety |
+| `site_deploy/test_site_deploy_routes.py` | product-safety |
 | `test_tpcds_divergence_report.py` | tooling |
 | `test_tpcds_platform_identity.py` | product-safety |
 

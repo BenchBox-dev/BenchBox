@@ -111,6 +111,7 @@ jobs:
       explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
       explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
       site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
+      site-needed: ${{ steps.classify.outputs.site-needed }}
       unit-core: ${{ steps.units.outputs.unit-core }}
       unit-explorer: ${{ steps.units.outputs.unit-explorer }}
       unit-results-data: ${{ steps.units.outputs.unit-results-data }}
@@ -1669,7 +1670,7 @@ jobs:
           # rendered output as much as any source file. uv.lock and
           # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
-            benchbox/ docs/ examples/ landing/
+            benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1681,7 +1682,7 @@ jobs:
           # and the baseline ancestor walk use the narrow rendered-input list.
           # Keep this a subset of SITE_PATHS.
           RENDER_PATHS=(
-            docs/ landing/ examples/ results-data/ results-explorer/
+            docs/ landing/ examples/ results-data/ results-explorer/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1928,6 +1929,57 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+  site-build:
+    name: site-build
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Typecheck, audit and build website
+        run: make site-check site-build
+
+      - name: Scan website output for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py website/dist
+
   example-validation:
     needs: visual-inputs
     if: needs.visual-inputs.outputs.changed == 'true'
@@ -2123,7 +2175,7 @@ jobs:
   # Unit result: landing.
   landing:
     name: landing
-    needs: [ci-paths, site-theme-tokens, visual-inputs]
+    needs: [ci-paths, site-theme-tokens, visual-inputs, site-build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2146,7 +2198,8 @@ jobs:
             --needs "$NEEDS_JSON" \
             --always ci-paths \
             --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
-            --expect visual-inputs=${{ true }}
+            --expect visual-inputs=${{ true }} \
+            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}
 
   # Unit result: tooling.
   tooling:

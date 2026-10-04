@@ -247,4 +247,4 @@ Snowpark Connect uses standard Snowflake credit consumption:
 - [Snowflake SQL](snowflake.md) - Direct SQL access to Snowflake
 - [Databricks](databricks.md) - Full Spark with Delta Lake
 - [PySpark](pyspark-dataframe.md) - Apache Spark DataFrame API
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms
