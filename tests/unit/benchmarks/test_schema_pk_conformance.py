@@ -6,14 +6,19 @@ from pathlib import Path
 
 import duckdb
 import pytest
+import yaml
 
 from benchbox.core.amplab.schema import get_all_create_table_sql as amplab_ddl
 from benchbox.core.clickbench.schema import get_create_table_sql as clickbench_ddl
 from benchbox.core.h2odb.schema import get_all_create_table_sql as h2odb_ddl
 from benchbox.core.joinorder.schema import JoinOrderSchema
+from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
 from benchbox.core.ssb.schema import get_all_create_table_sql as ssb_ddl
 from benchbox.core.tpcds.schema import get_create_all_tables_sql as tpcds_ddl
 from benchbox.core.tpch.schema import get_create_all_tables_sql as tpch_ddl
+from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+from benchbox.core.tuning.packaged_templates import packaged_template_path
 
 pytestmark = [
     pytest.mark.unit,
@@ -118,7 +123,11 @@ EXPECTED_KEYS: dict[str, dict[str, tuple[str, ...]]] = {
     "clickbench": CLICKBENCH_KEYS,
     "amplab": AMPLAB_KEYS,
     "h2odb": H2ODB_KEYS,
+    "read_primitives": TPCH_KEYS,
+    "tpchavoc": TPCH_KEYS,
 }
+
+TPCH_DERIVED_BENCHMARKS = ("read_primitives", "tpchavoc")
 
 KEY_SOURCES: dict[str, str] = {
     "tpch": TPCH_SPEC_RI,
@@ -128,7 +137,16 @@ KEY_SOURCES: dict[str, str] = {
     "clickbench": "ClickHouse/ClickBench duckdb/create.sql: hits primary key over the five listed columns",
     "amplab": "BenchBox definition: rankings and documents keyed by URL; the AMPLab uservisits table has no key",
     "h2odb": "BenchBox definition: the H2O trips table has no key",
+    "read_primitives": "benchbox/core/read_primitives/schema.py builds TABLES from the TPC-H schema; keys are _sources/tpc-h/dbgen/dss.ri",
+    "tpchavoc": "benchbox/core/tpchavoc inherits the TPC-H schema unchanged; keys are _sources/tpc-h/dbgen/dss.ri",
 }
+
+
+def _tuned_benchmark_ddl(benchmark_class: type, name: str) -> str:
+    template = packaged_template_path("duckdb", name)
+    tuning = UnifiedTuningConfiguration.from_dict(yaml.safe_load(template.read_text(encoding="utf-8")))
+    return benchmark_class(scale_factor=0.01).get_create_tables_sql(dialect="duckdb", tuning_config=tuning)
+
 
 DDL_BUILDERS: dict[str, Callable[[], str]] = {
     "tpch": tpch_ddl,
@@ -138,10 +156,21 @@ DDL_BUILDERS: dict[str, Callable[[], str]] = {
     "clickbench": clickbench_ddl,
     "amplab": amplab_ddl,
     "h2odb": h2odb_ddl,
+    "read_primitives": lambda: _tuned_benchmark_ddl(ReadPrimitivesBenchmark, "read_primitives"),
+    "tpchavoc": lambda: _tuned_benchmark_ddl(TPCHavocBenchmark, "tpchavoc"),
 }
 
-DUCKDB_TEMPLATE_BENCHMARKS = {"tpch", "tpcds", "ssb", "joinorder", "clickbench", "amplab", "h2odb"}
-DUCKDB_TEMPLATES_WITHOUT_KEY_PINS = {"read_primitives", "tpchavoc"}
+DUCKDB_TEMPLATE_BENCHMARKS = {
+    "tpch",
+    "tpcds",
+    "ssb",
+    "joinorder",
+    "clickbench",
+    "amplab",
+    "h2odb",
+    "read_primitives",
+    "tpchavoc",
+}
 
 
 def _duckdb_primary_keys(ddl: str) -> dict[str, tuple[str, ...]]:
@@ -183,7 +212,7 @@ def test_every_duckdb_template_benchmark_is_pinned() -> None:
         path.name.removesuffix("_tuned.yaml")
         for path in (REPO_ROOT / "benchbox/core/tuning/templates/duckdb").glob("*_tuned.yaml")
     }
-    assert templates == DUCKDB_TEMPLATE_BENCHMARKS | DUCKDB_TEMPLATES_WITHOUT_KEY_PINS
+    assert templates == DUCKDB_TEMPLATE_BENCHMARKS
     assert set(EXPECTED_KEYS) == set(DDL_BUILDERS) == set(KEY_SOURCES) == DUCKDB_TEMPLATE_BENCHMARKS
 
 
@@ -198,6 +227,11 @@ def test_tpcds_keys_match_the_vendored_specification_ddl() -> None:
 
 def test_tpch_keys_match_the_vendored_specification_ddl() -> None:
     assert _spec_tpch_keys() == TPCH_KEYS
+
+
+@pytest.mark.parametrize("suite", TPCH_DERIVED_BENCHMARKS)
+def test_tpch_derived_benchmark_keys_match_the_vendored_specification_ddl(suite: str) -> None:
+    assert EXPECTED_KEYS[suite] == _spec_tpch_keys()
 
 
 @pytest.mark.parametrize("suite", ["tpch", "tpcds"])
