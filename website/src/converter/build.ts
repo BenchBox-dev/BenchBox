@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { convertDocument, type ConvertedDocument } from "./document.ts";
 import { DocsIndex, placeholderInfo } from "./docs-index.ts";
@@ -98,19 +98,22 @@ export function buildSite(options: BuildOptions): BuildResult {
 export const OUTPUT_MARKER = ".benchbox-converter-output";
 
 export class UnownedOutputError extends Error {
-  constructor(outRoot: string) {
-    super(`refusing to touch ${outRoot}: it is not empty and has no ${OUTPUT_MARKER} file from an earlier converter run`);
+  constructor(outRoot: string, reason = `it is not empty and has no ${OUTPUT_MARKER} file from an earlier converter run`) {
+    super(`refusing to touch ${outRoot}: ${reason}`);
     this.name = "UnownedOutputError";
   }
 }
 
 export function assertOwnedOutput(outRoot: string): void {
-  let entries: string[];
+  let stats;
   try {
-    entries = readdirSync(outRoot);
-  } catch {
-    return;
+    stats = lstatSync(outRoot);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
   }
+  if (!stats.isDirectory()) throw new UnownedOutputError(outRoot, "it exists and is not a directory");
+  const entries = readdirSync(outRoot);
   if (entries.length > 0 && !entries.includes(OUTPUT_MARKER)) throw new UnownedOutputError(outRoot);
 }
 
@@ -134,7 +137,7 @@ export function writeOutput(outRoot: string, files: Map<string, string>): void {
     for (const name of entries) {
       const absolute = path.join(directory, name);
       const relative = prefix ? `${prefix}/${name}` : name;
-      if (statSync(absolute).isDirectory()) stale(absolute, relative);
+      if (lstatSync(absolute).isDirectory()) stale(absolute, relative);
       else if (!keep.has(relative)) rmSync(absolute);
     }
   };

@@ -1,8 +1,9 @@
+import { lineStarts } from "./handlers/colon-fence.ts";
 import { mergeDefinitionLists } from "./handlers/deflist.ts";
 import type { Code, FootnoteDefinition, Html, Paragraph, PhrasingContent, Root, RootContent } from "mdast";
 import { collectionOf, contentIdFor, DocsIndex, routeFor } from "./docs-index.ts";
 import { ConverterError, UnknownConstructError, UnresolvedReferenceError } from "./errors.ts";
-import { smarten } from "../lib/smartypants.ts";
+import { smartenTitle, titleText, type TitleNode } from "../lib/smartypants.ts";
 import { IdAllocator } from "./ids.ts";
 import type { Collection, DocInfo, LabelInfo, PageData, ResolvedDoc, ResolvedLabel, SourcePosition, TocNode, TocSection, ToctreeBlock } from "./model.ts";
 import { parse as parseYaml } from "yaml";
@@ -114,7 +115,7 @@ class DocumentConverter implements ConvertContext {
   private nesting = 0;
   readonly labels = new Map<string, LabelInfo>();
   readonly headingIds: string[] = [];
-  title: string | undefined;
+  title: TitleNode[] | undefined;
   titleId: string | undefined;
   private readonly registry: HandlerRegistry;
   private readonly ids = new IdAllocator();
@@ -156,7 +157,7 @@ class DocumentConverter implements ConvertContext {
     try {
       resolved = this.index.resolveDoc(this.file, target, at, kind);
     } catch (error) {
-      if (this.pass === "collect" && error instanceof UnresolvedReferenceError) return { path: target, route: "#", title: target };
+      if (this.pass === "collect" && error instanceof UnresolvedReferenceError) return { path: target, route: "#", title: target, titleNodes: [{ type: "text", value: target }] };
       throw error;
     }
     return resolved;
@@ -182,7 +183,7 @@ class DocumentConverter implements ConvertContext {
     try {
       return this.index.resolveLabel(label, at);
     } catch (error) {
-      if (this.pass === "collect" && error instanceof UnresolvedReferenceError) return { route: "#", id: label, title: label };
+      if (this.pass === "collect" && error instanceof UnresolvedReferenceError) return { route: "#", id: label, title: [{ type: "text", value: label }] };
       throw error;
     }
   }
@@ -201,8 +202,8 @@ class DocumentConverter implements ConvertContext {
     return this.title === undefined && this.depth === 0;
   }
 
-  allocateHeadingId(text: string): string {
-    const labels = this.flushLabels(text);
+  allocateHeadingId(text: string, title: TitleNode[]): string {
+    const labels = this.flushLabels(title);
     const explicit = this.explicitId;
     this.explicitId = undefined;
     const own = this.ids.fromName(explicit ?? text);
@@ -213,8 +214,8 @@ class DocumentConverter implements ConvertContext {
     return primary.id;
   }
 
-  claimTitle(text: string, id: string): void {
-    this.title = text;
+  claimTitle(title: TitleNode[], id: string): void {
+    this.title = title;
     this.titleId = id;
   }
 
@@ -236,7 +237,7 @@ class DocumentConverter implements ConvertContext {
     this.toctrees.push(block);
   }
 
-  addSection(depth: number, title: string, id: string): void {
+  addSection(depth: number, title: TitleNode[], id: string): void {
     if (this.depth > 0 || this.nesting > 0) return;
     while (this.sections.length > 0 && this.sections[this.sections.length - 1].depth >= depth) this.sections.pop();
     const first = this.sections.length === 0 && !this.toc.some((node) => node.kind === "section");
@@ -257,7 +258,7 @@ class DocumentConverter implements ConvertContext {
     this.components.add(name);
   }
 
-  flushLabels(title: string | undefined): { id: string; node: Html }[] {
+  flushLabels(title: TitleNode[] | undefined): { id: string; node: Html }[] {
     const queued = this.pending;
     this.pending = [];
     return queued.map((entry) => {
@@ -386,6 +387,10 @@ class DocumentConverter implements ConvertContext {
     if (misplaced) {
       throw new UnknownConstructError(at.file, at.line, `syntax:misplaced-${misplaced[1]}`, `${misplaced[1]} line is indented four or more columns past its paragraph, where MyST reads it as plain text`);
     }
+    const trimmed = node.value.trim();
+    if (trimmed !== node.value && (trimmed === COMMENT_MARKER || LABEL_MARKER.test(trimmed) || ATTRS_MARKER.test(trimmed))) {
+      throw new UnknownConstructError(at.file, at.line, "syntax:nested-marker", "label, attrs or comment line inside a definition list definition is not supported; move it before the term");
+    }
     if (node.value === COMMENT_MARKER) return this.registry.syntaxHandler("comment", at).handle(node, at, this);
     if (LABEL_MARKER.test(node.value)) return this.registry.syntaxHandler("label", at).handle(node, at, this);
     this.releaseOnContent();
@@ -394,12 +399,12 @@ class DocumentConverter implements ConvertContext {
   }
 
   private paragraph(node: Paragraph, at: SourcePosition, frame: Frame): RootContent[] {
-    const raw = node.position ? frame.source.slice(node.position.start.offset, node.position.end.offset) : "";
-    if (raw.split("\n").some((line) => line.trimStart().startsWith(":::"))) {
+    const starts = lineStarts(node.children);
+    if (starts.some((line) => line.trimStart().startsWith(":::"))) {
       node.children = this.phrasing(node.children, frame);
       return this.registry.syntaxHandler("colon-fence", at).handle(node, at, this);
     }
-    if (this.extensions.has("deflist") && raw.split("\n").some((line, index) => index > 0 && /^:\s/.test(line))) {
+    if (this.extensions.has("deflist") && starts.some((line, index) => index > 0 && /^:\s/.test(line))) {
       node.children = this.phrasing(node.children, frame);
       return this.registry.syntaxHandler("deflist", at).handle(node, at, this);
     }
@@ -525,8 +530,8 @@ class DocumentConverter implements ConvertContext {
       if (generated.has(id)) this.errors.push(new ConverterError(at.file, at.line, `raw html id ${JSON.stringify(id)} duplicates an id the page already generates`));
     }
     const frontTitle = this.pageData.get("title");
-    const rawTitle = this.title ?? (typeof frontTitle === "string" ? frontTitle : undefined);
-    const title = rawTitle === undefined ? undefined : smarten(rawTitle);
+    const titleNodes = this.title ?? (typeof frontTitle === "string" ? smartenTitle([{ type: "text", value: frontTitle }]) : undefined);
+    const title = titleNodes === undefined ? undefined : titleText(titleNodes);
     if (title === undefined) {
       this.errors.push(new ConverterError(this.file, 1, "document has no title: add a first-level heading or a front matter title"));
     }
@@ -545,6 +550,7 @@ class DocumentConverter implements ConvertContext {
       path: this.file,
       route: routeFor(this.file),
       title: title ?? this.file,
+      titleNodes: titleNodes ?? [{ type: "text", value: this.file }],
       collection: this.collection,
       labels: this.labels,
       ids: [...new Set([...this.ids.all(), ...this.rawIds.keys()])].sort(),

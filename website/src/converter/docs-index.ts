@@ -1,3 +1,4 @@
+import { cloneTitle } from "../lib/smartypants.ts";
 import { readFileSync } from "node:fs";
 import { ConverterError, UnresolvedReferenceError } from "./errors.ts";
 import type { Collection, DocInfo, LabelInfo, ResolvedDoc, ResolvedLabel, SourcePosition } from "./model.ts";
@@ -26,6 +27,7 @@ export function placeholderInfo(source: { relative: string }): DocInfo {
     path: source.relative,
     route: routeFor(source.relative),
     title: stemOf(source.relative).split("/").pop() ?? source.relative,
+    titleNodes: [{ type: "text", value: stemOf(source.relative).split("/").pop() ?? source.relative }],
     collection: collectionOf(source.relative),
     labels: new Map(),
     ids: [],
@@ -66,7 +68,7 @@ export class DocsIndex {
     if (stem === undefined) return undefined;
     for (const candidate of [`${stem}.md`]) {
       const info = this.docs.get(candidate);
-      if (info) return { path: info.path, route: info.route, title: info.title };
+      if (info) return { path: info.path, route: info.route, title: info.title, titleNodes: cloneTitle(info.titleNodes) };
     }
     return undefined;
   }
@@ -96,6 +98,6 @@ export class DocsIndex {
     if (!found) throw new UnresolvedReferenceError(at.file, at.line, `ref:${label}`, "does not match any label");
     const info = this.docs.get(found.path);
     if (!info) throw new UnresolvedReferenceError(at.file, at.line, `ref:${label}`, "points at a missing document");
-    return { route: info.route, id: found.info.id, title: found.info.title };
+    return found.info.title === undefined ? { route: info.route, id: found.info.id } : { route: info.route, id: found.info.id, title: cloneTitle(found.info.title) };
   }
 }

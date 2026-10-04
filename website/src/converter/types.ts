@@ -1,3 +1,4 @@
+import type { TitleNode } from "../lib/smartypants.ts";
 import type { Definition, Heading, Html, Image, ImageReference, Link, Paragraph, PhrasingContent, RootContent } from "mdast";
 import type { DocsIndex } from "./docs-index.ts";
 import type { Collection, ResolvedDoc, ResolvedLabel, SourcePosition, ToctreeBlock } from "./model.ts";
@@ -35,13 +36,13 @@ export interface ConvertContext {
   queueLabel(label: string, at: SourcePosition): Html;
   releaseLabels(): void;
   needsTitle(): boolean;
-  allocateHeadingId(text: string): string;
-  claimTitle(text: string, id: string): void;
+  allocateHeadingId(text: string, title: TitleNode[]): string;
+  claimTitle(title: TitleNode[], id: string): void;
   recordHeadingId(id: string): void;
   recordRawId(id: string, at: SourcePosition): void;
   addTags(tags: readonly string[]): void;
   addToctree(block: ToctreeBlock): void;
-  addSection(depth: number, title: string, id: string): void;
+  addSection(depth: number, title: TitleNode[], id: string): void;
   setPageData(key: string, value: unknown): void;
   useComponent(name: ComponentName): void;
 }

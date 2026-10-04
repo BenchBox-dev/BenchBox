@@ -340,6 +340,14 @@ describe("unknown constructs", () => {
     expect(bodyOf(result, "docs/a.md")).toContain("&#58;::{note}\nhi\n&#58;::");
   });
 
+  it("escapes a colon fence inside a blockquote, including on later lines", () => {
+    const result = build({ "a.md": "# A\n\n> :::note\n> quoted\n> :::\n\n> Intro\n> :::tip\n" });
+    expect(result.errors).toEqual([]);
+    const body = bodyOf(result, "docs/a.md");
+    expect(body).toContain("> &#58;::note\n> quoted\n> &#58;::");
+    expect(body).toContain("> Intro\n> &#58;::tip");
+  });
+
   it("escapes a brace-less :::note fence so the page renders it as the literal text Sphinx shows", () => {
     const result = build({ "a.md": "# A\n\nIntro line\n:::note\nliteral *text*\n:::\n" });
     expect(result.errors).toEqual([]);

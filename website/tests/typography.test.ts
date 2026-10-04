@@ -14,6 +14,11 @@ describe("docutils smart quotes and dashes", () => {
     expect(closeQuotesAfterWords("a=“b” (“c”) “d”")).toBe("a=”b” (“c”) “d”");
   });
 
+  it("leaves inline code in a page title alone", () => {
+    const result = build({ "a.md": '# Using `--scale` -- "x"\n' });
+    expect(frontMatterOf(result, "docs/a.md")).toContain("title: Using --scale – “x”");
+  });
+
   it("applies to page titles and sidebar labels", () => {
     const result = build({
       "index.md": '# Home\n\n```{toctree}\n:caption: Guides -- "all"\n\nPage -- one <a>\nb\n```\n',

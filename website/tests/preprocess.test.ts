@@ -28,6 +28,24 @@ describe("label, attrs and comment lines", () => {
     expect(body).toContain('Para line\n\n<span id="after"></span>\n\nnext para');
   });
 
+  it.each([
+    ["a bullet item", "- (lab)=\n  Text.\n", '- <span id="lab"></span>\n\n  Text.'],
+    ["an ordered item", "1. % note\n   Text.\n", "1. Text."],
+    ["a nested item", "- - % note\n    Text.\n", "- - Text."],
+  ])("are found on %s even when no other line could hold one", (_where, source, expected) => {
+    const result = build({ "a.md": `# A\n\n${source}` });
+    expect(result.errors).toEqual([]);
+    const body = bodyOf(result, "docs/a.md");
+    expect(body).toContain(expected);
+    expect(body).not.toContain("note");
+  });
+
+  it("fail inside a definition list definition with a clear error", () => {
+    const front = "---\nmyst:\n  enable_extensions:\n    - deflist\n---\n# A\n\n";
+    expect(constructs({ "a.md": `${front}Term\n: def\n  (lbl)=\n  more\n` })).toEqual(["10 syntax:nested-marker"]);
+    expect(build({ "a.md": `${front}Term\n: (lbl)=\n` }).errors.map((error) => error.message)).toEqual([expect.stringContaining("a.md:8: deflist: a label, attrs or comment line inside a definition")]);
+  });
+
   it("fail where MyST would read them as paragraph text", () => {
     expect(constructs({ "a.md": "# A\n\nPara line\n    (cont)=\n" })).toEqual(["4 syntax:misplaced-label"]);
   });

@@ -9,6 +9,7 @@ type Entry = { term: Line; definitions: Line[] };
 
 const DEFINITION_START = /^:(\s+|$)/;
 const BULLET = /^[-*+]\s+/;
+const MARKER_LINE = /^(\([^)\s][^)]*\)=\s*$|\{[#.][^{}]*\}\s*$|%)/;
 const OTHER_BLOCK = /^(#{1,6}\s|>|`{3,}|~{3,}|\d{1,9}[.)]\s)/;
 
 function splitLines(children: readonly PhrasingContent[]): Line[] {
@@ -110,6 +111,7 @@ function paragraph(children: Line): Paragraph {
 function definitionBody(definition: Line, at: SourcePosition): RootContent {
   const first = definition[0];
   if (first?.type !== "text") return paragraph(definition);
+  if (MARKER_LINE.test(first.value)) throw new ConverterError(at.file, at.line, "deflist: a label, attrs or comment line inside a definition is not supported; move it before the term");
   if (OTHER_BLOCK.test(first.value)) throw new ConverterError(at.file, at.line, `deflist: a definition that starts with ${JSON.stringify(first.value.slice(0, 3))} is not supported`);
   const bullet = first.value.match(BULLET);
   if (!bullet) return paragraph(definition);

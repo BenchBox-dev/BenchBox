@@ -1,5 +1,6 @@
 import { statSync, type Stats } from "node:fs";
 import path from "node:path";
+import { cloneTitle, type TitleNode } from "../../lib/smartypants.ts";
 import { routeFor } from "../docs-index.ts";
 import { UnresolvedReferenceError } from "../errors.ts";
 import type { Link, PhrasingContent } from "mdast";
@@ -45,7 +46,7 @@ export const BLOG_PAGES: Readonly<Record<string, string>> = {
   "blog/author.html": "/blog/author.html",
 };
 
-type Resolution = { url: string; title?: string };
+type Resolution = { url: string; title?: TitleNode[] };
 
 function resolveTarget(target: string, context: ConvertContext, at: SourcePosition, fragment: string): Resolution {
   const unresolved = (detail: string): UnresolvedReferenceError => new UnresolvedReferenceError(at.file, at.line, `link:${withFragment(target, fragment)}`, detail);
@@ -57,17 +58,17 @@ function resolveTarget(target: string, context: ConvertContext, at: SourcePositi
   if (DOC_SUFFIX.test(target)) {
     const resolved = context.resolveDoc(target, at, "link");
     if (fragment !== "") context.checkFragment(resolved.path, fragment, at);
-    return fragment === "" ? { url: resolved.route, title: resolved.title } : { url: withFragment(resolved.route, fragment) };
+    return fragment === "" ? { url: resolved.route, title: resolved.titleNodes } : { url: withFragment(resolved.route, fragment) };
   }
   const doc = context.findDoc(target);
   if (doc) {
     if (fragment !== "") throw unresolved("names a document without its suffix, which Sphinx cannot resolve with a fragment; link to the .md file");
-    return { url: doc.route, title: doc.title };
+    return { url: doc.route, title: doc.titleNodes };
   }
   const stats = statOf(absolute);
   if (stats?.isFile()) return { url: repositoryTarget(absolute, context.docsRoot, fragment, unresolved) };
   const index = stats?.isDirectory() ? context.findDoc(`${target.replace(/\/+$/, "")}/index`) : undefined;
-  if (index && fragment === "") return { url: index.route, title: index.title };
+  if (index && fragment === "") return { url: index.route, title: index.titleNodes };
   throw unresolved("does not match a document or file under docs/");
 }
 
@@ -88,7 +89,7 @@ function localLink(node: Link, fragment: string, at: SourcePosition, context: Co
   const label = context.index.get(context.file)?.labels.get(fragment);
   if (label?.title === undefined) throw emptyText(node, at, "MyST fills empty text only from a label on a heading");
   node.url = `#${label.id}`;
-  node.children = [{ type: "text", value: label.title }];
+  node.children = cloneTitle(label.title);
   return [node];
 }
 
@@ -119,8 +120,8 @@ export const linkSyntax: SyntaxHandler<"link"> = {
       return [node];
     }
     if (link && isEmpty(link)) {
-      if (resolution.title === undefined) throw emptyText(link, at, "MyST fills empty text only for a whole page");
-      link.children = [{ type: "text", value: resolution.title }];
+      if (resolution.title === undefined) throw emptyText(link, at, "MyST fills empty text only for a whole page that this site builds");
+      link.children = resolution.title;
     }
     node.url = resolution.url;
     return [node];

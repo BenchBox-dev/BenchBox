@@ -1,4 +1,5 @@
 import type { List, ListItem, RootContent } from "mdast";
+import { cloneTitle, type TitleNode } from "../../lib/smartypants.ts";
 import { stemOf } from "../docs-index.ts";
 import { UnknownConstructError, UnresolvedReferenceError } from "../errors.ts";
 import type { DocInfo, TocNode, ToctreeBlock, ToctreeEntry } from "../model.ts";
@@ -9,7 +10,7 @@ const URL_TARGET = /:\/\//;
 const GLOB_CHARACTERS = /[*?[]/;
 const FLAGS = ["hidden", "titlesonly", "includehidden", "reversed", "glob"];
 
-type Item = { kind: "item"; title: string; url: string; children: Node[] };
+type Item = { kind: "item"; title: TitleNode[]; url: string; children: Node[] };
 
 type Pending = { kind: "toctree"; owner: DocInfo; block: ToctreeBlock };
 
@@ -95,7 +96,11 @@ function parseEntries(call: DirectiveCall, context: ConvertContext): ToctreeEntr
   return "reversed" in call.options ? entries.reverse() : entries;
 }
 
-function item(title: string, url: string): Item {
+function plain(value: string): TitleNode[] {
+  return [{ type: "text", value }];
+}
+
+function item(title: TitleNode[], url: string): Item {
   return { kind: "item", title, url, children: [] };
 }
 
@@ -103,7 +108,7 @@ function tocOf(info: DocInfo, nodes: readonly TocNode[]): Node[] {
   return nodes.map((node): Node =>
     node.kind === "toctree"
       ? { kind: "toctree", owner: info, block: info.toctrees[node.block] }
-      : { kind: "item", title: node.title, url: node.anchor === "" ? info.route : `${info.route}#${node.anchor}`, children: tocOf(info, node.children) },
+      : { kind: "item", title: cloneTitle(node.title), url: node.anchor === "" ? info.route : `${info.route}#${node.anchor}`, children: tocOf(info, node.children) },
   );
 }
 
@@ -122,14 +127,14 @@ function resolvePending(nodes: readonly Node[], parents: readonly string[], opti
 function entriesOf(owner: DocInfo, block: ToctreeBlock, parents: readonly string[], options: Resolve): Node[] {
   const out: Node[] = [];
   for (const entry of block.entries) {
-    if (entry.kind === "url") out.push(item(entry.title, entry.url));
-    else if (entry.kind === "self") out.push(item(entry.title ?? owner.title, owner.route));
+    if (entry.kind === "url") out.push(item(plain(entry.title), entry.url));
+    else if (entry.kind === "self") out.push(item(entry.title === undefined ? cloneTitle(owner.titleNodes) : plain(entry.title), owner.route));
     else if (!parents.includes(entry.path)) {
       const info = options.context.index.get(entry.path);
       if (!info) throw new UnresolvedReferenceError(block.at.file, block.at.line, `toctree:${entry.path}`, "is not a document");
-      const toc = info.toc.length > 0 ? tocOf(info, info.toc) : [item(info.title, info.route)];
+      const toc = info.toc.length > 0 ? tocOf(info, info.toc) : [item(cloneTitle(info.titleNodes), info.route)];
       const top = toc.filter((node): node is Item => node.kind === "item");
-      if (entry.title !== undefined && toc.length === 1 && top.length === 1) top[0].title = entry.title;
+      if (entry.title !== undefined && toc.length === 1 && top.length === 1) top[0].title = plain(entry.title);
       if (options.titlesonly) for (const node of top) node.children = pendingUnder(node.children);
       out.push(...resolvePending(toc, [info.path, ...parents], options));
     }
@@ -145,7 +150,7 @@ function toList(nodes: readonly Node[], level: number, maxdepth: number): List |
     ordered: false,
     spread: false,
     children: items.map((node): ListItem => {
-      const row: ListItem = { type: "listItem", spread: false, children: [{ type: "paragraph", children: [{ type: "link", url: node.url, children: [{ type: "text", value: node.title }] }] }] };
+      const row: ListItem = { type: "listItem", spread: false, children: [{ type: "paragraph", children: [{ type: "link", url: node.url, children: node.title }] }] };
       const nested = maxdepth > 0 && level >= maxdepth ? undefined : toList(node.children, level + 1, maxdepth);
       if (nested) row.children.push(nested);
       return row;

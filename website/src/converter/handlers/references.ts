@@ -15,7 +15,7 @@ export const docRole: RoleHandler = {
   handle(call, context) {
     const { title, target } = split(call.content);
     const resolved = context.resolveDoc(target, call.at);
-    const link: Link = { type: "link", url: resolved.route, children: [{ type: "text", value: title ?? resolved.title }] };
+    const link: Link = { type: "link", url: resolved.route, children: title === undefined ? resolved.titleNodes : [{ type: "text", value: title }] };
     return [link];
   },
 };
@@ -26,11 +26,10 @@ export const refRole: RoleHandler = {
   handle(call, context) {
     const { title, target } = split(call.content);
     const resolved = context.resolveLabel(target, call.at);
-    const text = title ?? resolved.title;
-    if (text === undefined) {
+    if (title === undefined && resolved.title === undefined) {
       throw new UnresolvedReferenceError(call.at.file, call.at.line, `ref:${target}`, "labels content without a heading, so it needs explicit link text: {ref}`text <label>`");
     }
-    const link: Link = { type: "link", url: `${resolved.route}#${resolved.id}`, children: [{ type: "text", value: text }] };
+    const link: Link = { type: "link", url: `${resolved.route}#${resolved.id}`, children: title === undefined ? (resolved.title ?? []) : [{ type: "text", value: title }] };
     return [link];
   },
 };

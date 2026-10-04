@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,6 +33,33 @@ describe("converter output directory", () => {
     expect(() => writeOutput(out, new Map([["content/a.md", "x"]]))).toThrow(UnownedOutputError);
     expect(() => clearOutput(out)).toThrow(UnownedOutputError);
     expect(readdirSync(out)).toEqual(["keep.txt"]);
+  });
+
+  it("refuses a path that exists but is not a directory, and keeps it", () => {
+    const file = path.join(scratch(), "precious.txt");
+    writeFileSync(file, "keep me");
+    expect(() => writeOutput(file, new Map([["content/a.md", "x"]]))).toThrow(UnownedOutputError);
+    expect(() => clearOutput(file)).toThrow(UnownedOutputError);
+    expect(readFileSync(file, "utf-8")).toBe("keep me");
+  });
+
+  it("rethrows errors other than a missing path", () => {
+    const blocked = path.join(scratch(), "file.txt", "out");
+    writeFileSync(path.dirname(blocked), "x");
+    expect(() => clearOutput(blocked)).toThrow(/ENOTDIR/);
+  });
+
+  it("removes a stale symlink without following it", () => {
+    const root = scratch();
+    const outside = path.join(root, "outside");
+    mkdirSync(outside);
+    writeFileSync(path.join(outside, "keep.md"), "outside");
+    const out = path.join(root, "generated");
+    writeOutput(out, new Map([["content/a.md", "x"]]));
+    symlinkSync(outside, path.join(out, "content", "linked"));
+    writeOutput(out, new Map([["content/a.md", "x"]]));
+    expect(readdirSync(path.join(out, "content"))).toEqual(["a.md"]);
+    expect(readFileSync(path.join(outside, "keep.md"), "utf-8")).toBe("outside");
   });
 
   it("clears only a marked directory", () => {

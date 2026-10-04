@@ -1,6 +1,22 @@
 import type { PhrasingContent } from "mdast";
 import type { SyntaxHandler } from "../types.ts";
 
+export function lineStarts(children: readonly PhrasingContent[]): string[] {
+  const starts: string[] = [];
+  let atLineStart = true;
+  for (const child of children) {
+    if (child.type === "text") {
+      child.value.split("\n").forEach((line, index) => {
+        if (index > 0 || atLineStart) starts.push(line);
+      });
+      atLineStart = child.value.endsWith("\n");
+    } else {
+      if (atLineStart) starts.push("");
+      atLineStart = child.type === "break";
+    }
+  }
+  return starts;
+}
 
 function escapeLineStarts(children: readonly PhrasingContent[]): PhrasingContent[] {
   const out: PhrasingContent[] = [];

@@ -1,4 +1,4 @@
-import type { Root, Text } from "mdast";
+import type { InlineCode, PhrasingContent, Root, Text } from "mdast";
 import remarkSmartypants from "remark-smartypants";
 import { unified } from "unified";
 import { visit } from "unist-util-visit";
@@ -33,4 +33,34 @@ export function smarten(text: string): string {
   const result = processor.runSync(tree) as Root;
   const paragraph = result.children[0];
   return paragraph.type === "paragraph" ? paragraph.children.map((child) => (child as Text).value ?? "").join("") : text;
+}
+
+export type TitleNode = Text | InlineCode;
+
+export function flattenTitle(children: readonly PhrasingContent[]): TitleNode[] {
+  const out: TitleNode[] = [];
+  for (const child of children) {
+    if (child.type === "inlineCode") out.push({ type: "inlineCode", value: child.value });
+    else if (child.type === "text") {
+      const last = out[out.length - 1];
+      if (last?.type === "text") last.value += child.value;
+      else out.push({ type: "text", value: child.value });
+    } else if ("children" in child) out.push(...flattenTitle(child.children as PhrasingContent[]));
+  }
+  return out;
+}
+
+export function smartenTitle(nodes: readonly TitleNode[]): TitleNode[] {
+  const tree: Root = { type: "root", children: [{ type: "paragraph", children: nodes.map((node) => ({ ...node })) }] };
+  const result = processor.runSync(tree) as Root;
+  const paragraph = result.children[0];
+  return paragraph.type === "paragraph" ? flattenTitle(paragraph.children) : [...nodes];
+}
+
+export function titleText(nodes: readonly TitleNode[]): string {
+  return nodes.map((node) => node.value).join("");
+}
+
+export function cloneTitle(nodes: readonly TitleNode[]): TitleNode[] {
+  return nodes.map((node) => ({ ...node }));
 }
