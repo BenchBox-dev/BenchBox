@@ -964,15 +964,15 @@ def install_clickhouse_stub(
     try:
         import benchbox.platforms.clickhouse._dependencies as deps_module
 
-        deps_module.ClickHouseClient = StubClient
-        deps_module.ClickHouseError = ClickHouseError
+        monkeypatch.setattr(deps_module, "ClickHouseClient", StubClient)
+        monkeypatch.setattr(deps_module, "ClickHouseError", ClickHouseError)
     except ImportError:  # pragma: no cover - defensive
         pass
 
     try:
         import benchbox.platforms.clickhouse.setup as setup_module
 
-        setup_module.ClickHouseClient = StubClient
+        monkeypatch.setattr(setup_module, "ClickHouseClient", StubClient)
     except ImportError:  # pragma: no cover - defensive
         pass
 
@@ -2563,7 +2563,7 @@ def install_lakesail_stub(
     try:
         import benchbox.platforms.lakesail as adapter_module
 
-        adapter_module.SparkSession = StubSparkSession
+        monkeypatch.setattr(adapter_module, "SparkSession", StubSparkSession)
         for type_name in [
             "StructType",
             "StructField",
@@ -2574,7 +2574,7 @@ def install_lakesail_stub(
             "DecimalType",
             "DateType",
         ]:
-            setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
+            monkeypatch.setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name), raising=False)
 
         # Make the adapter think the server is reachable so tests skip the
         # real TCP connection and pysail import checks.

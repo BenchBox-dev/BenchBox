@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import ast
+import functools
 import importlib
 import importlib.abc
 import importlib.machinery
+import importlib.util
 import os
 import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import types
 from dataclasses import dataclass, field
@@ -535,6 +539,16 @@ DRIVER_ROOTS = frozenset(
         "influxdb3",
         "datafusion",
         "polars",
+        "botocore",
+        "urllib3",
+        "cryptography",
+        "flightsql",
+        "pyiceberg",
+        "vortex",
+        "delta",
+        "dask",
+        "cudf",
+        "rmm",
     }
 )
 OPTIONAL_IMPORT_NAMES = frozenset(
@@ -592,8 +606,13 @@ class FakeServiceNeverCompletes(Exception):
     pass
 
 
-def sleep_never_completes(seconds: float) -> None:
-    raise FakeServiceNeverCompletes(f"fake service cannot complete a {seconds}s poll")
+def sleep_never_completes(owner: int, real_sleep: Callable[[float], None]) -> Callable[[float], None]:
+    def sleep(seconds: float) -> None:
+        if threading.get_ident() != owner:
+            return real_sleep(seconds)
+        raise FakeServiceNeverCompletes(f"fake service cannot complete a {seconds}s poll")
+
+    return sleep
 
 
 class FakeFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
@@ -610,6 +629,108 @@ class FakeFinder(importlib.abc.MetaPathFinder, importlib.abc.Loader):
 
     def exec_module(self, module: types.ModuleType) -> None:
         return None
+
+
+@dataclass(frozen=True)
+class DriverImport:
+    name: str
+    module: str
+    attribute: str = ""
+
+    def resolve(self) -> Any:
+        module = importlib.import_module(self.module)
+        return getattr(module, self.attribute) if self.attribute else module
+
+
+@dataclass(frozen=True)
+class Reexport:
+    name: str
+    module: str
+    attribute: str
+    level: int
+
+    def source_name(self, importer: types.ModuleType) -> str:
+        return importlib.util.resolve_name("." * self.level + self.module, importer.__package__ or "")
+
+
+@dataclass(frozen=True)
+class DriverBindings:
+    imports: tuple[DriverImport, ...] = ()
+    availability_flags: frozenset[str] = frozenset()
+    reexports: tuple[Reexport, ...] = ()
+
+    @property
+    def driven_names(self) -> frozenset[str]:
+        return frozenset({binding.name for binding in self.imports} | self.availability_flags)
+
+
+def module_level_statements(body: list[ast.stmt]) -> Iterator[ast.stmt]:
+    for node in body:
+        yield node
+        if isinstance(node, ast.Try):
+            for block in (node.body, node.orelse, node.finalbody, *(handler.body for handler in node.handlers)):
+                yield from module_level_statements(block)
+        elif isinstance(node, ast.If) and "TYPE_CHECKING" not in ast.unparse(node.test):
+            yield from module_level_statements(node.body)
+            yield from module_level_statements(node.orelse)
+
+
+def imports_driver(node: ast.stmt) -> bool:
+    if isinstance(node, ast.Import):
+        return any(alias.name.split(".")[0] in DRIVER_ROOTS for alias in node.names)
+    return isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").split(".")[0] in DRIVER_ROOTS
+
+
+def driver_imports_of(node: ast.stmt) -> Iterator[DriverImport]:
+    if isinstance(node, ast.Import):
+        for alias in node.names:
+            if alias.name.split(".")[0] in DRIVER_ROOTS:
+                yield DriverImport(
+                    alias.asname or alias.name.split(".")[0], alias.name if alias.asname else alias.name.split(".")[0]
+                )
+    elif isinstance(node, ast.ImportFrom) and imports_driver(node):
+        for alias in node.names:
+            if alias.name != "*":
+                yield DriverImport(alias.asname or alias.name, node.module or "", alias.name)
+
+
+def availability_flags_of(node: ast.Try) -> Iterator[str]:
+    for block in (node.body, node.orelse, *(handler.body for handler in node.handlers)):
+        for child in block:
+            if (
+                isinstance(child, ast.Assign)
+                and isinstance(child.value, ast.Constant)
+                and isinstance(child.value.value, bool)
+            ):
+                yield from (target.id for target in child.targets if isinstance(target, ast.Name))
+
+
+def reexports_of(node: ast.stmt) -> Iterator[Reexport]:
+    if isinstance(node, ast.ImportFrom) and node.module and (node.level > 0 or node.module.split(".")[0] == "benchbox"):
+        for alias in node.names:
+            if alias.name != "*":
+                yield Reexport(alias.asname or alias.name, node.module, alias.name, node.level)
+
+
+@functools.cache
+def driver_bindings(source_path: str) -> DriverBindings:
+    tree = ast.parse(Path(source_path).read_text(encoding="utf-8"))
+    imports: list[DriverImport] = []
+    reexports: list[Reexport] = []
+    flags: set[str] = set()
+    for node in module_level_statements(tree.body):
+        imports.extend(driver_imports_of(node))
+        reexports.extend(reexports_of(node))
+        if isinstance(node, ast.Try) and any(imports_driver(child) for child in node.body):
+            flags.update(availability_flags_of(node))
+    return DriverBindings(tuple(imports), frozenset(flags), tuple(reexports))
+
+
+def bindings_of(module: types.ModuleType) -> DriverBindings:
+    source_path = getattr(module, "__file__", None)
+    if not source_path or not source_path.endswith(".py"):
+        return DriverBindings()
+    return driver_bindings(source_path)
 
 
 def driver_replacement(ledger: Ledger, owner: str, name: str, value: Any) -> Any:
@@ -920,6 +1041,27 @@ def restore_modules(before: dict[str, Any]) -> None:
             sys.modules[name] = module
 
 
+def force_driver_bindings(monkeypatch: pytest.MonkeyPatch, modules: dict[str, types.ModuleType]) -> None:
+    driven: set[tuple[str, str]] = set()
+    for module_name, module in modules.items():
+        bindings = bindings_of(module)
+        for binding in bindings.imports:
+            monkeypatch.setattr(module, binding.name, binding.resolve(), raising=False)
+        for flag in bindings.availability_flags:
+            monkeypatch.setattr(module, flag, True, raising=False)
+        driven.update((module_name, name) for name in bindings.driven_names)
+    changed = True
+    while changed:
+        changed = False
+        for module_name, module in modules.items():
+            for reexport in bindings_of(module).reexports:
+                source_name = reexport.source_name(module)
+                if (source_name, reexport.attribute) in driven and (module_name, reexport.name) not in driven:
+                    monkeypatch.setattr(module, reexport.name, getattr(modules[source_name], reexport.attribute))
+                    driven.add((module_name, reexport.name))
+                    changed = True
+
+
 @pytest.fixture
 def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
     modules_before = dict(sys.modules)
@@ -953,10 +1095,14 @@ def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
     for module_name in [name for name in sys.modules if name.split(".")[0] in DRIVER_ROOTS]:
         monkeypatch.delitem(sys.modules, module_name)
     monkeypatch.setattr(sys, "meta_path", [FakeFinder(ledger), *sys.meta_path])
-    monkeypatch.setattr(time, "sleep", sleep_never_completes)
-    for module_name, module in list(sys.modules.items()):
-        if not module_name.startswith("benchbox.") or module is None:
-            continue
+    monkeypatch.setattr(time, "sleep", sleep_never_completes(threading.get_ident(), time.sleep))
+    benchbox_modules = {
+        name: module
+        for name, module in list(sys.modules.items())
+        if name.startswith("benchbox.") and module is not None
+    }
+    force_driver_bindings(monkeypatch, benchbox_modules)
+    for module_name, module in benchbox_modules.items():
         for name, value in list(vars(module).items()):
             replacement = driver_replacement(ledger, module_name, name, value)
             if replacement is not None:
@@ -964,10 +1110,14 @@ def ledger(world: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Ledger]:
         for name, stand_in in NETWORK_STAND_INS.items():
             if name in vars(module):
                 monkeypatch.setattr(module, name, stand_in)
+    session_manager = importlib.import_module("benchbox.platforms.pyspark.session").SparkSessionManager
+    for attribute, value in SPARK_SESSION_STATE.items():
+        monkeypatch.setattr(session_manager, attribute, value)
     yield ledger
     restore_modules(modules_before)
 
 
+SPARK_SESSION_STATE: dict[str, Any] = {"_session": None, "_config": None, "_refcount": 0, "_java_validated": True}
 NETWORK_STAND_INS: dict[str, Callable[..., Any]] = {
     "is_spark_connect_reachable": lambda *a, **k: True,
     "check_platform_dependencies": lambda *a, **k: (True, []),
