@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -91,11 +90,11 @@ def _arm(gh: FakeGh, pr: str | None = "7", head: str | None = None, *, unpublish
     )
 
 
-def test_arms_the_exact_head_with_squash_and_match_head_commit() -> None:
+def test_arms_the_exact_head_with_squash_auto_and_match_head_commit() -> None:
     gh = FakeGh()
     assert _arm(gh) == 0
     assert gh.merged() == [
-        ["gh", "pr", "merge", "7", "--repo", pr_arm.REPOSITORY, "--squash", "--match-head-commit", HEAD]
+        ["gh", "pr", "merge", "7", "--repo", pr_arm.REPOSITORY, "--squash", "--auto", "--match-head-commit", HEAD]
     ]
 
 
@@ -248,8 +247,7 @@ def test_makefile_exposes_pr_arm_through_the_helper_and_declares_it_phony() -> N
     makefile = (ROOT / "Makefile").read_text()
     assert "\npr-arm:\n" in makefile
     assert "scripts/pr_arm.py" in makefile
-    phony = next(line for line in makefile.splitlines() if line.startswith(".PHONY: pr-arm "))
-    assert re.search(r"(?<![\w-])pr-arm(?![\w-])", phony)
+    assert ".PHONY: pr-arm" in makefile.splitlines()
 
 
 def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str, str]]:

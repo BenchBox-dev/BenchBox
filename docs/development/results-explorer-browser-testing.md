@@ -83,10 +83,10 @@ the former documentation input paths are unaffected.
 A merge group that passes its comparison also uploads a candidate baseline for
 its own `merge_group.head_sha`. The next queue group uses that head as its base,
 so the candidate is the capture of the exact tree that group merges onto. The
-download script accepts a candidate only from a `merge_group` Documentation run
+download script accepts a candidate only from a `merge_group` CI run
 on this repository's `gh-readonly-queue/develop/*` branch at that SHA, and it
 prefers a protected `develop` artifact when both exist. Merge groups capture
-their own tree first, then wait up to 30 minutes for the exact-base artifact
+their own tree first, then wait up to 10 minutes for the exact-base artifact
 before failing closed. Pull requests keep a short retry.
 
 If a protected `develop` push was dropped or its baseline expired, dispatch
@@ -124,9 +124,66 @@ reviewed PR merges. An approved merge group also uploads a candidate for its own
 head, which only the queue group stacked on that exact head consumes. PR
 diagnostic artifacts remain short-lived and non-promotable.
 
+### Intentional visual changes while the site moves to Astro
+
+Several changes alter what the current site renders before the switch to Astro:
+
+- converting reStructuredText pages to MyST;
+- replacing the autodoc API reference with authored pages;
+- adopting shared design tokens.
+
+The comparison is advisory until the public site is in production
+([merge-queue governance](../operations/merge-queue-governance.md)).
+Until then, a changed capture does not block the merge, but it is still
+reviewed. The procedure has two phases.
+
+**Advisory phase (now).** For a PR whose comparison reports changed captures:
+
+1. Download the PR run's `public-site-visual-diagnostics-*` artifact.
+2. For each changed route and viewport, compare the current capture with the
+   baseline. Confirm the change is the one the PR intends and that nothing else
+   on the page moved.
+3. Record the review in the PR: the run id, each changed capture as
+   route and width, and one line per capture saying why the change is expected.
+4. Repeat for the merge-group run, because the group tree can differ from the
+   PR head. Record that run id too.
+
+A change nobody intended is a defect. Fix it in the PR; do not record it as
+expected.
+
+**Gating phase (after the check is required again).** Use the two approval
+slots described above, one per tree:
+
+1. Review the PR run's diagnostics. Set `APPROVED_HEAD_SHA` to the PR head SHA
+   and `APPROVAL_REASON` to the review note, then re-run the failed job.
+2. When the merge group's run fails on the same intended change, review that
+   group's diagnostics. Set `APPROVED_MERGE_GROUP_SHA` to its
+   `merge_group.head_sha` and `MERGE_GROUP_APPROVAL_REASON` to the note, then
+   re-run.
+3. Clear all four variables after the approved runs.
+
+A PR approval never applies to a merge group.
+
+**When the merge group is re-formed.** A group re-forms when a PR ahead of it
+fails or leaves the queue. The re-formed group has a new `merge_group.head_sha`.
+In the advisory phase, review the new run. In the gating phase, the earlier
+group approval no longer matches, so review the new group's diagnostics and set
+the group slot again.
+
+**Stacked groups.** A follower group's base is the head of the group ahead of
+it. That head has a baseline only once the leader's comparison has passed and
+uploaded a candidate, or when a site-equivalent ancestor exists. If the
+follower fails at the baseline download step, wait for the leader to merge.
+Confirm `public-site-visual-baseline-<develop head>` exists, then re-queue the
+follower. Site-changing PRs should land one at a time.
+
+**Missing exact-SHA baseline.** Dispatch Documentation on `develop` with
+`baseline_source_sha`, as shown above. Wait for its visual job, then re-run the
+failed job. A PR diagnostic artifact is never a substitute.
+
 ## What CI gates
 
-The `explorer-e2e` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)
 (Chromium full suite, blocking) runs on **pull requests** and **merge groups**
 when the change touches the explorer unit (with the `explorer` unit result
 always reporting; the job is skipped when no relevant files change).

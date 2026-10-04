@@ -11,7 +11,7 @@ from pathlib import PurePosixPath
 
 import yaml
 from comment_execution import PythonBindings
-from comment_payloads import nested_sources, shell_payloads
+from comment_payloads import astro_template_comments, nested_sources, shell_payloads
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
 
@@ -44,6 +44,7 @@ LANGUAGES = {
     ".ini": "ini",
     ".cfg": "ini",
     ".css": "css",
+    ".astro": "astro",
     ".html": "html",
     ".htm": "html",
     ".jinja": "html+jinja",
@@ -88,6 +89,7 @@ OWNED_ROOTS = (
     "tools/",
     "_project/scripts/",
     "results-explorer/",
+    "website/",
     "docker/",
     "make/",
     ".github/",
@@ -441,6 +443,12 @@ def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]
     return result
 
 
+def astro_findings(path: str, source: str, lang: str) -> list[Finding]:
+    if lang != "astro":
+        return []
+    return [Finding(path, line, "comment", text) for line, text in astro_template_comments(source)]
+
+
 def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     try:
         if source.startswith("#!"):
@@ -458,8 +466,8 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             for start, child_path, text, child_lang, symbol in nested_sources(path, source, lang)
             for f in scan(child_path, text, child_lang, js_results)
         ]
-        if lang in {"notebook", "examples"}:
-            return nested
+        if lang in {"notebook", "examples", "astro"}:
+            return nested + astro_findings(path, source, lang)
         if lang == "bash":
             lines = source.splitlines(keepends=True)
             for start, _, text, _, _ in shell_payloads(path, source, include_data=True):

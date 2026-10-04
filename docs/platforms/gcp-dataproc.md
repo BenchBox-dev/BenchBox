@@ -271,4 +271,4 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
 
 - [Apache Spark Platform](spark.md) - Local/cluster Spark usage
 - [AWS Glue Platform](aws-glue.md) - Serverless Spark on AWS
-- [Cloud Platforms Overview](cloud-platforms.rst) - All cloud platforms
+- [Cloud Platforms Overview](cloud-platforms.md) - All cloud platforms

@@ -1,0 +1,19 @@
+---
+import Shell from "../layouts/Shell.astro";
+---
+
+<Shell title="Page Not Found - BenchBox">
+  <script is:inline slot="head">
+    if (window.location.pathname.startsWith("/results/")) {
+      var originalPath = window.location.pathname + window.location.search + window.location.hash;
+      try {
+        window.sessionStorage.setItem("benchbox.results.redirect", originalPath);
+      } catch (error) {}
+      window.location.replace("/results/");
+    }
+  </script>
+  <div class="prose">
+    <h1>Page not found</h1>
+    <p><a href="/">Return to the BenchBox home page</a>.</p>
+  </div>
+</Shell>

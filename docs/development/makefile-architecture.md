@@ -30,7 +30,7 @@ consumers use GNU Make's evaluated target graph.
 | `make/worktrees.mk` | Disposable worktree creation, exact-path removal, manual release, finish preview, and listing | Keep the native Git lifecycle wrappers here; do not add slot allocation or automatic branch cleanup |
 | `make/worktree-maintenance.mk` | Finding and soundness reporting utilities | Keep unrelated reporting targets here; worktree reaping remains exact-path and operator-driven — the only branch reaper (`branch-prune-merged` in the root `Makefile`) is an explicit exception for worktree-less branches at their historically proven merge-time PR head |
 | `make/help.mk` | Exact ordered `make help` recipe | Preserve existing category and command order; add a help line in the same change as a new user-facing target |
-| `make/inventory.json` | Current evaluated target, alias, prerequisite, recipe, variable, macro, statement-order, default-goal, and include-order contract | Regenerate only for an intentional permitted contract change and review the manifest diff |
+| `make/inventory.json` | Locally generated target, alias, prerequisite, recipe, variable, macro, statement-order, default-goal, and include-order contract, derived wholly from the `Makefile`, its included modules, and the migration files below | Never edit or commit it; only `make/check_makefile_inventory.py --write` writes it |
 | `make/monolith-baseline.json` | Durable inventory of the committed pre-split monolith: 198 targets, 195 public targets, and default goal `test` | Do not regenerate during ordinary Make changes; changing this migration proof requires a separate architectural decision |
 | `make/migration-proof.json` | Compact hashes, counts, include order, and reviewed delta for the initial split | The normal inventory writer never changes this file; preserve it with the monolith baseline as historical evidence |
 | `make/check_makefile_inventory.py` | Inventory reader, writer, and historical verifier | Keep it with the release-retained Make runtime so the public guard remains executable after curation |
@@ -46,7 +46,7 @@ The split was designed against repository consumers, not only target size.
 
 | Implementation or consumer | Observed contract | Design consequence |
 |---|---|---|
-| `.github/workflows/ci.yml`, `nightly.yml`, and `lint.yml` | Invoke public targets through GNU Make | Included targets are transparent; the inventory pins their names, prerequisites, recipes, and ordering within recipes |
+| `.github/workflows/ci.yml`, `nightly.yml`, and `lint.yml` | Invoke public targets through GNU Make | Included targets are transparent to these callers |
 | `tests/system/test_ci_lint_parity.py` and `tests/unit/scripts/test_ci_lint_environment_boundary.py` | Parse the literal root `ci-lint:` recipe | `ci-lint` remains root-owned with byte-identical command order |
 | `tests/unit/test_standardized_test_commands.py` and `tests/unit/test_linting_consolidation.py` | Search or parse root test, coverage, correctness, marker, lint, and format definitions | Those definitions remain root-owned; moving them requires first migrating the consumers in a separately scoped change |
 | `tests/unit/test_release_infrastructure.py`, `tests/unit/workflows/test_auto_merge_enablement_point.py`, and `tests/unit/test_auto_merge_soundness_paths.py` | Parse release, PR, auto-merge, worktree lifecycle, package, and UAT gate source text | Those operational safety recipes remain root-owned |
@@ -92,7 +92,9 @@ make makefile-inventory-check
 ```
 
 The guard expands only the repository's narrow, mandatory include syntax and
-does not execute Make recipes. It compares the checked-in manifest against:
+does not execute Make recipes. The check builds the inventory in memory and
+never writes, so it works on a read-only tree and does not depend on the
+untracked `make/inventory.json`. The inventory records:
 
 - the default goal and ordered include list;
 - all explicit and pattern targets plus the phony target set;
@@ -102,10 +104,9 @@ does not execute Make recipes. It compares the checked-in manifest against:
 - the global ordered stream of assignments, macros, phony declarations, and
   rules after include expansion.
 
-Moving an unchanged target between root and a module leaves its rule contract
-unchanged only when its expanded parse position is also unchanged. Removing or
-renaming a public target, changing a prerequisite or recipe, or reordering
-assignments fails closed.
+The check fails when the Make sources cannot be inventoried safely (a missing
+include, an include cycle, unsupported top-level syntax) or when the migration
+proof no longer matches the monolith baseline.
 
 The separate migration proof records the six ordered includes, the
 non-overridable `BENCHBOX_MAKEFILE_ROOT` bootstrap, the public phony
@@ -114,20 +115,20 @@ required by the complexity test that still depends on `_project`. Its normalized
 semantic hash equals the monolith's hash; the reviewed target delta changes the
 baseline counts from 198/195 to 199/196.
 
-That evidence does not freeze the Make interface. For an intentional future
-contract change, regenerate only the current inventory and review its diff:
+That evidence does not freeze the Make interface; changing a target, prerequisite,
+or recipe needs no manifest update. Pull requests that change `Makefile` or
+`make/` get an informational public-target and recipe diff against their base
+in the CI step summary (`make/interface_summary.py`). To write the evaluated
+contract to a local manifest for inspection, run:
 
 ```bash
 uv run -- python make/check_makefile_inventory.py --write
-git diff -- Makefile make/
-make makefile-inventory-check
 ```
 
 The writer validates but never rewrites `monolith-baseline.json` or
-`migration-proof.json`. Before such a future regeneration, the ordinary check
-fails closed; after regeneration it accepts the reviewed current contract. Do
-not add the writer to `guards-fix`: target-interface changes require a reviewed
-decision rather than automatic regeneration.
+`migration-proof.json`. Its generated `make/inventory.json` is ignored by
+`.gitignore`, so it does not appear in `git status`; leave it in place or
+delete it.
 
 At the introducing split commit, or a checkout reconstructed from it, reproduce
 the historical comparison explicitly:
@@ -144,9 +145,9 @@ third full inventory copy.
 
 | Change | Required action | Rollback |
 |---|---|---|
-| Add a target inside an existing domain | Add it to the owning module, add help if public, regenerate and review inventory | Revert the target, help entry, and manifest together |
-| Move a target from root to a module | First prove no root-literal consumer remains; move comments, variables, rule, and recipe as one block; inventory should show only include/ownership changes | Move the exact block back to its original parse position and remove an empty module |
-| Add a module | Add one mandatory rooted include at the intended parse position and update this ownership table; regenerate inventory | Move its blocks back, remove the include, then remove the module |
+| Add a target inside an existing domain | Add it to the owning module, add help if public | Revert the target and help entry together |
+| Move a target from root to a module | First prove no root-literal consumer remains; move comments, variables, rule, and recipe as one block; `make makefile-inventory-check` must still pass | Move the exact block back to its original parse position and remove an empty module |
+| Add a module | Add one mandatory rooted include at the intended parse position and update this ownership table | Move its blocks back, remove the include, then remove the module |
 | Emergency rollback of this split | Restore the six module bodies at their include positions, delete the include lines and `BENCHBOX_MAKEFILE_ROOT`, then remove the guard target/help line | The resulting Makefile should reproduce `monolith-baseline.json` exactly |
 
 ## Alternatives rejected

@@ -27,24 +27,27 @@ from benchbox.core.tpch.queries import TPCHQueries
 from benchbox.core.tpch.schema import TABLES
 from benchbox.core.tpch.streams import TPCHStreams
 
-# TPC-H Reference Seeds for Validation
-# The official TPC-H answer files at SF=1.0 were generated using seed 0o0101000000 (17039360 decimal)
-# This seed must be used when performing exact validation against official answer files
-TPCH_SF1_REFERENCE_SEED = 0o0101000000  # 17039360 decimal
+TPCH_ANSWER_SET_SCALE_FACTOR = 1.0
 
 
-def get_reference_seed(scale_factor: float) -> int | None:
-    """Get the reference seed for exact validation at a given scale factor.
+def has_answer_set(scale_factor: float) -> bool:
+    return float(scale_factor) == TPCH_ANSWER_SET_SCALE_FACTOR
 
-    Args:
-        scale_factor: Scale factor for the benchmark
 
-    Returns:
-        Reference seed for exact validation, or None if no reference exists
-    """
-    if scale_factor == 1.0:
-        return TPCH_SF1_REFERENCE_SEED
-    return None
+def binds_answer_set_parameters(seed: int | None) -> bool:
+    return seed is None
+
+
+def power_stream_seed(seed: int | None, stream_id: int) -> int | None:
+    if seed is None:
+        return None
+    return seed + stream_id * 1000
+
+
+def describe_query_parameters(seed: int | None) -> str:
+    if seed is None:
+        return "qgen -d (TPC-H default substitution parameters)"
+    return f"qgen -r ({seed} + 1000 * stream_id)"
 
 
 # Data structures for test results

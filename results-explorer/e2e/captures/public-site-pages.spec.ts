@@ -116,6 +116,24 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
       const filename = `${route.slug}-${width}.png`;
       const screenshotPath = path.join(OUTPUT, filename);
       await page.evaluate(() => window.scrollTo(0, 0));
+      if (route.slug === "landing") {
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                new Promise<string>((resolve) =>
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() =>
+                      resolve(document.querySelector(".section-nav__link[aria-current]")?.getAttribute("href") ?? ""),
+                    ),
+                  ),
+                ),
+            ),
+          )
+          .toBe("#overview");
+        await page.evaluate(() => document.querySelector(".section-nav__links")?.scrollTo({ left: 0, behavior: "instant" }));
+        await expect.poll(() => page.evaluate(() => document.querySelector(".section-nav__links")?.scrollLeft ?? 0)).toBe(0);
+      }
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const digest = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
       captures.push({ digest, filename, route: route.path, viewport_width: width });
