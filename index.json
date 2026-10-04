@@ -19660,7 +19660,9 @@
     },
     "throughput-corpus-cohort-depth-third-identity": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "sqlite-throughput-dialect-and-stream-isolation"
+      ],
       "priority": "medium",
       "status": "open",
       "title": "Give the TPC-H SF1 throughput cohort three engine identities and make the depth gate phase-aware"
