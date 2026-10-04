@@ -57,6 +57,7 @@ Required status checks:
 - docs
 - landing
 - tooling
+- oracle-review
 ```
 
 Each required context is one always-reporting result job in
