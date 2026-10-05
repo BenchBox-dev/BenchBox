@@ -53,6 +53,7 @@ phase_key_order:
 - data_generation
 - schema_creation
 - data_loading
+- post_load_maintenance
 - validation
 - statistics
 - migration

@@ -80,3 +80,13 @@ def test_a_bundle_with_the_phase_still_loads() -> None:
 
     assert reconstructed.benchmark_name == "TPC-H"
     assert reconstructed.platform == "clickhouse"
+
+
+def test_phase_is_ordered_between_data_loading_and_validation() -> None:
+    payload = build_result_payload(
+        _result(PostLoadMaintenancePhase(duration_ms=4200, status="SUCCESS", tables_processed=8))
+    )
+
+    order = list(payload["phases"])
+
+    assert order.index("data_loading") < order.index("post_load_maintenance") < order.index("validation")
