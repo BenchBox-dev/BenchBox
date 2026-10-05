@@ -21670,17 +21670,12 @@
       "title": "Make the tuning metadata store portable (no unsupported CREATE INDEX; per-dialect DDL)"
     },
     "tuning-post-load-seam-20261001": {
-      "claim": {
-        "expires_at": "2026-10-06T14:25:09Z",
-        "generation": "75488a73c9a84756991499590e7e6cbf",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
-      },
+      "claim": null,
       "needs": [
         "tuning-physical-identifier-resolution-20261001"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Add one post-load tuning seam and move maintenance ops (OPTIMIZE/ANALYZE/VACUUM/ZORDER/RESUME RECLUSTER) into it"
     },
     "tuning-registry-mixin-honesty-20260717": {
