@@ -5,6 +5,11 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import threading
+import time
+import types
+from unittest.mock import patch
+
 import pytest
 
 from benchbox.experimental.load_testing.executor import (
@@ -391,3 +396,84 @@ class TestConcurrentLoadExecutorEdgeCases:
 
         # Should complete and record failures
         assert result.total_queries_failed > 0
+
+
+class TestExecutorBoundedWaitsAndClocks:
+    def _run_in_thread(self, executor, timeout):
+        outcome = {}
+
+        def target():
+            outcome["result"] = executor.run()
+
+        thread = threading.Thread(target=target, daemon=True)
+        thread.start()
+        thread.join(timeout)
+        return thread, outcome
+
+    def test_hung_stream_does_not_block_the_run_forever(self, mock_connection_factory, mock_query_factory):
+        release = threading.Event()
+
+        def hung_execute(connection, sql):
+            release.wait(30)
+            return True, 1, None
+
+        config = ConcurrentLoadConfig(
+            query_factory=mock_query_factory,
+            connection_factory=mock_connection_factory,
+            execute_query=hung_execute,
+            pattern=SteadyPattern(concurrency=1, duration_seconds=0.3),
+            queries_per_stream=1,
+            query_timeout_seconds=0.3,
+            collect_resource_metrics=False,
+        )
+        executor = ConcurrentLoadExecutor(config)
+        try:
+            thread, outcome = self._run_in_thread(executor, timeout=10)
+            assert not thread.is_alive(), "run() blocked on a hung stream"
+        finally:
+            release.set()
+
+        result = outcome["result"]
+        assert result.total_streams_succeeded == 0
+        assert any("abandoned" in (stream.error or "") for stream in result.streams)
+
+    def test_query_over_the_timeout_is_recorded_as_failed(self, mock_connection_factory, mock_query_factory):
+        def slow_execute(connection, sql):
+            time.sleep(0.15)
+            return True, 1, None
+
+        config = ConcurrentLoadConfig(
+            query_factory=mock_query_factory,
+            connection_factory=mock_connection_factory,
+            execute_query=slow_execute,
+            pattern=SteadyPattern(concurrency=1, duration_seconds=0.2),
+            queries_per_stream=1,
+            query_timeout_seconds=0.05,
+            collect_resource_metrics=False,
+        )
+        result = ConcurrentLoadExecutor(config).run()
+
+        assert result.total_queries_executed > 0
+        assert result.total_queries_succeeded == 0
+        failures = [e for stream in result.streams for e in stream.query_executions]
+        assert all("timeout" in (execution.error or "") for execution in failures)
+
+    def test_run_duration_ignores_wall_clock_steps(
+        self, mock_connection_factory, mock_query_factory, mock_execute_query
+    ):
+        ticks = iter(range(10_000, 0, -1))
+        stepped_clock = types.SimpleNamespace(time=lambda: float(next(ticks)), sleep=time.sleep)
+
+        config = ConcurrentLoadConfig(
+            query_factory=mock_query_factory,
+            connection_factory=mock_connection_factory,
+            execute_query=mock_execute_query,
+            pattern=SteadyPattern(concurrency=1, duration_seconds=0.3),
+            queries_per_stream=1,
+            collect_resource_metrics=False,
+        )
+        with patch("benchbox.experimental.load_testing.executor.time", stepped_clock):
+            result = ConcurrentLoadExecutor(config).run()
+
+        assert result.total_duration_seconds >= 0.3
+        assert result.overall_throughput > 0

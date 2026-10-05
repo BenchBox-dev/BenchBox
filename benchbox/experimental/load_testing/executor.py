@@ -11,7 +11,7 @@ import logging
 import threading
 import time
 from collections import deque
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -210,6 +210,7 @@ class ConcurrentLoadExecutor:
                 does not provide a matching `role_factories` entry.
         """
         start_time = time.time()
+        start_mono = mono_time()
         pattern = self._config.pattern
         self._validate_role_factories(pattern)
 
@@ -233,7 +234,7 @@ class ConcurrentLoadExecutor:
                 monitor_thread.join(timeout=2.0)
 
         end_time = time.time()
-        total_duration = end_time - start_time
+        total_duration = elapsed_seconds(start_mono)
 
         # Aggregate results
         total_queries = sum(s.queries_executed for s in self._stream_results)
@@ -323,7 +324,8 @@ class ConcurrentLoadExecutor:
         stream_counter = 0
 
         # Use ThreadPoolExecutor for managing concurrent streams
-        with ThreadPoolExecutor(max_workers=pattern.max_concurrency) as executor:
+        executor = ThreadPoolExecutor(max_workers=pattern.max_concurrency)
+        try:
             futures: dict[Future, tuple[int, str]] = {}
             phase_streams: dict[str, int] = {}
             phases = list(pattern.iter_phases())
@@ -368,26 +370,7 @@ class ConcurrentLoadExecutor:
                     # Check for completed streams
                     completed = [f for f in futures if f.done()]
                     for future in completed:
-                        try:
-                            result = future.result()
-                            self._stream_results.append(result)
-                        except Exception as e:
-                            stream_id = futures[future][0]
-                            self._stream_results.append(
-                                StreamResult(
-                                    stream_id=stream_id,
-                                    queries_executed=0,
-                                    queries_succeeded=0,
-                                    queries_failed=0,
-                                    total_time_seconds=0,
-                                    error=str(e),
-                                )
-                            )
-                        finally:
-                            _, role = futures[future]
-                            with self._lock:
-                                self._active_streams -= 1
-                                self._decrement_role_locked(role)
+                        self._record_stream_future(future, *futures[future])
                         del futures[future]
 
                     # Small sleep to prevent busy-waiting
@@ -400,28 +383,41 @@ class ConcurrentLoadExecutor:
                 upcoming = phases[index + 1].roles if index + 1 < len(phases) else None
                 self._await_role_drain(futures, next_phase_roles=upcoming)
 
-            # Wait for remaining streams to complete
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    self._stream_results.append(result)
-                except Exception as e:
-                    stream_id = futures[future][0]
-                    self._stream_results.append(
-                        StreamResult(
-                            stream_id=stream_id,
-                            queries_executed=0,
-                            queries_succeeded=0,
-                            queries_failed=0,
-                            total_time_seconds=0,
-                            error=str(e),
-                        )
-                    )
-                finally:
-                    _, role = futures[future]
-                    with self._lock:
-                        self._active_streams -= 1
-                        self._decrement_role_locked(role)
+            self._drain_streams(futures, list(futures))
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+    def _record_stream_future(self, future: Future, stream_id: int, role: str, *, abandoned: bool = False) -> None:
+        try:
+            if abandoned:
+                raise TimeoutError(
+                    f"Stream {stream_id} did not finish within {self._stream_wait_seconds():g}s; worker abandoned"
+                )
+            self._stream_results.append(future.result())
+        except Exception as e:
+            self._stream_results.append(
+                StreamResult(
+                    stream_id=stream_id,
+                    queries_executed=0,
+                    queries_succeeded=0,
+                    queries_failed=0,
+                    total_time_seconds=0,
+                    error=str(e),
+                )
+            )
+        finally:
+            with self._lock:
+                self._active_streams -= 1
+                self._decrement_role_locked(role)
+
+    def _stream_wait_seconds(self) -> float:
+        return self._config.query_timeout_seconds * max(1, self._config.queries_per_stream)
+
+    def _drain_streams(self, futures: dict[Future, tuple[int, str]], draining: list[Future]) -> None:
+        _, pending = wait(draining, timeout=self._stream_wait_seconds())
+        for future in draining:
+            stream_id, role = futures.pop(future)
+            self._record_stream_future(future, stream_id, role, abandoned=future in pending)
 
     def _decrement_role_locked(self, role: str) -> None:
         """Release one active-stream slot. Call with `self._lock` held."""
@@ -445,27 +441,7 @@ class ConcurrentLoadExecutor:
         if not next_phase_roles:
             return
         draining = [f for f, (_, role) in futures.items() if role not in next_phase_roles]
-        for future in as_completed(draining):
-            try:
-                self._stream_results.append(future.result())
-            except Exception as e:  # noqa: BLE001 - record per-stream failures as data
-                stream_id = futures[future][0]
-                self._stream_results.append(
-                    StreamResult(
-                        stream_id=stream_id,
-                        queries_executed=0,
-                        queries_succeeded=0,
-                        queries_failed=0,
-                        total_time_seconds=0,
-                        error=str(e),
-                    )
-                )
-            finally:
-                _, role = futures[future]
-                with self._lock:
-                    self._active_streams -= 1
-                    self._decrement_role_locked(role)
-            del futures[future]
+        self._drain_streams(futures, draining)
 
     def _execute_stream(self, stream_id: int, enqueue_time: float, role: str = "") -> StreamResult:
         """Execute a single stream of queries.
@@ -496,10 +472,14 @@ class ConcurrentLoadExecutor:
                 for i in range(self._config.queries_per_stream):
                     query_id, sql = query_factory(i)
                     query_start = time.time()
+                    query_mono = mono_time()
 
                     try:
                         success, rows, error = self._config.execute_query(connection, sql)
                         query_end = time.time()
+                        if success and elapsed_seconds(query_mono) > self._config.query_timeout_seconds:
+                            success = False
+                            error = f"Query exceeded the {self._config.query_timeout_seconds:g}s timeout"
 
                         if success:
                             queries_succeeded += 1
