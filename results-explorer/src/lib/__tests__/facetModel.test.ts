@@ -186,7 +186,7 @@ describe("facetsToWhereClause", () => {
 
     expect(sql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(sql).toContain("scale_factor IN (?)");
-    expect(sql).toContain("THEN 'unknown' ELSE trim(lower(test_type)) END IN (?)");
+    expect(sql).toContain("THEN 'power' ELSE trim(lower(test_type)) END IN (?)");
     expect(sql).toContain("(platform IN (?) OR platform_id IN (?))");
     expect(sql).toContain("deployment_class IN (?, ?)");
     expect(sql).toContain("instance_or_warehouse IN (?)");
@@ -251,6 +251,16 @@ describe("facetsToWhereClause", () => {
       keys: ["phase"],
     });
     expect(rowMatches).toBe(true);
+  });
+
+  it("folds the standard phase into power on both the SQL and in-memory sides", () => {
+    const { sql, params } = facetsToWhereClause({ phase: ["standard", "power"] });
+
+    expect(params).toEqual(["power"]);
+    expect(sql).toContain("WHEN trim(lower(test_type)) = 'standard' THEN 'power'");
+    expect(
+      matchesFacetRow({ test_type: "standard" }, normalizeFacetState({ phase: ["power"] }), { keys: ["phase"] }),
+    ).toBe(true);
   });
 
   describe("hardware identity and engine version facets", () => {

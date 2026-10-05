@@ -1254,7 +1254,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " COALESCE(si.short_id, '') AS short_id," +
     " r.benchmark," +
     " r.scale_factor," +
-    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN lower(r.test_type) ELSE 'unknown' END AS phase," +
+    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN lower(r.test_type) = 'standard' THEN 'power' WHEN r.test_type IS NOT NULL THEN lower(r.test_type) ELSE 'unknown' END AS phase," +
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +

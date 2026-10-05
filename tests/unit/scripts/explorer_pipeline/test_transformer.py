@@ -1223,6 +1223,21 @@ class TestExtendedManifestFields:
 
         assert entry.test_type is None
 
+    def test_not_run_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
+        """A phase recorded as NOT_RUN is no evidence the phase ran."""
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["benchmark"]["test_type"]
+        data["phases"] = {
+            "power_test": {"status": "NOT_RUN"},
+            "throughput_test": {"status": "COMPLETED", "streams": 3},
+        }
+        bundle = tmp_path / "phases_not_run.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.test_type == "throughput"
+
     def test_extended_fields_in_detail_result(self, bundle_file: Path) -> None:
         """DetailResult carries the same extended fields as ManifestEntry."""
         import math

@@ -803,18 +803,23 @@ def _physical_rendering_id(bundle: BundleDocument) -> str | None:
     return str(val) if val else None
 
 
+def _phase_executed(phase: Any) -> bool:
+    if phase is None:
+        return False
+    evidence = phase.model_dump(exclude_unset=True)
+    return bool(evidence) and str(evidence.get("status") or "").upper() != "NOT_RUN"
+
+
 def _test_type(bundle: BundleDocument) -> str | None:
     """Extract test type (power/throughput) from schema-v2 bundle."""
     if bundle.benchmark.test_type:
         return bundle.benchmark.test_type
-    # A present-but-empty phase block carries no evidence the phase ran;
-    # truthiness on the unset-excluded dump matches the historical
-    # raw-mapping check.
-    power_phase = bundle.phases.get("power_test")
-    if power_phase is not None and bool(power_phase.model_dump(exclude_unset=True)):
+    # A present-but-empty phase block, or one marked NOT_RUN, carries no
+    # evidence the phase ran; truthiness on the unset-excluded dump matches
+    # the historical raw-mapping check.
+    if _phase_executed(bundle.phases.get("power_test")):
         return "power"
-    throughput_phase = bundle.phases.get("throughput_test")
-    if throughput_phase is not None and bool(throughput_phase.model_dump(exclude_unset=True)):
+    if _phase_executed(bundle.phases.get("throughput_test")):
         return "throughput"
     return None
 
