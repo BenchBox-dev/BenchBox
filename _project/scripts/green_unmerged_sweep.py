@@ -19,13 +19,13 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from auto_merge_soundness_paths import any_soundness_path
 from required_lane import (
     REQUIRED_CHECK_NAMES,  # noqa: F401
     is_check_run_success,  # noqa: F401
     is_required_lane_green,
     latest_check_run,  # noqa: F401
 )
+from soundness_paths import any_soundness_path
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 

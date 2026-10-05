@@ -124,9 +124,6 @@ jobs:
           if [ ! -f _project/scripts/ruleset_review_enforcement.py ]; then
             git show origin/develop:_project/scripts/ruleset_review_enforcement.py > _project/scripts/ruleset_review_enforcement.py
           fi
-          if [ ! -f _project/scripts/auto_merge_soundness_paths.py ]; then
-            git show origin/develop:_project/scripts/auto_merge_soundness_paths.py > _project/scripts/auto_merge_soundness_paths.py
-          fi
           git show origin/develop:scripts/ruleset_drift_check.py > scripts/ruleset_drift_check.py
 
       - name: Bootstrap ruleset drift evidence

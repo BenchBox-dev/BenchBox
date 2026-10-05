@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import importlib.util
-import os
-import shutil
-import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = ROOT / "_project/scripts/auto_merge_soundness_paths.py"
+ROOT = Path(__file__).resolve().parents[3]
+SCRIPT_PATH = ROOT / "_project/scripts/soundness_paths.py"
 
-spec = importlib.util.spec_from_file_location("auto_merge_soundness_paths", SCRIPT_PATH)
+spec = importlib.util.spec_from_file_location("soundness_paths_predicate_test", SCRIPT_PATH)
 assert spec is not None and spec.loader is not None
 soundness = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = soundness
 spec.loader.exec_module(soundness)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -51,6 +50,14 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/core/expected_results/registry.py",
         "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json",
         "benchbox/platforms/base/result_capture.py",
+        "benchbox/platforms/base/tuning_trust.py",
+        "benchbox/core/tuning/introspection.py",
+        "benchbox/core/tuning/applied_ledger.py",
+        "benchbox/core/tuning/capability_registry.py",
+        "benchbox/core/tuning/metadata.py",
+        "benchbox/platforms/duckdb_introspection.py",
+        "benchbox/platforms/snowflake_introspection.py",
+        "benchbox/platforms/clickhouse/introspection.py",
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
@@ -89,7 +96,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         ".github/workflows/publication-lane-docs.yml",
         ".github/workflows/publication-lane-explorer.yml",
         ".github/workflows/publication-corpus-cutover.yml",
-        "_project/scripts/auto_merge_soundness_paths.py",
+        "_project/scripts/soundness_paths.py",
         ".github/workflows/release.yml",
         ".github/workflows/pr.yml",
         ".github/workflows/release-canary.yml",
@@ -121,7 +128,7 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "docs/operations/results-phase-3-runbook.md",
         "docs/reference/hosted-results-contract.md",
         "docs/reference/threat-model.md",
-        "tests/unit/test_auto_merge_soundness_paths.py",
+        "tests/unit/scripts/test_soundness_paths.py",
         "AGENTS.md",
         ".github/workflowsx/new-example.yml",
         "scripts/pr_arm.py.bak",
@@ -132,6 +139,15 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "benchbox/sql_compat/registry.py",
         "benchbox/sql_compat/actions.py",
         "benchbox/platforms/base/result_capture_helpers.py",
+        "benchbox/platforms/base/adapter.py",
+        "benchbox/platforms/duckdb.py",
+        "benchbox/platforms/base/tuning_trust_helpers.py",
+        "benchbox/core/tuning/coverage.py",
+        "benchbox/core/tuning/modes.py",
+        "benchbox/core/tuning/introspection.py.bak",
+        "benchbox/core/tuning/metadata_helpers.py",
+        "benchbox/platforms/duckdb_introspection_notes.md",
+        "benchbox/platforms/clickhouse/adapter.py",
         "benchbox/core/results/exporter.py",
         "benchbox/core/results/schema.py",
         "benchbox/core/results/anonymization.py.bak",
@@ -162,6 +178,36 @@ def test_soundness_files_glob_duality_stays_pinned() -> None:
     assert soundness.is_soundness_path("results-data/bundles/x.override.json.bak") is False
 
 
+TUNING_TRUST_FILES = (
+    "benchbox/platforms/base/tuning_trust.py",
+    "benchbox/core/tuning/introspection.py",
+    "benchbox/core/tuning/applied_ledger.py",
+    "benchbox/core/tuning/capability_registry.py",
+    "benchbox/core/tuning/metadata.py",
+    "benchbox/platforms/clickhouse/introspection.py",
+)
+TUNING_TRUST_GLOB = "benchbox/platforms/*_introspection.py"
+
+
+def test_tuning_trust_paths_are_pinned_in_manifest() -> None:
+    manifest = (ROOT / ".github" / "soundness-paths.txt").read_text(encoding="utf-8").splitlines()
+    for path in TUNING_TRUST_FILES:
+        assert f"file\t{path}" in manifest
+        assert (ROOT / path).is_file(), f"{path} no longer exists; update the soundness manifest"
+        assert soundness.is_soundness_path(path) is True
+    assert f"glob\t{TUNING_TRUST_GLOB}" in manifest
+    introspection_modules = sorted((ROOT / "benchbox" / "platforms").glob("*_introspection.py"))
+    assert introspection_modules, "the platform introspection glob matches no module"
+    for module in introspection_modules:
+        assert soundness.is_soundness_path(module.relative_to(ROOT).as_posix()) is True
+
+
+def test_any_soundness_path_recognises_tuning_trust_paths() -> None:
+    assert soundness.any_soundness_path(["docs/index.md", *TUNING_TRUST_FILES[:1]]) is True
+    assert soundness.any_soundness_path(["benchbox/platforms/duckdb_introspection.py"]) is True
+    assert soundness.any_soundness_path(["benchbox/platforms/base/adapter.py", "benchbox/platforms/duckdb.py"]) is False
+
+
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
@@ -172,48 +218,3 @@ def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     helper = (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
     assert "soundness_paths_changed" in helper
     assert "auto-enqueue is forbidden" in helper
-
-
-def _assert_git_index_executable(path: Path, *, env: dict[str, str] | None = None) -> None:
-    relative_path = path.relative_to(ROOT).as_posix()
-    recorded = subprocess.run(
-        ["git", "ls-files", "--stage", "--", relative_path],
-        cwd=ROOT,
-        env=env,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.split()
-
-    assert recorded, f"{relative_path} is not tracked by git"
-    assert recorded[0] == "100755", f"expected git mode 100755, got {recorded[0]}"
-
-
-def test_shared_predicate_script_is_executable_for_workflow() -> None:
-    _assert_git_index_executable(SCRIPT_PATH)
-
-
-def test_shared_predicate_executable_guard_rejects_non_executable_index_mode(tmp_path: Path) -> None:
-    real_index = subprocess.run(
-        ["git", "rev-parse", "--git-path", "index"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    index_path = Path(real_index)
-    if not index_path.is_absolute():
-        index_path = ROOT / index_path
-
-    test_index = tmp_path / "index"
-    shutil.copyfile(index_path, test_index)
-    env = {**os.environ, "GIT_INDEX_FILE": str(test_index)}
-    subprocess.run(
-        ["git", "update-index", "--chmod=-x", "--", SCRIPT_PATH.relative_to(ROOT).as_posix()],
-        cwd=ROOT,
-        env=env,
-        check=True,
-    )
-
-    with pytest.raises(AssertionError, match="expected git mode 100755, got 100644"):
-        _assert_git_index_executable(SCRIPT_PATH, env=env)

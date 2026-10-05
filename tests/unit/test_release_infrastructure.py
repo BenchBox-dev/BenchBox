@@ -555,7 +555,6 @@ class TestReleaseInfrastructure:
         restore_step = job["steps"][restore_index]
         assert restore_step["if"] == "steps.release-readiness.outputs.bootstrap_required == 'true'"
         assert "_project/scripts/ruleset_review_enforcement.py" in restore_step["run"]
-        assert "_project/scripts/auto_merge_soundness_paths.py" in restore_step["run"]
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):

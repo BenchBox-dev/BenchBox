@@ -58,9 +58,9 @@ make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 
 ### B. Soundness Path Withholding
 
-If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `auto_merge_soundness_paths.py`):
+If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `soundness_paths.py`):
 
-1. Withdraw readiness before editing an armed PR (`make pr-landing-withdraw PR=<n> HEAD=<sha>`). After the last push, obtain CI and the connector's review or thumbs-up (or the stand-in approval) on that exact head before arming with `make pr-arm`. The `auto-merge-on-open.yml` workflow retains label-based revocation for `no-auto-merge`; it no longer revokes based on soundness paths.
+1. Withdraw readiness before editing an armed PR (`make pr-landing-withdraw PR=<n> HEAD=<sha>`). After the last push, obtain CI and the connector's review or thumbs-up (or the stand-in approval) on that exact head before arming with `make pr-arm`. The `no-auto-merge` label blocks arming only; to hold an armed PR, disable auto-merge (`gh pr merge <n> --disable-auto`) or withdraw it as above, then add the label.
 2. The required `oracle-review` check must pass on the current head before the pull request can merge.
 3. A soundness-path pull request that sits green and unarmed is reported by the soundness-drain digest (`make soundness-drain-report`, see `docs/operations/soundness-drain.md`), not by the nightly green-unmerged sweep, which skips soundness-gated pull requests.
 

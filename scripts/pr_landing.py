@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.auto_merge_soundness_paths import any_soundness_path
+from _project.scripts.soundness_paths import any_soundness_path
 
 CLI_DESCRIPTION = (
     "One cohesive revision/readiness/queue/follow-up helper behind the Make PR targets.\n"

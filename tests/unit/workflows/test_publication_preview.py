@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,11 +14,12 @@ DEPLOY_PATH = REPO_ROOT / ".github" / "workflows" / "publication-preview-deploy.
 SOAK_PATH = REPO_ROOT / ".github" / "workflows" / "publication-preview-soak.yml"
 
 _SOUNDNESS_SPEC = importlib.util.spec_from_file_location(
-    "auto_merge_soundness_paths",
-    REPO_ROOT / "_project" / "scripts" / "auto_merge_soundness_paths.py",
+    "preview_soundness_paths",
+    REPO_ROOT / "_project" / "scripts" / "soundness_paths.py",
 )
 assert _SOUNDNESS_SPEC is not None and _SOUNDNESS_SPEC.loader is not None
 _soundness = importlib.util.module_from_spec(_SOUNDNESS_SPEC)
+sys.modules[_SOUNDNESS_SPEC.name] = _soundness
 _SOUNDNESS_SPEC.loader.exec_module(_soundness)
 
 

@@ -198,17 +198,16 @@ The soundness gate, as operated:
   It neither verifies a merge queue nor merges `develop` itself. Refresh a
   conflicting PR near its landing turn, then rerun CI and obtain review on the
   resulting head before arming.
-- `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
-  arms on any event (bare `gh pr create` does not auto-arm, and the
-  historical `ready_for_review` arm point — which never fired once, drafts
-  being unused — was deleted per
+- No workflow arms or disarms auto-merge (bare `gh pr create` does not
+  auto-arm, and the historical `ready_for_review` arm point — which never
+  fired once, drafts being unused — was deleted per
   `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
-  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate the
-  `no-auto-merge` hold label only.
-- Durable holds every layer honours: **draft** (job/sweep skip) and label
-  **`no-auto-merge`** (`make pr-arm-auto-merge` / `pr-ready` refuse to arm;
-  workflow disables; nightly green-unmerged sweep never enables auto-merge
-  and does not classify the label as stranded). See
+- Durable holds: **draft** and label **`no-auto-merge`** are checked when
+  arming (`make pr-arm-auto-merge` / `pr-arm` / `pr-ready` refuse to arm); the
+  nightly green-unmerged sweep never enables auto-merge and does not classify
+  either hold as stranded. Nothing disarms an already-armed PR when the label
+  is added later: disable auto-merge (`gh pr merge <n> --disable-auto`) or run
+  `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. See
   `docs/operations/pr-triage.md` "Durable auto-merge holds".
 - `make pr-arm` refuses drafts, non-develop bases, durable holds, requested
   changes, unresolved threads, unpublished work and a remote head that differs

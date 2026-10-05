@@ -18,18 +18,14 @@ from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.throughput.containment import await_quiescence
 from benchbox.core.tuning.applied_ledger import (
-    APPLIED_UNVERIFIED,
-    APPLIED_VERIFIED,
-    EXECUTED,
     PHASE_DDL,
-    PHASE_POST_LOAD,
     PHASE_SESSION,
-    STATEMENT_FAILED,
     AppliedTuningLedger,
     is_schema_tuning_statement,
     recording_connection,
 )
-from benchbox.core.tuning.introspection import Introspector, corroborate
+from benchbox.core.tuning.introspection import Introspector
+from benchbox.platforms.base import tuning_trust
 from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
@@ -652,28 +648,14 @@ class PlatformAdapter(
                 existing_errors=list(self.plan_capture_errors),
             )
 
-            final_tuning_status = tuning_validation_status
-            applied_ledger_payload = None
-            applied_ledger_hash = None
-            applied_receipt_payload = None
-            try:
-                final_tuning_status = self._applied_tuning_ledger.overall_status(
-                    tuning_enabled=self.tuning_enabled,
-                    has_config=bool(effective_tuning_config),
-                )
-                final_tuning_status, applied_receipt_payload = self._corroborate_applied_ledger(
-                    connection, final_tuning_status
-                )
-                drift_check_payload = self._build_drift_check_payload()
-                if not self._applied_tuning_ledger.is_empty() or drift_check_payload is not None:
-                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(
-                        status=final_tuning_status,
-                        receipt=applied_receipt_payload,
-                        drift_check=drift_check_payload,
-                    )
-                    applied_ledger_hash = self._applied_tuning_ledger.applied_ledger_hash()
-            except Exception as exc:
-                self.logger.debug("applied-ledger read-back degraded: %s", exc)
+            (
+                final_tuning_status,
+                applied_ledger_payload,
+                applied_ledger_hash,
+                applied_receipt_payload,
+            ) = tuning_trust.read_back_applied_ledger(
+                self, connection, tuning_validation_status, bool(effective_tuning_config)
+            )
 
             return benchmark.create_enhanced_benchmark_result(
                 platform=self.platform_name,
@@ -868,68 +850,16 @@ class PlatformAdapter(
         return metadata
 
     def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
-        if status != APPLIED_UNVERIFIED:
-            return status, None
-        introspector = None
-        try:
-            introspector = self.get_tuning_introspector()
-        except Exception as exc:  # pragma: no cover
-            self.logger.debug("tuning introspector lookup degraded: %s", exc)
-        if introspector is None:
-            return status, None
-        try:
-            state = introspector.introspect(connection, self._applied_tuning_ledger)
-            receipt = corroborate(self._applied_tuning_ledger, state)
-            if receipt.corroborated:
-                status = APPLIED_VERIFIED
-            return status, receipt.to_payload()
-        except Exception as exc:
-            self.logger.debug("applied-ledger corroboration degraded: %s", exc)
-            return status, None
+        return tuning_trust.corroborate_applied_ledger(self, connection, status)
 
     def _attach_applied_ledger_payload(self, result: Any, status: str) -> None:
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        if ledger is None or result is None:
-            return
-        drift_check_payload = self._build_drift_check_payload()
-        if ledger.is_empty() and drift_check_payload is None:
-            return
-        try:
-            result.applied_tuning_ledger = ledger.to_payload(status=status, drift_check=drift_check_payload)
-            result.applied_ledger_hash = ledger.applied_ledger_hash()
-        except Exception as exc:
-            self.logger.debug("applied-ledger attach degraded: %s", exc)
+        tuning_trust.attach_applied_ledger_payload(self, result, status)
 
     def _build_drift_check_payload(self) -> dict[str, Any] | None:
-        try:
-            if not (self.tuning_enabled and getattr(self, "database_was_reused", False)):
-                return None
-            result = getattr(self, "_drift_validation_result", None)
-            if result is None:
-                return None
-            return result.to_payload()
-        except Exception as exc:
-            self.logger.debug("drift-check payload build degraded: %s", exc)
-            return None
+        return tuning_trust.build_drift_check_payload(self)
 
     def _fold_layout_operations_into_ledger(self) -> None:
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        layout_ops = getattr(self, "_applied_layout_operations", None)
-        if ledger is None or not layout_ops:
-            return
-        for op in layout_ops:
-            try:
-                op_status = EXECUTED if op.get("status") == "applied" else STATEMENT_FAILED
-                ledger.record(
-                    op.get("statement", ""),
-                    op.get("phase") or PHASE_POST_LOAD,
-                    status=op_status,
-                    mechanism=op.get("mechanism"),
-                    table=op.get("table"),
-                    error=op.get("error_message"),
-                )
-            except Exception as exc:
-                self.logger.debug("applied-ledger layout fold degraded: %s", exc)
+        tuning_trust.fold_layout_operations_into_ledger(self)
 
     def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
         data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")

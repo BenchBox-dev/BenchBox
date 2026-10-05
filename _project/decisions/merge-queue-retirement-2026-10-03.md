@@ -4,7 +4,8 @@ Date: 2026-10-03
 Status: Decided. The merge queue and strict up-to-date rule were removed from
 `develop-squash-only` on 2026-10-03. On 2026-10-04 `auto-merge-on-open.yml`
 stopped revoking auto-merge by soundness path, and the `oracle-review` context
-was then added to the ruleset's required checks.
+was then added to the ruleset's required checks. The workflow was later deleted;
+the `no-auto-merge` label now blocks arming only.
 Related: `docs/operations/merge-queue-governance.md` (now "Merge and trunk
 governance"); `docs/development/adr/adr-dev-loop-v2.md` (D4 and the 2026-10-03
 amendment); `.github/workflows/trunk.yml`.

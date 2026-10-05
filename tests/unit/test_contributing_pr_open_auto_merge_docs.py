@@ -33,7 +33,9 @@ def test_contributing_documents_arming_the_exact_head_and_monitoring_to_merge(co
         "[WRITE-CLOSEOUT-001]",
     ):
         assert required in contributing_text, f"CONTRIBUTING missing cue {required!r}"
-    assert "only revokes and never arms" in contributing_text
+    assert "blocks arming only" in contributing_text
+    assert "gh pr merge <n> --disable-auto" in contributing_text
+    assert "auto-merge-on-open" not in contributing_text
 
 
 def test_contributing_does_not_teach_holding_a_finished_pr(contributing_text: str) -> None:

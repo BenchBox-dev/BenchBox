@@ -14,10 +14,12 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 POLICY_FILES = (
-    "_project/scripts/auto_merge_soundness_paths.py",
     "_project/scripts/soundness_paths.py",
     ".github/soundness-paths.txt",
 )
+
+
+HELPER, MANIFEST = 0, 1
 
 
 @pytest.fixture
@@ -55,9 +57,9 @@ def test_real_base_policy_does_not_expand_an_ordinary_code_change(
 def test_policy_union_keeps_base_removals_and_pr_additions(
     policy_sources: dict[str, str], base_rule: bool, pr_rule: bool, expected: bool
 ) -> None:
-    manifest = policy_sources[POLICY_FILES[2]].replace("file\tscripts/pr_arm.py\n", "")
-    base = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tscripts/pr_arm.py\n" if base_rule else "")}
-    pr = {**policy_sources, POLICY_FILES[2]: manifest + ("file\tscripts/pr_arm.py\n" if pr_rule else "")}
+    manifest = policy_sources[POLICY_FILES[MANIFEST]].replace("file\tscripts/pr_arm.py\n", "")
+    base = {**policy_sources, POLICY_FILES[MANIFEST]: manifest + ("file\tscripts/pr_arm.py\n" if base_rule else "")}
+    pr = {**policy_sources, POLICY_FILES[MANIFEST]: manifest + ("file\tscripts/pr_arm.py\n" if pr_rule else "")}
     result = _classify(["scripts/pr_arm.py"], base, pr)
     assert result["heavy_needed"] is expected, result["reason"]
 
@@ -87,25 +89,27 @@ def test_installed_startup_hook_cannot_replace_the_snapshot_helper(
         site_packages = (
             environment / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
         )
-    original = policy_sources[POLICY_FILES[1]]
+    original = policy_sources[POLICY_FILES[HELPER]]
     hostile = original.replace("return any(is_soundness_path(path) for path in paths)", "return False")
     assert hostile != original
     (site_packages / "soundness_paths.py").write_text(hostile, encoding="utf-8")
     (site_packages / "policy-startup.pth").write_text("import soundness_paths\n", encoding="utf-8")
-    pr = {**policy_sources, POLICY_FILES[2]: policy_sources[POLICY_FILES[2]].replace("file\tscripts/pr_arm.py\n", "")}
+    pr = {
+        **policy_sources,
+        POLICY_FILES[MANIFEST]: policy_sources[POLICY_FILES[MANIFEST]].replace("file\tscripts/pr_arm.py\n", ""),
+    }
     monkeypatch.setattr(heavy.sys, "executable", str(interpreter))
     result = _classify(["scripts/pr_arm.py"], policy_sources, pr)
     assert result["heavy_needed"] is True, result["reason"]
     assert "soundness path touched" in result["reason"]
 
 
-@pytest.mark.parametrize("present", [(0, 1), (0, 2)])
+@pytest.mark.parametrize("present", [(HELPER,), (MANIFEST,)])
 @pytest.mark.parametrize("bad_copy", ["base", "pr"])
-def test_partial_modern_snapshot_cannot_emit_a_valid_false_verdict(
+def test_partial_snapshot_cannot_emit_a_valid_false_verdict(
     policy_sources: dict[str, str], present: tuple[int, ...], bad_copy: str
 ) -> None:
     partial = {POLICY_FILES[index]: policy_sources[POLICY_FILES[index]] for index in present}
-    partial[POLICY_FILES[0]] = "print('soundness_path=false')\n"
     result = _classify(
         ["ordinary.py"],
         partial if bad_copy == "base" else policy_sources,
@@ -167,18 +171,18 @@ def test_base_reader_ignores_git_replacement_trees(tmp_path: Path) -> None:
 @pytest.mark.parametrize("bad_copy", ["base", "pr"])
 @pytest.mark.parametrize(
     "defect",
-    ["missing-wrapper", "missing-helper", "missing-manifest", "invalid-manifest", "bad-output", "execution-error"],
+    ["missing-helper", "missing-manifest", "invalid-manifest", "bad-output", "execution-error"],
 )
 def test_invalid_policy_copies_fail_closed(policy_sources: dict[str, str], bad_copy: str, defect: str) -> None:
     invalid = dict(policy_sources)
     if defect.startswith("missing-"):
-        invalid.pop(POLICY_FILES[{"missing-wrapper": 0, "missing-helper": 1, "missing-manifest": 2}[defect]])
+        invalid.pop(POLICY_FILES[{"missing-helper": HELPER, "missing-manifest": MANIFEST}[defect]])
     elif defect == "invalid-manifest":
-        invalid[POLICY_FILES[2]] = "not a rule\n"
+        invalid[POLICY_FILES[MANIFEST]] = "not a rule\n"
     elif defect == "bad-output":
-        invalid[POLICY_FILES[0]] = "print('soundness_path=false\\nsoundness_path=true')\n"
+        invalid[POLICY_FILES[HELPER]] = "print('soundness_path=false\\nsoundness_path=true')\n"
     else:
-        invalid[POLICY_FILES[0]] = "raise RuntimeError('broken policy')\n"
+        invalid[POLICY_FILES[HELPER]] = "raise RuntimeError('broken policy')\n"
     result = _classify(
         ["ordinary.py"],
         invalid if bad_copy == "base" else policy_sources,
@@ -186,17 +190,6 @@ def test_invalid_policy_copies_fail_closed(policy_sources: dict[str, str], bad_c
     )
     assert result["heavy_needed"] is True
     assert "failed closed" in result["reason"]
-
-
-def test_standalone_legacy_predicate_still_runs() -> None:
-    legacy = {
-        POLICY_FILES[
-            0
-        ]: "import sys\nprint('soundness_path=' + str('protected.py' in sys.stdin.read().splitlines()).lower())\n"
-    }
-    assert _classify(["protected.py"], legacy, legacy)["heavy_needed"] is True
-    result = _classify(["ordinary.py"], legacy, legacy)
-    assert result["heavy_needed"] is False, result["reason"]
 
 
 def test_unreadable_base_ref_fails_closed() -> None:

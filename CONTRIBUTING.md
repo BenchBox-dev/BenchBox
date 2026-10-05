@@ -115,7 +115,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
    `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
    readiness evidence transaction used to deliver a prepared batch, where the evidence file must declare
    `delivery_mode` and the complete prepared-batch binding; a single PR does not need it.
-   `auto-merge-on-open.yml` only revokes and never arms (see `docs/operations/repo-admin-settings.md`).
+   The `no-auto-merge` label blocks arming only; to hold an armed PR, run `gh pr merge <n> --disable-auto` or
+   `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label.
 
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
