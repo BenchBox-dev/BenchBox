@@ -104,3 +104,64 @@ def test_enhanced_data_processing_without_files_is_not_success(tmp_path):
     assert results["success"] is False
     assert results["error"]
     benchmark.finwire_processor.process_finwire_file.assert_not_called()
+
+
+def test_sequential_failure_names_every_failed_file(tmp_path):
+    benchmark = _benchmark(tmp_path, False)
+    first = _write_customers(tmp_path / "customer_a.csv", [1])
+    second = _write_customers(tmp_path / "customer_b.csv", [2])
+    healthy = _write_customers(tmp_path / "customer_c.csv", [3])
+
+    def transform(file_path, batch_type):
+        if file_path == healthy:
+            return {"records_processed": 1, "transformations": ["stub"]}
+        raise ValueError("boom")
+
+    with patch.object(benchmark, "_transform_csv_file", transform):
+        with pytest.raises(TPCDITransformationError) as raised:
+            benchmark._transform_source_data({"csv": [first, healthy, second]}, "historical")
+
+    assert sorted(raised.value.failed_files) == sorted([first, second])
+
+
+@pytest.mark.parametrize("enable_parallel", [False, True])
+@pytest.mark.parametrize("source_files", [{}, {"csv": []}, {"unknown": ["a.dat"]}])
+def test_transform_phase_without_transformable_files_is_not_success(tmp_path, enable_parallel, source_files):
+    benchmark = _benchmark(tmp_path, enable_parallel)
+    transform = benchmark._transform_source_data_parallel if enable_parallel else benchmark._transform_source_data
+
+    with pytest.raises(TPCDITransformationError, match="no transformable source files"):
+        transform(source_files, "historical")
+
+
+def test_etl_pipeline_fails_when_nothing_was_transformed(tmp_path):
+    benchmark = _benchmark(tmp_path, False)
+
+    with patch.object(benchmark, "generate_source_data", return_value={"csv": []}):
+        with pytest.raises(TPCDITransformationError):
+            benchmark.run_etl_pipeline(backend=MagicMock(), validate_data=False)
+
+    assert benchmark.batch_status["historical"]["status"] == "failed"
+
+
+def test_enhanced_phase_error_text_is_carried_into_the_pipeline_result(tmp_path):
+    benchmark = _benchmark(tmp_path, False)
+
+    with (
+        patch.object(benchmark, "_initialize_connection_dependent_systems"),
+        patch.object(
+            benchmark, "_run_enhanced_data_processing", return_value={"success": False, "error": "no input files"}
+        ),
+        patch.object(benchmark, "_run_enhanced_scd_processing", return_value={"success": True}),
+        patch.object(
+            benchmark, "_run_incremental_data_loading", return_value={"success": False, "error": "load broke"}
+        ),
+    ):
+        results = benchmark.run_enhanced_etl_pipeline(
+            MagicMock(), dialect="sqlite", enable_data_quality_monitoring=False
+        )
+
+    assert results["success"] is False
+    assert results["phases"]["enhanced_data_processing"]["error"] == "no input files"
+    assert results["phases"]["incremental_loading"]["error"] == "load broke"
+    assert results["phases"]["enhanced_scd_processing"]["error"] is None

@@ -91,10 +91,10 @@ _POSTGRES_BOOLEAN_NUMBER_RE = re.compile(
 
 
 class TPCDITransformationError(RuntimeError):
-    def __init__(self, failures: list[tuple[str, BaseException]]):
+    def __init__(self, failures: list[tuple[str, BaseException]], message: str | None = None):
         self.failed_files = [file_path for file_path, _ in failures]
         details = "; ".join(f"{file_path}: {error}" for file_path, error in failures)
-        super().__init__(f"TPC-DI transformation failed for {len(failures)} file(s): {details}")
+        super().__init__(message or f"TPC-DI transformation failed for {len(failures)} file(s): {details}")
 
 
 class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
@@ -1634,20 +1634,33 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "staged_data_parts": {},
         }
 
+        transformers = self._file_transformers()
+        failures: list[tuple[str, BaseException]] = []
+        attempted = 0
         for format_type, files in source_files.items():
-            transform = self._file_transformers().get(format_type)
+            transform = transformers.get(format_type)
             if transform is None:
                 continue
             for file_path in files:
+                attempted += 1
                 try:
                     result = transform(file_path, batch_type)
                 except Exception as e:
-                    raise TPCDITransformationError([(file_path, e)]) from e
+                    failures.append((file_path, e))
+                    continue
 
                 self._accumulate_transformation_result(transformation_results, result)
 
+        self._require_transformed_files(attempted, failures)
         self._materialize_staged_data(transformation_results)
         return transformation_results
+
+    @staticmethod
+    def _require_transformed_files(attempted: int, failures: list[tuple[str, BaseException]]) -> None:
+        if failures:
+            raise TPCDITransformationError(failures) from failures[0][1]
+        if attempted == 0:
+            raise TPCDITransformationError([], "TPC-DI transformation found no transformable source files")
 
     def _transform_source_data_parallel(self, source_files: dict[str, list[str]], batch_type: str) -> dict[str, Any]:
         """Transform source data into staging format using simple parallel processing."""
@@ -1682,9 +1695,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         continue
                     self._accumulate_transformation_result(transformation_results, result)
 
-        if failures:
-            raise TPCDITransformationError(failures) from failures[0][1]
-
+        self._require_transformed_files(len(transform_tasks), failures)
         self._materialize_staged_data(transformation_results)
         return transformation_results
 
@@ -2388,6 +2399,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "finwire_records": phase1_results.get("finwire_records", 0),
                 "customer_mgmt_records": phase1_results.get("customer_mgmt_records", 0),
                 "success": phase1_results.get("success", False),
+                "error": phase1_results.get("error") or phase1_results.get("errors") or None,
             }
 
             # Phase 2: Enhanced SCD Type 2 Processing
@@ -2402,6 +2414,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "scd_records_processed": phase2_results.get("records_processed", 0),
                 "change_records_detected": phase2_results.get("changes_detected", 0),
                 "success": phase2_results.get("success", False),
+                "error": phase2_results.get("error") or phase2_results.get("errors") or None,
             }
 
             # Phase 3: Incremental Data Loading
@@ -2416,6 +2429,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "incremental_batches": phase3_results.get("batches_loaded", 0),
                 "records_loaded": phase3_results.get("records_loaded", 0),
                 "success": phase3_results.get("success", False),
+                "error": phase3_results.get("error") or phase3_results.get("errors") or None,
             }
 
             # Phase 4: Data Quality Monitoring (if enabled)
