@@ -16118,6 +16118,13 @@
       "status": "done",
       "title": "Add full-suite canary and GitHub ruleset drift detection for release readiness"
     },
+    "release-guide-accounting-literal-timing": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Correct the release guide on when to move the accounting literal and the changelog compare link"
+    },
     "release-readiness-py310-utc-compat": {
       "claim": null,
       "needs": [],

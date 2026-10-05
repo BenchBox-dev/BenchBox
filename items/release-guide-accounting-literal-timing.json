@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The release guide says to keep the accounting literal and the [Unreleased] compare link at the published version on the release branch, and to move both in the develop version-sync PR.",
+    "The .claude/skills/benchbox release reference agrees with the guide.",
+    "Optional: a sync command updates the literal and the compare links, with a test."
+  ],
+  "context": "Found during the v0.4.2 release. With the footer moved to v0.4.2 the guard failed ('[Unreleased] comparison does not start at v0.4.1'); with the literal renamed to 0.4.2 it failed ('published PyPI version 0.4.2 has no visible git tag v0.4.2'). With both left at 0.4.1 on the release branch, all 23 guard tests passed. The guide line is around 'rename the test to the new version by hand at each cut'.",
+  "description": "docs/operations/release-guide.md says to rename the release-accounting test literal (tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*) to the new version \"at each cut\", and the v0.4.2 handoff said to update the CHANGELOG footer links at cut time. Both are wrong for the release branch. check_release_accounting validates the version PyPI currently serves, so on the release PR the literal must stay at the published version and the [Unreleased] compare link must still start at that version's tag. Moving either at cut time fails the required test job. Both belong in the develop version-sync PR after publication, which is how #2669 did it. Fix the guide and the BenchBox release skill reference, and consider having update_version.py or a sync target move both so no one edits them by hand.",
+  "links": [
+    "docs/operations/release-guide.md",
+    "tests/unit/release/test_changelog_tag_guard.py",
+    "scripts/generate_changelog_entry.py",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2669"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:25:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "302b0be480934096937875d8753663a9",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}
