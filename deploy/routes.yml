@@ -1,5 +1,5 @@
 version: 1
-renderer: sphinx
+renderer: auto
 refs:
   release:
     kind: release-tag

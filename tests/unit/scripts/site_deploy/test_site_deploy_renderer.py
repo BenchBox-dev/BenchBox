@@ -120,8 +120,8 @@ def test_no_policy_can_force_astro(policy: str) -> None:
         routes.parse_manifest(data)
 
 
-def test_committed_manifest_pins_sphinx_until_the_cutover_change() -> None:
-    assert routes.load_manifest(MANIFEST).renderer_policy == renderer.SPHINX
+def test_committed_manifest_selects_auto_and_defaults_to_sphinx() -> None:
+    assert routes.load_manifest(MANIFEST).renderer_policy == renderer.POLICY_AUTO
     data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
     del data["renderer"]
     assert routes.parse_manifest(data).renderer_policy == renderer.SPHINX
@@ -164,11 +164,12 @@ def _release_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def test_the_committed_policy_selects_sphinx_for_any_release_tag(tmp_path: Path) -> None:
+def test_the_committed_policy_selects_astro_only_for_a_ready_release_tag(tmp_path: Path) -> None:
     repo = _release_repo(tmp_path)
     policy = routes.load_manifest(MANIFEST).renderer_policy
-    for tag in ("v0.4.1", "v0.5.0"):
-        assert renderer.select_for_commit(policy, repo, tag).renderer == renderer.SPHINX, tag
+    assert policy == renderer.POLICY_AUTO
+    assert renderer.select_for_commit(policy, repo, "v0.4.1").renderer == renderer.SPHINX
+    assert renderer.select_for_commit(policy, repo, "v0.5.0").renderer == renderer.ASTRO
 
 
 def test_auto_selects_astro_only_from_a_ready_release_tag(tmp_path: Path) -> None:
@@ -616,7 +617,7 @@ def test_resolve_records_the_renderer_and_when_the_visual_guard_runs(
     assert f"visual_required={'true' if visual else 'false'}" in lines
 
 
-def test_resolve_with_the_committed_manifest_stays_on_sphinx_for_a_ready_release(
+def test_resolve_with_the_committed_manifest_selects_astro_for_a_ready_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     api = FakeGitHub()
@@ -624,8 +625,8 @@ def test_resolve_with_the_committed_manifest_stays_on_sphinx_for_a_ready_release
     _use(monkeypatch, api, ready=True)
     code, resolved = _resolve(tmp_path, "--mode", "deploy", repo_dir=REPO_ROOT)
     assert code == 0
-    assert resolved["renderer"] == renderer.SPHINX
-    assert resolved["renderer_selection"]["policy"] == renderer.SPHINX
+    assert resolved["renderer"] == renderer.ASTRO
+    assert resolved["renderer_selection"]["policy"] == renderer.POLICY_AUTO
 
 
 def test_a_first_deploy_compares_only_when_it_would_publish_astro() -> None:

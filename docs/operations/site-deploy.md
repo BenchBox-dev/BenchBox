@@ -26,15 +26,15 @@ SHA in a receipt is the git tree hash of `results-data/` at the trunk SHA.
 One renderer builds every route of an artifact. `deploy/routes.yml` names the
 policy:
 
-- `renderer: sphinx`, the committed value, holds every route on Sphinx whatever
-  the release tag contains.
-- `renderer: auto` selects the renderer from the tree of the newest release
-  tag's commit, never from the working tree. It selects Astro when that tree
-  contains every one of `website/package.json`, `website/package-lock.json`,
-  `website/astro.config.ts`, `website/src/converter/cli.ts`,
-  `website/src/pages/index.astro`, `website/src/pages/404.astro`,
-  `website/src/pages/blog.astro`, at least one file under each of
-  `website/src/pages/docs/`, `website/src/pages/blog/` and
+- `renderer: sphinx` holds every route on Sphinx whatever the release tag
+  contains. It is the rollback policy.
+- `renderer: auto`, the committed value, selects the renderer from the tree of
+  the newest release tag's commit, never from the working tree. It selects Astro
+  when that tree contains every one of `website/package.json`,
+  `website/package-lock.json`, `website/astro.config.ts`,
+  `website/src/converter/cli.ts`, `website/src/pages/index.astro`,
+  `website/src/pages/404.astro`, `website/src/pages/blog.astro`, at least one
+  file under each of `website/src/pages/docs/`, `website/src/pages/blog/` and
   `website/src/pages/prompts/`, a `site-build:` target in
   `make/documentation.mk`, and no `.rst` file under `docs/` (every page has been
   migrated to MyST). This is what "the release tag contains `website/` and all
@@ -42,8 +42,9 @@ policy:
 
 No policy forces Astro. `scripts/site_deploy/renderer.py` holds the list, and the
 resolve step writes the selection and its reasons to `resolved.json`.
-`test_the_committed_policy_selects_sphinx_for_any_release_tag` shows that the
-committed policy keeps Sphinx even for a ready tag, and
+`test_the_committed_policy_selects_astro_only_for_a_ready_release_tag` shows
+that the committed policy keeps Sphinx for a tag that is not ready and selects
+Astro for a ready one, and
 `test_auto_selects_astro_only_from_a_ready_release_tag` covers `auto` on
 synthetic release trees.
 
