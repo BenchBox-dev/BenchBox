@@ -113,7 +113,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_corpus_event_bridge.py` | product-safety | Corpus event integrity |
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
-| `test_docs_skip_marker.py` | pure-process | Docs skip mechanics |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the connector-review check |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |

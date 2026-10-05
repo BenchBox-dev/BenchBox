@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   # Pull-request validation lives in ci.yml. This workflow keeps
-  # the protected-develop baseline capture and the release Pages deploy.
+  # the protected-develop baseline capture; production Pages is deployed by site-deploy.yml.
   push:
     branches: [release, develop]
   workflow_dispatch:
@@ -18,8 +18,8 @@ permissions:
 
 concurrency:
   # Cancel superseded pull_request runs for the same PR when a newer push
-  # arrives. Pushes to develop and release feed the deploy job and must
-  # never cancel each other, so push and workflow_dispatch runs each get a
+  # arrives. Pushes to develop and release must never cancel each
+  # other, so push and workflow_dispatch runs each get a
   # unique per-SHA group with cancellation disabled.
   group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || format('docs-{0}-{1}', github.sha, github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -212,12 +212,6 @@ jobs:
       - name: Scan assembled site for privacy leaks
         run: uv run python scripts/publication/check_artifact_privacy.py site
 
-      - name: Upload HTML artifacts
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: site
-          include-hidden-files: true
-
       # The visual job consumes the exact assembled tree without rebuilding it.
       # This is a short-lived transport artifact, not a publication baseline.
       - name: Upload assembled site for visual acceptance
@@ -360,190 +354,6 @@ jobs:
             echo "::error::Changed public-site inputs require a successful build and exact-base visual comparison."
             exit 1
           fi
-
-  # Deploy to GitHub Pages (release pushes only)
-  # Isolated as its own job so the github-pages environment protection
-  # rules don't gate the build job on PRs.
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
-    needs: build
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pages-deploy
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: read
-      actions: read
-      pages: write
-      id-token: write
-    outputs:
-      skipped: ${{ steps.independent.outputs.skipped }}
-      skipped_deployment_id: ${{ steps.capture-deployment.outputs.deployment_id }}
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Check for independent publication ownership
-        id: independent
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ACTIVE=false
-          gh api --paginate "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("publication-live-receipt-")) | "\(.created_at) \(.id) \(.workflow_run.id)"' \
-            | sort -r > independent-publication-runs.txt
-          while read -r _CREATED_AT ARTIFACT_ID RUN_ID; do
-            [ -n "${RUN_ID:-}" ] || continue
-            RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" \
-              --jq '[.name, .status, .conclusion, .event, .head_branch] | @tsv')
-            IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT RUN_BRANCH <<< "$RUN_META"
-            if [[ ( "$RUN_NAME" != "Publication Control Plane Deployment" && "$RUN_NAME" != "Publication Transactions" ) || "$RUN_STATUS" != "completed" || \
-                  "$RUN_EVENT" != "workflow_dispatch" || "$RUN_BRANCH" != "develop" ]]; then
-              continue
-            fi
-            rm -rf independent-receipt && mkdir independent-receipt
-            gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > independent-receipt.zip
-            unzip -q independent-receipt.zip -d independent-receipt
-            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
-          import json
-          import os
-          import re
-          from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
-
-          path = Path("independent-receipt/live-receipt.json")
-          if not path.is_file():
-              raise SystemExit(1)
-          receipt = json.loads(path.read_text())
-          valid, _ = verify_live_receipt_signature(receipt)
-          target = receipt.get("target")
-          target_host = target.get("host") if isinstance(target, dict) else target
-          if isinstance(target, dict) and not target_host:
-              base_url = target.get("base_url") or target.get("url")
-              target_host = str(base_url or "").rstrip("/").split("://")[-1]
-          if not valid or target_host != "benchbox.dev":
-              raise SystemExit(1)
-          receipt_run = (
-              receipt.get("receipt_run_id")
-              or receipt.get("artifact_run_id")
-              or receipt.get("workflow_run_id")
-              or receipt.get("writer_run_id")
-          )
-          if str(receipt_run) != os.environ["EXPECTED_RUN_ID"]:
-              raise SystemExit(1)
-          source_commit = receipt.get("source_commit") or receipt.get("develop_sha")
-          if not re.fullmatch(r"[0-9a-f]{40}", str(source_commit or "")):
-              raise SystemExit(1)
-          if os.environ["RUN_CONCLUSION"] != "success":
-              if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
-                  raise SystemExit(1)
-              if not receipt.get("routes") or not all(route.get("ok") for route in receipt["routes"]):
-                  raise SystemExit(1)
-          PY
-            then
-              ACTIVE=true
-              break
-            fi
-          done < independent-publication-runs.txt
-          echo "active=$ACTIVE" >> "$GITHUB_OUTPUT"
-          if [ "$ACTIVE" = "true" ]; then
-            echo "::notice::Independent publication owns Pages; skipping the legacy release deployment"
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        if: steps.independent.outputs.active != 'true'
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
-
-      - name: Capture this run's skipped deployment record
-        id: capture-deployment
-        if: steps.independent.outputs.skipped == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Bind the follow-on marker to THIS run's record, not merely "a record
-          # for this SHA": duplicate github-pages records per SHA exist (reruns,
-          # concurrent queued runs), so an unscoped newest-first lookup can mark
-          # the wrong record. The github-pages environment pre-created this run's
-          # record when the job started seconds ago; select the newest
-          # release-ref record for this SHA created after this workflow run
-          # started, which only this run's record can satisfy.
-          # Use this run's ISO-8601 start time as the selection boundary so
-          # both operands share a representation (deployment `created_at`
-          # values are ISO-8601 while the push event's `pushed_at` is an
-          # epoch value frozen at the original push, which also breaks
-          # reruns). Querying the Actions API anchors reruns to the current
-          # attempt, not merely the run: full reruns must not reuse a stale
-          # boundary from an earlier attempt.
-          RUN_STARTED=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}" \
-            --jq '.run_started_at // .created_at // empty')
-          if [ -z "${RUN_STARTED:-}" ]; then
-            echo "::warning::Could not determine current run start time; skipping inactive marker."
-            echo "deployment_id=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # NOTE: deployment records carry the bare branch name in `.ref`
-          # ("release", not "refs/heads/release") — verified against live
-          # github-pages records.
-          # NOTE: this gh version has no `--arg` flag, so the boundary is
-          # passed via the environment (`env.SINCE`) inside a single valid
-          # `--jq` argument.
-          export SINCE="$RUN_STARTED"
-          DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&sha=${{ github.sha }}&per_page=100" \
-            --jq '[.[] | select(.ref == "release") | select(.created_at >= env.SINCE)] | sort_by(.created_at) | last | .id // empty')
-          if [ -z "${DEPLOYMENT_ID:-}" ]; then
-            echo "::warning::No release-ref github-pages deployment record found for this run; skipping inactive marker."
-          fi
-          echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
-
-  # Records the skipped legacy release deployment after the github-pages
-  # environment job finalizes. Running inside the deploy job above would let
-  # the environment's terminal status overwrite the inactive marker with
-  # `success` on job exit even though nothing was published. This follow-on
-  # job intentionally sets no `environment:` key and runs only on the skipped
-  # path (independent publication owns Pages).
-  record-skipped-deployment:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release' && needs.deploy.outputs.skipped == 'true' && needs.deploy.outputs.skipped_deployment_id != ''
-    needs: deploy
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-      deployments: write
-    steps:
-      - name: Record skipped deployment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          DEPLOYMENT_ID: ${{ needs.deploy.outputs.skipped_deployment_id }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          # The github-pages environment pre-created this exact deployment record
-          # (bound by the deploy job via ref + push-time window, not by bare
-          # newest-first lookup, because duplicate records per SHA exist). The
-          # independent-publication receipt gated off the real deploy, so mark
-          # that record `inactive` (from outside the environment job) so
-          # deployment history distinguishes "skipped, independent pipeline
-          # owns Pages" from a real deployment.
-          # auto_inactive=false: the default (true) would additionally mark
-          # every prior successful non-transient, non-production github-pages
-          # deployment inactive — including the live independent-publication
-          # deployment. Only this run's own skipped record may change.
-          gh api --method POST "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
-            -f state="inactive" \
-            -F auto_inactive=false \
-            -f description="Superseded: independent publication owns Pages; legacy release deployment skipped." \
-            --jq '.state' > /dev/null
-          echo "::notice::Legacy release deployment skipped and recorded as inactive; independent publication owns Pages."
 
   # Validate example files and documentation references
   # Blocking: failures should fail the workflow

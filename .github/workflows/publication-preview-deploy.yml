@@ -14,18 +14,17 @@
 # and an approver IS the manual maintainer approval the A1 contract requires
 # for a new publication generation. No push/PR trigger may be added: an
 # automatic trigger would turn every matching push into a production Pages
-# write. The github-pages environment serializes this against docs.yml
-# production deploys (Pages runs one deployment at a time); the concurrency
-# group below serializes concurrent dispatches of this workflow.
+# write. The github-pages environment serializes Pages deployments (Pages
+# runs one at a time); the concurrency group below serializes concurrent
+# dispatches of this workflow.
 #
 # Soak: this workflow deploys and records state; publication-preview-soak.yml
 # (cron, 30min) probes root stability + preview equivalence for the 12h soak
 # window and assembles the live receipt. G2 passes only on that receipt.
 #
-# Freeze: mirror retirement stays blocked until G2 passes; docs.yml stays the
-# production deployer until G3 passes. A mid-soak docs.yml release deploy
-# wipes /preview/* (full-site replacement) — the soak then reports
-# INCONCLUSIVE (production moved under us), never PASS.
+# Freeze: mirror retirement stays blocked until G2 passes. A mid-soak
+# production deploy wipes /preview/* (full-site replacement) — the soak then
+# reports INCONCLUSIVE (production moved under us), never PASS.
 
 name: Publication Preview Deploy (G2)
 
