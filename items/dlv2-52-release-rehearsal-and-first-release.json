@@ -5,7 +5,7 @@
     "After the owner's release: PyPI run URL, hashes match queue run, attestation verifies, t3:install green",
     "Release freeze lifted in the item context"
   ],
-  "context": "muse M6: legacy release path retirement waits for this item.\n\nOwner decision 2026-10-04: release freeze lifted. v0.4.2 ships through the legacy release-cut/release-finalize path after the in-flight CI governance batch (#2573, #2566, #2567) lands, with a fresh release canary on the exact cut head. This item's first release therefore targets the next version after 0.4.2; dlv2-51 still needs dlv2-22 and a trunk-artifact redesign (#2584) because the merge queue it consumed was retired (#2582).",
+  "context": "muse M6: legacy release path retirement waits for this item.\n\nOwner decision 2026-10-04: release freeze lifted. v0.4.2 ships through the legacy release-cut/release-finalize path after the in-flight CI governance batch (#2573, #2566, #2567) lands, with a fresh release canary on the exact cut head. This item's first release therefore targets the next version after 0.4.2; dlv2-51 still needs dlv2-22 and a trunk-artifact redesign (#2584) because the merge queue it consumed was retired (#2582).\n\n2026-10-05: v0.4.2 is published through the legacy path (release PR #2668, merge 627496f04, tag v0.4.2, release.yml run 37304421548; develop synced by #2669). The title's \"0.4.2\" is now out of date: this item's rehearsal and first release target the next version. Legacy-path gaps found during that release are tracked in release-cut-single-pass-agent-curation, release-cut-strip-list-drift-check and release-guide-accounting-literal-timing.",
   "description": "Release freeze (G7) is in force from the start of dlv2-40 until this item finishes; the legacy release path remains the fallback.\nAgent (pre-approved): make release-prep VERSION=0.4.2rc1 (or the repo's pre-release convention), queue it, tag, run release-v2 to TestPyPI; verify published hashes equal the queue-run hashes and pip install from TestPyPI works on all T4 cells. Then make release-prep VERSION=0.4.2, merge it, and STOP: report readiness (rehearsal evidence, candidate commit, hashes) to the owner. EXPECTED STOP: the owner creates the v0.4.2 tag and/or approves the `pypi` environment deployment. After the owner's release, the agent verifies hashes, attestation, and pypi-latest installability (t3:install) and finishes the item.",
   "sessions": [
     {
@@ -39,6 +39,14 @@
       "op": "update",
       "op_id": "dafbf7b41242400f931643c1f630d449",
       "session_id": "1a68e7536ec349e1bfcb0045123dedbb"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:28:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1066e195d7e04aadbf437ca3009b73af",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
     }
   ]
 }
