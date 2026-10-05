@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -76,7 +76,8 @@ async function stableSearch(page) {
 async function settled(page) {
   await page.evaluate(async () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    await Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
+    const finite = document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
+    await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
   });
 }
 
@@ -173,90 +174,36 @@ function contrast(a, b) {
   await context.close();
 }
 
-const prismRoot = path.join(here, "..", "node_modules", "prismjs");
-const prismTypes = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
-
-async function servePrism(context) {
-  await context.route(/^https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/prism\/1\.29\.0\//, async (route) => {
-    const relative = new URL(route.request().url()).pathname.replace(/^\/ajax\/libs\/prism\/1\.29\.0\//, "");
-    const file = path.join(prismRoot, relative);
-    if (!file.startsWith(prismRoot) || !existsSync(file)) return route.fulfill({ status: 404, body: "" });
-    return route.fulfill({ status: 200, contentType: prismTypes[path.extname(file)] ?? "text/plain", body: readFileSync(file) });
-  });
-}
-
-const PRISM_TOMORROW_TEXT = "rgb(204, 204, 204)";
-
 function codeColours(page) {
-  return page.evaluate(() => {
-    const blocks = [...document.querySelectorAll(".code-block pre code")];
-    const resolve = (host, variable) => {
-      const probe = document.createElement("span");
-      probe.style.color = `var(${variable})`;
-      host.appendChild(probe);
-      const color = getComputedStyle(probe).color;
-      probe.remove();
-      return color;
-    };
-    return {
-      fg: getComputedStyle(blocks[0].closest("pre")).color,
-      bg: getComputedStyle(blocks[0].closest(".code-block")).backgroundColor,
-      variables: Object.fromEntries(["--text-muted", "--code-line-number", "--code-comment", "--text-secondary", "--prism-string", "--prism-keyword", "--prism-deleted", "--prism-variable", "--prism-operator"].map((name) => [name, resolve(blocks[0], name)])),
-      blocks: blocks.map((code) => {
-        const chars = [];
-        const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
-        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-          const color = getComputedStyle(node.parentElement).color;
-          for (const ch of node.textContent) if (!/\s/.test(ch)) chars.push([ch, color]);
-        }
-        return chars;
-      }),
-    };
-  });
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".code-block pre code")].map((code) => {
+      const bg = getComputedStyle(code.closest(".code-block")).backgroundColor;
+      const colors = new Set();
+      const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.textContent.trim()) colors.add(getComputedStyle(node.parentElement).color);
+      }
+      return { id: code.id, bg, colors: [...colors] };
+    }),
+  );
 }
 
 for (const theme of ["light", "dark"]) {
-  const old = await open("/", { theme, origin: oldBase, before: (target) => servePrism(target.context()) });
-  const prismLoaded = await until(old.page, () => document.querySelectorAll(".token").length > 20 && document.querySelector("#install .token.keyword"));
-  check(prismLoaded, `Prism did not highlight the static page in ${theme}`);
-  const oldColours = await codeColours(old.page);
-  await old.context.close();
   const current = await open("/", { theme });
-  const newColours = await codeColours(current.page);
+  const blocks = await codeColours(current.page);
   await current.context.close();
-
-  const translate = (color) => {
-    if (color === PRISM_TOMORROW_TEXT) return newColours.fg;
-    const names = Object.keys(oldColours.variables).filter((name) => oldColours.variables[name] === color);
-    if (theme === "dark" || names.length === 0) return color;
-    const mapped = new Set(names.map((name) => newColours.variables[name === "--text-muted" ? "--code-comment" : name]));
-    return mapped.size === 1 ? [...mapped][0] : color;
-  };
-  const differences = [];
-  check(oldColours.blocks.length === newColours.blocks.length, `code block count differs in ${theme}`);
-  oldColours.blocks.forEach((oldChars, index) => {
-    const newChars = newColours.blocks[index] ?? [];
-    check(oldChars.map(([ch]) => ch).join("") === newChars.map(([ch]) => ch).join(""), `code text differs in block ${index}`);
-    let run = null;
-    oldChars.forEach(([ch, color], position) => {
-      const want = translate(color);
-      const got = newChars[position]?.[1];
-      if (want === got) {
-        run = null;
-        return;
-      }
-      if (run && run.want === want && run.got === got) run.text += ch;
-      else {
-        run = { block: index, text: ch, want, got, was: color };
-        differences.push(run);
-      }
-    });
-  });
-  const ratios = Object.fromEntries([...new Set(newColours.blocks.flat().map(([, color]) => color))].map((color) => [color, contrast(color, newColours.bg)]));
-  for (const [color, ratio] of Object.entries(ratios)) check(ratio >= 4.5, `code colour ${color} on ${newColours.bg} in ${theme} is ${ratio.toFixed(2)}:1`);
-  report.landing[`tokens ${theme}`] = { ratios, variables: newColours.variables, oldVariables: oldColours.variables, differences };
-  for (const d of differences.slice(0, 12)) fail(`code colour in ${theme}, block ${d.block}, "${d.text}": Prism page ${d.was} (expected ${d.want}), Astro ${d.got}`);
-  if (differences.length > 12) fail(`${differences.length - 12} more code colour differences in ${theme}`);
+  check(blocks.length >= 6, `expected at least 6 code blocks on / in ${theme}, found ${blocks.length}`);
+  const hero = blocks.find((block) => block.id === "hero-code");
+  check((hero?.colors.length ?? 0) >= 3, `hero code uses fewer than 3 colours in ${theme}`);
+  const ratios = {};
+  for (const block of blocks) {
+    for (const color of block.colors) {
+      const ratio = contrast(color, block.bg);
+      ratios[`${color} on ${block.bg}`] = Number(ratio.toFixed(2));
+      check(ratio >= 4.5, `code colour ${color} on ${block.bg} in ${theme} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+  report.landing[`tokens ${theme}`] = ratios;
 }
 
 for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {

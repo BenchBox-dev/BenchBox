@@ -729,7 +729,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 @pytest.mark.unit
 class TestPackagedTemplatesParity:
-    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks", "snowflake")
+    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks", "snowflake", "clickhouse")
 
     EXCLUDED_AUTO_DISCOVERY_SOURCES = {
         ("databricks", "tpch_liquid_tuned.yaml"): (

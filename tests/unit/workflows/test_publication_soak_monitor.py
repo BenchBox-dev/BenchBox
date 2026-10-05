@@ -18,15 +18,11 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def test_soak_monitor_samples_every_five_minutes() -> None:
+def test_soak_monitor_is_dispatch_only() -> None:
     wf = _load_yaml(MONITOR_PATH)
     triggers = wf.get("on") or wf.get(True) or {}
 
-    assert "push" not in triggers
-    assert "pull_request" not in triggers
-    assert "workflow_dispatch" in triggers
-    crons = [entry.get("cron") for entry in triggers.get("schedule", [])]
-    assert "*/5 * * * *" in crons
+    assert set(triggers) == {"workflow_dispatch"}
 
 
 def test_soak_monitor_never_cancels_a_sample() -> None:

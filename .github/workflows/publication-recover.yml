@@ -1,15 +1,6 @@
 name: Publication Watchdog
 
 on:
-  workflow_run:
-    workflows:
-      - "Publication Transactions"
-      - "Publication Control Plane Deployment"
-      - "Publication Preview Deploy (G2)"
-    types:
-      - completed
-  schedule:
-    - cron: "2-57/5 * * * *"
   workflow_dispatch:
 
 permissions:

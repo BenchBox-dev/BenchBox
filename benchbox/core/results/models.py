@@ -104,6 +104,13 @@ class ValidationPhase:
 
 
 @dataclass
+class PostLoadMaintenancePhase:
+    duration_ms: int
+    status: str = "SUCCESS"
+    tables_processed: int = 0
+
+
+@dataclass
 class StatisticsGatheringPhase:
     duration_ms: int
     status: str
@@ -121,6 +128,7 @@ class SetupPhase:
     data_loading: DataLoadingPhase | None = None
     validation: ValidationPhase | None = None
     statistics_gathering: StatisticsGatheringPhase | None = None
+    post_load_maintenance: PostLoadMaintenancePhase | None = None
 
 
 @dataclass(init=False)

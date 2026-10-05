@@ -18,13 +18,65 @@ _BENCHMARK_SPECS_FILES: dict[str, tuple[str, ...]] = {
     "tsbs": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
 }
 
+_GENERATOR_BINARIES: dict[str, str] = {
+    "tpch": "dbgen",
+    "tpchavoc": "dbgen",
+    "tpch_skew": "dbgen",
+    "read_primitives": "dbgen",
+    "write_primitives": "dbgen",
+    "transaction_primitives": "dbgen",
+    "ai_primitives": "dbgen",
+    "datavault": "dbgen",
+    "tpcds": "dsdgen",
+    "tpcds_obt": "dsdgen",
+}
+
+_DEFECTIVE_GENERATOR_BINARIES: dict[str, frozenset[str]] = {
+    "dbgen": frozenset(
+        {
+            "1ef8282179910b38e517a9393ad8ab0df9f2b6575bbcab6455b38a6617475bc1",
+            "1077578cf4d2bf6754f458d26a7ac95759e3ef1bb02e05d33d0ce17bc2fd8e06",
+            "7f90ccc6fa0313067830b3f04318259a4c2ec182ded55143bbcec4791fdb7fc2",
+            "e08b12a356314a3b305e583c6d4c5621423ec9df5d2ebea4267df3203ed5367a",
+        }
+    ),
+}
+
 _PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+
+_binary_digest_cache: dict[tuple[str, int, int], str] = {}
 
 
 def _spec_files_for(benchmark: str | None) -> list[Path]:
     if not benchmark:
         return []
     return [_PACKAGE_ROOT / rel for rel in _BENCHMARK_SPECS_FILES.get(str(benchmark).lower(), ())]
+
+
+def _generator_binary_name(benchmark: str | None) -> str | None:
+    return _GENERATOR_BINARIES.get(str(benchmark).lower()) if benchmark else None
+
+
+def generator_binary_digest(benchmark: str | None) -> str | None:
+    binary_name = _generator_binary_name(benchmark)
+    if binary_name is None:
+        return None
+    try:
+        from benchbox.utils.tpc_compilation import get_tpc_compiler
+
+        resolved = get_tpc_compiler(auto_compile=False).get_binary_path(binary_name)
+        if resolved is None:
+            return None
+        path = Path(resolved)
+        info = path.stat()
+        key = (str(path), info.st_mtime_ns, info.st_size)
+        digest = _binary_digest_cache.get(key)
+        if digest is None:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            _binary_digest_cache[key] = digest
+        return digest
+    except Exception:
+        return None
 
 
 def compute_base_constants_hash(benchmark: str | None = None) -> str:
@@ -39,11 +91,14 @@ def compute_base_constants_hash(benchmark: str | None = None) -> str:
 
 
 def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]:
-
-    return {
+    stamp: dict[str, Any] = {
         "data_generation_version": DATA_GENERATION_VERSION,
         "base_constants_hash": compute_base_constants_hash(benchmark),
     }
+    binary_digest = generator_binary_digest(benchmark)
+    if binary_digest is not None:
+        stamp["generator_binary_sha256"] = binary_digest
+    return stamp
 
 
 def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[str, Any] | None = None) -> str:
@@ -63,8 +118,25 @@ def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: s
         return False
     if manifest.get("data_generation_version") != DATA_GENERATION_VERSION:
         return False
-    expected = compute_base_constants_hash(benchmark if benchmark is not None else manifest.get("benchmark"))
-    return manifest.get("base_constants_hash") == expected
+    name = benchmark if benchmark is not None else manifest.get("benchmark")
+    if manifest.get("base_constants_hash") != compute_base_constants_hash(name):
+        return False
+    return _generator_binary_staleness(manifest, name) is None
+
+
+def _generator_binary_staleness(manifest: Mapping[str, Any], benchmark: str | None) -> str | None:
+    binary_name = _generator_binary_name(benchmark)
+    if binary_name is None:
+        return None
+    recorded = manifest.get("generator_binary_sha256")
+    if not isinstance(recorded, str) or not recorded:
+        return (
+            f"this dataset does not record which {binary_name} binary wrote it; "
+            "it regenerates once to establish provenance"
+        )
+    if recorded in _DEFECTIVE_GENERATOR_BINARIES.get(binary_name, frozenset()):
+        return f"this dataset was written by a known-defective {binary_name} build"
+    return None
 
 
 def describe_datagen_staleness(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> str | None:
@@ -83,4 +155,7 @@ def describe_datagen_staleness(manifest: Mapping[str, Any] | None, benchmark: st
             f"datagen version {manifest.get('data_generation_version')!r} "
             f"does not match current version {DATA_GENERATION_VERSION}"
         )
-    return "datagen base constants changed since this data was generated"
+    name = benchmark if benchmark is not None else manifest.get("benchmark")
+    if manifest.get("base_constants_hash") != compute_base_constants_hash(name):
+        return "datagen base constants changed since this data was generated"
+    return _generator_binary_staleness(manifest, name)

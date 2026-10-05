@@ -8,6 +8,9 @@ from typing import Iterable, Mapping
 
 import yaml
 
+from benchbox.core.tuning.capability_registry import DEFAULT_FALLBACK_DESCRIPTION, PLATFORM_FALLBACK_DESCRIPTIONS
+from benchbox.core.tuning.packaged_templates import template_platform_key
+
 TUNED_TEMPLATE = "tuned_template"
 BASIC_CONSTRAINTS = "basic_constraints"
 UNTUNED = "untuned"
@@ -28,9 +31,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TUNING_TEMPLATE_ROOT = REPO_ROOT / "examples" / "tunings"
 MATRIX_COLUMNS = ("platform", "benchmark", "status", "decision", "reason", "template_path")
 
+_FALLBACK_DESCRIPTIONS = (DEFAULT_FALLBACK_DESCRIPTION, *sorted(set(PLATFORM_FALLBACK_DESCRIPTIONS.values())))
+
 _RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = (
     ("Tuning: auto-discovered template", TUNED_TEMPLATE),
-    ("Tuning: using basic constraints", BASIC_CONSTRAINTS),
+    *((f"Tuning: using {description}", BASIC_CONSTRAINTS) for description in _FALLBACK_DESCRIPTIONS),
     ("Tuning disabled:", UNTUNED),
 )
 
@@ -88,9 +93,10 @@ def template_path_for(platform: str, benchmark: str, *, root: Path = REPO_ROOT) 
 
 
 def classify_template(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> tuple[str, str]:
-    template_path = template_path_for(platform, benchmark, root=root)
-    if template_path.exists():
-        return TUNED_TEMPLATE, _relpath(template_path, root)
+    for key in dict.fromkeys((platform, template_platform_key(platform))):
+        template_path = template_path_for(key, benchmark, root=root)
+        if template_path.exists():
+            return TUNED_TEMPLATE, _relpath(template_path, root)
     return BASIC_CONSTRAINTS, "-"
 
 

@@ -60,7 +60,7 @@ class DuckDBConnectionWrapper:
         self._platform_adapter = platform_adapter
 
     def execute(self, query: str, parameters=None):
-        if self._platform_adapter.dry_run_mode:
+        if self._platform_adapter.dry_run_mode and not self._platform_adapter._catalog_lookup_active:
             self._platform_adapter.capture_sql(query, "query", None)
             return DuckDBCursorWrapper([], self._platform_adapter)
         else:
@@ -475,6 +475,7 @@ class DuckDBAdapter(PlatformAdapter):
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
     physical_identifier_case = "lower"
     index_ddl_unsupported_reason: str | None = None
+    _catalog_lookup_active: bool = False
 
     @property
     def platform_name(self) -> str:
@@ -489,10 +490,13 @@ class DuckDBAdapter(PlatformAdapter):
         target = connection if connection is not None else self.connection
         if target is None:
             return None
+        self._catalog_lookup_active = True
         try:
             names = [row[0] for row in target.execute(sql, params).fetchall()]
         except Exception:
             return None
+        finally:
+            self._catalog_lookup_active = False
         if logical in names:
             return logical
         return names[0] if names else None

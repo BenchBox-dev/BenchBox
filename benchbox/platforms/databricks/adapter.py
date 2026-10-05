@@ -233,6 +233,7 @@ class DatabricksAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     physical_identifier_case = "lower"
+    post_load_connection_recording = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -2112,8 +2113,11 @@ class DatabricksAdapter(PlatformAdapter):
         effective_tuning = self.get_effective_tuning_configuration()
         if effective_tuning is not None:
             self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
+            self.run_post_load_tunings(table_name_upper, effective_tuning, connection)
 
         optimize_time = 0.0
+        already_optimized = table_name_upper.lower() in self._delta_optimized_after_load()
+        self._delta_optimized_after_load().discard(table_name_upper.lower())
         if self.table_format == "hudi":
             self._record_layout_operation(
                 mechanism="optimize",
@@ -2123,7 +2127,7 @@ class DatabricksAdapter(PlatformAdapter):
                 phase="post_load",
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
-        elif self.enable_delta_optimization:
+        elif self.enable_delta_optimization and not already_optimized:
             optimize_start = mono_time()
             optimize_statement = f"OPTIMIZE {table_name_upper}"
             try:
@@ -2946,6 +2950,30 @@ class DatabricksAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
+    def _delta_optimized_after_load(self) -> set[str]:
+        optimized = getattr(self, "_delta_optimized_tables", None)
+        if optimized is None:
+            optimized = set()
+            self._delta_optimized_tables = optimized
+        return optimized
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        table_tuning = self.table_tuning_for(effective_config, table_name)
+        if table_tuning is None or not table_tuning.has_any_tuning() or not self.enable_delta_optimization:
+            return False
+        physical_table = self.resolve_physical_table(table_name)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"DESCRIBE EXTENDED {physical_table}")
+            if not any("DELTA" in str(row).upper() for row in cursor.fetchall()):
+                return False
+            self._delta_optimized_after_load().add(physical_table.lower())
+            if not self._apply_delta_optimize(cursor, physical_table, phase="post_load"):
+                self.note_post_load_maintenance_failure()
+            return True
+        finally:
+            cursor.close()
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         if not table_tuning or not table_tuning.has_any_tuning():
             return
@@ -3026,9 +3054,6 @@ class DatabricksAdapter(PlatformAdapter):
                 sort_columns,
                 use_liquid,
             )
-            if is_delta_table and self.enable_delta_optimization:
-                self._apply_delta_optimize(cursor, table_name, phase="pre_load")
-
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
@@ -3259,7 +3284,7 @@ class DatabricksAdapter(PlatformAdapter):
                 f"Sorting in Databricks achieved via {mechanism} for table {table_name}: {', '.join(names)}"
             )
 
-    def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> None:
+    def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> bool:
         if self.table_format == "hudi":
             self._record_layout_operation(
                 mechanism="optimize",
@@ -3269,7 +3294,7 @@ class DatabricksAdapter(PlatformAdapter):
                 phase=phase,
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name}")
-            return
+            return True
         optimize_statement = f"OPTIMIZE {table_name}"
         try:
             cursor.execute(optimize_statement)
@@ -3291,7 +3316,7 @@ class DatabricksAdapter(PlatformAdapter):
                 error=e,
             )
             self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
-            return
+            return False
 
         analyze_statement = f"ANALYZE TABLE {table_name} COMPUTE STATISTICS"
         try:
@@ -3314,6 +3339,8 @@ class DatabricksAdapter(PlatformAdapter):
                 error=e,
             )
             self.logger.warning(f"Failed to analyze Delta table {table_name}: {e}")
+            return False
+        return True
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning

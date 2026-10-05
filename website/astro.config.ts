@@ -17,7 +17,7 @@ import { headingIds } from "./src/plugins/heading-ids.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const cobalt2 = ExpressiveCodeTheme.fromJSONString(readFileSync(path.join(repoRoot, "website", "src", "lib", "cobalt2-theme.json"), "utf-8"));
+const codeTheme = ExpressiveCodeTheme.fromJSONString(readFileSync(path.join(repoRoot, "website", "src", "lib", "code-theme.json"), "utf-8"));
 
 function generatedSidebar() {
   const manifest = path.join(repoRoot, "website", ".generated", "manifest", "sidebar.json");
@@ -35,6 +35,21 @@ function htmlFiles(root: string, relative = ""): string[] {
 }
 
 const sitemapOwnedByPublishStatic: AstroIntegration = { name: "@astrojs/sitemap", hooks: {} };
+
+const devDirectoryIndex: AstroIntegration = {
+  name: "benchbox-dev-directory-index",
+  hooks: {
+    "astro:server:setup": ({ server }) => {
+      server.middlewares.use((request, _response, next) => {
+        const [pathname, query] = (request.url ?? "").split("?", 2);
+        if (pathname.length > 1 && pathname.endsWith("/") && !/^\/[@_]/.test(pathname)) {
+          request.url = `${pathname}index.html${query === undefined ? "" : `?${query}`}`;
+        }
+        next();
+      });
+    },
+  },
+};
 
 const publishStatic = (): AstroIntegration => ({
   name: "benchbox-publish-static",
@@ -72,6 +87,7 @@ export default defineConfig({
   markdown: { processor: unified({ remarkPlugins: [headingIds, docutilsQuotes], smartypants: SMARTYPANTS }) },
   integrations: [
     sitemapOwnedByPublishStatic,
+    devDirectoryIndex,
     preact(),
     starlight({
       title: "BenchBox",
@@ -79,7 +95,14 @@ export default defineConfig({
       disable404Route: true,
       lastUpdated: false,
       routeMiddleware: "./src/starlight-route.ts",
-      customCss: ["../landing/shared/site-tokens.css", "../landing/shared/site-shell.css", "./src/styles/shell.css", "./src/styles/starlight-map.css"],
+      customCss: [
+        "@fontsource-variable/instrument-sans/wght.css",
+        "@fontsource-variable/martian-mono/wdth.css",
+        "../landing/shared/site-tokens.css",
+        "../landing/shared/site-shell.css",
+        "./src/styles/shell.css",
+        "./src/styles/starlight-map.css",
+      ],
       components: {
         Header: "./src/components/starlight/Header.astro",
         PageTitle: "./src/components/starlight/PageTitle.astro",
@@ -88,7 +111,34 @@ export default defineConfig({
         ThemeSelect: "./src/components/starlight/Empty.astro",
       },
       sidebar: generatedSidebar(),
-      expressiveCode: { themes: [cobalt2], useStarlightUiThemeColors: false, minSyntaxHighlightingColorContrast: 4.5 },
+      expressiveCode: {
+        themes: [codeTheme],
+        useStarlightUiThemeColors: false,
+        minSyntaxHighlightingColorContrast: 4.5,
+        styleOverrides: {
+          borderRadius: "14px",
+          borderColor: "var(--code-border)",
+          codeBackground: "var(--code-bg)",
+          codeForeground: "var(--code-fg)",
+          frames: {
+            frameBoxShadowCssValue: "none",
+            editorBackground: "var(--code-bg)",
+            editorTabBarBackground: "var(--code-bg)",
+            editorTabBarBorderBottomColor: "color-mix(in srgb, var(--code-fg) 16%, transparent)",
+            editorActiveTabBackground: "var(--code-bg)",
+            editorActiveTabForeground: "var(--code-comment)",
+            editorActiveTabIndicatorTopColor: "transparent",
+            editorActiveTabIndicatorBottomColor: "var(--code-comment)",
+            terminalBackground: "var(--code-bg)",
+            terminalTitlebarBackground: "var(--code-bg)",
+            terminalTitlebarForeground: "var(--code-comment)",
+            terminalTitlebarDotsForeground: "var(--code-comment)",
+            terminalTitlebarBorderBottomColor: "color-mix(in srgb, var(--code-fg) 16%, transparent)",
+            inlineButtonForeground: "var(--code-fg)",
+            inlineButtonBorder: "var(--code-fg)",
+          },
+        },
+      },
     }),
     publishStatic(),
   ],

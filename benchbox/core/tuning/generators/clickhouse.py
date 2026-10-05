@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -48,6 +49,48 @@ CLICKHOUSE_TYPE_MAPPING: dict[str, str] = {
 }
 
 
+class ClickHousePrimaryKeyPrefixError(ValueError):
+    pass
+
+
+def clickhouse_sort_key_columns(table_tuning: TableTuning) -> list[str]:
+    from benchbox.core.tuning.interface import TuningType
+
+    ordered = []
+    for tuning_type in (TuningType.CLUSTERING, TuningType.SORTING):
+        columns = table_tuning.get_columns_by_type(tuning_type)
+        if columns:
+            ordered.extend(sorted(columns, key=lambda c: c.order))
+
+    seen = set()
+    names = []
+    for column in ordered:
+        if column.name not in seen:
+            names.append(column.name)
+            seen.add(column.name)
+    return names
+
+
+def primary_key_prefix_violation(
+    table_name: str,
+    primary_key_columns: Sequence[str],
+    sort_key_columns: Sequence[str],
+) -> str | None:
+    if not primary_key_columns or not sort_key_columns:
+        return None
+
+    primary_key = [column.lower() for column in primary_key_columns]
+    sort_key = [column.lower() for column in sort_key_columns]
+    if sort_key[: len(primary_key)] == primary_key:
+        return None
+
+    return (
+        f"ClickHouse table {table_name}: primary key ({', '.join(primary_key_columns)}) must be a prefix of "
+        f"the tuned sort key ({', '.join(sort_key_columns)}). "
+        "Put the PK columns first in the sort key, or disable primary_keys."
+    )
+
+
 class MergeTreeEngine(str, Enum):
     MERGE_TREE = "MergeTree"
     REPLACING_MERGE_TREE = "ReplacingMergeTree"
@@ -85,6 +128,7 @@ class ClickHouseDDLGenerator(BaseDDLGenerator):
         self,
         table_tuning: TableTuning | None,
         platform_opts: PlatformOptimizationConfiguration | None = None,
+        primary_key_columns: Sequence[str] | None = None,
     ) -> TuningClauses:
         clauses = TuningClauses()
 
@@ -101,26 +145,14 @@ class ClickHouseDDLGenerator(BaseDDLGenerator):
                 f"Distribution is handled via Distributed engine, not table DDL."
             )
 
-        order_columns = []
-
-        cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
-        if cluster_columns:
-            order_columns.extend(sorted(cluster_columns, key=lambda c: c.order))
-
-        sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
-        if sort_columns:
-            order_columns.extend(sorted(sort_columns, key=lambda c: c.order))
-
-        if order_columns:
-            seen = set()
-            unique_columns = []
-            for col in order_columns:
-                if col.name not in seen:
-                    unique_columns.append(col)
-                    seen.add(col.name)
-
-            col_names = [c.name for c in unique_columns]
-            clauses.sort_by = ", ".join(col_names)
+        sort_key_columns = clickhouse_sort_key_columns(table_tuning)
+        if sort_key_columns:
+            clauses.sort_by = ", ".join(sort_key_columns)
+            if primary_key_columns:
+                violation = primary_key_prefix_violation(table_tuning.table_name, primary_key_columns, sort_key_columns)
+                if violation:
+                    raise ClickHousePrimaryKeyPrefixError(violation)
+                clauses.primary_key = ", ".join(primary_key_columns)
 
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
@@ -163,6 +195,8 @@ class ClickHouseDDLGenerator(BaseDDLGenerator):
 
             if tuning.sort_by:
                 statement = f"{statement}\nORDER BY ({tuning.sort_by})"
+                if tuning.primary_key:
+                    statement = f"{statement}\nPRIMARY KEY ({tuning.primary_key})"
             else:
                 statement = f"{statement}\nORDER BY tuple()"
 
@@ -214,5 +248,8 @@ class ClickHouseDDLGenerator(BaseDDLGenerator):
 
 __all__ = [
     "ClickHouseDDLGenerator",
+    "ClickHousePrimaryKeyPrefixError",
     "MergeTreeEngine",
+    "clickhouse_sort_key_columns",
+    "primary_key_prefix_violation",
 ]

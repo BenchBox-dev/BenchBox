@@ -5,6 +5,7 @@ run-name: oracle-review (${{ github.event.action || github.event_name }})
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
+    branches-ignore: [release]
   pull_request_review:
     types: [submitted, dismissed]
   workflow_dispatch:
@@ -27,6 +28,7 @@ concurrency:
 jobs:
   oracle-review:
     name: oracle-review
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.base.ref != 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

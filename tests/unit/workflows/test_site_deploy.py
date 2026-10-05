@@ -223,7 +223,8 @@ def test_gates_run_before_any_artifact_is_marked_for_deployment() -> None:
 def test_workflow_is_the_only_new_pages_writer_and_legacy_writers_keep_the_group() -> None:
     writers = {path.name for path in WORKFLOWS_DIR.glob("*.yml") if "deploy-pages" in path.read_text(encoding="utf-8")}
     assert "site-deploy.yml" in writers
-    for name in ("docs.yml", "publication-deploy.yml", "publication-transaction.yml"):
+    assert "docs.yml" not in writers
+    for name in ("publication-deploy.yml", "publication-transaction.yml"):
         assert "group: pages-deploy" in (WORKFLOWS_DIR / name).read_text(encoding="utf-8")
 
 

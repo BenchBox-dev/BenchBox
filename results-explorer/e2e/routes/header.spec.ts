@@ -33,6 +33,15 @@ async function loadStaticHeader(page: Page, html: string): Promise<void> {
   await page.setContent(html, { waitUntil: "domcontentloaded" });
 }
 
+async function chooseTheme(page: Page, choice: "system" | "light" | "dark") {
+  const button = page.locator("[data-theme-toggle]");
+  for (let step = 0; step < 3; step++) {
+    if ((await button.getAttribute("data-theme-choice")) === choice) break;
+    await button.click();
+  }
+  await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", choice);
+}
+
 test.describe("Global header", () => {
   test("@smoke preserves the global header contract on desktop", async ({ page }) => {
     await page.goto("/results/");
@@ -42,8 +51,8 @@ test.describe("Global header", () => {
     await expect(globalNav.getByRole("link")).toHaveText(GLOBAL_LABELS);
     await expect(globalNav.getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
     await expect(globalNav.getByRole("link", { name: HEADER_CTA.label })).toHaveAttribute("href", HEADER_CTA.href);
-    await expect(globalNav.getByRole("radiogroup")).toHaveCount(0);
-    await expect(page.getByRole("radiogroup", { name: "Color theme" })).toBeVisible();
+    await expect(globalNav.getByRole("button", { name: /Color theme/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Color theme: / })).toBeVisible();
 
     const explorerNav = page.getByRole("navigation", { name: "Results Explorer" });
     await expect(explorerNav.getByRole("link")).toHaveText(["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]);
@@ -61,18 +70,15 @@ test.describe("Global header", () => {
     await expect(page.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL }).getByRole("link")).toHaveText(GLOBAL_LABELS);
   });
 
-  test("@smoke persists the theme choice from the footer radiogroup", async ({ page }) => {
+  test("@smoke persists the theme choice from the footer theme button", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
 
-    const lightOption = page.getByRole("radio", { name: "Light theme" });
-    await lightOption.click();
-    await expect(lightOption).toHaveAttribute("aria-checked", "true");
-    await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
+    await chooseTheme(page, "light");
     await page.reload();
     await waitForShell(page);
     await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
-    await expect(page.getByRole("radio", { name: "Light theme" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("button", { name: "Color theme: Light theme" })).toBeVisible();
   });
 
   test("Results global header bounding-box meets shared min-height contract", async ({ page }) => {
@@ -100,12 +106,10 @@ test.describe("Global header", () => {
       return box!;
     };
 
-    await page.getByRole("radio", { name: "Light theme" }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
+    await chooseTheme(page, "light");
     const lightBox = await measure();
 
-    await page.getByRole("radio", { name: "Dark theme" }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "dark");
+    await chooseTheme(page, "dark");
     const darkBox = await measure();
 
     expect(Math.abs(darkBox.height - lightBox.height)).toBeLessThanOrEqual(0.5);

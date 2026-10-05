@@ -22,7 +22,7 @@ from benchbox.core.tuning.introspection import (
     MISMATCH,
     corroborate,
 )
-from benchbox.platforms.duckdb import DuckDBAdapter
+from benchbox.platforms.duckdb import DuckDBAdapter, DuckDBConnectionWrapper
 from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -79,6 +79,22 @@ class TestDuckDBPhysicalIdentifiers:
         columns = {row[0] for row in connection.execute("SELECT column_name FROM duckdb_columns()").fetchall()}
         for logical in ("L_ORDERKEY", "l_linenumber"):
             assert adapter.resolve_physical_column("LINEITEM", logical, connection) in columns
+
+    def test_dry_run_captures_index_ddl_but_not_catalog_lookups(self, schema_connection):
+        adapter, connection = schema_connection
+        adapter.enable_dry_run()
+        wrapper = DuckDBConnectionWrapper(connection, adapter)
+        adapter.apply_unified_tuning(_sort_config(), wrapper)
+        captured = [entry["sql"] for entry in adapter.captured_sql]
+        assert any(sql.startswith("CREATE INDEX") for sql in captured)
+        assert not any("duckdb_tables()" in sql or "duckdb_columns()" in sql for sql in captured)
+
+    def test_dry_run_lookups_still_resolve_against_the_catalog(self, schema_connection):
+        adapter, connection = schema_connection
+        adapter.enable_dry_run()
+        wrapper = DuckDBConnectionWrapper(connection, adapter)
+        assert adapter.resolve_physical_table("LINEITEM", wrapper) in _catalog_tables(connection)
+        assert adapter.captured_sql == []
 
     def test_resolution_without_a_catalog_follows_the_adapter_policy(self):
         adapter = DuckDBAdapter()

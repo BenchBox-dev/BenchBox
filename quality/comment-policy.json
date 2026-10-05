@@ -37990,7 +37990,7 @@
       "path": "tests/unit/workflows/test_publication_canaries.py",
       "symbol": "test_publication_canaries_scripts_fail_closed_without_evidence",
       "text": "unresolved executable source: sys.executable",
-      "payload": "sha256:10a99eb40b39f85521ddb36c6bba78402b4173406b1b48790a7037fb7f08bba8",
+      "payload": "sha256:549f13df56b1d262033af19ba7d27c70202086126ceb4f5be7de6af23484c95b",
       "finding_kind": "payload-error",
       "kind": "fixture",
       "consumer": "tests/unit/workflows/test_publication_canaries.py",

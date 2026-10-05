@@ -1604,7 +1604,13 @@ benchbox-fixture-key-material
 
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
             assert any("ALTER TABLE TEST_TABLE CLUSTER BY" in call for call in execute_calls)
-            assert any("RESUME RECLUSTER" in call for call in execute_calls)
+            assert not any("RESUME RECLUSTER" in call for call in execute_calls)
+
+            mock_cursor.execute.reset_mock()
+            adapter.apply_post_load_tunings("TEST_TABLE", None, mock_connection)
+
+            post_load_calls = [str(call) for call in mock_cursor.execute.call_args_list]
+            assert any("ALTER TABLE TEST_TABLE RESUME RECLUSTER" in call for call in post_load_calls)
 
         mock_cursor.close.assert_called()
 

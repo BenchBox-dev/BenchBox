@@ -701,6 +701,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
             if effective_tuning:
                 self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
             table_duration = elapsed_seconds(table_start)
             table_stats[table_name_lower] = row_count

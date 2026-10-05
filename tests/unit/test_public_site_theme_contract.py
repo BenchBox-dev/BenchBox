@@ -94,13 +94,45 @@ def test_public_site_token_scan_covers_landing_shell_css() -> None:
 
 
 TOKENS = "landing/shared/site-tokens.css"
-LEGACY_THEME = "landing/shared/site-theme.css"
 DARK = ':root[data-bb-theme="dark"]'
 
-LANDING_RESTYLE = {
-    ":root": {"accent-primary", "accent-secondary"},
-    DARK: {"text-secondary", "text-muted", "bb-site-header-text"},
-}
+TEXT_PAIRS = [
+    *[
+        (text, ground)
+        for text in ("text-primary", "text-secondary", "text-muted", "accent-primary")
+        for ground in ("bg-primary", "bg-secondary", "bg-tertiary")
+    ],
+    ("on-accent", "accent-secondary"),
+    ("pill-fg", "pill-bg"),
+    *[
+        (code, "code-bg")
+        for code in (
+            "code-fg",
+            "code-comment",
+            "code-punctuation",
+            "prism-string",
+            "prism-keyword",
+            "prism-deleted",
+            "prism-variable",
+            "prism-operator",
+        )
+    ],
+    *[
+        (text, "bb-surface-data")
+        for text in (
+            "bb-data-fg-primary",
+            "bb-data-fg-muted",
+            "bb-data-fg-subtle",
+            "bb-accent",
+            "bb-status-success",
+            "bb-status-warning",
+            "bb-status-danger",
+        )
+    ],
+    *[(text, "bb-bg-panel") for text in ("bb-fg-primary", "bb-fg-muted", "bb-accent")],
+    *[(f"bb-tone-{tone}-fg", f"bb-tone-{tone}-bg") for tone in ("info", "success", "warning", "danger", "neutral")],
+    ("bb-fg-on-accent", "bb-accent"),
+]
 
 SHARED_FAMILIES = {
     "color": ("bg-", "text-", "accent-", "border-", "code-", "table-", "hero-", "card-"),
@@ -169,14 +201,12 @@ def test_explorer_tailwind_config_reads_the_shared_variables() -> None:
 
 
 @pytest.mark.parametrize("selector", [":root", DARK])
-def test_shared_tokens_match_the_legacy_theme_except_the_landing_restyle(selector: str) -> None:
-    shared = _variables(_read(TOKENS), selector)
-    legacy = _variables(_read(LEGACY_THEME), selector)
-    overlap = {name for name in shared if name in legacy}
+@pytest.mark.parametrize(("text", "ground"), TEXT_PAIRS)
+def test_shared_text_tokens_meet_aa_contrast(selector: str, text: str, ground: str) -> None:
+    css = _read(TOKENS)
+    tokens = _variables(css, ":root") | _variables(css, selector)
 
-    assert overlap
-    differing = {name for name in overlap if shared[name].strip() != legacy[name].strip()}
-    assert differing == LANDING_RESTYLE[selector]
+    assert _contrast(tokens[text], tokens[ground]) >= 4.5
 
 
 def test_results_dark_chart_palette_has_panel_contrast() -> None:

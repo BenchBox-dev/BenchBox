@@ -14,7 +14,6 @@ WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 TX_WORKFLOW_PATH = WORKFLOWS_DIR / "publication-transaction.yml"
 PREVIEW_DEPLOY_PATH = WORKFLOWS_DIR / "publication-preview-deploy.yml"
 PREVIEW_SOAK_PATH = WORKFLOWS_DIR / "publication-preview-soak.yml"
-DOCS_PATH = WORKFLOWS_DIR / "docs.yml"
 DEPLOY_PATH = WORKFLOWS_DIR / "publication-deploy.yml"
 
 
@@ -108,7 +107,6 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
     workflow_names = {p.name for p in deploy_pages_workflows}
     expected_workflow_names = {
         "publication-transaction.yml",
-        "docs.yml",
         "publication-deploy.yml",
         "publication-preview-deploy.yml",
         "site-deploy.yml",
@@ -126,14 +124,6 @@ def test_five_write_paths_inventory_and_disabled_or_journaled_invariant() -> Non
     assert "permanently disabled in code" in first_step.get("run", ""), (
         "Preview deploy job must contain an explicit code guard asserting permanent disablement"
     )
-
-    docs_wf = _load_yaml(DOCS_PATH)
-    docs_deploy_steps = docs_wf["jobs"]["deploy"]["steps"]
-    guard_step = next(
-        (s for s in docs_deploy_steps if s.get("name") == "Check for independent publication ownership"), None
-    )
-    assert guard_step is not None, "docs.yml must retain independent publication admission guard"
-    assert "Publication Transactions" in guard_step.get("run", "")
 
     deploy_wf = _load_yaml(DEPLOY_PATH)
     assert "concurrency" not in deploy_wf, "publication-deploy.yml must not lock concurrency at workflow level"

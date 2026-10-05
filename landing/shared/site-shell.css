@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  max-width: 1200px;
+  max-width: 1280px;
   height: 100%;
   margin: 0 auto;
   padding: 0 1rem;
@@ -38,11 +38,22 @@
   align-items: center;
   order: 1;
   min-height: 2.75rem;
-  color: var(--accent-primary);
-  font-family: var(--font-mono);
-  font-size: 1.25rem;
-  font-weight: 700;
+  color: var(--text-primary);
   text-decoration: none;
+}
+
+.site-header__logo .logo {
+  display: block;
+  width: auto;
+  height: 1.25rem;
+}
+
+.site-header__logo-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -67,14 +78,17 @@
   min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0 0.5rem;
-  border-radius: 6px;
-  font-size: 0.9375rem;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-size: 0.8125rem;
   font-weight: 500;
+  letter-spacing: 0.08em;
   text-decoration: none;
+  text-transform: uppercase;
 }
 
 .site-header__link {
-  color: var(--text-secondary);
+  color: var(--bb-site-header-text);
 }
 
 .site-header__link:hover,
@@ -84,70 +98,79 @@
 
 .site-header__link[aria-current="page"] {
   text-decoration: underline;
-  text-decoration-color: var(--accent-primary);
+  text-decoration-color: currentColor;
   text-decoration-thickness: 2px;
   text-underline-offset: 0.35rem;
 }
 
 .site-header__cta {
-  padding: 0 0.75rem;
-  background: var(--bb-accent);
-  color: var(--bb-fg-inverse);
-  font-weight: 700;
+  min-height: 2.5rem;
+  padding: 0 1.1rem;
+  background: var(--accent-secondary);
+  color: var(--on-accent);
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .site-header__cta:hover {
-  background: var(--bb-accent-hover);
+  background: var(--text-secondary);
 }
 
-.theme-toggle button,
 .site-header__toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
   min-width: 2.75rem;
   min-height: 2.75rem;
   border: 1px solid var(--border-primary);
-  border-radius: 6px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.875rem;
-  padding: 0 0.6rem;
 }
 
-.theme-toggle button:hover,
 .site-header__toggle:hover {
   color: var(--text-primary);
 }
 
 .theme-toggle {
-  display: inline-flex;
-}
-
-.theme-toggle button {
-  border-radius: 0;
-  margin-left: -1px;
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
-.theme-toggle button:first-child {
-  border-radius: 6px 0 0 6px;
-  margin-left: 0;
+.theme-toggle:hover {
+  border-color: var(--text-primary);
 }
 
-.theme-toggle button:last-child {
-  border-radius: 0 6px 6px 0;
+.theme-toggle__icon {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: rotate(-120deg) scale(0.4);
+  transition:
+    opacity 0.2s ease,
+    transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.theme-toggle button[aria-checked="true"] {
-  background: var(--bb-site-header-control-bg);
-  border-color: var(--bb-accent);
-  color: var(--bb-accent);
-  position: relative;
+.theme-toggle[data-theme-choice="system"] [data-theme-icon="system"],
+.theme-toggle[data-theme-choice="light"] [data-theme-icon="light"],
+.theme-toggle[data-theme-choice="dark"] [data-theme-icon="dark"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle__icon {
+    transition: none;
+  }
 }
 
 .site-header__toggle {
@@ -202,9 +225,9 @@
 
 .site-footer {
   border-top: 1px solid var(--border-primary);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.875rem;
-  padding: 1.5rem 1rem;
+  padding: 2rem 1rem;
 }
 
 .site-footer__inner {
@@ -213,7 +236,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1.5rem;
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -228,12 +251,20 @@
 }
 
 .site-footer__link {
-  color: var(--accent-primary);
-  text-decoration: underline;
+  color: var(--text-primary);
+  font-family: var(--font-head);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
   display: inline-flex;
   align-items: center;
   min-height: 2.75rem;
   padding: 0 0.5rem;
+}
+
+.site-footer__link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 56.25rem) {

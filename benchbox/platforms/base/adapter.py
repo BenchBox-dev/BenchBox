@@ -175,6 +175,10 @@ class PlatformAdapter(
         self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
+        self._post_load_maintenance_seconds: float = 0.0
+        self._post_load_maintenance_tables: list[str] = []
+        self._post_load_maintenance_by_table: dict[str, float] = {}
+        self._post_load_maintenance_errors: int = 0
         self._reset_plan_capture_stats()
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
@@ -189,6 +193,10 @@ class PlatformAdapter(
         self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables = []
         self._sorted_ingestion_total_apply_seconds = 0.0
+        self._post_load_maintenance_seconds = 0.0
+        self._post_load_maintenance_tables = []
+        self._post_load_maintenance_by_table = {}
+        self._post_load_maintenance_errors = 0
         self._reset_plan_capture_stats()
         self._client_link_metadata = None
         self._link_probe_timed_out = False
@@ -607,6 +615,7 @@ class PlatformAdapter(
                 data_loading=data_loading_phase,
                 validation=validation_phase,
                 statistics_gathering=statistics_phase,
+                post_load_maintenance=self.build_post_load_maintenance_phase(),
             )
 
             execution_phases, total_exec_time, power_test_phase, throughput_test_phase = self._build_execution_phases(
@@ -931,6 +940,7 @@ class PlatformAdapter(
         quiet_console.print("Loading benchmark data...")
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
         require_loaded_tables(benchmark, table_stats)
+        loading_time, per_table_timings = self.exclude_post_load_maintenance(loading_time, per_table_timings)
         quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
         self._last_per_table_timings = per_table_timings

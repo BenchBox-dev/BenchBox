@@ -205,8 +205,17 @@ to answer what a run requested and what it applied:
 - `platform.tuning.source_file` is a repo-relative path or
   `"<basename>:<content-hash>"` - never a raw local filesystem path.
 - `platform.tuning.applied` holds the applied ledger: `status`, `statements`,
-  `dropped`, and the introspection `receipt` when one was taken.
-  `applied_ledger_hash` stays on `platform.tuning` itself.
+  `dropped`, `satisfied` when an intent was realized by DDL, and the
+  introspection `receipt` when one was taken. `applied_ledger_hash` stays on
+  `platform.tuning` itself.
+  - `dropped` lists requested intents that no executed statement realized, each
+    with a `reason`. A dropped intent blocks `applied_verified`.
+  - `satisfied` lists intents that an executed statement realized as a side of
+    its own DDL, such as a ClickHouse or StarRocks sort expressed as `ORDER BY`
+    in `CREATE TABLE`. Each entry has the `intent`, `satisfied_by` (the index of
+    that statement in `statements`), and a `reason`. It is omitted when empty,
+    is not part of `applied_ledger_hash`, and never counts as corroboration:
+    only the referenced statement's own receipt entry does.
 
 Bundles exported before this were accompanied by `<result>.tuning.json` and
 `<result>.applied.json` files carrying the same content. Nothing writes them
@@ -257,6 +266,26 @@ duration, counts, and stage-specific metadata.
   }
 }
 ```
+
+`post_load_maintenance` is an optional phase, present only when a platform ran
+tuning operations after a table loaded (ClickHouse `OPTIMIZE` when
+`optimize_after_load` is enabled, Redshift `ANALYZE` when `auto_analyze` is
+off, Databricks Delta `OPTIMIZE` and `ANALYZE`, Snowflake `RESUME RECLUSTER`).
+`status` is `FAILED` when a maintenance statement raised or was refused:
+
+```json
+{
+  "post_load_maintenance": {
+    "status": "SUCCESS",
+    "duration_ms": 4200,
+    "tables_processed": 8
+  }
+}
+```
+
+`duration_ms` is the measured time of those operations across all tables.
+`data_loading.duration_ms` and each table's load time exclude it, so load time
+stays comparable between runs with and without maintenance.
 
 #### Summary Block
 

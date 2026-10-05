@@ -1,8 +1,7 @@
+
 name: Publication Preview Soak (G2)
 
 "on":
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       generation:

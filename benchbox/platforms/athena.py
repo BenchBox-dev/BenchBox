@@ -723,6 +723,7 @@ class AthenaAdapter(PlatformAdapter):
                     table_stats[table_name_lower] = row_count
                     if count_verified and effective_tuning is not None:
                         self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                        self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
                     self.logger.info(
                         f"✅ Loaded {table_stats[table_name_lower]:,} rows into {table_name_lower}{chunk_info}"
@@ -734,6 +735,7 @@ class AthenaAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     for table_name_lower in table_stats:
                         self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                        self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())

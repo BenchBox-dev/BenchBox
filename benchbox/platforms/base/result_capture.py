@@ -1109,6 +1109,7 @@ class ResultCaptureMixin:
             data_loading=data_loading_phase,
             schema_creation=schema_creation_phase,
             validation=validation_phase,
+            post_load_maintenance=self.build_post_load_maintenance_phase(),
         )
 
         power_test_phase = PowerTestPhase(
@@ -1134,6 +1135,7 @@ class ResultCaptureMixin:
             "validation_details": validation_phase.validation_details,
             "benchbox_version": "0.1.0",
             "sorted_ingestion": self.get_sorted_ingestion_metadata(),
+            "post_load_maintenance": self.get_post_load_maintenance_metadata(),
         }
 
         total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -1500,6 +1502,7 @@ class ResultCaptureMixin:
                 ),
             },
             "sorted_ingestion": self.get_sorted_ingestion_metadata(),
+            "post_load_maintenance": self.get_post_load_maintenance_metadata(),
         }
         from benchbox.core.results.builder import normalize_benchmark_id
 
