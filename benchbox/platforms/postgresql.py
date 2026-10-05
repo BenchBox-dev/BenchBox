@@ -1337,7 +1337,7 @@ _build_postgresql_config = make_platform_config_builder(
     __name__,
     "PostgreSQL",
     "psycopg",
-    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale",),
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale", "statement_timeout"),
     base_options={"schema": "public"},
-    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False, "statement_timeout": 0},
 )

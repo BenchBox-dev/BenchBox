@@ -72,10 +72,15 @@ test.describe("External corpus smoke", () => {
 
   test("@uat-external-corpus renders throughput phase and stream data from mounted bundle", async ({ page }) => {
     const maybeSeed = discoverThroughputSeed();
+    const requiredStreams = requiredThroughputStreams();
     // Only throughput corpora (e.g. the throughput-phase explorer sweep) can
     // exercise this path; other sweeps skip here and keep the generic route
     // coverage above.
-    test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    if (requiredStreams !== null) {
+      expect(maybeSeed, "mounted corpus has no throughput bundle").not.toBeNull();
+    } else {
+      test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    }
     const seed: CorpusRouteSeed = maybeSeed as CorpusRouteSeed;
 
     await page.goto(`/results/r/${seed.resultId}`);
@@ -97,7 +102,11 @@ test.describe("External corpus smoke", () => {
     // or misclassified stream changes the count. A throughput bundle with
     // fewer than two recorded streams is a dropped-stream regression, not a
     // reason to skip.
-    expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
+    if (requiredStreams !== null) {
+      expect(seed.streamValues).toHaveLength(requiredStreams);
+    } else {
+      expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
+    }
     await expect(page.getByText(`Individual samples (${seed.executionRows})`)).toBeVisible();
     // Stream identity must survive onto the page: open the samples disclosure
     // and require at least two recorded stream ids to appear as cell text.
@@ -150,6 +159,16 @@ function discoverExternalCorpusSeed(): CorpusRouteSeed {
   }
   if (!first) throw new Error(`external corpus has no routable benchmark/platform bundles: ${bundlesDir}`);
   return first;
+}
+
+function requiredThroughputStreams(): number | null {
+  const raw = process.env.E2E_REQUIRE_THROUGHPUT_STREAMS;
+  if (raw === undefined || raw === "") return null;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 2) {
+    throw new Error(`E2E_REQUIRE_THROUGHPUT_STREAMS must be an integer >= 2, got ${JSON.stringify(raw)}`);
+  }
+  return value;
 }
 
 /** Dedicated seed for the throughput-rendering test (A3): scans only for a

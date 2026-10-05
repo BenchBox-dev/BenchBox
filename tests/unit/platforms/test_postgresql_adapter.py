@@ -1173,3 +1173,42 @@ class TestBuildPostgreSQLConfig:
 
         assert result.scale_factor == 10.0
         assert result.benchmark == "tpch"
+
+
+class TestPostgreSQLStatementTimeoutOption:
+    def test_platform_option_parses_to_integer_milliseconds(self):
+        from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
+
+        parsed = PlatformHookRegistry.parse_options("postgresql", [("statement_timeout", "300000")])
+
+        assert parsed["statement_timeout"] == 300000
+
+    def test_statement_timeout_unset_by_default(self):
+        from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
+
+        assert PlatformHookRegistry.get_default_options("postgresql")["statement_timeout"] is None
+        assert "statement_timeout" not in PlatformHookRegistry.parse_options("postgresql", [])
+
+    def test_option_reaches_connection_params_through_config_builder(self, postgres_stubs):
+        from benchbox.platforms.postgresql import _build_postgresql_config
+
+        explicit = {"statement_timeout": 300000}
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm_cls.return_value.get_platform_credentials.return_value = {}
+            config = _build_postgresql_config("postgresql", explicit, {"_explicit_platform_options": explicit}, None)
+
+        adapter = PostgreSQLAdapter.from_config(config.model_dump())
+
+        assert adapter.statement_timeout == 300000
+        assert adapter._get_connection_params()["options"] == "-c statement_timeout=300000"
+
+    def test_connection_options_empty_without_statement_timeout(self, postgres_stubs):
+        from benchbox.platforms.postgresql import _build_postgresql_config
+
+        with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
+            mock_cm_cls.return_value.get_platform_credentials.return_value = {}
+            config = _build_postgresql_config("postgresql", {}, {}, None)
+
+        adapter = PostgreSQLAdapter.from_config(config.model_dump())
+
+        assert "options" not in adapter._get_connection_params()

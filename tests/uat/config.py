@@ -187,6 +187,7 @@ class PackageConfig:
 @dataclass(frozen=True)
 class ExplorerSmokeConfig:
     playwright_browsers: tuple[str, ...] = ("chromium",)
+    require_throughput_streams: int | None = None
 
 
 @dataclass(frozen=True)
@@ -767,13 +768,17 @@ def _validate_explorer_smoke(payload: dict[str, Any] | None) -> ExplorerSmokeCon
         payload = {}
     if not isinstance(payload, dict):
         raise ConfigError("`explorer_smoke:` must be a mapping")
-    _reject_unknown_fields(payload, frozenset({"playwright_browsers"}), "explorer_smoke")
+    _reject_unknown_fields(payload, frozenset({"playwright_browsers", "require_throughput_streams"}), "explorer_smoke")
+    require_throughput_streams = _optional_positive_int(payload, "require_throughput_streams", section="explorer_smoke")
+    if require_throughput_streams is not None and require_throughput_streams < 2:
+        raise ConfigError("`explorer_smoke.require_throughput_streams` must be at least 2")
     return ExplorerSmokeConfig(
         playwright_browsers=_as_string_tuple(
             payload.get("playwright_browsers", ["chromium"]),
             section="explorer_smoke",
             key="playwright_browsers",
-        )
+        ),
+        require_throughput_streams=require_throughput_streams,
     )
 
 

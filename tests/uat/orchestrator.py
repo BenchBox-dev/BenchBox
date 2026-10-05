@@ -676,6 +676,7 @@ def _run_sweep_phases(  # noqa: C901
                 output_dir=log_dir / "explorer_data",
                 log_dir=log_dir,
                 playwright_browsers=config.explorer_smoke.playwright_browsers,
+                require_throughput_streams=config.explorer_smoke.require_throughput_streams,
             )
             phase_exit_codes[phase] = result.exit_code()
             # Thread the ran/skipped distinction into the gate summary: an

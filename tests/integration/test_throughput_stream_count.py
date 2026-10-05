@@ -20,8 +20,8 @@ Two independent breaks fed this defect:
    at the driver boundary (fixed here via the shared
    ``_resolve_requested_stream_count`` helper).
 2. ``run-official --streams N`` validated and printed the value but never
-   forwarded it anywhere (fixed here via ``_forward_requested_streams`` in
-   ``benchbox/cli/commands/run_official.py``).
+   forwarded it anywhere (fixed by passing it to ``run`` as ``concurrency``
+   in ``benchbox/cli/commands/run_official.py``).
 
 Follow-up (review): mapping ``concurrent_streams`` straight through initially
 introduced a second regression -- ``BenchmarkConfig.concurrency`` defaults to
@@ -235,61 +235,6 @@ def test_throughput_stream_count_legacy_num_streams_key_still_wins(tmp_path):
     result, _results = _run_tpch_throughput(tmp_path, concurrent_streams=8, num_streams=3)
 
     assert result.streams_executed == 3
-
-
-def test_run_official_forward_requested_streams_sets_concurrency():
-    """CLI regression: run-official's --streams forwarding sets BenchmarkConfig.concurrency.
-
-    ``run()`` has no ``--streams``/``--concurrency`` option of its own, so
-    ``run_official.py`` cannot forward the value as a keyword argument to
-    ``ctx.invoke(run, ...)``. Instead it patches
-    ``BenchmarkOrchestrator.execute_benchmark`` for the duration of that one
-    call so the requested count lands on the same ``BenchmarkConfig.concurrency``
-    field the throughput drivers now read. This drives that mechanism
-    directly (no CLI harness, no data generation) so it stays fast and
-    deterministic while still exercising the real production code path.
-    """
-    from types import SimpleNamespace
-
-    from benchbox.cli.commands.run_official import _forward_requested_streams
-    from benchbox.cli.orchestrator import BenchmarkOrchestrator
-
-    original = BenchmarkOrchestrator.execute_benchmark
-    captured: dict = {}
-
-    def _stub_execute_benchmark(
-        self, config, system_profile, database_config, phases_to_run=None, progress=None, execution_context=None
-    ):
-        captured["concurrency"] = config.concurrency
-        return "stub-result"
-
-    BenchmarkOrchestrator.execute_benchmark = _stub_execute_benchmark
-    try:
-        with _forward_requested_streams(4):
-            patched = BenchmarkOrchestrator.execute_benchmark
-            assert patched is not _stub_execute_benchmark, "context manager should have wrapped execute_benchmark"
-
-            fake_config = SimpleNamespace(concurrency=1)
-            outcome = patched(object(), fake_config, None, None)
-
-            assert outcome == "stub-result"
-            assert fake_config.concurrency == 4, "requested streams must be set on the BenchmarkConfig"
-
-        # Restored after the context manager exits.
-        assert BenchmarkOrchestrator.execute_benchmark is _stub_execute_benchmark
-        assert captured["concurrency"] == 4
-    finally:
-        BenchmarkOrchestrator.execute_benchmark = original
-
-
-def test_run_official_forward_requested_streams_noop_when_not_requested():
-    """When --streams is absent (None), execute_benchmark must be left untouched."""
-    from benchbox.cli.commands.run_official import _forward_requested_streams
-    from benchbox.cli.orchestrator import BenchmarkOrchestrator
-
-    original = BenchmarkOrchestrator.execute_benchmark
-    with _forward_requested_streams(None):
-        assert BenchmarkOrchestrator.execute_benchmark is original
 
 
 def test_run_official_rejects_explicit_streams_one():
