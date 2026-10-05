@@ -533,6 +533,7 @@ class TestExecutorLatencyAndAbandonedStreams:
             assert not thread.is_alive()
             result = outcome["result"]
 
+            assert result.abandoned_stream_ids == [0]
             assert result.outstanding_stream_ids == [0]
             assert result.cleanup_state == "outstanding"
             assert executor._stream_stops[0].is_set()
@@ -542,6 +543,7 @@ class TestExecutorLatencyAndAbandonedStreams:
         abandoned = executor._abandoned[0]
         assert _wait_done(abandoned)
         assert len(calls) == 1
+        assert [s for s in executor._abandoned if not executor._abandoned[s].done()] == []
 
     @pytest.mark.parametrize("timeout", [0, -1.0])
     def test_non_positive_query_timeout_is_rejected(self, mock_connection_factory, mock_query_factory, timeout):

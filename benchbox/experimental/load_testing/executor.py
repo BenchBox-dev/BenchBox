@@ -157,6 +157,7 @@ class ConcurrentLoadResult:
     pattern_name: str = ""
     max_concurrency_reached: int = 0
 
+    abandoned_stream_ids: list[int] = field(default_factory=list)
     outstanding_stream_ids: list[int] = field(default_factory=list)
     cleanup_state: str = "complete"
 
@@ -280,6 +281,7 @@ class ConcurrentLoadExecutor:
             resource_metrics=resource_metrics,
             pattern_name=pattern.__class__.__name__,
             max_concurrency_reached=self._max_concurrency_reached,
+            abandoned_stream_ids=sorted(self._abandoned),
             outstanding_stream_ids=outstanding_stream_ids,
             cleanup_state="outstanding" if outstanding_stream_ids else "complete",
         )
