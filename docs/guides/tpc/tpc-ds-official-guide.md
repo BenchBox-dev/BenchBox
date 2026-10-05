@@ -133,7 +133,8 @@ Both `run_official_benchmark` methods are deprecated and require `adapter=` (a p
 adapter) whenever the throughput test runs. The adapter supplies the stream capability
 gate and one session per stream; without it they raise `TypeError`. The connection factory
 must return a new connection on each call, because each phase closes its connection. They
-report Power@Size and Throughput@Size only. For supported runs use
+report Power@Size and Throughput@Size only. The throughput phase uses the adapter's target
+dialect; `dialect=` applies to the power and maintenance phases only. For supported runs use
 `benchbox run --phases throughput`.
 
 ## Usage

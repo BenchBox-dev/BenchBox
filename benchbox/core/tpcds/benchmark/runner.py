@@ -1185,6 +1185,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Raises:
             ValueError: If benchmark configuration is invalid
         """
+        warn_legacy_throughput_api("TPCDSBenchmark.run_official_benchmark", "tpcds")
         if throughput_test:
             require_adapter("TPCDSBenchmark.run_official_benchmark", adapter)
 
@@ -1286,6 +1287,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 dialect=dialect,
                 adapter=adapter,
                 connection=connection,
+                _warn_deprecated=False,
             )
             result["throughput_test_result"] = throughput_result
             if throughput_result.throughput_at_size is None:
@@ -1358,7 +1360,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         *,
         adapter: Any = None,
         connection: Any = None,
+        _warn_deprecated: bool = True,
     ) -> ThroughputTestResult:
+        if _warn_deprecated:
+            warn_legacy_throughput_api("TPCDSBenchmark.run_throughput_test", "tpcds")
         if num_streams < 1:
             raise ValueError(f"num_streams must be positive, got {num_streams}")
         if query_timeout < 1:
@@ -1368,7 +1373,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if max_retries < 0:
             raise ValueError(f"max_retries must be non-negative, got {max_retries}")
         require_stream_minimum(num_streams, "num_streams")
-        warn_legacy_throughput_api("TPCDSBenchmark.run_throughput_test", "tpcds")
         require_adapter("TPCDSBenchmark.run_throughput_test", adapter)
         if connection_factory is not None:
             warnings.warn(

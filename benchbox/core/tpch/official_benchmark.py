@@ -116,6 +116,7 @@ class TPCHOfficialBenchmark:
         config: Optional[TPCHOfficialBenchmarkConfig] = None,
         *,
         adapter: Any = None,
+        _warn_deprecated: bool = True,
     ) -> TPCHOfficialBenchmarkResult:
         """Run the complete TPC-H Official Benchmark.
 
@@ -137,7 +138,8 @@ class TPCHOfficialBenchmark:
         if config is None:
             config = self.config
 
-        warn_legacy_throughput_api("TPCHOfficialBenchmark.run_official_benchmark", "tpch")
+        if _warn_deprecated:
+            warn_legacy_throughput_api("TPCHOfficialBenchmark.run_official_benchmark", "tpch")
         if config.throughput_test_enabled:
             require_adapter("TPCHOfficialBenchmark.run_official_benchmark", adapter)
         benchmark_start = mono_time()

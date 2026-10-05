@@ -86,7 +86,7 @@ class TestTPCHOfficialBenchmark:
         assert result.success is True, result.errors
         assert result.throughput_at_size > 0
         assert result.throughput_test_result.streams_successful == 2
-        assert result.qphh_at_size == 0.0
+        assert not hasattr(result, "qphh_at_size")
 
     def test_unsupported_adapter_is_refused_and_publishes_no_metric(self, tpch_database, unsupported_adapter, tmp_path):
         _adapter, _connection, path = tpch_database
@@ -145,7 +145,7 @@ class TestTPCDSOfficialBenchmark:
         assert result.success is True, result.errors
         assert result.throughput_at_size > 0
         assert result.throughput_test_result.config.scale_factor == SCALE_FACTOR
-        assert result.qphds_at_size == 0.0
+        assert not hasattr(result, "qphds_at_size")
 
     def test_unsupported_adapter_is_refused_and_publishes_no_metric(
         self, tpcds_database, unsupported_adapter, tmp_path
@@ -223,7 +223,7 @@ class TestTPCDSBenchmarkThroughput:
 
         assert result["success"] is True, result["errors"]
         assert result["throughput_at_size"] > 0
-        assert result["qphds_at_size"] == 0.0
+        assert "qphds_at_size" not in result
 
     def test_official_run_with_unsupported_adapter_publishes_no_metric(
         self, tpcds_database, unsupported_adapter, tmp_path
