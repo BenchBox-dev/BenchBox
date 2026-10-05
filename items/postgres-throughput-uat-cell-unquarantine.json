@@ -1,11 +1,11 @@
 {
   "acceptance": [
     "The throughput-uat job uploads ~/Developer/benchmark_runs logs and results with if: always()",
-    "The Postgres cell passes a statement_timeout so a slow query fails individually instead of the cell producing no result",
-    "Root cause identified from captured logs and fixed",
-    "continue-on-error removed from both Postgres steps after at least 3 consecutive green nightly runs; GitHub issue #2571 closed"
+    "The CedarDB cell passes a statement_timeout so a slow query fails individually instead of the cell producing no result",
+    "Root cause identified from captured logs and fixed (CedarDB replaces the Postgres cell per owner decision)",
+    "continue-on-error removed from both CedarDB steps after at least 3 consecutive green nightly CedarDB cells; GitHub issue #2571 closed or retitled"
   ],
-  "context": "2026-10-04 throughput adversarial review (develop 8ed0c64e1). Quarantine lines verified directly; nightly outcomes read from gh run history by the reviewer. GitHub issue #2571 is open.",
+  "context": "P6 merged as b31c1a22b (PR #2672): diagnostics + CedarDB switch landed. Remaining for P10: observe 3 consecutive green nightly CedarDB cells with quarantine still on, then remove quarantine + set numeric floor. Owner questions pending: retitle of issue #2571, spike branch/worktree deletion.",
   "description": "`.github/workflows/nightly.yml:1038` and `:1119` set `continue-on-error: true` on the Postgres throughput sweep and assert steps (quarantine for GitHub issue #2571, added in #2572). The sweep failed in all 10 nightlies from 09-25 to 10-04, hitting the 2400 s cell cap with no result JSON. Raising the timeout in #2384 changed nothing. The per-stream INDEPENDENT_CONNECTION path that PostgreSQL uses therefore has no working nightly check.\n\nThe failure cannot be diagnosed from CI. The throughput-uat job (nightly.yml:964-1155) has no upload-artifact step. The verbose re-run is skipped on timeout (tests/uat/runner.py:393). PostgreSQL statement_timeout defaults to 0 (postgresql.py:239,403), and the UAT options set only the username.\n\nLikely cause, unverified: one runaway query (TPC-H Q17 or Q20, correlated subqueries) on unindexed PostgreSQL at SF1 consumes the whole budget.",
   "links": [
     ".github/workflows/nightly.yml",
@@ -29,6 +29,14 @@
       "generation": "7a718fde0a1443819c3f6bd37db82a32",
       "op": "take",
       "op_id": "b8fb83508eb94686be88c4d870879e87",
+      "session_id": "eff49e8c0ad54e82b63c1bc45dfaf22f"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69",
+      "at": "2026-10-05T22:35:32Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "240e626760364e9b9dfa7a55c19f4cae",
       "session_id": "eff49e8c0ad54e82b63c1bc45dfaf22f"
     }
   ]
