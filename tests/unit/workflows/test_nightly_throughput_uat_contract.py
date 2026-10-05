@@ -10,7 +10,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NIGHTLY = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
-POSTGRES_CONFIG = REPO_ROOT / "tests" / "uat" / "configs" / "uat-throughput-postgresql-nightly.yaml"
+CEDARDB_CONFIG = REPO_ROOT / "tests" / "uat" / "configs" / "uat-throughput-cedardb-nightly.yaml"
 UPLOAD_ARTIFACT_PIN = "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f"
 
 
@@ -70,19 +70,19 @@ def test_throughput_job_is_not_continue_on_error() -> None:
     assert "if" not in job
 
 
-def test_only_the_postgres_sweep_and_assert_steps_are_quarantined() -> None:
+def test_only_the_cedardb_sweep_and_assert_steps_are_quarantined() -> None:
     quarantined = [step["name"] for step in _steps() if _is_quarantined(step)]
     assert len(quarantined) == 2
-    assert all("Postgres" in name and "#2571" in name for name in quarantined)
-    assert any(name.startswith("Run Postgres throughput UAT cell") for name in quarantined)
-    assert any(name.startswith("Assert the Postgres cell") for name in quarantined)
+    assert all("CedarDB" in name and "#2571" in name for name in quarantined)
+    assert any(name.startswith("Run CedarDB throughput UAT cell") for name in quarantined)
+    assert any(name.startswith("Assert the CedarDB cell") for name in quarantined)
 
 
-def test_postgres_assert_still_runs_after_a_failed_sweep() -> None:
-    step = _step("Assert the Postgres cell")
+def test_cedardb_assert_still_runs_after_a_failed_sweep() -> None:
+    step = _step("Assert the CedarDB cell")
     assert _condition(step) == "${{!cancelled()}}"
-    assert "uat_throughput_postgresql_nightly_*/cells.jsonl" in step["run"]
-    assert "--platform postgresql" in step["run"]
+    assert "uat_throughput_cedardb_nightly_*/cells.jsonl" in step["run"]
+    assert "--platform cedardb" in step["run"]
     assert "--evaluate-floor" not in step["run"]
 
 
@@ -99,7 +99,7 @@ def test_logs_and_results_upload_even_when_the_job_fails_or_times_out() -> None:
 def test_upload_steps_come_after_every_sweep_and_assert_step() -> None:
     names = [step.get("name", "") for step in _steps()]
     upload_index = names.index("Upload throughput UAT logs and results")
-    for prefix in ("Run DuckDB throughput", "Run Postgres throughput", "Assert the requested", "Assert the Postgres"):
+    for prefix in ("Run DuckDB throughput", "Run CedarDB throughput", "Assert the requested", "Assert the CedarDB"):
         assert next(index for index, name in enumerate(names) if name.startswith(prefix)) < upload_index
 
 
@@ -132,16 +132,28 @@ def test_only_a_successful_job_publishes_a_success_status() -> None:
     assert "*) state=failure ;;" in run
 
 
-def test_status_description_reports_the_quarantined_postgres_sweep_outcome() -> None:
-    assert _jobs()["throughput-uat"]["outputs"] == {"postgres_sweep_outcome": "${{ steps.postgres-sweep.outcome }}"}
-    assert _step("Run Postgres throughput UAT cell")["id"] == "postgres-sweep"
+def test_status_description_reports_the_quarantined_cedardb_sweep_outcome() -> None:
+    assert _jobs()["throughput-uat"]["outputs"] == {"cedardb_sweep_outcome": "${{ steps.cedardb-sweep.outcome }}"}
+    assert _step("Run CedarDB throughput UAT cell")["id"] == "cedardb-sweep"
     run = "\n".join(str(step.get("run", "")) for step in _jobs()["throughput-uat-signal"]["steps"])
-    assert "POSTGRES_SWEEP_OUTCOME" in run
+    assert "CEDARDB_SWEEP_OUTCOME" in run
 
 
-def test_postgres_cell_bounds_statements_so_one_query_cannot_consume_the_cell() -> None:
-    config = yaml.safe_load(POSTGRES_CONFIG.read_text(encoding="utf-8"))
-    extra_args = config["execute"]["extra_args"]
-    assert extra_args[extra_args.index("--platform-option") + 1].startswith("statement_timeout=")
-    timeout_ms = int(extra_args[extra_args.index("--platform-option") + 1].split("=", 1)[1])
-    assert 0 < timeout_ms < config["execute"]["per_cell_timeout_s"] * 1000
+def test_cedardb_cell_keeps_the_throughput_workload_and_a_bounded_timeout() -> None:
+    config = yaml.safe_load(CEDARDB_CONFIG.read_text(encoding="utf-8"))
+    execute = config["execute"]
+    assert config["platforms"]["include"] == ["cedardb"]
+    assert config["benchmarks"]["include"] == ["tpch"]
+    assert config["scales"]["rungs"] == [1]
+    assert (execute["official"], execute["streams"], execute["phases_arg"]) == (True, 3, "load,throughput")
+    assert execute["extra_args"] == ["--platform-option", "port=5435"]
+    assert 0 < execute["per_cell_timeout_s"] <= 900
+    assert config["cleanup"]["docker_manage_platforms"] is True
+    assert "uat_throughput_cedardb_nightly_" in config["output"]["logs_dir_template"]
+
+
+def test_cedardb_image_is_pinned_by_digest() -> None:
+    compose = yaml.safe_load((REPO_ROOT / "docker" / "cedardb" / "docker-compose.yml").read_text(encoding="utf-8"))
+    assert compose["services"]["cedardb"]["image"] == (
+        "cedardb/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62"
+    )

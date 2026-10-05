@@ -599,15 +599,18 @@ count end to end via the production CLI (`run-official --streams 3`):
 
 - DuckDB TPC-H SF1 (`uat-throughput-duckdb-nightly.yaml`) on the
   SHARED_CURSOR fast path. Gating.
-- Docker Postgres TPC-H SF1 (`uat-throughput-postgresql-nightly.yaml`)
-  on INDEPENDENT_CONNECTION: one fresh session per stream. The cell
-  manages its own compose stack (`cleanup.docker_manage_platforms`), so
-  the nightly job needs no service container for it. Quarantined
-  (`continue-on-error` on its sweep and assert steps, GitHub issue #2571)
-  because it failed every nightly from 2026-09-25 at the cell cap. The
-  cell now passes `statement_timeout=300000` (milliseconds) so one slow
-  statement fails on its own, and the job uploads logs and results so the
-  next failure can be diagnosed.
+- Docker CedarDB TPC-H SF1 (`uat-throughput-cedardb-nightly.yaml`) on
+  INDEPENDENT_CONNECTION: one fresh session per stream. The cell manages
+  its own compose stack (`cleanup.docker_manage_platforms`), so the
+  nightly job needs no service container for it, and the compose file
+  pins the image by digest. It runs CedarDB because unindexed PostgreSQL
+  cannot finish TPC-H SF1 Q17 and Q20 inside the cell, and a 64 MB
+  `/dev/shm` breaks Q4 and Q21. On a ubuntu runner CedarDB passed 66 of
+  66 queries and 3 of 3 streams in 80 seconds, so the cell timeout is 600
+  seconds. The cell is quarantined (`continue-on-error` on its sweep and
+  assert steps, GitHub issue #2571) until it has three green nightly
+  runs, and the job uploads logs and results so a failure can be
+  diagnosed.
 
 The DuckDB cell gates on the sweep exit code plus an independent assert
 step (`python -m tests.uat.throughput assert`, run under `if: !cancelled()`
@@ -637,7 +640,7 @@ commit status `nightly/throughput-uat` from the job result, so a throughput
 failure is visible independent of the other red nightly jobs.
 `tests/unit/workflows/test_nightly_throughput_uat_contract.py` fails if the
 DuckDB steps gain `continue-on-error`, lose `if: !cancelled()`, or if any
-step other than the two named Postgres steps is quarantined.
+step other than the two named CedarDB steps is quarantined.
 
 The throughput explorer sweep (`uat-throughput-explorer-smoke.yaml`) sets
 `explorer_smoke.require_throughput_streams: 3`. With that key a skipped

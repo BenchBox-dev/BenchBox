@@ -968,17 +968,17 @@ jobs:
     # throughput-stream-count-wiring-defect) would have shipped green. This
     # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
     # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
-    # The Docker Postgres cell below is the deferred w4: same stream-count
-    # contract on a client/server engine via INDEPENDENT_CONNECTION, with the
-    # cell managing its own compose stack
-    # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
+    # The Docker CedarDB cell below runs the same stream-count contract on a
+    # client/server engine via INDEPENDENT_CONNECTION, with the cell managing
+    # its own compose stack
+    # (see tests/uat/configs/uat-throughput-cedardb-nightly.yaml).
     runs-on: ubuntu-latest
-    # Cell budgets: DuckDB 900s + Postgres 2400s = 55 min worst case, plus
+    # Cell budgets: DuckDB 900s + CedarDB 600s = 25 min worst case, plus
     # ~25 min headroom for checkout, deps, integration tests, Docker
     # startup/cleanup, and both assert steps.
-    timeout-minutes: 80
+    timeout-minutes: 60
     outputs:
-      postgres_sweep_outcome: ${{ steps.postgres-sweep.outcome }}
+      cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
       # Throughput@Size floor activation: repository configuration variables
       # flow into the DuckDB assert step below. Unset vars evaluate to empty,
@@ -1021,17 +1021,16 @@ jobs:
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: "Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
-        id: postgres-sweep
-        # w4: the same stream-count contract on a client/server engine. Unlike
-        # DuckDB's SHARED_CURSOR fast path, PostgreSQL opts into
+      - name: "Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+        id: cedardb-sweep
+        # Unlike DuckDB's SHARED_CURSOR fast path, CedarDB uses
         # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
         # proves N concurrent independent sessions end to end via the
         # production CLI. The cell manages its own compose stack
         # (cleanup.docker_manage_platforms); no service container is needed.
         continue-on-error: true
         run: |
-          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-cedardb-nightly.yaml
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
         if: ${{ !cancelled() }}
@@ -1042,13 +1041,13 @@ jobs:
             --evaluate-floor \
             --baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"
 
-      - name: "Assert the Postgres cell stream count and per-stream success (quarantine #2571)"
+      - name: "Assert the CedarDB cell stream count and per-stream success (quarantine #2571)"
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
           uv run -- python -m tests.uat.throughput assert \
-            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_postgresql_nightly_*/cells.jsonl" \
-            --platform postgresql --benchmark tpch --scale 1 --streams 3
+            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_cedardb_nightly_*/cells.jsonl" \
+            --platform cedardb --benchmark tpch --scale 1 --streams 3
 
       - name: Upload throughput UAT logs and results
         if: always()
@@ -1083,7 +1082,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           THROUGHPUT_UAT_RESULT: ${{ needs.throughput-uat.result }}
-          POSTGRES_SWEEP_OUTCOME: ${{ needs.throughput-uat.outputs.postgres_sweep_outcome }}
+          CEDARDB_SWEEP_OUTCOME: ${{ needs.throughput-uat.outputs.cedardb_sweep_outcome }}
         run: |
           case "${THROUGHPUT_UAT_RESULT}" in
             success) state=success ;;
@@ -1093,7 +1092,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="${state}" \
             -f context="nightly/throughput-uat" \
-            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; postgres cell (quarantined) ${POSTGRES_SWEEP_OUTCOME:-not run}" \
+            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; cedardb cell (quarantined) ${CEDARDB_SWEEP_OUTCOME:-not run}" \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   pyspark-tests:

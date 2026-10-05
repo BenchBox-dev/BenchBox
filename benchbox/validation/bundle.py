@@ -412,6 +412,7 @@ KNOWN_PLATFORMS = {
     "firebolt",
     # SQL - self-hosted & extensions
     "postgresql",
+    "cedardb",
     "timescaledb",
     "pg-duckdb",
     "pg_duckdb",
