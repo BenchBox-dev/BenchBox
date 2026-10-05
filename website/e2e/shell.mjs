@@ -3,8 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+import { startSiteServer } from "./site-server.mjs";
 
-const base = process.env.BASE_URL ?? "http://127.0.0.1:4330";
+const siteDir = path.resolve(process.env.SITE_DIR ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist"));
+const served = process.env.BASE_URL ? undefined : await startSiteServer(siteDir, siteDir);
+const base = process.env.BASE_URL ?? `http://127.0.0.1:${served.server.address().port}`;
 const outDir = process.env.OUT_DIR ?? path.join(os.tmpdir(), "benchbox-website-shell");
 mkdirSync(outDir, { recursive: true });
 
@@ -64,6 +68,7 @@ for (const [name, route] of Object.entries(pages)) {
       const key = `${name} ${size} ${theme}`;
       const { page, context } = await open(width, route, theme);
       await openNav(page);
+      await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => null))), new Promise((resolve) => setTimeout(resolve, 5000))]));
       const result = await new AxeBuilder({ page }).analyze();
       const blocking = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
       report.axe[key] = {
@@ -280,6 +285,7 @@ for (const [size, width] of Object.entries(widths).filter(([size]) => size !== "
 }
 
 await browser.close();
+served?.server.close();
 report.failures = failures;
 writeFileSync(path.join(outDir, "shell.json"), JSON.stringify(report, null, 2));
 console.log(`wrote ${path.join(outDir, "shell.json")}`);

@@ -369,7 +369,7 @@ recovery version through this same flow.
 `release-prep` and `release-check` prepare release content in an ordinary pull
 request against `develop`. They do not replace `release-cut` and
 `release-finalize` above. Do not tag the merged develop commit until the
-replacement publisher has passed its exact merge-group artifact, attestation,
+replacement publisher has passed its exact `trunk.yml` distribution artifact, attestation,
 installed-artifact matrix, and release acceptance checks. The legacy
 `release.yml` publisher requires `origin/release` ancestry and rejects develop
 tags. Passing the content check alone does not authorize tagging or publication.
@@ -405,7 +405,7 @@ baseline defaults to the newest final release tag older than `VERSION`; that
 tag is resolved once to a commit. CI selects changes to managed release markers,
 the current version's changelog section, the lock schema, or release enforcement
 inputs. Its always-required `ci-paths` job runs the check with the immutable
-pull-request or merge-group event base SHA as `BASE_REF`; a failed check blocks
+pull-request event base SHA as `BASE_REF`; a failed check blocks
 `core`. Unchanged release identity avoids the dependency installation and check.
 Missing baseline history fails the check. Preparation uses a frozen environment
 until its explicit `uv lock` step. It validates the date and changelog lower

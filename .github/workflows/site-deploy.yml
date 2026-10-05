@@ -369,7 +369,7 @@ jobs:
           run_id=$(jq -r '.deployed.run_id // empty' out/resolved.json)
           receipt_sha=$(jq -r '.deployed.receipt_sha256 // empty' out/resolved.json)
           if [ -z "$run_id" ] || [ -z "$receipt_sha" ]; then
-            echo "::error::no receipted production generation to compare the candidate with; the visual comparison cannot pass"
+            echo "::error::no receipted production generation to compare the candidate with; deploy and receipt a Sphinx generation before switching deploy/routes.yml to renderer: auto"
             exit 1
           fi
           python -m scripts.site_deploy fetch-run --run-id "$run_id" --receipt-sha256 "$receipt_sha" --receipt-dir production/receipt --tree-dir production/tree --verify-tree

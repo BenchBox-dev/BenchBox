@@ -104,11 +104,19 @@ def test_gate_steps_leave_results_for_the_report_and_clear_stale_ones() -> None:
         ("site-parity-browser", "explorer-result.json"),
         ("site-parity-browser", "browser-report.json"),
         ("site-parity-browser", "parity-result.json"),
+        ("site-parity-browser", "shell-result.json"),
     ):
         recipe = _recipe(target)
         assert "rm -f" in recipe and result in recipe
     report = _recipe("site-parity-report")
     assert "rm -rf" in report
-    for flag in ("--e2e-report", "--step-result", "parity-result.json", "explorer-result.json", "privacy-result.json"):
+    for flag in (
+        "--e2e-report",
+        "--step-result",
+        "parity-result.json",
+        "shell-result.json",
+        "explorer-result.json",
+        "privacy-result.json",
+    ):
         assert flag in report
     assert "wildcard" not in report

@@ -307,13 +307,23 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
     const button = document.querySelector('[data-copy-target="prompt-text"]');
     const region = document.querySelector("#copy-status");
     new MutationObserver(() => window.__labels.push(button.textContent)).observe(button, { childList: true, characterData: true, subtree: true });
-    new MutationObserver(() => window.__statuses.push(region.textContent)).observe(region, { childList: true, characterData: true, subtree: true });
+    new MutationObserver(() => {
+      window.__statuses.push(region.textContent);
+      window.__statusTimes.push(performance.now());
+    }).observe(region, { childList: true, characterData: true, subtree: true });
+    window.__statusTimes = [];
   });
   await page.locator('[data-copy-target="prompt-text"]').click();
   check(await until(page, () => window.__labels.includes("Copied") && window.__labels.at(-1) === "Copy"), "copy label did not change and reset");
   const history = await page.evaluate(() => ({ labels: window.__labels, statuses: window.__statuses }));
   check(history.statuses.includes("Copied agent prompt"), `copy status text history ${history.statuses}`);
   check(await until(page, () => document.querySelector("#copy-status").textContent === ""), "copy status did not clear");
+  const times = await page.evaluate(() => window.__statusTimes);
+  const shown = history.statuses.indexOf("Copied agent prompt");
+  const cleared = history.statuses.indexOf("", shown + 1);
+  const visibleFor = cleared > shown && shown >= 0 ? times[cleared] - times[shown] : Number.NaN;
+  report.prompts.copyStatusVisibleMs = visibleFor;
+  check(visibleFor >= 1000 && visibleFor <= 2500, `copy status cleared after ${visibleFor}ms, expected about 1500ms`);
 
   await page.selectOption("#sel-surface", "mcp");
   await until(page, () => !document.querySelector("#block-mcp-setup").hidden);
@@ -365,6 +375,8 @@ for (const [route, name] of [["/", "landing"], ["/prompts/", "prompts"]]) {
   report.prompts.safetyGlyph = glyph;
   check(glyph.includes("⚠"), "credential safety heading has no warning glyph");
   check((await page.locator("#cloud-safety-list li").count()) > 0, "credential safety list empty");
+  check((await page.getByRole("heading", { name: /credential safety/i }).count()) === 1, "credential safety heading is not exposed as a heading");
+  check(await page.locator("#block-cloud-safety").evaluate((el) => !el.hidden && el.getClientRects().length > 0), "credential safety block is not rendered");
 
   const url = await stableSearch(page);
   await page.reload({ waitUntil: "networkidle" });
@@ -431,6 +443,10 @@ for (const theme of ["light", "dark"]) {
   await page.selectOption("#sel-platform", { index: 0 });
   const copy = await page.locator('[data-copy-target="prompt-text"]').boundingBox();
   check(copy && copy.x >= 0 && copy.x + copy.width <= 400, "copy button not reachable at 400px");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check(overflow <= 0, `page scrolls horizontally at 400px by ${overflow}px`);
+  const clipped = await page.locator(".prompts-field select").evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().right > 400).map((el) => el.id));
+  check(clipped.length === 0, `selects extend past the 400px viewport: ${clipped}`);
   await context.close();
 }
 
