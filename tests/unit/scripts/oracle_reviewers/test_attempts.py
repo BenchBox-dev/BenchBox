@@ -11,7 +11,9 @@ from _project.scripts.oracle_reviewers import attempts, cli, report, selection
 from _project.scripts.oracle_reviewers.absence import Absence
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
-from _project.scripts.oracle_reviewers.selection import SelectionInput, excluded_families
+from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED
+from _project.scripts.oracle_reviewers.selection import Attempt, SelectionInput, Step, excluded_families
+from _project.scripts.oracle_reviewers.verdict import validate
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -139,6 +141,7 @@ def test_artifact_from_another_run_or_head_is_rejected(policy: Policy, tmp_path:
     assert any("another head" in error for error in errors)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "pending"
+    assert final.pending_cause == INTEGRITY
 
 
 def test_out_of_order_reviewer_fails_the_replay(policy: Policy, tmp_path: Path) -> None:
@@ -175,6 +178,7 @@ def test_all_absent_is_pending_and_names_every_reviewer(policy: Policy, tmp_path
     assert final.description.startswith("pending: opus: absent (quota")
     assert len(final.description) <= 140
     assert "opus: absent (quota)" in final.body and "sol: absent (auth)" in final.body
+    assert final.pending_cause == ALL_ABSENT
 
 
 def test_selected_reviewer_that_never_reported_is_pending(policy: Policy, tmp_path: Path) -> None:
@@ -184,6 +188,7 @@ def test_selected_reviewer_that_never_reported_is_pending(policy: Policy, tmp_pa
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "pending"
     assert "selected but did not report" in final.body
+    assert final.pending_cause == UNREPORTED
 
 
 def _run_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *argv: str) -> dict[str, str]:
@@ -251,6 +256,7 @@ def test_cli_select_finalize_and_ensure_attempt(
     assert status["target_url"].endswith(f"/actions/runs/{RUN_ID}")
     state = json.loads((final_dir / "state" / "state.json").read_text(encoding="utf-8"))
     assert state["head_sha"] == HEAD and state["outcome"] == "failure"
+    assert state["pending_cause"] is None
     comment = json.loads((final_dir / "comment.json").read_text(encoding="utf-8"))
     assert "Findings on diff lines" in comment["body"]
 
@@ -287,3 +293,28 @@ def test_cli_finalize_fixed_decisions(
     assert out["state"] == state and out["has_state"] == "false" and out["comment"] == "false"
     status = json.loads((tmp_path / "o" / "status.json").read_text(encoding="utf-8"))
     assert status["description"] == ("no soundness path changed" if decision == "success" else "fork: owner review")
+
+
+def test_verdict_comes_from_the_terminal_reviewer_slot(policy: Policy) -> None:
+    plan = _plan(policy)
+    decisive = validate({"summary": "decisive", "findings": [_finding("High", 2)]})
+    later = validate({"summary": "later", "findings": [_finding("Low", 40)]})
+    sonnet = Step(selection.FAIL, policy.reviewers["sonnet"], ("sonnet: blocking findings",))
+    attempts_list = [Attempt(1, "sonnet", selection.FAIL), Attempt(2, "sol", selection.PASS)]
+    final = report.finalize(plan, sonnet, [], attempts_list, {1: decisive, 2: later}, commentable_lines(DIFF))
+    assert final.state == "failure"
+    assert "decisive" in final.body and "later" not in final.body
+    assert "checker.py:2`" in final.body and "checker.py:40`" not in final.body
+    assert final.pending_cause is None
+
+
+def test_blocking_finding_outside_the_diff_still_fails(policy: Policy, tmp_path: Path) -> None:
+    plan = _plan(policy)
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("Critical", 400)]})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+    assert step.kind == selection.FAIL
+    assert final.state == "failure"
+    assert "Findings on diff lines" not in final.body
+    assert "checker.py:400`" in final.body.split("**Findings outside the diff**")[1]
+    assert "Blocking findings outside the diff still fail the review." in final.body

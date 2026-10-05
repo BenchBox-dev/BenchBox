@@ -5,7 +5,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from _project.scripts.oracle_reviewers.policy import Policy
-from _project.scripts.oracle_reviewers.retry import State, decide_rerun, due_for_retry, next_state
+from _project.scripts.oracle_reviewers.retry import (
+    ALL_ABSENT,
+    INTEGRITY,
+    UNREPORTED,
+    State,
+    decide_rerun,
+    due_for_retry,
+    next_state,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -14,13 +22,21 @@ HEAD = "a" * 40
 OTHER = "b" * 40
 
 
-def _state(outcome: str, *, head: str = HEAD, age: timedelta = timedelta(hours=2), retries: int = 0) -> State:
+def _state(
+    outcome: str,
+    *,
+    head: str = HEAD,
+    age: timedelta = timedelta(hours=2),
+    retries: int = 0,
+    cause: str | None = ALL_ABSENT,
+) -> State:
     return State(
         7,
         head,
         outcome,
         NOW - age,
         tuple(NOW - timedelta(minutes=10 * (index + 1)) for index in range(retries)),
+        pending_cause=cause if outcome == "pending" else None,
     )
 
 
@@ -79,3 +95,46 @@ def test_sweep_retries_only_pending_runs_on_the_current_head(policy: Policy) -> 
     assert not due_for_retry(_state("pending"), OTHER, NOW, policy.retry)
     assert not due_for_retry(_state("success"), HEAD, NOW, policy.retry)
     assert not due_for_retry(_state("pending", age=timedelta(minutes=5)), HEAD, NOW, policy.retry)
+
+
+@pytest.mark.parametrize("cause", [INTEGRITY, UNREPORTED, None])
+def test_same_head_rerun_is_refused_unless_every_reviewer_was_absent(policy: Policy, cause: str | None) -> None:
+    previous = _state("pending", cause=cause)
+    for manual in (True, False):
+        decision = _decide(policy, previous, manual=manual)
+        assert not decision.allowed
+        assert "not absent reviewers" in decision.reason
+    assert _decide(policy, previous, manual=False, new_diff=True).allowed
+    assert not due_for_retry(previous, HEAD, NOW, policy.retry)
+    assert _decide(policy, _state("pending", head=OTHER, cause=cause)).allowed
+
+
+def test_all_absent_pending_is_retryable(policy: Policy) -> None:
+    previous = _state("pending", cause=ALL_ABSENT)
+    assert _decide(policy, previous).allowed
+    assert due_for_retry(previous, HEAD, NOW, policy.retry)
+
+
+def test_pending_cause_round_trips_and_clears_on_decisive_results(policy: Policy) -> None:
+    pending = next_state(
+        previous=None,
+        pr=7,
+        head_sha=HEAD,
+        outcome="pending",
+        manual=False,
+        now=NOW,
+        pool_blocked_until={},
+        pending_cause=INTEGRITY,
+    )
+    assert State.from_json(pending.to_json()).pending_cause == INTEGRITY
+    decided = next_state(
+        previous=pending,
+        pr=7,
+        head_sha=HEAD,
+        outcome="success",
+        manual=False,
+        now=NOW,
+        pool_blocked_until={},
+        pending_cause=INTEGRITY,
+    )
+    assert decided.pending_cause is None

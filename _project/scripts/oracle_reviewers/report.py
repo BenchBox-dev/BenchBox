@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import selection
-from .retry import FAILURE, PENDING, SUCCESS
+from .retry import ALL_ABSENT, FAILURE, INTEGRITY, PENDING, SUCCESS, UNREPORTED
 from .selection import Attempt, Step
 from .verdict import Finding, Placement, Verdict, place
 
@@ -20,6 +20,7 @@ class Final:
     body: str
     review: dict[str, Any] | None
     reviewer: str | None
+    pending_cause: str | None = None
 
 
 def _clip(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
@@ -88,13 +89,19 @@ def finalize(
         body = "\n".join(
             [*_header(plan, PENDING), *_section("Result withheld: the run's artifacts failed validation", errors)]
         )
-        return Final(PENDING, "result withheld: artifacts failed validation", body, None, None)
+        return Final(PENDING, "result withheld: artifacts failed validation", body, None, None, INTEGRITY)
+    pending_cause = ALL_ABSENT
     if step.kind == selection.REVIEW:
         reason = f"{step.reviewer.name if step.reviewer else 'a reviewer'}: selected but did not report"
         step = Step(selection.PENDING, None, (*step.reasons, reason))
+        pending_cause = UNREPORTED
     state = STATES[step.kind]
     reviewer = step.reviewer.name if step.reviewer else None
-    verdict = verdicts.get(attempts[-1].slot) if attempts and step.kind != selection.PENDING else None
+    terminal = next(
+        (attempt for attempt in attempts if attempt.reviewer == reviewer and attempt.outcome == step.kind),
+        None,
+    )
+    verdict = verdicts.get(terminal.slot) if terminal is not None else None
     if verdict is None:
         placement = Placement((), ())
     else:
@@ -115,11 +122,14 @@ def finalize(
     if delivery == "comment":
         lines += _section("Findings on diff lines", findings_lines)
     lines += _section("Findings outside the diff", other_lines)
+    if any(finding in blocking for finding in placement.summary):
+        lines += ["Blocking findings outside the diff still fail the review.", ""]
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
     has_content = bool(placement.inline or placement.summary or state != SUCCESS)
     review = _review_payload(plan, body, placement) if delivery == "review" and verdict is not None else None
-    return Final(state, _clip(description), body if has_content else "", review, reviewer)
+    cause = pending_cause if state == PENDING else None
+    return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)
 
 
 def fixed(state: str, description: str) -> Final:

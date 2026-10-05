@@ -190,13 +190,13 @@ def test_invalid_pr_number_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
 
 def test_sweep_dispatches_only_due_pending_prs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    due = State(7, HEAD, "pending", datetime.now(UTC) - timedelta(hours=2))
+    due = State(7, HEAD, "pending", datetime.now(UTC) - timedelta(hours=2), pending_cause="all-absent")
     fake = FakeGitHub(_pull(), SOUNDNESS, due)
     fake.install(monkeypatch)
     _env(monkeypatch, tmp_path, "schedule", {}, "refs/heads/develop")
     assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
     assert fake.dispatched == [7]
-    fresh = FakeGitHub(_pull(), SOUNDNESS, State(7, HEAD, "pending", datetime.now(UTC)))
+    fresh = FakeGitHub(_pull(), SOUNDNESS, State(7, HEAD, "pending", datetime.now(UTC), pending_cause="all-absent"))
     fresh.install(monkeypatch)
     assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
     assert fresh.dispatched == []

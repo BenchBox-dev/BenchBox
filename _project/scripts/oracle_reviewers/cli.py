@@ -321,6 +321,7 @@ def command_finalize(args: argparse.Namespace) -> int:
             manual=bool(plan["manual"]),
             now=now,
             pool_blocked_until=selection.pool_resets(selection_input, loaded.attempts),
+            pending_cause=final.pending_cause,
         )
         _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     _write_json(out_dir / "status.json", report.status_payload(plan, final, run_url))

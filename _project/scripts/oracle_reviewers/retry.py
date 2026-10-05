@@ -11,6 +11,10 @@ SUCCESS = "success"
 FAILURE = "failure"
 PENDING = "pending"
 DECISIVE = (SUCCESS, FAILURE)
+ALL_ABSENT = "all-absent"
+INTEGRITY = "integrity"
+UNREPORTED = "unreported"
+PENDING_CAUSES = (ALL_ABSENT, INTEGRITY, UNREPORTED)
 WINDOW = timedelta(hours=24)
 
 
@@ -22,6 +26,7 @@ class State:
     updated_at: datetime
     retries: tuple[datetime, ...] = ()
     pool_blocked_until: Mapping[str, datetime] = field(default_factory=dict)
+    pending_cause: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -31,6 +36,7 @@ class State:
             "updated_at": self.updated_at.isoformat(),
             "retries": [moment.isoformat() for moment in self.retries],
             "pool_blocked_until": {pool: moment.isoformat() for pool, moment in self.pool_blocked_until.items()},
+            "pending_cause": self.pending_cause,
         }
 
     @classmethod
@@ -44,6 +50,7 @@ class State:
             pool_blocked_until={
                 pool: datetime.fromisoformat(value) for pool, value in data.get("pool_blocked_until", {}).items()
             },
+            pending_cause=data.get("pending_cause"),
         )
 
 
@@ -71,6 +78,12 @@ def decide_rerun(
     same_head = previous is not None and previous.head_sha == head_sha
     if same_head and previous is not None and previous.outcome in DECISIVE and not new_diff:
         return RerunDecision(False, f"head {head_sha} already has a {previous.outcome} result")
+    if same_head and previous is not None and previous.outcome == PENDING and not new_diff:
+        if previous.pending_cause != ALL_ABSENT:
+            cause = previous.pending_cause or "unknown"
+            return RerunDecision(
+                False, f"the last run on head {head_sha} was pending for {cause}, not absent reviewers"
+            )
     if not manual:
         return RerunDecision(True, "pull request event")
     retries = recent_retries(previous, now)
@@ -93,9 +106,11 @@ def next_state(
     manual: bool,
     now: datetime,
     pool_blocked_until: Mapping[str, datetime],
+    pending_cause: str | None = None,
 ) -> State:
     retries = recent_retries(previous, now) + ((now,) if manual else ())
-    return State(pr, head_sha, outcome, now, retries, dict(pool_blocked_until))
+    cause = pending_cause if outcome == PENDING else None
+    return State(pr, head_sha, outcome, now, retries, dict(pool_blocked_until), cause)
 
 
 def due_for_retry(state: State, current_head: str, now: datetime, rules: RetryRules) -> bool:
