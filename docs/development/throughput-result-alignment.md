@@ -77,25 +77,28 @@ names and public API unchanged. Their `stream_results` field type becomes
 
 ## Success-Rate Gate Difference
 
-**Update (`throughput-timeout-leak-and-success-gates`, 2026-07):** TPC-DS's
-gate is now configurable, mirroring TPC-H. The two hard-coded `0.7` literals
-that previously existed (the run-level gate in `run()` and the per-stream
-gate in `_finalize_stream_success()`) have been replaced with a single
-`TPCDSThroughputTestConfig.min_success_rate` field (default `0.70`), which
-`validate_results()` also now reads instead of a third hard-coded `0.7`.
+**Update (2026-10):** `min_success_rate` no longer gates TPC-DS streams. A
+TPC-DS stream is successful only when none of its queries failed, matching
+TPC-H, and a FAILED platform result counts as a failed query. The field stays
+on `TPCDSThroughputTestConfig` (default `0.70`) and on
+`TPCHThroughputTestConfig` (default `0.99`) because both configs are public,
+but neither value changes a stream's status or whether a metric is published.
 
 | | TPC-H | TPC-DS |
 |---|---|---|
-| Gate expression | `streams_successful / num_streams >= config.min_success_rate` | `streams_successful / max(num_streams, 1) >= config.min_success_rate` |
-| Default threshold | `0.99` (from `TPCHThroughputTestConfig.min_success_rate`) | `0.70` (from `TPCDSThroughputTestConfig.min_success_rate`) |
-| Configurable? | Yes | Yes |
+| Stream is successful when | no query failed | no query failed |
+| Run publishes Throughput@Size when | every requested stream succeeded | every requested stream succeeded |
+| `min_success_rate` | retained, not a gate | retained, not a gate |
 
-**Spec citation (both benchmarks): none exists.** Neither the TPC-H
-specification nor the TPC-DS specification v4.0.0 defines a partial-success
-/ "acceptable failure rate" allowance for the Throughput Test. Checked
-directly against the specification PDFs bundled in this repo
-(`_sources/tpc-h/specification.pdf`, `_sources/tpc-ds/specification/
-specification_4.0.0.pdf`):
+The shared metric boundary (`throughput_result_succeeded`) requires every
+requested stream and every query to succeed before `StreamRunner` emits
+Throughput@Size, so a partial run is never scored under either benchmark.
+
+**Spec citation (both benchmarks): none exists for partial success.** Neither
+the TPC-H specification nor the TPC-DS specification v4.0.0 defines an
+"acceptable failure rate" for the Throughput Test. Checked directly against
+the specification PDFs bundled in this repo (`_sources/tpc-h/specification.pdf`,
+`_sources/tpc-ds/specification/specification_4.0.0.pdf`):
 
 - TPC-H specification, Clause 5.1.1.6: *"A failed run is defined as a run
   that did not complete successfully due to unforeseen system failures."*
@@ -103,43 +106,14 @@ specification_4.0.0.pdf`):
   failures in a compliant run.
 - The TPC-H spec's only "1%" / "0.99" occurrences are unrelated numeric
   *result-value* tolerances for ratio/AVG aggregate validation (Clause
-  2.2.4.2), not a query- or stream-failure allowance. The previous comment
-  in `TPCHThroughputTestConfig` ("TPC-H spec allows up to 1% query failures
-  in production environments") was an invented citation; it has been
-  corrected.
+  2.2.4.2), not a query- or stream-failure allowance.
 - The TPC-DS specification has no equivalent clause either; its "success"
   occurrences are about individual operations (e.g. data-maintenance
   functions, Data Accessibility Test) completing, not a benchmark-wide
   partial-success tolerance.
 
-**Conclusion:** both `0.99` and `0.70` are BenchBox-internal tolerances for
-treating a throughput run as "usable" for iterative development/CI despite
-some stream or query failures. Neither is an official TPC compliance gate;
-a result with `streams_successful < num_streams` (TPC-H) or any
-sub-100%-successful stream (TPC-DS) is not eligible for TPC-compliant/
-audited reporting regardless of how these config knobs are set. This is now
-documented directly on each config dataclass (`min_success_rate`
-docstring/comment) rather than only here.
-
-**Outcome:** The success-rate gate is NOT extracted to `StreamRunner`. Each
-spec's `run()` applies its own gate after `StreamRunner.compute_metrics()`
-returns, reading its own dataclass's `min_success_rate` field. This
-preserves TPC-H's configurable threshold and gives TPC-DS the same
-single-source-of-truth pattern instead of duplicated hard-coded literals.
-
-**Gate coupling (review follow-up):** for TPC-DS, `min_success_rate` now
-drives *both* gates -- the run-level stream-success gate in `run()` and the
-per-stream query-success gate in `_finalize_stream_success()`. Before this
-change these were two independent hardcoded `0.7` literals that happened to
-share a value; a user tuning one gate now necessarily tunes the other
-identically, since both read the same config field. There is no mechanism
-today to set the run-level and per-stream thresholds independently. This is
-a documentation-only note -- no behavior changed from the single-source-of-
-truth refactor itself; it is called out here because it's a discoverability
-gap for anyone reaching for `min_success_rate` expecting it to affect only
-one of the two gates. (TPC-H's `min_success_rate` has always had this same
-shape: see `TPCHThroughputTestConfig` -- its gate is run-level only, TPC-H
-has no per-stream query-success sub-gate, so no coupling applies there.)
+**Outcome:** The success gate is not extracted to `StreamRunner` beyond the
+shared metric boundary described above.
 
 ---
 
