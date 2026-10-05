@@ -219,7 +219,8 @@ only:
 
 - ClickHouse `OPTIMIZE TABLE ... FINAL`, only when you set the
   `optimize_after_load` platform option to `true` (off by default).
-- Redshift `ANALYZE` and `VACUUM`.
+- Redshift `ANALYZE`, only when `auto_analyze` is `false`. Redshift's own
+  `VACUUM` and `ANALYZE` pass already covers every loaded table by default.
 - Databricks Delta `OPTIMIZE` and `ANALYZE`.
 - Snowflake `RESUME RECLUSTER`.
 
