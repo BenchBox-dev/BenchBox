@@ -14,7 +14,7 @@ import anyio
 import pytest
 from mcp.shared.exceptions import MCPError
 
-from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker
+from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker, _response_has_outstanding_work
 from benchbox.mcp.security import JobLimits, TenantWorkspaceProvider
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -1337,25 +1337,22 @@ def test_per_principal_queue_bound_holds_across_repository_handles(tmp_path: Pat
     second.submit("tenant-b", _request())
 
 
-def test_leaked_work_that_quiesces_before_the_worker_checks_still_releases_its_capacity(tmp_path: Path) -> None:
+def _quiesced_result(stream_id: int = 2):
     from types import SimpleNamespace
 
-    from benchbox.core.throughput.containment import record_outstanding_result
-
-    leaked = SimpleNamespace(
-        outstanding_stream_ids=[2],
+    return SimpleNamespace(
+        outstanding_stream_ids=[stream_id],
         cleanup_state="outstanding",
         outstanding_notes=[],
-        _outstanding_futures={2: _done_future()},
+        _outstanding_futures={stream_id: _done_future()},
     )
 
+
+def _run_with_tracked_result(tmp_path: Path, tracked, response: dict[str, object]):
+    from benchbox.core.throughput.containment import record_outstanding_result
+
     def executor(_job, _staging):
-        record_outstanding_result(leaked)
-        response = {
-            "phases": {"throughput_test": {"outstanding_work": {"stream_ids": [2], "cleanup_state": "outstanding"}}}
-        }
-        leaked.outstanding_stream_ids = []
-        leaked.cleanup_state = "quiesced"
+        record_outstanding_result(tracked)
         return response
 
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1, poll_seconds=0.01))
@@ -1366,9 +1363,94 @@ def test_leaked_work_that_quiesces_before_the_worker_checks_still_releases_its_c
     waiting, _ = repository.submit("tenant-b", _request())
     claimed = repository.claim("worker-a")
     assert claimed is not None
-
     anyio.run(worker._run_job, claimed)
+    return repository, worker, submitted, waiting
 
-    assert _wait_until(lambda: (repository.get(submitted.execution_id)).quiesced_at is not None)
+
+def test_tracked_work_that_quiesced_in_run_publishes_with_its_derived_outcome(tmp_path: Path) -> None:
+    from benchbox.mcp.jobs import _public_status
+
+    response = {
+        "summary": {"queries": {"total": 22, "passed": 22, "failed": 0}},
+        "phases": {"throughput_test": {"status": "FAILED"}},
+    }
+    repository, worker, submitted, waiting = _run_with_tracked_result(tmp_path, _quiesced_result(), response)
+
+    finished = repository.get(submitted.execution_id)
+    assert finished is not None and finished.state == "completed"
+    assert finished.artifact_path is not None and Path(finished.artifact_path).is_file()
+    assert finished.outcome == "failed"
+    assert _public_status(finished)["outcome"] == "failed"
     replacement = repository.claim("worker-b")
     assert replacement is not None and replacement.execution_id == waiting.execution_id
+
+
+def test_stale_outstanding_export_of_quiesced_work_publishes_a_quiesced_result(tmp_path: Path) -> None:
+    response = {
+        "phases": {
+            "throughput_test": {
+                "status": "FAILED",
+                "outstanding_work": {"stream_ids": [2], "cleanup_state": "outstanding"},
+            }
+        }
+    }
+    repository, _worker, submitted, waiting = _run_with_tracked_result(tmp_path, _quiesced_result(), response)
+
+    finished = repository.get(submitted.execution_id)
+    assert finished is not None and finished.state == "completed" and finished.outcome == "failed"
+    payload = json.loads(Path(finished.artifact_path).read_text(encoding="utf-8"))
+    assert not _response_has_outstanding_work(payload)
+    assert payload["phases"]["throughput_test"]["outstanding_work"] == {"stream_ids": [], "cleanup_state": "quiesced"}
+    replacement = repository.claim("worker-b")
+    assert replacement is not None and replacement.execution_id == waiting.execution_id
+
+
+def test_unproven_tracked_work_is_quarantined_then_attested_even_after_it_quiesces(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from benchbox.core.throughput.containment import record_outstanding_result
+
+    release = threading.Event()
+    pool = ThreadPoolExecutor(max_workers=1)
+    tracked = SimpleNamespace(
+        outstanding_stream_ids=[2],
+        cleanup_state="outstanding",
+        outstanding_notes=[],
+        _outstanding_futures={2: pool.submit(release.wait, 5.0)},
+    )
+
+    def executor(_job, _staging):
+        record_outstanding_result(tracked)
+        return {"summary": {"queries": {"failed": 0}}}
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1, poll_seconds=0.01))
+    worker = DurableJobWorker(
+        repository, TenantWorkspaceProvider(tmp_path / "workspaces"), executor=executor, worker_id="worker-a"
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    try:
+        anyio.run(worker._run_job, claimed)
+        contained = repository.get(submitted.execution_id)
+        assert contained is not None and contained.state == "unknown" and contained.artifact_path is None
+        release.set()
+        assert _wait_until(lambda: repository.get(submitted.execution_id).quiesced_at is not None)
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+
+
+def test_public_outcome_stops_reporting_outstanding_work_once_quiescence_is_attested(tmp_path: Path) -> None:
+    from benchbox.mcp.jobs import _public_status
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    submitted, _ = repository.submit("tenant-a", _request())
+    assert repository.claim("worker-a") is not None
+    assert repository.mark_unknown_outstanding(submitted.execution_id, "worker-a") is True
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None and _public_status(contained)["outcome"] == "outstanding_work"
+
+    assert repository.attest_quiescence(submitted.execution_id, "worker-a") is True
+    released = repository.get(submitted.execution_id)
+    assert released is not None and _public_status(released)["outcome"] == "unknown"

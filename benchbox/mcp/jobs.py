@@ -1036,6 +1036,23 @@ def derive_job_outcome(response: Mapping[str, Any]) -> str:
     return "completed"
 
 
+def _mark_quiesced(value: object) -> None:
+    if isinstance(value, dict):
+        outstanding_work = value.get("outstanding_work")
+        if isinstance(outstanding_work, dict):
+            outstanding_work["stream_ids"] = []
+            outstanding_work["cleanup_state"] = "quiesced"
+        if value.get("cleanup_state") == "outstanding":
+            value["cleanup_state"] = "quiesced"
+        if value.get("outstanding_stream_ids"):
+            value["outstanding_stream_ids"] = []
+        for item in value.values():
+            _mark_quiesced(item)
+    elif isinstance(value, list):
+        for item in value:
+            _mark_quiesced(item)
+
+
 def _published_outcome(response_path: Path) -> str:
     try:
         payload = json.loads(response_path.read_text(encoding="utf-8"))
@@ -1237,9 +1254,7 @@ class DurableJobWorker:
                     except Exception as exc:
                         execution_error = exc
                     tracked_results = list(leaked_results)
-                    executor_quiescent = not (
-                        tracked_results or (execution_error is None and _response_has_outstanding_work(response))
-                    )
+                    executor_quiescent = self._executor_is_quiescent(tracked_results, response, execution_error)
                     if not executor_quiescent:
                         if execution_error is not None:
                             logger.error(
@@ -1354,6 +1369,18 @@ class DurableJobWorker:
             publish=publish,
             outcome=derive_job_outcome(response),
         )
+
+    @staticmethod
+    def _executor_is_quiescent(
+        tracked_results: list[Any], response: dict[str, Any] | None, execution_error: Exception | None
+    ) -> bool:
+        if any(not await_quiescence(result, timeout=0) for result in tracked_results):
+            return False
+        if tracked_results:
+            if response is not None:
+                _mark_quiesced(response)
+            return True
+        return execution_error is not None or response is None or not _response_has_outstanding_work(response)
 
     def _attest_when_leaked_work_ends(self, execution_id: str, staging: Path, leaked_results: list[Any]) -> None:
         if not leaked_results:
@@ -1492,7 +1519,7 @@ def _public_outcome(job: JobRecord) -> str | None:
     if job.outcome is not None:
         return job.outcome
     if job.state == "unknown":
-        return "outstanding_work" if job.error_code == "outstanding_work" else "unknown"
+        return "outstanding_work" if job.error_code == "outstanding_work" and job.quiesced_at is None else "unknown"
     if job.state in {"failed", "cancelled"}:
         return job.state
     if job.state == "completed" and job.artifact_path is not None and Path(job.artifact_path).is_file():
