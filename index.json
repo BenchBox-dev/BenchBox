@@ -21013,10 +21013,15 @@
       "title": "Add regression tests for TPC-H stdout data generation"
     },
     "tpch-throughput-dialect-translation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-06T22:39:10Z",
+        "generation": "54906e5ac454458f988dff22e84f0a40",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-H throughput runs untranslated SQL on every platform; power translates to the target dialect"
     },
     "tpch-throughput-parameter-aware-rowcounts": {
