@@ -1011,15 +1011,14 @@ def _response_has_outstanding_work(value: object) -> bool:
     return False
 
 
+_ATTEST_ATTEMPTS = 6
 _FAILED_PHASE_STATUSES = frozenset({"FAILED", "ERROR"})
 _INCOMPLETE_RUN_STATUSES = frozenset({"no_results", "incomplete"})
 
 
 def derive_job_outcome(response: Mapping[str, Any]) -> str:
     metadata = response.get("mcp_metadata")
-    if isinstance(metadata, Mapping) and (
-        metadata.get("status") in _INCOMPLETE_RUN_STATUSES or metadata.get("export_failed") is True
-    ):
+    if isinstance(metadata, Mapping) and metadata.get("status") in _INCOMPLETE_RUN_STATUSES:
         return "incomplete"
     summary = response.get("summary")
     if isinstance(summary, Mapping):
@@ -1237,17 +1236,26 @@ class DurableJobWorker:
                             response = await anyio.to_thread.run_sync(self.executor, job, staging)
                     except Exception as exc:
                         execution_error = exc
+                    still_leaked = [
+                        result for result in leaked_results if getattr(result, "outstanding_stream_ids", None)
+                    ]
+                    executor_quiescent = not (
+                        still_leaked or (execution_error is None and _response_has_outstanding_work(response))
+                    )
+                    if not executor_quiescent:
+                        if execution_error is not None:
+                            logger.error(
+                                "Durable MCP benchmark failed with leaked work (%s)", type(execution_error).__name__
+                            )
+                        await anyio.to_thread.run_sync(
+                            self.repository.mark_unknown_outstanding,
+                            job.execution_id,
+                            self.worker_id,
+                        )
+                        self._attest_when_leaked_work_ends(job.execution_id, staging, still_leaked)
+                        return
                     if execution_error is None:
                         assert response is not None
-                        executor_quiescent = not _response_has_outstanding_work(response)
-                        if not executor_quiescent:
-                            await anyio.to_thread.run_sync(
-                                self.repository.mark_unknown_outstanding,
-                                job.execution_id,
-                                self.worker_id,
-                            )
-                            self._attest_when_leaked_work_ends(job.execution_id, staging, list(leaked_results))
-                            return
                         if response.get("status") == "failed":
                             await anyio.to_thread.run_sync(
                                 lambda: self.repository.fail_attempt(
@@ -1355,11 +1363,24 @@ class DurableJobWorker:
         poll_seconds = max(0.05, min(self.repository.limits.poll_seconds, 1.0))
 
         def attest() -> None:
-            pending = list(leaked_results)
-            while pending:
-                pending = [result for result in pending if not await_quiescence(result, timeout=poll_seconds)]
-            shutil.rmtree(staging, ignore_errors=True)
-            self.repository.attest_quiescence(execution_id, self.worker_id)
+            try:
+                pending = list(leaked_results)
+                while pending:
+                    pending = [result for result in pending if not await_quiescence(result, timeout=poll_seconds)]
+                shutil.rmtree(staging, ignore_errors=True)
+            except Exception:
+                logger.exception("Leaked-work observation failed; job stays quarantined")
+                return
+            delay = poll_seconds
+            for _ in range(_ATTEST_ATTEMPTS):
+                try:
+                    self.repository.attest_quiescence(execution_id, self.worker_id)
+                    return
+                except Exception:
+                    logger.exception("Quiescence attestation failed; retrying")
+                    time.sleep(delay)
+                    delay = min(delay * 2, 5.0)
+            logger.error("Quiescence attestation abandoned; job stays quarantined")
 
         threading.Thread(target=attest, name=f"benchbox-mcp-quiescence-{execution_id}", daemon=True).start()
 
@@ -1476,6 +1497,8 @@ def _public_outcome(job: JobRecord) -> str | None:
         return "outstanding_work" if job.error_code == "outstanding_work" else "unknown"
     if job.state in {"failed", "cancelled"}:
         return job.state
+    if job.state == "completed" and job.artifact_path is not None and Path(job.artifact_path).is_file():
+        return _published_outcome(Path(job.artifact_path))
     return None
 
 

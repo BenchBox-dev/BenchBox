@@ -552,7 +552,7 @@ def _build_run_response(
             response["phases"] = {"throughput_test": {"outstanding_work": outstanding_work}}
     response["mcp_metadata"] = {
         "execution_id": execution_id,
-        "status": "completed" if result else "no_results",
+        "status": "incomplete" if export_failed else ("completed" if result else "no_results"),
         "platform_requested": platform,
         "benchmark_requested": benchmark,
         "scale_factor_requested": scale_factor,
@@ -560,8 +560,6 @@ def _build_run_response(
         "execution_time_seconds": round(execution_time, 2),
         "result_file": result_file_path,
     }
-    if export_failed:
-        response["mcp_metadata"]["export_failed"] = True
     _attach_summary_charts(response, result)
     return response
 

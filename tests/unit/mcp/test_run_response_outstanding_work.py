@@ -101,4 +101,5 @@ def test_double_export_failure_without_outstanding_work_is_incomplete(tmp_path: 
         response = _build(_result(None), tmp_path)
 
     assert not _response_has_outstanding_work(response)
+    assert response["mcp_metadata"]["status"] == "incomplete"
     assert derive_job_outcome(response) == "incomplete"
