@@ -271,8 +271,9 @@ duration, counts, and stage-specific metadata.
 
 `post_load_maintenance` is an optional phase, present only when a platform ran
 tuning operations after a table loaded (ClickHouse `OPTIMIZE` when
-`optimize_after_load` is enabled, Redshift `ANALYZE` and `VACUUM`, Databricks
-Delta `OPTIMIZE` and `ANALYZE`, Snowflake `RESUME RECLUSTER`):
+`optimize_after_load` is enabled, Redshift `ANALYZE` when `auto_analyze` is
+off, Databricks Delta `OPTIMIZE` and `ANALYZE`, Snowflake `RESUME RECLUSTER`).
+`status` is `FAILED` when a maintenance statement raised or was refused:
 
 ```json
 {
