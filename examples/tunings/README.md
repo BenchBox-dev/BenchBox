@@ -23,7 +23,7 @@ a matching `<benchmark>_notuning.yaml`):
   preview-only in the current adapters)
 - `clickhouse/` - `tpch`, `tpcds`, `ssb`. One directory serves every
   ClickHouse platform: `clickhouse-local`, `clickhouse-server`,
-  `clickhouse-cloud` and `chdb`. TPC-H, SSB and TPC-DS set a MergeTree sort
+  `clickhouse-cloud` and the `chdb` alias. TPC-H, SSB and TPC-DS set a MergeTree sort
   key per fact table; TPC-H also partitions `LINEITEM` and `ORDERS` by month.
   All constraints are disabled, because the sort key is ClickHouse's primary
   index
@@ -89,10 +89,11 @@ relevant to these templates is:
 6. DataFrame platforms only: `examples/tunings/dataframe/<platform>_optimized.yaml`
    (cwd-relative), for `polars`, `pandas` and `cudf`. The run is recorded as
    mode `tuned`.
-7. If none of the above exist, the run falls back to the platform's default
-   configuration and prints a warning that names what the fallback applies
-   (for example "OLAP session pack" on ClickHouse or "engine runtime defaults
-   (streaming)" on Polars). An interactive terminal is also offered the tuning
+7. If none of the above exist, the run falls back to a generic configuration
+   (basic constraints unless the platform has its own fallback), prints a
+   warning that no template was found, and logs a line that names what the
+   fallback applies (for example "OLAP session pack" on ClickHouse or "engine
+   runtime defaults (streaming)" on Polars). An interactive terminal is also offered the tuning
    wizard. A DataFrame platform with no `_optimized.yaml`, such as Dask, is
    recorded as mode `tuned-fallback`, not `tuned`.
 
@@ -214,14 +215,16 @@ basic-constraints fallback as equivalent tuned runs.
 
 ### Maintenance after the load
 
-Some platforms run maintenance on each table after it loads, on tuned runs
-only:
+Some platforms run maintenance after a table loads, on tuned runs and only for
+tables the tuning configuration covers:
 
 - ClickHouse `OPTIMIZE TABLE ... FINAL`, only when you set the
   `optimize_after_load` platform option to `true` (off by default).
 - Redshift `ANALYZE`, only when `auto_analyze` is `false`. Redshift's own
   `VACUUM` and `ANALYZE` pass already covers every loaded table by default.
-- Databricks Delta `OPTIMIZE` and `ANALYZE`.
+- Databricks Delta `OPTIMIZE` and `ANALYZE`. Every Databricks load also runs a
+  plain `OPTIMIZE` inside the load time while `enable_delta_optimization` is
+  on; tuned tables get theirs here instead, so it runs once.
 - Snowflake `RESUME RECLUSTER`.
 
 This time is not part of data-loading time. Results report it as
@@ -230,8 +233,9 @@ This time is not part of data-loading time. Results report it as
 ### ClickHouse sort keys and primary keys
 
 The ClickHouse tuned templates set `primary_keys.enabled: false`, which is
-honored: no `PRIMARY KEY` clause is emitted and the sort key alone defines the
-index. If you enable `primary_keys` in your own file, its columns must be a
+honored for the tables they sort: those get no `PRIMARY KEY` clause and the sort
+key alone defines the index. A table the template does not tune keeps the
+schema's primary key and derives its `ORDER BY` from it. If you enable `primary_keys` in your own file, its columns must be a
 prefix of the table's tuned sort key. Otherwise the run fails before any table
 is created. Put the key columns first in the sort key, or disable
 `primary_keys`.

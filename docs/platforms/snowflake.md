@@ -196,7 +196,8 @@ ALTER TABLE orders CLUSTER BY (o_orderdate);
 ```
 
 For up to four clustering columns, BenchBox then runs
-`ALTER TABLE <table> RESUME RECLUSTER` after the table loads, so automatic
+`ALTER TABLE <table> RESUME RECLUSTER` after a table with a clustering key
+loads, so automatic
 clustering has data to work on. The time is reported as
 `phases.post_load_maintenance` and is not counted in data-loading time.
 

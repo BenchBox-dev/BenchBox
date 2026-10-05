@@ -89,15 +89,17 @@ For how the container rung is selected and admitted, see
 MergeTree sort keys, plus monthly partitions on the TPC-H `LINEITEM` and
 `ORDERS` tables. The same templates serve the local, server and cloud platforms
 (`examples/tunings/clickhouse/`, packaged with BenchBox). For other
-benchmarks, `--tuning tuned` falls back to the "OLAP session pack" session
-settings.
+benchmarks there is no curated template, so `--tuning tuned` resolves to the
+fallback. ClickHouse's "OLAP session pack" session settings apply to tuned runs
+either way.
 
 ```bash
 benchbox run --platform clickhouse-server --benchmark tpch --tuning tuned
 ```
 
-The templates disable every constraint, so no `PRIMARY KEY` clause is emitted
-and the sort key is the index. If you supply a template that enables
+The templates disable every constraint, so a table the template sorts has no
+`PRIMARY KEY` clause and its sort key is the index. A table the template does
+not tune keeps the schema's primary key and derives its `ORDER BY` from it. If you supply a template that enables
 `primary_keys`, its columns must be a prefix of the tuned sort key, or the run
 fails before any table is created.
 

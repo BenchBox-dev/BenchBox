@@ -24,8 +24,8 @@ cp examples/tunings/<platform>/<benchmark>_tuned.yaml \
 Only the platforms/benchmarks with real auto-discovery naming
 (`duckdb/`, `databricks/`, `snowflake/`, `clickhouse/`) are packaged here.
 `clickhouse/` holds `tpch`, `tpcds` and `ssb`, and serves every ClickHouse
-platform (`clickhouse-local`, `clickhouse-server`, `clickhouse-cloud` and
-`chdb`). DataFrame profiles (`examples/tunings/dataframe/`) are resolved only
+platform (`clickhouse-local`, `clickhouse-server`, `clickhouse-cloud` and the
+`chdb` alias). DataFrame profiles (`examples/tunings/dataframe/`) are resolved only
 from a checkout (`--tuning tuned` finds `<platform>_optimized.yaml` for
 `polars`, `pandas` and `cudf` there; see `examples/tunings/README.md`) and are
 not packaged.
