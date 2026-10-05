@@ -21,10 +21,31 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_outstanding_sink: ContextVar[list[Any] | None] = ContextVar("benchbox_outstanding_sink", default=None)
+
+
+@contextmanager
+def track_outstanding_results() -> Iterator[list[Any]]:
+    sink: list[Any] = []
+    token = _outstanding_sink.set(sink)
+    try:
+        yield sink
+    finally:
+        _outstanding_sink.reset(token)
+
+
+def record_outstanding_result(throughput_result: Any) -> None:
+    sink = _outstanding_sink.get()
+    if sink is not None:
+        sink.append(throughput_result)
 
 
 @dataclass(frozen=True)

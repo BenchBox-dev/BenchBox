@@ -258,8 +258,8 @@ def test_publication_commit_excludes_recovery_fence(tmp_path: Path) -> None:
         assert recovery.result(timeout=2) is None
 
 
-def test_recovery_removes_only_expired_attempt_staging(tmp_path: Path) -> None:
-    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
+def test_recovery_leaves_fenced_attempt_staging_until_quiescence_and_purge(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2, retention_seconds=3600)
     repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
     worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"), worker_id="recovery")
     submitted, _ = repository.submit("tenant-a", _request())
@@ -267,15 +267,29 @@ def test_recovery_removes_only_expired_attempt_staging(tmp_path: Path) -> None:
     assert claimed is not None
     staging, _, _ = worker._job_paths(claimed)
     staging.mkdir(parents=True)
-    (staging / "large-result.bin").write_bytes(b"orphan")
+    (staging / "partial.bin").write_bytes(b"live")
 
     worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
 
-    assert not staging.exists()
     recovered = repository.get(submitted.execution_id)
     assert recovered is not None and recovered.state == "unknown"
+    assert (staging / "partial.bin").read_bytes() == b"live"
+    (staging / "later.bin").write_bytes(b"still writable")
+
+    worker.purge_expired()
+    assert staging.exists()
+
+    assert repository.attest_quiescence(submitted.execution_id, "lost-worker") is True
+    with repository._connect() as connection:
+        connection.execute(
+            "UPDATE mcp_benchmark_jobs SET completed_at = ? WHERE execution_id = ?",
+            ("2000-01-01T00:00:00+00:00", submitted.execution_id),
+        )
+    worker.purge_expired()
+    assert not staging.exists()
+    assert repository.get(submitted.execution_id) is None
 
 
 def test_job_leases_use_shared_generations_across_host_clock_offsets(monkeypatch, tmp_path: Path) -> None:
@@ -1028,3 +1042,169 @@ def test_concurrent_initializers_migrate_legacy_database_once(tmp_path: Path) ->
         ).fetchone()
     assert total == 1
     assert stranded is None
+
+
+def _wait_until(predicate, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def test_leaked_throughput_work_attests_quiescence_when_its_futures_finish(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from benchbox.core.throughput.containment import record_outstanding_result
+
+    release = threading.Event()
+    pool = ThreadPoolExecutor(max_workers=1)
+    leaked = SimpleNamespace(
+        outstanding_stream_ids=[3],
+        cleanup_state="outstanding",
+        outstanding_notes=[],
+        _outstanding_futures={3: pool.submit(release.wait, 5.0)},
+    )
+
+    def executor(_job, _staging):
+        record_outstanding_result(leaked)
+        return {
+            "phases": {
+                "throughput_test": {
+                    "status": "FAILED",
+                    "outstanding_work": {"stream_ids": [3], "cleanup_state": "outstanding"},
+                }
+            }
+        }
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1, poll_seconds=0.01))
+    worker = DurableJobWorker(
+        repository, TenantWorkspaceProvider(tmp_path / "workspaces"), executor=executor, worker_id="worker-a"
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    waiting, _ = repository.submit("tenant-b", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    staging, _, _ = worker._job_paths(claimed)
+
+    try:
+        anyio.run(worker._run_job, claimed)
+
+        contained = repository.get(submitted.execution_id)
+        assert contained is not None and contained.state == "unknown" and contained.quiesced_at is None
+        assert repository.claim("worker-b") is None
+        assert staging.exists()
+
+        release.set()
+        assert _wait_until(lambda: (repository.get(submitted.execution_id) or contained).quiesced_at is not None)
+        assert _wait_until(lambda: not staging.exists())
+        replacement = repository.claim("worker-b")
+        assert replacement is not None and replacement.execution_id == waiting.execution_id
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+
+
+def test_leaked_work_without_observable_handles_stays_quarantined(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1))
+    worker = DurableJobWorker(
+        repository,
+        TenantWorkspaceProvider(tmp_path / "workspaces"),
+        executor=lambda _job, _staging: {
+            "phases": {"throughput_test": {"outstanding_work": {"stream_ids": [1], "cleanup_state": "outstanding"}}}
+        },
+        worker_id="worker-a",
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+
+    anyio.run(worker._run_job, claimed)
+
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None and contained.state == "unknown" and contained.quiesced_at is None
+    assert repository.capacity_summary()["outstanding"] == 1
+
+
+@pytest.mark.parametrize(
+    ("response", "state", "outcome"),
+    [
+        (
+            {"summary": {"queries": {"total": 2, "passed": 2, "failed": 0}}, "mcp_metadata": {"status": "completed"}},
+            "completed",
+            "completed",
+        ),
+        (
+            {"summary": {"queries": {"total": 2, "passed": 1, "failed": 1}}, "mcp_metadata": {"status": "completed"}},
+            "completed",
+            "failed",
+        ),
+        (
+            {"summary": {"queries": {"failed": 0}}, "phases": {"power_test": {"status": "FAILED"}}},
+            "completed",
+            "failed",
+        ),
+        ({"summary": {"queries": {"failed": 0}, "validation": "failed"}}, "completed", "failed"),
+        ({"mcp_metadata": {"status": "no_results"}}, "completed", "incomplete"),
+        ({"mcp_metadata": {"status": "incomplete"}}, "completed", "incomplete"),
+        ({"status": "failed", "execution_id": "x"}, "failed", "failed"),
+    ],
+)
+def test_job_stores_and_exposes_shared_outcome_derived_from_result(
+    tmp_path: Path, response: dict[str, object], state: str, outcome: str
+) -> None:
+    from benchbox.mcp.jobs import _public_status
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    worker = DurableJobWorker(
+        repository,
+        TenantWorkspaceProvider(tmp_path / "workspaces"),
+        executor=lambda _job, _staging: dict(response),
+        worker_id="worker-a",
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+
+    anyio.run(worker._run_job, claimed)
+
+    finished = repository.get(submitted.execution_id)
+    assert finished is not None and finished.state == state
+    assert finished.outcome == outcome
+    assert _public_status(finished)["outcome"] == outcome
+
+
+def test_public_outcome_reports_non_terminal_and_quarantined_states(tmp_path: Path) -> None:
+    from benchbox.mcp.jobs import _public_status
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=2))
+    submitted, _ = repository.submit("tenant-a", _request())
+    assert _public_status(submitted)["outcome"] is None
+    assert repository.claim("worker-a") is not None
+    assert repository.mark_unknown_outstanding(submitted.execution_id, "worker-a") is True
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None
+    assert _public_status(contained)["outcome"] == "outstanding_work"
+
+
+def test_recovered_published_artifact_keeps_its_derived_outcome(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"), worker_id="recovery")
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("lost-worker")
+    assert claimed is not None
+    assert repository.begin_publication(submitted.execution_id, "lost-worker")
+    _, final_dir, response_path = worker._job_paths(claimed)
+    final_dir.mkdir(parents=True)
+    response_path.write_text(json.dumps({"summary": {"queries": {"failed": 2}}}), encoding="utf-8")
+    (final_dir / ".published").write_text(submitted.execution_id, encoding="ascii")
+
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+
+    recovered = repository.get(submitted.execution_id)
+    assert recovered is not None and recovered.state == "completed"
+    assert recovered.outcome == "failed"

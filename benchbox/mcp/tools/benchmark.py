@@ -509,11 +509,47 @@ def _execute_mcp_run_via_core(
             data_dir=data_dir,
         )
 
+    return _build_run_response(
+        result,
+        execution_id=execution_id,
+        results_dir=results_dir,
+        anonymize=anonymize,
+        start_time=start_time,
+        platform=platform,
+        benchmark=benchmark,
+        scale_factor=scale_factor,
+        resolved_mode=resolved_mode,
+    )
+
+
+def _result_outstanding_work(result: Any) -> dict[str, Any] | None:
+    throughput = getattr(getattr(result, "execution_phases", None), "throughput_test", None)
+    outstanding_work = getattr(throughput, "outstanding_work", None)
+    return dict(outstanding_work) if isinstance(outstanding_work, Mapping) and outstanding_work else None
+
+
+def _build_run_response(
+    result: Any,
+    *,
+    execution_id: str,
+    results_dir: Path,
+    anonymize: bool,
+    start_time: float,
+    platform: str,
+    benchmark: str,
+    scale_factor: float,
+    resolved_mode: str,
+) -> dict[str, Any]:
     execution_time = elapsed_seconds(start_time)
     result_file_path, result_payload = (
         _export_and_build_payload(result, execution_id, results_dir, anonymize=anonymize) if result else (None, None)
     )
     response: dict[str, Any] = result_payload or {}
+    export_failed = bool(result) and not result_payload
+    if export_failed:
+        outstanding_work = _result_outstanding_work(result)
+        if outstanding_work is not None:
+            response["phases"] = {"throughput_test": {"outstanding_work": outstanding_work}}
     response["mcp_metadata"] = {
         "execution_id": execution_id,
         "status": "completed" if result else "no_results",
@@ -524,6 +560,8 @@ def _execute_mcp_run_via_core(
         "execution_time_seconds": round(execution_time, 2),
         "result_file": result_file_path,
     }
+    if export_failed:
+        response["mcp_metadata"]["export_failed"] = True
     _attach_summary_charts(response, result)
     return response
 

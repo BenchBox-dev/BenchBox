@@ -8,6 +8,7 @@ import os
 import shutil
 import sqlite3
 import sys
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
@@ -22,6 +23,7 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import get_all_benchmarks
+from benchbox.core.throughput.containment import await_quiescence, track_outstanding_results
 from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
@@ -94,6 +96,7 @@ class JobRecord:
     completed_at: str | None
     unproven_owner: str | None = None
     quiesced_at: str | None = None
+    outcome: str | None = None
 
 
 class DurableJobRepository:
@@ -147,7 +150,8 @@ class DurableJobRepository:
                     updated_at TEXT NOT NULL,
                     completed_at TEXT,
                     unproven_owner TEXT,
-                    quiesced_at TEXT
+                    quiesced_at TEXT,
+                    outcome TEXT
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS mcp_job_idempotency_idx
                     ON mcp_benchmark_jobs (principal_id, idempotency_key)
@@ -170,6 +174,7 @@ class DurableJobRepository:
             self._ensure_column(connection, "lease_generation", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(connection, "unproven_owner", "TEXT")
             self._ensure_column(connection, "quiesced_at", "TEXT")
+            self._ensure_column(connection, "outcome", "TEXT")
             self._ensure_column(connection, "enqueue_sequence", "INTEGER")
             connection.execute("UPDATE mcp_benchmark_jobs SET enqueue_sequence = rowid WHERE enqueue_sequence IS NULL")
             connection.execute(
@@ -279,7 +284,8 @@ class DurableJobRepository:
                 updated_at TEXT NOT NULL,
                 completed_at TEXT,
                 unproven_owner TEXT,
-                quiesced_at TEXT
+                quiesced_at TEXT,
+                outcome TEXT
             )
             """
         )
@@ -321,6 +327,7 @@ class DurableJobRepository:
             completed_at=row["completed_at"],
             unproven_owner=row["unproven_owner"],
             quiesced_at=row["quiesced_at"],
+            outcome=row["outcome"],
         )
 
     @staticmethod
@@ -562,6 +569,7 @@ class DurableJobRepository:
         artifact_path: Path,
         *,
         publish: Callable[[], None] | None = None,
+        outcome: str = "completed",
     ) -> bool:
         """Mark complete only after the worker has durably published the artifact."""
         now = utc_now().isoformat()
@@ -582,10 +590,10 @@ class DurableJobRepository:
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = 'completed', artifact_path = ?, lease_owner = NULL, lease_expires_at = NULL,
-                    updated_at = ?, completed_at = ?
+                    outcome = ?, updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND state = 'publishing' AND lease_owner = ?
                 """,
-                (str(artifact_path), now, now, execution_id, worker_id),
+                (str(artifact_path), outcome, now, now, execution_id, worker_id),
             ).rowcount
             connection.commit()
         return changed == 1
@@ -627,10 +635,18 @@ class DurableJobRepository:
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = ?, lease_owner = NULL, lease_expires_at = NULL, error_code = ?,
-                    lease_version = 1, lease_generation = 0, updated_at = ?, completed_at = ?
+                    lease_version = 1, lease_generation = 0, outcome = ?, updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND lease_owner = ?
                 """,
-                (next_state, error_code[:80], now, completed_at, execution_id, worker_id),
+                (
+                    next_state,
+                    error_code[:80],
+                    "failed" if next_state == "failed" else None,
+                    now,
+                    completed_at,
+                    execution_id,
+                    worker_id,
+                ),
             )
             connection.commit()
         return next_state
@@ -766,7 +782,13 @@ class DurableJobRepository:
         assert fenced is not None
         return self._record(fenced)
 
-    def recover(self, job: JobRecord, *, published_artifact: Path | None = None) -> str | None:
+    def recover(
+        self,
+        job: JobRecord,
+        *,
+        published_artifact: Path | None = None,
+        published_outcome: str = "completed",
+    ) -> str | None:
         """Recover one expired lease without allowing duplicate completion.
 
         The publication commit point can be completed from a durable artifact.
@@ -795,24 +817,27 @@ class DurableJobRepository:
                 next_state = "completed"
                 artifact = str(published_artifact)
                 error_code = None
+                outcome = published_outcome
                 completed_at = now
             else:
                 next_state = "unknown"
                 artifact = None
                 error_code = "cancellation_unconfirmed" if bool(current["cancel_requested"]) else "unknown_outcome"
+                outcome = None
                 completed_at = now
             changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = ?, artifact_path = ?, lease_owner = NULL, lease_expires_at = NULL,
                     lease_version = 1, lease_generation = 0,
-                    error_code = ?, updated_at = ?, completed_at = ?
+                    error_code = ?, outcome = ?, updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND lease_owner = ?
                 """,
                 (
                     next_state,
                     artifact,
                     error_code,
+                    outcome,
                     now,
                     completed_at,
                     job.execution_id,
@@ -969,17 +994,55 @@ BenchmarkExecutor = Callable[[JobRecord, Path], dict[str, Any]]
 
 
 def _response_has_outstanding_work(value: object) -> bool:
-    """Return whether a serialized core result says work may still be running."""
     if isinstance(value, Mapping):
         outstanding = value.get("outstanding_stream_ids")
         if isinstance(outstanding, (list, tuple)) and bool(outstanding):
             return True
         if value.get("cleanup_state") == "outstanding":
             return True
+        outstanding_work = value.get("outstanding_work")
+        if isinstance(outstanding_work, Mapping):
+            stream_ids = outstanding_work.get("stream_ids")
+            if isinstance(stream_ids, (list, tuple)) and bool(stream_ids):
+                return True
         return any(_response_has_outstanding_work(item) for item in value.values())
     if isinstance(value, (list, tuple)):
         return any(_response_has_outstanding_work(item) for item in value)
     return False
+
+
+_FAILED_PHASE_STATUSES = frozenset({"FAILED", "ERROR"})
+_INCOMPLETE_RUN_STATUSES = frozenset({"no_results", "incomplete"})
+
+
+def derive_job_outcome(response: Mapping[str, Any]) -> str:
+    metadata = response.get("mcp_metadata")
+    if isinstance(metadata, Mapping) and (
+        metadata.get("status") in _INCOMPLETE_RUN_STATUSES or metadata.get("export_failed") is True
+    ):
+        return "incomplete"
+    summary = response.get("summary")
+    if isinstance(summary, Mapping):
+        queries = summary.get("queries")
+        if isinstance(queries, Mapping) and int(queries.get("failed") or 0) > 0:
+            return "failed"
+        if str(summary.get("validation", "")).lower() == "failed":
+            return "failed"
+    phases = response.get("phases")
+    if isinstance(phases, Mapping):
+        for phase in phases.values():
+            status = phase.get("status") if isinstance(phase, Mapping) else phase
+            if isinstance(status, str) and status.upper() in _FAILED_PHASE_STATUSES:
+                return "failed"
+    return "completed"
+
+
+def _published_outcome(response_path: Path) -> str:
+    try:
+        payload = json.loads(response_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "incomplete"
+    return derive_job_outcome(payload) if isinstance(payload, Mapping) else "incomplete"
 
 
 class DurableJobWorker:
@@ -1138,13 +1201,16 @@ class DurableJobWorker:
             job = self.repository.claim_expired(recovery_owner)
             if job is None:
                 return
-            staging, final_dir, response_path = self._job_paths(job)
+            _, final_dir, response_path = self._job_paths(job)
             marker = final_dir / ".published"
             published = response_path if marker.is_file() and response_path.is_file() else None
             if job.state == "publishing" and published is None:
                 shutil.rmtree(final_dir, ignore_errors=True)
-            shutil.rmtree(staging, ignore_errors=True)
-            self.repository.recover(job, published_artifact=published)
+            self.repository.recover(
+                job,
+                published_artifact=published,
+                published_outcome=_published_outcome(response_path) if published is not None else "completed",
+            )
 
     async def _run_job(self, job: JobRecord) -> None:
         gate = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
@@ -1162,11 +1228,13 @@ class DurableJobWorker:
             execution_error: Exception | None = None
             response: dict[str, Any] | None = None
             executor_quiescent = True
+            leaked_results: list[Any] = []
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self._heartbeat, job.execution_id, lease_lost)
                 try:
                     try:
-                        response = await anyio.to_thread.run_sync(self.executor, job, staging)
+                        with track_outstanding_results() as leaked_results:
+                            response = await anyio.to_thread.run_sync(self.executor, job, staging)
                     except Exception as exc:
                         execution_error = exc
                     if execution_error is None:
@@ -1178,7 +1246,7 @@ class DurableJobWorker:
                                 job.execution_id,
                                 self.worker_id,
                             )
-                            shutil.rmtree(staging, ignore_errors=True)
+                            self._attest_when_leaked_work_ends(job.execution_id, staging, list(leaked_results))
                             return
                         if response.get("status") == "failed":
                             await anyio.to_thread.run_sync(
@@ -1231,7 +1299,12 @@ class DurableJobWorker:
                 # The artifact crossed the durable publication boundary. Leave
                 # it in publishing for lease recovery rather than re-executing.
                 await anyio.to_thread.run_sync(
-                    self.repository.complete, job.execution_id, self.worker_id, response_path
+                    lambda: self.repository.complete(
+                        job.execution_id,
+                        self.worker_id,
+                        response_path,
+                        outcome=_published_outcome(response_path),
+                    )
                 )
                 return
             if lease_lost.is_set():
@@ -1273,7 +1346,22 @@ class DurableJobWorker:
             self.worker_id,
             response_path,
             publish=publish,
+            outcome=derive_job_outcome(response),
         )
+
+    def _attest_when_leaked_work_ends(self, execution_id: str, staging: Path, leaked_results: list[Any]) -> None:
+        if not leaked_results:
+            return
+        poll_seconds = max(0.05, min(self.repository.limits.poll_seconds, 1.0))
+
+        def attest() -> None:
+            pending = list(leaked_results)
+            while pending:
+                pending = [result for result in pending if not await_quiescence(result, timeout=poll_seconds)]
+            shutil.rmtree(staging, ignore_errors=True)
+            self.repository.attest_quiescence(execution_id, self.worker_id)
+
+        threading.Thread(target=attest, name=f"benchbox-mcp-quiescence-{execution_id}", daemon=True).start()
 
     @staticmethod
     def _rewrite_result_paths(response: dict[str, Any], staging: Path, final_dir: Path) -> dict[str, Any]:
@@ -1323,9 +1411,19 @@ class DurableJobWorker:
             cls._sync_path(path)
         cls._sync_path(root)
 
+    def _purge_staging(self, job: JobRecord) -> bool:
+        staging_root = self.workspaces.paths_for_principal_id(job.principal_id).root / "jobs" / ".staging"
+        leftovers = list(staging_root.glob(f"{job.execution_id}-*"))
+        for leftover in leftovers:
+            shutil.rmtree(leftover, ignore_errors=True)
+        return not any(leftover.exists() for leftover in leftovers)
+
     def purge_expired(self) -> None:
         """Delete retained artifacts only inside their persisted tenant workspace."""
         for job in self.repository.expired_terminal():
+            if not self._purge_staging(job):
+                logger.error("Could not purge expired MCP job staging")
+                continue
             if job.artifact_path is not None:
                 workspace = self.workspaces.paths_for_principal_id(job.principal_id)
                 artifact = Path(job.artifact_path)
@@ -1371,6 +1469,16 @@ def _owned_job(repository: DurableJobRepository, execution_id: str, principal: P
     return job
 
 
+def _public_outcome(job: JobRecord) -> str | None:
+    if job.outcome is not None:
+        return job.outcome
+    if job.state == "unknown":
+        return "outstanding_work" if job.error_code == "outstanding_work" else "unknown"
+    if job.state in {"failed", "cancelled"}:
+        return job.state
+    return None
+
+
 def _public_status(job: JobRecord) -> dict[str, Any]:
     status: dict[str, Any] = {
         "execution_id": job.execution_id,
@@ -1382,6 +1490,7 @@ def _public_status(job: JobRecord) -> dict[str, Any]:
         "completed_at": job.completed_at,
         "error_code": job.error_code,
     }
+    status["outcome"] = _public_outcome(job)
     if job.state == "unknown":
         status["outcome_note"] = (
             "A prior attempt lost its lease and may still have executed database work. "
@@ -1479,7 +1588,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             raise MCPError(JOB_NOT_READY, "Benchmark artifact is unavailable") from exc
         if not isinstance(payload, dict):
             raise MCPError(JOB_NOT_READY, "Benchmark artifact is invalid")
-        return payload
+        return {**payload, "outcome": _public_outcome(job)}
 
     @mcp.tool(annotations=CANCEL_ANNOTATIONS)
     async def cancel_benchmark(execution_id: str) -> dict[str, Any]:
