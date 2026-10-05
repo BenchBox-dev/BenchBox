@@ -19992,15 +19992,10 @@
       "title": "Let the throughput executor return without blocking on a hung/leaked stream at shutdown"
     },
     "throughput-explorer-smoke-vacuous-pass": {
-      "claim": {
-        "expires_at": "2026-10-06T22:34:06Z",
-        "generation": "0eaf09d7218448148723e0d87dee8c3f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Throughput explorer smoke sweep can pass without checking anything and accepts dropped streams"
     },
     "throughput-floor-baseline-retention-per-runner": {

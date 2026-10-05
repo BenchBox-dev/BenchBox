@@ -28,6 +28,15 @@
       "op": "take",
       "op_id": "4e1c3b41d0614000b4814235b232a820",
       "session_id": "eff49e8c0ad54e82b63c1bc45dfaf22f"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69",
+      "at": "2026-10-05T22:34:16Z",
+      "client": "tbh",
+      "generation": "0eaf09d7218448148723e0d87dee8c3f",
+      "op": "finish",
+      "op_id": "cf2b82add9a844eab0ec630fdf1e3cd1",
+      "session_id": "eff49e8c0ad54e82b63c1bc45dfaf22f"
     }
   ]
 }
