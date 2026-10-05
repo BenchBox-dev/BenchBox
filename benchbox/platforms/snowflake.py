@@ -1986,6 +1986,10 @@ class SnowflakeAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
+    def _reset_run_scoped_state(self) -> None:
+        super()._reset_run_scoped_state()
+        self._resume_recluster_tables = set()
+
     def _pending_resume_recluster(self) -> set[str]:
         pending = getattr(self, "_resume_recluster_tables", None)
         if pending is None:

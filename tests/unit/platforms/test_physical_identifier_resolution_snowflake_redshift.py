@@ -120,6 +120,16 @@ class TestSnowflakePhysicalIdentifiers:
         snowflake_adapter.apply_post_load_tunings("lineitem", None, connection)
         assert connection.recorder.statements[-1] == "ALTER TABLE LINEITEM RESUME RECLUSTER"
 
+    def test_run_scoped_reset_clears_pending_recluster(self, snowflake_adapter):
+        connection = RecordingConnection()
+        snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
+        assert snowflake_adapter._pending_resume_recluster() == {"LINEITEM"}
+        snowflake_adapter._reset_run_scoped_state()
+        assert snowflake_adapter._pending_resume_recluster() == set()
+        statements_before = len(connection.recorder.statements)
+        assert snowflake_adapter.apply_post_load_tunings("lineitem", None, connection) is False
+        assert len(connection.recorder.statements) == statements_before
+
     def test_catalog_probe_binds_the_physical_table(self, snowflake_adapter):
         probes = []
         connection = RecordingConnection()
