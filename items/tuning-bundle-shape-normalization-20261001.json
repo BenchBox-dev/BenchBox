@@ -3,7 +3,7 @@
     "Exporter test: notuning DuckDB and SQLite bundles both carry platform.tuning.validation_status == 'not_applicable'.",
     "result-formats.md no longer references the .applied.json companion; Explorer vitest for the untuned shape passes."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.4 (N-1, R-10).\n\nRESERVED (2026-10-04): in flight in the tuning-rework batch session (workstream W1). Implemented and published as PR #2628, branch fix/tuning-bundle-validation-status-always-emitted. Do not claim or implement; workstream W2 must not take this item. Finish it after #2628 merges.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.4 (N-1, R-10).\n\nResumption notes (2026-10-04): shipped in PR #2628 (merged as 7ec4bc22b). Deviations: a loaded bundle that never recorded a status (or recorded the not_validated placeholder) is re-exported with no status instead of an invented not_applicable; the tuned and untuned branches derive status the same way (derived status, then the applied ledger's status, never not_validated); untuned DataFrame runs report not_applicable (default configuration) and noop only when tuning was requested and nothing applied; the Databricks z_order cutoff warning keys on real tuning evidence. Known limit filed as tuning-bundle-and-console-residue-20261004: a legacy bundle with only source 'auto' loses its tuning block on re-export.",
   "description": "## Problem\nUntuned runs produce three bundle shapes:\n- no `platform.tuning` at all (DuckDB);\n- a tuning block whose only status is the nested `applied.status` (SQLite, ClickHouse);\n- the full block.\n\n`docs/reference/result-formats.md:178` describes a `.applied.json` companion that is no longer written, and says `validation_status` is omitted only for pre-ledger bundles.\n\n## Change\n- Always emit `platform.tuning.validation_status`, with `not_applicable` for untuned runs, consistent with `applied.status`.\n- Confirm Explorer ingest handles it.\n- Correct the docs.\n\n## Guardrails (must preserve)\n- Additive only; existing field names and shapes are unchanged (Explorer ingests verbatim).\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/core/results/exporter.py",
@@ -34,6 +34,14 @@
       "generation": "b6c3e51b8d674ee2b212af8dc5b360ae",
       "op": "take",
       "op_id": "aff1b6919108436d9b7568fe7052d33a",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-05T00:13:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "072555009e4241b3a798c91491fa81b4",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
