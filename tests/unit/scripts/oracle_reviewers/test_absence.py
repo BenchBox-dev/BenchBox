@@ -88,3 +88,35 @@ def test_calibration_tables_cover_every_harness() -> None:
     ):
         assert set(table) == {"agy", "claude", "codex", "muse"}
     assert not any(absence.CALIBRATED_QUOTA_PATTERNS[name] for name in ("claude", "codex", "muse"))
+
+
+META_KEY = "mta" + "Q7x9Lk2Pz8Rw4Tn6Yb1Vc3Hd5Jf0Gs7Ma2Ne"
+OPENAI_KEY = "sk-" + "proj-" + "Zx8Cv7Bn6Mq5Wr4Ty3Ui2Op1As0Df9Gh8"
+CLAUDE_OAUTH = "sk-ant-" + "oat01-" + "Kj7Hg6Fd5Sa4Lp3Oi2Uy1Tr0Ew9Qz8Xc7Vb6"
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [META_KEY, OPENAI_KEY, CLAUDE_OAUTH, f"META_API_KEY={META_KEY}", f"OPENAI_API_KEY: {OPENAI_KEY}"],
+)
+def test_excerpt_redacts_credentials(secret: str) -> None:
+    text = absence.excerpt("", f"error: request with {secret} was rejected\n")
+    assert "Q7x9Lk2Pz8" not in text
+    assert "Zx8Cv7Bn6" not in text
+    assert "Kj7Hg6Fd5" not in text
+    assert "[redacted]" in text
+
+
+def test_excerpt_redacts_the_exact_credential_values() -> None:
+    short_but_secret = "abc12345xyz"
+    text = absence.excerpt("", f"bad key {short_but_secret}", [short_but_secret])
+    assert short_but_secret not in text
+
+
+def test_excerpt_is_one_capped_line() -> None:
+    stderr = "first line with detail\n" + "x " * 1000 + "\n\n"
+    text = absence.excerpt("raw review output", stderr)
+    assert "first line" not in text
+    assert len(text) <= absence.EXCERPT_LIMIT
+    assert absence.excerpt("only stdout line\n", "") == "only stdout line"
+    assert absence.excerpt("", "") == ""

@@ -52,7 +52,7 @@ SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bxox[abposr]-[A-Za-z0-9\-]{10,}"),
     re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
     re.compile(
-        r"(?i)\b(api[_-]?key|access[_-]?token|auth[_-]?token|token|secret|password|private[_-]?key)\b(\s*[:=]\s*)"
+        r"(?i)\b[\w-]*?(api[_-]?key|access[_-]?token|auth[_-]?token|token|secret|password|private[_-]?key)\b(\s*[:=]\s*)"
         r"['\"]?[^\s'\"]{8,}"
     ),
 )

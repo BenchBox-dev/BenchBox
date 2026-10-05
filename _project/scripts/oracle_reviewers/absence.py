@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+from .verdict import REDACTED, sanitize
 
 OK = "ok"
 QUOTA = "quota"
@@ -35,6 +38,9 @@ CALIBRATED_EMPTY_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
 _RESET = re.compile(r"Resets in\s+(?P<duration>(?:\d+\s*[dhms]\s*)+)", re.IGNORECASE)
 _DURATION_PART = re.compile(r"(\d+)\s*([dhms])", re.IGNORECASE)
 _UNITS = {"d": "days", "h": "hours", "m": "minutes", "s": "seconds"}
+_LONG_TOKEN = re.compile(r"[A-Za-z0-9_\-]{32,}")
+EXCERPT_LIMIT = 300
+CREDENTIAL_ENV = ("CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY", "META_API_KEY", "GEMINI_API_KEY")
 
 
 @dataclass(frozen=True)
@@ -89,3 +95,16 @@ def classify(
     if not stdout.strip():
         return Absence(EMPTY, "exit code 0 with no output")
     return Absence(OK)
+
+
+def excerpt(stdout: str, stderr: str, credentials: Iterable[str] = ()) -> str:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    lines = lines or [line.strip() for line in stdout.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    text = lines[-1][: EXCERPT_LIMIT * 4]
+    for credential in credentials:
+        if len(credential) >= 8:
+            text = text.replace(credential, REDACTED)
+    text = _LONG_TOKEN.sub(REDACTED, sanitize(text, EXCERPT_LIMIT * 4))
+    return text if len(text) <= EXCERPT_LIMIT else text[: EXCERPT_LIMIT - 1] + "\u2026"

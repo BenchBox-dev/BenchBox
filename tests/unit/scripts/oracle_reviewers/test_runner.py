@@ -104,6 +104,17 @@ def test_diagnostic_is_sanitized(policy: Policy, tmp_path: Path, monkeypatch: py
     assert "AAAAAAAAAA" not in outcome.diagnostic and "[redacted]" in outcome.diagnostic
 
 
+def test_diagnostic_is_an_excerpt_not_the_raw_output(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    body = "print('model said private things')\nsys.stderr.write('trace 1\\ntrace 2\\nfatal: quota\\n')\nsys.exit(1)"
+    _fake_muse(tmp_path, monkeypatch, body)
+    monkeypatch.setenv("META_API_KEY", "should-not-appear")
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.diagnostic == "fatal: quota"
+
+
 def test_execute_kills_on_timeout(tmp_path: Path) -> None:
     invocation = Invocation((sys.executable, "-c", "import time; time.sleep(30)"), tmp_path, None)
     result = runner.execute(invocation, 1)

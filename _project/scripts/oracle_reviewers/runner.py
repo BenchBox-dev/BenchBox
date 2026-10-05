@@ -12,9 +12,7 @@ from typing import Any
 from . import absence
 from .commands import Invocation, build
 from .policy import Reviewer
-from .verdict import VerdictError, parse_output, sanitize, validate
-
-DIAGNOSTIC_LIMIT = 1500
+from .verdict import VerdictError, parse_output, validate
 
 
 @dataclass(frozen=True)
@@ -60,8 +58,8 @@ def execute(invocation: Invocation, timeout_seconds: int) -> RunResult:
 
 
 def _diagnostic(result: RunResult) -> str:
-    tail = f"{result.stderr[-DIAGNOSTIC_LIMIT:]}\n{result.stdout[-DIAGNOSTIC_LIMIT:]}".strip()
-    return sanitize(tail, DIAGNOSTIC_LIMIT)
+    credentials = [os.environ.get(name, "") for name in absence.CREDENTIAL_ENV]
+    return absence.excerpt(result.stdout, result.stderr, credentials)
 
 
 def review(
