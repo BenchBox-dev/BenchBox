@@ -104,6 +104,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never applied, or CHECK constraints, which cannot be verified against
   DuckDB's catalog. DuckDB tuned results recorded before this change carry a
   different `requested_config_hash`, so don't compare the hashes directly.
+- **Cached TPC-H and TPC-DS data regenerates once.** Dataset manifests now
+  record the SHA-256 of the bundled `dbgen` or `dsdgen` binary that wrote the
+  data. A cache that records no generator, or that a known-defective `dbgen`
+  wrote, is regenerated on the next run. This covers TPC-H data generated on
+  macOS by the earlier `dbgen`, which wrote non-canonical supplier and
+  customer addresses (Q2, Q10, Q15 and Q20 return different values), and
+  TPC-DS data generated on Windows before `dsdgen` options were passed
+  correctly, which was always scale factor 1. The TPC-H Skew, TPC-Havoc,
+  primitives and Data Vault datasets are built from `dbgen` and regenerate too.
 
 ### Added
 
