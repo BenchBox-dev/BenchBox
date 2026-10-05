@@ -1,0 +1,305 @@
+name: Spike nightly throughput engine
+
+on:
+  push:
+    branches:
+      - chore/spike-nightly-throughput-engine
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: ${{ matrix.candidate }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        candidate:
+          - postgresql-notuning
+          - postgresql-indexed
+          - pg-duckdb
+          - cedardb
+    env:
+      CANDIDATE: ${{ matrix.candidate }}
+      SEED: "20260709"
+      CEDARDB_IMAGE: cedardb/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62
+      PGDUCKDB_IMAGE: pgduckdb/pgduckdb:18-v1.1.1
+      OUT: ${{ github.workspace }}/spike-out
+      BBOUT: ${{ github.workspace }}/bbout
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Prepare output directories and record runner
+        run: |
+          mkdir -p "$OUT" "$BBOUT"
+          echo "T_JOB_START $(date +%s)" | tee -a "$OUT/timings.txt"
+          {
+            echo "--- uname"; uname -a
+            echo "--- nproc"; nproc
+            echo "--- free -m"; free -m
+            echo "--- df -h"; df -h / /dev/shm
+            echo "--- docker version"; docker version --format '{{.Server.Version}}'
+            echo "--- docker info"; docker info 2>&1 | head -40
+            echo "--- runner image"; echo "${ImageOS:-} ${ImageVersion:-}"
+          } > "$OUT/runner.txt" 2>&1
+          cat "$OUT/runner.txt"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: |
+          t0=$(date +%s)
+          uv sync --group dev
+          echo "T_UV_SYNC_SECONDS $(( $(date +%s) - t0 ))" | tee -a "$OUT/timings.txt"
+
+      - name: Write helper files
+        run: |
+          cat > "$RUNNER_TEMP/poll.py" <<'PY'
+          import sys, time
+          import psycopg
+          host, port, user, pw, db = sys.argv[1:6]
+          deadline = time.monotonic() + 300
+          last = ""
+          while time.monotonic() < deadline:
+              try:
+                  with psycopg.connect(host=host, port=int(port), user=user, password=pw, dbname=db, connect_timeout=3) as c:
+                      if c.execute("select 1").fetchone() == (1,):
+                          print("READY")
+                          sys.exit(0)
+              except Exception as e:
+                  last = str(e).strip().splitlines()[-1] if str(e).strip() else repr(e)
+              time.sleep(2)
+          print("NOT READY:", last)
+          sys.exit(1)
+          PY
+          cat > "$RUNNER_TEMP/pg_pk_tuning.yaml" <<'YAML'
+          primary_keys:
+            enabled: true
+            enforce_uniqueness: true
+            nullable: false
+
+          foreign_keys:
+            enabled: false
+          YAML
+          cat > "$RUNNER_TEMP/fk_indexes.sql" <<'SQL'
+          CREATE INDEX idx_lineitem_partkey_suppkey ON lineitem (l_partkey, l_suppkey);
+          CREATE INDEX idx_lineitem_partkey ON lineitem (l_partkey);
+          CREATE INDEX idx_lineitem_suppkey ON lineitem (l_suppkey);
+          CREATE INDEX idx_orders_custkey ON orders (o_custkey);
+          CREATE INDEX idx_customer_nationkey ON customer (c_nationkey);
+          CREATE INDEX idx_supplier_nationkey ON supplier (s_nationkey);
+          CREATE INDEX idx_nation_regionkey ON nation (n_regionkey);
+          CREATE INDEX idx_partsupp_suppkey ON partsupp (ps_suppkey);
+          SQL
+          cat > "$RUNNER_TEMP/watcher.sh" <<'SH'
+          #!/bin/bash
+          C=spike-db
+          P="docker exec $C psql -U benchbox -d benchbox_tpch_sf1 -Atq"
+          deadline=$(( $(date +%s) + 1800 ))
+          until [ "$($P -c "select to_regclass('public.lineitem')" 2>/dev/null)" = "lineitem" ] \
+             && [ "$($P -c "select to_regclass('public.nation')" 2>/dev/null)" = "nation" ] \
+             && [ "$($P -c "select to_regclass('public.partsupp')" 2>/dev/null)" = "partsupp" ]; do
+            [ "$(date +%s)" -gt "$deadline" ] && { echo "WATCHER TIMEOUT waiting for tables"; exit 1; }
+            sleep 0.5
+          done
+          echo "TABLES_EXIST $(date -u +%T.%N)"
+          docker exec -i $C psql -U benchbox -d benchbox_tpch_sf1 -v ON_ERROR_STOP=1 < "$RUNNER_TEMP/fk_indexes.sql" 2>&1
+          echo "FK_INDEXES_CREATED $(date -u +%T.%N)"
+          until [ "$($P -c 'select count(*) from lineitem' 2>/dev/null)" = "6001215" ] \
+             && [ "$($P -c 'select count(*) from partsupp' 2>/dev/null)" = "800000" ] \
+             && [ "$($P -c 'select count(*) from orders' 2>/dev/null)" = "1500000" ]; do
+            [ "$(date +%s)" -gt "$deadline" ] && { echo "WATCHER TIMEOUT waiting for row counts"; exit 1; }
+            sleep 0.5
+          done
+          echo "ROWS_LOADED $(date -u +%T.%N)"
+          $P -c "analyze"
+          echo "ANALYZE_DONE $(date -u +%T.%N)"
+          SH
+          chmod +x "$RUNNER_TEMP/watcher.sh"
+          cat > "$RUNNER_TEMP/summ.py" <<'PY'
+          import glob, json, os, sys
+          out = sys.argv[1]
+          files = sorted(glob.glob(os.path.join(out, "result*.json")))
+          if not files:
+              print("NO RESULT JSON")
+              sys.exit(0)
+          d = json.load(open(files[-1]))
+          ph = d.get("phases", {})
+          sm = d.get("summary", {})
+          qs = d.get("queries", [])
+          ok = [q for q in qs if q.get("status") == "SUCCESS"]
+          bad = [q for q in qs if q.get("status") != "SUCCESS"]
+          top = sorted(qs, key=lambda q: -(q.get("ms") or 0))[:5]
+          t = ph.get("throughput_test", {})
+          res = {
+              "phases": {k: (v.get("status"), v.get("duration_ms")) for k, v in ph.items()},
+              "queries": sm.get("queries"),
+              "validation": sm.get("validation"),
+              "tpc_metrics": sm.get("tpc_metrics"),
+              "streams": t.get("stream_results"),
+              "n_queries_recorded": len(qs),
+              "n_ok": len(ok),
+              "failed": sorted({(q.get("id"), q.get("stream"), round(q.get("ms") or 0)) for q in bad}, key=str),
+              "top5_ms": [(q.get("id"), q.get("stream"), round(q.get("ms") or 0), q.get("status")) for q in top],
+              "version": d.get("platform", {}).get("version"),
+          }
+          print(json.dumps(res, indent=1, default=str))
+          json.dump(res, open(os.path.join(out, "summary.json"), "w"), indent=1, default=str)
+          PY
+
+      - name: Pull image
+        run: |
+          case "$CANDIDATE" in
+            postgresql-*) IMAGE=postgres:18 ;;
+            pg-duckdb) IMAGE="$PGDUCKDB_IMAGE" ;;
+            cedardb) IMAGE="$CEDARDB_IMAGE" ;;
+          esac
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          t0=$(date +%s)
+          docker pull "$IMAGE"
+          echo "T_IMAGE_PULL_SECONDS $(( $(date +%s) - t0 ))" | tee -a "$OUT/timings.txt"
+          docker image inspect "$IMAGE" --format 'IMAGE_ID {{.Id}} DIGESTS {{.RepoDigests}} SIZE {{.Size}}' | tee -a "$OUT/timings.txt"
+
+      - name: Start container and wait for readiness
+        run: |
+          set -u
+          case "$CANDIDATE" in
+            postgresql-notuning)
+              RUN_ARGS=(-p 5432:5432 -e POSTGRES_USER=benchbox -e POSTGRES_PASSWORD=benchbox -e POSTGRES_DB=benchbox_test)
+              SERVER_ARGS=(postgres -c statement_timeout=600s)
+              DB_HOST_PORT=5432; DB_USER=benchbox; DB_PASSWORD=benchbox; DB_NAME=benchbox_test ;;
+            postgresql-indexed)
+              RUN_ARGS=(--shm-size=2g -p 5432:5432 -e POSTGRES_USER=benchbox -e POSTGRES_PASSWORD=benchbox -e POSTGRES_DB=benchbox_test)
+              SERVER_ARGS=(postgres -c statement_timeout=600s)
+              DB_HOST_PORT=5432; DB_USER=benchbox; DB_PASSWORD=benchbox; DB_NAME=benchbox_test ;;
+            pg-duckdb)
+              RUN_ARGS=(--shm-size=256m -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=benchbox -e POSTGRES_DB=benchbox)
+              SERVER_ARGS=(postgres -c statement_timeout=600s)
+              DB_HOST_PORT=5432; DB_USER=postgres; DB_PASSWORD=benchbox; DB_NAME=benchbox ;;
+            cedardb)
+              RUN_ARGS=(-m 2g -p 5435:5432 -e CEDAR_USER=benchbox -e CEDAR_PASSWORD='Benchbox1!' -e CEDAR_DB=benchbox_test)
+              SERVER_ARGS=()
+              DB_HOST_PORT=5435; DB_USER=benchbox; DB_PASSWORD='Benchbox1!'; DB_NAME=benchbox_test ;;
+          esac
+          {
+            echo "DB_HOST_PORT=$DB_HOST_PORT"
+            echo "DB_USER=$DB_USER"
+            echo "DB_NAME=$DB_NAME"
+          } >> "$GITHUB_ENV"
+          printf 'DB_PASSWORD<<EOF\n%s\nEOF\n' "$DB_PASSWORD" >> "$GITHUB_ENV"
+          t0=$(date +%s.%N)
+          docker run -d --name spike-db "${RUN_ARGS[@]}" "$IMAGE" "${SERVER_ARGS[@]}"
+          if uv run --no-sync -- python "$RUNNER_TEMP/poll.py" localhost "$DB_HOST_PORT" "$DB_USER" "$DB_PASSWORD" "$DB_NAME"; then
+            python3 -c "import sys;print('CONTAINER_READY_SECONDS', round(float(sys.argv[2])-float(sys.argv[1]),1))" "$t0" "$(date +%s.%N)" | tee -a "$OUT/timings.txt"
+          else
+            echo "CONTAINER NOT READY" | tee -a "$OUT/timings.txt"
+            docker logs spike-db 2>&1 | tail -50
+            exit 1
+          fi
+          docker exec spike-db df -h /dev/shm | tee "$OUT/devshm.txt"
+          docker inspect spike-db --format 'SHM_SIZE_BYTES {{.HostConfig.ShmSize}} MEMORY {{.HostConfig.Memory}}' | tee -a "$OUT/devshm.txt"
+          docker logs spike-db 2>&1 | head -30
+
+      - name: Run TPC-H SF1 3-stream throughput
+        timeout-minutes: 42
+        run: |
+          set -u
+          export BENCHBOX_OUTPUT_DIR="$BBOUT"
+          (while true; do echo "--- $(date -u +%T)"; docker stats --no-stream spike-db 2>&1; sleep 30; done) > "$OUT/docker-stats.log" 2>&1 &
+          STATS=$!
+          touch "$RUNNER_TEMP/bench.start"
+          B0=$(date +%s)
+          echo "T_BENCH_START $B0" | tee -a "$OUT/timings.txt"
+          set +e
+          case "$CANDIDATE" in
+            postgresql-notuning)
+              timeout --signal=TERM --kill-after=30 2400 \
+                uv run --no-sync -- benchbox run-official tpch --platform postgresql --scale 1.0 \
+                  --phases load,throughput --streams 3 --seed "$SEED" --quiet \
+                  --platform-option username=benchbox --platform-option password=benchbox \
+                  > "$OUT/bench.log" 2>&1
+              RC=$? ;;
+            postgresql-indexed)
+              "$RUNNER_TEMP/watcher.sh" > "$OUT/watcher.log" 2>&1 &
+              WATCH=$!
+              timeout --signal=TERM --kill-after=30 2400 \
+                uv run --no-sync -- benchbox run --official --platform postgresql --benchmark tpch --scale 1.0 \
+                  --phases load,throughput --streams 3 --seed "$SEED" \
+                  --tuning "$RUNNER_TEMP/pg_pk_tuning.yaml" --non-interactive --quiet \
+                  --platform-option username=benchbox --platform-option password=benchbox \
+                  > "$OUT/bench.log" 2>&1
+              RC=$?
+              kill "$WATCH" 2>/dev/null; wait "$WATCH" 2>/dev/null ;;
+            pg-duckdb)
+              timeout --signal=TERM --kill-after=30 2400 \
+                uv run --no-sync -- benchbox run-official tpch --platform pg-duckdb --scale 1.0 \
+                  --phases load,throughput --streams 3 --seed "$SEED" --quiet \
+                  --platform-option password=benchbox \
+                  > "$OUT/bench.log" 2>&1
+              RC=$? ;;
+            cedardb)
+              timeout --signal=TERM --kill-after=30 2400 \
+                uv run --no-sync -- benchbox run-official tpch --platform cedardb --scale 1.0 \
+                  --phases load,throughput --streams 3 --seed "$SEED" --quiet \
+                  --platform-option username=benchbox --platform-option database=benchbox_test \
+                  --platform-option "password=$DB_PASSWORD" --platform-option port=5435 \
+                  > "$OUT/bench.log" 2>&1
+              RC=$? ;;
+          esac
+          set -e
+          B1=$(date +%s)
+          kill "$STATS" 2>/dev/null || true
+          echo "BENCHBOX_EXIT $RC" | tee -a "$OUT/timings.txt"
+          echo "T_BENCH_END $B1" | tee -a "$OUT/timings.txt"
+          echo "BENCH_TOTAL_SECONDS $(( B1 - B0 ))" | tee -a "$OUT/timings.txt"
+          tail -40 "$OUT/bench.log"
+          exit 0
+
+      - name: Collect results and summarize
+        if: always()
+        run: |
+          set +e
+          docker logs spike-db > "$OUT/container.log" 2>&1
+          docker exec spike-db df -h /dev/shm > "$OUT/devshm-after.txt" 2>&1
+          {
+            echo "shm errors in bench.log: $(grep -c -i 'shared memory segment\|No space left on device' "$OUT/bench.log" 2>/dev/null)"
+            echo "shm errors in container.log: $(grep -c -i 'shared memory segment\|No space left on device' "$OUT/container.log" 2>/dev/null)"
+            echo "statement timeouts in container.log: $(grep -c -i 'canceling statement due to statement timeout' "$OUT/container.log" 2>/dev/null)"
+            echo "OOM kill: $(docker inspect spike-db --format '{{.State.OOMKilled}}' 2>/dev/null)"
+          } | tee "$OUT/error-counts.txt"
+          n=0
+          for f in $(find "$BBOUT" -path '*results*' -name '*.json' -newer "$RUNNER_TEMP/bench.start" 2>/dev/null); do
+            n=$((n+1)); cp "$f" "$OUT/result-$n.json"
+          done
+          echo "result files copied: $n"
+          uv run --no-sync -- python "$RUNNER_TEMP/summ.py" "$OUT" | tee "$OUT/summary.txt"
+          {
+            echo "### $CANDIDATE"
+            echo '```'
+            cat "$OUT/timings.txt" "$OUT/error-counts.txt" "$OUT/summary.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          find "$BBOUT" -maxdepth 3 -type d | head -30
+
+      - name: Upload logs and result JSON
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: ${{ matrix.candidate }}
+          path: spike-out/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f spike-db || true
