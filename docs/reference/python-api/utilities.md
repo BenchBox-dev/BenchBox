@@ -660,7 +660,7 @@ if "bigquery" in target_dialect:
 
 ## Timing and UTC Boundaries
 
-#### `benchbox.utils.clock.mono_time`
+### `benchbox.utils.clock.mono_time`
 
 <span id="benchbox.utils.clock.mono_time"></span>
 
@@ -672,19 +672,19 @@ Returns a `perf_counter` timestamp in seconds, for elapsed-time calculations.
 def mono_time() -> float: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `float`: the timestamp. Its origin is unspecified, so it is not a UTC timestamp.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.clock.elapsed_seconds`
+### `benchbox.utils.clock.elapsed_seconds`
 
 <span id="benchbox.utils.clock.elapsed_seconds"></span>
 
@@ -696,22 +696,22 @@ Returns the seconds between two monotonic timestamps.
 def elapsed_seconds(start: float, end: float | None = None) -> float: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `start` | `float` | required | The start timestamp from `mono_time()`. |
 | `end` | `float \| None` | `None` | The end timestamp. `None` samples `mono_time()` at the time of the call. |
 
-##### Returns
+#### Returns
 
 `float`: `end - start`. Both supplied timestamps must come from the same monotonic clock. A negative difference is returned unchanged.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.clock.utc_now`
+### `benchbox.utils.clock.utc_now`
 
 <span id="benchbox.utils.clock.utc_now"></span>
 
@@ -723,19 +723,19 @@ Returns the current time as a timezone-aware UTC `datetime`, for event metadata.
 def utc_now() -> datetime: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `datetime`: the current UTC time.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.clock.Stopwatch`
+### `benchbox.utils.clock.Stopwatch`
 
 <span id="benchbox.utils.clock.Stopwatch"></span>
 <span id="benchbox.utils.clock.Stopwatch.__init__"></span>
@@ -749,14 +749,14 @@ class Stopwatch:
     def __init__(self, start_mono: float, start_utc: datetime) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `start_mono` | `float` | required | The monotonic start timestamp. |
 | `start_utc` | `datetime` | required | The UTC start boundary. |
 
-##### Returns
+#### Returns
 
 A `Stopwatch`. Both constructor fields are required, and direct construction does not sample either clock. Use `Stopwatch.start()` to sample both.
 
@@ -774,11 +774,11 @@ A `Stopwatch`. Both constructor fields are required, and direct construction doe
 <span id="benchbox.utils.clock.Stopwatch.finish"></span>
 `finish() -> tuple[datetime, float]` returns the current UTC boundary and the elapsed seconds. It does not stop or freeze the stopwatch, so each later call samples again.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.clock.measure_elapsed`
+### `benchbox.utils.clock.measure_elapsed`
 
 <span id="benchbox.utils.clock.measure_elapsed"></span>
 
@@ -790,21 +790,21 @@ A context manager that yields a newly started `Stopwatch`.
 def measure_elapsed() -> Iterator[Stopwatch]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 A `Stopwatch` for the body of the `with` block. Leaving the block does not stop the stopwatch and does not store a finish value. Call its elapsed methods or `finish()` when you reach the boundary you want to measure.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself. Exceptions raised in the body of the `with` block propagate.
 
 ## Cloud URL Components
 
-#### `benchbox.utils.cloud_urls.parse_cloud_url`
+### `benchbox.utils.cloud_urls.parse_cloud_url`
 
 <span id="benchbox.utils.cloud_urls.parse_cloud_url"></span>
 
@@ -816,23 +816,23 @@ Splits a cloud URL into a bucket and a key prefix at the first slash after the s
 def parse_cloud_url(url: str) -> tuple[str, str]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `url` | `str` | required | The cloud URL, such as `s3://bucket/path/`. |
 
-##### Returns
+#### Returns
 
 `tuple[str, str]`: the bucket and the key prefix. For `s3://bucket/path/` the result is `("bucket", "path/")`, and for `s3://bucket/` it is `("bucket", "")`. Remaining slashes, query-looking suffixes and percent escapes are kept as they are.
 
 The function only splits the string. It does not validate the scheme, the bucket or credentials. The named schemes are `s3`, `gs` and `az`, and other schemes are split with the same prefix-length rule. Pass a correctly formed URL.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.cloud_urls.parse_s3_url`
+### `benchbox.utils.cloud_urls.parse_s3_url`
 
 <span id="benchbox.utils.cloud_urls.parse_s3_url"></span>
 
@@ -844,21 +844,21 @@ Splits an S3 URL by calling `parse_cloud_url`.
 def parse_s3_url(s3_url: str) -> tuple[str, str]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `s3_url` | `str` | required | The S3 URL. |
 
-##### Returns
+#### Returns
 
 `tuple[str, str]`: the same result as `parse_cloud_url`. The function does not enforce the S3 scheme.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.cloud_urls.parse_gcs_url`
+### `benchbox.utils.cloud_urls.parse_gcs_url`
 
 <span id="benchbox.utils.cloud_urls.parse_gcs_url"></span>
 
@@ -870,23 +870,23 @@ Splits a Google Cloud Storage URL by calling `parse_cloud_url`.
 def parse_gcs_url(gcs_url: str) -> tuple[str, str]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `gcs_url` | `str` | required | The GCS URL. |
 
-##### Returns
+#### Returns
 
 `tuple[str, str]`: the same result as `parse_cloud_url`. The function does not enforce the GCS scheme.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
 ## Display Formatting
 
-#### `benchbox.utils.formatting.format_duration`
+### `benchbox.utils.formatting.format_duration`
 
 <span id="benchbox.utils.formatting.format_duration"></span>
 
@@ -898,21 +898,21 @@ Formats a duration for display.
 def format_duration(seconds: float) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `seconds` | `float` | required | The duration in seconds. |
 
-##### Returns
+#### Returns
 
 `str`: values below one second are shown as milliseconds with one decimal, values from one second to below sixty seconds as seconds with three decimals, and values of sixty seconds or more as minutes with one decimal. The function does not check the range. For example, `0.123` produces `"123.0ms"` and `1.5` produces `"1.500s"`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.formatting.format_bytes`
+### `benchbox.utils.formatting.format_bytes`
 
 <span id="benchbox.utils.formatting.format_bytes"></span>
 
@@ -924,21 +924,21 @@ Formats a byte count for display.
 def format_bytes(bytes_val: int | float) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `bytes_val` | `int` or `float` | required | The number of bytes. It is converted to `float`. |
 
-##### Returns
+#### Returns
 
 `str`: the value divided repeatedly by 1,024, with the unit `B`, `KB`, `MB`, `GB` or `TB` chosen while the value is below the next boundary, and `PB` for larger values. The result always has two decimal places and a space before the unit. Despite the unit labels, the conversion uses binary factors.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.formatting.format_memory_usage`
+### `benchbox.utils.formatting.format_memory_usage`
 
 <span id="benchbox.utils.formatting.format_memory_usage"></span>
 
@@ -950,21 +950,21 @@ Formats a memory amount given in megabytes.
 def format_memory_usage(memory_mb: float) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `memory_mb` | `float` | required | The memory amount in binary megabytes. |
 
-##### Returns
+#### Returns
 
 `str`: the input multiplied by `1024 * 1024` and passed to `format_bytes`. For example, `512.5` produces `"512.50 MB"`. The input unit is binary megabytes, and the output has two decimals.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.formatting.format_number`
+### `benchbox.utils.formatting.format_number`
 
 <span id="benchbox.utils.formatting.format_number"></span>
 
@@ -976,24 +976,24 @@ Formats a number with comma thousands separators.
 def format_number(value: int | float, precision: int = 2) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `value` | `int` or `float` | required | The number to format. |
 | `precision` | `int` | `2` | The number of decimal places for values that are not integers. |
 
-##### Returns
+#### Returns
 
 `str`: the number with comma thousands separators. Integer inputs keep integer formatting whatever `precision` is. Other numeric inputs use `precision` decimal places.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself. Python formatting errors propagate.
 
 ## SQL Identifier and Parenthesis Checks
 
-#### `benchbox.utils.sql_identifier.is_valid_sql_identifier`
+### `benchbox.utils.sql_identifier.is_valid_sql_identifier`
 
 <span id="benchbox.utils.sql_identifier.is_valid_sql_identifier"></span>
 
@@ -1005,14 +1005,14 @@ Checks that a name looks like a plain ASCII SQL identifier within a length cap.
 def is_valid_sql_identifier(identifier: str, *, max_length: int) -> bool: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `identifier` | `str` | required | The name to check. |
 | `max_length` | `int` | required | The longest name the caller accepts. It is keyword-only and has no default. |
 
-##### Returns
+#### Returns
 
 `bool`: `False` for an empty or non-string input and for a name longer than `max_length`. Otherwise the result is whether the name matches the ASCII pattern `^[a-zA-Z_][a-zA-Z0-9_]*$` under Python's regular-expression matcher.
 
@@ -1020,11 +1020,11 @@ The function does not reject reserved words, does not quote a name and does not 
 
 BenchBox callers currently use caps of 63 for PostgreSQL, TimescaleDB, pg_duckdb, pg_mooncake and CedarDB; 127 for QuestDB; and 128 for Spark, LakeSail, Velox, the Hive metastore and the MySQL-wire family (Doris and SingleStore). These are project caller settings, not a universal statement about those engines.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.sql_parsing.find_matching_parenthesis`
+### `benchbox.utils.sql_parsing.find_matching_parenthesis`
 
 <span id="benchbox.utils.sql_parsing.find_matching_parenthesis"></span>
 
@@ -1036,24 +1036,24 @@ Finds the closing parenthesis that matches an opening parenthesis.
 def find_matching_parenthesis(text: str, open_index: int) -> int: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `text` | `str` | required | The text to scan. |
 | `open_index` | `int` | required | The index of the opening parenthesis. A valid index is a precondition the caller must meet. |
 
-##### Returns
+#### Returns
 
 `int`: the index of the matching closing parenthesis. The scan tracks nested parentheses. Parentheses inside single-quoted text are ignored, and doubled single quotes are recognized. Backslash escapes, comments and double-quoted identifiers are not parsed.
 
-##### Raises
+#### Raises
 
 `ValueError`: the scan reaches the end of the text without closing the group.
 
 ## Data-Generation Provenance
 
-#### `benchbox.utils.datagen_version.DATA_GENERATION_VERSION`
+### `benchbox.utils.datagen_version.DATA_GENERATION_VERSION`
 
 <span id="benchbox.utils.datagen_version.DATA_GENERATION_VERSION"></span>
 
@@ -1061,11 +1061,11 @@ The generation-logic version that is stored in manifest stamps. Maintainers must
 
 **Import:** `from benchbox.utils.datagen_version import DATA_GENERATION_VERSION` · **Extras:** none
 
-##### Returns
+#### Returns
 
 An `int` constant. The current value is `1`.
 
-#### `benchbox.utils.datagen_version.compute_base_constants_hash`
+### `benchbox.utils.datagen_version.compute_base_constants_hash`
 
 <span id="benchbox.utils.datagen_version.compute_base_constants_hash"></span>
 
@@ -1077,23 +1077,23 @@ Returns a digest of the generation version and the registered specification file
 def compute_base_constants_hash(benchmark: str | None = None) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `benchmark` | `str \| None` | `None` | The benchmark name. It is lowercased before lookup. |
 
-##### Returns
+#### Returns
 
 `str`: a SHA-256 hex digest seeded by `DATA_GENERATION_VERSION` and extended with the raw bytes of the registered specification files. The registered names are `tpch`, `tpch_skew` and `tsbs_devops` (also `tsbs`). Skewed TPC-H includes both the base TPC-H and the skew specifications. An unknown name uses only the version marker.
 
 Unreadable specification files are skipped. The digest therefore cannot certify that those files are present, and it cannot detect edits to specification files that are not registered.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.datagen_version.current_datagen_stamp`
+### `benchbox.utils.datagen_version.current_datagen_stamp`
 
 <span id="benchbox.utils.datagen_version.current_datagen_stamp"></span>
 
@@ -1105,21 +1105,21 @@ Returns the stamp to store in newly generated manifests.
 def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `benchmark` | `str \| None` | `None` | The benchmark name. |
 
-##### Returns
+#### Returns
 
 `dict[str, Any]` with `data_generation_version` and `base_constants_hash`. The current generation version is `1`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.datagen_version.compute_datagen_identity_hash`
+### `benchbox.utils.datagen_version.compute_datagen_identity_hash`
 
 <span id="benchbox.utils.datagen_version.compute_datagen_identity_hash"></span>
 
@@ -1131,22 +1131,22 @@ Returns a hash that identifies a generation setup.
 def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[str, Any] | None = None) -> str: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `benchmark` | `str \| None` | required | The benchmark name. |
 | `configuration` | `Mapping[str, Any] \| None` | `None` | The effective configuration. A shallow dictionary copy is hashed. |
 
-##### Returns
+#### Returns
 
 `str`: the hash of a compact, key-sorted JSON object that holds the generation version, the base-constants hash and the optional configuration. `None` and an empty configuration produce different identities.
 
-##### Raises
+#### Raises
 
 `TypeError`: the configuration values cannot be encoded as JSON.
 
-#### `benchbox.utils.datagen_version.manifest_datagen_is_current`
+### `benchbox.utils.datagen_version.manifest_datagen_is_current`
 
 <span id="benchbox.utils.datagen_version.manifest_datagen_is_current"></span>
 
@@ -1158,22 +1158,22 @@ Tells whether a manifest carries the current generation stamp.
 def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> bool: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `manifest` | `Mapping[str, Any] \| None` | required | The manifest to check. |
 | `benchmark` | `str \| None` | `None` | The benchmark name. An explicit value takes precedence over `manifest["benchmark"]`. |
 
-##### Returns
+#### Returns
 
 `bool`: `True` when the manifest is a mapping with the current generation version and the expected base-constants hash. The function checks neither the generated data files nor the identity of the effective configuration.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.datagen_version.describe_datagen_staleness`
+### `benchbox.utils.datagen_version.describe_datagen_staleness`
 
 <span id="benchbox.utils.datagen_version.describe_datagen_staleness"></span>
 
@@ -1185,24 +1185,24 @@ Explains why a manifest is not current.
 def describe_datagen_staleness(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> str | None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `manifest` | `Mapping[str, Any] \| None` | required | The manifest to check. |
 | `benchmark` | `str \| None` | `None` | The benchmark name. |
 
-##### Returns
+#### Returns
 
 `str | None`: `None` when the stamp is current. Otherwise a reason: the manifest is missing or unreadable, it has no version stamp, the generation version differs, or the base constants changed. The function does not regenerate data.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
 ## Data Format Selection
 
-#### `benchbox.utils.format_selection.FormatSelector`
+### `benchbox.utils.format_selection.FormatSelector`
 
 <span id="benchbox.utils.format_selection.FormatSelector"></span>
 
@@ -1210,11 +1210,11 @@ Selects a data format and inspects which formats are available locally. The clas
 
 **Import:** `from benchbox.utils.format_selection import FormatSelector` · **Extras:** none
 
-##### Parameters
+#### Parameters
 
 None. Call the static methods on the class.
 
-##### Returns
+#### Returns
 
 The methods below return these values.
 
@@ -1227,7 +1227,7 @@ The methods below return these values.
 <span id="benchbox.utils.format_selection.FormatSelector.detect_available_formats"></span>
 `FormatSelector.detect_available_formats(data_dir: Path, table_name: str, manifest_data: dict[str, Any] | None = None) -> list[str]` returns the formats found for a table. It prefers nonempty manifest format metadata: the top-level `formats`, followed by the keys of `tables[table_name]["formats"]`, without duplicates and in the order found. That path does not check that files exist. Otherwise it inspects local table-name patterns for `tbl` and `dat`, CSV and Parquet files, then the `_delta_log` directory for Delta and the Iceberg layout. It returns `["tbl"]` when nothing is detected. It does no cloud storage discovery.
 
-##### Raises
+#### Raises
 
 `ValueError`, from `select_format`, when a nonempty preference is not both available and supported.
 
@@ -1237,7 +1237,7 @@ These helpers construct names and paths. Except for `ensure_directory`, they do 
 
 Scale-label formatting and its precision and identity limits are described in {doc}`additional-utilities`.
 
-#### `benchbox.utils.output_path.normalize_output_root`
+### `benchbox.utils.output_path.normalize_output_root`
 
 <span id="benchbox.utils.output_path.normalize_output_root"></span>
 
@@ -1249,7 +1249,7 @@ Adds a benchmark and scale suffix to an output root unless the root already ends
 def normalize_output_root(output_root: str | None, benchmark: str, scale: float) -> str | None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1257,15 +1257,15 @@ def normalize_output_root(output_root: str | None, benchmark: str, scale: float)
 | `benchmark` | `str` | required | The benchmark name. It is stripped and lowercased. An empty name leaves only the scale suffix. |
 | `scale` | `float` | required | The scale factor used to build the scale suffix. |
 
-##### Returns
+#### Returns
 
 `str | None`: a falsy root is returned unchanged. Otherwise trailing slashes are stripped from the root, and the suffix is appended only when the last slash-separated component does not already match it, ignoring letter case. An existing component keeps its case. Local paths and remote URIs get the same string operation, and no scheme or file system validation happens.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.get_default_data_directory`
+### `benchbox.utils.path_utils.get_default_data_directory`
 
 <span id="benchbox.utils.path_utils.get_default_data_directory"></span>
 
@@ -1277,19 +1277,19 @@ Returns the default data directory.
 def get_default_data_directory() -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `Path`: a nonempty `BENCHBOX_DATA_DIR` used as given, otherwise `Path.cwd() / "data"`. The function does not strip whitespace and does not expand `~`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.find_work_tree_root`
+### `benchbox.utils.path_utils.find_work_tree_root`
 
 <span id="benchbox.utils.path_utils.find_work_tree_root"></span>
 
@@ -1301,21 +1301,21 @@ Finds the root of the enclosing Git work tree.
 def find_work_tree_root(start: Path | None = None) -> Path | None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `start` | `Path \| None` | `None` | The directory to start from. An explicit value is resolved first. `None` starts at `Path.cwd()`. |
 
-##### Returns
+#### Returns
 
 `Path | None`: the first directory, starting from `start` and moving up through its parents, that holds an existing `.git` entry. Both clone directories and linked-work-tree files count. It returns `None` when no entry exists. The search does not launch Git, so it also works without a Git executable while a benchmark is being constructed.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.default_benchmark_runs_root`
+### `benchbox.utils.path_utils.default_benchmark_runs_root`
 
 <span id="benchbox.utils.path_utils.default_benchmark_runs_root"></span>
 
@@ -1327,21 +1327,21 @@ Returns the default `benchmark_runs` root.
 def default_benchmark_runs_root(start: Path | None = None) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `start` | `Path \| None` | `None` | The directory to start from. |
 
-##### Returns
+#### Returns
 
 `Path`: the result of the shared runtime path resolution. It is `benchmark_runs` beside the enclosing Git work tree, or beneath the starting directory outside Git. A work tree is identified by an existing `.git` entry, not by its directory type.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.resolve_benchmark_runs_dir`
+### `benchbox.utils.path_utils.resolve_benchmark_runs_dir`
 
 <span id="benchbox.utils.path_utils.resolve_benchmark_runs_dir"></span>
 
@@ -1353,19 +1353,19 @@ Returns the directory that holds benchmark run output.
 def resolve_benchmark_runs_dir() -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `Path`: a nonblank `BENCHBOX_OUTPUT_DIR`, trimmed and with `~` expanded. Otherwise the shared work-tree-sibling rule of `default_benchmark_runs_root` applies. This is separate from the `BENCHBOX_DATA_DIR` rule used by `get_default_data_directory`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.get_benchmark_runs_datagen_path`
+### `benchbox.utils.path_utils.get_benchmark_runs_datagen_path`
 
 <span id="benchbox.utils.path_utils.get_benchmark_runs_datagen_path"></span>
 
@@ -1377,7 +1377,7 @@ Returns the generated-data directory for a benchmark and scale factor.
 def get_benchmark_runs_datagen_path(benchmark_name: str, scale_factor: float, base_dir: str | Path | None = None) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1385,15 +1385,15 @@ def get_benchmark_runs_datagen_path(benchmark_name: str, scale_factor: float, ba
 | `scale_factor` | `float` | required | The scale factor, formatted into the directory name. |
 | `base_dir` | `str`, `Path` or `None` | `None` | An explicit datagen root. `None` uses `resolve_benchmark_runs_dir() / "datagen"`. |
 
-##### Returns
+#### Returns
 
 `Path`: `<benchmark>_<formatted scale>` appended to the datagen root. An explicit root does not get another `datagen` component, and it is not expanded or resolved.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.get_benchmark_runs_databases_path`
+### `benchbox.utils.path_utils.get_benchmark_runs_databases_path`
 
 <span id="benchbox.utils.path_utils.get_benchmark_runs_databases_path"></span>
 
@@ -1405,7 +1405,7 @@ Returns the database directory for a benchmark and scale factor.
 def get_benchmark_runs_databases_path(benchmark_name: str, scale_factor: float, base_dir: str | Path | None = None) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1413,15 +1413,15 @@ def get_benchmark_runs_databases_path(benchmark_name: str, scale_factor: float, 
 | `scale_factor` | `float` | required | The scale factor, formatted into the directory name. |
 | `base_dir` | `str`, `Path` or `None` | `None` | An explicit databases root. `None` uses `resolve_benchmark_runs_dir() / "databases"`. |
 
-##### Returns
+#### Returns
 
 `Path`: the same rule as `get_benchmark_runs_datagen_path`, with `databases` as the default subdirectory.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.get_benchmark_runs_dataframe_path`
+### `benchbox.utils.path_utils.get_benchmark_runs_dataframe_path`
 
 <span id="benchbox.utils.path_utils.get_benchmark_runs_dataframe_path"></span>
 
@@ -1433,21 +1433,21 @@ Returns the directory for DataFrame data.
 def get_benchmark_runs_dataframe_path(base_dir: str | Path | None = None) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `base_dir` | `str`, `Path` or `None` | `None` | An explicit root. |
 
-##### Returns
+#### Returns
 
 `Path`: an explicit root as a `Path`, otherwise the shared `datagen` directory that SQL generation uses. No dataset suffix is appended.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.get_results_path`
+### `benchbox.utils.path_utils.get_results_path`
 
 <span id="benchbox.utils.path_utils.get_results_path"></span>
 
@@ -1459,7 +1459,7 @@ Returns the results path for a benchmark run.
 def get_results_path(benchmark_name: str, timestamp: str, base_dir: str | Path | None = None) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1467,15 +1467,15 @@ def get_results_path(benchmark_name: str, timestamp: str, base_dir: str | Path |
 | `timestamp` | `str` | required | The run timestamp. It is not sanitized. |
 | `base_dir` | `str`, `Path` or `None` | `None` | An explicit root. `None` uses the default data directory. |
 
-##### Returns
+#### Returns
 
 `Path`: `results/<benchmark>_<timestamp>` appended to the root. The default root comes from `BENCHBOX_DATA_DIR`, not from `BENCHBOX_OUTPUT_DIR`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.path_utils.ensure_directory`
+### `benchbox.utils.path_utils.ensure_directory`
 
 <span id="benchbox.utils.path_utils.ensure_directory"></span>
 
@@ -1487,23 +1487,23 @@ Creates a directory and any missing parents.
 def ensure_directory(path: str | Path) -> Path: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `path` | `str` or `Path` | required | The directory to create. |
 
-##### Returns
+#### Returns
 
 `Path`: the directory as a `Path`, not resolved. The directory is created with `exist_ok=True`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself. File system errors propagate.
 
 ## Runtime Toggles and Output
 
-#### `benchbox.utils.toggles.is_probe_requested`
+### `benchbox.utils.toggles.is_probe_requested`
 
 <span id="benchbox.utils.toggles.is_probe_requested"></span>
 
@@ -1515,13 +1515,13 @@ Normalizes an opt-out toggle into a boolean. It decides intent only and runs no 
 def is_probe_requested(value: Any) -> bool: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `value` | `Any` | required | The toggle value. |
 
-##### Returns
+#### Returns
 
 `bool`:
 
@@ -1531,13 +1531,13 @@ def is_probe_requested(value: Any) -> bool: ...
 - Any other string, including an empty one, logs a warning and returns `False`. An ambiguous input never enables a probe that could be billable.
 - Other objects use `bool(value)`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
 Quiet-aware output helpers provide a shared runtime channel. Use `emit` for text or Rich renderables. When you need Rich keyword arguments, use `quiet_console.print` or inject `quiet_console` into display classes.
 
-#### `benchbox.utils.printing.set_quiet`
+### `benchbox.utils.printing.set_quiet`
 
 <span id="benchbox.utils.printing.set_quiet"></span>
 
@@ -1549,21 +1549,21 @@ Sets the process-wide quiet state.
 def set_quiet(enabled: bool) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `enabled` | `bool` | required | Converted with `bool()`. The initial state is `False`. |
 
-##### Returns
+#### Returns
 
 `None`. The new state affects later helper calls and later attribute lookups on `quiet_console`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.is_quiet`
+### `benchbox.utils.printing.is_quiet`
 
 <span id="benchbox.utils.printing.is_quiet"></span>
 
@@ -1575,19 +1575,19 @@ Returns the process-wide quiet state.
 def is_quiet() -> bool: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `bool`: the current global quiet state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.get_console`
+### `benchbox.utils.printing.get_console`
 
 <span id="benchbox.utils.printing.get_console"></span>
 
@@ -1599,22 +1599,22 @@ Returns a Rich console for the requested channel and quiet setting.
 def get_console(quiet: bool | None = None, *, stderr: bool = False) -> Console: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `quiet` | `bool \| None` | `None` | `None` uses the global state. An explicit boolean overrides it, so `False` can force visible output while global quiet is on. |
 | `stderr` | `bool` | `False` | Use the standard error channel instead of standard output. It is keyword-only. |
 
-##### Returns
+#### Returns
 
 `Console`: the stdout and stderr consoles are created lazily and cached separately. Quiet calls share one sink console that writes to an in-memory stream, whatever channel was requested.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.get_quiet_console`
+### `benchbox.utils.printing.get_quiet_console`
 
 <span id="benchbox.utils.printing.get_quiet_console"></span>
 
@@ -1626,19 +1626,19 @@ Returns the quiet sink console.
 def get_quiet_console() -> Console: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `Console`: the sink console, whatever the global quiet state is. The call does not change that state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.emit`
+### `benchbox.utils.printing.emit`
 
 <span id="benchbox.utils.printing.emit"></span>
 
@@ -1650,7 +1650,7 @@ Prints a message or Rich renderable unless output is quiet.
 def emit(msg: Any = "", *, quiet: bool | None = None, stderr: bool = False) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1658,15 +1658,15 @@ def emit(msg: Any = "", *, quiet: bool | None = None, stderr: bool = False) -> N
 | `quiet` | `bool \| None` | `None` | Same precedence as `get_console`: `None` uses the global state and an explicit boolean overrides it. It is keyword-only. |
 | `stderr` | `bool` | `False` | Print to standard error. It is keyword-only. |
 
-##### Returns
+#### Returns
 
 `None`. A quiet call returns without printing. A visible call passes the single message or renderable to Rich's `Console.print` on the requested channel. The function does not accept Rich styling keyword arguments.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.info`
+### `benchbox.utils.printing.info`
 
 <span id="benchbox.utils.printing.info"></span>
 
@@ -1678,21 +1678,21 @@ Prints an informational message.
 def info(msg: str) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `msg` | `str` | required | The message. |
 
-##### Returns
+#### Returns
 
 `None`. The call goes to `emit` on standard output under the global quiet state. These helpers do not apply logging levels and do not use a separate verbosity gate.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.warn`
+### `benchbox.utils.printing.warn`
 
 <span id="benchbox.utils.printing.warn"></span>
 
@@ -1704,21 +1704,21 @@ Prints a warning message.
 def warn(msg: str) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `msg` | `str` | required | The message. |
 
-##### Returns
+#### Returns
 
 `None`. The call goes to `emit` on standard output under the global quiet state. These helpers do not apply logging levels and do not use a separate verbosity gate.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.debug`
+### `benchbox.utils.printing.debug`
 
 <span id="benchbox.utils.printing.debug"></span>
 
@@ -1730,21 +1730,21 @@ Prints a debug message.
 def debug(msg: str) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `msg` | `str` | required | The message. |
 
-##### Returns
+#### Returns
 
 `None`. The call goes to `emit` on standard output under the global quiet state. These helpers do not apply logging levels and do not use a separate verbosity gate.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.error`
+### `benchbox.utils.printing.error`
 
 <span id="benchbox.utils.printing.error"></span>
 
@@ -1756,21 +1756,21 @@ Prints an error message.
 def error(msg: str) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `msg` | `str` | required | The message. |
 
-##### Returns
+#### Returns
 
 `None`. The call goes to `emit` on standard error under the global quiet state. It does not apply a logging level.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.silence_output`
+### `benchbox.utils.printing.silence_output`
 
 <span id="benchbox.utils.printing.silence_output"></span>
 
@@ -1782,21 +1782,21 @@ A context manager that temporarily replaces `sys.stdout` and `sys.stderr` with i
 def silence_output(enabled: bool = True) -> Iterator[None]: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `enabled` | `bool` | `True` | `False` makes the context manager do nothing. |
 
-##### Returns
+#### Returns
 
 A context manager that yields `None`. Both streams are restored in a `finally` block. It changes the process-wide stream bindings, not file descriptors or output streams that other code holds independently. It is not task-local isolation, and it does not change the global quiet state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.printing.QuietConsoleProxy`
+### `benchbox.utils.printing.QuietConsoleProxy`
 
 <span id="benchbox.utils.printing.QuietConsoleProxy"></span>
 
@@ -1808,21 +1808,21 @@ Forwards attribute lookups and context-manager calls to the console that the qui
 class QuietConsoleProxy: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 A proxy object. `quiet_console` in the same module is the shared instance. Changing the quiet state affects later lookups on it. Its representation reports `quiet` or `verbose` according to the global state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
 ## Verbosity Settings and Logging
 
-#### `benchbox.utils.verbosity.VerbositySettings`
+### `benchbox.utils.verbosity.VerbositySettings`
 
 <span id="benchbox.utils.verbosity.VerbositySettings"></span>
 <span id="benchbox.utils.verbosity.VerbositySettings.__init__"></span>
@@ -1836,7 +1836,7 @@ class VerbositySettings:
     def __init__(self, level: int = 0, verbose_enabled: bool = False, very_verbose: bool = False, quiet: bool = False) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1845,7 +1845,7 @@ class VerbositySettings:
 | `very_verbose` | `bool` | `False` | Whether very verbose output is on. |
 | `quiet` | `bool` | `False` | Whether output is quiet. |
 
-##### Returns
+#### Returns
 
 A frozen `VerbositySettings`. Direct construction does not normalize inconsistent fields.
 
@@ -1864,11 +1864,11 @@ A frozen `VerbositySettings`. Direct construction does not normalize inconsisten
 <span id="benchbox.utils.verbosity.VerbositySettings.default"></span>
 `VerbositySettings.default() -> VerbositySettings` (class method) returns the default settings shown in the signature.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself. The class methods let conversion errors propagate.
 
-#### `benchbox.utils.verbosity.compute_verbosity`
+### `benchbox.utils.verbosity.compute_verbosity`
 
 <span id="benchbox.utils.verbosity.compute_verbosity"></span>
 
@@ -1880,22 +1880,22 @@ Computes verbosity settings from flags. It calls `VerbositySettings.from_flags`.
 def compute_verbosity(verbose: int | bool | None, quiet: bool | None) -> VerbositySettings: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `verbose` | `int`, `bool` or `None` | required | The verbose flag or level. |
 | `quiet` | `bool \| None` | required | The quiet flag. |
 
-##### Returns
+#### Returns
 
 `VerbositySettings`: the result of `VerbositySettings.from_flags`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.verbosity.VerbosityMixin`
+### `benchbox.utils.verbosity.VerbosityMixin`
 
 <span id="benchbox.utils.verbosity.VerbosityMixin"></span>
 
@@ -1907,11 +1907,11 @@ A mixin that gives a class verbosity-aware logging methods.
 class VerbosityMixin: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 A mixin class. Consumers set `logger` to a `logging.Logger` before a logging method uses it. Reading an unset logger raises `AttributeError`, and assigning another type raises `TypeError`. The verbosity fields start at level 0 with false flags.
 
@@ -1947,11 +1947,11 @@ Logging methods return without logging when `quiet` is true. They log through Py
 <span id="benchbox.utils.verbosity.VerbosityMixin.log_version_warning"></span>
 `log_version_warning()` checks version consistency and logs any inconsistency at WARNING. When very verbose, it adds source details at DEBUG. Failures in the version check are suppressed.
 
-##### Raises
+#### Raises
 
 `AttributeError` when `logger` is read before it is set, and `TypeError` when `logger` is assigned something other than a `logging.Logger`.
 
-#### `benchbox.utils.verbosity.create_debug_logger`
+### `benchbox.utils.verbosity.create_debug_logger`
 
 <span id="benchbox.utils.verbosity.create_debug_logger"></span>
 
@@ -1963,7 +1963,7 @@ Returns the named logger with its level set from the verbosity settings.
 def create_debug_logger(name: str, verbose_level: int = 0, quiet: bool = False) -> logging.Logger: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -1971,17 +1971,17 @@ def create_debug_logger(name: str, verbose_level: int = 0, quiet: bool = False) 
 | `verbose_level` | `int` | `0` | The verbosity level. |
 | `quiet` | `bool` | `False` | Whether output is quiet. |
 
-##### Returns
+#### Returns
 
 `logging.Logger`: the named Python logger. Its level is ERROR for quiet, DEBUG for level 2 or higher, INFO for level 1, and WARNING otherwise. The function changes the shared named logger and adds no handlers.
 
 At level 2 or higher it also checks version consistency and logs a warning if it is inconsistent, even when quiet was requested. The logger's ERROR level normally filters that warning in quiet mode. Failures in the version check are suppressed.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.verbosity.log_debug_context`
+### `benchbox.utils.verbosity.log_debug_context`
 
 <span id="benchbox.utils.verbosity.log_debug_context"></span>
 
@@ -1993,7 +1993,7 @@ Logs a title and each key and value of a context dictionary at DEBUG.
 def log_debug_context(logger: logging.Logger, context: dict[str, Any], title: str = "Debug Context") -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -2001,15 +2001,15 @@ def log_debug_context(logger: logging.Logger, context: dict[str, Any], title: st
 | `context` | `dict[str, Any]` | required | The values to log. |
 | `title` | `str` | `"Debug Context"` | The title line. |
 
-##### Returns
+#### Returns
 
 `None`. The function does not consult a separate verbosity or quiet state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.verbosity.log_import_debug`
+### `benchbox.utils.verbosity.log_import_debug`
 
 <span id="benchbox.utils.verbosity.log_import_debug"></span>
 
@@ -2021,7 +2021,7 @@ Logs the success or failure of an import at DEBUG.
 def log_import_debug(logger: logging.Logger, module_name: str, error: Exception | None = None) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -2029,11 +2029,11 @@ def log_import_debug(logger: logging.Logger, module_name: str, error: Exception 
 | `module_name` | `str` | required | The name of the imported module. |
 | `error` | `Exception \| None` | `None` | A truthy error selects the failure output. |
 
-##### Returns
+#### Returns
 
 `None`. A failure logs the available version and Python context. Failures of the version report are suppressed. The function does not consult a separate verbosity or quiet state.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
@@ -2041,7 +2041,7 @@ Nothing it raises itself.
 
 The [Execution Configuration](#execution-configuration) section above describes `ExecutionConfigHelper`. This section describes the providers and settings classes behind it.
 
-#### `benchbox.utils.config_interface.ConfigInterface`
+### `benchbox.utils.config_interface.ConfigInterface`
 
 <span id="benchbox.utils.config_interface.ConfigInterface"></span>
 
@@ -2053,19 +2053,19 @@ The abstract provider interface for configuration values. Providers may offer ri
 class ConfigInterface: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None. It is an abstract class.
 
-##### Returns
+#### Returns
 
 An abstract base class with two methods that every provider must implement: `get(key, default=None)` and `set(key, value)`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_interface.SimpleConfigProvider`
+### `benchbox.utils.config_interface.SimpleConfigProvider`
 
 <span id="benchbox.utils.config_interface.SimpleConfigProvider"></span>
 <span id="benchbox.utils.config_interface.SimpleConfigProvider.__init__"></span>
@@ -2079,13 +2079,13 @@ class SimpleConfigProvider:
     def __init__(self, defaults: dict | None = None) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `defaults` | `dict \| None` | `None` | Values to store. They are shallow-copied, and keys that are absent are filled with the built-in defaults. Supplied values, including `None`, take precedence. |
 
-##### Returns
+#### Returns
 
 A `SimpleConfigProvider`. Keys are flat dotted strings, not nested-path lookups.
 
@@ -2100,11 +2100,11 @@ A `SimpleConfigProvider`. Keys are flat dotted strings, not nested-path lookups.
 
 The built-in `execution.power_run` defaults are `iterations=4`, `warm_up_iterations=0`, `timeout_per_iteration_minutes=60` and `concurrent_streams=1`. The `execution.throughput_test` defaults are `duration_minutes=60`, `concurrent_streams=4` and `warm_up_minutes=5`. The other execution defaults are `timeout_minutes=120`, `memory_limit_gb=8` and `enable_profiling=False`.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_interface.set_config_provider`
+### `benchbox.utils.config_interface.set_config_provider`
 
 <span id="benchbox.utils.config_interface.set_config_provider"></span>
 
@@ -2116,21 +2116,21 @@ Registers a process-wide configuration provider.
 def set_config_provider(provider: ConfigInterface | None) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `provider` | `ConfigInterface \| None` | required | The provider to register. `None` clears the registration. |
 
-##### Returns
+#### Returns
 
 `None`. Higher layers supply their user configuration through this interface, which keeps the utilities independent of CLI imports.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_interface.get_config_provider`
+### `benchbox.utils.config_interface.get_config_provider`
 
 <span id="benchbox.utils.config_interface.get_config_provider"></span>
 
@@ -2142,19 +2142,19 @@ Returns the registered configuration provider, or a built-in provider when none 
 def get_config_provider() -> ConfigInterface: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `ConfigInterface`: the registered object when there is one. Otherwise the result of `get_default_config_provider`. This fallback supports library and MCP consumers that run without CLI startup. Changes made to an unregistered fallback do not persist across later calls.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_interface.get_default_config_provider`
+### `benchbox.utils.config_interface.get_default_config_provider`
 
 <span id="benchbox.utils.config_interface.get_default_config_provider"></span>
 
@@ -2166,19 +2166,19 @@ Creates a built-in configuration provider.
 def get_default_config_provider() -> ConfigInterface: ...
 ```
 
-##### Parameters
+#### Parameters
 
 None.
 
-##### Returns
+#### Returns
 
 `ConfigInterface`: a new built-in provider on every call.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_helpers.PowerRunSettings`
+### `benchbox.utils.config_helpers.PowerRunSettings`
 
 <span id="benchbox.utils.config_helpers.PowerRunSettings"></span>
 
@@ -2190,7 +2190,7 @@ A mutable dataclass for the power-run execution settings.
 class PowerRunSettings: ...
 ```
 
-##### Parameters
+#### Parameters
 
 Every field is required when the class is constructed directly. The defaults in the table are the fallback values that `from_config_manager` uses when the manager has no value.
 
@@ -2202,7 +2202,7 @@ Every field is required when the class is constructed directly. The defaults in 
 | `fail_fast` | `bool` | `False` | Whether to stop on the first failure. |
 | `collect_metrics` | `bool` | `True` | Whether to collect metrics. |
 
-##### Returns
+#### Returns
 
 A `PowerRunSettings`. It reads and writes its fields under the dotted prefix `execution.power_run`. The fallback values are `iterations=4`, `warm_up_iterations=0`, `timeout_per_iteration_minutes=60`, `fail_fast=False`, `collect_metrics=True`.
 
@@ -2217,11 +2217,11 @@ A `PowerRunSettings`. It reads and writes its fields under the dotted prefix `ex
 
 None of these operations coerce or validate values.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_helpers.ConcurrentQueriesSettings`
+### `benchbox.utils.config_helpers.ConcurrentQueriesSettings`
 
 <span id="benchbox.utils.config_helpers.ConcurrentQueriesSettings"></span>
 
@@ -2233,7 +2233,7 @@ A mutable dataclass for the concurrent-query execution settings.
 class ConcurrentQueriesSettings: ...
 ```
 
-##### Parameters
+#### Parameters
 
 Every field is required when the class is constructed directly. The defaults in the table are the fallback values that `from_config_manager` uses when the manager has no value.
 
@@ -2246,7 +2246,7 @@ Every field is required when the class is constructed directly. The defaults in 
 | `retry_failed_queries` | `bool` | `True` | Whether failed queries are retried. |
 | `max_retries` | `int` | `3` | The maximum number of retries. |
 
-##### Returns
+#### Returns
 
 A `ConcurrentQueriesSettings`. It reads and writes its fields under the dotted prefix `execution.concurrent_queries`. The fallback values are `enabled=False`, `max_concurrent=2`, `query_timeout_seconds=300`, `stream_timeout_seconds=3600`, `retry_failed_queries=True`, `max_retries=3`.
 
@@ -2261,11 +2261,11 @@ A `ConcurrentQueriesSettings`. It reads and writes its fields under the dotted p
 
 None of these operations coerce or validate values.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself.
 
-#### `benchbox.utils.config_helpers.ExecutionConfigHelper`
+### `benchbox.utils.config_helpers.ExecutionConfigHelper`
 
 <span id="benchbox.utils.config_helpers.ExecutionConfigHelper"></span>
 
@@ -2273,7 +2273,7 @@ Reads and changes execution settings through a configuration provider. The param
 
 The helper keeps the manager it was given. Without one, it takes the registered or default provider at construction, and later registrations do not replace that captured object.
 
-#### `benchbox.utils.config_helpers.create_sample_execution_config`
+### `benchbox.utils.config_helpers.create_sample_execution_config`
 
 <span id="benchbox.utils.config_helpers.create_sample_execution_config"></span>
 
@@ -2285,17 +2285,17 @@ Writes a sample YAML execution configuration file.
 def create_sample_execution_config(output_path: str | Path) -> None: ...
 ```
 
-##### Parameters
+#### Parameters
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `output_path` | `str` or `Path` | required | The file to write. |
 
-##### Returns
+#### Returns
 
 `None`. The file is written in UTF-8 and replaces an existing file. Parent directories are not created. The sample holds execution settings and profile descriptions. It does not register a provider and does not apply settings.
 
-##### Raises
+#### Raises
 
 Nothing it raises itself. YAML import, conversion and file system errors propagate.
 
