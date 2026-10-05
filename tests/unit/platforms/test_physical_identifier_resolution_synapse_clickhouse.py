@@ -139,7 +139,7 @@ class TestClickHousePhysicalIdentifiers:
         assert "l_orderkey INTEGER NOT NULL" in lineitem
 
     def test_apply_table_tunings_never_optimizes(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True, "tuning_enabled": True})
         client = RecordingClient()
         tuning = _lineitem_tuning(
             sorting=[TuningColumn(name="L_ORDERKEY", type="INTEGER", order=1)],
@@ -151,7 +151,7 @@ class TestClickHousePhysicalIdentifiers:
         assert client.tuning_statements == []
 
     def test_post_load_optimize_targets_the_physical_table(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True, "tuning_enabled": True})
         client = RecordingClient()
 
         adapter.apply_post_load_tunings("LINEITEM", SimpleNamespace(table_tunings={}), client)
@@ -169,7 +169,7 @@ class TestClickHousePhysicalIdentifiers:
     def test_post_load_optimize_names_the_table_the_schema_created(
         self, clickhouse_factory, adapter_cls, kwargs, tpch_benchmark
     ):
-        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True, "tuning_enabled": True})
         client = RecordingClient()
         adapter.create_schema(tpch_benchmark, client)
         created = _clickhouse_created_tables(client.statements)
@@ -182,7 +182,7 @@ class TestClickHousePhysicalIdentifiers:
         assert targets <= set(created)
 
     def test_mixed_case_schema_is_resolved_through_the_catalog(self, clickhouse_factory, adapter_cls, kwargs):
-        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True})
+        adapter = clickhouse_factory(adapter_cls, {**kwargs, "optimize_after_load": True, "tuning_enabled": True})
         client = RecordingClient(
             tables=["DimDate", "DimCustomer", "lineitem"],
             columns={"DimCustomer": ["SK_CustomerID", "CustomerID"]},

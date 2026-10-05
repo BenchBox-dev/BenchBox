@@ -364,3 +364,22 @@ class TestClickHouseOptionReachesTheAdapter:
 
         assert enabled._optimize_after_load_enabled() is True
         assert default._optimize_after_load_enabled() is False
+
+    @pytest.mark.parametrize("adapter_name", ["ClickHouseLocalAdapter", "ClickHouseCloudAdapter"])
+    def test_optimize_after_load_does_nothing_when_tuning_is_off(self, adapter_name):
+        import importlib
+
+        module = importlib.import_module(
+            "benchbox.platforms.clickhouse_local" if "Local" in adapter_name else "benchbox.platforms.clickhouse_cloud"
+        )
+        config = {"host": "h", "password": "p"} if "Cloud" in adapter_name else {}
+        with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
+            adapter = getattr(module, adapter_name).from_config({**config, "optimize_after_load": True})
+        connection = _Connection()
+
+        assert adapter.apply_post_load_tunings("lineitem", CONFIG, connection) is False
+        assert connection.statements == []
+
+        adapter.tuning_enabled = True
+        assert adapter.apply_post_load_tunings("lineitem", CONFIG, connection) is True
+        assert [s for s in connection.statements if "system." not in s] == ["OPTIMIZE TABLE lineitem FINAL"]

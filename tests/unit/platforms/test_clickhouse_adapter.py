@@ -999,6 +999,7 @@ class TestClickHouseAdapter:
         assert optimize_final_calls == []
 
         adapter.platform_config["optimize_after_load"] = True
+        adapter.tuning_enabled = True
         adapter.apply_post_load_tunings("test_table", Mock(table_tunings={}), connection)
 
         post_load_calls = [

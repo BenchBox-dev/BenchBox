@@ -351,7 +351,7 @@ class ClickHouseTuningMixin:
         return bool(value)
 
     def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
-        if not self._optimize_after_load_enabled():
+        if not getattr(self, "tuning_enabled", False) or not self._optimize_after_load_enabled():
             return False
         self.optimize_table(connection, self.resolve_physical_table(table_name, connection))
         return True
