@@ -19,12 +19,31 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.primitives_benchmark_utils import quote_identifier
+from benchbox.core.primitives_benchmark_utils import (
+    failed_platform_error,
+    quote_identifier_for_dialect,
+    table_exists,
+)
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
 
 ResultT = TypeVar("ResultT")
 _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
+# Dialects whose driver rollback() is a no-op under autocommit, so an explicit
+# SQL ROLLBACK is needed to close a transaction opened by catalog BEGIN SQL.
+_SQL_ROLLBACK_AFTER_ERROR_DIALECTS = frozenset({"databricks"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
+# The catalog writes integer series as ``(SELECT unnest(generate_series(a, b)) AS n) t``.
+# Snowflake and BigQuery have neither function (verified live: "Unknown functions
+# GENERATE_SERIES, UNNEST" and "Unexpected keyword UNNEST"); rewrite the whole
+# derived-table body into each engine's series generator.
+_UNNEST_SERIES_SELECT_RE = re.compile(
+    r"SELECT\s+unnest\(\s*generate_series\(\s*(?P<lo>[^,()]+?)\s*,\s*(?P<hi>[^,()]+?)\s*\)\s*\)\s+AS\s+(?P<alias>\w+)",
+    re.IGNORECASE,
+)
+_SERIES_SELECT_TEMPLATES = {
+    "snowflake": "SELECT value::INT AS {alias} FROM TABLE(FLATTEN(ARRAY_GENERATE_RANGE({lo}, {hi} + 1)))",
+    "bigquery": "SELECT {alias} FROM UNNEST(GENERATE_ARRAY({lo}, {hi})) AS {alias}",
+}
 _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
     r"SET\s+TRANSACTION\s+ISOLATION\s+LEVEL\s+(?P<level>REPEATABLE\s+READ|SERIALIZABLE|READ\s+COMMITTED)\s*;\s*"
     r"BEGIN\s+TRANSACTION\s*;",
@@ -61,6 +80,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     operations_manager: OperationsRegistryBase[Any]
     data_generator: Any
     tables: dict[str, Path]
+    _setup_dialect: str = "standard"
 
     # ------------------------------------------------------------------
     # Abstract hooks implemented spec-locally
@@ -283,6 +303,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
         operation = self.operations_manager.get_operation(operation_id)
 
+        # Seed the quoting dialect before the reuse probe: is_setup()
+        # quotes staging probes through _setup_dialect, which setup() only
+        # copies from platform_key afterwards. On a fresh benchmark object
+        # against an already-initialized cloud database the probe would
+        # otherwise use the default "standard" quoting (double-quoted
+        # source-case names), miss backticked UPPERCASE tables on BigQuery
+        # or quoted-uppercase tables on Snowflake, and rerun setup —
+        # including lock/table DDL a reuse principal may not run.
+        if platform_key:
+            self._setup_dialect = platform_key
         if operation.requires_setup and not self.is_setup(connection):
             self.log_verbose("Staging tables not initialized - running setup() automatically...")
             try:
@@ -319,18 +349,37 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
     def _rewrite_transactional_sql_for_platform(self, sql: str, platform_key: str | None) -> str:
         """Apply narrow transactional catalog rewrites for the active SQL dialect."""
-        if (platform_key or "").lower() not in _POSTGRES_SERIES_DIALECTS:
+        dialect = (platform_key or "").lower()
+        template = _SERIES_SELECT_TEMPLATES.get(dialect)
+        if template is not None:
+            return _UNNEST_SERIES_SELECT_RE.sub(
+                lambda m: template.format(lo=m.group("lo"), hi=m.group("hi"), alias=m.group("alias")), sql
+            )
+        if dialect not in _POSTGRES_SERIES_DIALECTS:
             return sql
         sql = _UNNEST_GENERATE_SERIES_RE.sub(r"generate_series(\g<args>)", sql)
         return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)
 
     def _rollback_connection_after_error(self, connection: DatabaseConnection) -> None:
-        """Clear aborted transaction state on drivers that require explicit rollback after errors."""
+        """Clear aborted transaction state after an operation error.
+
+        Catalog operations open transactions with explicit ``BEGIN TRANSACTION``
+        SQL. Under autocommit, a DB-API ``rollback()`` is a no-op on some
+        drivers (Databricks SQL), so a statement that fails between BEGIN and
+        COMMIT leaves the SQL transaction open and every later statement on the
+        session fails. Issue a SQL ROLLBACK as well; engines with no open
+        transaction treat it as a no-op or raise, and either is ignored.
+        """
         try:
             if hasattr(connection, "rollback"):
                 connection.rollback()
         except Exception as exc:
             self.log_verbose(f"Warning: rollback after operation error failed: {exc}")
+        if (getattr(self, "_setup_dialect", None) or "").lower() in _SQL_ROLLBACK_AFTER_ERROR_DIALECTS:
+            try:
+                connection.execute("ROLLBACK")
+            except Exception as exc:
+                self.log_verbose(f"SQL ROLLBACK after operation error was not needed or failed: {exc}")
 
     # ------------------------------------------------------------------
     # Staging provenance manifest
@@ -353,25 +402,61 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     #: write_primitives sharing one physical database do not clobber each
     #: other's row.
     #:
-    #: The ``_v2`` generation is load-bearing, not cosmetic. The first release
-    #: of this manifest wrote a row unconditionally at the end of ``setup()``,
-    #: including on the path that skipped repopulation because the staging
-    #: tables were already non-empty. Those rows are *internally consistent* --
-    #: correct scale, correct spec version, and a digest of the live source
-    #: tables -- while the staging data they describe is stale. Reusing the
-    #: original table name would therefore match them, ``is_setup()`` would
-    #: short-circuit, and every database that generation already mis-certified
-    #: would stay silently wrong forever. A new name makes them unmatchable, so
-    #: those databases take the missing-manifest path and rebuild once.
-    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v2"
+    #: The ``_v3`` generation is load-bearing, not cosmetic, as was the
+    #: ``_v2`` bump before it. The first release of this manifest wrote a row
+    #: unconditionally at the end of ``setup()``, including on the path that
+    #: skipped repopulation because the staging tables were already non-empty.
+    #: Those rows are *internally consistent* -- correct scale, correct spec
+    #: version, and a digest of the live source tables -- while the staging
+    #: data they describe is stale; the ``_v2`` name made them unmatchable so
+    #: those databases rebuilt once. The ``_v2`` generation in turn can certify
+    #: staging tables created before the Databricks catalogManaged DDL
+    #: requirement: again internally consistent rows describing plain
+    #: (non-catalog-managed) Delta tables that Databricks multi-statement
+    #: transactions cannot write
+    #: (TRANSACTION_NOT_SUPPORTED.WRITE_NON_CATALOG_MANAGED_TABLE). Reusing the
+    #: ``_v2`` name would therefore match them, ``is_setup()`` would
+    #: short-circuit, ``CREATE TABLE IF NOT EXISTS`` would leave the legacy
+    #: tables in place, and every affected database would keep failing its
+    #: transaction operations. A new name makes them unmatchable, so those
+    #: databases take the missing-manifest path and rebuild once with the
+    #: catalogManaged DDL.
+    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v3"
 
-    #: Superseded manifest table, dropped on rebuild so a database does not
+    #: Superseded manifest tables, dropped on rebuild so a database does not
     #: carry a stale generation's rows around indefinitely. Never read.
-    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = ("benchbox_staging_manifest",)
+    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = (
+        "benchbox_staging_manifest_v2",
+        "benchbox_staging_manifest",
+    )
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
-        return quote_identifier(identifier)
+        return quote_identifier_for_dialect(identifier, getattr(self, "_setup_dialect", "standard"))
+
+    def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
+        """Check if a table exists in the database.
+
+        Uses a platform-agnostic approach that attempts to query the table
+        with LIMIT 0, which should work across most SQL databases without
+        requiring INFORMATION_SCHEMA access.
+
+        Args:
+            connection: Database connection
+            table_name: Name of table to check (will be quoted for safety)
+
+        Returns:
+            True if table exists, False otherwise
+
+        Note:
+            This method catches exceptions to distinguish between:
+            - Table doesn't exist (expected, returns False)
+            - Other errors (logged, returns False for safety)
+
+        Security:
+            Table name is quoted using _quote_identifier() to prevent SQL injection.
+        """
+        return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
     def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
         """Remove superseded manifest generations during a rebuild.
@@ -426,13 +511,27 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         for table in source_tables:
             try:
                 quoted = self._quote_identifier(table)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                count = result[0] if result else 0
+                res = connection.execute(f"SELECT COUNT(*) FROM {quoted}")
+                if failed_platform_error(res) is not None:
+                    count = 0
+                else:
+                    result = res.fetchone()
+                    count = result[0] if result else 0
             except Exception:
                 count = 0
             parts.append(f"{table}:{count}")
         payload = "|".join(parts)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _manifest_text_type(self) -> str:
+        """Return the unbounded text column type for the staging manifest DDL.
+
+        Databricks SQL rejects ``VARCHAR`` without a length, and BigQuery has
+        no ``VARCHAR`` at all; both spell the type ``STRING``. Other engines
+        accept a bare ``VARCHAR``.
+        """
+        dialect = (getattr(self, "_setup_dialect", None) or "standard").lower()
+        return "STRING" if dialect in ("databricks", "bigquery") else "VARCHAR"
 
     def _write_staging_manifest(self, connection: DatabaseConnection, source_tables: list[str]) -> None:
         """Persist this setup()'s staging provenance so a later is_setup() can require an exact match.
@@ -446,18 +545,42 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
 
-        connection.execute(
+        text_type = self._manifest_text_type()
+        res1 = connection.execute(
             f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
-            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
-            "source_digest VARCHAR, created_at VARCHAR)"
+            f"benchmark {text_type}, scale {text_type}, spec_version {text_type}, "
+            f"source_digest {text_type}, created_at {text_type})"
         )
-        connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res1)) is not None:
+            raise RuntimeError(f"Failed to create staging manifest table: {err}")
+
+        res2 = connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res2)) is not None:
+            raise RuntimeError(f"Failed to delete previous staging manifest entry: {err}")
+
         created_at = datetime.now(timezone.utc).isoformat()
-        connection.execute(
+        res3 = connection.execute(
             f"INSERT INTO {quoted_table} (benchmark, scale, spec_version, source_digest, created_at) VALUES "
             f"('{_sql_escape(benchmark_id)}', '{_sql_escape(scale)}', '{_sql_escape(spec_version)}', "
             f"'{_sql_escape(source_digest)}', '{_sql_escape(created_at)}')"
         )
+        if (err := failed_platform_error(res3)) is not None:
+            raise RuntimeError(f"Failed to insert staging manifest entry: {err}")
+
+    def _invalidate_staging_manifest(self, connection: DatabaseConnection) -> None:
+        """Remove this benchmark's manifest row before rebuilding staging in place.
+
+        A rebuild that replaces tables in place leaves earlier tables populated
+        if it fails part-way. Without this, the old manifest row would still
+        match and a later setup() would reuse the half-rebuilt staging set.
+        """
+        benchmark_id, _scale, _spec = self._staging_provenance_key()
+        quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
+        try:
+            connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        except Exception as e:
+            # A missing manifest table already means "no reusable staging".
+            self.log_verbose(f"Staging manifest not cleared ({e})")
 
     def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
         """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
@@ -478,7 +601,10 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 f"spec_version = '{_sql_escape(spec_version)}' AND "
                 f"source_digest = '{_sql_escape(source_digest)}'"
             )
-            result = connection.execute(query).fetchone()
+            res = connection.execute(query)
+            if failed_platform_error(res) is not None:
+                return False
+            result = res.fetchone()
             return bool(result and result[0])
         except Exception:
             return False

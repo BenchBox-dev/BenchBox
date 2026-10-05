@@ -47,7 +47,9 @@ MIRRORED_PREFIXES: tuple[str, ...] = (
     "results-data/generate_corpus_inventory.py",
     "benchbox/validation/bundle.py",
     "benchbox/core/results/query_status.py",
+    "benchbox/core/results/schema_policy.py",
     "scripts/validate_submission.py",
+    "scripts/publication/validator_parity.py",
     "scripts/generate_corpus_inventory.py",
 )
 

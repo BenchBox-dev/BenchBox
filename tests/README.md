@@ -46,6 +46,22 @@ Many are isolated and fast, but the directory does not itself guarantee a
 runtime or absence of external dependencies. Select the `fast` marker for the
 curated fast lane.
 
+Unit tests derive checkout paths from `tests.utilities.paths.REPO_ROOT`, not
+the caller's working directory. The early pytest plugin acquires the shared
+test lock before creating a disposable HOME, so conftest imports and collection
+cannot read the caller's BenchBox configuration. Each unit test then receives
+a fresh HOME. Child pytest processes share only a verified ancestor's live
+lock, including collection-only subprocesses.
+
+The required state detector checks cwd, every environment key, and registered
+raw quiet/config-provider globals after fixture teardown. It restores leaked
+state and reports a teardown error without printing environment values. Use
+`monkeypatch` or an owned context for intentional changes. Existing reset safety
+nets defer to that final check rather than hiding leaks. Unit CLI invocations
+own their quiet/provider state because CliRunner does not exit a real CLI
+process. Patch wall clocks at the consuming module, not globally, so timeout
+and watchdog clocks keep running.
+
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
 - CLI option validation
@@ -100,7 +116,7 @@ directory name.
 The standard gates are intentionally split by the risk they are meant to catch:
 
 - `make test-fast`: quick developer and develop-PR feedback for code-impacting
-  changes. The matching selection in `.github/workflows/pr.yml` also collects
+  changes. The matching selection in `.github/workflows/ci.yml` also collects
   coverage.
 - `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
   DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
@@ -152,7 +168,7 @@ The standard gates are intentionally split by the risk they are meant to catch:
     SKIPs (e.g. duckdb unavailable, or the case dropped from the stable matrix),
     which would otherwise pass the gate without executing anything.
   - **Required CI job composition**: the `correctness-gate` job in
-    `.github/workflows/pr.yml` runs more than this row-count+value gate. It also runs
+    `.github/workflows/ci.yml` runs more than this row-count+value gate. It also runs
     the value-level cross-surface and TPC-Havoc equivalence gates
     (`tpchavoc-equivalence-report`, `tpchavoc-dataframe-equivalence-report`, and the
     ssb/amplab/coffeeshop/clickbench/joinorder-synthetic cross-surface reports), so
@@ -167,7 +183,7 @@ The standard gates are intentionally split by the risk they are meant to catch:
   signals until their cost, credential, and flake policies are suitable for
   blocking routine PRs.
 
-The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`,
+The `medium-test` job in `.github/workflows/ci.yml` runs `make test-medium`,
 but only when the heavy tier is needed: code-routed runs where the event is
 `merge_group` or the change touches soundness paths or packaging
 (`scripts/heavy_tier_needed.py` reports `heavy-needed == 'true'`). Ordinary
@@ -354,9 +370,10 @@ override.
 - Lock path defaults to `~/.benchbox/test.lock`; `BENCHBOX_TEST_LOCK_DIR`
   changes only the directory, not the filename.
 - Uses `fcntl.flock(LOCK_EX | LOCK_NB)` on POSIX, `msvcrt.locking` on Windows.
-- On contention, the second run **fails fast** with a message identifying the
-  holder (pid, start time, command) and three recovery options. See
-  `tests/conftest.py:138-159`.
+- On contention, the second local run waits up to 3600 seconds with holder
+  information and periodic progress messages. Set
+  `BENCHBOX_TEST_LOCK_WAIT_SECONDS=0` to fail immediately; CI does this.
+  Ctrl-C cancels the wait without disturbing the holder.
 - The fd is held open for the whole session and released in `pytest_unconfigure`.
 
 **When to bypass**: only for intentional concurrent debug runs. Set

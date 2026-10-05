@@ -209,6 +209,29 @@ class TestValidateBundle:
         assert vr.ok, vr.errors
         assert not any("provenance cutoff" in warning for warning in vr.warnings)
 
+    @pytest.mark.parametrize("tuning", [{"validation_status": "not_applicable"}, {}])
+    def test_untuned_status_only_tuning_block_still_warns(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "tuning",
+        [{"requested": {"table_tunings": {"t": {}}}}, {"source": "yaml", "hash": "a" * 64}],
+    )
+    def test_requested_or_legacy_tuning_evidence_suppresses_the_warning(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
     def test_post_cutoff_z_order_does_not_warn(self):
         data = self._databricks_bundle()
         data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
@@ -965,7 +988,7 @@ class TestCacheControlGate:
     def test_absent_receipt_with_declared_enabled_cache_refused(self):
         # A receipt-capable platform declaring result_cache_enabled without a
         # receipt advertises cached timings with no disabling evidence.
-        for platform_name in ("Snowflake", "Redshift"):
+        for platform_name in ("Snowflake", "Redshift", "Databricks"):
             vr = ValidationResult("test")
             data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
             _validate_bundle(data, vr)
@@ -979,10 +1002,10 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
-        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # Platforms that never record a receipt (e.g. DuckDB) keep the
         # legacy exemption even when they declare an enabled cache.
         vr = ValidationResult("test")
-        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        data = _bundle_with_cache_control(None, platform_name="DuckDB", result_cache_enabled=True)
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 
@@ -1578,6 +1601,110 @@ class TestSubmissionDeterministicGates:
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
+
+    def test_tpchavoc_requires_every_declared_variant(self):
+        from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS
+
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpchavoc"
+        data["queries"] = [
+            {"id": query_id, "ms": 100, "status": "SUCCESS"} for query_id in sorted(TPCHAVOC_CANONICAL_VARIANTS)
+        ]
+        data["summary"]["queries"] = {"total": 220, "passed": 220, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+        data["queries"] = [query for query in data["queries"] if query["id"] != "12_v4"]
+        data["summary"]["queries"] = {"total": 219, "passed": 219, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("covers 21 of 22 canonical queries" in error and "12_v4" in error for error in vr.errors)
+
+        data["queries"].append({"id": "12_v4", "ms": 100, "status": "SUCCESS", "run_type": "warmup"})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("12_v4" in error for error in vr.errors)
+
+    def test_tpchavoc_success_without_timing_does_not_cover_variant(self):
+        # A SUCCESS row with ms null carries no measurement and must not
+        # satisfy variant coverage, even with 219 other timed rows.
+        from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS
+
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpchavoc"
+        data["queries"] = [
+            {"id": query_id, "ms": 100, "status": "SUCCESS"} for query_id in sorted(TPCHAVOC_CANONICAL_VARIANTS)
+        ]
+        data["queries"][0]["ms"] = None
+        data["summary"]["queries"] = {"total": 220, "passed": 220, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any(data["queries"][0]["id"] in error for error in vr.errors)
+
+    def test_tpchavoc_accepts_only_documented_engine_skips(self):
+        from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS, TPCHAVOC_DOCUMENTED_SKIPS
+
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpchavoc"
+        data["platform"]["name"] = "DataFusion"
+        ids = TPCHAVOC_CANONICAL_VARIANTS - TPCHAVOC_DOCUMENTED_SKIPS["datafusion"]
+        data["queries"] = [{"id": query_id, "ms": 100, "status": "SUCCESS"} for query_id in sorted(ids)]
+        data["summary"]["queries"] = {"total": len(ids), "passed": len(ids), "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+        data["queries"] = [query for query in data["queries"] if query["id"] != "2_v1"]
+        data["queries"].append({"id": "FAKE", "ms": 100, "status": "SUCCESS"})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("2_v1" in error for error in vr.errors)
+
+    def test_tpchavoc_mirror_skip_snapshot_matches_runtime_policy(self):
+        from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+        from benchbox.core.tpchavoc.variant_sets import VARIANT_REGISTRY
+        from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
+        from benchbox.validation.bundle import (
+            TPCHAVOC_CANONICAL_VARIANTS,
+            TPCHAVOC_DOCUMENTED_SKIPS,
+            _tpchavoc_documented_skips,
+        )
+
+        assert {
+            f"{query}_v{variant}" for query, variants in VARIANT_REGISTRY.items() for variant in variants
+        } == TPCHAVOC_CANONICAL_VARIANTS
+        assert {
+            "clickhouse": frozenset(CLICKHOUSE_TPCHAVOC_SKIPS),
+            "datafusion": frozenset(DATAFUSION_TPCHAVOC_SKIPS),
+            "lakesail": frozenset(LAKESAIL_TPCHAVOC_SKIPS),
+            "postgres": frozenset(POSTGRES_TPCHAVOC_SKIPS),
+            "snowflake": frozenset(CLOUD_TPCHAVOC_SKIPS["snowflake"]),
+            "databricks": frozenset(CLOUD_TPCHAVOC_SKIPS["databricks"]),
+            "bigquery": frozenset(CLOUD_TPCHAVOC_SKIPS["bigquery"]),
+        } == TPCHAVOC_DOCUMENTED_SKIPS
+        benchmark = object.__new__(TPCHavocBenchmark)
+        for platform in (
+            "DataFusion",
+            "LakeSail",
+            "ClickHouse (Local)",
+            "ClickHouse Cloud",
+            "PG-DuckDB",
+            "TimescaleDB",
+            "DuckDB",
+            "Snowflake",
+            "Databricks",
+            "BigQuery",
+        ):
+            assert _tpchavoc_documented_skips(platform) == frozenset(benchmark.get_platform_skip_queries(platform))
 
     def test_tpcds_paired_variants_cover_all_99_logical_queries(self):
         data = _minimal_bundle()

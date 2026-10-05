@@ -1,5 +1,3 @@
-"""Static checks for the shared public-site theme contract."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -68,6 +66,7 @@ def _contrast(foreground: str, background: str) -> float:
         "landing/prompts/index.html",
         "docs/_templates/page.html",
         "results-explorer/index.html",
+        "website/src/components/ThemeScript.astro",
     ],
 )
 def test_early_theme_bootstrap_normalizes_stored_choice(path: str) -> None:
@@ -94,8 +93,94 @@ def test_public_site_token_scan_covers_landing_shell_css() -> None:
     assert scan.scan_file(ROOT / "landing" / "style.css") == []
 
 
+TOKENS = "landing/shared/site-tokens.css"
+LEGACY_THEME = "landing/shared/site-theme.css"
+DARK = ':root[data-bb-theme="dark"]'
+
+LANDING_RESTYLE = {
+    ":root": {"accent-primary", "accent-secondary"},
+    DARK: {"text-secondary", "text-muted", "bb-site-header-text"},
+}
+
+SHARED_FAMILIES = {
+    "color": ("bg-", "text-", "accent-", "border-", "code-", "table-", "hero-", "card-"),
+    "typography": ("font-", "bb-text-", "bb-font-"),
+    "spacing": ("space-", "bb-inset-"),
+    "radius": ("radius-", "bb-skeleton-radius-"),
+}
+
+
+def test_one_token_file_defines_every_family_in_both_schemes() -> None:
+    css = _read(TOKENS)
+    light = _variables(css, ":root")
+    dark = _variables(css, DARK)
+
+    for family, prefixes in SHARED_FAMILIES.items():
+        assert any(name.startswith(prefixes) for name in light), family
+    assert {"bg-primary", "text-primary", "accent-primary", "bb-surface-data", "bb-chart-cat-1"} <= set(dark)
+    assert set(dark) - set(light) == set()
+
+
+def test_website_explorer_and_landing_import_the_shared_token_file() -> None:
+    assert "../landing/shared/site-tokens.css" in _read("website/astro.config.ts")
+    assert "landing/shared/site-tokens.css" in _read("website/src/layouts/Shell.astro")
+    assert "landing/shared/site-tokens.css" in _read("results-explorer/src/index.css")
+    assert 'href="shared/site-tokens.css' in _read("landing/index.html")
+    assert 'href="../shared/site-tokens.css' in _read("landing/prompts/index.html")
+    assert not (ROOT / "website" / "src" / "styles" / "tokens.css").exists()
+
+
+def _without_final_print_block(css: str) -> str:
+    start = css.rindex("@media print")
+    body = _css_block(css[start:], "@media print")
+    return css[:start] + css[css.index("{", start) + len(body) + 2 :]
+
+
+TOKEN_DECLARATION = re.compile(r"--[\w-]+\s*:")
+
+
+def test_consumers_define_no_theme_tokens_of_their_own() -> None:
+    explorer_css = _without_final_print_block(_read("results-explorer/src/index.css"))
+    assert TOKEN_DECLARATION.findall(explorer_css) == []
+    assert "--space-xs:" not in _read("landing/style.css")
+    for path in ("website/src/styles/shell.css", "website/src/styles/starlight-map.css"):
+        declared = TOKEN_DECLARATION.findall(_read(path))
+        assert all(name.startswith(("--header-height", "--sl-", "--pagefind-")) for name in declared), path
+
+
+@pytest.mark.parametrize("path", ["landing/index.html", "landing/prompts/index.html"])
+def test_landing_links_shared_tokens_after_the_legacy_theme(path: str) -> None:
+    source = _read(path)
+
+    assert source.index("shared/site-theme.css") < source.index("shared/site-tokens.css")
+
+
+def test_explorer_tailwind_config_reads_the_shared_variables() -> None:
+    config = _read("results-explorer/tailwind.config.js")
+    css = _read(TOKENS)
+    variables = _variables(css, ":root")
+
+    assert "var(--bb-brand-${stop})" in config
+    assert "var(--bb-font-mono-system)" in config
+    assert "bb-font-mono-system" in variables
+    for stop in re.findall(r"brandStops = \[([^\]]+)\]", config)[0].split(","):
+        assert f"bb-brand-{stop.strip()}" in variables
+    assert re.search(r"#[0-9a-fA-F]{6}", config) is None
+
+
+@pytest.mark.parametrize("selector", [":root", DARK])
+def test_shared_tokens_match_the_legacy_theme_except_the_landing_restyle(selector: str) -> None:
+    shared = _variables(_read(TOKENS), selector)
+    legacy = _variables(_read(LEGACY_THEME), selector)
+    overlap = {name for name in shared if name in legacy}
+
+    assert overlap
+    differing = {name for name in overlap if shared[name].strip() != legacy[name].strip()}
+    assert differing == LANDING_RESTYLE[selector]
+
+
 def test_results_dark_chart_palette_has_panel_contrast() -> None:
-    css = _read("results-explorer/src/index.css")
+    css = _read(TOKENS)
     light = _variables(css, ":root")
     dark = _variables(css, ':root[data-bb-theme="dark"]')
 

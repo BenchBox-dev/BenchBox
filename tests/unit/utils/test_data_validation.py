@@ -4,11 +4,12 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 import pytest
 
+import benchbox.utils.data_validation as data_validation
 from benchbox.utils.data_validation import (
     BenchmarkDataValidator,
     DataValidationResult,
@@ -16,6 +17,20 @@ from benchbox.utils.data_validation import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+NOW = datetime(2026, 1, 15, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _validation_wallclock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Control this validator's event timestamps without stopping watchdogs."""
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            return NOW if tz is None else NOW.replace(tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(data_validation, "datetime", FixedDatetime)
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +42,7 @@ class TestDataValidationResult:
     """Tests for the DataValidationResult dataclass."""
 
     def test_fields_are_stored(self):
-        now = datetime.now()
+        now = NOW
         result = DataValidationResult(
             valid=True,
             tables_validated={"orders": True, "lineitem": True},
@@ -52,7 +67,7 @@ class TestDataValidationResult:
             missing_tables=["lineitem"],
             row_count_mismatches={"orders": (1500000, 999)},
             file_size_info={},
-            validation_timestamp=datetime.now(),
+            validation_timestamp=NOW,
             issues=["Missing data files for table lineitem"],
         )
         assert result.valid is False
@@ -358,12 +373,10 @@ class TestShouldRegenerateData:
 class TestValidationTimestamp:
     """Tests that validation timestamps are populated."""
 
-    def test_timestamp_is_recent(self, tmp_path):
-        before = datetime.now()
+    def test_timestamp_uses_consumer_clock(self, tmp_path):
         v = BenchmarkDataValidator("tpch", scale_factor=0.01)
         result = v.validate_data_directory(tmp_path)
-        after = datetime.now()
-        assert before <= result.validation_timestamp <= after
+        assert result.validation_timestamp == NOW
 
 
 # ---------------------------------------------------------------------------
@@ -393,3 +406,36 @@ class TestFormatBytes:
         v = BenchmarkDataValidator("tpch")
         formatted = v._format_bytes(1073741824)
         assert "GB" in formatted
+
+
+# ---------------------------------------------------------------------------
+# Reuse boundary: a manifest that lists no tables
+# ---------------------------------------------------------------------------
+
+
+class TestEmptyManifestIsNotReusable:
+    """A manifest naming zero tables must force regeneration, not reuse."""
+
+    @staticmethod
+    def _write_empty_manifest(data_dir: Path, benchmark: str) -> None:
+        import json
+
+        from benchbox.utils.datagen_version import current_datagen_stamp
+
+        manifest = {
+            "benchmark": benchmark,
+            "scale_factor": 1.0,
+            "tables": {},
+            **current_datagen_stamp(benchmark),
+        }
+        (data_dir / "_datagen_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    @pytest.mark.parametrize("benchmark_name", ["tpch", "tpcds", "custom_bench"])
+    def test_empty_manifest_with_data_files_is_invalid(self, tmp_path, benchmark_name):
+        (tmp_path / "customer.tbl.zst").write_bytes(b"\x28\xb5\x2f\xfd" + b"x" * 64)
+        self._write_empty_manifest(tmp_path, benchmark_name)
+
+        result = BenchmarkDataValidator(benchmark_name, scale_factor=1.0).validate_data_directory(tmp_path)
+
+        assert result.valid is False
+        assert any("manifest" in issue.lower() for issue in result.issues), result.issues

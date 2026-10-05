@@ -6,9 +6,9 @@ all rely on settings that live outside the repository tree, so they need
 to be documented here so they can be re-applied after a transfer, restored
 after accidental drift, or reviewed during incident triage.
 
-This document tracks current state. Each change is also captured in a dated
-record under `_project/decisions/` for audit history; this file is the
-"what is currently configured" view.
+This document specifies the required configuration. Verify live settings before
+claiming they are applied. Each change is also captured in a dated record under
+`_project/decisions/` for audit history.
 
 ## Required workflow permissions
 
@@ -17,12 +17,11 @@ default_workflow_permissions: read
 can_approve_pull_request_reviews: true
 ```
 
-The default token permission is intentionally read-only. The
-`develop-post-merge.yml` `auto-revert-on-failure` job declares
-`contents: write`, `issues: write`, `pull-requests: write` at the job level
-to scope writes narrowly. `can_approve_pull_request_reviews: true` lets the
-workflow request review on the auto-revert PR from the original PR author
-when the GraphQL lookup populates the field.
+The default token permission is intentionally read-only. Any workflow that
+needs to write declares the specific scopes at the job level to keep writes
+narrow. `can_approve_pull_request_reviews: true` is a leftover from the
+retired post-merge auto-revert job, which used it to request review from the
+original PR author; no current workflow depends on it.
 
 Verify:
 
@@ -52,63 +51,54 @@ Ruleset name: `develop-squash-only` (id `15611785`), targets
 Required status checks:
 
 ```text
-- ci-required-result
-- Results Explorer browser gate
-- ruleset-drift
+- core
+- explorer
+- results-data
+- docs
+- landing
+- tooling
+- oracle-review
 ```
 
-A code-PR `synchronize` is not one Develop PR run. The same head SHA also
-starts Results Explorer browser tests, PR base guard, auto-merge revocation,
-the unconditional `develop-refresh-shadow` observational workflow, and
-ruleset-drift (plus path-filtered siblings such as extension-smoke and
-gitignore lint). Documentation (`docs.yml`) only starts when the diff touches
-its own path filter (`benchbox/**`, `docs/**`, `examples/**`, and similar) —
-for example a `tests/**`-only PR does not start it. Split runner minutes from
-wall minutes by workflow when judging savings; the next-slowest sibling can
-dominate remaining wall time after `pr.yml` jobs are skipped.
+Six of the required contexts are always-reporting result jobs in
+`.github/workflows/ci.yml`; `oracle-review` comes from
+`.github/workflows/oracle-review.yml` and passes at once for a change outside
+`.github/soundness-paths.txt`. The `ci-paths` job maps changed paths to units with
+`.github/ci-units.yml`; a unit no path touches reports success immediately, and
+a touched unit succeeds only when every job it requires succeeded. A required
+job that was skipped fails the unit, so a path filter or a broken `if:` can
+never read as a pass (`scripts/ci_unit_result.py` holds the rule). Because all
+six contexts report on every `pull_request` event, no
+required check can stay pending forever on a change that does not touch it.
 
-`ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
-that aggregates the jobs in its `needs` contract: `ci-paths`,
-`tpch-binary-framing`, `content-guard`, `skill-integrity`, `code-lint`,
-`code-test`, `correctness-gate`, `plan-capture-gate`, `medium-test`
-(added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
-the same umbrella, no ruleset change needed), `explorer-tokens`,
-`site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
-`dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
-`needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
-skipped where their classifier says they are not applicable. Since the
-heavy-tier queue-only change, the heavy tier (`medium-test`,
-`correctness-gate`, `plan-capture-gate`, `tpch-binary-framing`, and the
-integration samples) additionally reports skipped on `pull_request` runs
-unless the `heavy-needed` output fires (merge queue, soundness paths, or
-packaging paths); the umbrella requires success when the tier ran and
-skipped when it was deferred, so a silent skip can never read as a pass.
+| Context | Runs for | Jobs it requires |
+| --- | --- | --- |
+| `core` | `benchbox/`, `tests/`, packaging, executable docs code; framing also on test infrastructure or bundled binary changes | lint, unit tests, and when heavy inputs change the medium tests, correctness gate, required local-engine cases, plan-capture gate and DataFusion integration; macOS/Windows TPC-H binary framing on heavy or framing inputs; package smoke and dependency audit on packaging changes |
+| `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite |
+| `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check |
+| `landing` | `landing/`, quickstart inputs | site theme token scan |
+| `tooling` | every event | content guard, skill integrity, and audit checks by path |
+| `oracle-review` | every PR; review required on soundness paths | Codex connector review of the current head, or the stand-in approval when the connector cannot review, with connector threads resolved; other paths report success |
 
-Slow-marked reproducer jobs remain required PR CI through this umbrella. The
-post-merge workflow has fast and medium lanes but no slow-signature lane, so
-moving those reproducers out of required PR CI would remove their only
-required execution path.
+The public-site visual comparison is advisory and feeds no required context until the site is in production. It runs only when a rendered public-site input changed
+(`render_changed` in the `visual-inputs` job). The site build keeps the broader
+input list so Sphinx warnings still fail before merge.
 
-`Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
-`.github/workflows/results-explorer-browser.yml`. It is required because the
-Chromium full-suite job's own name has claimed to block since it was written,
-while the ruleset required only `ci-required-result` — so the full `e2e/` suite
-gated nothing. The gate job, not the Chromium job, holds the required context:
-the browser jobs are conditional, and GitHub keeps a PR unmergeable forever
-waiting on a required check that never reports. The gate runs `if: always()`,
-passes when Chromium succeeded or when no explorer-relevant path changed, and
-fails closed if change detection itself broke. Firefox and WebKit stay advisory
-and are deliberately absent from its `needs`.
-Branch protection deliberately keys off the umbrella so the path-aware
-classifier can skip subordinate jobs without making the protected check
-disappear. The classifier fails closed: any path not on the
-`safe-content` allowlist in `.github/path-filters.yml` (including unknown
-top-level paths) routes through `code-lint` + `code-test`.
+`scripts/ruleset_drift_check.py` compares the live rulesets with this runbook.
+With no merge queue it no longer runs inside `ci.yml`; run it by hand after a
+settings change, and the nightly workflow runs it as an advisory check.
+
+Change this list and `APPROVED_MERGE_QUEUE_CONTEXTS` in
+`scripts/ruleset_drift_check.py` in the same PR that changes the workflow, then
+update the hosted ruleset immediately after that PR merges. Read the live
+ruleset back and run `scripts/ruleset_drift_check.py` before claiming the
+change.
 
 Other ruleset properties to preserve:
 
 ```text
-strict_required_status_checks_policy: true
+strict_required_status_checks_policy: false
 required_linear_history: true
 non_fast_forward: true
 required_pull_request_reviews:    squash-only PRs
@@ -116,27 +106,28 @@ deletion: blocked
 bypass_actors: (none)
 ```
 
-Current-base checks are required because instruction budgets and other
-repository-wide invariants are not additive per PR. Without the strict policy,
-two PRs can each pass against the same older base and exceed an invariant when
-merged in sequence. The tradeoff is deliberate: when `develop` advances, an
-otherwise-green PR must refresh its required checks before it can merge.
+Current-base checks are not required. With no merge queue and about thirty
+merges a day, the strict policy would invalidate every open PR on every merge.
+Instead `trunk.yml` runs the fast lane, medium tests, correctness gate and
+required local-engine cases after each merge. A red run is reverted with
+`make trunk-revert`. The rare case where two PRs each pass on an older base and break an invariant
+together is caught there, not before merge. If that happens more than about
+once a week, turn the strict policy back on.
 
-The latest bounded, read-only wall and runner-minute remeasure is recorded in
-[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
-It keeps `pull_request` and `merge_group` event evidence separate and does
+The latest bounded, read-only wall and runner-minute remeasure, taken while the
+merge queue was still in use, is recorded in
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](https://github.com/BenchBox-dev/BenchBox/blob/develop/_project/analysis/ci-waste-remeasure-2026-08-31.md).
+It kept `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 
-`refresh-shadow` (added with the strict-base refresh shadow rollout) is the
-observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
-**not a required** context. It classifies exact `develop` refreshes using the
-trusted base copy of `scripts/pr_refresh_certification.py` and publishes a
-bounded artifact. It cannot skip Develop PR lanes, cannot satisfy
-`ci-required-result`, and does not change auto-merge or ruleset 15611785.
-`.github/workflows/pr.yml` also uploads `pr-certification-identity` and
-`pr-certification-lanes` artifacts so a later activation gate can bind a full
-run to a specific head, base, merge tree, workflow fingerprint, and lane
-set. Missing artifacts fail closed to `full_required`.
+The strict-base refresh shadow (`develop-refresh-shadow.yml`) and the
+`pr-certification-identity` and `pr-certification-lanes` artifacts that
+`pr.yml` uploaded for it were retired with the six-unit CI. The shadow was
+observational and never a required context. `scripts/pr_refresh_certification.py`
+remains as a library for a later activation gate, which would need to bind a
+full run to a specific head, base, merge tree, workflow fingerprint, and lane
+set from `ci.yml`. Base advance alone does not require a refresh. Resolve
+conflicts with `make pr-refresh`; any resulting new head needs fresh CI and review.
 
 Verify:
 
@@ -163,90 +154,73 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
   }'
 ```
 
-### Native Merge Queue Configuration (Post-v0.4.0)
+### No merge queue
 
-When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611785`), the following rule parameters govern queue operations:
+`develop-squash-only` (ruleset id `15611785`) has no `merge_queue` rule since
+2026-10-03; see `_project/decisions/merge-queue-retirement-2026-10-03.md`.
+Agents arm a PR with `make pr-arm`, which enables auto-merge; it squash-merges
+when the required checks pass and every review thread is resolved. The drift
+check reports a `merge_queue` rule that reappears.
 
-```json
-{
-  "type": "merge_queue",
-  "parameters": {
-    "check_response_timeout_minutes": 60,
-    "grouping_strategy": "ALLGREEN",
-    "max_entries_to_build": 5,
-    "max_entries_to_merge": 5,
-    "merge_method": "SQUASH",
-    "min_entries_to_merge": 1,
-    "min_entries_to_merge_wait_minutes": 0
-  }
-}
-```
+The policy requires `oracle-review` (from `.github/workflows/oracle-review.yml`): it
+passes when the change touches no soundness path, or when the Codex connector
+has reviewed the current head and none of its review threads is unresolved.
+It also passes when an account in `STANDIN_ATTESTERS`
+(`_project/scripts/oracle_review_check.py`) has posted
+`Stand-in oracle review: APPROVE <full head SHA>` for the exact head after the
+head commit and any retarget, unedited, with no connector thread unresolved. A
+plain owner comment does not count. See
+[soundness drain](soundness-drain.md).
 
-- **Speculative Integration:** `max_entries_to_build: 5` evaluates up to 5 concurrent pull requests speculatively without serializing check waits.
-- **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** Soundness PRs are withheld from auto-enqueue by `auto_merge_soundness_paths.py` and require CODEOWNERS approval before entry.
-- **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
+### Soundness-path review enforcement
 
-### Soundness-path review enforcement (enforced; operational caution)
-
-Live verification on 2026-07-21 shows that `develop-squash-only` (ruleset id
-`15611785`) is `active` and its `pull_request` rule has
-`require_code_owner_review: true`, with `required_approving_review_count: 0`
-and no bypass actors. This current live state supersedes the 2026-07-18
-retirement note, which was based on the rule not yet being applied.
+The required `develop-squash-only` policy combines `oracle-review` with
+`required_review_thread_resolution: true`, `required_approving_review_count: 0`
+and no bypass actors. Code-owner review is disabled; CODEOWNERS is retired.
+`oracle-review` is a required status check. All review threads must be
+resolved before merging.
 
 The soundness gate, as operated:
 
-- `SOUNDNESS_PREFIXES` in `_project/scripts/auto_merge_soundness_paths.py`
-  (mirrored 1:1 into `.github/CODEOWNERS`, lockstep pinned by
-  `tests/unit/test_auto_merge_soundness_paths.py`) classifies the
-  soundness-critical surface: comparators/parsers
-  (`benchbox/core/equivalence/**`, `benchbox/core/query_plans/parsers/**`,
-  `benchbox/core/**/validation.py`), the oracle-adjacent surface
-  (`benchbox/core/expected_results/**`,
-  `benchbox/platforms/base/result_capture.py`, the `benchbox/sql_compat/`
-  rule-dispatch core), and the gate machinery itself (the predicate,
-  `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
-  `.github/workflows/release.yml`).
-- `make pr-open` no longer arms auto-merge at all; `make pr-ready` (or
-  `make pr-open READY=1`) runs the exact readiness transaction and then does,
-  so a PR cannot merge while a follow-up commit is still being written. Arming at creation stranded three commits in one
-  session, two of them the fixes for their own review findings.
-- `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
-  live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
-  conflict-free native queue permits publication without an author-side
-  refresh; absent, unknown, or misconfigured queue state keeps the current-base
-  gate and requires `make pr-refresh` (one PR at a time). There is no stale
-  override. `pr-open` must not merge `develop` itself; that would turn
-  `pr-fanout` into a refresh storm. See
-  `_project/decisions/behind-pr-occurrence-2026-08-16.md`.
-- `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
-  arms on any event (bare `gh pr create` does not auto-arm, and the
-  historical `ready_for_review` arm point — which never fired once, drafts
-  being unused — was deleted per
+- `.github/soundness-paths.txt`, read by `_project/scripts/soundness_paths.py`,
+  classifies the soundness-critical surface. `oracle-review` checks the diff
+  against the trusted base's predicate, including changes to the gate itself.
+  A soundness-path PR needs the Codex connector's review or thumbs-up on its
+  current head, or the stand-in approval when the connector cannot review,
+  with every connector thread resolved.
+- **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without the connector's review. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
+- `make pr-open` does not arm auto-merge when it creates a PR; `make pr-arm`
+  (or `make pr-open READY=1`) arms it after a live check of the PR, so a PR
+  cannot merge while a follow-up commit is still being written. Arm only when
+  implementation and review fixes are finished on the pushed head.
+- `make pr-open` checks a non-ancestor branch with `git merge-tree` and permits
+  conflict-free publication without requiring the develop tip to be an ancestor.
+  It neither verifies a merge queue nor merges `develop` itself. Refresh a
+  conflicting PR near its landing turn, then rerun CI and obtain review on the
+  resulting head before arming.
+- No workflow arms or disarms auto-merge (bare `gh pr create` does not
+  auto-arm, and the historical `ready_for_review` arm point — which never
+  fired once, drafts being unused — was deleted per
   `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
-  `opened` / `reopened` / `synchronize` / `labeled` re-evaluate revocation
-  only (soundness paths or the hold label). The soundness check unions the
-  base-ref predicate with the PR checkout copy so a gate widened mid-flight
-  still revokes and a PR cannot weaken its own gate.
-- Durable holds every layer honours: **draft** (job/sweep skip) and label
-  **`no-auto-merge`** (`make pr-arm-auto-merge` / `pr-ready` refuse to arm;
-  workflow disables; nightly green-unmerged sweep never enables auto-merge
-  and does not classify the label as stranded). See
+- Durable holds: **draft** and label **`no-auto-merge`** are checked when
+  arming (`make pr-arm-auto-merge` / `pr-arm` / `pr-ready` refuse to arm); the
+  nightly green-unmerged sweep never enables auto-merge and does not classify
+  either hold as stranded. Nothing disarms an already-armed PR when the label
+  is added later: disable auto-merge (`gh pr merge <n> --disable-auto`) or run
+  `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. See
   `docs/operations/pr-triage.md` "Durable auto-merge holds".
-- The Makefile arming path WITHHOLDS squash auto-merge for PRs touching those
-  paths, and `auto-merge-on-open.yml` revokes it on a later push that newly
-  touches them. CI cannot catch a change that redefines the oracle it
-  validates against, so these PRs must not merge hands-free.
-- The active ruleset now supplies the repo-layer control; the owner must still
-  review and merge manually because the current single-owner account cannot
-  approve its own PR. Adding a second code-owner or changing the PR identity
-  model would remove that operational deadlock; alternatively, an admin must
-  remove the live rule before it blocks a soundness-path release.
+- `make pr-arm` refuses drafts, non-develop bases, durable holds, requested
+  changes, unresolved threads, unpublished work and a remote head that differs
+  from local HEAD. It enables squash auto-merge for the exact reviewed head;
+  required checks and thread resolution control the merge.
+- A new push invalidates the prior head's review. Wait for a current-head
+  connector review and successful `oracle-review` before re-arming a
+  soundness-path PR. The retired code-owner self-approval deadlock does not
+  require manual merging under this policy.
 
 `scripts/ruleset_drift_check.py` now imports the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`require_code_owner_review` as a **blocking** finding through
+`review_enforcement_findings` predicate and treats missing thread resolution or a missing `oracle-review` required
+check as a **blocking** finding through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`. The daily `release-canary.yml` run and
 `validate-release-pr.yml` bootstrap use the same path. The standalone check is
 available for an immediate live verification:
@@ -258,9 +232,8 @@ gh api repos/BenchBox-dev/BenchBox/rules/branches/develop \
 
 The predicate deliberately does not assert `required_approving_review_count`:
 that setting is branch-wide and would gate every develop PR. The checker
-reports drift; it does not make the current single-owner self-approval rule
-operable. Treat a green drift check as evidence of configuration, not proof
-that a soundness-path PR is mergeable under the current identity model.
+reports drift. Treat a green drift check as evidence of configuration, not
+proof that a PR has passed its checks, received current-head review or merged.
 
 The review predicate and its blocking/default-plus-explicit-override behavior
 are covered by `tests/unit/release/test_ruleset_review_enforcement.py` and
@@ -391,10 +364,6 @@ gh api -X POST repos/BenchBox-dev/BenchBox/rulesets \
   -f 'conditions[ref_name][include][]=refs/tags/v*' \
   -f 'conditions[ref_name][exclude][]=' \
   -f 'rules[][type]=creation'
-# Restricting the actor list further (e.g. to a release-bot identity) needs
-# a bypass_actors / rules payload tailored to who should retain the ability
-# to tag; draft that with the admin before applying, this is a starting
-# point, not the final payload.
 ```
 
 Why this can't be applied by the write-task's own PR: same as the
@@ -407,8 +376,6 @@ w3): `_project/scripts/ruleset_review_enforcement.py` carries a
 flag. Feed it the live tag rulesets to check:
 
 ```bash
-# Fetch each ruleset in full (the list endpoint omits conditions/rules,
-# which the predicate correctly treats as "not protected"):
 ids=$(gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[].id')
 for id in $ids; do gh api repos/BenchBox-dev/BenchBox/rulesets/$id; done \
   | jq -s '.' \
@@ -509,7 +476,6 @@ publish paths). Observed on 2026-08-05:
 
 ```bash
 gh api repos/BenchBox-dev/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
-# {"name":"test-pypi","protection_rules":[]}
 ```
 
 That empty gate is accepted by design; do not copy the real-PyPI
@@ -552,20 +518,22 @@ For the first release that introduces `release-canary.yml`, before GitHub can
 run the workflow from the default branch, `validate-base` runs the same
 non-fast canary suite and ruleset drift check inline as bootstrap evidence.
 
-Ruleset drift is checked for every develop PR by
-`develop-ruleset-drift.yml` and independently by `release-canary.yml`. The PR
-workflow uses `pull_request_target`, checks out only the trusted base SHA, and
-never executes pull-request-head code with the admin-visible token. Its
-`ruleset-drift` job is a required `develop-squash-only` context, so drift blocks
-the next merge instead of waiting for the scheduled canary. The script parses this runbook for
+Ruleset drift runs as an advisory job in `nightly.yml`, on manual invocation,
+and as a blocking release check in `release-canary.yml` and the
+`validate-release-pr.yml` bootstrap. It is not part of the required develop
+`tooling` result. Nightly and canary drift jobs check out `develop`; the release
+bootstrap restores the checker and its review helper from `develop` into the
+curated release checkout. The admin-visible token is limited to the drift step.
+The script parses this runbook for
 `develop-squash-only` and `release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
 target refs. For `develop-squash-only`, it also applies the shared
-`review_enforcement_findings` predicate and treats a missing or false
-`require_code_owner_review` as a blocking finding through
-`DEVELOP_REVIEW_RULE_ENFORCED = True`. The
-Both workflows must use the repository secret `RULESET_DRIFT_TOKEN`
+`review_enforcement_findings` predicate and treats missing thread
+resolution or a missing `oracle-review` required check as a blocking finding
+through
+`DEVELOP_REVIEW_RULE_ENFORCED = True`.
+The hosted checks use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
 `bypass_actors`; the default `GITHUB_TOKEN` is intentionally not used for this
 check. If GitHub API access fails, the canary is red; release PRs then fail on
@@ -583,8 +551,8 @@ from both CI call sites without a separate code path.
 > copy, so every develop-authored scheduled workflow now registers and fires
 > directly — the "land it on `main`" problem below no longer exists. Verified
 > 2026-07-08 via the Actions list-workflows API: `release-canary.yml`
-> (id 309070628), `phase3-promotion-review.yml`, and
-> `orphaned-commit-detector.yml` are now registered (26 workflows, up from 19).
+> (id 309070628) and two other scheduled workflows (since retired) are now
+> registered (26 workflows, up from 19).
 > Activation options (a)/(b)/(c) and the "Admin steps (w2)" below are
 > **superseded** and retained only as history. The `nightly.yml`
 > `scheduled-workflow-liveness` guard now runs from `develop` directly (no
@@ -602,25 +570,10 @@ Historical live state observed 2026-07-05 (release-canary-scheduled-activation T
   `on.schedule` cron has **never fired** and none of its jobs
   (pypi-latest-installability, ruleset-drift, credential-free-non-fast,
   plus the release-canary-result aggregator) has ever executed.
-- Same class, second instance: `phase3-promotion-review.yml` (quarterly
-  cron `0 9 1-7 1,4,7,10 *`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either. The liveness
-  guard below will name it alongside release-canary; the admin should
-  land it on `main` in the same pass (or deliberately remove its
-  schedule and record that decision here). Its `review` job now checks out
-  `develop` explicitly via a `PHASE3_REVIEW_REF` env var (the same
-  `RELEASE_CANARY_REF` shell pattern release-canary.yml uses), so landing
-  the file on `main` does not leave a scheduled run checking out `main`'s
-  stripped tree (no `_project/` or `scripts/phase2_metrics.py`) by default.
-- Same class, third instance (#1020 review): `orphaned-commit-detector.yml`
-  (weekly cron `0 7 * * 1`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either — only its
-  path-filtered `push: branches: [develop]` trigger can run, on the cadence
-  of detector/allowlist edits rather than weekly. It already hardcodes
-  `ref: develop` on its checkout step (the same shell pattern as
-  release-canary.yml/phase3-promotion-review.yml), so it is safe to land on
-  `main` as-is whenever the admin does the next pass for this class of fix —
-  no `main`-relative edits needed first.
+- Same class, other instances: `phase3-promotion-review.yml` (quarterly) and
+  `orphaned-commit-detector.yml` (weekly) were also on `develop` but absent
+  from `origin/main`, so their schedules never fired either. Both workflows
+  were retired with the six-unit CI, so the history no longer needs action.
 
 GitHub runs `on.schedule` workflows only from the default branch (historically
 `main`; **now `develop` as of 2026-07-08** — see the RESOLVED note above, which
@@ -681,26 +634,11 @@ access and let the canary return to green.
 
 ## Repository labels
 
-The `develop-post-merge.yml` auto-revert job creates these labels on
-demand if they do not exist:
-
-- `incident:develop-red` — used on an auto-revert PR or an owned
-  post-merge incident/advisory when attribution is unproven.
-- `incident:develop-red-revert-conflict` — used on the manual-action issue
-  when a proven revert path cannot complete (revert conflict, push failure,
-  PR-creation failure, or target/diff inspection failure).
-
-Attribution incidents include the immutable failing commit and PR, test/job
-identifiers, predecessor and source-input evidence, ownership match,
-classification, owner, next action, and a stable incident key. The workflow
-must not create a revert proposal from temporal adjacency, missing evidence,
-an unmappable job failure, stale target state, external-reference drift, or a
-transient rerun. Those outcomes keep develop red and update the existing
-`incident:develop-red` issue by incident key.
-
-The on-demand `gh label create … || true` in the workflow means a fresh
-clone or transfer does not need the labels pre-created. They will appear
-the first time develop goes red.
+The `incident:develop-red` and `incident:develop-red-revert-conflict` labels
+were created on demand by the retired post-merge auto-revert job. No workflow
+creates or reads them now. Any that still exist on the repository are legacy
+and are scheduled for deletion in the dev-loop v2 cleanup
+(`docs/development/adr/adr-dev-loop-v2.md`).
 
 Verify:
 
@@ -730,8 +668,9 @@ transfer, re-apply in this order:
    resolving the live ruleset **by name** (`develop-squash-only`) in
    workflows; do not treat a stale numeric id as authority.
 3. Verify with the `gh api … rulesets/<id> --jq …` command above.
-4. Push a no-op commit to develop and confirm `develop-post-merge.yml`
-   produces a `metrics` artifact and the lint + fast-test jobs are green.
+4. Open a no-op pull request against develop and confirm the six unit
+   results and `oracle-review` report on it. Arm the exact head for squash
+   auto-merge and confirm its merged commit has a successful `trunk.yml` run.
    This validates that workflow permissions are correct end-to-end.
 
 ## Out-of-scope

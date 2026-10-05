@@ -1,4 +1,4 @@
-Architecture Decision Records
+# Architecture decision records
 
 - [ADR-0001: Unified Platform Registration Architecture](0001-unified-platform-registration.md)
 - [ADR: Extract ASCII Charting into `textcharts` Standalone Library](adr-textcharts-extraction.md)
@@ -14,9 +14,13 @@ Architecture Decision Records
 - [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md)
 - [ADR: `clickhouse-server` Containerization and Linux SF1 Certification](adr-clickhouse-server-containerization.md)
 - [ADR: Corpus Public-Mirror Validation-Status Admission Policy](adr-corpus-validation-admission-policy.md)
+- [ADR: Require complete TPC-Havoc variants for public submissions](adr-tpchavoc-submission-variant-coverage.md)
 - [ADR: Client-to-Platform Locality Disclosure and Statement Overhead Probe](adr-client-link-locality-disclosure.md)
 - [ADR: Scan billing units — decimal terabytes for Athena/Synapse, tebibytes for BigQuery](adr-billing-unit-tb-tib-contract.md)
 - [ADR: Concurrency Utility APIs — Remove the Quarantined Executors](adr-concurrency-public-api-reconciliation.md)
 - [ADR: Cross-benchmark power and throughput scores](adr-cross-benchmark-power-throughput-scores.md)
 - [ADR: Concurrency Outcome and Resource-Ownership Contract](adr-concurrency-outcome-and-ownership-contract.md)
 - [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
+- [ADR: Prove FlightData Source Months Before Reusing a Corpus](adr-flightdata-month-source-policy.md)
+- [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
+- [ADR: Development Loop Architecture (v2)](adr-dev-loop-v2.md)

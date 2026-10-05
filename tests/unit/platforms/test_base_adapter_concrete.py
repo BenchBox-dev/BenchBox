@@ -1191,6 +1191,84 @@ class TestDuckDBAdapterInit:
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.show_query_plans is False
 
+    def test_apply_run_plan_flags_applies_and_restores_show_query_plans(self):
+        """--show-plans applies for one run and never leaks into later runs."""
+        adapter = DuckDBAdapter(database_path=":memory:")
+        assert adapter.show_query_plans is False
+
+        snapshot = adapter._apply_run_plan_flags({"show_query_plans": True})
+        assert adapter.show_query_plans is True
+        assert snapshot["show_query_plans"] is False
+        # Restore exactly as run_enhanced_benchmark's finally block does.
+        adapter.show_query_plans = snapshot["show_query_plans"]
+        assert adapter.show_query_plans is False
+
+    def test_run_enhanced_benchmark_restores_plan_flags_on_failure(self):
+        """The finally block in run_enhanced_benchmark must restore every flag.
+
+        Fails the review's repro: delete the finally-block restore lines in
+        adapter.py and this test goes red. The sentinel raises inside the
+        try, so only the finally block can restore the flags.
+        """
+        from unittest.mock import patch
+
+        adapter = DuckDBAdapter(database_path=":memory:")
+        assert adapter.show_query_plans is False
+        assert adapter.normalize_plan_literals is False
+
+        with (
+            patch.object(
+                adapter,
+                "_create_enhanced_data_generation_phase",
+                side_effect=RuntimeError("sentinel"),
+            ),
+            patch.object(adapter, "_close_run_connection", return_value=None),
+        ):
+            import pytest
+
+            with pytest.raises(RuntimeError, match="sentinel"):
+                adapter.run_enhanced_benchmark(
+                    Mock(),
+                    show_query_plans=True,
+                    normalize_plan_literals=True,
+                    capture_plans=True,
+                )
+
+        assert adapter.show_query_plans is False
+        assert adapter.normalize_plan_literals is False
+        assert adapter.capture_plans is False
+
+    def test_apply_run_plan_flags_none_timeout_keeps_default_without_mutation(self):
+        """plan_capture_timeout_seconds=None means unset, not int(None).
+
+        Coercion happens before any assignment, so a bad value cannot leave
+        partial adapter mutation behind.
+        """
+        adapter = DuckDBAdapter(database_path=":memory:")
+        before = adapter.plan_capture_timeout_seconds
+
+        snapshot = adapter._apply_run_plan_flags({"show_query_plans": True, "plan_capture_timeout_seconds": None})
+        assert adapter.plan_capture_timeout_seconds == before
+        assert adapter.show_query_plans is True
+        assert snapshot["plan_capture_timeout_seconds"] == before
+
+    def test_apply_run_plan_flags_none_show_query_plans_preserves_adapter_value(self):
+        """RunConfig show_query_plans=None leaves a preconfigured adapter value alone.
+
+        Covers the reported case: the caller sets show_query_plans=True via
+        platform_config (or a preconfigured adapter) without duplicating it
+        in DatabaseConfig, so the runner passes None and the adapter must
+        keep True instead of resetting to False.
+        """
+        adapter = DuckDBAdapter(database_path=":memory:", show_query_plans=True)
+        assert adapter.show_query_plans is True
+
+        snapshot = adapter._apply_run_plan_flags({"show_query_plans": None})
+        assert adapter.show_query_plans is True
+        assert snapshot["show_query_plans"] is True
+        adapter.show_query_plans = snapshot["show_query_plans"]
+        assert adapter.show_query_plans is True
+
     def test_dry_run_mode_default_false(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.dry_run_mode is False

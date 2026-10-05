@@ -221,6 +221,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def get_queries(self, dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]:
         """Get all TPC-DS benchmark queries.
 
+        Parameters are rendered at the data's scale factor, as get_query() does: dsqgen derives some
+        values from the scale (for example row-count thresholds), so SQL rendered at a different scale
+        would not match the generated data.
+
         Args:
             dialect: Target SQL dialect for translation (e.g., 'duckdb', 'postgres')
 
@@ -231,8 +235,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
 
-        # Generate queries using dsqgen in the base dialect
-        int_queries = self.query_manager.get_all_queries(dialect=src)
+        # Generate queries using dsqgen in the base dialect, at the data's scale factor
+        int_queries = self.query_manager.get_all_queries(dialect=src, scale_factor=self.data_generator.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
 
         # Always pass through SQLGlot from base to target for consistency
@@ -311,6 +315,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if query_id == 90 and target in {"spark", "lakesail"}:
             return self._rewrite_spark_q90_zero_denominator(query)
 
+        if query_id == 90:
+            return self._rewrite_default_q90_zero_denominator(query)
+
         if "clickhouse" not in target:
             return query
 
@@ -339,6 +346,24 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return re.sub(
             r"/\s+CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
             "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _rewrite_default_q90_zero_denominator(query: str) -> str:
+        """Guard Q90's PM count denominator on all other dialects.
+
+        The canonical TPC-DS template divides by ``pmc`` with no zero guard, so
+        an empty PM bucket is engine-defined (DuckDB yields NaN, Postgres-style
+        engines error). Default every remaining dialect to NULLIF(pmc, 0) so the
+        zero-denominator result is consistently SQL NULL.
+        """
+        return re.sub(
+            r'/\s*CAST\(\s*(?P<denominator>pmc|`pmc`|"pmc"|\[pmc\])\s+AS\s+'
+            r"(?P<type>(?:DECIMAL|NUMERIC)\s*\(\s*15\s*,\s*4\s*\))\s*\)",
+            lambda match: f"/CAST(NULLIF({match.group('denominator')}, 0) AS {match.group('type')})",
             query,
             count=1,
             flags=re.IGNORECASE,

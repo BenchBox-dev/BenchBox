@@ -145,4 +145,35 @@ describe("TuningBadge", () => {
     expect(tuningLabel("tuned-fallback")).toBe("Tuned with fallback settings");
     expect(tuningLabel("custom")).toBe("Custom tuning");
   });
+
+  it.each(["tuned", "tuned-fallback", "auto"])("%s with a noop status does not claim tuning was applied", (mode) => {
+    const { container } = render(<TuningBadge tuningMode={mode} tuningValidationStatus="noop" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
+    expect(badge?.textContent).toBe("No tuning applied");
+    expect(badge?.textContent).not.toBe("Tuned");
+    expect(badge?.getAttribute("title")).toMatch(/recorded no applied tuning settings/i);
+  });
+
+  it.each(["tuned", "tuned-fallback", "auto"])("%s with a not_applicable status renders no tuning applied", (mode) => {
+    const { container } = render(<TuningBadge tuningMode={mode} tuningValidationStatus="not_applicable" />);
+    expect(container.querySelector(".badge")?.textContent).toBe("No tuning applied");
+  });
+
+  it.each(["tuned", "tuned-fallback", "auto"])("%s with a failed status renders a danger badge", (mode) => {
+    const { container } = render(<TuningBadge tuningMode={mode} tuningValidationStatus="failed" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("danger");
+    expect(badge?.textContent).toBe("Tuning failed");
+  });
+
+  it.each(["applied_unverified", "applied_verified"])("tuned with %s keeps the Tuned badge", (status) => {
+    const { container } = render(<TuningBadge tuningMode="tuned" tuningValidationStatus={status} />);
+    expect(container.querySelector(".badge")?.textContent).toBe("Tuned");
+  });
+
+  it("notuning is unaffected by a not_applicable status", () => {
+    const { container } = render(<TuningBadge tuningMode="notuning" tuningValidationStatus="not_applicable" />);
+    expect(container.querySelector(".badge")?.textContent).toBe("No tuning");
+  });
 });

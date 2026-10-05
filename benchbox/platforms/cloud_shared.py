@@ -252,6 +252,25 @@ def rewrite_tpcdi_for_bigquery(query: str) -> str:
     )
 
 
+_LEADING_SQL_COMMENTS_RE = re.compile(r"\A(?:\s|--[^\n]*(?:\n|\Z)|/\*.*?\*/)*", re.DOTALL)
+
+
+def split_leading_sql_comments(statement: str) -> tuple[str, str]:
+    """Split leading whitespace/comments from a SQL statement chunk.
+
+    Schema builders emit decorative header blocks (``--`` lines, or ``/* */``
+    after dialect translation) that survive naive ``";"`` splitting, so a
+    chunk can start with comments before the real ``CREATE TABLE``.
+    Converters that gate on ``startswith("CREATE")`` miss those chunks
+    (BigQuery then sends an unqualified CREATE; Snowflake and Databricks
+    skip their idempotent ``OR REPLACE`` rewrite). Match against the
+    returned remainder instead, and re-attach the prefix unchanged.
+    """
+    match = _LEADING_SQL_COMMENTS_RE.match(statement)
+    prefix = match.group(0) if match else ""
+    return prefix, statement[len(prefix) :]
+
+
 def rewrite_tpcdi_for_databricks(query: str) -> str:
     """TPC-DI SQLite idioms with Databricks' JULIANDAY rendering."""
     return rewrite_tpcdi_sqlite_idioms(

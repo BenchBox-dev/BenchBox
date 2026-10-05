@@ -18,7 +18,7 @@ unique_constraints:
   ignore_nulls: false
 
 check_constraints:
-  enabled: true
+  enabled: false
   enforce_on_insert: true
   enforce_on_update: true
 
@@ -34,10 +34,6 @@ platform_optimizations:
 table_tunings:
   STORE_SALES:
     table_name: STORE_SALES
-    partitioning:
-    - name: SS_SOLD_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: SS_ITEM_SK
       type: INTEGER
@@ -57,10 +53,6 @@ table_tunings:
 
   STORE_RETURNS:
     table_name: STORE_RETURNS
-    partitioning:
-    - name: SR_RETURNED_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: SR_ITEM_SK
       type: INTEGER
@@ -77,10 +69,6 @@ table_tunings:
 
   CATALOG_SALES:
     table_name: CATALOG_SALES
-    partitioning:
-    - name: CS_SOLD_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: CS_ITEM_SK
       type: INTEGER
@@ -91,10 +79,6 @@ table_tunings:
 
   CATALOG_RETURNS:
     table_name: CATALOG_RETURNS
-    partitioning:
-    - name: CR_RETURNED_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: CR_ITEM_SK
       type: INTEGER
@@ -102,10 +86,6 @@ table_tunings:
 
   WEB_SALES:
     table_name: WEB_SALES
-    partitioning:
-    - name: WS_SOLD_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: WS_ITEM_SK
       type: INTEGER
@@ -122,10 +102,6 @@ table_tunings:
 
   WEB_RETURNS:
     table_name: WEB_RETURNS
-    partitioning:
-    - name: WR_RETURNED_DATE_SK
-      type: INTEGER
-      order: 1
     sorting:
     - name: WR_ITEM_SK
       type: INTEGER

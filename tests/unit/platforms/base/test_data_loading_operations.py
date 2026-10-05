@@ -1300,6 +1300,67 @@ class TestDataSourceResolver:
         assert ds.source_type == "benchmark_tables"
         assert ds.table_formats.get("lineitem") == "tbl"
 
+    def test_bigquery_native_uses_all_manifest_tbl_shards(self, tmp_path):
+        """A one-file benchmark mapping must not hide additional manifest shards."""
+        first = tmp_path / "lineitem_000.tbl.gz"
+        second = tmp_path / "lineitem_001.tbl.gz"
+        first.write_bytes(b"a")
+        second.write_bytes(b"b")
+        benchmark = MagicMock()
+        benchmark.tables = {"lineitem": first}
+        manifest_data = {
+            "version": 2,
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "format_preference": ["tbl"],
+            "tables": {
+                "lineitem": {
+                    "formats": {
+                        "tbl": [
+                            {"path": first.name, "size_bytes": 1, "row_count": 1},
+                            {"path": second.name, "size_bytes": 1, "row_count": 1},
+                        ]
+                    }
+                }
+            },
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
+
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [first, second]
+        assert source.table_formats["lineitem"] == "tbl"
+
+        external = tmp_path / "external.tbl.gz"
+        external.write_bytes(b"c")
+        benchmark.tables = {"lineitem": external}
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [external]
+
+    def test_bigquery_native_infers_tbl_format_for_v1_manifest(self, tmp_path):
+        """A v1 manifest carries no table_formats; the format is inferred from paths."""
+        first = tmp_path / "lineitem_000.tbl.gz"
+        second = tmp_path / "lineitem_001.tbl.gz"
+        first.write_bytes(b"a")
+        second.write_bytes(b"b")
+        benchmark = MagicMock()
+        benchmark.tables = {"lineitem": first}
+        manifest_data = {
+            "tables": {
+                "lineitem": [
+                    {"path": first.name},
+                    {"path": second.name},
+                ]
+            }
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
+
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [first, second]
+        assert source.table_formats["lineitem"] == "tbl"
+
     def test_format_hints_injected_for_mixed_case_benchmark_tables_source(self, tmp_path):
         """Resolver normalizes mixed-case format hints so downstream lowercase lookups succeed."""
         benchmark = MagicMock()
@@ -1697,3 +1758,79 @@ class TestPrepareLocalLoadFile:
         conn = MagicMock()
         count = InMemoryDataHandler.load_table("mytable", None, conn)
         assert count == 0
+
+
+class TestEmptySourceFailsClosed:
+    """An unresolvable or table-less data source must fail the run for
+    benchmarks that expect data -- never load nothing and validate vacuously."""
+
+    @staticmethod
+    def _loader(tmp_path: Path, benchmark: object, resolved: object) -> DataLoader:
+        loader = DataLoader.__new__(DataLoader)
+        loader.adapter = MagicMock()
+        loader.benchmark = benchmark
+        loader.connection = MagicMock()
+        loader.data_dir = tmp_path
+        loader.tuning_config = None
+        loader.resolver = MagicMock()
+        loader.resolver.resolve = MagicMock(return_value=resolved)
+        return loader
+
+    def test_load_raises_when_no_source_resolves(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        loader = self._loader(tmp_path, SimpleNamespace(), None)
+        with pytest.raises(ValueError, match="No data files found"):
+            loader.load()
+
+    def test_load_raises_when_source_names_zero_tables(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        empty = DataSource(source_type="manifest", tables={})
+        loader = self._loader(tmp_path, SimpleNamespace(), empty)
+        with pytest.raises(ValueError, match="No data files found"):
+            loader.load()
+
+    def test_load_stays_empty_when_benchmark_skips_loading(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        skipped = SimpleNamespace(SKIP_DATA_LOADING=True)
+        loader = self._loader(tmp_path, skipped, None)
+        stats, _ = loader.load()
+        assert stats == {}
+
+
+class TestManifestMissingFiles:
+    """Manifest entries whose files are gone must not shadow regeneration."""
+
+    @staticmethod
+    def _write_manifest(data_dir: Path, tables: dict) -> None:
+        (data_dir / "_datagen_manifest.json").write_text(json.dumps({"tables": tables}), encoding="utf-8")
+
+    def test_empty_tables_manifest_resolves_to_no_source(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        (tmp_path / "call_center.dat").write_text("1|\n", encoding="utf-8")
+        self._write_manifest(tmp_path, {})
+        assert ManifestFileSource().get_data_source(SimpleNamespace(), tmp_path) is None
+
+
+class TestZstdToolProbe:
+    """Opening a .zst file through the system-command handler without the zstd
+    CLI fails with an actionable error instead of loading nothing, while choosing
+    the handler needs no CLI (adapters that decompress in-process rely on that)."""
+
+    def test_missing_zstd_cli_raises_actionable_error_on_open(self, tmp_path: Path, monkeypatch) -> None:
+        from benchbox.platforms.base import data_loading
+
+        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
+        handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        with pytest.raises(DataLoadingError, match="zstd.*command was not found"), handler.open(tmp_path / "x.dat.zst"):
+            pass
+
+    def test_handler_selection_does_not_require_the_zstd_cli(self, tmp_path: Path, monkeypatch) -> None:
+        from benchbox.platforms.base import data_loading
+
+        monkeypatch.setattr(data_loading.shutil, "which", lambda _cmd: None)
+        handler = FileFormatRegistry.get_compression_handler(tmp_path / "x.dat.zst")
+        assert isinstance(handler, ZstdHandler)

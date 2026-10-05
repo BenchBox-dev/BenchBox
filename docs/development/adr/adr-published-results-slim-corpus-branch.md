@@ -91,6 +91,8 @@ second corpus authority.
 | `scripts/validate_submission.py` | Per-bundle validator entrypoint — a thin CLI wrapper that must run inside the submission CI without shipping the rest of `benchbox/`. Imports the shared implementation from `benchbox/validation/bundle.py` (with an `importlib` file-loader fallback). |
 | `benchbox/validation/bundle.py` | The shared validator implementation used by both develop and this branch. Mirrored here so `validate_submission.py` runs without installing BenchBox; kept in sync by `sync-results-data-to-published.yml`. |
 | `benchbox/core/results/query_status.py` | Stdlib-only failed-query policy shared by publication, ranking, and the slim validator so both branches judge measurement failures identically. |
+| `benchbox/core/results/schema_policy.py` | Stdlib-only schema-version policy required by the shared bundle validator. |
+| `scripts/publication/validator_parity.py` | Trusted validator entry point comparing the PR-head and merge payload outcomes. Its runtime consists only of the allowlisted shared validator files. |
 | `scripts/generate_corpus_inventory.py` | Inventory generator — same rationale as above. |
 | `.github/workflows/validate-submission.yml` | The submission CI gate. |
 | `.gitignore` | Repository-root ignore — kept minimal. |
@@ -104,7 +106,7 @@ in the slim-down.
 
 ### Explicit exclusions (deleted in the slim-down)
 
-- `benchbox/` (the package source) — **except** the two mirrored validation
+- `benchbox/` (the package source) — **except** the three mirrored validation
   files listed above. The rest of the
   package is not needed to validate or display bundles; `validate_submission.py`
   is a thin wrapper over that one shared module.
@@ -126,20 +128,15 @@ in the slim-down.
 
 ### Validator invocation contract
 
-`generate_corpus_inventory.py` is stdlib-only Python. `validate_submission.py`
-is a thin wrapper that imports the shared implementation from
-`benchbox/validation/bundle.py` (mirrored onto this branch), with an
-`importlib` file-loader fallback if `benchbox` is not importable; that shared
-module's own dependencies are stdlib-only (`hashlib`, `json`, `sys`,
-`argparse`, `pathlib`, `decimal`, `collections`, `datetime`), but it also
-*tries* one `benchbox.*` import — `benchbox.core.results.schema_policy` — and
-falls back to a standalone policy check when that import fails (as it will on
-this slim branch, which has no installed BenchBox). That is an optional
-BenchBox import, not an absence of one: develop intentionally uses the
-central schema policy when `benchbox` is importable there, while
-`published-results` always takes the standalone fallback path. CI invokes
-both scripts with `uv run --no-project --python 3.11`, so neither needs
-project metadata or an installed BenchBox to run.
+`generate_corpus_inventory.py`, `validate_submission.py`, and
+`scripts/publication/validator_parity.py` use the same stdlib-only runtime on
+both branches. The validator entry points import `benchbox/validation/bundle.py`,
+which loads the mirrored `query_status.py` and `schema_policy.py` policies.
+File-loader fallbacks support the slim checkout without an installed BenchBox;
+they load those same shared policy files rather than substitute inline rules.
+The mirror must carry all six runtime files together. CI invokes the scripts
+with `uv run --no-project --python 3.11 -- python`, so neither project metadata
+nor an installed BenchBox is required.
 
 The current `validate-submission.yml` invokes them via
 `uv run -- python scripts/<script>.py`, which expects a `pyproject.toml`
@@ -180,18 +177,17 @@ host the same mix of `maintainer-run` (seed corpus, no sidecar) and
 
 ### Vendored scripts: source of truth and divergence detection
 
-`validate_submission.py` and `generate_corpus_inventory.py` exist on
-`develop` (the canonical home) and are vendored to `published-results`
-for self-contained CI. Sync is automated by
-[`.github/workflows/sync-results-data-to-published.yml`](../../../.github/workflows/sync-results-data-to-published.yml):
-when develop's copy of either script changes, the workflow opens a
+The complete six-file runtime listed below exists on `develop` (the canonical
+home) and is vendored to `published-results` for self-contained CI. Sync is automated by
+[`.github/workflows/sync-results-data-to-published.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/sync-results-data-to-published.yml):
+when develop's copy of any runtime file changes, the workflow opens a
 draft mirror PR vs `published-results` carrying the change. Maintainers
 review and flip ready when the develop change is intended to surface on
 the public corpus branch.
 
 This means `published-results` will normally be at most one mirror PR
-behind develop on the vendored scripts. If a develop PR modifies one
-of the scripts but the mirror PR is left as a draft (e.g. waiting on a
+behind develop on the vendored runtime. If a develop PR modifies one
+of these files but the mirror PR is left as a draft (e.g. waiting on a
 matching slim-branch contributor PR), divergence is bounded and visible
 in the open-PR list against `published-results`.
 
@@ -205,11 +201,16 @@ not make `develop` authoritative for published-only archive bundles.
 
 ### The workflow file itself is NOT auto-mirrored — this is permanent, not a gap to close
 
-`sync-results-data-to-published.yml`'s automated mirror only covers
-`scripts/validate_submission.py`, `benchbox/validation/bundle.py`,
-`benchbox/core/results/query_status.py`, and
-`scripts/generate_corpus_inventory.py` (the vendored validation surface). It
-deliberately does **not** include
+`sync-results-data-to-published.yml`'s automated mirror covers these six files:
+
+- `scripts/validate_submission.py`
+- `scripts/generate_corpus_inventory.py`
+- `scripts/publication/validator_parity.py`
+- `benchbox/validation/bundle.py`
+- `benchbox/core/results/query_status.py`
+- `benchbox/core/results/schema_policy.py`
+
+It deliberately does **not** include
 `.github/workflows/validate-submission.yml` itself, and never will:
 `GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless
 of the `permissions:` block granted to it — this is a hard-coded GitHub

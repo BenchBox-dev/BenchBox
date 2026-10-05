@@ -17,7 +17,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _provide_fake_duckdb(monkeypatch):
+def _provide_fake_duckdb(_hermetic_state, monkeypatch):
     """Provide a lightweight duckdb stub when the optional dependency is missing."""
     from benchbox.platforms import duckdb as duckdb_module  # import late to honour patching
 
@@ -67,7 +67,7 @@ def duckdb_memory_db():
 
 
 @pytest.fixture(autouse=True)
-def mock_platform_dependency_checks():
+def mock_platform_dependency_checks(_hermetic_state):
     """Provide default dependency stubs for cloud adapters in unit tests."""
 
     targets = [
@@ -89,7 +89,18 @@ def mock_platform_dependency_checks():
         try:
             from benchbox.platforms.snowflake import SnowflakeAdapter
 
-            SnowflakeAdapter.add_cli_arguments = staticmethod(lambda parser: None)
+            real_add_cli_arguments = SnowflakeAdapter.__dict__["add_cli_arguments"]
+
+            def _stub_add_cli_arguments(parser) -> None:
+                return None
+
+            # Expose the real implementation so CLI-option tests can prove it.
+            _stub_add_cli_arguments.real = getattr(
+                real_add_cli_arguments.__func__, "real", real_add_cli_arguments.__func__
+            )
+            stack.enter_context(
+                patch.object(SnowflakeAdapter, "add_cli_arguments", staticmethod(_stub_add_cli_arguments))
+            )
             # Don't stub from_config - we want to test the real implementation
         except ImportError:
             pass

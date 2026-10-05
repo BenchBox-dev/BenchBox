@@ -29,7 +29,13 @@ from ..utils.cloud_storage import get_cloud_path_info, snowflake_stage_mode_erro
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.config_utils import make_registered_platform_config_builder
-from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
+from .base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    resolve_adapter_data_source,
+    resolve_csv_dialect,
+    run_staged_table_loads,
+)
 from .base.runtime_metadata import build_default_normalized_result_metadata
 from .base.tuning import make_informational_constraint_applier
 from .presto_trino_utils import normalize_existing_files
@@ -53,6 +59,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "upper"
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -779,8 +786,16 @@ class SnowflakeAdapter(PlatformAdapter):
             self.log_very_verbose("Retrieving schema SQL from benchmark")
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+            # Split schema into individual statements and execute. Chunks that
+            # hold only decorative "--" comments (a ";" inside a comment
+            # splits one off) carry no DDL: skip the no-op round trip.
+            from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+            statements = [
+                stmt.strip()
+                for stmt in schema_sql.split(";")
+                if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
+            ]
 
             self.log_verbose(f"Executing {len(statements)} schema statements")
 
@@ -811,10 +826,10 @@ class SnowflakeAdapter(PlatformAdapter):
         self.log_verbose(f"Starting data loading for benchmark: {benchmark.__class__.__name__}")
         self.log_very_verbose(f"Data directory: {data_dir}")
 
-        start_time = mono_time()
-        table_stats = {}
-        per_table_timings: dict[str, Any] = {}
-        total_time = 0.0
+        # Phase clock starts at load_data entry so the returned duration
+        # covers cursor creation, query-tag/file-format setup, and file
+        # resolution, matching the pre-template behavior.
+        phase_start = mono_time()
 
         cursor = connection.cursor()
 
@@ -826,50 +841,36 @@ class SnowflakeAdapter(PlatformAdapter):
             self._create_load_file_formats(cursor)
             data_source = self._resolve_data_files(benchmark, data_dir)
 
-            # Load data for each table (handle multi-chunk files)
-            for table_name, file_paths in data_source.tables.items():
-                valid_files = self._normalize_existing_files(file_paths)
+            def load_one(table_name: str, valid_files: list[Path]) -> int:
+                return self._load_table_from_stage(
+                    cursor, table_name, table_name.upper(), valid_files, data_source, benchmark
+                )
 
-                if not valid_files:
-                    self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name.upper()] = 0
-                    per_table_timings[table_name.upper()] = {"total_ms": 0}
-                    continue
+            def on_table_loaded(table_name: str, table_name_upper: str, row_count: int) -> None:
+                del row_count
+                effective_tuning = self.get_effective_tuning_configuration()
+                if effective_tuning is not None:
+                    self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
 
-                chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
-
-                try:
-                    load_start = mono_time()
-                    table_name_upper = table_name.upper()
-                    actual_count = self._load_table_from_stage(
-                        cursor, table_name, table_name_upper, valid_files, data_source, benchmark
-                    )
-                    table_stats[table_name_upper] = actual_count
-
-                    effective_tuning = self.get_effective_tuning_configuration()
-                    if effective_tuning is not None:
-                        self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
-
-                    load_time = elapsed_seconds(load_start)
-                    per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
-                    self.log_verbose(
-                        f"✅ Loaded {actual_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
-                    )
-
-                except Exception as e:
-                    self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
-                    table_stats[table_name.upper()] = 0
-                    per_table_timings[table_name.upper()] = {"total_ms": 0}
-                    # Fail fast: loads are full refreshes, so a failed table
-                    # must abort the run instead of benchmarking a wiped table.
-                    raise
-
-            total_time = elapsed_seconds(start_time)
-            total_rows = sum(table_stats.values())
-            self.log_verbose(f"✅ Loaded {total_rows:,} total rows in {total_time:.2f}s")
+            # Fail fast: loads are full refreshes, so a failed table must
+            # abort the run instead of benchmarking a wiped table.
+            # Success and summary lines stay verbose-gated as before.
+            table_stats, total_time, per_table_timings = run_staged_table_loads(
+                self,
+                tables=data_source.tables,
+                stat_key=str.upper,
+                filter_files=self._normalize_existing_files,
+                load_one=load_one,
+                on_table_loaded=on_table_loaded,
+                record_timings=True,
+                fail_fast=True,
+                success_log=self.log_verbose,
+                summary_log=self.log_verbose,
+                phase_start=phase_start,
+            )
+            assert per_table_timings is not None
             self.log_operation_complete(
-                "Snowflake data loading", details=f"Loaded {total_rows:,} rows in {total_time:.2f}s"
+                "Snowflake data loading", details=f"Loaded {sum(table_stats.values()):,} rows in {total_time:.2f}s"
             )
 
         except Exception as e:
@@ -1320,6 +1321,15 @@ class SnowflakeAdapter(PlatformAdapter):
             value_column_index=1,
         )
 
+    @staticmethod
+    def _first_statement_keyword(statement: str) -> str:
+        """Extract the first uppercase keyword from a SQL statement, ignoring comments."""
+        import re
+
+        cleaned = re.sub(r"^(?:\s*--(?:[^\n]*)\n|\s*/\*.*?\*/)+", "", statement, flags=re.DOTALL)
+        m = re.match(r"^\s*([A-Za-z]+)", cleaned)
+        return m.group(1).upper() if m else ""
+
     def execute_query(
         self,
         connection: Any,
@@ -1360,8 +1370,48 @@ class SnowflakeAdapter(PlatformAdapter):
             # Zero-divisor guard is a no-op unless the query divides.
             query = self._safeguard_snowflake_division(query)
             self.log_verbose(f"Executing query {query_id} on Snowflake")
-            cursor.execute(query)
-            result = cursor.fetchall()
+            # Snowflake's driver rejects multi-statement strings ("Actual
+            # statement count N did not match the desired statement count
+            # 1"), which operation benchmarks emit routinely (DELETE+INSERT
+            # pairs, the 3-statement SCD2 stage batch, DDL sequences).
+            # Run each statement in session order and report the last
+            # statement's rows; a single statement takes the identical
+            # single-execute path as before.
+            # Multi-statement DML sequences (such as SCD2 close-then-insert)
+            # are executed in an explicit transaction (BEGIN ... COMMIT) so
+            # failure at a later statement triggers ROLLBACK rather than
+            # committing earlier statements under autocommit=True.
+            from benchbox.platforms.base.mysql_wire import split_sql_statements
+
+            statements = split_sql_statements(query)
+            statements_to_run = statements or [query]
+            result = []
+
+            keywords = [self._first_statement_keyword(s) for s in statements_to_run]
+            has_tx_control = any(kw in {"BEGIN", "START", "COMMIT", "ROLLBACK"} for kw in keywords)
+            has_ddl = any(
+                kw in {"CREATE", "DROP", "ALTER", "TRUNCATE", "RENAME", "COMMENT", "GRANT", "REVOKE", "USE"}
+                for kw in keywords
+            )
+            use_explicit_tx = len(statements_to_run) > 1 and not has_tx_control and not has_ddl
+
+            if use_explicit_tx:
+                cursor.execute("BEGIN")
+                try:
+                    for statement in statements_to_run:
+                        cursor.execute(statement)
+                        result = cursor.fetchall()
+                    cursor.execute("COMMIT")
+                except Exception:
+                    try:
+                        cursor.execute("ROLLBACK")
+                    except Exception as rollback_err:
+                        self.log_very_verbose(f"Rollback failed: {rollback_err}")
+                    raise
+            else:
+                for statement in statements_to_run:
+                    cursor.execute(statement)
+                    result = cursor.fetchall()
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
@@ -1490,15 +1540,24 @@ class SnowflakeAdapter(PlatformAdapter):
         Uppercasing quoted identifiers keeps both spellings resolving to the
         same table. Single-quoted string literals are left untouched.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        # Schema chunks can carry decorative "--" header lines before the real
+        # CREATE (naive ";" splitting preserves them). Gate and rewrite on the
+        # remainder so those chunks still get the idempotent OR REPLACE form;
+        # the prefix is re-attached unchanged at the end.
+        prefix, body = split_leading_sql_comments(statement)
+        if not body.upper().startswith("CREATE TABLE"):
             return statement
 
         # Ensure idempotency with OR REPLACE (defense-in-depth), unless the
         # statement already has IF NOT EXISTS (OR REPLACE + IF NOT EXISTS
-        # is a Snowflake syntax error).
-        if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            if "IF NOT EXISTS" not in statement.upper():
-                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        # is a Snowflake syntax error). Rewrite the body only, so a comment
+        # that happens to mention CREATE TABLE is never corrupted.
+        if "CREATE TABLE" in body and "OR REPLACE" not in body.upper():
+            if "IF NOT EXISTS" not in body.upper():
+                body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        statement = prefix + body
 
         import re
 
@@ -1632,18 +1691,18 @@ class SnowflakeAdapter(PlatformAdapter):
             return "FAILED", validation_details
 
     def _get_query_statistics(
-        self, connection: Any, query_id: str, max_retries: int = 3, initial_delay: float = 0.5
+        self, connection: Any, query_id: str, max_retries: int = 0, initial_delay: float = 0.5
     ) -> dict[str, Any]:
         """Get detailed query statistics from Snowflake query history.
 
         Snowflake query history may not be immediately available after query execution.
-        This method implements retry logic with exponential backoff to handle delayed
-        statistics availability.
+        The timed query result remains valid when optional statistics are absent, so
+        the normal path makes one lookup. Explicit callers may retry a missing row.
 
         Args:
             connection: Snowflake connection
             query_id: Query identifier to look up in history
-            max_retries: Maximum number of retry attempts (default: 3)
+            max_retries: Maximum number of retries for a missing row (default: 0)
             initial_delay: Initial delay in seconds between retries (default: 0.5s)
 
         Returns:
@@ -1652,24 +1711,17 @@ class SnowflakeAdapter(PlatformAdapter):
         import time as time_module
 
         cursor = connection.cursor()
-        last_error = None
-
         for attempt in range(max_retries + 1):
             try:
-                # Query the QUERY_HISTORY view for performance metrics
+                # Use the Information Schema table function's column set.
                 cursor.execute(f"""
                     SELECT
                         QUERY_ID,
-                        QUERY_TEXT,
                         TOTAL_ELAPSED_TIME,
                         EXECUTION_TIME,
                         COMPILATION_TIME,
                         BYTES_SCANNED,
-                        BYTES_WRITTEN,
-                        BYTES_SPILLED_TO_LOCAL_STORAGE,
-                        BYTES_SPILLED_TO_REMOTE_STORAGE,
                         ROWS_PRODUCED,
-                        ROWS_EXAMINED,
                         CREDITS_USED_CLOUD_SERVICES,
                         WAREHOUSE_SIZE,
                         CLUSTER_NUMBER
@@ -1677,7 +1729,7 @@ class SnowflakeAdapter(PlatformAdapter):
                         END_TIME_RANGE_START => DATEADD('MINUTE', -5, CURRENT_TIMESTAMP()),
                         END_TIME_RANGE_END => CURRENT_TIMESTAMP()
                     ))
-                    WHERE QUERY_TAG LIKE '%{query_id}%'
+                    WHERE QUERY_TAG = '{self.query_tag}_{query_id}'
                     ORDER BY START_TIME DESC
                     LIMIT 1
                 """)
@@ -1689,22 +1741,18 @@ class SnowflakeAdapter(PlatformAdapter):
                     cursor.close()
                     return {
                         "snowflake_query_id": result[0],
-                        "total_elapsed_time_ms": result[2],
-                        "execution_time_ms": result[3],
-                        "compilation_time_ms": result[4],
-                        "bytes_scanned": result[5],
-                        "bytes_written": result[6],
-                        "bytes_spilled_local": result[7],
-                        "bytes_spilled_remote": result[8],
-                        "rows_produced": result[9],
-                        "rows_examined": result[10],
+                        "total_elapsed_time_ms": result[1],
+                        "execution_time_ms": result[2],
+                        "compilation_time_ms": result[3],
+                        "bytes_scanned": result[4],
+                        "rows_produced": result[5],
                         # CREDITS_USED_CLOUD_SERVICES covers the cloud-services
                         # layer only, not warehouse compute. It is reported
                         # under a truthful key and never priced; warehouse cost
                         # is estimated from execution time and warehouse size.
-                        "credits_used_cloud_services": result[11],
-                        "warehouse_size": result[12],
-                        "cluster_number": result[13],
+                        "credits_used_cloud_services": result[6],
+                        "warehouse_size": result[7],
+                        "cluster_number": result[8],
                         "retrieval_attempts": attempt + 1,
                     }
                 else:
@@ -1726,21 +1774,11 @@ class SnowflakeAdapter(PlatformAdapter):
                             "retrieval_attempts": max_retries + 1,
                         }
 
-            except Exception as e:
-                last_error = e
-                if attempt < max_retries:
-                    delay = initial_delay * (2**attempt)
-                    self.logger.debug(
-                        f"Error retrieving query statistics for {query_id}: {e}, "
-                        f"retrying in {delay:.1f}s (attempt {attempt + 1}/{max_retries})"
-                    )
-                    time_module.sleep(delay)
-                else:
-                    cursor.close()
-                    return {
-                        "statistics_error": str(last_error),
-                        "retrieval_attempts": max_retries + 1,
-                    }
+            except Exception as exc:
+                # A bad projection or permission error will not become valid
+                # after sleeping. Keep optional telemetry off the query path.
+                cursor.close()
+                return {"statistics_error": str(exc), "retrieval_attempts": attempt + 1}
 
         cursor.close()
         return {"note": "Query statistics not yet available", "retrieval_attempts": max_retries + 1}
@@ -1868,8 +1906,9 @@ class SnowflakeAdapter(PlatformAdapter):
         cursor = connection.cursor()
         try:
             # Snowflake automatically maintains statistics, but we can trigger clustering
-            cursor.execute(f"ALTER TABLE {table_name.upper()} RECLUSTER")
-            self.logger.info(f"Triggered reclustering for table {table_name.upper()}")
+            physical_table = self.resolve_physical_table(table_name, connection)
+            cursor.execute(f"ALTER TABLE {physical_table} RECLUSTER")
+            self.logger.info(f"Triggered reclustering for table {physical_table}")
         finally:
             cursor.close()
 
@@ -1964,7 +2003,7 @@ class SnowflakeAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.upper()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Snowflake tunings for table: {table_name}")
 
         cursor = connection.cursor()

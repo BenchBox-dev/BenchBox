@@ -46,7 +46,7 @@ Before a release PR can merge, the `release-only` ruleset must require:
 
 - the required fast lane, `test (ubuntu-latest, 3.12)`;
 - the bounded real-result correctness gate, `make test-correctness-gate`
-  (`DuckDB x TPC-H` at SF=1 with the pinned reference qgen seed, through
+  (`DuckDB x TPC-H` at SF=1 with `qgen -d` default substitution parameters, through
   generate/load/execute with EXACT stored answer-set row-count validation of the
   18 answer-stable TPC-H queries; Q11/Q16/Q18/Q20 are excluded for answer-set
   boundary sensitivity, and validation is cardinality-level, not value-level).
@@ -246,6 +246,16 @@ then PR back to `develop`. This realigns all six version sources
 markers, and the `landing/index.html` badge) with the latest published release,
 so `develop` no longer trails PyPI.
 
+The fast guard
+`tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*`
+pins the published version as its own literal. No tooling updates that literal:
+rename the test to the new version by hand at each cut (or extend
+`scripts/update_version.py`, which currently has no reference to it). It stays
+a literal rather than reading
+`pyproject.toml`, because that is exactly what the accounting check validates;
+deriving it from the checked source would let a sync to an unpublished version
+pass. Only PyPI is authoritative for publication state.
+
 After the synchronization PR is prepared, verify it against PyPI's live
 publication state rather than assuming the newest git tag was published:
 
@@ -279,8 +289,13 @@ release as if it had been blocked.
   do not finalize until both stable required contexts exist.
 - **`validate-base` or `release-required-result` is pending or failed**: wait
   for GitHub Actions or fix on a feature branch off `develop`, PR back to
-  `develop`, then re-run `make release-cut` (the option-c sweep will delete
-  the stale `vX.Y.Z` branch automatically).
+  `develop`, then inspect the stale `vX.Y.Z` branch and resolve its
+  disposition first (keep, delete locally, delete on origin) before re-running
+  `make release-cut`. The option-c sweep only deletes *prior* release branches
+  (`Makefile` excludes `v$(VERSION)` via `grep -Fxv`), and
+  `scripts/release_cut_start.sh` hard-fails on any branch or tag collision, so
+  re-running the cut without resolving the stale branch stops at the collision
+  check with no further instruction.
 - **UAT campaign evidence is missing, stale, red, dirty, or non-ancestor**:
   follow up with the optional three-stage campaign and review its report (see
   "UAT matrix campaign evidence"). This does not block `release-finalize` and
@@ -349,15 +364,64 @@ See `release-recovery-v0-3-1` for the worked example of diagnosing a broken
 PyPI-latest release, confirming the fix on `develop`, and cutting the
 recovery version through this same flow.
 
+## Preparing and checking a release on develop
+
+`release-prep` and `release-check` prepare release content in an ordinary pull
+request against `develop`. They do not replace `release-cut` and
+`release-finalize` above. Do not tag the merged develop commit until the
+replacement publisher has passed its exact `trunk.yml` distribution artifact, attestation,
+installed-artifact matrix, and release acceptance checks. The legacy
+`release.yml` publisher requires `origin/release` ancestry and rejects develop
+tags. Passing the content check alone does not authorize tagging or publication.
+
+```bash
+make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
+# hand-curate the [X.Y.Z] section of CHANGELOG.md, then
+make release-check VERSION=X.Y.Z [BASE_REF=<immutable-predecessor-sha>]
+```
+
+`release-prep` runs `scripts/update_version.py` (`pyproject.toml`,
+`benchbox/__init__.py`, the documentation release markers, and the landing-page
+badge), then `uv lock`, then `scripts/generate_changelog_entry.py`. The changelog
+lower bound defaults to the newest final `vX.Y.Z` tag; `SINCE_REF` overrides it.
+Commit the changed files as one PR.
+
+`release-check` (`scripts/release_flow.py check`) exits non-zero and lists every
+problem it finds. It verifies that:
+
+- the version in `pyproject.toml`, `benchbox/__init__.py`, the documentation
+  markers, the landing badge, and the `uv.lock` package entry equals `VERSION`;
+- `CHANGELOG.md` has a dated, hand-curated `## [X.Y.Z]` section;
+- the `uv.lock` schema revision was not downgraded
+  (`_project/scripts/check_uv_lock_revision.py`);
+- every top-level path is accounted for (`scripts/check_release_curation.py`);
+- no capped dependency reached its bound
+  (`scripts/check_dependency_bounds.py --fail-on=cap-reached`).
+
+Both targets need the full development tree, because the lock-revision check
+lives under `_project/`.
+The check uses a locked environment and leaves `uv.lock` unchanged. Its revision
+baseline defaults to the newest final release tag older than `VERSION`; that
+tag is resolved once to a commit. CI selects changes to managed release markers,
+the current version's changelog section, the lock schema, or release enforcement
+inputs. Its always-required `ci-paths` job runs the check with the immutable
+pull-request event base SHA as `BASE_REF`; a failed check blocks
+`core`. Unchanged release identity avoids the dependency installation and check.
+Missing baseline history fails the check. Preparation uses a frozen environment
+until its explicit `uv lock` step. It validates the date and changelog lower
+bound before changing version markers; a later command failure can leave
+partial changes for inspection.
+
 ## Reference
 
-- Makefile targets: `release-cut`, `release-finalize`.
+- Makefile targets: `release-cut`, `release-finalize`, `release-prep`, `release-check`.
 - Workflow: `.github/workflows/release.yml`.
 - Canary workflow: `.github/workflows/release-canary.yml`.
 - Release-readiness gate: `scripts/release_readiness_check.py`.
 - Ruleset drift gate: `scripts/ruleset_drift_check.py`.
 - Curation drift guard: `scripts/check_release_curation.py` (runs in
   `lint.yml` on every PR).
+- Release preparation and pre-tag check: `scripts/release_flow.py`.
 - Version updater: `scripts/update_version.py`.
 - Changelog generator: `scripts/generate_changelog_entry.py`.
 - Architecture record: `_project/decisions/single-repo-migration.md`

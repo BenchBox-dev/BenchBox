@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 352
+**Total rules:** 337
 
 **Platforms with rules:** 22
 
@@ -12,13 +12,25 @@ Rules the registry applies to queries, benchmarks, and DDL statements. Split int
 
 Queries or benchmarks that are **omitted from the result set** - either because the benchmark is refused at preflight (BLOCKED) or a specific query is excluded from execution (SKIPPED_QUERY). Users see these as missing entries in result counts.
 
+### bigquery
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | BigQuery does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.bigquery.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | BigQuery rejects the correlated scalar subquery in this grouped variant. | `execution_filter.bigquery.tpchavoc.2_v2` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_create_temp_table | execution_filter | BigQuery runs each multi-statement script as chained single-statement jobs, so a TEMP TABLE created in one statement is invisible to the next. | `execution_filter.bigquery.transaction_primitives.transaction_create_temp_table` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | BigQuery has no SAVEPOINT statement. | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | BigQuery has no SAVEPOINT statement. | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_nested` |
+
 ### clickhouse-cloud
 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-cloud.tpchavoc.11_v4` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-cloud.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.16_v1` |
@@ -26,7 +38,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-cloud.tpchavoc.1_v10` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-cloud.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-cloud.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-cloud.tpchavoc.3_v10` |
@@ -47,7 +58,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | BLOCKED | benchmark=metadata_primitives | benchmark_gate | Embedded ClickHouse Local has no privileged ACL introspection contract. | `benchmark_gate.clickhouse-local.metadata_primitives.unsupported` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-local.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.16_v1` |
@@ -55,7 +65,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-local.tpchavoc.1_v10` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-local.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-local.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-local.tpchavoc.3_v10` |
@@ -75,7 +84,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-server.tpchavoc.11_v4` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-server.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.16_v1` |
@@ -83,7 +91,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-server.tpchavoc.1_v10` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-server.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-server.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-server.tpchavoc.3_v10` |
@@ -97,12 +104,24 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | ClickHouse cannot execute the two correlated market-share subqueries (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.8_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | ClickHouse cannot execute this correlated profit subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.9_v1` |
 
+### databricks
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Databricks SQL has array aggregation but not DuckDB's LIST_SUM and LIST_ZIP functions used here. | `execution_filter.databricks.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_create_temp_table | execution_filter | Databricks SQL rejects CREATE TEMPORARY TABLE ... IF NOT EXISTS, and temporary views are not allowed inside a transaction (TRANSACTION_NOT_SUPPORTED.COMMAND). | `execution_filter.databricks.transaction_primitives.transaction_create_temp_table` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | Databricks SQL multi-statement transactions do not support SAVEPOINT. | `execution_filter.databricks.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | Databricks SQL multi-statement transactions do not support SAVEPOINT. | `execution_filter.databricks.transaction_primitives.transaction_savepoint_nested` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_truncate_in_transaction | execution_filter | Databricks SQL does not allow TRUNCATE TABLE inside a transaction (TRANSACTION_NOT_SUPPORTED.COMMAND). | `execution_filter.databricks.transaction_primitives.transaction_truncate_in_transaction` |
+
 ### datafusion
 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=12_v1 | execution_filter | DataFusion `scalar_subquery_to_join` optimizer rule reports an ambiguous `count(*)` for this variant. | `execution_filter.datafusion.tpchavoc.12_v1` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=14_v2 | execution_filter | DataFusion rejects the generated empty-tuple sub-query (`Empty tuple not supported yet`). | `execution_filter.datafusion.tpchavoc.14_v2` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v10 | execution_filter | DataFusion physical planning does not support the IN sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.16_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v7 | execution_filter | DataFusion physical planning does not support the IN sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.16_v7` |
@@ -111,7 +130,6 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | DataFusion has no `LIST` aggregate used by this variant (`Invalid function 'list'`). | `execution_filter.datafusion.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=4_v10 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.4_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | DataFusion physical planning does not support EXISTS in this variant shape. | `execution_filter.datafusion.tpchavoc.4_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=6_v2 | execution_filter | DataFusion rejects the generated empty-tuple sub-query (`Empty tuple not supported yet`). | `execution_filter.datafusion.tpchavoc.6_v2` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.7_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | DataFusion `scalar_subquery_to_join` optimizer rule fails to resolve a sub-query field for this variant. | `execution_filter.datafusion.tpchavoc.8_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | DataFusion physical planning does not support the scalar sub-query in this variant shape. | `execution_filter.datafusion.tpchavoc.9_v1` |
@@ -239,22 +257,12 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
 | BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
 | BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=10_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.10_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-duckdb.tpchavoc.10_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=11_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `value` in WHERE. | `execution_filter.pg-duckdb.tpchavoc.11_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v9 | execution_filter | PostgreSQL-family engines reject this window expression in WHERE. | `execution_filter.pg-duckdb.tpchavoc.11_v9` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-duckdb.tpchavoc.13_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v2 | execution_filter | PostgreSQL-family engines report ambiguous `l_partkey` resolution for this variant shape. | `execution_filter.pg-duckdb.tpchavoc.17_v2` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v4 | execution_filter | PostgreSQL-family engines do not provide Oracle's `dual` table. | `execution_filter.pg-duckdb.tpchavoc.17_v4` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | PostgreSQL-family engines do not provide DuckDB's `LIST()` aggregate used by this variant. | `execution_filter.pg-duckdb.tpchavoc.1_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v5 | execution_filter | PostgreSQL-family engines report ambiguous `ps_partkey` resolution for this variant shape. | `execution_filter.pg-duckdb.tpchavoc.2_v5` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=3_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.3_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `order_count` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.4_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=5_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.5_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-duckdb.tpchavoc.5_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.7_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=7_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-duckdb.tpchavoc.7_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `sum_profit` in HAVING. | `execution_filter.pg-duckdb.tpchavoc.9_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-duckdb.tpchavoc.9_v9` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | pg_duckdb rejects non-default transaction isolation changes during operation execution. | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_repeatable_read` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | pg_duckdb rejects non-default transaction isolation changes during operation execution. | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_serializable` |
@@ -271,22 +279,12 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | BLOCKED | benchmark=transaction_primitives | benchmark_gate | pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, but transaction_primitives requires repeated transactional writes against the TPC-H corpus. Targeted UAT on 2026-05-13 failed in the same promotion/write path, including Moonlink duplicate replication registration after the write_primitives attempt. | `benchmark_gate.pg-mooncake.transaction_primitives.moonlink_read_only_mirrors` |
 | BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
 | BLOCKED | benchmark=write_primitives | benchmark_gate | pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, and those mirrors do not support the write_primitives setup/write contract. Targeted UAT on 2026-05-13 reached execution after raising replication sender limits, then failed setup with `DuckDB does not support modifying Postgres tables`. | `benchmark_gate.pg-mooncake.write_primitives.moonlink_read_only_mirrors` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=10_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.10_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-mooncake.tpchavoc.10_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=11_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `value` in WHERE. | `execution_filter.pg-mooncake.tpchavoc.11_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v9 | execution_filter | PostgreSQL-family engines reject this window expression in WHERE. | `execution_filter.pg-mooncake.tpchavoc.11_v9` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-mooncake.tpchavoc.13_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v2 | execution_filter | PostgreSQL-family engines report ambiguous `l_partkey` resolution for this variant shape. | `execution_filter.pg-mooncake.tpchavoc.17_v2` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v4 | execution_filter | PostgreSQL-family engines do not provide Oracle's `dual` table. | `execution_filter.pg-mooncake.tpchavoc.17_v4` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | PostgreSQL-family engines do not provide DuckDB's `LIST()` aggregate used by this variant. | `execution_filter.pg-mooncake.tpchavoc.1_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v5 | execution_filter | PostgreSQL-family engines report ambiguous `ps_partkey` resolution for this variant shape. | `execution_filter.pg-mooncake.tpchavoc.2_v5` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=3_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.3_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `order_count` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.4_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=5_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.5_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-mooncake.tpchavoc.5_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.7_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=7_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-mooncake.tpchavoc.7_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `sum_profit` in HAVING. | `execution_filter.pg-mooncake.tpchavoc.9_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.pg-mooncake.tpchavoc.9_v9` |
 
 ### postgres
@@ -367,6 +365,18 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | BLOCKED | benchmark=vector_search | benchmark_gate | QuestDB 9.3.4 has no VECTOR column type. Schema creation fails immediately. No fix planned: requires QuestDB to add native vector support. | `benchmark_gate.questdb.vector_search.unsupported` |
 
+### snowflake
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Snowflake does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.snowflake.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | Snowflake rejects the correlated scalar subquery in this grouped variant. | `execution_filter.snowflake.tpchavoc.2_v2` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | Snowflake has no SAVEPOINT statement. | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | Snowflake has no SAVEPOINT statement. | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_nested` |
+
 ### starrocks
 
 | support | scope | phase | reason | rule_id |
@@ -380,22 +390,12 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
 | BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
 | BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=10_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.timescaledb.tpchavoc.10_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.timescaledb.tpchavoc.10_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=11_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `value` in WHERE. | `execution_filter.timescaledb.tpchavoc.11_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v9 | execution_filter | PostgreSQL-family engines reject this window expression in WHERE. | `execution_filter.timescaledb.tpchavoc.11_v9` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.timescaledb.tpchavoc.13_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v2 | execution_filter | PostgreSQL-family engines report ambiguous `l_partkey` resolution for this variant shape. | `execution_filter.timescaledb.tpchavoc.17_v2` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v4 | execution_filter | PostgreSQL-family engines do not provide Oracle's `dual` table. | `execution_filter.timescaledb.tpchavoc.17_v4` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | PostgreSQL-family engines do not provide DuckDB's `LIST()` aggregate used by this variant. | `execution_filter.timescaledb.tpchavoc.1_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v5 | execution_filter | PostgreSQL-family engines report ambiguous `ps_partkey` resolution for this variant shape. | `execution_filter.timescaledb.tpchavoc.2_v5` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=3_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.timescaledb.tpchavoc.3_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `order_count` in HAVING. | `execution_filter.timescaledb.tpchavoc.4_v7` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=5_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.timescaledb.tpchavoc.5_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.timescaledb.tpchavoc.5_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `revenue` in HAVING. | `execution_filter.timescaledb.tpchavoc.7_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=7_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.timescaledb.tpchavoc.7_v9` |
-| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v7 | execution_filter | PostgreSQL-family engines do not allow the select-list alias `sum_profit` in HAVING. | `execution_filter.timescaledb.tpchavoc.9_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v9 | execution_filter | PostgreSQL-family engines reject aggregate expressions inside window definitions. | `execution_filter.timescaledb.tpchavoc.9_v9` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | TimescaleDB rejects non-default transaction isolation changes once the benchmark operation wrapper has already executed statements on the connection. | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_repeatable_read` |
 | SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | TimescaleDB rejects non-default transaction isolation changes once the benchmark operation wrapper has already executed statements on the connection. | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_serializable` |

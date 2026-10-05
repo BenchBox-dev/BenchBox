@@ -48,13 +48,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # noqa: E402
+from _project.scripts.soundness_paths import any_soundness_path  # noqa: E402
 
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
-    "ci-required-result",
-    "Results Explorer browser gate",
-    "ruleset-drift",
+    "core",
+    "explorer",
+    "results-data",
+    "docs",
+    "landing",
+    "tooling",
 )
 REQUIRED_BATCH_TOOLS = frozenset({"register_batch", "prepare", "bind_batch_pr", "abort_batch"})
 MAX_RERUNS_PER_JOB = 1
@@ -1257,7 +1260,10 @@ def ready_failures(
     if remote_head != expected_head:
         failures.append(f"remote head {remote_head[:12]} != expected {expected_head[:12]}")
     failures.extend(f"unpublished work: {problem}" for problem in unpublished_work(repo))
-    if evidence.review_decision != "APPROVED":
+    # GitHub leaves reviewDecision empty when the branch-wide ruleset needs no formal approval.
+    # Non-soundness PRs still require complete review dispositions; soundness paths require approval.
+    soundness_changed = head_valid and soundness_paths_changed(repo, identity.base, expected_head)
+    if evidence.review_decision != "APPROVED" and (evidence.review_decision != "" or soundness_changed):
         failures.append(f"review decision is {evidence.review_decision!r}, not APPROVED")
     if not evidence.dispositions_complete:
         failures.append("review dispositions incomplete (every top-level finding needs evidence)")
@@ -1266,7 +1272,7 @@ def ready_failures(
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
     failures.extend(batch_mode_failures(evidence, repo))
-    if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
+    if soundness_changed:
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if head_valid and evidence.batch is not None:
         if evidence.batch.get("repository") != evidence.repository:
@@ -1303,6 +1309,7 @@ def enqueue_pr(
     *,
     expected_branch: str | None = None,
     expected_node_id: str | None = None,
+    expected_review_decision: str = "APPROVED",
 ) -> dict:
     """Arm queue enrollment after a final expected-head check.
 
@@ -1313,6 +1320,8 @@ def enqueue_pr(
     """
     repo_full = normalize_github_repository(repo_full)
     _require_revision(expected_head, "expected head")
+    if expected_review_decision not in {"", "APPROVED"}:
+        raise LandingError("expected review decision is not ready for enqueue")
     if remote_head != expected_head:
         raise LandingError(
             f"remote head moved to {remote_head[:12]} during enqueue; "
@@ -1343,7 +1352,7 @@ def enqueue_pr(
             )
         if state != "OPEN":
             raise LandingError(f"PR #{pr_number} state {state!r} is not OPEN; readiness is invalid")
-        if current.get("reviewDecision") != "APPROVED":
+        if str(current.get("reviewDecision") or "") != expected_review_decision:
             raise LandingError("PR review disposition changed before enqueue; readiness is invalid")
         if unresolved_review_threads(run, repo_full, pr_number):
             raise LandingError("PR review threads changed before enqueue; unresolved, non-outdated threads remain")
@@ -1364,42 +1373,6 @@ def enqueue_pr(
     if rc != 0:
         raise LandingError(f"enqueue refused for PR #{pr_number}: {out.strip()[:300]}")
     return {"pr": pr_number, "enqueued": True, "note": "API success is not proof of merge"}
-
-
-# ---------------------------------------------------------------------------
-# Queue-aware local publication policy (native-queue-local-landing)
-# ---------------------------------------------------------------------------
-def queue_report_verified(report: object) -> bool:
-    """Accept a queue verdict only when the checker explicitly proved it.
-
-    Missing, malformed, warning-only, overridden, or failed reports all use
-    the current-base fallback. This keeps a readable-but-incomplete API
-    response from becoming permission to publish a stale branch.
-    """
-    return (
-        isinstance(report, dict)
-        and report.get("status") == "ok"
-        and report.get("queue_verified") is True
-        and report.get("findings") == []
-        and report.get("blocking_findings") == []
-    )
-
-
-def stale_base_decision(*, queue_verified: bool | None, conflict: bool) -> str:
-    """Whether an ancestry-behind branch may publish without a refresh merge.
-
-    * conflict -> "resolve-conflict-first" (always; no refresh can fix it).
-    * verified native queue -> "publish-without-refresh": queue integration
-      tests the speculative merge, so an author-side refresh only destroys a
-      nearly-complete gate to no benefit.
-    * otherwise -> "require-current": the conservative ancestry fallback when
-      the queue is absent, unreadable, unsupported, or misconfigured.
-    """
-    if conflict:
-        return "resolve-conflict-first"
-    if queue_verified is True:
-        return "publish-without-refresh"
-    return "require-current"
 
 
 # ---------------------------------------------------------------------------
@@ -2089,6 +2062,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
             str(pr.get("headRefOid") or ""),
             expected_branch=branch,
             expected_node_id=node_id,
+            expected_review_decision=evidence.review_decision,
         )
         print(json.dumps(result, indent=2))
     else:
@@ -2120,11 +2094,6 @@ def main(argv: list[str] | None = None) -> int:
 
     arm = sub.add_parser("arm", help="arm the exact current checkout PR")
     arm.add_argument("--pr", type=int, default=None)
-
-    policy = sub.add_parser("queue-policy", help="stale-base publication decision")
-    policy.add_argument("--queue-verified", action="store_true")
-    policy.add_argument("--queue-report", type=Path, help="ruleset checker JSON report")
-    policy.add_argument("--conflict", action="store_true")
 
     rec = sub.add_parser("followup-record", help="persist continuation state")
     rec.add_argument("--key", required=True)
@@ -2166,17 +2135,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "arm":
             assert identity is not None
             return _run_arm(args, identity, repo)
-        if args.command == "queue-policy":
-            queue_verified: bool | None = args.queue_verified
-            if args.queue_report is not None:
-                try:
-                    report = json.loads(args.queue_report.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    report = None
-                queue_verified = queue_report_verified(report)
-            decision = stale_base_decision(queue_verified=queue_verified, conflict=args.conflict)
-            print(decision)
-            return 0 if decision == "publish-without-refresh" else 1
         directory = state_dir(repo)
         if args.command == "followup-record":
             try:

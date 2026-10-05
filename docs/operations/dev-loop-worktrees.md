@@ -106,7 +106,8 @@ Finish preview performs comprehensive live revalidation:
 - Inspects worktree lifecycle metadata (`benchbox.worktree.*`), rejecting malformed or foreign worktrees.
 - Enforces controller safety: worktrees bound to an external controller (e.g. `bossmode`) are held unless explicitly released.
 - Revalidates fresh GitHub PR integration evidence (merged PR, target base branch `develop`/`release`/`published-results`, merge commit reachability, tip commit match, and zero unintegrated descendants).
-- **Strictly read-only / zero mutation**: Emits human or JSON previews naming the exact proposed worktree removal and atomic expected-OID ref deletion commands, while performing zero changes to worktrees, branches, refs, locks, or tracker state.
+- **Preview is the default / zero mutation**: without APPLY=1, emits human or JSON previews naming the exact proposed worktree removal and atomic expected-OID ref deletion commands, while performing zero changes to worktrees, branches, refs, locks, or tracker state.
+- **Separately gated apply**: `APPLY=1 make worktree-finish ...` re-evaluates fresh evidence in the same invocation, then executes normal `git worktree remove` on the canonical path followed by `git update-ref -d` on the local branch with the expected OID. A held target, a moved branch, or a failed removal stops the sequence; partial success (worktree removed, branch preserved) is reported explicitly.
 
 After the PR merges and the worktree is clean, remove the exact registration:
 
@@ -175,80 +176,31 @@ Existing registrations created by the retired workflow are not automatically
 reset or removed by this workflow. Review and remove them separately,
 preserving dirty, locked, divergent, or ambiguous worktrees.
 
-## Local validation singleflight
+## Test lock
 
 Parallel pytest runs serialize on the shared flock in `tests/conftest.py`.
-The default is immediate fail-fast with holder info; set
-`BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
-owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
-deletes, or bypasses — a held flock always means a live holder).
+The default local wait is 3600 seconds with holder and progress information;
+set `BENCHBOX_TEST_LOCK_WAIT_SECONDS=0` to fail immediately. CI sets it to 0.
+Ctrl-C cancels the wait; it never steals, deletes, or bypasses a lock. A held
+flock always means a live holder.
 `make test-unlock` clears only inactive diagnostic text and refuses an active
 kernel lock; it never removes the lock pathname.
 
-Gate authors avoid duplicate invocations against identical trees with
-`scripts/local_validation.py` (see `make local-validation GATE=... CMD=...`):
-
-- Ordered local path: focused checks first
-  (`pytest -m "fast and not (slow or stress or resource_heavy or live_integration)"`),
-  then the classifier-selected `make pr-preflight`. One gate name per stage;
-  a hook that does no work reports `skipped`, never `tested`/`passed`.
-- `run` executes the command unless a completed receipt binds the identical
-  input identity (HEAD, base ref, status incl. untracked digests, validation
-  config, tool versions, gate, batch block). Simultaneous identical requests
-  execute once: waiters re-check the identity under the store lock and reuse
-  the winner's receipt.
-- Changed files/refs/tools/config, unknown identity, failed or cancelled
-  priors, and different gates always execute. A tree change while waiting or
-  while the command runs prevents reuse and prevents writing a receipt.
-  Receipts are local-only evidence and never satisfy hosted required checks.
-- Gate-relevant `BENCHBOX_`, `PYTEST_`, `PYTHON*`, `UV_`, and `PRE_COMMIT*`
-  variables plus `CI`, `GITHUB_ACTIONS`, `PATH`, and `VIRTUAL_ENV` are hashed
-  into the identity; raw values are never written to receipts. The receipt
-  store selector is excluded because it changes evidence location, not gate
-  behavior.
-- Batch members pass `--batch-id/--batch-member/--batch-role` plus the
-  accepted member head, scope/config hashes, and canonical changed paths.
-  Integrator records additionally bind the current integration head/tree, a
-  real predecessor tree, and a complete canonical member list. Member
-  preparation evidence never certifies the later integrated tree because the
-  integration identity is part of the frozen record. Pre-PR effort stays
-  counted: receipts record executions, they do not erase them from delivery
-  accounting.
-- Integrator evidence requires a canonical JSON member list with immutable
-  member id, source or accepted head, scope hash, and config hash. Each member
-  head must be ancestral to a distinct integration head; the predecessor must
-  be a real prior tree. Batch facts are rechecked under the receipt lock and
-  after successful execution before evidence is stored.
-- `make pr-preflight` is the canonical ordered path and records both stage
-  receipts. The focused stage runs the classifier-selected fast checks; the
-  required stage owns the content guard and remaining checks, so each actual
-  gate runs once. Both stages classify independently against the same
-  revalidated transaction identity; drift restarts the ordered path. The
-  optional pre-push hook runs only the focused stage, so it can reuse the
-  focused receipt from a prior manual preflight without broadening the hook
-  into a second full preflight.
-- Every invocation appends a lock-protected local event to the same evidence
-  store. `python scripts/local_validation.py report` distinguishes executed,
-  reused, failed, cancelled, and skipped gates, records the exact identity key,
-  role, command execution count, and monotonic duration, and explicitly never
-  claims hosted required-check certification.
-- Ordered local validation records one strict transaction event containing the
-  exact focused and required commands and tool identities. Accounting rejects
-  malformed records, groups only by the canonical batch/member identity, and
-  refuses invalid skip metadata; it never claims hosted required-check status.
+Only runs that use xdist take the lock. `make pr-preflight` lints the changed
+Python files and runs the tests mapped from the changed paths serially
+(`-n 0`), so it never waits on the lock and writes no local receipt. Use
+`make pr-preflight-fast-tests` to run the full fast lane locally under the
+lock; CI runs that lane on every PR and is the authoritative check.
 
 ## Queue-aware publication and resumable follow-up
 
 - `make pr-status` is a short operator view. Use its separate bounded
   `make pr-status ALL_OPEN=1` inventory when reconciling every open develop PR;
   neither an empty PR list nor an empty review queue is a completion signal.
-- Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
-  `make pr-open` probes the current base/head merge, then asks
-  `scripts/ruleset_drift_check.py --queue-policy` for a live, complete queue
-  verdict. A verified queue means publish without an ancestry-only refresh;
-  a conflict means resolve first; absent, unreadable, unknown, or drifted
-  queue state leaves the conservative ancestry gate in force. The old
-  `STALE=1` bypass is not accepted for this path.
+- Stale-base publication: `make pr-open` probes the current base/head merge.
+  A conflict means resolve first; a conflict-free branch that is behind
+  `origin/develop` is published without a refresh. The old `STALE=1` bypass is
+  not accepted for this path.
 - Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
   (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
   explicit owner, session, scope, attempts, due date, claim expiry, and next

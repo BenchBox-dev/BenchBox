@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -144,15 +145,15 @@ def test_changed_skew_configuration_rejects_manifest_reuse(tmp_path: Path):
     assert manifest is None
 
 
-def test_read_and_write_tbl_file_roundtrip(tmp_path: Path):
+def test_stream_tbl_file_normalizes_trailing_delimiters(tmp_path: Path):
     gen = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
     src = tmp_path / "src.tbl"
     src.write_text("1|A|B|\n2|C|D|\n", encoding="utf-8")
-    rows = gen._read_tbl_file(src)
-    assert rows == [["1", "A", "B"], ["2", "C", "D"]]
+    assert list(gen._iter_tbl_rows(src)) == [["1", "A", "B"], ["2", "C", "D"]]
+    assert gen._count_tbl_rows(src) == 2
 
     out = tmp_path / "out.tbl"
-    gen._write_tbl_file(rows, out)
+    gen._stream_tbl_file(src, out, {})
     assert out.read_text(encoding="utf-8") == "1|A|B\n2|C|D\n"
 
 
@@ -243,56 +244,94 @@ def test_transform_methods_apply_configured_skews(monkeypatch, tmp_path: Path):
     gen = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
     monkeypatch.setattr(gen, "_generate_skewed_values", _small_skewed_values)
 
-    captured: dict[str, list[list[str]]] = {}
-    monkeypatch.setattr(gen, "_write_tbl_file", lambda rows, path: captured.__setitem__(path.name, rows))
+    sources = {
+        "customer": ["1", "name", "addr", "1", "ph", "1.0", "BUILDING", "c"],
+        "supplier": ["1", "n", "a", "1", "ph", "1.0", "c"],
+        "part": ["1", "n", "Brand#11", "b", "STANDARD", "1", "SM CASE", "1.0", "c"],
+        "orders": ["1", "1", "O", "1", "1993-01-01", "5-LOW", "cl", "0", "c"],
+        "lineitem": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "N",
+            "O",
+            "1993-01-01",
+            "1993-01-02",
+            "1993-01-03",
+            "x",
+            "AIR",
+            "c",
+        ],
+    }
+    for name, row in sources.items():
+        source = tmp_path / f"{name}.tbl"
+        source.write_text("|".join(row) + "|\n", encoding="utf-8")
+        getattr(gen, f"_transform_{name}")(source, tmp_path / f"{name}_out.tbl")
 
-    customer_rows = [["1", "name", "addr", "1", "ph", "1.0", "BUILDING", "c"]]
-    supplier_rows = [["1", "n", "a", "1", "ph", "1.0", "c"]]
-    part_rows = [["1", "n", "Brand#11", "b", "STANDARD", "1", "SM CASE", "1.0", "c"]]
-    orders_rows = [["1", "1", "O", "1", "1993-01-01", "5-LOW", "cl", "0", "c"]]
-    line_rows = [
-        ["1", "1", "1", "1", "1", "1", "0", "0", "N", "O", "1993-01-01", "1993-01-02", "1993-01-03", "x", "AIR", "c"]
-    ]
+    output = {name: (tmp_path / f"{name}_out.tbl").read_text(encoding="utf-8").split("|") for name in sources}
+    assert output["customer"][3].isdigit()
+    assert output["supplier"][3].isdigit()
+    assert output["part"][2].startswith("Brand#")
+    assert output["orders"][1].isdigit()
+    assert "1992-01-01" <= output["orders"][4] <= "1998-12-31"
+    assert output["lineitem"][1].isdigit()
+    assert output["lineitem"][14] in {"REG AIR", "AIR", "RAIL", "SHIP", "TRUCK", "MAIL", "FOB"}
 
-    monkeypatch.setattr(
-        gen,
-        "_read_tbl_file",
-        lambda path: {
-            "customer.tbl": [r[:] for r in customer_rows],
-            "supplier.tbl": [r[:] for r in supplier_rows],
-            "part.tbl": [r[:] for r in part_rows],
-            "orders.tbl": [r[:] for r in orders_rows],
-            "lineitem.tbl": [r[:] for r in line_rows],
-        }[path.name],
-    )
-    monkeypatch.setattr(
-        gen,
-        "_apply_temporal_skew_to_dates",
-        lambda rows, col, _sk: rows.__setitem__(0, rows[0][:col] + ["1998-12-31"] + rows[0][col + 1 :]),
-    )
 
-    gen._transform_customer(tmp_path / "customer.tbl", tmp_path / "customer_out.tbl")
-    gen._transform_supplier(tmp_path / "supplier.tbl", tmp_path / "supplier_out.tbl")
-    gen._transform_part(tmp_path / "part.tbl", tmp_path / "part_out.tbl")
-    gen._transform_orders(tmp_path / "orders.tbl", tmp_path / "orders_out.tbl")
-    gen._transform_lineitem(tmp_path / "lineitem.tbl", tmp_path / "lineitem_out.tbl")
-
-    assert captured["customer_out.tbl"][0][3].isdigit()
-    assert captured["supplier_out.tbl"][0][3].isdigit()
-    assert captured["part_out.tbl"][0][2].startswith("Brand#")
-    assert captured["orders_out.tbl"][0][1].isdigit()
-    assert captured["orders_out.tbl"][0][4] == "1998-12-31"
-    assert captured["lineitem_out.tbl"][0][1].isdigit()
-    assert captured["lineitem_out.tbl"][0][14] in {"REG AIR", "AIR", "RAIL", "SHIP", "TRUCK", "MAIL", "FOB"}
+def test_streaming_preserves_skewed_table_bytes(tmp_path: Path):
+    """Golden digests come from the original in-memory transformer at seed 42."""
+    source_rows = {
+        "customer": ["1", "name", "addr", "1", "ph", "1.0", "BUILDING", "c"],
+        "supplier": ["1", "n", "a", "1", "ph", "1.0", "c"],
+        "part": ["1", "n", "Brand#11", "b", "STANDARD", "1", "SM CASE", "1.0", "c"],
+        "orders": ["1", "1", "O", "1", "1993-01-01", "5-LOW", "cl", "0", "c"],
+        "lineitem": [
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "1",
+            "0",
+            "0",
+            "N",
+            "O",
+            "1993-01-01",
+            "1993-01-02",
+            "1993-01-03",
+            "x",
+            "AIR",
+            "c",
+        ],
+    }
+    expected_sha256 = {
+        "customer": "4bc0b1d6f27fc1d71187fe543773ef143167a2f102f4c790f778ec3885e94752",
+        "supplier": "d0767221af28dbb40fe358d0d831aecc4df77e771b003b4b11de9756424f4e50",
+        "part": "c8dc895b646f984c51a5fea537d3d098269a454462e3e102ab0912d19f8f90a3",
+        "orders": "25a6f52118a6c92bcc7aa962273bdc962e2f0265cf64c79599500cb8881e06f7",
+        "lineitem": "1e74cdf56980665635116a514b87d4f3178f6c6a298ec77c06d8a60edc31a999",
+    }
+    generator = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
+    for table, row in source_rows.items():
+        source = tmp_path / f"{table}_in.tbl"
+        output = tmp_path / f"{table}_out.tbl"
+        source.write_text("".join("|".join([str(i + 1), *row[1:]]) + "|\n" for i in range(100)), encoding="utf-8")
+        getattr(generator, f"_transform_{table}")(source, output)
+        assert hashlib.sha256(output.read_bytes()).hexdigest() == expected_sha256[table]
 
 
 def test_temporal_skew_and_statistics(tmp_path: Path):
     cfg = _make_config("exponential")
     gen = TPCHSkewDataGenerator(scale_factor=0.1, output_dir=tmp_path, skew_config=cfg)
 
-    rows = [["1993-01-01"], ["1994-01-01"], ["1995-01-01"]]
-    gen._apply_temporal_skew_to_dates(rows, 0, 0.5)
-    assert all(len(r[0]) == 10 and r[0].count("-") == 2 for r in rows)
+    offsets = gen._temporal_day_offsets(3, 0.5)
+    choices = gen._date_choices()
+    assert all("1992-01-01" <= choices[int(day)] <= "1998-12-31" for day in offsets)
 
     stats = gen.get_skew_statistics()
     assert stats["scale_factor"] == 0.1

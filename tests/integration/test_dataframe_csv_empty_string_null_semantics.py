@@ -30,6 +30,7 @@ from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE, 
 from benchbox.platforms.dataframe.pandas_df import PANDAS_AVAILABLE, PandasDataFrameAdapter
 from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE, PolarsDataFrameAdapter
 from benchbox.platforms.dataframe.pyspark_df import PYSPARK_AVAILABLE, PySparkDataFrameAdapter
+from tests.utilities.optional_engines import pyspark_usable
 
 pytestmark = [
     pytest.mark.integration,
@@ -154,25 +155,9 @@ def _make_dask() -> Any:
     return DaskDataFrameAdapter(use_distributed=False)
 
 
-def _java_17_plus_available() -> bool:
-    """PySpark SQL mode needs Java 17/21; skip (not fail) on a Java-less dev env."""
-    import re
-    import shutil
-    import subprocess
-
-    if not shutil.which("java"):
-        return False
-    try:
-        result = subprocess.run(["java", "-version"], capture_output=True, text=True, timeout=15)
-    except (OSError, subprocess.SubprocessError):
-        return False
-    match = re.search(r'version "(\d+)', (result.stderr or "") + (result.stdout or ""))
-    return bool(match and int(match.group(1)) >= 17)
-
-
 _ADAPTER_CASES = [
     _AdapterCase("datafusion", DATAFUSION_DF_AVAILABLE, DataFusionDataFrameAdapter),
-    _AdapterCase("pyspark", PYSPARK_AVAILABLE and _java_17_plus_available(), _make_pyspark),
+    _AdapterCase("pyspark", PYSPARK_AVAILABLE and pyspark_usable(), _make_pyspark),
     _AdapterCase("pandas", PANDAS_AVAILABLE, PandasDataFrameAdapter),
     _AdapterCase("polars", POLARS_AVAILABLE, PolarsDataFrameAdapter),
     _AdapterCase("dask", DASK_AVAILABLE, _make_dask),
@@ -217,6 +202,8 @@ def _adapter_context(case: _AdapterCase) -> Any:
 
 @pytest.fixture(params=_ADAPTER_CASES, ids=lambda case: case.id)
 def csv_adapter(request: pytest.FixtureRequest) -> Any:
+    if request.param.id == "pyspark":
+        request.getfixturevalue("pyspark_test_environment")
     with _adapter_context(request.param) as adapter:
         yield adapter
 

@@ -16,7 +16,14 @@ from sqlglot import exp
 
 from benchbox.core.tpcds_obt.schema import OBT_TABLE_NAME, get_column_lineage
 
-TEMPLATE_DIR = Path(__file__).resolve().parents[3] / "_sources" / "tpc-ds" / "query_templates"
+
+def _resolve_template_dir() -> Path:
+    from benchbox.utils.tpc_compilation import get_tpc_templates_dir
+
+    return get_tpc_templates_dir("tpc-ds") / "query_templates"
+
+
+TEMPLATE_DIR = _resolve_template_dir()
 
 
 def _load_query_specs() -> dict[str, Any]:

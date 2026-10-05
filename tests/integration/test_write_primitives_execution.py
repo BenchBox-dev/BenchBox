@@ -33,7 +33,7 @@ class TestWritePrimitivesBasic:
         info = bench.get_benchmark_info()
 
         assert info["name"] == "Write Primitives Benchmark"
-        assert info["version"] == "1.0"
+        assert info["version"] == "2.0"
         assert (
             info["total_operations"] == 112
         )  # Total operations: INSERT (12), UPDATE (15), DELETE (14), BULK_LOAD (36), MERGE (23), DDL (12)

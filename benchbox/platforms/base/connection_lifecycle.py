@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from benchbox.utils.printing import quiet_console
 
@@ -184,6 +185,23 @@ class ConnectionLifecycleMixin:
         """
         return None
 
+    @contextmanager
+    def non_destructive_connection_context(self) -> Iterator[None]:
+        """Guard extra mid-run connections against create/drop handling.
+
+        Helpers that must open their own connection mid-run (metadata capture,
+        introspection, link probe, statistics) wrap the open in this context so
+        the resulting `handle_existing_database` call takes the validation
+        early-return instead of validating an unfinished database and removing
+        it. Restores the prior flag value on exit; safe to nest.
+        """
+        prior = getattr(self, "_validating_database", False)
+        self._validating_database = True
+        try:
+            yield
+        finally:
+            self._validating_database = prior
+
     def handle_existing_database(self, **connection_config) -> None:
         """Handle existing database non-interactively for core/programmatic usage.
 
@@ -218,6 +236,16 @@ class ConnectionLifecycleMixin:
             self.log_very_verbose("Inside validation context - skipping reuse/recreate logic.")
             return
 
+        # Once-per-run decision: the first call above decides reuse/recreate for
+        # the whole run. Any later connection (metadata, introspection, link
+        # probe, statistics helpers) must not re-validate an empty database and
+        # drop the run's own database mid-run. Reset per run (see
+        # _reset_run_scoped_state and _execute_load_only_mode).
+        if getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("Existing-database decision already made for this run - skipping.")
+            return
+        self._existing_db_decided = True
+
         self.log_very_verbose("Checking if database exists...")
         if not self.check_database_exists(**connection_config):
             self.log_very_verbose("Database does not exist. Returning.")
@@ -248,8 +276,14 @@ class ConnectionLifecycleMixin:
                 self.logger.warning(f"⚠️ {warning}")
 
         if validation_result.issues:
+            from benchbox.core.tuning.metadata import NO_TUNING_METADATA_ERROR
+
+            fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                self.logger.error(f"❌ {issue}")
+                if issue == fresh_database_issue and validation_result.database_empty:
+                    self.log_verbose(issue)
+                else:
+                    self.logger.error(f"❌ {issue}")
 
         if validation_result.is_valid:
             self.log_verbose("Database is configured for this run")
@@ -285,12 +319,24 @@ class ConnectionLifecycleMixin:
                     self.logger.warning(f"Deleted database directory: {db_path_obj}")
                 else:
                     self.logger.warning("Database path exists but is neither file nor directory")
+            elif self.reset_database_in_place(**connection_config):
+                self.logger.warning("Emptied existing tables in place; schema kept for reload")
             else:
                 self.drop_database(**connection_config)
                 self.logger.warning("Dropped database")
         except Exception as e:
             self.logger.error(f"Failed to remove database: {e}")
             raise RuntimeError(f"Could not remove existing database: {e}") from e
+
+    def reset_database_in_place(self, **connection_config) -> bool:
+        """Empty a server-side database for reload without dropping it.
+
+        Return True when the database was reset in place, so the caller skips
+        ``drop_database``. The default does nothing and returns False. Override
+        it where dropping objects is costly, for example where dropped tables
+        keep counting against a catalog quota.
+        """
+        return False
 
     def drop_database(self, **connection_config) -> None:
         """Drop/remove database on server (for server-based databases).

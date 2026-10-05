@@ -104,3 +104,34 @@ Three related gaps surfaced in the 2026-07-12 tuning-system review:
   routine cross-platform "tuned" comparisons unreasonably hard to find. The receipt-level warning
   plus the new `physical_rendering_id` secondary facet gives users the same visibility on demand
   without narrowing the default facet.
+
+## Addendum (2026-10-04): `--tuning tuned` on DataFrame platforms
+
+Curated DataFrame profiles exist in `examples/tunings/dataframe/`
+(`polars_optimized.yaml`, `pandas_optimized.yaml`, `cudf_optimized.yaml`, and
+others). `--tuning tuned` searched only `<platform>/<benchmark>_tuned.yaml`
+(`get_tuning_template_paths` in `benchbox/cli/tuning_resolver.py`), so on
+DataFrame platforms it always resolved to `tuned-fallback`. On Polars that
+fallback applied three streaming-runtime settings while the console said it was
+"using basic constraints".
+
+**Decision: resolve the curated profile, and keep the fallback distinct.**
+
+- **Resolution order** in `get_tuning_template_paths`:
+  1. `<platform>/<benchmark>_tuned.yaml`;
+  2. `examples/tunings/dataframe/<platform>_optimized.yaml`, and its packaged
+     mirror if one exists;
+  3. `tuned-fallback`.
+  A platform with no `<platform>_optimized.yaml` (Dask ships
+  `dask_distributed.yaml` and no `dask_optimized.yaml`) continues to step 3.
+- **Facet.** A run that resolves a curated profile reports mode `tuned`, with
+  the resolved file recorded as the tuning source.
+- **The fallback stays distinct.** `tuned-fallback` keeps its separate facet
+  from Decision 1 above and never facet-matches a curated run. Tests cover both
+  directions: a fallback run does not match a curated `tuned` run, and a curated
+  `tuned` run does not match a fallback run.
+- **Console text for the fallback comes from the capability registry per
+  platform**, describing what that platform's fallback actually applies, for
+  example "basic constraints", "engine runtime defaults (streaming)" or "OLAP
+  session pack". A fixed string such as "using basic constraints" is not
+  allowed, because it misdescribes platforms whose fallback applies more.

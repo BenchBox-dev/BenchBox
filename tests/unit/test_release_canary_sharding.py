@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import re
 from pathlib import Path
 
@@ -12,9 +13,12 @@ import yaml
 from scripts.release_canary_sharding import (
     DEFAULT_SHARD_COUNT,
     MARKER_EXPRESSION,
+    MEDIUM_MARKER_EXPRESSION,
+    MEDIUM_SHARD_COUNT,
     collect_node_ids,
     parse_collection_output,
     partition_node_ids,
+    verify_medium_shards,
     write_shard,
 )
 
@@ -116,6 +120,131 @@ def test_collection_and_shard_manifests_conserve_node_ids(tmp_path: Path):
     assert sorted(assigned) == sorted(nodeids.read_text(encoding="utf-8").splitlines())
 
 
+def _medium_artifacts(root: Path, sha: str) -> list[str]:
+    collection = root / f"t2-medium-nodeids-{sha}"
+    collection.mkdir()
+    raw = collection / "raw.txt"
+    ids = [f"tests/unit/test_a.py::test_{index}" for index in range(6)]
+    raw.write_text("\n".join(ids) + "\n6/100 tests collected\n")
+    collect_node_ids(
+        raw,
+        collection / "medium-nodeids.txt",
+        collection / "medium-collection.json",
+        expected_count=6,
+        shard_count=MEDIUM_SHARD_COUNT,
+        checked_sha=sha,
+        workflow="ci.yml",
+        job="medium-collect",
+        marker_expression=MEDIUM_MARKER_EXPRESSION,
+    )
+    for index in range(MEDIUM_SHARD_COUNT):
+        shard = root / f"t2-medium-shard-{index}-{sha}"
+        shard.mkdir()
+        write_shard(
+            collection / "medium-nodeids.txt",
+            shard / "assigned.txt",
+            shard / "summary.json",
+            shard_index=index,
+            shard_count=MEDIUM_SHARD_COUNT,
+            workflow="ci.yml",
+            job="medium-test",
+            marker_expression=MEDIUM_MARKER_EXPRESSION,
+            collection_summary=collection / "medium-collection.json",
+            checked_sha=sha,
+        )
+        assigned = partition_node_ids(ids, index, MEDIUM_SHARD_COUNT)
+        (shard / f"shard-{index}-execution.json").write_text(
+            json.dumps(
+                {
+                    "commit_sha": sha,
+                    "complete": True,
+                    "pytest_exit_status": 0,
+                    "assigned_node_ids": assigned,
+                    "executed_node_ids": assigned,
+                    "collected_node_ids": [assigned, assigned],
+                    "node_outcomes": [
+                        {
+                            "node_id": node_id,
+                            "reports": [
+                                {"phase": phase, "outcome": "passed", "skip_reason": None, "xfail_reason": None}
+                                for phase in ("setup", "call", "teardown")
+                            ],
+                        }
+                        for node_id in assigned
+                    ],
+                }
+            )
+        )
+    return ids
+
+
+def test_medium_artifact_union_covers_the_exact_collection(tmp_path: Path) -> None:
+    _medium_artifacts(tmp_path, "a" * 40)
+    verify_medium_shards(tmp_path, "a" * 40)
+
+
+@pytest.mark.parametrize(
+    "defect", ["missing", "wrong-sha", "failure", "incomplete", "deselected", "duplicated", "wrong-collection"]
+)
+def test_medium_shard_evidence_refuses_missing_or_changed_coverage(tmp_path: Path, defect: str) -> None:
+    sha = "a" * 40
+    _medium_artifacts(tmp_path, sha)
+    path = tmp_path / f"t2-medium-shard-1-{sha}" / "shard-1-execution.json"
+    data = json.loads(path.read_text())
+    if defect == "missing":
+        path.unlink()
+    else:
+        if defect == "wrong-sha":
+            data["commit_sha"] = "b" * 40
+        elif defect == "failure":
+            data["pytest_exit_status"] = 1
+        elif defect == "incomplete":
+            data["complete"] = False
+        elif defect == "deselected":
+            data["executed_node_ids"].pop()
+        elif defect == "duplicated":
+            data["executed_node_ids"].append(data["executed_node_ids"][0])
+        else:
+            data["collected_node_ids"][1].pop()
+        path.write_text(json.dumps(data))
+    with pytest.raises((ValueError, FileNotFoundError)):
+        verify_medium_shards(tmp_path, sha)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("commit_sha", "b" * 40),
+        ("node_ids_sha256", "wrong"),
+        ("shard_count", 3),
+        ("total_count", 5),
+        ("marker_expression", MARKER_EXPRESSION),
+        ("workflow", "other.yml"),
+    ],
+)
+def test_medium_partition_refuses_a_changed_collection(tmp_path: Path, field: str, value: object) -> None:
+    sha = "a" * 40
+    _medium_artifacts(tmp_path, sha)
+    collection = tmp_path / f"t2-medium-nodeids-{sha}"
+    summary = collection / "medium-collection.json"
+    data = json.loads(summary.read_text())
+    data[field] = value
+    summary.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="does not match"):
+        write_shard(
+            collection / "medium-nodeids.txt",
+            tmp_path / "ids",
+            tmp_path / "summary",
+            shard_index=0,
+            shard_count=MEDIUM_SHARD_COUNT,
+            workflow="ci.yml",
+            job="medium-test",
+            marker_expression=MEDIUM_MARKER_EXPRESSION,
+            collection_summary=summary,
+            checked_sha=sha,
+        )
+
+
 def test_release_canary_workflow_uses_collection_artifact_and_six_single_threaded_shards():
     workflow = _workflow()
     jobs = workflow["jobs"]
@@ -153,6 +282,47 @@ def test_release_canary_workflow_uses_collection_artifact_and_six_single_threade
     assert "release_canary_sharding.py" in shard_text
     assert "mapfile -t node_ids" in shard_text
     assert "-n 0" in shard_text
+    assert "--maxfail=5" in shard_text
+    # Every shard publishes per-test durations and setup/test timing without
+    # changing selection, sharding, or the pass/fail signal.
+    assert '--junitxml="$junit_xml"' in shard_text
+    assert "shard-${SHARD_INDEX}-junit.xml" in shard_text
+    assert ".canary-setup-start-mono" in shard_text
+    assert ".canary-tests-start-mono" in shard_text
+    assert ".canary-tests-end-mono" in shard_text
+    assert '"setup_seconds": "${setup_seconds}"' in shard_text
+    assert '"test_seconds": "${test_seconds}"' in shard_text
+    assert '"junit_present": ${junit_present}' in shard_text
+    # Durations are monotonic, so an NTP correction during the job cannot
+    # publish a skewed or negative setup_seconds or test_seconds. These stamps
+    # are read from the kernel rather than from benchbox.utils.clock because
+    # the setup stamp is taken before Python and uv are installed.
+    assert "/proc/uptime" in shard_text
+    assert "date +%s" not in shard_text
+    # GitHub runs `shell: bash` under errexit. Without `set +e` a failing pytest
+    # aborts the step at the pipeline and skips the exit-code capture, the end
+    # stamp, the JUnit fallback, and the capture marker.
+    assert "set +e" in shard_text
+    # A missing JUnit file falls back to a marked empty report; the exit code
+    # still comes only from pytest (or the log tee). The fallback report is
+    # present but holds no durations, so the summary reports capture state
+    # separately: junit_captured is set false on the fallback path, carried
+    # between steps on a marker file, and re-checked against "true" before it
+    # is published. A consumer sizing shards must never read junit_present
+    # alone as evidence that per-test durations exist.
+    assert 'junit_captured="true"' in shard_text
+    assert 'junit_captured="false"' in shard_text
+    assert ".canary-junit-captured" in shard_text
+    assert '"junit_captured": ${junit_captured}' in shard_text
+    assert '[ "$junit_captured" != "true" ]' in shard_text
+    assert 'name="junit_captured" value="false"' in shard_text
+    # pytest exits 5 when it collected nothing and still writes a well-formed,
+    # non-empty report with no <testcase> in it. A size check alone would
+    # publish that as a capture, so capture state also requires a real
+    # testcase. pytest escapes captured output, so this cannot be forged by a
+    # test that prints the tag.
+    assert 'grep -q "<testcase" "$junit_xml"' in shard_text
+    assert 'exit "$rc"' in shard_text
 
 
 def test_release_canary_aggregation_fails_closed_and_preserves_summary_contract():

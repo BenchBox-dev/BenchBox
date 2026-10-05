@@ -199,6 +199,132 @@ CANONICAL_LOGICAL_QUERY_IDS: dict[str, frozenset[str]] = {
     "clickbench": _CLICKBENCH_CANONICAL_IDS,
 }
 
+# Keep this stdlib-only snapshot in sync with the TPC-Havoc variant registry and
+# execution-filter skip dictionaries. The public results mirror does not ship
+# those modules; the unit contract test checks both copies on the source branch.
+TPCHAVOC_CANONICAL_VARIANTS = frozenset(f"{query}_v{variant}" for query in range(1, 23) for variant in range(1, 11))
+TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
+    "datafusion": frozenset(
+        [
+            "12_v1",
+            "14_v8",
+            "16_v10",
+            "16_v7",
+            "17_v10",
+            "17_v7",
+            "1_v7",
+            "4_v10",
+            "4_v7",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "lakesail": frozenset(
+        [
+            "10_v1",
+            "11_v4",
+            "11_v9",
+            "12_v1",
+            "14_v2",
+            "14_v8",
+            "16_v1",
+            "16_v10",
+            "16_v7",
+            "17_v10",
+            "17_v2",
+            "17_v4",
+            "17_v7",
+            "1_v7",
+            "1_v8",
+            "2_v5",
+            "2_v7",
+            "3_v1",
+            "4_v10",
+            "4_v7",
+            "5_v4",
+            "6_v2",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "clickhouse": frozenset(
+        [
+            "10_v1",
+            "11_v4",
+            "13_v8",
+            "14_v8",
+            "16_v1",
+            "16_v4",
+            "17_v10",
+            "17_v7",
+            "1_v10",
+            "1_v7",
+            "3_v1",
+            "3_v10",
+            "3_v9",
+            "4_v10",
+            "4_v7",
+            "5_v1",
+            "5_v10",
+            "5_v4",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "postgres": frozenset(
+        [
+            "10_v9",
+            "11_v9",
+            "13_v9",
+            "1_v7",
+            "5_v9",
+            "7_v9",
+            "9_v9",
+        ]
+    ),
+    "snowflake": frozenset(
+        [
+            "1_v7",
+            "2_v2",
+        ]
+    ),
+    "databricks": frozenset(
+        [
+            "1_v7",
+        ]
+    ),
+    "bigquery": frozenset(
+        [
+            "1_v7",
+            "2_v2",
+        ]
+    ),
+}
+
+
+def _tpchavoc_documented_skips(platform_name: Any) -> frozenset[str]:
+    if not isinstance(platform_name, str):
+        return frozenset()
+    platform = re.sub(r"[^a-z0-9]+", "-", platform_name.lower()).strip("-")
+    if platform in {"clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
+        return TPCHAVOC_DOCUMENTED_SKIPS["clickhouse"]
+    if platform in {"pg-duckdb", "pg-mooncake", "timescaledb"}:
+        return TPCHAVOC_DOCUMENTED_SKIPS["postgres"]
+    return TPCHAVOC_DOCUMENTED_SKIPS.get(platform, frozenset())
+
+
+def _tpchavoc_variant_has_usable_timing(query: dict) -> bool:
+    # A SUCCESS row with no timing (null, non-numeric, non-finite, or zero
+    # ms) must not satisfy variant coverage: it carries no measurement.
+    try:
+        ms = float(query.get("ms"))
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(ms) and ms > 0
+
 
 def _normalize_coverage_query_id(raw_id: Any) -> str | None:
     """Normalize a bundle query ID for coverage membership, or None.
@@ -1048,7 +1174,7 @@ def _warn_cross_bundle_timing(entries: list[tuple[dict[str, Any], ValidationResu
 #: ``platform.compute.cache_control``. Only these platforms can produce an
 #: absent receipt that contradicts a declared cache state; every other
 #: platform keeps the legacy absent-receipt exemption.
-_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift"})
+_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift", "databricks"})
 
 
 def _platform_records_cache_receipt(platform: dict) -> bool:
@@ -1242,6 +1368,27 @@ def _validate_query_coverage(
             observed.discard(base_id)
             if {f"{base_id}a", f"{base_id}b"} <= observed:
                 observed.add(base_id)
+    variant_hint = ""
+    if normalized_id == "tpchavoc":
+        platform = data.get("platform")
+        platform_name = platform.get("name") if isinstance(platform, dict) else None
+        documented_skips = _tpchavoc_documented_skips(platform_name)
+        successful = {
+            _normalize_coverage_query_id(q.get("id"))
+            for q in queries
+            if isinstance(q, dict)
+            and isinstance(q.get("status"), str)
+            and q["status"].upper() in {"SUCCESS", "PASS"}
+            and str(q.get("run_type") or "measurement").strip().lower() == "measurement"
+            and _tpchavoc_variant_has_usable_timing(q)
+        }
+        missing_variants = TPCHAVOC_CANONICAL_VARIANTS - documented_skips - successful
+        observed = canonical - {variant.split("_v")[0] for variant in missing_variants}
+        if missing_variants:
+            shown = ", ".join(sorted(missing_variants, key=lambda v: tuple(map(int, v.split("_v"))))[:12])
+            if len(missing_variants) > 12:
+                shown += f", … (+{len(missing_variants) - 12} more)"
+            variant_hint = f" (missing successful or documented-skip variants: {shown})"
     missing = sorted(
         canonical - observed,
         key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
@@ -1254,7 +1401,7 @@ def _validate_query_coverage(
         hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
         vr.error(
             f"benchmark {bm_id!r} covers {covered} of {len(canonical)} canonical queries{hint} "
-            f"(missing: {shown}); partial runs remain local artifacts "
+            f"(missing: {shown}){variant_hint}; partial runs remain local artifacts "
             "unless validated through the trusted mirror path"
         )
 
@@ -1470,6 +1617,48 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
             vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
 
 
+#: Tables a benchmark's queries read, which must be loaded with rows. Kept as
+#: data rather than imported from the benchmark classes so the validator stays
+#: self-contained. Mirrors ``REQUIRED_LOADED_TABLES`` on the benchmark class.
+_REQUIRED_LOADED_TABLES: dict[str, tuple[str, ...]] = {
+    "tpcds_obt": ("tpcds_sales_returns_obt",),
+}
+
+
+def _validate_required_tables(data: dict, vr: ValidationResult) -> None:
+    """Reject a bundle that measured without the benchmark's query tables.
+
+    A run that loads the wrong dataset can still finish: the schema creates
+    the query table empty and every query succeeds with no or trivial rows.
+    A bundle with measured queries must therefore show these tables in its
+    ``tables`` block; omitting the block is not evidence that they loaded.
+    """
+    benchmark = data.get("benchmark")
+    benchmark_id = str(benchmark.get("id") or "").lower() if isinstance(benchmark, dict) else ""
+    required = _REQUIRED_LOADED_TABLES.get(benchmark_id)
+    if not required:
+        return
+    tables = data.get("tables")
+    if not isinstance(tables, dict):
+        if data.get("queries"):
+            vr.error(
+                f"benchmark '{benchmark_id}' bundle has measured queries but no 'tables' block, "
+                f"so it cannot show that {', '.join(required)} was loaded"
+            )
+        return
+    loaded = {str(name).lower(): entry for name, entry in tables.items()}
+    for table in required:
+        entry = loaded.get(table)
+        rows = entry.get("rows") if isinstance(entry, dict) else None
+        if entry is None:
+            vr.error(
+                f"benchmark '{benchmark_id}' queries table '{table}', which is not in 'tables' "
+                f"(loaded: {sorted(loaded)}); the run measured a different dataset"
+            )
+        elif isinstance(rows, (int, float)) and not isinstance(rows, bool) and rows <= 0:
+            vr.error(f"benchmark '{benchmark_id}' queries table '{table}', which was loaded with {rows} rows")
+
+
 def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> None:
     """Shape-check the optional ``platform.config`` clustering field when present.
 
@@ -1498,6 +1687,9 @@ def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> No
         vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
+_TUNING_EVIDENCE_KEYS = ("requested", "tuning_source", "requested_config_hash", "hash", "source")
+
+
 def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     """Warn on Databricks ``z_order`` claims that predate provenance.
 
@@ -1506,8 +1698,9 @@ def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     (introduced in #2199, after the fix) is the cutoff marker: a bundle
     without it that claims ``z_order`` outside any tuning context may be
     a mislabeled untuned run, so readers must treat it as unknown. Tuned
-    runs (non-empty ``platform.tuning``) and post-cutoff bundles are
-    unaffected. Old bundles are never rewritten; warn only.
+    runs (``platform.tuning`` carrying a requested configuration or its
+    source or hash) and post-cutoff bundles are unaffected. Old bundles are
+    never rewritten; warn only.
     """
     platform = data.get("platform")
     if not isinstance(platform, dict):
@@ -1520,7 +1713,7 @@ def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     if config.get("databricks_clustering_strategy") != "z_order":
         return
     tuning = platform.get("tuning")
-    if isinstance(tuning, dict) and tuning:
+    if isinstance(tuning, dict) and any(tuning.get(key) for key in _TUNING_EVIDENCE_KEYS):
         return
     export = data.get("export")
     if isinstance(export, dict) and export.get("benchbox_version"):
@@ -1923,6 +2116,7 @@ def _validate_bundle(
     _validate_translation_section(data, vr)
     _validate_environment_client_link(data, vr)
     _validate_tables_block(data, vr)
+    _validate_required_tables(data, vr)
     _validate_platform_config_clustering(data, vr)
     _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
@@ -2121,6 +2315,7 @@ def _oversized_applied_ledger_arrays(applied: dict) -> list[tuple[str, int]]:
     candidates = (
         ("statements", applied.get("statements")),
         ("dropped", applied.get("dropped")),
+        ("satisfied", applied.get("satisfied")),
         ("receipt.entries", receipt.get("entries")),
         ("receipt.observed", receipt.get("observed")),
         ("receipt.dropped", receipt.get("dropped")),

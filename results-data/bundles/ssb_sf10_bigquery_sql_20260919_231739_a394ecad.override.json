@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "scale-invariant",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "Across SF 0.1 to SF 10, BigQuery SSB loads approximately 100x as many rows and scans 0.846 GB to 84.476 GB, while the geometric mean grows 1.37x (894 to 1,228 ms) and the median per-query mean grows 1.34x. Query caching is recorded off, the median measurement/warmup ratio at SF 10 is 0.96, and the SF 1 to SF 10 geometric mean grows 1.42x. The limited scaling is consistent with fixed per-job and client overhead masking lighter queries. Provider queue and execution timings were not recorded, so that explanation is an inference.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/105f1207d597c9a5e04c40129ea7a42a3fbdbda0/results-data/CORPUS_NOTES.md#bigquery-ssb-timing-2026-10-03",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "ssb_sf10_bigquery_sql_20260919_231739_a394ecad"
+  ]
+}

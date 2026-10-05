@@ -1,17 +1,17 @@
 # CI / local lint parity
 
-`make ci-lint` (and the product lane selected by `make pr-preflight`) exists
-so that every lint guard CI enforces on a develop PR also runs locally, before
-you push. A guard that only exists in `.github/workflows/pr.yml` fires for the
+`make ci-lint` exists
+so that every lint guard CI enforces on a develop PR can also run locally, before
+you push. A guard that only exists in `.github/workflows/ci.yml` fires for the
 first time on a pushed PR -- that costs a full remote CI round trip for a
 failure you could have caught in seconds locally.
 
 ## The invariant
 
-Every guard the `lint` job (job id `code-lint`) in `pr.yml` runs, after its
+Every guard the `lint` job (job id `code-lint`) in `ci.yml` runs, after its
 dependency-install step, must also run in the Makefile's `ci-lint` recipe --
 at the **command** level, not just under a similarly-named local target.
-`tests/system/test_ci_lint_parity.py` parses `pr.yml` (the source of truth)
+`tests/system/test_ci_lint_parity.py` parses `ci.yml` (the source of truth)
 and pins this: it fails if a `lint`-job guard command is missing from
 `ci-lint`, and it fails if an exclusion entry references a step that was
 renamed or removed (so the exclusion can't quietly rot into cover for a
@@ -24,7 +24,7 @@ checks.
 
 ## Adding a new lint guard
 
-When you add a new guard step to the `lint` job in `pr.yml`:
+When you add a new guard step to the `lint` job in `ci.yml`:
 
 1. Give the step an `id: guard-<slug>` (see "Report-all: one CI cycle,
    every guard's result" below for why) and `continue-on-error: true`.
@@ -35,7 +35,7 @@ When you add a new guard step to the `lint` job in `pr.yml`:
    -- copy the pattern of an existing guard pair in the recipe.
 3. If the guard has meaningful inline logic (more than a couple of lines)
    and would otherwise live only inside the workflow YAML, extract it to a
-   script under `scripts/` first and have both `pr.yml` and `ci-lint` call
+   script under `scripts/` first and have both `ci.yml` and `ci-lint` call
    that script. Duplicating logic into the Makefile as a second
    implementation is exactly the drift this invariant exists to prevent.
 4. Run `uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q`.
@@ -72,8 +72,8 @@ would show `success` for every failed-but-continued guard and defeat the
 whole point). It writes a pass/fail table to `$GITHUB_STEP_SUMMARY` and
 exits nonzero if any guard's `outcome` was `failure`. Because
 `lint-guard-summary` itself has no `continue-on-error`, that nonzero exit
-makes the `code-lint` job's own result `failure` -- so `ci-required-result`
-(which gates on `needs.code-lint.result`) still blocks the merge exactly
+makes the `code-lint` job's own result `failure` -- so the `core` unit
+(which requires `code-lint`) still blocks the merge exactly
 as before. Nothing here softens the gate; it only changes *when* you find
 out a second guard also failed.
 
@@ -100,39 +100,21 @@ checked after each command -- so `make ci-lint`'s console output looks the
 same as before, just with the run continuing past a failure instead of
 stopping. Because the `ci-lint` recipe body is now one logical shell line,
 the parity test's line-matching normalizes away each guard command's
-trailing `; \` continuation marker before comparing it against the `pr.yml`
+trailing `; \` continuation marker before comparing it against the `ci.yml`
 command text -- see `_normalize_recipe_lines` in
 `tests/system/test_ci_lint_parity.py`.
 
-If a guard genuinely cannot run locally (see the cache exception below
-for the only current example), add it to the `EXCLUDED_STEPS` dict in the
+If a guard genuinely cannot run locally, add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
 
-## Documented exceptions
-
-### Fast lane delta guard vs. develop
-
-The `lint` job's "Fast lane ceiling delta vs develop" step
-(`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
-develop fast-lane baseline count, populated by `develop-post-merge.yml`
-after every push to develop) and diffs this PR's own fast-lane collect
-count against it. There is no local equivalent for an Actions cache
-restore, so this has no `ci-lint` counterpart. It does not weaken local
-enforcement: `guard-timing-policy` (the `--strict` step immediately above
-it) already runs the absolute `max_fast_tests` ceiling check both in CI and
-in `make ci-lint` -- the delta guard is additive to that check, not a
-replacement, and is fail-open (`DELTA_CHECK_SKIPPED`, exit 0) whenever no
-baseline is available, which is always true locally. See
-docs/operations/fast-lane-budget.md for the full model.
-
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
-Everything above is about the direction "a `pr.yml` guard must also run
-locally." There is a second, separate direction this doc did not previously
-cover: `develop-post-merge.yml`'s `lint` job runs `make ci-lint` directly on
-a real, ephemeral GitHub-hosted runner (not as a local-parity convenience --
-as a blocking gate wired into `auto-revert-on-failure`). Most `ci-lint`
+Everything above is about the direction "a `ci.yml` guard must also run
+locally." There is a second, separate direction: `make ci-lint` may itself
+run on a real, ephemeral GitHub-hosted runner. The trunk workflow invokes its
+own test and artifact jobs rather than `make ci-lint`; the guard below keeps
+the recipe safe when another hosted workflow invokes it. Most `ci-lint`
 guards are equally meaningful there, because they inspect the checked-out
 tree, the installed venv, or a registry the repo ships -- none of which
 differ between a laptop and a runner. A couple of guards instead read state
@@ -189,17 +171,17 @@ entry removes real CI coverage inside `make ci-lint`'s own CI invocation
 unless that guard is *also* covered for real somewhere else in CI:
 
 - `agent-identity-check` has no CI-runner equivalent anywhere, by design --
-  see `pr.yml`'s `code-lint` job, which has no counterpart step for the same
+  see `ci.yml`'s `code-lint` job, which has no counterpart step for the same
   reason. `agent-commit-range-check` is the real merge-time control (it
   reads the commits a branch actually carries, not resolved config) and is
   never in the gate's table; it keeps running unconditionally, in `ci-lint`
-  and in `pr.yml`.
-- `skill-sync-check`'s real CI-side coverage is `pr.yml`'s required
+  and in `ci.yml`.
+- `skill-sync-check`'s real CI-side coverage is `ci.yml`'s required
   `skill-integrity` job. It runs when `.claude/skills/**`, `skill-sync.conf`,
   or `tools/skill-sync` changes, validates the config/receipt/tool-pin
   policy, clones the skill sources, runs the full
   preview/apply/verify/check cycle with the vendored wrapper, and runs
-  instruction/identity controls before `ci-required-result` can pass.
+  instruction/identity controls before the `tooling` unit can pass.
   Skipping the checkout-dependent `skill-sync-check` inside `ci-lint`'s own
   CI invocation does not remove coverage that existed there -- it removes a
   guard that is structurally unable to check anything on a runner.
@@ -229,58 +211,43 @@ The tool pin is fixed independently in
 `scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
 clean preview/apply/check/verify proof and full CI. GitHub classification
 binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
-`develop` advances during the run, strict current-base enforcement may mark
-that correctly certified run BEHIND. Refresh such PRs one at a time.
+`develop` advances during the run, the run still certifies the base it started
+from; the strict up-to-date rule is off, so the PR does not need a refresh.
 
-### Local preflight routing
+### Local preflight
 
-`make pr-preflight` creates one path-classifier JSON artifact and one generated
-path-list directory, then passes both to its selected targets. The Makefile has
-no skill path globs of its own. Its lane output is explicit:
+`make pr-preflight` lints the changed Python files with ruff and runs the tests
+mapped from the changed paths (`_project/scripts/preflight_targets.py`), failed
+tests first. The pre-push hook runs it. Checks that now run only in CI, with
+the command to run each locally: `ty` (`uv run ty check`), import-linter
+(`make lint-imports`), comment policy (`make comment-policy-check`), the
+content guard (`make pr-preflight-fast-tests`), skill integrity
+(`make skill-integrity-check`), UAT hygiene (`make uat-artifact-hygiene`); the
+full fast lane is `make pr-preflight-fast-tests` and every `ci-lint` guard is
+`make ci-lint`.
 
-- `Selected preflight lanes: skill-integrity` means an approved pure skill diff
-  runs `skill-integrity-check` without the product `ci-lint` or fast pytest
-  selection.
-- `Selected preflight lanes: skill-integrity content` means an approved skill
-  diff plus safe content runs the focused integrity lane and `pr-content-guard`,
-  still without product `ci-lint` or fast pytest.
-- `Selected preflight lanes: product ...` preserves the historical full local
-  lint, content-guard, and fast-test contract. Content-only, unknown, empty,
-  structural-manifest, and ordinary product diffs remain here.
-- A mixed skill/product diff prints both `product` and `skill-integrity` and
-  runs both lanes.
-
-The focused local target validates config/receipt/tool-pin policy and runs
-the vendored wrapper's offline `verify` directly -- no network, no Node, no
-build. It then enforces tracked/untracked mirror integrity, instruction
-authority, resolved and commit-range identity, wrapper budgets, and
-tracked-artifact hygiene. A missing wrapper fails the preflight.
-
-Routing does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
+The preflight does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
 or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole
 currency refusal point and `make pr-refresh` remains the one-at-a-time absorb.
 
 `GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
 every GitHub Actions job already has, so local runs (including
-`pr-preflight`) are unaffected -- both listed guards keep running locally
+`pr-preflight-fast-tests`) are unaffected -- both listed guards keep running locally
 exactly as before this table existed.
 
-## `pr-preflight` and the content guard
+## `pr-preflight-fast-tests` and the content guard
 
-On the full product path, `make pr-preflight-fast-tests` always runs
+`make pr-preflight-fast-tests` is the full local fast lane. It always runs
 `pr-content-guard` (YAML/markdown/docs hygiene + artifact hygiene), regardless
 of whether the branch's `needs-code-ci` path-filter decision is true. This
 preserves the fix for docs-plus-code PRs that previously hit those guards for
 the first time in CI. The `needs-code-ci` decision still gates only the
-fast-test pytest run. Direct invocation, including the opt-in `BENCHBOX_PREPUSH=1`
-hook, creates the classifier JSON and path lists when the parent preflight did
-not already supply them. An approved pure skill diff does not enter this generic
-content target; its focused lane carries the integrity and artifact controls
-listed above. A skill-plus-safe-content diff uses the two narrow lanes instead.
+fast-test pytest run. Direct invocation creates the classifier JSON and path lists when the caller did not
+supply them. It runs under the shared test lock.
 
 ## Hosted merge-gate guard inventory
 
-The command-level lint pin above is the detailed contract for `pr.yml`'s
+The command-level lint pin above is the detailed contract for `ci.yml`'s
 `code-lint` job. `tests/system/test_ci_lint_parity.py` also inventories
 guard-shaped steps in the independent publication docs lane and the release
 test workflow. Each such step must name a local equivalent or carry a written
@@ -289,19 +256,33 @@ exception in the test's `MERGE_GATE_EXEMPTIONS` table. This keeps a new
 failure. A strict local superset is acceptable; an unclassified hosted guard
 is not.
 
+The conditional `ci-paths` release-content check uses the same `make
+release-check VERSION=X.Y.Z BASE_REF=<immutable-base-sha>` entry point available
+locally. It verifies the prepared version, changelog, lockfile, generator
+markers, and release curation against the specified base. It is a local
+equivalent, so the parity inventory records `release-check` rather than a
+hosted-only exception.
+
 ### Hosted-only guard inventory
+
+Bundled generator integrity has local equivalents. Run
+`uv run -- python scripts/bundled_binary_manifest.py` to check the shipped
+source tree. After `uv build --out-dir /tmp/benchbox-dist`, run
+`uv run -- python scripts/verify_distribution_binaries.py /tmp/benchbox-dist/*.whl /tmp/benchbox-dist/*.tar.gz`
+to compare both distributions with the source manifest. The queue artifact
+job runs the same checks before uploading distributions. An installed wheel
+can check its own file membership and hashes with
+`python -m benchbox.utils.binary_manifest` from outside the checkout.
+Release authenticity still requires the exact trusted queue artifact and its
+attestation; a manifest consistency check alone does not establish provenance.
 
 The explicit exceptions cover inputs that only exist in their hosted gate:
 
 - cross-platform binary smoke tests and promoted slow/medium regression nodes;
-- fresh-runner skill-source cloning and PR-base/merge-queue ancestry checks;
+- fresh-runner skill-source cloning and PR-base ancestry checks;
 - release-branch curation and release-artifact reports; and
 - the audit-SHA comparison against the immutable PR event base.
 
 These are intentionally named in the parity test with the reason they cannot
 be reproduced from a normal checkout. They are not skipped by local validation
-under another name. The publication docs lane has a local equivalent:
-`make pr-preflight` consumes the classifier's `PATH_LISTS` and invokes
-`make lane-isolation-check`, which runs the existing verifier for site,
-explorer, and corpus against the exact changed-path artifact. The target fails
-closed when that artifact is absent or empty.
+under another name.

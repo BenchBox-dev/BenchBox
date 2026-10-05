@@ -278,8 +278,8 @@ benchmark_metadata:
     description: Read operation benchmarks testing SELECT queries
     category: Primitives
     support_status: beta
-    num_queries: 136
-    query_description: Multiple read test queries
+    num_queries: 157
+    query_description: 157 SQL queries (153 DuckDB-transpilable); 152 DataFrame queries, 148 gateable
     supports_streams: false
     default_scale: 0.01
     scale_options:
@@ -405,8 +405,8 @@ benchmark_metadata:
     description: Uniformly-random Join Order schema smoke-test data
     category: Academic
     support_status: repo_only
-    num_queries: 13
-    query_description: 13 synthetic smoke queries
+    num_queries: 113
+    query_description: 113 JOB queries (13 historical smoke plus 100 canonical extensions)
     supports_streams: false
     default_scale: 1.0
     scale_options:
@@ -586,7 +586,7 @@ benchmark_metadata:
     display_name: Vector Search
     description: Vector similarity search benchmark (kNN, ANN, filtered)
     category: AI/ML
-    support_status: beta
+    support_status: stable
     num_queries: 6
     query_description: 6 queries (kNN cosine/L2, filtered, recall@k, ANN, multi-category)
     supports_streams: false

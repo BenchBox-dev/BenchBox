@@ -18,24 +18,27 @@ This document provides guidelines and instructions for contributing.
 ### Setting Up Your Environment
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/BenchBox-dev/BenchBox.git
    cd BenchBox
    ```
 
 2. Install the package in development mode:
+
    ```bash
    make develop          # equivalent to: uv sync --group dev
    ```
 
 3. Install the pre-commit + pre-push hooks:
+
    ```bash
    pre-commit install
    ```
 
    This installs two hooks (configured in `.pre-commit-config.yaml`):
    - **pre-commit**: ruff format/check, codespell, YAML / markdown lint, timing-policy check.
-   - **pre-push**: `pr-preflight-fast-tests` — when `BENCHBOX_PREPUSH=1`, runs the path-aware fast-test lane so code PR pushes don't discover failures via the CI roundtrip.
+   - **pre-push**: `pr-preflight` — runs `make pr-preflight` (ruff on the changed Python files and the tests mapped from them) before each push.
    Existing clones that installed hooks before the pre-push stage was added should re-run `pre-commit install` once.
 
    If `pre-commit install` errors with `Cowardly refusing to install hooks with core.hooksPath set` and points at the default `.git/hooks` location, run `git config --unset-all core.hooksPath` and try again — that's a redundant override left over from earlier tooling.
@@ -44,11 +47,11 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
+Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`, plus `oracle-review`, which passes on a result-affecting PR only when the Codex connector app has reviewed or thumbed up its current head (or, when the connector cannot review, a listed attester has posted the stand-in approval for that head) and its threads are resolved. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the lint/type + Ubuntu 3.12 fast-test checks. Soundness-path review applies even when the author uses the owner's account; once a finished branch is armed, auto-merge lands it when required checks are green and all review threads are resolved.
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready`; `make pr-open READY=1` may arm only when it reuses an already-open, reviewed PR. A newly created PR remains held until review; then walk away — don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it with `make pr-arm`, which checks the live PR for a hold and arms auto-merge on the exact head; GitHub merges it when its required checks are green. After the merge, `trunk.yml` tests `develop`; if it fails because of your change, revert first with `make trunk-revert PR=<n>`. You are done when the PR is merged, not when it is open or green: re-arm (`make pr-arm` again) after a spurious failure and fix and push after a real failure. Stop and hand back only for the exceptions listed in `AGENTS.md` `[WRITE-CLOSEOUT-001]`.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -78,30 +81,31 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
    git commit -m "fix: resolve race in foo loader"
    ```
 
-4. **Run the local preflight, then open the PR (auto-merge withheld):**
+4. **Run the local preflight, then open the PR:**
 
    ```bash
-   make pr-preflight      # local lint + path-aware content guard / fast tests
-   make pr-open           # push + gh pr create --base develop (does NOT arm auto-merge)
+   make pr-preflight
+   make pr-open
    ```
 
-   `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
+   `make pr-open` refuses to run from `develop` or `release`.
 
-5. **When the branch is final, run the readiness transaction** (hands-free finish path):
+5. **Arm it and monitor until it merges:**
 
    ```bash
-   make pr-ready PR=123 HEAD=$(git rev-parse HEAD) EVIDENCE=/tmp/readiness.json
-   # Or reuse an already-open, reviewed PR and arm it in one step:
-   # make pr-open READY=1 EVIDENCE=/tmp/readiness.json
+   make pr-arm            # PR=<n> optional; refuses on a hold label, requested changes, a draft, or a head that is not pushed
    ```
 
-   The evidence file must declare `delivery_mode` (`serial` or `batch`); batch
-   mode must include the complete prepared-batch binding. `make pr-ready` (or
-   `READY=1` while reusing an already-open, reviewed PR) is the only arm path:
-   `auto-merge-on-open.yml` is revoke-only and never arms. Once the exact readiness transaction passes, the PR
-   squash-merges when required checks turn green — don't poll.
-   Soundness-critical paths and the `no-auto-merge` hold label stay withheld
-   pending review (see `docs/operations/repo-admin-settings.md`).
+   `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
+   being mistaken for a failing check; remove a hold deliberately to release it. Before editing an armed PR,
+   withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
+   push the correction, rerun CI and obtain the connector's review or thumbs-up (or the stand-in approval) on the new head before arming:
+   a later `--match-head-commit` cannot undo a merge of the old head.
+   `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
+   readiness evidence transaction used to deliver a prepared batch, where the evidence file must declare
+   `delivery_mode` and the complete prepared-batch binding; a single PR does not need it.
+   The `no-auto-merge` label blocks arming only; to hold an armed PR, run `gh pr merge <n> --disable-auto` or
+   `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label.
 
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
@@ -123,7 +127,9 @@ There are two layers, and you only need the first:
 make pr-preflight
 ```
 
-This runs the local lint/type gate, then uses `.github/path-filters.yml` to decide the fast-test lane. Content-only branches run the cheap content guard and skip Python fast tests; code, infra, workflow, tooling, and unknown paths run the fast tests. This mirrors the `ci-required-result` umbrella, so a green preflight almost always means a green CI. The opt-in pre-push git hook runs the same path-aware test portion when `BENCHBOX_PREPUSH=1`.
+This runs `ruff check` and `ruff format --check` on the Python files you changed, then runs the tests for them without xdist, so it does not wait on the shared test lock. A changed `tests/**/test_*.py` runs itself; a changed `benchbox/**/<module>.py` or `scripts/<module>.py` runs every `tests/**/test_<module>.py`. Tests that failed in the previous run go first (`--ff`), then the rest run. If no test maps to your change it runs no tests and says CI will run the fast lane.
+
+It does not run the full fast lane, type checking, or the other lint guards. CI runs all of them on every PR within about 20 minutes and is the authoritative check. To run the full fast lane before pushing, use `make pr-preflight-fast-tests`; to run the CI lint guards use `make ci-lint`.
 
 **Optional thoroughness check** — only useful when you've changed cross-cutting things (CI workflows, packaging, docs build, integration paths):
 
@@ -134,16 +140,16 @@ make ci-local
 This runs the broader CI mirror:
 
 | Step | Target |
-|---|---|
+| --- | --- |
 | Lint + format + type checking | `make ci-lint` |
 | Fast tests with coverage | `make ci-test` |
 | Integration smoke tests | `make test-integration-smoke` |
 | Documentation build | `make ci-docs` |
 | Package build + install test | `make test-package` |
 
-Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
+Or run any of those individually. Additional one-offs: `make security-audit` and `make spellcheck`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
 
 ## Testing
 

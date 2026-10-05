@@ -527,6 +527,61 @@ def test_report_excludes_vacuous_cells_from_discriminating_count(capsys):
     assert "2 vacuous empty-vs-empty" in out
 
 
+def test_report_fails_on_stale_legitimately_empty_entry(capsys):
+    """A classified-empty query whose reference now returns rows FAILS."""
+    exit_code = _report(
+        [],
+        total=2,
+        coverage={"expression": 1, "pandas": 1},
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 3},
+        legitimately_empty={"Q1": "was empty before"},
+    )
+    assert exit_code == 1
+    assert "legitimately_empty entries whose reference now returns rows: ['Q1']" in capsys.readouterr().out
+
+
+def test_report_counts_all_null_rows_apart_from_zero_rows(capsys):
+    """An all-NULL reference row stays vacuous but is reported separately from zero rows."""
+    exit_code = _report(
+        [],
+        total=4,
+        coverage={"expression": 2, "pandas": 2},
+        known={},
+        benchmark="fake",
+        reference_row_counts={"Q1": 0, "Q2": 0},
+        legitimately_empty={"Q1": "zero rows", "Q2": "all-NULL aggregate"},
+        all_null_references={"Q2"},
+    )
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "compared 0 of 4 query-backend cells" in out
+    assert "vacuous queries: 1 zero-row, 1 single all-NULL row" in out
+    assert "Q2 [all-NULL row]: all-NULL aggregate" in out
+    assert "Q1: zero rows" in out
+
+
+def test_all_null_reference_is_recorded_as_vacuous_and_all_null():
+    """The comparison records an all-NULL reference as 0 rows and in the all-NULL set."""
+    rows = [(None, None)]
+    connection, reference_sql, dataframe_query, contexts = _make_inputs(rows, {"expression": rows, "pandas": rows})
+    counts: dict = {}
+    all_null: set = set()
+    find_cross_surface_divergences(
+        connection,
+        query_ids=["Q1"],
+        reference_sql=reference_sql,
+        dataframe_query=dataframe_query,
+        contexts=contexts,
+        validator=ResultValidator(),
+        reference_row_counts=counts,
+        all_null_references=all_null,
+    )
+    assert counts == {"Q1": 0}
+    assert all_null == {"Q1"}
+
+
 def test_report_with_real_divergence_still_fails_for_nonempty_query():
     """A genuine mismatch on a NON-empty query still fails - the guard is additive."""
     coverage = {"expression": 1, "pandas": 1}
@@ -1561,3 +1616,78 @@ def test_h2odb_q9_residue_requires_p90_to_be_the_only_mismatched_column():
         "Q9_pandas", "Q9.1: Value mismatch at row 0, column 0. Original: gA, Variant: gB; also columns [2]"
     )
     assert _h2odb_q9_decimal_residue(zero_first) is False
+
+
+_HIERARCHY_SQL = (
+    "SELECT total, category, level, rnk FROM t "
+    "ORDER BY level DESC, CASE WHEN level = 0 THEN category END, rnk LIMIT 100"
+)
+_HIERARCHY_COLUMNS = [("total", "DECIMAL(17,2)"), ("category", "VARCHAR"), ("level", "INTEGER"), ("rnk", "BIGINT")]
+
+
+def test_derived_order_accepts_rows_in_case_key_order():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    rows = [(90.0, None, 2, 1), (60.0, "Music", 1, 1), (30.0, "Books", 1, 2), (20.0, "Books", 0, 1), (5.0, None, 0, 1)]
+    assert _derived_order_violation(_HIERARCHY_SQL, _HIERARCHY_COLUMNS, rows) is None
+
+
+def test_derived_order_rejects_subtotals_sorted_by_category():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    rows = [(90.0, None, 2, 1), (30.0, "Books", 1, 2), (60.0, "Music", 1, 1), (20.0, "Books", 0, 1)]
+    violation = _derived_order_violation(_HIERARCHY_SQL, _HIERARCHY_COLUMNS, rows)
+    assert violation is not None
+    assert violation.startswith("returned row 1 breaks the ORDER BY")
+
+
+def test_derived_order_allows_any_order_within_ties():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a, b FROM t ORDER BY a - b"
+    columns = [("a", "DOUBLE"), ("b", "DOUBLE")]
+    assert _derived_order_violation(sql, columns, [(3.0, 2.0), (2.0, 1.0), (5.0, 1.0)]) is None
+    assert _derived_order_violation(sql, columns, [(5.0, 1.0), (3.0, 2.0)]) is not None
+
+
+def test_derived_order_is_not_checked_when_a_key_is_not_in_the_result():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a FROM t ORDER BY hidden"
+    assert _derived_order_violation(sql, [("a", "INTEGER")], [(2,), (1,)]) is None
+    qualified = "SELECT b AS a FROM t ORDER BY t.a + 0"
+    assert _derived_order_violation(qualified, [("a", "INTEGER")], [(2,), (1,)]) is None
+
+
+def test_derived_order_fails_closed_when_the_sort_keys_cannot_be_evaluated():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a FROM t ORDER BY a / 2"
+    violation = _derived_order_violation(sql, [("a", "VARCHAR")], [("x",), ("y",)])
+    assert violation is not None
+    assert "could not evaluate the sort keys" in violation
+
+
+def test_report_lists_vacuity_without_failing_for_an_unclassified_draw(capsys):
+    """A non-default draw reports vacuous and stale emptiness but fails only on divergences."""
+    arguments = {
+        "total": 4,
+        "coverage": {"expression": 2, "pandas": 2},
+        "known": {},
+        "benchmark": "fake",
+        "reference_row_counts": {"Q1": 0, "Q2": 4},
+        "legitimately_empty": {"Q2": "empty on the default draw"},
+        "enforce_vacuity": False,
+    }
+    assert _report([], **arguments) == 0
+    out = capsys.readouterr().out
+    assert "lists it without failing: ['Q1']" in out
+    assert "GATE FAILURE" not in out
+    assert _report([SurfaceDivergence("Q2", "pandas", "value mismatch")], **arguments) == 1
+
+
+def test_derived_order_is_not_checked_for_order_by_all():
+    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+
+    sql = "SELECT a, b FROM t ORDER BY ALL DESC"
+    assert _derived_order_violation(sql, [("a", "INTEGER"), ("b", "INTEGER")], [(1, 2), (3, 4)]) is None

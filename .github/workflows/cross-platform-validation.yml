@@ -1,5 +1,8 @@
 name: Cross-Platform Validation
 
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
 # Nightly matrix: DuckDB × {DataFusion, Polars-DF, ClickHouse-local} at TPC-H SF=0.01.
 #
 # Purpose: detect silent cross-platform divergences before they land on release.

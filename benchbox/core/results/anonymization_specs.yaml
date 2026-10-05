@@ -64,6 +64,8 @@ identifier_keys:
   workspacename: workspace
   warehouse: warehouse
   warehousename: warehouse
+  # Databricks SQL warehouse id (platform config, compute and raw metadata).
+  warehouseid: warehouse
   workgroup: workgroup
   workgroupname: workgroup
   cluster: cluster
@@ -71,6 +73,13 @@ identifier_keys:
   clustername: cluster
   database: database
   databasename: database
+  # BigQuery datasets and Databricks Unity Catalog namespaces. Plain `catalog`
+  # is deliberately absent: local bundles use it for an engine catalog type.
+  dataset: dataset
+  datasetid: dataset
+  uccatalog: catalog
+  ucschema: schema
+  ucvolume: volume
   db: database
   dbname: database
   schema: schema
@@ -122,6 +131,8 @@ path_keys:
 - httppath
 - outputdirectory
 - outputlocation
+# Saved cloud output location (gs://, s3://, @stage); names a private bucket or stage.
+- defaultoutputlocation
 - outputpath
 - path
 - s3stagingurl

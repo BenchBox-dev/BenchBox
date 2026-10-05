@@ -1,0 +1,111 @@
+# Ownership map for the six merge units reported by .github/workflows/ci.yml.
+#
+# A changed path belongs to EVERY unit whose patterns match it, so a
+# cross-unit contract is expressed by listing a path under more than one
+# unit. A changed path that matches no unit belongs to `core`: the classifier
+# fails closed so a new top-level area runs the widest unit, never none.
+# `all-units` paths (the classifier itself and the workflow that consumes it)
+# run every unit.
+
+all-units:
+  - ".github/ci-units.yml"
+  - ".github/workflows/ci.yml"
+  - "scripts/ci_units.py"
+  - "scripts/ci_unit_result.py"
+
+core:
+  - "benchbox/**"
+  - "tests/**"
+  - "examples/**"
+  - "docker/**"
+  - "_binaries/**"
+  - "_sources/**"
+  - "quality/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "MANIFEST.in"
+  - "tox.ini"
+  - "pytest.ini"
+  - "pytest-ci.ini"
+  - ".importlinter"
+  - "codecov.yml"
+  - "deploy/**"
+  # Executable documentation machinery is product code: it runs under lint,
+  # type, and unit tests like any other Python or template source.
+  - "docs/conf.py"
+  - "docs/Makefile"
+  - "docs/_extensions/**"
+  - "docs/_static/**"
+  - "docs/_templates/**"
+  - "docs/**.py"
+  - "docs/**.js"
+  - "docs/**.css"
+  - "docs/**.html"
+  - "docs/**.jinja"
+  - "docs/**.j2"
+  - "docs/agent/**"
+  - "docs/development/dependency-audit-raw.md"
+  - "docs/operations/agent-instruction*.md"
+  - "landing/**.py"
+  - "website/**.py"
+
+explorer:
+  - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
+  - "_project/scripts/explorer_pipeline/**"
+  - "_project/scripts/explorer_publish.py"
+  - "tests/parity/**"
+  - "scripts/generate_corpus_inventory.py"
+  # Producer-owned contracts: the explorer consumes the results schema, the
+  # published bundles, and the chart vocabulary the CLI writes.
+  - "benchbox/core/results/**"
+  - "benchbox/core/visualization/**"
+  - "results-data/**"
+
+results-data:
+  - "results-data/**"
+  - "scripts/validate_submission.py"
+  - "scripts/check_submission_validator_sync.py"
+  - "benchbox/core/results/**"
+  - "benchbox/validation/**"
+
+docs:
+  - "docs/**"
+  - "website/**"
+  - "_project/scripts/generate_oracle_coverage_map.py"
+  - "scripts/generate_query_docs.py"
+  - "scripts/generate_compat_docs.py"
+  # Autodoc imports the package; the CLI and registries define the public
+  # surface the reference pages describe.
+  - "benchbox/__init__.py"
+  - "benchbox/cli/**"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/benchmark_registry.py"
+
+landing:
+  - "landing/**"
+  - "website/**"
+  - "docs/_static/custom.css"
+  - "docs/_templates/page.html"
+  - "results-explorer/index.html"
+  - "scripts/generate_landing_quickstarts.py"
+  # Quickstarts are generated from the platform registry and dependency groups.
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/platforms/manifest.py"
+  - "pyproject.toml"
+
+tooling:
+  - ".github/**"
+  - "scripts/**"
+  - "_project/**"
+  - "_blog/**"
+  - "make/**"
+  - "Makefile"
+  - ".pre-commit-config.yaml"
+  - ".claude/**"
+  - ".agents/**"
+  - "skill-sync.conf"
+  - "tools/**"
+  - ".gitignore"
+  - ".gitattributes"
+  - "*.md"

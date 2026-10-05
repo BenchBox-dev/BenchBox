@@ -191,6 +191,18 @@ class TestMetadataPrimitivesQueryManager:
         assert "with_admin_option AS admin_option" in query
         assert "\n    admin_option\n" not in query
 
+    def test_databricks_skips_unsupported_acl_queries(self):
+        """Databricks lacks the ACL introspection views these queries need."""
+        manager = MetadataPrimitivesQueryManager()
+
+        for query_id in (
+            "acl_column_privileges_list",
+            "acl_role_list",
+            "acl_role_membership",
+        ):
+            with pytest.raises(ValueError, match="not supported on dialect"):
+                manager.get_query(query_id, dialect="databricks")
+
     def test_get_query_entry(self):
         """Test getting full query entry."""
         manager = MetadataPrimitivesQueryManager()

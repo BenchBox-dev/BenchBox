@@ -41,14 +41,20 @@ table_tunings:
       type: INTEGER
       order: 1
     clustering:
-    - name: lo_orderkey
+    - name: lo_orderdate
       type: INTEGER
       order: 1
-    - name: lo_custkey
+    - name: lo_suppkey
       type: INTEGER
       order: 2
+    - name: lo_custkey
+      type: INTEGER
+      order: 3
+    - name: lo_partkey
+      type: INTEGER
+      order: 4
     distribution:
-    - name: lo_orderkey
+    - name: lo_orderdate
       type: INTEGER
       order: 1
 

@@ -20,6 +20,33 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+_GIT_LOCAL_ENV_FALLBACK = [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+]
+try:
+    import subprocess as _subprocess
+
+    _git_local_env = _subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"], capture_output=True, text=True, check=True, timeout=10
+    ).stdout.split()
+except (OSError, _subprocess.SubprocessError):
+    _git_local_env = []
+for _git_local_key in {*_git_local_env, *_GIT_LOCAL_ENV_FALLBACK}:
+    os.environ.pop(_git_local_key, None)
 # DuckDB ignores env vars; patched in pytest_configure below.
 
 import sys
@@ -30,8 +57,9 @@ from typing import Any
 
 import pytest
 
-from benchbox.utils.config_interface import set_config_provider
-from benchbox.utils.printing import set_quiet
+pytest.register_assert_rewrite("tests.utilities.leak_detector")
+from tests.utilities.leak_detector import restore_global
+from tests.utilities.session_isolation import active as isolated_session_active
 
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
 # Guarded because older Sphinx versions (e.g. on Python 3.10) lack this class,
@@ -51,6 +79,7 @@ pytest_plugins = [
     "tests.fixtures.result_dict_fixtures",
     "tests.fixtures.platform_fixtures",
     "tests.fixtures.utility_fixtures",
+    "tests.utilities.leak_detector",
 ]
 
 
@@ -102,9 +131,9 @@ def _load_lock_waiter() -> Any:
 
 def _lock_wait_seconds() -> float:
     try:
-        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "0") or 0))
+        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "3600") or "3600"))
     except ValueError:
-        return 0.0
+        return 3600.0
 
 
 def _get_test_lock_path() -> Path:
@@ -121,6 +150,8 @@ def _should_acquire_test_lock(config: pytest.Config) -> bool:
     process locks), when parallelism is disabled (-n 0 / no numprocesses), or
     when BENCHBOX_SKIP_TEST_LOCK is set in the environment.
     """
+    if isolated_session_active():
+        return False  # early plugin acquired or verified the real shared lock
     if hasattr(config, "workerinput"):
         return False  # xdist worker - the controller holds the lock on our behalf
     if os.environ.get("BENCHBOX_SKIP_TEST_LOCK"):
@@ -183,14 +214,13 @@ def pytest_configure(config) -> None:
 
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
-    # BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 (default) keeps the historical
-    # immediate fail-fast; a positive value waits that long with owner
-    # visibility before failing the same way. Ctrl-C cancels the wait.
+    # Local parallel runs wait up to an hour with owner visibility.
+    # CI sets BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 to fail immediately.
     if _should_acquire_test_lock(config):
         test_lock_path = _get_test_lock_path()
         test_lock_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
-        waiter = None if sys.platform == "win32" else _load_lock_waiter()
+        waiter = _load_lock_waiter()
         wait_seconds = 0.0 if waiter is None else _lock_wait_seconds()
         lock_error: Exception | None = None
         if waiter is not None and wait_seconds > 0:
@@ -214,11 +244,8 @@ def pytest_configure(config) -> None:
             except (BlockingIOError, OSError) as exc:
                 lock_error = exc
         if lock_error is not None:
-            # Another parallel run holds the lock - fail fast with a clear message.
-            try:
-                holder_info = test_lock_path.read_text(encoding="utf-8").strip()
-            except OSError:
-                holder_info = "(could not read lock file)"
+            # Another parallel run holds the lock - report the holder and timeout.
+            holder_info = waiter.read_holder(test_lock_path) if waiter is not None else "(could not read lock file)"
             os.close(fd)
             # Use os._exit() rather than sys.exit(): pytest_configure is called
             # before the session loop so SystemExit bubbles up as INTERNALERROR.
@@ -227,7 +254,7 @@ def pytest_configure(config) -> None:
                 f"  Waited    : {wait_seconds:g}s (BENCHBOX_TEST_LOCK_WAIT_SECONDS)\n" if wait_seconds > 0 else ""
             )
             sys.stderr.write(
-                f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
+                f"\n\033[91m[benchbox] BLOCKED: A parallel test run is still active.\033[0m\n"
                 f"  Lock file : {test_lock_path}\n"
                 f"  Holder    : {holder_info}\n"
                 f"{waited_note}\n"
@@ -365,7 +392,38 @@ def _create_test_databases() -> None:
 
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(session, config, items) -> None:
-    """Create shared test databases only when the selected test set needs them."""
+    """Enforce duration/quarantine policy and create shared test databases."""
+    from tests.duration_policy import (
+        current_test_tier,
+        is_bootstrap_artifact,
+        load_durations,
+        t1_budget_violations,
+        validate_markers,
+    )
+
+    try:
+        tier = current_test_tier()
+        durations = load_durations()
+    except (OSError, ValueError) as exc:
+        raise pytest.UsageError(f"test duration policy is invalid: {exc}") from exc
+
+    duration_bootstrap = is_bootstrap_artifact() or os.environ.get(
+        "BENCHBOX_TEST_DURATION_BOOTSTRAP", ""
+    ).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    violations: list[str] = []
+    for item in items:
+        violations.extend(validate_markers(item))
+        if tier == "t1":
+            violations.extend(t1_budget_violations(item, durations, allow_missing=duration_bootstrap))
+        if tier in {"t1", "t2"} and item.get_closest_marker("quarantine") is not None:
+            item.add_marker(pytest.mark.skip(reason=f"quarantined outside T3 ({tier})"))
+    if violations:
+        raise pytest.UsageError("test duration policy violations:\n" + "\n".join(violations))
+
     if _items_require_test_databases(items):
         _create_test_databases()
 
@@ -376,59 +434,26 @@ def pytest_collection_finish(session) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_quiet_state():
-    """Never let benchbox's global quiet flag leak across tests.
+def _reset_global_quiet_state(request, _hermetic_state):
+    """Retain the quiet-state safety net without erasing leak evidence.
 
-    benchbox.utils.printing keeps module-global output state (_QUIET) that
-    tests toggle via set_quiet(True). A test that fails, times out, or forgets
-    its reset between set_quiet(True) and its cleanup poisons every later
-    test in the same xdist worker: emit() routes to the sink console and
-    capsys sees ''. Observed live on develop-post-merge run 28706929881,
-    where test_display_results failed with CaptureResult(out='') under -n 5
-    while passing in isolation (medium-tier-red-disposition-and-promotion).
-    Resetting AFTER each test (post-yield) contains the blast radius to the
-    leaking test itself.
-
-    ``set_quiet`` is imported at module scope (not lazily here in the
-    teardown body): this fixture is autouse, so its teardown runs after
-    EVERY test, including one that monkeypatches ``builtins.__import__``
-    for the duration of its own test body (e.g. the vortex-converter
-    "missing module" test). A lazy import here would route through that
-    patched ``__import__`` and raise the OTHER test's synthetic
-    ImportError, misattributed to this fixture's teardown, whenever pytest's
-    fixture-teardown ordering runs this after monkeypatch's own finalizer
-    (order is topology-dependent, hence intermittent). Importing once at
-    module load time, before any test's monkeypatch is active, avoids the
-    race entirely.
+    Checked unit tests defer restoration to the outer teardown hook, after
+    every fixture has cleaned up. Raw module access avoids imports while a
+    test still owns a patched import function.
     """
     yield
-    set_quiet(False)
+    restore_global(request.node, "benchbox.utils.printing", "_QUIET", False)
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_config_provider():
-    """Never let the CLI's config provider leak across tests.
+def _reset_global_config_provider(request, _hermetic_state):
+    """Retain provider isolation using its raw identity, never a default getter.
 
-    benchbox.utils.config_interface keeps a process-global provider that the
-    CLI installs from its group callback (install_cli_config_provider, added
-    with the utils -> cli dependency inversion in #1556). Any test that invokes
-    a CLI subcommand therefore makes CLIConfigProvider -- backed by a real
-    ConfigManager reading ~/.benchbox/config.yaml -- the provider for every
-    LATER test in the same xdist worker. A test that then builds an
-    ExecutionConfigHelper() or an execution manager without passing
-    config_manager silently reads the developer's real config instead of
-    SimpleConfigProvider's documented defaults, and does so only when it
-    happens to be scheduled after a CLI test on that worker.
-
-    Resetting AFTER each test (post-yield) mirrors _reset_global_quiet_state
-    and contains the blast radius to the leaking test itself.
-
-    ``set_config_provider`` is imported at module scope for the same reason
-    that fixture documents: this teardown runs after EVERY test, including
-    tests that monkeypatch ``builtins.__import__`` for their own duration.
+    The outer teardown hook checks before restoring the provider for unit
+    tests. Other test tiers keep the existing unconditional reset.
     """
     yield
-    set_config_provider(None)
+    restore_global(request.node, "benchbox.utils.config_interface", "_config_provider", None)
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:

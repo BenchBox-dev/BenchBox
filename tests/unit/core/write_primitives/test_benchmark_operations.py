@@ -260,6 +260,73 @@ class TestEffectiveWriteSqlSkipOrder:
         assert skip_reason is not None and "unsupported on platform 'datafusion'" in skip_reason
 
 
+SKETCH_PARAMETER_SWEEPS = (
+    "sketch_query_theta_union_merge_lgk10",
+    "sketch_query_theta_union_merge_lgk14",
+    "sketch_query_kll_quantiles_merge_k100",
+    "sketch_query_kll_quantiles_merge_k1000",
+    "sketch_query_topk_combine_lgmm8",
+    "sketch_query_topk_combine_lgmm10",
+)
+
+
+@pytest.mark.parametrize("operation_id", SKETCH_PARAMETER_SWEEPS)
+@pytest.mark.parametrize("platform", ["clickhouse", "trino"])
+def test_unsupported_sketch_parameter_sweeps_skip_adapter_overrides(
+    wp: WritePrimitivesBenchmark, operation_id: str, platform: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operation = wp.get_operation(operation_id)
+
+    sql, reason = wp._get_effective_write_sql(operation, platform_key=platform, sql_override="SELECT 1")
+
+    assert sql is None
+    assert reason is not None and f"unsupported on platform '{platform}'" in reason
+
+    connection = Mock()
+    monkeypatch.setattr(wp, "is_setup", lambda connection: True)
+    result = wp.execute_operation(operation_id, connection, platform_key=platform, sql_override="SELECT 1")
+    assert result.status == "SKIPPED"
+    assert result.validation_results == []
+    connection.execute.assert_not_called()
+
+
+TRINO_UNSUPPORTED_SKETCH_HEADLINES = (
+    "sketch_ddl_create_persistent_table",
+    "sketch_insert_theta_per_partition",
+    "sketch_insert_kll_per_partition",
+    "sketch_insert_topk_per_shard",
+    "sketch_query_theta_union_merge",
+    "sketch_query_kll_quantiles_merge",
+    "sketch_query_topk_combine",
+    "sketch_drop_persistent_table",
+)
+
+
+@pytest.mark.parametrize("operation_id", TRINO_UNSUPPORTED_SKETCH_HEADLINES)
+def test_trino_sketch_headlines_skip_before_execution(
+    wp: WritePrimitivesBenchmark, operation_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = Mock()
+    monkeypatch.setattr(wp, "is_setup", lambda connection: True)
+
+    result = wp.execute_operation(operation_id, connection, platform_key="trino", sql_override="SELECT 1")
+
+    assert result.status == "SKIPPED"
+    assert "unsupported on platform 'trino'" in (result.skip_reason or "")
+    assert result.validation_results == []
+    connection.execute.assert_not_called()
+
+
+@pytest.mark.parametrize("operation_id", SKETCH_PARAMETER_SWEEPS)
+def test_duckdb_sketch_parameter_sweeps_keep_catalog_sql(wp: WritePrimitivesBenchmark, operation_id: str) -> None:
+    operation = wp.get_operation(operation_id)
+
+    sql, reason = wp._get_effective_write_sql(operation, platform_key="duckdb")
+
+    assert reason is None
+    assert sql == operation.write_sql
+
+
 # ---------------------------------------------------------------------------
 # _get_effective_write_sql fallback key (shared-dialect override inheritance)
 # ---------------------------------------------------------------------------

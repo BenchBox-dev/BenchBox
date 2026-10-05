@@ -68,14 +68,16 @@ document already described in prose.
 ## Seed Corpus
 
 After the 2026-08-28 trust boundary, the checked-in
-corpus holds **244** maintainer-run bundles across **16** benchmarks and **42**
+corpus holds **395** maintainer-run bundles across **20** benchmarks and **61**
 cohorts, all at the >=3-identity validator floor. Covered families include the
 local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
-ssb, tpcds, tpch, tpch_skew) and the admitted datavault, flightdata, nyctaxi,
-tpcdi, tpcds_obt, and tpchavoc cohorts.
-`metadata_primitives` and `write_primitives` remain uncovered until each can
-form a validation-passed three-identity cohort; `star_schema` is an alias of
-`ssb` and is not admitted separately. See `REGENERATION.md` for deferral detail.
+ssb, tpcds, tpch, tpch_skew), the admitted datavault, flightdata, nyctaxi,
+tpcdi, tpcds_obt, and tpchavoc cohorts, and 150 live cloud bundles (BigQuery,
+Snowflake, Databricks; added 2026-10-02 and 2026-10-03) that also add
+metadata_primitives, write_primitives, transaction_primitives and tsbs_devops.
+See `CORPUS_NOTES.md`
+for the cloud cohorts. `star_schema` is an alias of `ssb` and is not admitted
+separately. See `REGENERATION.md` for deferral detail.
 
 The DuckDB version-matrix cells (ClickBench / SSB / TPC-H / TPC-DS at SF 10)
 use three independent power repetitions per cell and promote one median bundle

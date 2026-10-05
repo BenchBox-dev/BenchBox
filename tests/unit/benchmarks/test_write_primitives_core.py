@@ -100,7 +100,7 @@ class TestWritePrimitivesCatalog:
         """Test loading operations catalog."""
         catalog = load_write_primitives_catalog()
         assert catalog is not None
-        assert catalog.version == 1
+        assert catalog.version == 2
         assert len(catalog.operations) > 0
 
     def test_catalog_operations_have_required_fields(self):
@@ -196,7 +196,7 @@ class TestWriteOperationsManager:
     def test_manager_initialization(self):
         """Test manager loads catalog correctly."""
         manager = WriteOperationsManager()
-        assert manager.catalog_version == 1
+        assert manager.catalog_version == 2
         assert manager.get_operation_count() > 0
 
     def test_get_operation(self):
@@ -262,7 +262,7 @@ class TestWritePrimitivesBenchmark:
 
         assert benchmark.scale_factor == 1.0
         assert benchmark._name == "Write Primitives Benchmark"
-        assert benchmark._version == "1.0"
+        assert benchmark._version == "2.0"
 
     def test_get_data_source_benchmark(self):
         """Test that benchmark declares TPC-H data source."""
@@ -321,7 +321,7 @@ class TestWritePrimitivesBenchmark:
         info = benchmark.get_benchmark_info()
 
         assert info["name"] == "Write Primitives Benchmark"
-        assert info["version"] == "1.0"
+        assert info["version"] == "2.0"
         assert info["scale_factor"] == 1.0
         assert info["total_operations"] > 0
         assert len(info["categories"]) > 0

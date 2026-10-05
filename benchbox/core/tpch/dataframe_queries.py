@@ -23,6 +23,9 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from csv import reader
 from datetime import date
 from typing import Any
@@ -90,7 +93,9 @@ TPCH_DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
 
 # Module-level parameter overrides. When set by the DataFrame run path before
 # query execution, get_tpch_parameters() merges these into the defaults.
-_parameter_overrides: dict[int, dict[str, Any]] | None = None
+_parameter_overrides: ContextVar[dict[int, dict[str, Any]] | None] = ContextVar(
+    "tpch_parameter_overrides", default=None
+)
 
 # Module-level scale factor for scale-dependent parameter defaults. Canonical
 # TPC-H Q11 renders its value threshold as 0.0001 / SF (qgen does this); the
@@ -99,7 +104,7 @@ _parameter_overrides: dict[int, dict[str, Any]] | None = None
 # every scale, mirroring the SQL run path's {q11_fraction} rendering. Set by the
 # DataFrame run path (and the TPC-Havoc equivalence gate) before execution;
 # defaults to 1.0 (the qgen SF=1 rendering).
-_scale_factor: float = 1.0
+_scale_factor: ContextVar[float] = ContextVar("tpch_scale_factor", default=1.0)
 
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
@@ -111,8 +116,27 @@ def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None
     Args:
         overrides: Dict mapping query_id (1-22) to param dict, or None to clear.
     """
-    global _parameter_overrides
-    _parameter_overrides = overrides
+    _parameter_overrides.set(overrides)
+
+
+@contextmanager
+def seeded_parameter_overrides(seed: int | None, scale_factor: float, stream_id: int) -> Iterator[None]:
+    scale_factor = float(scale_factor)
+    overrides = None
+    if seed is not None:
+        from benchbox.core.tpch.benchmark import power_stream_seed
+        from benchbox.core.tpch.parameter_extractor import get_tpch_extracted_parameters
+
+        stream_seed = power_stream_seed(seed, stream_id)
+        assert stream_seed is not None
+        overrides = get_tpch_extracted_parameters(stream_seed, float(scale_factor))
+    parameter_token = _parameter_overrides.set(overrides)
+    scale_token = _scale_factor.set(scale_factor)
+    try:
+        yield
+    finally:
+        _scale_factor.reset(scale_token)
+        _parameter_overrides.reset(parameter_token)
 
 
 def set_scale_factor(scale_factor: float | None) -> None:
@@ -130,8 +154,7 @@ def set_scale_factor(scale_factor: float | None) -> None:
     Args:
         scale_factor: The run's scale factor, or None to reset to 1.0.
     """
-    global _scale_factor
-    _scale_factor = 1.0 if scale_factor is None else float(scale_factor)
+    _scale_factor.set(1.0 if scale_factor is None else float(scale_factor))
 
 
 # Benchmark ids whose DataFrame queries reuse this module's parameter seam
@@ -179,14 +202,16 @@ def get_tpch_parameters(query_id: int) -> dict[str, Any]:
         Dict of parameter values for this query.
     """
     params = dict(TPCH_DEFAULT_PARAMS.get(query_id, {}))
-    if query_id == 11 and "fraction" in params and _scale_factor > 0:
+    scale_factor = _scale_factor.get()
+    overrides = _parameter_overrides.get()
+    if query_id == 11 and "fraction" in params and scale_factor > 0:
         # Mirror canonical qgen's `0.0001 / SF` rendering exactly - including its
         # 10-decimal literal - so the unseeded default matches both the SQL run
         # path's {q11_fraction} token and the seeded extraction (which parses
         # that same literal). TPCH_DEFAULT_PARAMS holds the SF=1 base value.
-        params["fraction"] = float(f"{params['fraction'] / _scale_factor:.10f}")
-    if _parameter_overrides is not None and query_id in _parameter_overrides:
-        params.update(_parameter_overrides[query_id])
+        params["fraction"] = float(f"{params['fraction'] / scale_factor:.10f}")
+    if overrides is not None and query_id in overrides:
+        params.update(overrides[query_id])
     return params
 
 
@@ -837,10 +862,15 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     # Find maximum revenue using optimized scalar extraction
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
-    # Join with suppliers having maximum revenue
+    # Join with suppliers having maximum revenue. Compare with a small relative
+    # tolerance instead of exact float equality: the stored per-supplier
+    # aggregate and the scalar max can differ in the last ulp after separate
+    # float summation paths (observed: ...660600001 vs ...6606), which would
+    # otherwise filter out the true top supplier.
+    tolerance = abs(max_revenue) * 1e-9 if max_revenue else 1e-9
     return (
         supplier.join(revenue, left_on="s_suppkey", right_on="supplier_no")
-        .filter(col("total_revenue") == lit(max_revenue))
+        .filter((col("total_revenue") - lit(max_revenue)).abs() <= lit(tolerance))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
@@ -896,13 +926,24 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Calculate average quantity per part
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    # Main query
-    return (
+    # SQL SUM over an empty or all-NULL input returns NULL. Aggregate first,
+    # then project the conditional result so every backend infers its type
+    # from the native sum without constructing a NULL-only DataFrame.
+    filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
-        .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+    )
+    totals = filtered.select(
+        col("l_extendedprice").count().alias("__q17_price_count"),
+        col("l_extendedprice").sum().alias("__q17_price_sum"),
+    )
+    return totals.select(
+        ctx.when(col("__q17_price_count") > lit(0))
+        .then(col("__q17_price_sum") / lit(7.0))
+        .otherwise(lit(None))
+        .alias("avg_yearly")
     )
 
 
@@ -1749,7 +1790,11 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined[joined["l_quantity"] < joined["avg_qty"]]
 
     # Calculate result
-    # Note: compute() handles both lazy (Dask) and eager (Pandas) values
+    # Note: compute() handles both lazy (Dask) and eager (Pandas) values.
+    # SQL SUM over an empty set returns NULL, not 0: preserve that so the
+    # gate compares NULL-vs-NULL instead of manufacturing 0.0.
+    if len(joined) == 0:
+        return pd.DataFrame({"avg_yearly": [None]})
     avg_yearly = joined["l_extendedprice"].sum() / 7.0
     avg_yearly_val = avg_yearly.compute() if hasattr(avg_yearly, "compute") else avg_yearly
 

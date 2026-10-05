@@ -19,12 +19,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
+from benchbox.core.query_catalog_base import CLOUD_TRANSLATED_DIALECTS, TranslatableQueryMixin
 from benchbox.core.tsbs_devops.generator import TSBSDevOpsDataGenerator
 from benchbox.core.tsbs_devops.queries import TSBSDevOpsQueryManager
 from benchbox.core.tsbs_devops.schema import (
     TSBS_DEVOPS_SCHEMA,
     get_create_tables_sql,
 )
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.compression_mixin import extract_compression_kwargs
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
@@ -32,7 +34,7 @@ if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
 
 
-class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
+class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenchmark):
     """TSBS DevOps benchmark implementation.
 
     Implements Time Series Benchmark Suite for DevOps monitoring workloads:
@@ -73,6 +75,11 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         interval_seconds: Measurement interval
     """
 
+    # Queries are written in DuckDB SQL; BigQuery rejects DATE_TRUNC('minute', ts)
+    # on timestamps, so translate for cloud engines.
+    _source_dialect = "duckdb"
+    _translated_dialects = CLOUD_TRANSLATED_DIALECTS
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -105,8 +112,13 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
         # construction time (canonical tsbs_devops_sf<N> datagen name); falls
         # back to Path.cwd()/benchmark_runs/datagen when no override is set.
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; Path(...) would stringify it to the local cache and drop the
+        # cloud upload target the orchestrator resolved at construction time.
         resolved_output_dir = (
-            Path(output_dir) if output_dir else get_benchmark_runs_datagen_path("tsbs_devops", scale_factor)
+            normalize_output_dir(output_dir)
+            if output_dir
+            else get_benchmark_runs_datagen_path("tsbs_devops", scale_factor)
         )
         super().__init__(
             scale_factor=scale_factor,
@@ -175,16 +187,21 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return list(self.tables.values())
 
+    def supported_dialects(self) -> list[str]:
+        """Return dialects whose query rendering get_queries() actually provides."""
+        return ["duckdb", *self._translated_dialects]
+
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all benchmark queries.
 
         Args:
-            dialect: Target SQL dialect (not used - queries are standard SQL)
+            dialect: Target SQL dialect; cloud dialects are translated from the
+                DuckDB source
 
         Returns:
             Dictionary mapping query IDs to query strings
         """
-        return self.query_manager.get_queries()
+        return {qid: self.translate_for_dialect(sql, dialect) for qid, sql in self.query_manager.get_queries().items()}
 
     def get_query(
         self,
@@ -198,7 +215,7 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Args:
             query_id: Query identifier (e.g., "single-host-12-hr", "cpu-max-all-1-hr")
             params: Optional parameter overrides
-            **kwargs: Additional arguments
+            **kwargs: Additional arguments; ``dialect`` selects the target SQL dialect
 
         Returns:
             Parameterized query string
@@ -207,7 +224,7 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             ValueError: If query_id is unknown
         """
         query_key = str(query_id)
-        return self.query_manager.get_query(query_key, params)
+        return self.translate_for_dialect(self.query_manager.get_query(query_key, params), kwargs.get("dialect"))
 
     def get_schema(self) -> dict[str, dict[str, Any]]:
         """Get the TSBS DevOps schema.

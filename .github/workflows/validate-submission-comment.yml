@@ -42,8 +42,10 @@ jobs:
   comment:
     name: Post validation comment from trusted context
     runs-on: ubuntu-latest
-    # Only PR-triggered validation runs carry a comment artifact.
-    if: github.event.workflow_run.event == 'pull_request'
+    # Only PR-triggered validation runs carry a comment artifact. The
+    # validator fires on pull_request_target (fork-safe base context), so the
+    # workflow_run event name is 'pull_request_target', not 'pull_request'.
+    if: github.event.workflow_run.event == 'pull_request_target'
     steps:
       - name: Download validation comment artifact
         id: download

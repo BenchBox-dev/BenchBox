@@ -310,6 +310,15 @@ class SQLiteAdapter(PlatformAdapter):
         )
 
         # Pass through other relevant config (verbose settings, tuning config, etc.)
+        # Plan display/capture keys ride along via shared PLAN_FORWARD_KEYS
+        # (skipping None so adapter defaults apply): __init__ only ever sees
+        # this rebuilt config, so dropping them silently disables console plan
+        # display and plan capture/filtering even when requested.
+        from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
+
+        for key in PLAN_FORWARD_KEYS:
+            if key in config and config[key] is not None:
+                adapter_config[key] = config[key]
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -388,8 +397,21 @@ class SQLiteAdapter(PlatformAdapter):
         # the adapted real value using its native numeric representation.
         sqlite3.register_adapter(Decimal, float)
 
-        # Create connection
-        conn = sqlite3.connect(db_path, timeout=self.timeout, check_same_thread=self.check_same_thread)
+        # Create connection. Throughput streams run on cursors of this one
+        # connection (SHARED_CURSOR). CPython's sqlite3 keeps a per-connection
+        # statement cache (sqlite3.connect cached_statements, default 128):
+        # concurrent cursors running identical SQL can share one prepared
+        # statement, so one stream's execute resets another's result set and it
+        # reads wrong or missing rows (sqlite 3.53.1, threadsafety 1). Zero
+        # disables reuse so each cursor prepares its own statement. The cost is
+        # one extra prepare per stream query; benchmark queries dominate it,
+        # and this adapter serves single-file testing, not a hot OLTP path.
+        conn = sqlite3.connect(
+            db_path,
+            timeout=self.timeout,
+            check_same_thread=self.check_same_thread,
+            cached_statements=0,
+        )
 
         _register_sqlite_compatibility_functions(conn)
 

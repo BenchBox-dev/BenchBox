@@ -3,12 +3,13 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NIGHTLY = REPO_ROOT / ".github/workflows/nightly.yml"
-PR_WORKFLOW = REPO_ROOT / ".github/workflows/pr.yml"
+PR_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 
 
 def _job_block(workflow: str, job: str, next_job: str) -> str:
@@ -54,3 +55,14 @@ def test_nightly_pilot_is_bounded_and_uploads_replay_evidence() -> None:
     assert '--seed "${GITHUB_RUN_ID}"' in job
     assert "sqlglot-generator-summary.json" in job
     assert "sqlglot-generator-failure.json" in job
+
+
+def test_ruleset_drift_runs_trusted_develop_code_with_the_token() -> None:
+    workflow = yaml.safe_load(NIGHTLY.read_text(encoding="utf-8"))
+    job = workflow["jobs"]["ruleset-drift"]
+
+    assert "needs" not in job
+    assert job["continue-on-error"] is True
+    checkout = next(step for step in job["steps"] if str(step.get("uses", "")).startswith("actions/checkout@"))
+    assert checkout["with"]["ref"] == "develop"
+    assert checkout["with"]["persist-credentials"] is False

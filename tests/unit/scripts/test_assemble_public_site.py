@@ -98,22 +98,21 @@ def test_prose_only_omits_cname_and_404(tmp_path: Path) -> None:
     assert (site_dir / "404.html").is_file()
 
 
-@pytest.mark.parametrize("destination", [Path("/"), Path.home()])
-def test_refuses_broad_output_directories(tmp_path: Path, destination: Path) -> None:
+@pytest.mark.parametrize("destination", [Path("/"), None])
+def test_refuses_broad_output_directories(tmp_path: Path, destination: Path | None) -> None:
+    destination = Path.home() if destination is None else destination
     _pages_inputs(tmp_path)
 
     with pytest.raises(ValueError, match="refusing unsafe site output directory"):
         assemble_public_site(repo_root=tmp_path, site_dir=destination)
 
 
-def test_docs_workflow_reuses_assembler_and_binds_visual_approval_to_pr_head() -> None:
+def test_docs_workflow_reuses_assembler_and_binds_visual_approval_to_event_head() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
 
     assert "uv run -- python scripts/assemble_public_site.py --site-dir site" in workflow
     assert "cat > site/404.html" not in workflow
-    assert (
-        "PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}"
-        in workflow
-    )
-    assert "APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}" in workflow
-    assert "APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}" in workflow
+    assert "github.event.pull_request.head.sha" in workflow
+    assert "merge_group" not in workflow
+    assert "github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA" in workflow
+    assert "github.event_name == 'pull_request' && vars.APPROVAL_REASON" in workflow

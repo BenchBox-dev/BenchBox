@@ -302,11 +302,11 @@ def test_requested_block_reports_platform_optimizations_non_defaults_only():
     assert "sorted_ingestion_mode" not in platform_optimizations
 
 
-def test_no_tuning_returns_no_platform_tuning_block_or_companion():
+def test_no_tuning_returns_only_the_validation_status_and_no_companion():
     result = _make_result(tunings_applied=None)
 
     assert build_tuning_payload(result) is None
-    assert build_result_payload(result)["platform"].get("tuning") is None
+    assert build_result_payload(result)["platform"]["tuning"] == {"validation_status": "not_applicable"}
 
 
 def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
@@ -328,11 +328,11 @@ def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
 
 
 def test_no_tuning_omits_tuning_policy_generation_marker():
-    """The generation marker rides with tuning: a run with no tuning emits no
-    platform.tuning block at all, so no marker leaks onto untuned bundles."""
+    """The generation marker rides with tuning: an untuned run's platform.tuning
+    block holds only its validation status, so no marker leaks onto untuned bundles."""
     result = _make_result(tunings_applied=None)
 
-    assert build_result_payload(result)["platform"].get("tuning") is None
+    assert "tuning_policy_generation" not in build_result_payload(result)["platform"]["tuning"]
     assert build_tuning_payload(result) is None
 
 

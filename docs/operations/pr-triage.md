@@ -4,8 +4,7 @@ Durable judgment rules for triaging open PRs against `develop` — the parts
 of PR triage that are stable enough to write down once, rather than
 rediscovered per-session. These are rules, not a walkthrough: they assume
 familiarity with the dev-loop (`AGENTS.md`) and the auto-merge machinery
-(`.github/workflows/auto-merge-on-open.yml`,
-`_project/scripts/auto_merge_soundness_paths.py`).
+(`scripts/pr_arm.py`, `_project/scripts/soundness_paths.py`).
 
 ## Always confirm against the current head SHA
 
@@ -44,21 +43,21 @@ side had already closed out.
 
 ## Browser-lane triage
 
-- Chromium's full e2e suite **does** gate develop merges. The required
-  status check is `Results Explorer browser gate` (ruleset
-  `develop-squash-only`), not a subordinate of `ci-required-result` —
-  browser and PR workflows are separate. The gate is path-aware via
-  `explorer-changes`: a red Chromium run on explorer-relevant paths makes
-  the PR unmergeable; unrelated PRs get a green gate without running the
-  suite. Before attributing a red Chromium (or gate) result to the PR under
+- Chromium's full e2e suite **does** gate develop merges. It is the
+  `explorer-e2e` job of the required `explorer` unit (ruleset
+  `develop-squash-only`). The unit is path-aware through `.github/ci-units.yml`:
+  a red Chromium run on explorer-relevant paths makes the PR unmergeable;
+  unrelated PRs get a green `explorer` unit without running the
+  suite. Before attributing a red Chromium (or `explorer`) result to the PR under
   review, check whether develop's own tip is already red for the same
   reason; a pre-existing develop-side failure is not the PR's fault.
   Full wiring and lane status:
   [`docs/operations/browser-ci.md`](browser-ci.md) (merge-gate decision).
   Historical tracker id `chromium-blocking-suite-not-in-required-checks`
   described the pre-ruleset state and is no longer accurate.
-- Firefox `@smoke` has been green in recent history — a red Firefox run is
-  worth investigating as a real signal, not waved off as routine flake.
+- Firefox `@smoke` runs nightly and has been green in recent history — a red
+  Firefox run is worth investigating as a real signal, not waved off as
+  routine flake.
 - WebKit failures are **not** dismissible as flake. See
   `docs/operations/browser-ci.md` for current lane status and the
   triage rule in force there.
@@ -81,11 +80,10 @@ a PR's mergeability — both only alert.
 
 - **Soundness-drain daily digest**
   (`_project/scripts/soundness_drain_report.py`, scheduled via a daily
-  workflow) — for PRs that correctly never get auto-merge because they
-  touch a soundness-critical path (or have the owner as a requested
-  reviewer): flags ones parked more than 24h since their required lane
-  went green, so they don't sit forgotten accumulating conflicts while
-  waiting on the owner's manual review and merge.
+  workflow) — for PRs that touch a soundness-critical path (or have the
+  owner as a requested reviewer): flags ones parked more than 24h since
+  their required lane went green, so they don't sit forgotten accumulating
+  conflicts while waiting on the review that `oracle-review` requires.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
   `.github/workflows/nightly.yml`) — alerts only on **true stranding**:
@@ -93,27 +91,67 @@ a PR's mergeability — both only alert.
   auto-merge is still off more than 2 hours after the head commit, **and**
   the PR timeline shows prior arm intent that was lost. "Required lane
   green" means **every** `develop-squash-only` required context is
-  latest-success — today both `ci-required-result` and `Results Explorer
-  browser gate` — so a PR that is green on one and red or silent on the
-  other is not green and is not alerted. `--apply` only
+  latest-success — the documented required contexts are
+  `core`, `explorer`, `results-data`, `docs`, `landing`, and `tooling` — so a
+  PR that is green on one and red or silent on another is not green and is not
+  alerted.
+  `--apply` only
   upserts the digest issue; it **never** enables auto-merge and must not
   re-arm a hold it did not set.
 
   After the auto-merge hold, **an intentional non-armed green PR is normal**,
   not a stuck state, and the sweep **excludes** it. Auto-merge is **not**
   armed by `opened`, `reopened`, or `synchronize` (a re-push will not flip it
-  on). The only intentional arm signals are:
+  on). The intentional arm paths are:
 
-  - `make pr-ready PR=<n> HEAD=<sha> EVIDENCE=<path>` on a finished branch
-  - `make pr-open READY=1 EVIDENCE=<path>` to open and arm in one step
+  - `make pr-arm` on a finished branch (arms auto-merge on the exact local head
+    after a live check of the PR)
+  - `make pr-open READY=1` to open or reuse the PR and arm it in one step
+  - `make pr-ready PR=<n> HEAD=<sha>`, which arms through `make pr-arm`; with
+    `EVIDENCE=<path>` or `BATCH=1` it runs the evidence transaction instead,
+    and the evidence file declares `delivery_mode` (`batch` evidence must
+    include the complete batch binding)
 
-  Those are the **only** arm paths, and both require an evidence file declaring
-  `delivery_mode` (`batch` evidence must include the complete batch binding):
-  `auto-merge-on-open.yml` is revoke-only
-  and never arms (its draft→ready arm point never fired once and was deleted
-  — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
-  D2). Both Makefile paths refuse while the PR carries the `no-auto-merge`
-  label or touches soundness paths.
+  No workflow arms auto-merge: a draft→ready arm point never fired once and
+  was deleted (see
+  `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
+  The Makefile paths refuse while the PR carries the `no-auto-merge` label or
+  is a draft. Nothing disarms a PR that is already armed when the label is
+  added later: to hold an armed PR, disable auto-merge
+  (`gh pr merge <n> --disable-auto`) or withdraw it with
+  `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. The
+  evidence transaction also refuses for soundness paths.
+  Soundness-path PRs require `oracle-review` on the current head and resolved
+  threads. After any push or refresh, rerun CI and obtain the connector's
+  review or thumbs-up (or the stand-in approval) on that head before arming.
+  Withdraw readiness before editing an armed PR.
+
+  To rerun `oracle-review`, first read the current PR:
+
+  ```bash
+  gh pr view <pr> --repo BenchBox-dev/BenchBox \
+    --json state,baseRefName,headRefName,headRefOid,isCrossRepository
+  ```
+
+  Confirm the PR is open, targets `develop`, and still has the reviewed head.
+  For a same-repository PR, select its current feature branch:
+
+  ```bash
+  gh workflow run oracle-review.yml --repo BenchBox-dev/BenchBox \
+    --ref <current-feature-branch> -f pr=<pr>
+  ```
+
+  Both `develop` and the selected feature branch must contain the dispatch
+  workflow. Review changes to that workflow before dispatch; checking out the
+  trusted base protects the checker and manifest, but does not authenticate
+  the candidate workflow.
+
+  Verify the resulting run's `headSha` and its `oracle-review` check against
+  the PR's still-current head before assessing readiness. For a fork PR,
+  rerun an existing `oracle-review` job from a PR run on that exact head;
+  parent-repository dispatch cannot select the fork's branch. If no eligible
+  current-head run exists, obtain one first. A successful rerun does not arm
+  the PR.
 
   **Classifier (arm intent):** a PR is stranded only when auto-merge is off
   *and* the issue/PR timeline includes at least one of
@@ -128,23 +166,23 @@ a PR's mergeability — both only alert.
 
   Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
   synchronize." That path no longer enables auto-merge. When the branch is
-  final, arm via `make pr-ready` / `READY=1` with exact readiness evidence; if work continues, leave
+  final, arm via `make pr-arm` (or `READY=1`); if work continues, leave
   auto-merge off (or apply a durable hold — see below).
 
-  A green revocation-workflow run is also not proof of the PR's `auto_merge`
-  field either way — the sweep re-reads the PR field (and the timeline)
-  rather than trusting the workflow conclusion.
+  A workflow conclusion is also not proof of the PR's `auto_merge` field
+  either way — the sweep re-reads the PR field (and the timeline).
 
 ## Durable auto-merge holds
 
 `gh pr merge --disable-auto` alone is **not** a durable product signal: a later
-intentional arm path could still enable auto-merge. Both re-arming layers
-honour these durable holds (and neither re-arms on push or nightly `--apply`):
+intentional arm path could still enable auto-merge. The arm paths and the
+sweep honour these durable holds (and nothing re-arms on push or nightly
+`--apply`):
 
 | Hold | Who honours it | Effect |
 | --- | --- | --- |
-| **Draft** | `auto-merge-on-open.yml` (job skip), green-unmerged sweep | Not ready; no arm, not stranded |
-| **Label `no-auto-merge`** | `make pr-arm-auto-merge` / `pr-ready` (refuse to arm), `auto-merge-on-open.yml` (disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
+| **Draft** | `make pr-arm` / `pr-ready` (refuse to arm), green-unmerged sweep | Not ready; no arm, not stranded |
+| **Label `no-auto-merge`** | `make pr-arm-auto-merge` / `pr-arm` / `pr-ready` (refuse to arm), green-unmerged sweep | Non-draft intentional hold; blocks arming only; not stranded |
 | **Never armed** | green-unmerged sweep (timeline arm-intent classifier) | Green + auto-merge OFF with no prior arm events is normal after the post-#1592 policy; not stranded |
 
 Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
@@ -152,20 +190,25 @@ should stay non-draft (CI/review as ready) but must not auto-merge — for
 example waiting on another PR, or after an explicit disable that must survive
 a later re-arm attempt. Remove the label before arming with `make pr-ready`
 (which refuses to arm while the label is present, and fails closed when the
-label list cannot be read). The hold guarantee is **eventual, not atomic**: a
-label applied after the arm path's check but before the arm lands is caught
-by the workflow's `labeled`-trigger revoke within one run, not instantly.
+label list cannot be read). The label is checked only when arming. It does
+not disarm a PR that is already armed: disable auto-merge
+(`gh pr merge <n> --disable-auto`) or run
+`make pr-landing-withdraw PR=<n> HEAD=<sha>` first, then add the label.
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly
 once when it drains — never a per-run flood of new issues.
 
-## Develop post-merge SLA
+## Red develop tip
 
-The green-unmerged sweep also checks the most recent "Develop post-merge"
-workflow run (`.github/workflows/develop-post-merge.yml`) on develop's
-tip. If that run's conclusion is `failure`, treat it as **same-day
-fix-forward priority**: every PR opened after a red develop tip inherits
-that breakage, so the fix should land before the day ends rather than
-queuing behind routine work. This SLA is about triage priority only —
-it does not change how `develop-post-merge.yml` itself behaves.
+`.github/workflows/trunk.yml` tests `develop` on pushes (fast lane,
+four-shard medium tier, correctness gate and required-local-cases), and builds
+the verified release distribution artifact. Pending runs are retained with
+`concurrency.queue: max`, so results can lag during merge bursts; a missing
+push event still needs separate recovery. A red develop tip is a trunk
+failure that the PR's own checks did not catch. Revert first: run
+`make trunk-revert PR=<n>` for the culprit and fix it afterwards. While trunk has
+been red for more than 30 minutes, `make pr-open` refuses any PR that is not a
+revert, because every PR opened on a red tip inherits the breakage. The
+green-unmerged sweep does not report it.
+See [Merge and trunk governance](merge-queue-governance.md).

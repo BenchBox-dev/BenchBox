@@ -1,188 +1,87 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# Develop post-merge push gaps
+# Develop push gaps
 
 ```{tags} contributor, operations, ci
 ```
 
 ## What failed
 
-`Develop post-merge` (`.github/workflows/develop-post-merge.yml`) is the
-safety net that re-runs lint, fast-test, explorer-tokens, and medium-test
-against the actual `develop` tip after a merge. Its primary trigger is:
-
-```yaml
-on:
-  push:
-    branches: [develop]
-```
-
-There is no path filter. In principle every develop push should produce a
-run for that exact SHA. In practice GitHub has **dropped push delivery** for
-consecutive develop merges:
+GitHub has **dropped push delivery** for consecutive `develop` merges. In
+principle every push to `develop` starts every workflow that listens for it. In
+practice:
 
 | When | Signal |
 | --- | --- |
-| 2026-08-03 | Three consecutive develop merges got **no** push workflows at all — not even develop-post-merge — which left the `published-results` corpus mirror stale (see the header comment on `corpus-drift-check.yml`). |
-| 2026-08-04 | Six consecutive develop merges produced **no** develop-post-merge run for their SHAs. |
+| 2026-08-03 | Three consecutive develop merges got **no** push workflows at all, which left the `published-results` corpus mirror stale (see the header comment on `corpus-drift-check.yml`). |
+| 2026-08-04 | Six consecutive develop merges produced **no** run of the post-merge workflow that existed then. |
 
-The mechanism (GitHub delivery drop vs concurrency edge vs API lag) is not
+The mechanism (GitHub delivery drop, concurrency edge, or API lag) is not
 fully proven. What is proven is the **observable gap**: `git log
-origin/develop` SHAs with no matching `gh run list --workflow
-develop-post-merge.yml` `headSha`.
+origin/develop` SHAs with no matching workflow run.
 
-That is a silent failure mode. Push-only guards share it. Every workflow
-that only fires on `push` to develop can miss the same window.
+That is a silent failure mode, and every workflow that fires only on `push` to
+develop shares it. The full list of those workflows, what each loses when a push
+is dropped, and how to recover is in
+[`develop-push-drop-inventory.md`](develop-push-drop-inventory.md).
 
-**Full inventory of develop-push workflows** (which ones already have a
-schedule, which residual gaps are accepted, and recovery commands) lives in
-[`develop-push-drop-inventory.md`](develop-push-drop-inventory.md). This page
-stays focused on the `develop-post-merge` backstop and gap detector.
+## What changed with trunk.yml
 
-## What we do about it
+The earlier post-merge workflow (`develop-post-merge.yml`), its hourly tip sweep,
+and its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
+`.github/workflows/trunk.yml` restores validation of the merged tree: the fast
+lane, four-shard medium tier, correctness gate and required-local-cases. It also
+builds the verified release distribution artifact. A failing trunk run leads to
+a revert (`make trunk-revert PR=<n>`). Its `concurrency.queue: max` retains
+pending runs instead of replacing them when merges arrive together.
 
-Two additive pieces. Neither replaces per-push runs.
+This closes the concurrency-replacement gap for delivered events, not the
+event-delivery gap. A push that GitHub never delivers produces no run for that
+commit. The next delivered push tests a tree containing it but cannot certify
+that earlier commit's release artifact. The fast-lane count baseline and delta
+guard are retired. The remaining consequences include:
 
-### 1. Scheduled sweep (coverage)
-
-`develop-post-merge.yml` also runs on:
-
-- `schedule: "17 * * * *"` (hourly, minute offset to spread load)
-- `workflow_dispatch` (manual recovery)
-
-**Schedule path is slim and gates-only:**
-
-| Job | `push` / `workflow_dispatch` | `schedule` |
+| Workflow | Loses when its push is dropped | Recovery |
 | --- | --- | --- |
-| lint, fast-test, explorer-tokens | yes | yes, unless the tip is already covered (early exit) |
-| medium-test (~40 min) | yes | **no** |
-| close-orphaned-prs, auto-revert-on-failure, green-run-cleanup | yes | **no** (mutation) |
+| `trunk.yml` | Test evidence and the release distribution artifact for that exact commit. Admission requires a successful trunk `push` run on `develop`; a dispatch or later commit cannot substitute. | Verify that the release candidate has its own successful push run before tagging it; otherwise choose a tested candidate or obtain an owner decision on recovery. |
+| `docs.yml` | The protected public-site visual baseline for that commit. A PR whose render inputs changed then has no baseline to compare against at the download step (the comparison is advisory). | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 
-A covered tip — one with a success/failure per-push run on its exact SHA,
-or a merge-queue certification — exits the sweep early with a step-summary
-note instead of re-running the slim gates. Any lookup error runs the gates
-(fail open), and an uncovered tip still runs them, so a silent push-drop is
-still re-gated within about an hour. Medium-test stays on the real merge
-path so a squash race still trips auto-revert; the hourly sweep deliberately
-omits it to avoid ~24 full medium runs/day when tip is already push-covered.
-Schedule also never opens revert PRs, closes orphaned PRs, or cleans
-green-run issues — those remain push/dispatch only.
+Check exact-commit workflow evidence before blaming a PR or admitting a release.
 
-Concurrency:
+## Diagnostic
 
-| Event | Concurrency group | `cancel-in-progress` |
-| --- | --- | --- |
-| `push` / `workflow_dispatch` | `develop-post-merge-${{ github.sha }}` | `false` (concurrent merges must not cancel each other) |
-| `schedule` | `develop-post-merge-schedule` (fixed) | `true` (newer sweep supersedes an older still-running one; never shares a group with push) |
-
-**Success criterion for the sweep:** develop **tip** is re-gated by the
-slim gates within about an hour of a silent push-drop. That is the safety
-property. It is **not** a claim that every intermediate dropped SHA gets
-its own run, and it is **not** a claim that the exact-SHA verification
-ladder stays green after an incident.
-
-Permissions are unchanged: workflow-level `contents: read`, with the same
-job-level escalations auto-revert / orphan-close already used on the
-push path only.
-
-### 2. Gap detector (instrumentation)
-
-`.github/workflows/develop-post-merge-gap-detector.yml` runs daily
-(`47 7 * * *`) and on `workflow_dispatch`. It is read-only
-(`contents: read`, `actions: read`) and calls:
-
-```bash
-python3 scripts/detect_develop_post_merge_gaps.py \
-  --live --branch origin/develop --commit-limit 20
-```
-
-The script compares the last N develop commits to recent
-`develop-post-merge` run `headSha`s. Any commit with **no** run (any status)
-is a gap: GitHub never started post-merge for that push. The job fails and
-emits `::error` annotations so the class stays visible until the SHAs age
-out of the lookback — it does **not** open PRs or re-run gates.
-
-Live mode paginates the run list until it has enough **unique** headShas
-(`commit_limit + margin`, default margin 10) or hits a hard row cap
-(default 1000). A fixed shallow `--limit` is not safe: after many hourly
-schedule runs for the same tip, the most-recent N rows can all share one
-`headSha` and would otherwise hide older push-covered commits deeper in
-history (self-poisoning).
-
-A tip that was only covered by the hourly sweep (event=`schedule`) still
-counts as covered for that tip SHA. Intermediate dropped SHAs remain
-uncovered by design: that is the instrumentation of the push-drop class.
-
-## Verification ladder
-
-Exact-SHA coverage for the last 10 develop commits (diagnostic, not a
-post-incident green promise):
+Exact-SHA coverage for the last 10 develop commits, for one workflow:
 
 ```bash
 bash -c '
   shas=$(git log --format=%H origin/develop -10)
-  runs=$(gh run list --workflow develop-post-merge.yml --limit 100 --json headSha --jq .[].headSha)
+  runs=$(gh run list --workflow trunk.yml --event push --branch develop --limit 100 --json headSha --jq .[].headSha)
   for s in $shas; do
-    echo "$runs" | grep -q "$s" || exit 1
+    echo "$runs" | grep -q "$s" || { echo "missing: $s"; }
   done
 '
 ```
 
-How to read the result:
+A missing SHA after a real push-drop episode is expected, and stays missing
+until it ages out of the window. A docs baseline can be recovered by dispatch
+as above. A dispatched trunk run gives test evidence, but release admission
+requires a push-produced artifact and rejects dispatch as a substitute.
 
-| Exit | Meaning |
-| --- | --- |
-| `0` | Every looked-up develop SHA currently has at least one post-merge run (push, schedule, or dispatch) whose `headSha` matches. Quiet periods with healthy push delivery look like this. |
-| `1` | At least one recent SHA has no run. **Expected after a real push-drop episode**, and can remain non-zero until those intermediate SHAs age out of the lookback — even when tip is green via the hourly sweep. Do not treat this as "the sweep is broken." |
+## Retired tooling
 
-Preferred scripted form (paginates unique headShas; same honesty rules):
-
-```bash
-python3 scripts/detect_develop_post_merge_gaps.py --live --json
-```
-
-Offline form (no pagination; you supply both lists):
-
-```bash
-git log --format=%H origin/develop -20 > /tmp/commits.txt
-gh run list --workflow develop-post-merge.yml --limit 200 --json headSha \
-  --jq '.[].headSha' > /tmp/runs.txt
-python3 scripts/detect_develop_post_merge_gaps.py \
-  --commits-file /tmp/commits.txt --runs-file /tmp/runs.txt --json
-```
-
-## Manual recovery
-
-If tip has no recent post-merge run and you do not want to wait for the
-hourly sweep (full push-equivalent path including medium-test and mutation
-jobs when tip is red/green as usual):
-
-```bash
-gh workflow run develop-post-merge.yml --ref develop
-```
-
-To re-check the gap class without waiting for the daily detector:
-
-```bash
-gh workflow run develop-post-merge-gap-detector.yml --ref develop
-```
+`scripts/detect_develop_post_merge_gaps.py`, `scripts/sweep_coverage.py`, and
+`scripts/post_merge_signature.py` were written for the retired workflow and
+have no workflow caller now. They remain in the tree until a follow-up removes
+them together with their tests.
 
 ## What we deliberately did not do
 
 - **No extra push-adjacent spam** (`pull_request`, `workflow_run`,
-  `repository_dispatch`, etc.) to force more events. That papers over the
-  class without bounding tip exposure cleanly and burns runners on every
-  related event.
-- **No replacement of the push trigger.** Push remains primary; schedule is
-  additive.
-- **No full medium-test on every hourly sweep.** Cost decision: slim
-  schedule (lint + fast-test + explorer-tokens) bounds tip exposure without
-  ~24× medium-tier runner hours/day.
-- **No mutation jobs on schedule.** Auto-revert / orphan-close / green-run
-  cleanup stay push + dispatch only so a sweep cannot open or close GitHub
-  objects without a real merge event.
-- **No new permission classes** beyond what develop-post-merge already uses
-  (`actions: read` already appears on metrics / auto-revert jobs).
-- **No claim that intermediate dropped SHAs are "covered" by a later tip
-  sweep, or that the every-SHA ladder stays green post-incident.** Tip
-  safety (≤~1h re-gate) and per-SHA instrumentation are separate signals.
+  `repository_dispatch`, and so on) to force more events. That papers over the
+  class without bounding exposure cleanly and burns runners on every related
+  event.
+- **No replacement of the push trigger.** Push stays the primary trigger for
+  workflows that record state on a develop commit; recovery is dispatch.
+- **No mutation jobs on schedule.** Anything that opens or closes GitHub
+  objects stays push and dispatch only, so a cron run cannot change state
+  without a real merge event.

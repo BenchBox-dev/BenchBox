@@ -15,16 +15,6 @@ Key API translations:
 - sort(descending=): Translates to orderBy() with asc()/desc() on PySpark
 - col().sum()/mean()/count(): Works on all platforms via UnifiedExpr
 
-DataFusion Compatibility Notes:
-    The DataFusion support includes experimental AST parsing for handling
-    aggregate arithmetic expressions. This was originally tested with
-    DataFusion 43.0.0 and re-validated against 53.0.0. If a future DataFusion
-    release changes the underlying error-message format this relies on,
-    `_get_datafusion_ast_string()` now raises `DataFusionASTFormatError`
-    (naming the installed DataFusion version and the unrecognized error
-    text) instead of silently falling back to unchanged-expression behavior.
-    See _get_datafusion_ast_string() for details.
-
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -33,7 +23,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
 if TYPE_CHECKING:
     import polars as pl
@@ -129,7 +120,108 @@ def _unwrap_unified_expr(value: Any) -> Any:
     return value
 
 
-class UnifiedStrExpr:
+def _resolve_datafusion_value(value: Any, frame: Any) -> Any:
+    while (
+        frame is not None
+        and isinstance(value, _DataFusionDeferredOperations)
+        and value._datafusion_resolver is not None
+    ):
+        value = value._datafusion_resolver(frame)
+    if isinstance(value, tuple):
+        return tuple(_resolve_datafusion_value(item, frame) for item in value)
+    if isinstance(value, list):
+        return [_resolve_datafusion_value(item, frame) for item in value]
+    if isinstance(value, dict):
+        return {key: _resolve_datafusion_value(item, frame) for key, item in value.items()}
+    return value
+
+
+def _has_datafusion_resolver(value: Any) -> bool:
+    if isinstance(value, _DataFusionDeferredOperations):
+        return value._datafusion_resolver is not None
+    if isinstance(value, (tuple, list)):
+        return any(_has_datafusion_resolver(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_datafusion_resolver(item) for item in value.values())
+    return False
+
+
+def _defer_datafusion_operation(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(*args: Any, **kwargs: Any) -> Any:
+        result = operation(*args, **kwargs)
+        if (
+            isinstance(result, _DataFusionDeferredOperations)
+            and all(result is not argument for argument in args)
+            and (_has_datafusion_resolver(args) or _has_datafusion_resolver(kwargs))
+        ):
+            captured_args = _resolve_datafusion_value(args, None)
+            captured_kwargs = _resolve_datafusion_value(kwargs, None)
+            result._datafusion_resolver = lambda frame: operation(
+                *_resolve_datafusion_value(captured_args, frame), **_resolve_datafusion_value(captured_kwargs, frame)
+            )
+        return result
+
+    return apply
+
+
+class _DataFusionDeferredOperations:
+    _datafusion_resolver: Callable[[Any], Any] | None = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for name, member in tuple(vars(cls).items()):
+            if name in {"__init__", "__repr__", "native"} or (name.startswith("_") and not name.endswith("__")):
+                continue
+            if isinstance(member, property) and member.fget is not None:
+                setattr(
+                    cls,
+                    name,
+                    property(_defer_datafusion_operation(member.fget), member.fset, member.fdel, member.__doc__),
+                )
+            elif callable(member):
+                setattr(cls, name, _defer_datafusion_operation(member))
+
+
+def _bind_datafusion_arguments(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(self: Any, *args: Any, **kwargs: Any) -> Any:
+        frame = self._source_df if isinstance(self, UnifiedGroupBy) else self._df
+        if _is_datafusion_df(frame):
+            args = _resolve_datafusion_value(args, frame)
+            kwargs = _resolve_datafusion_value(kwargs, frame)
+        return operation(self, *args, **kwargs)
+
+    return apply
+
+
+def _datafusion_division(numerator: Any, denominator: Any) -> UnifiedExpr:
+    from datafusion import lit as df_lit
+
+    def native(value: Any) -> Any:
+        value = value.native if isinstance(value, UnifiedExpr) else value
+        return value if _is_datafusion_expr(value) else df_lit(value)
+
+    def build(frame: Any = None) -> UnifiedExpr:
+        import pyarrow as pa
+        from datafusion import functions as df_f
+
+        left = native(numerator if frame is None else _resolve_datafusion_value(numerator, frame))
+        right = native(denominator if frame is None else _resolve_datafusion_value(denominator, frame))
+        divisor = df_f.nullif(right, df_f.cast_to_type(df_lit(0), right))
+        quotient = left / divisor
+        if frame is not None and pa.types.is_integer(
+            frame.select(quotient.alias("__division_type__")).schema()[0].type
+        ):
+            quotient = left.cast(pa.float64()) / divisor
+        return UnifiedExpr(quotient)
+
+    result = build()
+    result._datafusion_resolver = build
+    return result
+
+
+class UnifiedStrExpr(_DataFusionDeferredOperations):
     """Platform-agnostic string expression namespace.
 
     Provides Polars-style .str accessor methods that work across platforms:
@@ -323,7 +415,7 @@ class UnifiedStrExpr:
         return UnifiedExpr(self._expr.str.len_chars())
 
 
-class UnifiedListExpr:
+class UnifiedListExpr(_DataFusionDeferredOperations):
     """Platform-agnostic list/array expression namespace.
 
     Provides Polars-style .list accessor methods that work across platforms:
@@ -585,7 +677,7 @@ class UnifiedListExpr:
         return UnifiedExpr(self._expr.alias(name))
 
 
-class UnifiedMapExpr:
+class UnifiedMapExpr(_DataFusionDeferredOperations):
     """Platform-agnostic map expression namespace.
 
     Provides map accessor methods across platforms.
@@ -639,7 +731,7 @@ class UnifiedMapExpr:
         raise NotImplementedError("Map operations not supported on Polars (no native Map dtype)")
 
 
-class UnifiedDtExpr:
+class UnifiedDtExpr(_DataFusionDeferredOperations):
     """Platform-agnostic datetime expression namespace.
 
     Provides Polars-style .dt accessor methods that work across platforms:
@@ -714,7 +806,9 @@ class UnifiedDtExpr:
 
             # DataFusion dow: 0=Sunday..6=Saturday; convert to ISO
             return UnifiedExpr((df_f.date_part("dow", self._expr) + 6) % 7)
-        return UnifiedExpr(self._expr.dt.weekday())
+        # Polars dt.weekday(): 1=Monday..7=Sunday; convert to ISO 0=Monday..6=Sunday
+        # so every backend matches the documented convention.
+        return UnifiedExpr(self._expr.dt.weekday() - 1)
 
     def truncate(self, every: str) -> UnifiedExpr:
         """Truncate datetime to given interval.
@@ -774,7 +868,7 @@ class UnifiedDtExpr:
         return UnifiedExpr(self._expr.dt.total_days())
 
 
-class UnifiedStructExpr:
+class UnifiedStructExpr(_DataFusionDeferredOperations):
     """Platform-agnostic struct field accessor.
 
     Provides .struct.field(name) access pattern across platforms.
@@ -794,7 +888,7 @@ class UnifiedStructExpr:
         return UnifiedExpr(self._expr.struct.field(name))
 
 
-class UnifiedExpr:
+class UnifiedExpr(_DataFusionDeferredOperations):
     """Platform-agnostic expression wrapper.
 
     Wraps PySpark Columns and DataFusion Exprs to add Polars-compatible methods like
@@ -1004,30 +1098,14 @@ class UnifiedExpr:
         return UnifiedExpr(self._unwrap(other) * self._expr)
 
     def __truediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
-        # DataFusion: use nullif to prevent DivideByZero errors
-        # dividend / nullif(divisor, 0) returns NULL when divisor is 0
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            if isinstance(other_expr, (int, float)):
-                # Literal divisor - no need for nullif if non-zero
-                if other_expr == 0:
-                    return UnifiedExpr(self._expr / df_f.nullif(df_lit(other_expr), df_lit(0)))
-                return UnifiedExpr(self._expr / other_expr)
-            # Column divisor - wrap in nullif for safety
-            return UnifiedExpr(self._expr / df_f.nullif(other_expr, df_lit(0)))
-        return UnifiedExpr(self._expr / other_expr)
+            return _datafusion_division(self, other)
+        return UnifiedExpr(self._expr / self._unwrap(other))
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
-        # DataFusion: use nullif to prevent DivideByZero errors
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            # self._expr is the divisor here
-            return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
-        return UnifiedExpr(other_expr / self._expr)
+            return _datafusion_division(other, self)
+        return UnifiedExpr(self._unwrap(other) / self._expr)
 
     # =========================================================================
     # Comparison Operations
@@ -1657,30 +1735,12 @@ class UnifiedExpr:
     # =========================================================================
 
     def rank(self, method: str = "min", descending: bool = False) -> UnifiedExpr:
-        """Compute rank within partition.
-
-        Provides unified ranking:
-        - Polars: Uses .rank(method=method, descending=descending)
-        - PySpark: Requires Window specification - returns a deferred rank expression
-        - DataFusion: Requires Window specification - returns a deferred rank expression
-
-        Note: For PySpark/DataFusion, this returns a deferred expression. The actual ranking
-        requires calling .over() with a window specification.
-
-        Args:
-            method: Ranking method: "min", "max", "dense", "ordinal", "average"
-            descending: Whether to rank in descending order
-
-        Returns:
-            UnifiedExpr with rank values (Polars) or deferred for window (PySpark/DataFusion)
-        """
         if self._is_pyspark:
             # For PySpark, we need to store the rank parameters for later use with over()
             # Return a wrapper that tracks the ranking need
             # The actual rank will be computed when over() is called
             return _PySparkDeferredRank(self._expr, method, descending)
         if self._is_datafusion:
-            # For DataFusion, we also need deferred ranking with over()
             return _DataFusionDeferredRank(self._expr, method, descending)
         return UnifiedExpr(self._expr.rank(method=method, descending=descending))
 
@@ -1732,11 +1792,8 @@ class UnifiedExpr:
 
             return UnifiedExpr(self._expr.over(window))
 
-        # Polars: simple over() call
-        if order_by:
-            # Polars over() with order_by requires a different approach
-            # For now, just use partition_by (ordering within window is less common in Polars)
-            return UnifiedExpr(self._expr.over(partition_cols))
+        if order_by is not None:
+            return UnifiedExpr(self._expr.over(partition_cols, order_by=order_by))
         return UnifiedExpr(self._expr.over(partition_cols))
 
     def cum_sum(self) -> UnifiedExpr:
@@ -1758,10 +1815,7 @@ class UnifiedExpr:
             # Return sum expression - caller should use with over()
             return UnifiedExpr(F.sum(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            # Return sum expression - caller should use with over()
-            return UnifiedExpr(df_f.sum(self._expr))
+            return _DataFusionDeferredCumulative(self._expr, "sum")
         return UnifiedExpr(self._expr.cum_sum())
 
     def cum_max(self) -> UnifiedExpr:
@@ -1783,10 +1837,7 @@ class UnifiedExpr:
             # Return max expression - caller should use with over()
             return UnifiedExpr(F.max(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f
-
-            # Return max expression - caller should use with over()
-            return UnifiedExpr(df_f.max(self._expr))
+            return _DataFusionDeferredCumulative(self._expr, "max")
         return UnifiedExpr(self._expr.cum_max())
 
     def cum_min(self) -> UnifiedExpr:
@@ -2032,6 +2083,31 @@ class _PySparkDeferredRank(UnifiedExpr):
         return UnifiedExpr(rank_expr)
 
 
+_DATAFUSION_RANK_METHODS = frozenset({"min", "max", "dense", "ordinal", "average"})
+
+
+def _datafusion_whole_frame_rank(expr: DataFusionExpr, method: str, descending: bool) -> DataFusionExpr:
+    from datafusion import functions as df_f, lit as df_lit
+    from datafusion.expr import Window
+
+    nulls_last_window = Window(order_by=[expr.sort(ascending=not descending, nulls_first=False)])
+    rows_sharing_value = df_f.count(expr).over(Window(partition_by=[expr]))
+    min_rank = df_f.rank().over(nulls_last_window)
+    if method == "min":
+        ranked = min_rank
+    elif method == "dense":
+        ranked = df_f.dense_rank().over(nulls_last_window)
+    elif method == "ordinal":
+        ranked = df_f.row_number().over(nulls_last_window)
+    elif method == "max":
+        ranked = min_rank + rows_sharing_value - df_lit(1)
+    elif method == "average":
+        ranked = min_rank + (rows_sharing_value - df_lit(1)) / df_lit(2.0)
+    else:
+        raise ValueError(f"Unsupported rank method: {method!r}. Expected one of {sorted(_DATAFUSION_RANK_METHODS)}.")
+    return df_f.when(expr.is_null(), df_lit(None)).otherwise(ranked)
+
+
 class _DataFusionDeferredRank(UnifiedExpr):
     """Deferred rank expression for DataFusion.
 
@@ -2047,7 +2123,8 @@ class _DataFusionDeferredRank(UnifiedExpr):
             method: Ranking method: "min", "max", "dense", "ordinal", "average"
             descending: Whether to rank in descending order
         """
-        super().__init__(expr)
+        super().__init__(_datafusion_whole_frame_rank(expr, method, descending))
+        self._rank_source = expr
         self._rank_method = method
         self._rank_descending = descending
 
@@ -2056,15 +2133,6 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_by: str | list[str],
         order_by: str | None = None,
     ) -> UnifiedExpr:
-        """Apply ranking over a window partition.
-
-        Args:
-            partition_by: Column(s) to partition by
-            order_by: Optional column to order by (ignored, uses self._expr)
-
-        Returns:
-            UnifiedExpr with rank values
-        """
         from datafusion import col as df_col, functions as df_f
         from datafusion.expr import Window
 
@@ -2073,7 +2141,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_exprs = [df_col(c) if isinstance(c, str) else c for c in partition_cols]
 
         # Build ordering based on the expression
-        order_expr = self._expr.sort(ascending=not self._rank_descending)
+        order_expr = self._rank_source.sort(ascending=not self._rank_descending, nulls_first=self._rank_descending)
 
         # Build Window specification
         window = Window(partition_by=partition_exprs, order_by=[order_expr])
@@ -2096,6 +2164,27 @@ class _DataFusionDeferredRank(UnifiedExpr):
         return UnifiedExpr(rank_func.over(window))
 
 
+class _DataFusionDeferredCumulative(UnifiedExpr):
+    def __init__(self, expr: DataFusionExpr, operation: str) -> None:
+        super().__init__(expr)
+        self._operation = operation
+
+    def over(self, partition_by: str | list[str], order_by: str | None = None) -> UnifiedExpr:
+        from datafusion import col as df_col, functions as df_f
+        from datafusion.expr import Window, WindowFrame
+
+        if order_by is None:
+            raise ValueError("DataFusion cumulative windows require an explicit order_by column")
+        partition_cols = [partition_by] if isinstance(partition_by, str) else list(partition_by)
+        window = Window(
+            partition_by=[df_col(column) for column in partition_cols],
+            order_by=[df_col(order_by).sort(ascending=True, nulls_first=False)],
+            window_frame=WindowFrame("rows", None, 0),
+        )
+        aggregate = df_f.sum(self._expr) if self._operation == "sum" else df_f.max(self._expr)
+        return UnifiedExpr(aggregate.over(window))
+
+
 class _DataFusionDeferredFilter(UnifiedExpr):
     """Deferred filter expression for DataFusion.
 
@@ -2107,18 +2196,13 @@ class _DataFusionDeferredFilter(UnifiedExpr):
     an aggregate method (sum, count, etc.) is called.
     """
 
-    def __init__(self, expr: Any, condition: Any) -> None:
+    def __init__(self, expr: DataFusionExpr, condition: DataFusionExpr) -> None:
         """Initialize the deferred filter.
 
         Args:
             expr: The column expression to aggregate (DataFusion `Expr` at runtime)
             condition: The filter condition to apply (DataFusion `Expr` at runtime)
 
-        Both params stay `Any`: the only call site (`UnifiedExpr.filter` in
-        the DataFusion branch) unwraps `condition.native` which itself
-        returns `Any`. Tightening the annotation here would mis-state the
-        contract - runtime values are DataFusion expressions, but the
-        type-checker can't see the dynamic dispatch that guarantees it.
         """
         super().__init__(expr)
         self._filter_condition = condition
@@ -2174,7 +2258,7 @@ class _DataFusionDeferredFilter(UnifiedExpr):
         return self._apply_filtered_agg(df_f.max)
 
 
-class UnifiedWhenThen:
+class UnifiedWhenThen(_DataFusionDeferredOperations):
     """Intermediate result from when().then() for chaining.
 
     This allows the Polars-style when/then/otherwise pattern:
@@ -2259,7 +2343,7 @@ class UnifiedWhenThen:
         return UnifiedExpr(self._when_builder.otherwise(val))
 
 
-class UnifiedWhen:
+class UnifiedWhen(_DataFusionDeferredOperations):
     """Platform-agnostic WHEN expression builder.
 
     Provides Polars-style when/then/otherwise syntax that works across platforms:
@@ -2377,453 +2461,6 @@ def _is_datafusion_expr(expr: Any) -> bool:
     return "datafusion" in type_name
 
 
-# =========================================================================
-# DataFusion Aggregate Arithmetic Helpers (EXPERIMENTAL)
-# =========================================================================
-# These functions help handle DataFusion's limitation that arithmetic
-# on aggregates inside aggregate() is not supported. We extract the
-# arithmetic and apply it after the aggregation.
-#
-# WARNING: This implementation uses error message parsing to extract AST
-# information, which is inherently fragile. Originally tested with
-# DataFusion 43.0.0; re-validated against 53.0.0 as of the
-# unified-frame-error-parsing-hardening.yaml TODO (the pinned/installed
-# version has drifted well past 43.0.0, but the error format below is
-# unchanged as of 53.0.0).
-#
-# `_get_datafusion_ast_string()` distinguishes two failure modes instead of
-# silently returning None for both:
-#   1. The expression's AST doesn't contain an Alias/BinaryExpr/
-#      AggregateFunction node (e.g. a plain Column, Literal, or unaliased
-#      aggregate) - this is a genuinely different expression shape that this
-#      module's aggregate-arithmetic extraction doesn't apply to. Falls back
-#      to passing the expression through unchanged, exactly as before.
-#   2. `rex_call_operator()`'s error text no longer even matches the
-#      "Catch all triggered in get_operator_name: <ast>" wrapper format this
-#      module depends on - this means the underlying error-message mechanism
-#      itself changed (not just the AST it happens to embed), which is the
-#      actual fragile-dependency risk the module docstring warns about.
-#      Raises DataFusionASTFormatError loudly instead of silently degrading.
-
-
-class DataFusionASTFormatError(RuntimeError):
-    """DataFusion's rex_call_operator() error text no longer matches the
-    "Catch all triggered in get_operator_name: <ast>" format this module
-    depends on to extract AST information for aggregate-arithmetic support.
-
-    This means a DataFusion release changed the underlying error-message
-    mechanism this module relies on (not merely the specific AST node it
-    happens to embed - see _DATAFUSION_AST_SANITY_KEYWORDS for that case,
-    which is handled separately and does not raise). Fix by re-validating
-    the current error format (see w0 in
-    unified-frame-error-parsing-hardening.yaml) and updating
-    _DATAFUSION_AST_ERROR_PREFIX / the AST-extraction regexes below to match.
-    """
-
-
-# The stable wrapper text DataFusion's rex_call_operator() uses to embed a
-# Rust Debug-formatted AST dump in its error message, regardless of the
-# wrapped expression's own node type (Column, Literal, Alias, BinaryExpr,
-# AggregateFunction, ...). Confirmed present for Column/Literal/
-# AggregateFunction/Alias(BinaryExpr(...)) shapes as of DataFusion 53.0.0.
-_DATAFUSION_AST_ERROR_PREFIX = "Catch all triggered in get_operator_name"
-
-# Node-type keywords that indicate this expression is the
-# Alias(BinaryExpr(...AggregateFunction...)) shape this module's arithmetic
-# extraction cares about, as opposed to some other expression shape that
-# legitimately doesn't need arithmetic extraction.
-_DATAFUSION_AST_SANITY_KEYWORDS = ("Alias", "BinaryExpr", "AggregateFunction")
-
-
-def _get_datafusion_ast_string(expr: DataFusionExpr) -> str | None:
-    """Get the internal AST representation from a DataFusion expression.
-
-    EXPERIMENTAL: This function relies on parsing error messages from
-    DataFusion's rex_call_operator() method to extract AST information.
-    This is fragile and may break with DataFusion version changes.
-
-    Tested with: DataFusion 43.0.0 and 53.0.0.
-    Expected error message format: "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
-
-    Args:
-        expr: A DataFusion expression
-
-    Returns:
-        The AST string representation, or None if this expression's AST
-        doesn't contain an Alias/BinaryExpr/AggregateFunction node (a
-        genuinely different, unrelated expression shape - not an error).
-
-    Raises:
-        DataFusionASTFormatError: If DataFusion raised an error but its text
-            no longer matches the expected catch-all AST-dump wrapper format
-            at all, indicating the underlying mechanism this function
-            depends on has changed upstream.
-    """
-    if not hasattr(expr, "rex_call_operator"):
-        # Not a real DataFusion Expr at all (e.g. a plain column-name string
-        # mixed into the same select()/agg() call as an aggregate
-        # expression) - this is a type mismatch in the caller's input, not a
-        # DataFusion error-format question, so it is definitely not the
-        # Alias/BinaryExpr/AggregateFunction pattern this caller looks for.
-        return None
-
-    try:
-        # rex_call_operator throws an error for Alias expressions,
-        # but the error message contains the full AST
-        expr.rex_call_operator()
-        return None
-    except Exception as e:
-        # The error message contains the AST like:
-        # "Catch all triggered in get_operator_name: Alias(BinaryExpr...)"
-        error_str = str(e)
-
-        if _DATAFUSION_AST_ERROR_PREFIX not in error_str:
-            # The catch-all AST-dump wrapper itself is gone/changed - the
-            # mechanism this module depends on has broken upstream. This is
-            # the actual format-drift risk flagged in the module docstring;
-            # fail loudly and attributably rather than silently falling back
-            # to unchanged-expression behavior.
-            import datafusion
-
-            installed_version = getattr(datafusion, "__version__", "unknown")
-            raise DataFusionASTFormatError(
-                "DataFusion's rex_call_operator() error format has changed and no "
-                f"longer contains the expected '{_DATAFUSION_AST_ERROR_PREFIX}' "
-                "wrapper text that benchbox's aggregate-arithmetic AST extraction "
-                f"depends on. Installed DataFusion version: {installed_version}. "
-                f"Unrecognized error text: {error_str!r}"
-            ) from e
-
-        # Verify we got the expected format (basic sanity check): does this
-        # expression's own AST contain the Alias/BinaryExpr/AggregateFunction
-        # shape this caller is looking for?
-        if any(keyword in error_str for keyword in _DATAFUSION_AST_SANITY_KEYWORDS):
-            return error_str
-
-        # The catch-all wrapper is intact, but this expression is a
-        # genuinely different, unrelated shape (e.g. a plain Column, Literal,
-        # or unaliased aggregate) - not a format break. Return None so the
-        # caller falls back to passing the expression through unchanged.
-        return None
-
-
-def _extract_datafusion_alias_name(expr_str: str) -> str | None:
-    """Extract alias name from expression string representation."""
-    import re
-
-    # Pattern: name: \"avg_qty\" in the Alias structure (escaped quotes)
-    # The error message escapes quotes, so we need to match \"...\", not "..."
-    # Look for the last name: occurrence which is the alias name
-    matches = list(re.finditer(r'name:\s*\\"([^\\]+)\\"', expr_str))
-    if matches:
-        # Return the last match (alias name), not intermediate names
-        return matches[-1].group(1)
-    return None
-
-
-def _extract_datafusion_multiplier(expr_str: str) -> tuple[float | None, str | None]:
-    """Extract multiplier and operation from BinaryExpr Literal.
-
-    Returns:
-        Tuple of (multiplier, operation) where operation is 'multiply' or 'divide'
-    """
-    import re
-
-    # Pattern: Literal(Float64(0.2), None) or Literal(Int64(2), None)
-    match = re.search(r"Literal\((Float64|Int64)\(([0-9.]+)\)", expr_str)
-    if match:
-        multiplier = float(match.group(2))
-        # Determine operation type
-        if "op: Multiply" in expr_str:
-            return multiplier, "multiply"
-        elif "op: Divide" in expr_str:
-            return multiplier, "divide"
-    return None, None
-
-
-def _rebuild_datafusion_pure_aggregate(expr_str: str) -> DataFusionExpr | None:
-    """Rebuild a pure aggregate expression from a BinaryExpr AST string.
-
-    Given an AST string containing the aggregate pattern, extract just
-    the aggregate function call.
-    """
-    import re
-
-    from datafusion import col as df_col, functions as df_f
-
-    # Find aggregate function name - look for UDF inner name like Avg, Sum
-    # Pattern: AggregateUDF { inner: Avg { ... } }
-    func_match = re.search(r"inner:\s*(\w+)\s*\{", expr_str)
-    if not func_match:
-        return None
-    func_name = func_match.group(1).lower()  # Avg -> avg, Sum -> sum
-
-    # Find column name within the aggregate
-    # Pattern: Column { relation: ..., name: \"l_quantity\" } (escaped quotes)
-    col_match = re.search(r'Column \{[^}]*name:\s*\\"([^\\]+)\\"', expr_str)
-    if not col_match:
-        return None
-    col_name = col_match.group(1)
-
-    # Rebuild the pure aggregate
-    col_expr = df_col(col_name)
-    if func_name == "avg":
-        return df_f.avg(col_expr)
-    elif func_name == "sum":
-        return df_f.sum(col_expr)
-    elif func_name == "count":
-        return df_f.count(col_expr)
-    elif func_name == "min":
-        return df_f.min(col_expr)
-    elif func_name == "max":
-        return df_f.max(col_expr)
-
-    return None
-
-
-def _extract_datafusion_agg_arithmetic(
-    exprs: list[DataFusionExpr],
-) -> tuple[list[DataFusionExpr], list[tuple]]:
-    """Extract arithmetic operations from DataFusion aggregate expressions.
-
-    DataFusion doesn't support arithmetic on aggregates inside aggregate(),
-    e.g., (col.mean() * lit(0.2)).alias("avg_qty") fails with:
-    "Invalid aggregate expression 'BinaryExpr(...)'"
-
-    This function detects such patterns and separates:
-    1. The pure aggregate expressions (to run in aggregate())
-    2. The arithmetic to apply after aggregation
-
-    Handles two patterns:
-    1. aggregate * literal (e.g., sum(x) * 0.5)
-    2. aggregate * aggregate (e.g., sum(x) * avg(y))
-    3. aggregate + aggregate (e.g., sum(x) + sum(y) + sum(z))
-
-    Args:
-        exprs: List of native DataFusion expressions
-
-    Returns:
-        Tuple of:
-        - List of cleaned expressions for aggregate()
-        - List of post-ops (various formats for different operations)
-    """
-    processed = []
-    post_ops: list[tuple] = []
-
-    for expr in exprs:
-        # Get the internal AST representation by triggering an error message
-        # that contains the full Rust AST structure
-        ast_str = _get_datafusion_ast_string(expr)
-
-        # Check if this is an aliased BinaryExpr with aggregate
-        # Pattern: Alias(BinaryExpr { left: AggregateFunction(...), op: Multiply/Divide, right: Literal(...) }, ...)
-        if ast_str and "BinaryExpr" in ast_str and "AggregateFunction" in ast_str:
-            # Try to extract the alias name
-            alias_name = _extract_datafusion_alias_name(ast_str)
-            if alias_name:
-                # Count how many aggregates are in this expression
-                agg_count = ast_str.count("AggregateFunction(")
-
-                if agg_count >= 2:
-                    # Multiple aggregates combined with arithmetic (sum * avg, sum + sum + sum)
-                    multi_result = _extract_multi_agg_arithmetic(ast_str, alias_name)
-                    if multi_result is not None:
-                        temp_exprs, post_op = multi_result
-                        processed.extend(temp_exprs)
-                        post_ops.append(post_op)
-                        continue
-                else:
-                    # Single aggregate with literal multiplier (existing pattern)
-                    value, operation = _extract_datafusion_multiplier(ast_str)
-                    if value is not None and operation is not None:
-                        # Extract the pure aggregate by rebuilding
-                        pure_agg = _rebuild_datafusion_pure_aggregate(ast_str)
-                        if pure_agg is not None:
-                            temp_alias = f"__temp_{alias_name}__"
-                            processed.append(pure_agg.alias(temp_alias))
-                            post_ops.append(("literal", temp_alias, alias_name, value, operation))
-                            continue
-
-        # No transformation needed - use as-is
-        processed.append(expr)
-
-    return processed, post_ops
-
-
-_AGG_FUNCS = ("sum", "avg", "mean", "count", "min", "max")
-_OP_MAP = {"Multiply": "multiply", "Plus": "add", "Divide": "divide", "Minus": "subtract"}
-
-
-def _parse_multi_agg_pairs(ast_str: str, agg_funcs: list[str], col_matches: list[str], has_nvl: bool):
-    import re
-
-    if not has_nvl:
-        return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
-
-    # NVL-wrapped aggregates: match (func, col) pairs inside each AggregateFunction block
-    agg_pattern = (
-        r"AggregateFunction\s*\{[^}]*inner:\s*(\w+)[^}]*args:\s*\[ScalarFunction[^]]+name:\s*\\?\"([^\"\\]+)\\?\""
-    )
-    nvl_matches = re.findall(agg_pattern, ast_str, re.DOTALL)
-    aggregates = [(f.lower(), c) for f, c in nvl_matches if f.lower() in _AGG_FUNCS]
-    if aggregates:
-        return aggregates
-    # Fall back to positional pairing if the NVL-specific regex didn't match
-    return [(f.lower(), col_matches[i]) for i, f in enumerate(agg_funcs) if i < len(col_matches)]
-
-
-def _pick_primary_op(ops: list[str]) -> str:
-    for op in ops:
-        if op in ("Multiply", "Plus", "Divide", "Minus"):
-            return op
-    return ops[0]
-
-
-def _build_pure_agg_expr(func_name: str, col_name: str):
-    from datafusion import col as df_col, functions as df_f
-
-    dispatch = {
-        "avg": df_f.avg,
-        "mean": df_f.avg,
-        "sum": df_f.sum,
-        "count": df_f.count,
-        "min": df_f.min,
-        "max": df_f.max,
-    }
-    builder = dispatch.get(func_name)
-    if builder is None:
-        return None
-    return builder(df_col(col_name))
-
-
-def _extract_multi_agg_arithmetic(ast_str: str, alias_name: str) -> tuple[list[Any], tuple] | None:
-    """Extract multiple aggregates from a BinaryExpr.
-
-    Handles patterns like:
-    - sum(x) * avg(y) -> two temp columns, multiply after
-    - sum(a) + sum(b) + sum(c) -> three temp columns, add after
-    - sum(nvl(x, 0)) / sum(nvl(y, 0)) -> preserve nvl wrapper
-
-    Returns:
-        Tuple of (list of temp aggregate expressions, post_op tuple) or None
-    """
-    import re
-
-    func_matches = re.findall(r"inner:\s*(\w+)\s*\{", ast_str)
-    has_nvl = "NVLFunc" in ast_str or "nvl" in ast_str.lower()
-    has_cast = "Cast(" in ast_str and "Float64" in ast_str
-
-    col_matches = re.findall(r'name:\s*\\?"([^"\\]+)\\?"', ast_str)
-    col_matches = [c for c in col_matches if c and c[0].isalpha() and c not in ("?table?",)]
-    agg_funcs = [f for f in func_matches if f.lower() in _AGG_FUNCS]
-
-    if len(agg_funcs) < 2:
-        return None
-
-    aggregates = _parse_multi_agg_pairs(ast_str, agg_funcs, col_matches, has_nvl)
-    if len(aggregates) < 2:
-        return None
-
-    ops = re.findall(r"op:\s*(\w+)", ast_str)
-    if not ops:
-        return None
-    primary_op = _pick_primary_op(ops)
-
-    # IMPORTANT: DataFusion's aggregate() only accepts pure aggregate expressions.
-    # Any wrapping (Cast, coalesce, arithmetic) must be done AFTER aggregation.
-    temp_exprs = []
-    temp_aliases = []
-    for i, (func_name, col_name) in enumerate(aggregates):
-        agg_expr = _build_pure_agg_expr(func_name, col_name)
-        if agg_expr is None:
-            return None
-        temp_alias = f"__temp_{alias_name}_{i}__"
-        temp_aliases.append(temp_alias)
-        temp_exprs.append(agg_expr.alias(temp_alias))
-
-    operation = _OP_MAP.get(primary_op, "multiply")
-    return temp_exprs, ("multi", temp_aliases, alias_name, operation, has_nvl, has_cast)
-
-
-def _apply_datafusion_post_ops(result: DataFusionDataFrame, post_ops: list[tuple]) -> DataFusionDataFrame:
-    """Apply post-aggregation arithmetic operations to a DataFusion DataFrame.
-
-    Args:
-        result: DataFusion DataFrame with aggregation results
-        post_ops: List of post-op tuples in one of these formats:
-                  - ("literal", temp_alias, final_alias, value, operation) for single agg * literal
-                  - ("multi", temp_aliases, final_alias, operation) for multi agg arithmetic
-
-    Returns:
-        DataFrame with arithmetic applied and columns renamed
-    """
-    from datafusion import col as df_col
-
-    for post_op in post_ops:
-        op_type = post_op[0]
-        if op_type == "literal":
-            result = _apply_literal_post_op(result, post_op, df_col)
-        elif op_type == "multi":
-            result = _apply_multi_post_op(result, post_op, df_col)
-        else:
-            raise ValueError(f"Unsupported DataFusion post-op format: {post_op}")
-
-    return result
-
-
-def _apply_literal_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
-    """Apply ("literal", temp_alias, final_alias, value, operation) post-op."""
-    _, temp_alias, final_alias, value, operation = post_op
-    if operation == "multiply":
-        result = result.with_column(final_alias, df_col(temp_alias) * value)
-    elif operation == "divide":
-        result = result.with_column(final_alias, df_col(temp_alias) / value)
-    if temp_alias != final_alias:
-        result = result.drop(temp_alias)
-    return result
-
-
-def _apply_multi_post_op(result: DataFusionDataFrame, post_op: tuple, df_col) -> DataFusionDataFrame:
-    """Apply ("multi", temp_aliases, final_alias, operation[, has_nvl, has_cast]) post-op."""
-    if len(post_op) == 6:
-        _, temp_aliases, final_alias, operation, has_nvl, has_cast = post_op
-    else:
-        _, temp_aliases, final_alias, operation = post_op
-        has_nvl = False
-        has_cast = False
-
-    if len(temp_aliases) < 2:
-        return result
-
-    import pyarrow as pa
-    from datafusion import functions as df_f, lit as df_lit
-
-    def _prep(alias: str):
-        expr = df_col(alias)
-        if has_nvl:
-            expr = df_f.coalesce(expr, df_lit(0))
-        if has_cast:
-            expr = expr.cast(pa.float64())
-        return expr
-
-    combined = _prep(temp_aliases[0])
-    for temp_alias in temp_aliases[1:]:
-        next_col = _prep(temp_alias)
-        if operation == "multiply":
-            combined = combined * next_col
-        elif operation == "add":
-            combined = combined + next_col
-        elif operation == "divide":
-            combined = combined / df_f.nullif(next_col, df_lit(0.0))
-        elif operation == "subtract":
-            combined = combined - next_col
-
-    result = result.with_column(final_alias, combined)
-    for temp_alias in temp_aliases:
-        result = result.drop(temp_alias)
-    return result
-
-
 class UnifiedGroupBy(Generic[DF, Expr]):
     """Platform-agnostic GroupBy wrapper.
 
@@ -2851,6 +2488,7 @@ class UnifiedGroupBy(Generic[DF, Expr]):
         self._adapter = adapter
         self._source_df = source_df
 
+    @_bind_datafusion_arguments
     def agg(self, *exprs: Expr) -> UnifiedLazyFrame:
         """Aggregate the grouped data.
 
@@ -2876,20 +2514,12 @@ class UnifiedGroupBy(Generic[DF, Expr]):
             # Polars: Use group_by().agg()
             result = self._grouped.agg(*unwrapped)
         elif _is_datafusion_df(self._source_df):
-            # DataFusion: Use aggregate([group_cols], [agg_exprs])
-            # grouped is None, we use source_df.aggregate() directly
-            #
-            # DataFusion doesn't support arithmetic on aggregates inside agg(),
-            # e.g., (col.mean() * lit(0.2)).alias("x") fails.
-            # We need to detect these patterns and handle them in post-processing:
-            # 1. Extract the pure aggregates
-            # 2. Apply arithmetic after aggregation
-            processed_exprs, post_ops = _extract_datafusion_agg_arithmetic(unwrapped)
-            result = self._source_df.aggregate(self._columns, processed_exprs)
-
-            # Apply any post-aggregation arithmetic
-            if post_ops:
-                result = _apply_datafusion_post_ops(result, post_ops)
+            # DataFusion: Use aggregate([group_cols], [agg_exprs]); grouped is
+            # None, so call source_df.aggregate() directly. DataFusion plans
+            # arithmetic, CASE, casts and scalar functions over aggregates
+            # (e.g. sum(x) / sum(y), or a CASE whose condition and branches are
+            # aggregates) natively, so the expressions are passed through as-is.
+            result = self._source_df.aggregate(self._columns, unwrapped)
         else:
             # Fallback: try group_by().agg() pattern
             result = self._grouped.agg(*unwrapped)
@@ -3086,6 +2716,7 @@ def _prepare_join_items(df, items: list, side: str) -> tuple[Any, list[str], lis
     join_cols: list[str] = []
     temp_cols: list[str] = []
     for i, item in enumerate(items):
+        item = _resolve_datafusion_value(item, df)
         if isinstance(item, UnifiedExpr):
             temp_col = f"__{side}_join_key_{i}__"
             df = df.with_column(temp_col, item.native)
@@ -3766,6 +3397,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Grouping Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def group_by(self, *columns: str | Expr | list) -> UnifiedGroupBy:
         """Group by one or more columns.
 
@@ -3813,6 +3445,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Filter/Select Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def filter(self, condition: Expr) -> UnifiedLazyFrame:
         """Filter rows by condition.
 
@@ -3827,6 +3460,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         result = self._df.filter(native_condition)
         return UnifiedLazyFrame(result, self._adapter)
 
+    @_bind_datafusion_arguments
     def select(self, *columns: str | Expr | list) -> UnifiedLazyFrame:
         """Select columns.
 
@@ -3850,14 +3484,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             # If so, use aggregate() instead of select() for proper execution
             has_aggregate = self._has_aggregate_expr(unwrapped)
             if has_aggregate:
-                # DataFusion doesn't support arithmetic on aggregates inside aggregate(),
-                # so we need to extract and apply arithmetic post-aggregation
-                processed_exprs, post_ops = _extract_datafusion_agg_arithmetic(unwrapped)
-                # Use aggregate with empty group-by for DataFrame-level aggregation
-                result = self._df.aggregate([], processed_exprs)
-                # Apply any post-aggregation arithmetic
-                if post_ops:
-                    result = _apply_datafusion_post_ops(result, post_ops)
+                # Use aggregate with empty group-by for DataFrame-level
+                # aggregation; expressions over aggregates are planned natively.
+                result = self._df.aggregate([], unwrapped)
             else:
                 result = self._df.select(*unwrapped)
         else:
@@ -3905,6 +3534,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
                     return True
         return False
 
+    @_bind_datafusion_arguments
     def with_columns(self, *exprs: Expr | list) -> UnifiedLazyFrame:
         """Add or replace columns.
 
@@ -4109,6 +3739,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Sorting Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def sort(
         self,
         by: str | list[str] | list[tuple[str, str]],

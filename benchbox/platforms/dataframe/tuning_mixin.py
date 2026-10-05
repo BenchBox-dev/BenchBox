@@ -236,16 +236,17 @@ class TuningConfigurableMixin(ABC):
     def _derive_applied_tuning_status(self) -> str | None:
         """Derive the honest execution-path tuning status, or ``None``.
 
-        The DataFrame path always runs its tuning-application step (even for a
-        default config), so ``tuning_enabled``/``has_config`` are both true when
-        a config is present: a default run that applied nothing derives ``noop``,
-        a tuned run that applied >=1 setting derives ``applied_unverified``.
-        Returns ``None`` when there is no ledger (a non-tuning stub adapter).
+        A run with an absent or all-default configuration that recorded no
+        statement requested no tuning and derives ``not_applicable``. A run that
+        requested tuning derives ``applied_unverified`` when at least one setting
+        executed and ``noop`` when none did. Returns ``None`` when there is no
+        ledger (a non-tuning stub adapter).
         """
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is None:
             return None
-        has_config = getattr(self, "_tuning_config", None) is not None
+        config = getattr(self, "_tuning_config", None)
+        has_config = bool(ledger.statements) or (config is not None and not config.is_default())
         return ledger.overall_status(tuning_enabled=has_config, has_config=has_config)
 
     def _write_applied_tuning_ledger(self, builder: Any) -> None:

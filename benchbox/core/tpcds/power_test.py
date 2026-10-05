@@ -25,6 +25,10 @@ from benchbox.core.plan_capture_phase import (
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
+def power_parameter_seed(seed: Optional[int], stream_id: int) -> int:
+    return (seed or 1) + stream_id + 1000
+
+
 @dataclass
 class TPCDSPowerTestConfig:
     """Configuration for TPC-DS Power Test."""
@@ -192,7 +196,7 @@ class TPCDSPowerTest:
         try:
             connection = self.connection_factory()
             # Per TPC-DS spec: all queries in a stream share one parameter seed.
-            stream_param_seed = self.config.seed + self.config.stream_id + 1000
+            stream_param_seed = power_parameter_seed(self.config.seed, self.config.stream_id)
             if self.config.verbose:
                 self.logger.info(f"Using parameter seed {stream_param_seed} for stream {self.config.stream_id}")
 
@@ -472,7 +476,7 @@ class TPCDSPowerTest:
 
         # Use same parameter seed calculation as main execution loop
         # Per TPC-DS spec: all queries in a stream use the same parameter seed
-        stream_param_seed = self.config.seed + self.config.stream_id + 1000
+        stream_param_seed = power_parameter_seed(self.config.seed, self.config.stream_id)
 
         for position, item in enumerate(sequence):
             query_id, variant = item if isinstance(item, tuple) else (item, None)

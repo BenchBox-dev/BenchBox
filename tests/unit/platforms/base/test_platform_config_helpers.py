@@ -99,3 +99,25 @@ def test_apply_standard_unified_tuning_preserves_dispatch_order() -> None:
         ("table", "orders_tuning", connection),
         ("table", "lineitem_tuning", connection),
     ]
+
+
+def test_build_adapter_config_forwards_plan_keys_and_skips_none() -> None:
+    """from_config helpers built on build_adapter_config must not drop --show-plans."""
+    result = build_adapter_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "show_query_plans": True,
+            "capture_plans": False,
+            "plan_queries": "1,6",
+            "plan_capture_timeout_seconds": None,
+        },
+        platform="platform",
+        fields=(),
+        include_none=False,
+    )
+
+    assert result["show_query_plans"] is True
+    assert result["capture_plans"] is False
+    assert result["plan_queries"] == "1,6"
+    assert "plan_capture_timeout_seconds" not in result

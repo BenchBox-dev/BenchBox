@@ -99,6 +99,8 @@ class _DatabricksCursor:
             self._results = [("13.3",)]
         elif normalized.startswith("select current_catalog"):
             self._results = [(self._state.catalog, self._state.schema)]
+        elif normalized == "set use_cached_result":
+            self._results = [("use_cached_result", "false")]
         elif normalized.startswith("set "):
             self._results = []
         elif normalized.startswith("copy into"):
@@ -842,6 +844,9 @@ def install_athena_stubs(
     monkeypatch.setitem(sys.modules, "pyathena", pyathena_module)
     monkeypatch.setitem(sys.modules, "pyathena.cursor", cursor_module)
     monkeypatch.setitem(sys.modules, "boto3", boto3_module)
+    # The adapter's credential check reads the environment and ~/.aws; the stubs own both.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "athena-stub-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "athena-stub-secret-key")
 
     # Patch the adapter module to use our stubs
     try:
@@ -959,15 +964,15 @@ def install_clickhouse_stub(
     try:
         import benchbox.platforms.clickhouse._dependencies as deps_module
 
-        deps_module.ClickHouseClient = StubClient
-        deps_module.ClickHouseError = ClickHouseError
+        monkeypatch.setattr(deps_module, "ClickHouseClient", StubClient)
+        monkeypatch.setattr(deps_module, "ClickHouseError", ClickHouseError)
     except ImportError:  # pragma: no cover - defensive
         pass
 
     try:
         import benchbox.platforms.clickhouse.setup as setup_module
 
-        setup_module.ClickHouseClient = StubClient
+        monkeypatch.setattr(setup_module, "ClickHouseClient", StubClient)
     except ImportError:  # pragma: no cover - defensive
         pass
 
@@ -2558,7 +2563,7 @@ def install_lakesail_stub(
     try:
         import benchbox.platforms.lakesail as adapter_module
 
-        adapter_module.SparkSession = StubSparkSession
+        monkeypatch.setattr(adapter_module, "SparkSession", StubSparkSession)
         for type_name in [
             "StructType",
             "StructField",
@@ -2569,7 +2574,7 @@ def install_lakesail_stub(
             "DecimalType",
             "DateType",
         ]:
-            setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name))
+            monkeypatch.setattr(adapter_module, type_name, getattr(pyspark_types_module, type_name), raising=False)
 
         # Make the adapter think the server is reachable so tests skip the
         # real TCP connection and pysail import checks.

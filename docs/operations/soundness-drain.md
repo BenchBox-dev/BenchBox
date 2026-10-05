@@ -7,14 +7,27 @@
 
 ## The signal, and what it is not
 
-Soundness-path PRs (see `_project/scripts/auto_merge_soundness_paths.py`'s
-`SOUNDNESS_PREFIXES`, mirrored in `.github/CODEOWNERS`) correctly **never
-auto-merge**. `.github/workflows/auto-merge-on-open.yml` withholds or revokes
-squash auto-merge the moment a PR's diff touches the comparator/parser
-surface, the oracle-adjacent reference data, the `sql_compat` rule-dispatch
-core, or the gate machinery itself. That withholding is intentional — CI
-cannot catch a change that redefines the oracle it validates against, so
-those PRs must be reviewed and merged by hand.
+Soundness-path PRs (paths in `.github/soundness-paths.txt`) merge only after
+the required `oracle-review` check passes, which needs the Codex connector's
+review of the current head. CI cannot catch a change that redefines the oracle
+it validates against, so such a PR can sit green but unmergeable while it
+waits for that review.
+
+When the Codex connector cannot review (for example at its usage limit), a
+listed attester in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`)
+can substitute an independent stand-in review. After that review of the
+current head, the attester posts a PR comment whose whole text is the line
+`Stand-in oracle review: APPROVE <full head SHA>`; the review itself goes in a
+separate comment. The check accepts it only for
+that exact head, only if posted after the head commit and any retarget, and
+never while a Codex connector review thread is unresolved. An edited comment
+does not count, and neither does one with any other text, because Markdown
+around the line can hide or quote it.
+Posting the comment does not rerun the check: rerun the latest oracle-review
+run (`gh run rerun <run-id>`) or dispatch it with
+`gh workflow run oracle-review.yml --ref <feature-branch> -f pr=<number>`.
+The attester account is also the one local automation uses, so the
+attestation records who vouched for the review, not that a human read it.
 
 What the gate does not do on its own is tell anyone a PR is *waiting*. Two
 PRs (#1116, #1142) sat parked for days, accumulating merge conflicts,
@@ -35,17 +48,17 @@ hold:
 
 - **(a) required-lane green** — **every** required status context of the
   `develop-squash-only` ruleset has its latest check run on the PR's head
-  SHA completed with `conclusion: success`. Today that is both
-  `ci-required-result` (the aggregate required-check job defined in
-  `.github/workflows/pr.yml`) and `Results Explorer browser gate` (see
+  SHA completed with `conclusion: success`. Today that is
+  the six unit results defined in `.github/workflows/ci.yml` (`core`,
+  `explorer`, `results-data`, `docs`, `landing`, and `tooling`; see
   [`repo-admin-settings.md`](repo-admin-settings.md)). Partial green — one
   context green while another is red or has never reported — is not green;
   a missing run is fail-closed, not an absent requirement.
 - **(b) awaiting the owner** — auto-merge is currently OFF, **and** either
   the diff touches a soundness-critical path (reused via
-  `any_soundness_path` imported from `auto_merge_soundness_paths.py` —
-  never re-derived or edited), or the owner (`joeharris76`, per
-  `.github/CODEOWNERS`) is a requested reviewer.
+  `any_soundness_path` imported from `soundness_paths.py` —
+  never re-derived or edited), or the owner (`joeharris76`) is a requested
+  reviewer.
 - **(c) parked > 24h** — more than 24 hours of park time (see below).
   The gate deliberately does NOT use `updated_at`: the script's own label
   writes and ordinary human comments bump `updated_at`, so an idle-based
@@ -60,8 +73,8 @@ Each qualifying PR also reports **park time**: hours since the PR became
 ready-and-green, anchored on the `completed_at` of the **last** required
 context to finish (falling back to `updated_at` if any required context
 lacks that timestamp). The lane is only green once every context has
-finished, so anchoring on `ci-required-result` alone would overstate park
-time whenever the browser gate completes later — and trip the 24h gate
+finished, so anchoring on a single unit alone would overstate park
+time whenever another unit completes later — and trip the 24h gate
 early. This is emitted per PR in both the text digest and `--json` output,
 and is the intended input for park-time re-measurement work (the WS9
 re-measure references this field rather than recomputing it).
@@ -86,22 +99,20 @@ The label is fully owned by this script under `--apply`: it is added to
 every currently-qualifying PR and removed from any evaluated PR that no
 longer qualifies (check went red, auto-merge got re-enabled, idle dropped
 back under 24h on a fresh push, etc.). Do not hand-manage it — the next
-scheduled run will reconcile it back to the computed set.
+`--apply` run will reconcile it back to the computed set.
 
-## The daily digest issue
+## The digest issue
 
-`.github/workflows/soundness-drain.yml` runs the report on a daily schedule
-(`workflow_dispatch` is also available for an on-demand run) and calls
-`--apply`. The digest is posted to a single pinned issue titled
+No workflow runs the report on a schedule any more: the daily
+`soundness-drain.yml` was retired with the six-unit CI; the Codex connector
+now reviews soundness-path PRs. Run
+`make soundness-drain-report` for the read-only view, or the script with
+`--apply` when you want the label and issue updated. The digest is posted to a single pinned issue titled
 **"Soundness-PR drain queue"** — found by exact title plus a body marker
 (`<!-- soundness-drain-digest -->`, so a human issue reusing the title is
 never adopted or clobbered) and updated in place (or created if it doesn't
 exist yet), never as per-PR or per-event comments. When the queue drains,
 an existing digest is patched to the empty state exactly once; after that
 an empty queue produces no create, no update, no notification. This keeps
-the signal to at most one digest a day, silent on a clean queue, and never
+the signal to at most one digest per run, silent on a clean queue, and never
 leaves a stale "parked" list showing after the queue empties.
-
-The workflow uses the default `GITHUB_TOKEN` with a minimal permissions
-block (`contents: read`, `pull-requests: write`, `issues: write`) and never
-`pull_request_target`.

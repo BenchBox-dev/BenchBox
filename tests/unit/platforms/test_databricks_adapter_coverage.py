@@ -345,7 +345,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["min_cluster_count"] == 1
         assert metadata["platform_compute"]["max_cluster_count"] == 3
         assert metadata["platform_compute"]["spot_instance_policy"] == "COST_OPTIMIZED"
-        assert metadata["platform_compute"]["result_cache_enabled"] is True
+        assert "result_cache_enabled" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["collection_status"] == "available"
         assert metadata["platform_storage"]["table_format"] == "delta"
         assert metadata["platform_storage"]["staging_location"] == "dbfs:/Volumes/main/bench/stage"
@@ -378,7 +378,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["warehouse_size"] == "Large"
         assert "serverless" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["auto_stop_mins"] == 45
-        assert metadata["platform_compute"]["result_cache_enabled"] is False
+        assert "result_cache_enabled" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["warehouse_metadata_collection_status"] == "unavailable"
         assert metadata["platform_compute"]["collection_status"] == "partial"
         assert metadata["platform_cloud"]["region_collection_status"] == "unavailable"
@@ -736,7 +736,7 @@ class TestCreateExternalTables:
         create_sql = next((s for s in executed_sqls if "CREATE TABLE" in s and "PARQUET" in s), None)
         assert create_sql is not None, f"No CREATE TABLE USING PARQUET found in: {executed_sqls}"
         assert "ORDERS" in create_sql
-        assert "ORDERS" in table_stats
+        assert "orders" in table_stats
 
 
 # ---------------------------------------------------------------------------
@@ -775,6 +775,7 @@ class TestConfigureForBenchmark:
         cursor = MagicMock()
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         adapter.configure_for_benchmark(connection=connection, benchmark_type="tpch")
 
@@ -813,7 +814,8 @@ class TestExecuteQueryFailurePath:
 
         assert result["status"] == "FAILED"
         assert "error" in result
-        assert "query execution error" in result["error"]
+        assert "Databricks session cache control failed" in result["error"]
+        assert result["execution_time_seconds"] == 0.0
         assert result["query_id"] == "Q1"
 
 
@@ -1344,6 +1346,14 @@ class TestConvertToDeltaTable:
         sql = "INSERT INTO orders SELECT * FROM staging"
         result = adapter._convert_to_delta_table(sql)
         assert result == sql
+
+    def test_comment_prefixed_create_still_converted(self):
+        """Schema chunks with "--" headers must still get OR REPLACE + USING DELTA."""
+        adapter = _make_adapter()
+        sql = "-- Generated staging load tables\nCREATE TABLE orders (id INT)"
+        result = adapter._convert_to_delta_table(sql)
+        assert result.startswith("-- Generated staging load tables\n")
+        assert "CREATE OR REPLACE TABLE orders (id INT) USING DELTA" in result
 
     def test_pre_pass_applies_to_every_statement(self):
         """Pre-pass list comprehension transforms each statement independently."""
@@ -2438,6 +2448,7 @@ class TestCreateConnection:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -2457,6 +2468,7 @@ class TestCreateConnection:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -2465,6 +2477,29 @@ class TestCreateConnection:
                 adapter.create_connection()
 
         executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert any("USE SCHEMA" in s and "bench_tpch" in s for s in executed)
+
+    def test_sets_schema_on_new_database(self):
+        """Fresh databases also get schema context: pooled connections never
+        reach create_schema(), so deferring USE SCHEMA there strands them on
+        the default schema."""
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench_tpch"
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
+            with patch.object(adapter, "handle_existing_database"):
+                with patch.object(adapter, "database_was_reused", False, create=True):
+                    adapter.create_connection()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert any("CREATE SCHEMA IF NOT EXISTS" in s and "bench_tpch" in s for s in executed)
         assert any("USE SCHEMA" in s and "bench_tpch" in s for s in executed)
 
     def test_raises_on_connection_failure(self):
@@ -2571,6 +2606,7 @@ class TestExecuteQuerySuccessPath:
         cursor.fetchall.return_value = [(1, "data")]
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         with patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0):
             with patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.1):
@@ -2595,6 +2631,7 @@ class TestExecuteQuerySuccessPath:
         cursor.fetchall.return_value = [(42,)]
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         with patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0):
             with patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.2):
@@ -2681,9 +2718,9 @@ class TestLoadData:
                                     data_dir=Path("/data"),
                                 )
 
-        assert "ORDERS" in table_stats
-        assert "LINEITEM" in table_stats
-        assert table_stats["ORDERS"] == 1500
+        assert "orders" in table_stats
+        assert "lineitem" in table_stats
+        assert table_stats["orders"] == 1500
         assert total_time == 1.0
 
     def test_handles_individual_table_failure_gracefully(self):
@@ -2716,7 +2753,7 @@ class TestLoadData:
                                 )
 
         # Table should be recorded with 0 rows on failure
-        assert table_stats["ORDERS"] == 0
+        assert table_stats["orders"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -3582,3 +3619,57 @@ class TestGetPlatformMetadataCurrentVersion:
         assert metadata["platform_version"] == "4.2.0"
         assert metadata["engine_version_source"] == "sql_query"
         assert metadata["spark_version"] == "4.2.0"
+
+
+# ---------------------------------------------------------------------------
+# preprocess_operation_sql
+# ---------------------------------------------------------------------------
+
+
+def _make_operation(write_sql: str, overrides: dict | None = None):
+    from benchbox.core.write_primitives.catalog import WriteOperation
+
+    return WriteOperation(
+        id="test_op",
+        category="test",
+        description="test operation",
+        write_sql=write_sql,
+        platform_overrides=overrides or {},
+    )
+
+
+class TestPreprocessOperationSql:
+    """Databricks VARCHAR requires a length; rewrite to STRING."""
+
+    def test_cast_varchar_rewritten(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("SELECT CAST(n AS VARCHAR)"))
+
+        assert result == "SELECT CAST(n AS STRING)"
+
+    def test_unnest_generate_series_rewritten_to_explode_sequence(self):
+        """Databricks has neither unnest nor generate_series (UNRESOLVED_ROUTINE live)."""
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("SELECT n FROM (SELECT unnest(generate_series(1, 100)) AS n) t")
+        )
+
+        assert result == "SELECT n FROM (SELECT explode(sequence(1, 100)) AS n) t"
+
+    def test_skip_override_returns_none(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("SELECT 1", {"databricks": None}))
+
+        assert result is None
+
+    def test_other_platform_override_ignored(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("SELECT CAST(n AS VARCHAR)", {"bigquery": "SELECT 1"})
+        )
+
+        assert result == "SELECT CAST(n AS STRING)"

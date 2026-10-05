@@ -74,6 +74,29 @@ FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
 LAST_AVAILABLE_YEAR = int(_DATA_COVERAGE["last_available_year"])
 APPROXIMATE_MONTHLY_FLIGHTS = int(_DATA_COVERAGE["approximate_monthly_flights"])
 MONTHS_PER_SCALE_FACTOR = int(_DATA_COVERAGE["months_per_scale_factor"])
+
+
+def _unavailable_months() -> set[tuple[int, int]]:
+    """Expand ``unavailable_months`` ranges from the downloader spec.
+
+    Each entry is ``[start_year, start_month, end_year, end_month]`` covering
+    BTS PREZIP archives the provider no longer serves (verified by HTTP
+    probing, not assumed). Returns an empty set when the spec lists none.
+    """
+    missing: set[tuple[int, int]] = set()
+    for entry in _DATA_COVERAGE.get("unavailable_months") or []:
+        start_year, start_month, end_year, end_month = (int(v) for v in entry)
+        year, month = start_year, start_month
+        while (year, month) <= (end_year, end_month):
+            missing.add((year, month))
+            month += 1
+            if month == 13:
+                month = 1
+                year += 1
+    return missing
+
+
+UNAVAILABLE_MONTHS = _unavailable_months()
 FLIGHTS_SHARD_ROW_TARGET = int(_FLIGHT_SHARDS["row_target"])
 FLIGHTS_SHARD_DIRNAME = _FLIGHT_SHARDS["dirname"]
 FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
@@ -138,13 +161,30 @@ def _months_sequence(
     result = []
     year, month = end_year, end_month
     for _ in range(num_months):
-        result.append((year, month))
+        if (year, month) in UNAVAILABLE_MONTHS:
+            logger.warning(
+                "FlightData: BTS archive for %d-%02d is unavailable; substituting an older available month.",
+                year,
+                month,
+            )
+        else:
+            result.append((year, month))
         month -= 1
         if month == 0:
             month = 12
             year -= 1
         if year < FIRST_AVAILABLE_YEAR:
             break
+    # Backfill past skipped months so the window keeps its month count when
+    # older archives exist; if the corpus edge is reached first, the window
+    # is shorter and _scale_to_months already logged the ceiling.
+    while len(result) < num_months and year >= FIRST_AVAILABLE_YEAR:
+        if (year, month) not in UNAVAILABLE_MONTHS:
+            result.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
     return result
 
 
@@ -163,6 +203,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         verbose: int | bool = 0,
         quiet: bool = False,
         force_redownload: bool = False,
+        allow_synthetic_fallback: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize downloader.
@@ -174,6 +215,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             verbose: Verbosity level
             quiet: Suppress all output
             force_redownload: Re-download even if files exist
+            allow_synthetic_fallback: Permit synthetic months after download errors at SF >= 0.1
         """
         super().__init__(**kwargs)
 
@@ -181,12 +223,25 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self.output_dir = Path(output_dir)
         self.seed = seed if seed is not None else 42
         self.force_redownload = force_redownload
+        self.allow_synthetic_fallback = allow_synthetic_fallback
         self.logger = logger
         verbosity_settings = compute_verbosity(verbose, quiet)
         self.apply_verbosity(verbosity_settings)
         self._rng = random.Random(self.seed)
         self._num_months = _scale_to_months(scale_factor)
         self._months = _months_sequence(self._num_months)
+        if len(self._months) < self._num_months:
+            # Gaps in the provider archive (see unavailable_months in the
+            # downloader spec) mean fewer months are downloadable than the
+            # scale factor requests. Report the effective count so manifests
+            # and logs describe the corpus that was actually generated.
+            logger.warning(
+                "FlightData: only %d of %d requested months are available; "
+                "corpus is capped at the downloadable window.",
+                len(self._months),
+                self._num_months,
+            )
+            self._num_months = len(self._months)
         self._stats: dict[str, Any] = {
             "source": "bts-transtats",
             "scale_factor": scale_factor,
@@ -194,6 +249,8 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "months": list(self._months),
             "months_downloaded": 0,
             "months_synthetic": 0,
+            "downloaded_months": [],
+            "synthetic_months": [],
             "total_flights": 0,
         }
         self._table_row_counts: dict[str, int] = {}
@@ -222,6 +279,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         )
         return {
             "source": source,
+            "months_downloaded": downloaded_count,
+            "months_synthetic": synthetic_count,
+            "downloaded_months": list(self._stats["downloaded_months"]),
+            "synthetic_months": list(self._stats["synthetic_months"]),
             "expected_sha256": expected,
             "observed_sha256": observed,
             "promotion_eligible": eligible,
@@ -251,7 +312,15 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 )
                 self.force_redownload = True
             else:
-                self._restore_persisted_provenance()
+                try:
+                    persisted_manifest = load_manifest(self.output_dir / MANIFEST_FILENAME)
+                except (OSError, ValueError):
+                    persisted_manifest = {}
+                if self.manifest_matches_source_identity(persisted_manifest):
+                    self._restore_persisted_provenance()
+                else:
+                    logger.warning("FlightData cache lacks complete month provenance; regenerating")
+                    self.force_redownload = True
 
         flights_path = self.output_dir / self.get_compressed_filename("flights.csv")
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
@@ -271,7 +340,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
 
         try:
             flight_files = self._ensure_flights_data(flights_path)
-        except ChecksumMismatchError:
+        except (ChecksumMismatchError, RuntimeError):
             self.force_redownload = True
             self._remove_flights_outputs(flights_path)
             with contextlib.suppress(OSError):
@@ -764,17 +833,27 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         # network calls in CI/testing. Users wanting real data should use SF >= 0.1.
         if self.scale_factor < 0.1:
             self._stats["months_synthetic"] += 1
+            self._stats["synthetic_months"].append(f"{year}-{month:02d}")
             return self._generate_synthetic_month(writer, year, month, start_id)
 
         url = BTS_BASE_URL.format(year=year, month=month)
         try:
             rows = self._download_bts_month(writer, url, year, month, start_id)
             self._stats["months_downloaded"] += 1
+            self._stats["downloaded_months"].append(f"{year}-{month:02d}")
             return rows
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, zipfile.BadZipFile) as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, zipfile.BadZipFile, ValueError) as e:
+            # ValueError covers archive/content parsing failures: a valid ZIP
+            # with no CSV, and UnicodeDecodeError (a ValueError subclass) from
+            # undecodable rows. Without this, those errors bypass the fallback
+            # and the top-level cleanup, leaving partial output beside the old
+            # manifest, which a later run could mislabel as complete.
+            if not self.allow_synthetic_fallback:
+                raise RuntimeError(f"BTS download failed for {year}-{month:02d}; real data is required") from e
             logger.warning(f"BTS download failed for {year}-{month:02d}: {e}. Using synthetic data.")
             rows = self._generate_synthetic_month(writer, year, month, start_id)
             self._stats["months_synthetic"] += 1
+            self._stats["synthetic_months"].append(f"{year}-{month:02d}")
             return rows
 
     def _download_bts_month(self, writer: csv.writer, url: str, year: int, month: int, start_id: int) -> int:
@@ -1116,6 +1195,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "source": "bts-transtats",
             "base_url": BTS_BASE_URL,
             "csv_encoding": BTS_CSV_ENCODING,
+            "allow_synthetic_fallback": self.allow_synthetic_fallback,
             "months": list(self._months),
             "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
             "expected_sha256": {
@@ -1133,6 +1213,30 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         """
         canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def manifest_matches_source_identity(self, manifest: dict[str, Any]) -> bool:
+        """Require a complete month partition under the active source policy."""
+        if manifest.get("source_contract_id") != self.source_contract_id():
+            return False
+        provenance = manifest.get("source_provenance")
+        if not isinstance(provenance, dict):
+            return False
+        expected = {f"{year}-{month:02d}" for year, month in self._months}
+        downloaded = provenance.get("downloaded_months")
+        synthetic = provenance.get("synthetic_months")
+        if not isinstance(downloaded, list) or not isinstance(synthetic, list):
+            return False
+        if not all(isinstance(month, str) for month in downloaded + synthetic):
+            return False
+        if len(downloaded) + len(synthetic) != len(expected) or set(downloaded) & set(synthetic):
+            return False
+        if set(downloaded + synthetic) != expected:
+            return False
+        if provenance.get("months_downloaded") != len(downloaded):
+            return False
+        if provenance.get("months_synthetic") != len(synthetic):
+            return False
+        return self.scale_factor < 0.1 or self.allow_synthetic_fallback or not synthetic
 
     def _persisted_source_contract_id(self) -> str | None:
         """Return the contract id recorded in the existing manifest, if any."""
@@ -1155,11 +1259,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             self._content_hashes = {str(url): str(digest) for url, digest in hashes.items()}
         provenance = manifest.get("source_provenance")
         if isinstance(provenance, dict):
-            source = provenance.get("source")
-            if source in {"synthetic", "mixed"}:
-                self._stats["months_synthetic"] = self._num_months
-            if source in {"remote", "mixed"}:
-                self._stats["months_downloaded"] = len(self._content_hashes)
+            for count_key, list_key in (
+                ("months_synthetic", "synthetic_months"),
+                ("months_downloaded", "downloaded_months"),
+            ):
+                months = provenance.get(list_key)
+                if isinstance(months, list) and all(isinstance(value, str) for value in months):
+                    self._stats[list_key] = months
+                    self._stats[count_key] = len(months)
 
     def get_download_stats(self) -> dict[str, Any]:
         """Return statistics about the download operation."""

@@ -12,13 +12,18 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import hashlib
 import json
 import logging
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
+
+from benchbox.core.primitives_benchmark_utils import failed_platform_error
 
 from .interface import BenchmarkTunings, TableTuning, TuningColumn, TuningType, UnifiedTuningConfiguration
 
 logger = logging.getLogger(__name__)
+
+NO_TUNING_METADATA_ERROR = "No tuning metadata found in database"
 
 # The subset of TuningType values that _rebuild_tunings_from_records knows how
 # to place into a TableTuning (column-based, per-table tunings). Any other
@@ -183,6 +188,7 @@ class TuningMetadataManager:
         platform_adapter,
         database_name: Optional[str] = None,
         connection_config: Optional[dict[str, Any]] = None,
+        connection: Any = None,
     ):
         """Initialize the metadata manager.
 
@@ -190,15 +196,41 @@ class TuningMetadataManager:
             platform_adapter: Database platform adapter instance
             database_name: Optional database name for isolation
             connection_config: Exact connection settings used by validation
+            connection: Optional live connection to reuse. When supplied, every
+                metadata statement runs on it and the manager never opens (or
+                closes) its own connection -- this keeps mid-run metadata I/O
+                from re-entering database create/drop decisions. When omitted,
+                one guarded temporary connection is opened per operation.
         """
         self.platform_adapter = platform_adapter
         self.database_name = database_name
         self.connection_config = dict(connection_config or {})
+        self._shared_connection = connection
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None  # Cache for table existence check
         self.last_load_error: str | None = None
         self.marker_save_failed = False
+
+    @contextmanager
+    def _managed_connection(self) -> Iterator[Any]:
+        """Yield the connection metadata statements must use.
+
+        The caller-provided run connection wins; it is yielded as-is and never
+        closed here. Otherwise a single temporary connection is opened under
+        the adapter's non-destructive guard (when the adapter offers one) so
+        even the fallback path cannot re-enter create/drop handling mid-run.
+        """
+        if self._shared_connection is not None:
+            yield self._shared_connection
+            return
+        guard = getattr(self.platform_adapter, "non_destructive_connection_context", None)
+        with ExitStack() as stack:
+            if guard is not None:
+                stack.enter_context(guard())
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
+            stack.callback(self.platform_adapter.close_connection, temp_conn)
+            yield temp_conn
 
     def _connection_kwargs(self) -> dict[str, Any]:
         """Use the validated database name instead of silently falling back to another database."""
@@ -225,6 +257,8 @@ class TuningMetadataManager:
                 code = getattr(current, "sqlstate", None) or getattr(current, "pgcode", None)
                 errno = getattr(current, "errno", None) or getattr(current, "code", None)
                 if code == "42P01" or errno in {60, 1146}:
+                    return True
+                if "sqlstate: 42p01" in message:
                     return True
                 if any(
                     phrase in message
@@ -385,11 +419,8 @@ class TuningMetadataManager:
         FROM {self._metadata_table_name}
         WHERE table_name = '{self._SECTION_MARKER_TABLE}'
         """
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            rows = self._fetch_all(temp_conn, query_sql)
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+        with self._managed_connection() as conn:
+            rows = self._fetch_all(conn, query_sql)
 
         return dict(rows)
 
@@ -491,17 +522,15 @@ class TuningMetadataManager:
 
             self.logger.info(f"Creating tuning metadata table: {self._metadata_table_name}")
 
-            # Create temporary connection for schema operations
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, create_sql)
+            # Run schema operations on the shared run connection when one was
+            # supplied; otherwise a single guarded temporary connection.
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, create_sql)
 
                 # Create index for performance
                 index_sql = self._get_create_index_sql()
                 if index_sql:
-                    self._execute_sql(temp_conn, index_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+                    self._execute_sql(conn, index_sql)
 
             self._table_exists = True
             return True
@@ -709,6 +738,25 @@ class TuningMetadataManager:
             result.add_error(f"Validation failed with error: {e}")
             return result
 
+    def _format_literal(self, value: Any) -> str:
+        """Render a value as an inline SQL literal for job-style clients.
+
+        Only the tuning-metadata INSERT path uses this: job-style clients
+        such as BigQuery accept no ``?`` placeholders, so values are inlined
+        into the statement the adapter qualifies. Strings are single-quoted
+        with embedded quotes doubled; datetimes use ISO format; booleans
+        render as TRUE/FALSE; None renders as NULL.
+        """
+        if value is None:
+            return "NULL"
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, (int, float)):
+            return str(value)
+        if isinstance(value, datetime):
+            return f"'{value.isoformat()}'"
+        return "'" + str(value).replace("'", "''") + "'"
+
     def _batch_insert_records(self, records: list[TuningMetadata]) -> None:
         """Insert metadata records in batch."""
         if not records:
@@ -738,14 +786,29 @@ class TuningMetadataManager:
             )
 
         # Execute batch insert - handle platforms that don't support batch operations
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            cursor = temp_conn.cursor()
+        with self._managed_connection() as conn:
+            if not hasattr(conn, "cursor"):
+                # Job-style clients (BigQuery) expose query() instead of a
+                # DBAPI cursor and accept no ? placeholders: run one
+                # qualified INSERT per record through the adapter so the
+                # table resolves and values are inlined safely.
+                for params in param_lists:
+                    values = ", ".join(self._format_literal(value) for value in params)
+                    insert_sql = f"""
+        INSERT INTO {self._metadata_table_name}
+        (table_name, tuning_type, column_name, column_order,
+         configuration_hash, created_at, platform)
+        VALUES ({values})
+        """
+                    self._execute_sql(conn, insert_sql)
+                return
+            cursor = conn.cursor()
             for params in param_lists:
-                cursor.execute(insert_sql, params)
-            temp_conn.commit()
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+                res = cursor.execute(insert_sql, params)
+                target = res if res is not None else cursor
+                if (err := failed_platform_error(target)) is not None:
+                    raise RuntimeError(f"Failed to insert tuning metadata: {err}")
+            conn.commit()
 
     def load_tunings(self, benchmark_name: Optional[str] = None) -> Optional[BenchmarkTunings]:
         """Load tuning configuration from metadata table.
@@ -769,11 +832,8 @@ class TuningMetadataManager:
             ORDER BY table_name, tuning_type, column_order
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                results = self._fetch_all(temp_conn, query_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                results = self._fetch_all(conn, query_sql)
             if not results:
                 return None
 
@@ -793,13 +853,10 @@ class TuningMetadataManager:
         try:
             # Try to query the table
             query_sql = f"SELECT COUNT(*) FROM {self._metadata_table_name} LIMIT 1"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._fetch_one(temp_conn, query_sql)
+            with self._managed_connection() as conn:
+                self._fetch_one(conn, query_sql)
                 self._table_exists = True
                 return True
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
         except Exception as exc:
             if not self._is_missing_metadata_table_error(exc):
                 self.last_load_error = str(exc)
@@ -896,7 +953,7 @@ class TuningMetadataManager:
                 if self.last_load_error:
                     result.add_error(f"Failed to load tuning metadata: {self.last_load_error}")
                 else:
-                    result.add_error("No tuning metadata found in database")
+                    result.add_error(NO_TUNING_METADATA_ERROR)
                 return result
 
             # Compare configurations
@@ -994,13 +1051,12 @@ class TuningMetadataManager:
             if not self._table_exists_check():
                 return True  # Nothing to clear
 
-            # Delete all records (could be filtered by benchmark_name if we stored it)
-            delete_sql = f"DELETE FROM {self._metadata_table_name}"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, delete_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            # Delete all records (could be filtered by benchmark_name if we stored it).
+            # BigQuery rejects WHERE-less DELETE, so spell the full-table
+            # clear in a form every engine accepts.
+            delete_sql = f"DELETE FROM {self._metadata_table_name} WHERE TRUE"
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, delete_sql)
 
             self.logger.info("Cleared tuning metadata")
             return True
@@ -1035,11 +1091,8 @@ class TuningMetadataManager:
             WHERE table_name != '{self._SECTION_MARKER_TABLE}'
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                result = self._fetch_one(temp_conn, summary_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                result = self._fetch_one(conn, summary_sql)
             if result:
                 return {
                     "table_exists": True,
@@ -1069,7 +1122,14 @@ class TuningMetadataManager:
         """
         # Use platform adapter's query execution method
         if hasattr(self.platform_adapter, "execute_query"):
+            if not hasattr(connection, "cursor"):
+                # Job-style clients bypass the adapter's DDL qualification
+                # for reads; writes take the same path so INSERT and DELETE
+                # resolve the qualified table the creation path wrote.
+                sql = self._qualify_metadata_read_sql(sql)
             result = self.platform_adapter.execute_query(connection, sql, "metadata")
+            if (err := failed_platform_error(result)) is not None:
+                raise RuntimeError(f"Tuning metadata execution failed: {err}")
             return result.get("result")
         else:
             # Fall back to direct connection execution
@@ -1079,10 +1139,29 @@ class TuningMetadataManager:
             else:
                 cursor.execute(sql)
 
+            if (err := failed_platform_error(cursor)) is not None:
+                raise RuntimeError(f"Tuning metadata execution failed: {err}")
+
             try:
                 return cursor.fetchall()
             except Exception:
                 return None
+
+    def _qualify_metadata_read_sql(self, sql: str) -> str:
+        """Qualify a metadata SELECT for job-style connections.
+
+        The query()-job branch bypasses the adapter's execute_query(), which
+        is the path that qualifies and uppercases identifiers (BigQuery
+        creation routes through _convert_to_bigquery_table ->
+        _qualify_table_target, and reads through _qualify_table_names; the
+        connection itself carries no default dataset). Run reads through the
+        same adapter qualification when it is reachable so SELECTs resolve
+        the qualified uppercased table that creation wrote.
+        """
+        qualify = getattr(self.platform_adapter, "_qualify_table_names", None)
+        if callable(qualify):
+            return qualify(sql)
+        return sql
 
     def _fetch_all(self, connection, sql: str) -> list[tuple]:
         """Fetch all results from a SELECT query.
@@ -1098,10 +1177,26 @@ class TuningMetadataManager:
         # DBAPI cursor. Prefer their native execute() result before falling
         # back to the cursor contract used by DBAPI adapters.
         if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
-            return list(connection.execute(sql))
+            res = connection.execute(sql)
+            if (err := failed_platform_error(res)) is not None:
+                raise RuntimeError(f"Tuning metadata query failed: {err}")
+            return list(res)
+
+        # Job-style clients such as BigQuery expose neither cursor() nor
+        # execute(): statements run as jobs via query(). Consume the job
+        # result the same way so tuning metadata reads work there too.
+        # Qualify through the adapter first: the job connection carries no
+        # default dataset, and creation qualified/uppercased the table via
+        # execute_query(), so raw unqualified lowercase reads would miss it.
+        if not hasattr(connection, "cursor"):
+            query_fn = getattr(connection, "query", None)
+            if callable(query_fn):
+                return list(query_fn(self._qualify_metadata_read_sql(sql)).result())
 
         cursor = connection.cursor()
         cursor.execute(sql)
+        if (err := failed_platform_error(cursor)) is not None:
+            raise RuntimeError(f"Tuning metadata query failed: {err}")
         return cursor.fetchall()
 
     def _fetch_one(self, connection, sql: str) -> Optional[tuple]:
@@ -1115,9 +1210,22 @@ class TuningMetadataManager:
             Single result tuple or None
         """
         if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
-            rows = list(connection.execute(sql))
+            res = connection.execute(sql)
+            if (err := failed_platform_error(res)) is not None:
+                raise RuntimeError(f"Tuning metadata query failed: {err}")
+            rows = list(res)
             return rows[0] if rows else None
+
+        # Job-style clients such as BigQuery expose neither cursor() nor
+        # execute(): statements run as jobs via query() (see _fetch_all).
+        if not hasattr(connection, "cursor"):
+            query_fn = getattr(connection, "query", None)
+            if callable(query_fn):
+                rows = list(query_fn(self._qualify_metadata_read_sql(sql)).result())
+                return rows[0] if rows else None
 
         cursor = connection.cursor()
         cursor.execute(sql)
+        if (err := failed_platform_error(cursor)) is not None:
+            raise RuntimeError(f"Tuning metadata query failed: {err}")
         return cursor.fetchone()

@@ -248,17 +248,8 @@ class TestThroughputExecution:
 
 
 class TestThroughputReferenceSeedContext:
-    """tpch-throughput-seed-validation-fix w2/w3: _execute_stream() must tell
-    QueryValidator, per query, whether that query's derived seed
-    (seed + stream_id*1000 + position) matches the pinned reference seed for
-    its scale factor -- see
-    benchbox.core.validation.query_validation.set_reference_seed_context().
-    Per-position offsetting means this is essentially only ever True for
-    stream 0's first query (position 0) -- see w1 notes."""
-
-    def test_reference_seed_context_true_only_for_stream0_position0(self) -> None:
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
+    @pytest.mark.parametrize("seed", [42, 17039360])
+    def test_reference_seed_context_false_at_every_position(self, seed: int) -> None:
         benchmark = _make_benchmark_mock()
         connections: list[Mock] = []
         factory = _make_connection_factory(connections)
@@ -270,28 +261,7 @@ class TestThroughputReferenceSeedContext:
             "benchbox.core.tpch.throughput_test.set_reference_seed_context",
             side_effect=lambda v: calls.append(v),
         ):
-            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
-
-        assert len(calls) == 22
-        assert calls[0] is True  # position 0: seed + 0*1000 + 0 == reference seed
-        assert all(v is False for v in calls[1:])  # every other position diverges
-
-    def test_reference_seed_context_false_for_default_base_seed(self) -> None:
-        """Default base_seed=42 never coincides with the reference seed at
-        any position -- the throughput driver's default config is always
-        non-reference (matches w0's live repro)."""
-        benchmark = _make_benchmark_mock()
-        connections: list[Mock] = []
-        factory = _make_connection_factory(connections)
-
-        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=1)
-
-        calls: list[bool] = []
-        with patch(
-            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
-            side_effect=lambda v: calls.append(v),
-        ):
-            test._execute_stream(stream_id=0, seed=test.config.base_seed, config=test.config)
+            test._execute_stream(stream_id=0, seed=seed, config=test.config)
 
         assert len(calls) == 22
         assert all(v is False for v in calls)
@@ -308,42 +278,7 @@ class TestThroughputReferenceSeedContext:
 
         assert mock_clear.call_count == 22
 
-    def test_no_reference_seed_at_non_sf1_scale_factor(self) -> None:
-        """No pinned reference seed exists below SF=1.0 -- every query is
-        tagged non-reference regardless of the seed chosen."""
-        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
-
-        benchmark = _make_benchmark_mock()
-        connections: list[Mock] = []
-        factory = _make_connection_factory(connections)
-
-        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=0.01, num_streams=1)
-
-        calls: list[bool] = []
-        with patch(
-            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
-            side_effect=lambda v: calls.append(v),
-        ):
-            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
-
-        assert len(calls) == 22
-        assert all(v is False for v in calls)
-
     def test_boundary_query_not_failed_on_stream1_with_default_seed_at_sf1(self) -> None:
-        """End-to-end regression for the w0 defect: at SF=1.0 with the
-        default base_seed, every stream/position derives a non-reference seed
-        (base_seed 42 never lands on the pinned reference), so Q11/16/18/20 are
-        relaxed from EXACT to their RANGE/LOOSE bounds and must not come back
-        FAILED on ANY stream. The test deliberately supplies in-bounds counts
-        for those four queries and an invalid count for the remaining
-        EXACT-mode queries.
-
-        Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
-        QueryValidator stack via a connection_factory whose raw cursor
-        deliberately returns query-specific counts so the OTHER
-        (non-boundary) 18 queries genuinely fail their EXACT checks while
-        Q11/16/18/20 exercise their relaxed bounds.
-        """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 

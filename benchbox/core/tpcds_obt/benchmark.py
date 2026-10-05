@@ -12,6 +12,7 @@ from benchbox.base import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,13 @@ class TPCDSOBTBenchmark(BaseBenchmark):
     while OBT-specific transformations are stored separately.
     """
 
+    # OBT generates its own output table from TPC-DS source data, so the CLI
+    # must not redirect its output_dir to the shared TPC-DS root: that would
+    # hide the generated OBT parquet from the cloud loader.
+    GENERATES_OWN_OUTPUT = True
+    # Every query reads this table; the TPC-DS source tables only feed its build.
+    REQUIRED_LOADED_TABLES = ("tpcds_sales_returns_obt",)
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -169,15 +177,17 @@ class TPCDSOBTBenchmark(BaseBenchmark):
 
         # Determine standard paths via the shared helper so BENCHBOX_OUTPUT_DIR is
         # honored; falls back to Path.cwd()/benchmark_runs/datagen when unset.
-        # OBT output directory (for transformed OBT table)
+        # OBT output directory (for transformed OBT table). normalize_output_dir
+        # keeps a CloudStagingPath/DatabricksPath handler intact; Path(...)
+        # would stringify it to the local cache and drop the cloud target.
         if output_dir:
-            self.output_dir = Path(output_dir)
+            self.output_dir = normalize_output_dir(output_dir)
         else:
             self.output_dir = get_benchmark_runs_datagen_path("tpcds_obt", scale_factor)
 
         # TPC-DS source directory (for base TPC-DS data)
         if tpcds_source_dir:
-            self.tpcds_source_dir = Path(tpcds_source_dir)
+            self.tpcds_source_dir = normalize_output_dir(tpcds_source_dir)
         else:
             self.tpcds_source_dir = get_benchmark_runs_datagen_path("tpcds", scale_factor)
 
@@ -510,27 +520,62 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         return {table.name: table}
 
     def get_create_tables_sql(self, dialect: str = "standard", tuning_config=None) -> str:
-        """Generate DDL for creating the OBT table.
+        """Generate DDL for creating the OBT table plus its TPC-DS source tables.
 
         Args:
             dialect: Target SQL dialect for the DDL.
             tuning_config: Optional tuning configuration (accepted for API compatibility,
-                not currently used by OBT benchmark).
+                forwarded to the TPC-DS source-table DDL; not used by the OBT table itself).
 
         Returns:
-            DDL SQL string for creating the OBT table.
+            DDL SQL string creating the 25 TPC-DS source tables (needed because
+            cloud loaders resolve data files from ``self.tables``, which holds
+            the per-table source files after datagen) followed by the OBT table.
         """
+        from benchbox.core.tpcds.schema import get_create_all_tables_sql
         from benchbox.core.tpcds_obt import schema
         from benchbox.utils.dialect_utils import translate_sql_query
 
+        enable_primary_keys = tuning_config.primary_keys.enabled if tuning_config else False
+        enable_foreign_keys = tuning_config.foreign_keys.enabled if tuning_config else False
+        source_ddl = get_create_all_tables_sql(
+            enable_primary_keys=enable_primary_keys,
+            enable_foreign_keys=enable_foreign_keys,
+        )
+        # Cloud runs reuse the TPC-DS database/schema via get_data_source_benchmark(),
+        # so plain CREATE TABLE would fail against already-loaded source tables.
+        # IF NOT EXISTS is accepted by every cloud target (BigQuery, Snowflake,
+        # Databricks, Redshift, Synapse) and keeps reruns idempotent.
+        source_ddl = re.sub(
+            r"(?im)^CREATE TABLE (?!IF NOT EXISTS )",
+            "CREATE TABLE IF NOT EXISTS ",
+            source_ddl,
+        )
         # Note: tuning_config is accepted for API compatibility but OBT uses a fixed schema
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
+            # Translate statement-by-statement: sqlglot.transpile returns only
+            # the first element for multi-statement input, which would drop
+            # 24 of the 25 source tables (datavault follows the same pattern).
+            source_statements = [stmt.strip() for stmt in source_ddl.split(";") if stmt.strip()]
+            source_ddl = (
+                ";\n\n".join(
+                    translate_sql_query(
+                        stmt,
+                        target_dialect=target,
+                        source_dialect="standard",
+                        identify=True,
+                        scope="schema_ddl",
+                    )
+                    for stmt in source_statements
+                )
+                + ";"
+            )
             ddl = translate_sql_query(
                 ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
             )
-        return ddl
+        return f"{source_ddl}\n\n{ddl}"
 
     def __enter__(self) -> TPCDSOBTBenchmark:
         return self

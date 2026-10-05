@@ -588,8 +588,15 @@ class _StubTPCDSQueryManager:
         return "SELECT 1"
 
 
-def test_tpcds_dataframe_requires_variant_parity_in_mixin():
-    """Mixin path should fail when TPC-DS variants are missing in DataFrame registry."""
+def test_tpcds_dataframe_requires_variant_parity_in_mixin(monkeypatch):
+    from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
+
+    original_get = TPCDS_DATAFRAME_QUERIES.get
+    monkeypatch.setattr(
+        TPCDS_DATAFRAME_QUERIES,
+        "get",
+        lambda query_id: None if str(query_id).lower() == "q14b" else original_get(query_id),
+    )
     adapter = DummyAdapter()
     config = BenchmarkConfig(
         name="tpcds",
@@ -731,3 +738,23 @@ class TestHandleNoQueries:
                 benchmark_id="tpcds_obt",
                 query_filter=None,
             )
+
+
+class TestResolveColumnNamesAndDelimiter:
+    """The csv_delimiter override must be a real string, never Mock pollution."""
+
+    def _config(self):
+        return BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
+
+    def test_mock_benchmark_delimiter_is_ignored(self):
+        """getattr on a Mock fabricates a child mock; it must not become the delimiter."""
+        adapter = DummyAdapter()
+        _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), MagicMock())
+        assert delimiter is None
+
+    def test_string_benchmark_delimiter_is_kept(self):
+        """A real benchmark-declared delimiter still flows through."""
+        adapter = DummyAdapter()
+        benchmark = SimpleNamespace(csv_delimiter=";", tables={})
+        _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), benchmark)
+        assert delimiter == ";"

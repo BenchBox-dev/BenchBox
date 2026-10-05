@@ -13,8 +13,15 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from benchbox.platforms.base.data_loading import DataSource
+from benchbox.platforms.base.validation import SchemaValidator, TuningValidator, ValidationResult
 from benchbox.platforms.databricks import DatabricksAdapter
 from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
+
+
+def _first_copy_sql(cursor) -> str:
+    """Return the first COPY INTO statement executed; column resolution may DESCRIBE first."""
+    return next(str(c.args[0]) for c in cursor.execute.call_args_list if "COPY INTO" in str(c.args[0]))
+
 
 pytestmark = [
     pytest.mark.unit,
@@ -354,6 +361,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_databricks_sql.connect.return_value = mock_connection
 
         adapter = DatabricksAdapter(
@@ -371,15 +379,112 @@ class TestDatabricksAdapter:
         assert connection == mock_connection
         mock_databricks_sql.connect.assert_called_once()
 
-        # Check catalog was set (schema is set in create_schema(), not here)
+        # Check catalog and schema context were set on the connection itself
+        # (pooled connections never pass through create_schema())
         expected_calls = [
             call("USE CATALOG test_catalog"),
             call("SELECT 1"),  # Connection test
+            call("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema"),
+            call("USE SCHEMA test_schema"),
         ]
         for expected_call in expected_calls:
             mock_cursor.execute.assert_any_call(expected_call.args[0])
 
-        # Note: cursor is not closed in create_connection - connection stays open
+        mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_skips_create_schema_when_reused(self, mock_databricks_sql):
+        """Reused catalogs/schemas must connect with USE only.
+
+        CREATE SCHEMA IF NOT EXISTS is still authorized when the schema
+        exists, so principals with USE SCHEMA but no catalog-level
+        CREATE SCHEMA would fail every reconnect. USE CATALOG + USE SCHEMA
+        still run on every connection for pooled-connection correctness.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            for reused, expect_create in ((True, False), (False, True)):
+                mock_cursor.reset_mock()
+                adapter.database_was_reused = reused
+                adapter.create_connection()
+
+                executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+                assert "USE CATALOG test_catalog" in executed
+                assert "USE SCHEMA test_schema" in executed
+                assert ("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema" in executed) is expect_create
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_native_compatibility_validation_does_not_create_schema(self, mock_databricks_sql):
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+        )
+        adapter.benchmark_instance = Mock()
+
+        with (
+            patch.object(TuningValidator, "validate", return_value=ValidationResult(is_valid=True)),
+            patch.object(SchemaValidator, "validate", return_value=ValidationResult(is_valid=False)),
+        ):
+            adapter._validate_database_compatibility()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "USE CATALOG test_catalog" in executed
+        assert "USE SCHEMA test_schema" in executed
+        assert not any(sql.startswith("CREATE SCHEMA") for sql in executed)
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_defers_context_when_creating_catalog(self, mock_databricks_sql):
+        """Fresh catalog creation must not select the catalog first.
+
+        When create_catalog is set and the database was not reused,
+        create_schema() owns catalog creation: USE CATALOG would fail with
+        CATALOG_NOT_FOUND before it runs, so the connection issues no
+        context statements at all.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+            create_catalog=True,
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            adapter.database_was_reused = False
+            adapter.create_connection()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "USE CATALOG test_catalog" not in executed
+        assert "USE SCHEMA test_schema" not in executed
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_failure(self, mock_databricks_sql):
@@ -475,8 +580,8 @@ class TestDatabricksAdapter:
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
             assert load_time >= 0
-            assert "TEST_TABLE" in table_stats
-            assert table_stats["TEST_TABLE"] == 100
+            assert "test_table" in table_stats
+            assert table_stats["test_table"] == 100
 
             # Should execute COPY INTO statements without temporary views or insert-select
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -517,7 +622,7 @@ class TestDatabricksAdapter:
 
             stats, load_time, _ = adapter.create_external_tables(benchmark, mock_connection, Path("dbfs:/tmp/data"))
 
-            assert stats["ORDERS"] == 123
+            assert stats["orders"] == 123
             assert load_time >= 0
 
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -546,6 +651,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
 
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
@@ -557,7 +663,7 @@ class TestDatabricksAdapter:
 
         # Should execute cache control setting by default
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-        assert len(execute_calls) == 1, "Should set cache control"
+        assert len(execute_calls) == 2, "Should set and read back cache control"
         assert "use_cached_result = false" in execute_calls[0]
 
         # Should create cursor to apply cache control
@@ -569,6 +675,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
 
         # Create adapter with custom Spark configs
         adapter = DatabricksAdapter(
@@ -599,6 +706,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1, "test"), (2, "test2")]
 
         adapter = DatabricksAdapter(
@@ -638,16 +746,54 @@ class TestDatabricksAdapter:
         assert result["query_id"] == "q1"
         assert result["status"] == "FAILED"
         assert result["rows_returned"] == 0
-        assert result["error"] == "Query failed"
-        assert result["error_type"] == "Exception"
+        assert result["error"] == "Databricks session cache control failed"
+        assert result["error_type"] == "ConfigurationError"
         assert isinstance(result["execution_time_seconds"], float)
 
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_execute_query_splits_multi_statement_batch(self, mock_databricks_sql):
+        """The SQL execution API takes one statement per execute.
+
+        Operation batches (DELETE+INSERT pairs, the 3-statement SCD2 stage
+        batch) run statement-by-statement; the last statement's rows win.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        # Fresh sessions first emit SET use_cached_result = false (session
+        # cache disable), then the batch statements in order.
+        mock_cursor.fetchall.side_effect = [[], [], [(60,)]]
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+        )
+
+        result = adapter.execute_query(
+            mock_connection,
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10; INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+            "q_multi",
+        )
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert executed == [
+            "SET use_cached_result = false",
+            "SET use_cached_result",
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10",
+            "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+        ]
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):
         """TPC power harness passes a per-stream cursor without cursor()."""
         mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         adapter = DatabricksAdapter(
@@ -901,7 +1047,7 @@ class TestDatabricksAdapter:
 
             # Should execute clustering optimization via Z-ORDER
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-            assert any("OPTIMIZE TEST_TABLE ZORDER BY" in call for call in execute_calls)
+            assert any("OPTIMIZE test_table ZORDER BY" in call for call in execute_calls)
 
         mock_cursor.close.assert_called()
 
@@ -1085,6 +1231,80 @@ class TestDatabricksSqlGenerationHelpers:
         assert adapter._get_column_list_for_table(benchmark, "orders") == " (o_orderkey, o_orderdate)"
         assert adapter._get_column_list_for_table(Mock(spec=[]), "orders") == ""
 
+    def _column_list_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+            )
+
+    def test_get_column_list_for_table_reads_schema_table_objects(self):
+        """Data Vault returns Table objects, not dicts; their columns must still resolve."""
+        from benchbox.core.datavault.schema import Column, DataType, Table
+
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "hub_region": Table(
+                "hub_region",
+                [Column("hk_region", DataType.HASHKEY), Column("r_regionkey", DataType.INTEGER)],
+            )
+        }
+
+        assert adapter._get_column_list_for_table(benchmark, "hub_region") == " (hk_region, r_regionkey)"
+
+    def test_get_column_list_for_table_falls_back_to_describe_for_tables_outside_schema(self):
+        """Transaction Primitives and TPC-DS OBT load base tables their get_schema() omits."""
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"txn_orders": {"columns": [{"name": "o_orderkey"}]}}
+        cursor = Mock()
+        cursor.fetchall.return_value = [
+            ("c_custkey", "bigint", None),
+            ("c_name", "string", None),
+            ("", "", ""),
+            ("# Partition Information", "", ""),
+            ("c_name", "string", None),
+        ]
+
+        assert adapter._get_column_list_for_table(benchmark, "customer", cursor) == " (c_custkey, c_name)"
+        cursor.execute.assert_called_once_with("DESCRIBE TABLE CUSTOMER")
+
+    def test_get_column_list_for_table_prefers_schema_over_describe(self):
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"orders": {"columns": [{"name": "o_orderkey"}]}}
+        cursor = Mock()
+
+        assert adapter._get_column_list_for_table(benchmark, "orders", cursor) == " (o_orderkey)"
+        cursor.execute.assert_not_called()
+
+    def test_get_column_list_for_table_warns_when_nothing_resolves(self, caplog):
+        adapter = self._column_list_adapter()
+        cursor = Mock()
+        cursor.execute.side_effect = RuntimeError("table missing")
+
+        with caplog.at_level("WARNING"):
+            assert adapter._get_column_list_for_table(Mock(spec=[]), "orders", cursor) == ""
+        assert "map CSV fields by position" in caplog.text
+
+    @pytest.mark.parametrize(
+        ("benchmark_id", "scale", "table"),
+        [
+            ("tpchavoc", 0.01, "customer"),
+            ("datavault", 0.01, "hub_region"),
+        ],
+    )
+    def test_real_benchmark_schemas_resolve_copy_columns(self, benchmark_id, scale, table):
+        """Guard against schema-shape drift for benchmarks whose loaded tables appear in get_schema()."""
+        from benchbox.core.benchmark_registry import get_benchmark_class
+
+        adapter = self._column_list_adapter()
+        benchmark = get_benchmark_class(benchmark_id)(scale_factor=scale)
+
+        assert adapter._get_column_list_for_table(benchmark, table).startswith(" (")
+
     def test_external_location_from_file_uri_normalizes_wildcard_and_rejects_non_parquet(self):
         assert (
             DatabricksAdapter._external_location_from_file_uri("dbfs:/Volumes/main/benchbox/orders/part-*.parquet")
@@ -1141,7 +1361,7 @@ class TestDatabricksSqlGenerationHelpers:
         assert cursor.execute.call_args_list[0].args[0] == (
             "COPY INTO ORDERS (o_orderkey, o_orderdate) FROM "
             "'dbfs:/Volumes/main/benchbox/data/orders.tbl.1' "
-            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false')"
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false') COPY_OPTIONS('force' = 'true')"
         )
         assert cursor.execute.call_args_list[1].args[0] == "SELECT COUNT(*) FROM ORDERS"
         assert cursor.execute.call_args_list[2].args[0] == "OPTIMIZE ORDERS"
@@ -1195,7 +1415,7 @@ class TestDatabricksSqlGenerationHelpers:
         assert cursor.execute.call_args_list[0].args[0] == (
             "COPY INTO HITS (WatchID) FROM "
             "'dbfs:/Volumes/main/benchbox/data/hits.csv.gz' "
-            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false', 'nullValue'='__NULL__')"
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false', 'nullValue'='__NULL__') COPY_OPTIONS('force' = 'true')"
         )
 
     def test_vacuum_table_executes_delta_maintenance(self):
@@ -1299,6 +1519,52 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t (a INT) USING DELTA")
         assert result.count("USING DELTA") == 1
+
+    def test_ctas_places_using_delta_before_as_select(self):
+        """CTAS has no column list: USING DELTA precedes AS SELECT.
+
+        Scanning for the column-list close paren lands inside the query
+        (a subquery close paren) or appends at the end, both invalid.
+        """
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM (SELECT 1 AS id) s")
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
+        assert ") USING DELTA" not in result
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
+
+    def test_ctas_tblproperties_precede_as_select(self):
+        """Table clauses must sit before the terminal AS query on CTAS."""
+        adapter = self._make_adapter(delta_auto_optimize=True)
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        props_idx = result.index("TBLPROPERTIES")
+        select_idx = result.index("AS SELECT")
+        assert props_idx < select_idx
+        assert "SELECT 1 AS id TBLPROPERTIES" not in result
+
+    def test_ctas_with_join_using_keeps_using_delta(self):
+        """JOIN ... USING (cols) is not a format clause: USING DELTA stays."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM a JOIN b USING (id)")
+        assert "USING DELTA" in result
+        assert "USING (id)" in result
+
+    def test_using_named_columns_do_not_suppress_using_delta(self):
+        """Columns named using_* must not read as a format clause."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (id INT, using_status STRING)")
+        assert "USING DELTA" in result
+
+    def test_cte_ctas_places_clauses_before_with(self):
+        """CTE-based CTAS anchors clauses before AS WITH, not in the CTE."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS WITH cte AS (SELECT 1 AS id) SELECT * FROM cte")
+        using_idx = result.index("USING DELTA")
+        with_idx = result.index("AS WITH")
+        assert using_idx < with_idx
+        assert "(SELECT 1 AS id) USING DELTA" not in result
 
     def test_adds_tblproperties_for_auto_optimize(self):
         adapter = self._make_adapter(delta_auto_optimize=True)
@@ -2071,6 +2337,9 @@ class TestUnityCatalogNaming:
         calls = [c.args[0] for c in cursor.execute.call_args_list]
         assert "CREATE CATALOG IF NOT EXISTS new_catalog" in calls
         assert "CREATE SCHEMA IF NOT EXISTS new_catalog.new_schema" in calls
+        # One-shot creation state clears so later connections take the
+        # normal USE CATALOG / USE SCHEMA path instead of deferring again.
+        assert adapter.create_catalog is False
 
 
 class TestCopyIntoSqlGeneration:
@@ -2108,7 +2377,7 @@ class TestCopyIntoSqlGeneration:
                 {"lineitem"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "COPY INTO LINEITEM" in copy_sql
         assert "'delimiter'='|'" in copy_sql
         assert "'header'='false'" in copy_sql
@@ -2132,7 +2401,7 @@ class TestCopyIntoSqlGeneration:
                 {"customers"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "COPY INTO CUSTOMERS" in copy_sql
         assert "'delimiter'=','" in copy_sql
 
@@ -2155,7 +2424,7 @@ class TestCopyIntoSqlGeneration:
                 {"region"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "'dbfs:/Volumes/main/bench/data/region.tbl'" in copy_sql
 
     def test_copy_into_with_wildcard_for_sharded(self):

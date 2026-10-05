@@ -1,7 +1,7 @@
 # Results Explorer browser CI - lane status
 
-**Audience:** Maintainers watching `.github/workflows/results-explorer-browser.yml`
-and anyone triaging a red or advisory browser-lane check on a PR.
+**Audience:** Maintainers watching the `explorer-e2e` job in `.github/workflows/ci.yml`
+and anyone triaging a red or nightly browser-lane check on a PR.
 **Companion docs:** [`docs/development/browser-test-architecture.md`](../development/browser-test-architecture.md)
 (why the suite is shaped this way) and
 [`docs/development/results-explorer-browser-testing.md`](../development/results-explorer-browser-testing.md)
@@ -13,36 +13,39 @@ and anyone triaging a red or advisory browser-lane check on a PR.
 
 **Decision: the Chromium full suite gates merges.** The job name
 `Chromium (full suite, blocking)` is truthful: Chromium is not
-`continue-on-error`, and its result feeds a required status check on
-`develop`.
+`continue-on-error`, and its result feeds the `explorer` unit, which is a
+required status check on `develop`.
 
 ### How the gate actually blocks
 
-Merge blocking is **not** wired through `ci-required-result` in
-`.github/workflows/pr.yml`. Cross-workflow `needs` is not a GitHub Actions
-feature, so the browser suite cannot be a subordinate of that umbrella.
-It is wired through the develop branch ruleset instead:
+The suite is the `explorer-e2e` job in `.github/workflows/ci.yml`. It is a
+direct `needs` of the `explorer` unit job, and the `explorer` context is
+required by the develop branch ruleset:
 
 | Piece | Value |
 |-------|--------|
 | Ruleset | `develop-squash-only` (resolve by name; current id `15611785` until a transfer) |
-| Required context | `Results Explorer browser gate` |
-| Gate job | `browser-required-result` in `results-explorer-browser.yml` |
-| Gate inputs | `needs: [explorer-changes, chromium]`, `if: always()` |
+| Required context | `explorer` |
+| Unit job | `explorer` in `ci.yml`, `if: always()` |
+| Unit inputs | `explorer-tokens`, `explorer-vitest`, `parity-check`, `explorer-e2e`, `visual-inputs` |
 
-The gate job, not the Chromium job itself, holds the required context.
-Chromium is path-gated via `explorer-changes` and is skipped when nothing
-explorer-relevant changed; a required check that never reports leaves a PR
-unmergeable forever. The gate therefore always runs and:
+The `public-site-visual-regression` job still runs and uploads its report, but it
+is advisory until the public site is in production and feeds no required context.
 
-- **passes** when Chromium succeeded, or when change detection said the
-  suite was not needed (`needed=false` and Chromium was legitimately skipped);
-- **fails closed** if Chromium failed/cancelled, if Chromium was skipped while
-  `needed=true`, or if `explorer-changes` itself did not succeed.
+The unit job, not the Chromium job itself, holds the required context.
+`explorer-e2e` runs when the `ci-paths` classifier maps a changed path to the
+`explorer` unit (`.github/ci-units.yml`) and is skipped otherwise; a required
+check that never reports would leave a PR unmergeable forever. The unit job
+therefore always runs, and `scripts/ci_unit_result.py` decides its result:
 
-Firefox and WebKit remain advisory (`non-blocking` in the job name,
-`continue-on-error: true`) and are deliberately absent from the gate job's
-`needs`. Promote them only via the graduation path below.
+- **passes** when every job the unit requires succeeded, or when no path
+  touched the unit and its jobs were legitimately skipped;
+- **fails closed** if Chromium failed or was cancelled, or if Chromium was
+  skipped while the unit was touched.
+
+Firefox and WebKit are not part of the pull-request or merge-queue run. They
+run as the `t3:browser` matrix in `nightly.yml` and are advisory. Promote them
+only via the graduation path below.
 
 Live ruleset confirmation:
 
@@ -52,20 +55,20 @@ gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | select(.name=="develop-s
   --jq '.rules[]|select(.type=="required_status_checks")'
 ```
 
-Expect both `ci-required-result` and `Results Explorer browser gate` in
-`required_status_checks`. Unit tests under
-`tests/unit/workflows/test_results_explorer_browser_gate.py` pin the
-workflow-local half of the name/wiring agreement (Chromium not
-`continue-on-error`, gate depends on Chromium, documented context string);
-the live ruleset membership is the admin half.
+Expect `explorer` among the six contexts in `required_status_checks`.
+`scripts/ruleset_drift_check.py` pins that set against the live ruleset (the
+admin half). `tests/system/test_ci_lint_parity.py` pins the commands the
+`explorer-e2e` job runs, and `tests/unit/scripts/test_ci_units.py` and
+`test_ci_unit_result.py` pin the unit ownership and pass/fail rule (the
+workflow-local half).
 
 ### Historical note
 
-The Chromium job advertised "blocking" before the ruleset required the gate
-context. That name-without-wiring defect is closed: the required check and
-the always-running gate job exist, and recent browser workflow runs are
-green. Do **not** rename Chromium away from "blocking" while it still feeds
-the required gate — that would re-create the lie in the opposite direction.
+The Chromium job advertised "blocking" before the ruleset required a gate
+context. That name-without-wiring defect is closed: the required `explorer`
+unit and its always-running job exist, and recent runs are green. Do **not**
+rename Chromium away from "blocking" while it still feeds the required unit
+— that would re-create the lie in the opposite direction.
 Do **not** demote the suite solely because retry-based data waits trade a
 class of first-load coverage (see the cold-snapshot section below); that is
 a known residual risk, not evidence the gate should be unwired.
@@ -73,9 +76,14 @@ a known residual risk, not evidence the gate should be unwired.
 ## Frontend dependency audit
 
 The blocking Chromium job and the nightly parity job run
-`npm run audit:high` immediately after `npm ci`. The command fails on any
-high or critical advisory; low-severity build-tool advisories remain visible
-in the audit output and are not silently allowlisted. Dependency updates must
+`npm run audit:high` immediately after `npm ci`. The command runs
+`results-explorer/scripts/audit-high.mjs`, which fails on any high or critical
+advisory except those listed in `results-explorer/scripts/audit-high-allowlist.json`.
+Each entry names the advisory, the reason, a `review_by` date and a link, and
+is printed on every run. An entry stops applying, and the step fails, once its
+`review_by` date passes or the registry has a release outside the advisory's
+vulnerable range; remove the entry and update the dependency at that point.
+Only advisories with no available fix belong in the allowlist. Dependency updates must
 use the narrowest patched range and retain deterministic `npm ci` behavior;
 `npm audit fix --force` is not an accepted remediation. The only transitive
 override currently present is `undici >=7.28.0`, constrained to remove the
@@ -86,9 +94,9 @@ needs it.
 
 | Browser  | Job name                          | Scope                | Gate       | Status as of 2026-07-23 |
 |----------|------------------------------------|-----------------------|------------|--------------------------|
-| Chromium | `Chromium (full suite, blocking)` | Full `e2e/` suite      | Blocking   | Zero-row snapshot race mitigated 2026-07-29 (see correction below) |
-| Firefox  | `Firefox (@smoke, non-blocking)`  | `@smoke`-tagged subset | Advisory   | Green in recent history |
-| WebKit   | `WebKit (@smoke, non-blocking)`   | `@smoke`-tagged subset | Advisory   | Fixed 2026-07-23 (see below) - was deterministically red on PRs #1264 and #1270 |
+| Chromium | `Chromium (full suite, blocking)` (`ci.yml`) | Full `e2e/` suite      | Blocking   | Zero-row snapshot race mitigated 2026-07-29 (see correction below) |
+| Firefox  | `t3:browser \| firefox` (`nightly.yml`)  | `@smoke`-tagged subset | Nightly, advisory   | Green in recent history |
+| WebKit   | `t3:browser \| webkit` (`nightly.yml`)   | `@smoke`-tagged subset | Nightly, advisory   | Fixed 2026-07-23 (see below) - was deterministically red on PRs #1264 and #1270 |
 
 WebKit root cause (`webkit-smoke-fix-or-demote-2`): four `@smoke` specs
 (`benchmark-index`, `platform-index`, `query`, and the funding-legend test in
@@ -324,8 +332,8 @@ How slow is slow enough remains unmeasured.
 
 **Do not run the emulated amd64 arm again** — its result is known and
 uninformative. The next real step is a *native* amd64 reproduction, which means
-running the harness on a GitHub runner (`workflow_dispatch` on
-`results-explorer-browser.yml`) rather than locally.
+running the harness on a GitHub runner (`workflow_dispatch` on `nightly.yml`)
+rather than locally.
 
 ## Triage rule
 
@@ -349,13 +357,13 @@ red:
    only versus `waitForDataLoaded`/an extended timeout. This exact pattern
    caused `webkit-smoke-fix-or-demote-2`.
 4. If a real fix requires touching `results-explorer/src/**`, do not attempt
-   it under the browser-CI TODO scope - file it separately and demote the
-   WebKit job to nightly-only (`.github/workflows/nightly.yml`) with a
-   linked tracking issue rather than leaving it both non-blocking and red.
+   it under the browser-CI TODO scope - file it separately and record a
+   linked tracking issue rather than leaving the nightly WebKit job red
+   without an owner. WebKit already runs only in `nightly.yml`.
 
 ## Graduation path
 
-Firefox and WebKit `@smoke` stay advisory (`continue-on-error: true`) until
+Firefox and WebKit `@smoke` stay nightly and advisory until
 each independently clears the 10-consecutive-green criterion defined in
 `graduate-browser-smoke-to-blocking-gates`. Each browser is promoted in its
 own commit - do not batch both, and do not promote on a calendar/release

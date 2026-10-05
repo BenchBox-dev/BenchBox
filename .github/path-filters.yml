@@ -63,6 +63,7 @@ code-ci:
   - "landing/**"
   - "results-data/**"
   - "results-explorer/**"
+  - "website/**"
   - "docker/**"
   - "_binaries/**"
   - "_sources/**"
@@ -104,7 +105,7 @@ code-ci:
 
 # Extra path-filter groups (beyond the three core buckets above). Each key
 # here becomes a `<group>-needed` boolean output from ci-paths, computed by
-# path_filter_decision.py, so a pr.yml job can gate on
+# path_filter_decision.py, so a ci.yml job can gate on
 # `needs.ci-paths.outputs.<group>-needed == 'true'` without inventing a
 # second classifier. Most extra groups only select an additional job. The
 # skill-integrity group is also a first-class specialized class: when no
@@ -117,7 +118,7 @@ skill-integrity:
   - "tools/skill-sync"
 
 # Packaging-metadata changes: build/install/audit signal (package-smoke,
-# dependency-audit jobs in pr.yml) only needs to run when one of these
+# dependency-audit jobs in ci.yml) only needs to run when one of these
 # changed. See tracker item `pr-gate-package-and-audit-promotion`.
 packaging:
   - "pyproject.toml"
@@ -127,11 +128,37 @@ packaging:
   - "benchbox/__init__.py"
   - "uv.lock"
 
+# Test-infrastructure inputs to the Windows and macOS binary framing job in
+# ci.yml. Subprocess, file-lock, file-handle, HOME and plugin changes pass on
+# Linux and fail only where a held lock file is unreadable and open files block
+# directory cleanup. The job also runs for the bundled dbgen binaries and the
+# framing test itself.
+framing:
+  - "tests/utilities/**"
+  - "conftest.py"
+  - "**/conftest.py"
+  - "tests/plugins/**"
+  - "tests/**/plugins/*"
+  - "tests/fixtures/database_fixtures.py"
+  - "tests/fixtures/test_data_fixtures.py"
+  - "tests/fixtures/result_dict_fixtures.py"
+  - "tests/fixtures/platform_fixtures.py"
+  - "tests/fixtures/utility_fixtures.py"
+  - "_benchbox_pytest_xdist_safety.py"
+  - "scripts/local_validation.py"
+  - "tests/duration_policy.py"
+  - "pytest.ini"
+  - "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py"
+  - "benchbox/__init__.py"
+  - "benchbox/_binaries/tpc-h/**"
+  - "_binaries/tpc-h/**"
+
 # Results-explorer visualization / CLI<->explorer parity source changes:
-# gates the parity-check job in pr.yml. See
+# gates the parity-check job in ci.yml. See
 # tracker item `parity-check-develop-ring`.
 viz:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "tests/parity/**"
   - "_project/scripts/explorer_pipeline/**"
 
@@ -140,14 +167,14 @@ viz:
 # and publication workflow changes can all invalidate Vitest expectations.
 explorer-vitest:
   - "results-explorer/**"
+  - "landing/shared/site-tokens.css"
   - "_project/scripts/explorer_pipeline/**"
   - "_project/scripts/explorer_publish.py"
   - "results-data/**"
   - "scripts/generate_corpus_inventory.py"
   - "tests/parity/fixtures/**"
   - "tests/unit/core/tuning/fixtures/**"
-  - ".github/workflows/results-explorer-browser.yml"
-  - ".github/workflows/pr.yml"
+  - ".github/workflows/ci.yml"
   - ".github/path-filters.yml"
   - "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
   - "tests/parity/fixtures/chart_ids.json"
@@ -157,6 +184,7 @@ explorer-vitest:
 # surface, not e2e fixtures, read-model inputs, or publication scripts.
 explorer-tokens:
   - "results-explorer/src/**"
+  - "landing/shared/site-tokens.css"
 
 # Public site theme token contract. The scan reads these files directly, so it
 # must run when any of them changes even if no Explorer source file changed.
@@ -166,3 +194,38 @@ site-theme:
   - "docs/_static/custom.css"
   - "docs/_templates/page.html"
   - "results-explorer/index.html"
+
+site:
+  - "website/**"
+  - "docs/**"
+  - "landing/**"
+  - "results-explorer/**"
+  - "results-data/**"
+  - "_project/scripts/explorer_pipeline/**"
+  - "_project/scripts/explorer_publish.py"
+  - "scripts/generate_query_docs.py"
+  - "benchbox/**"
+  - "_binaries/**"
+  - "_sources/**"
+  - "scripts/publication/check_artifact_privacy.py"
+  - "Makefile"
+  - "make/documentation.mk"
+  - "pyproject.toml"
+  - "uv.lock"
+  - ".github/workflows/ci.yml"
+  - ".github/path-filters.yml"
+
+site-parity:
+  - "docs/**"
+  - "website/**"
+  - "landing/**"
+  - "results-explorer/**"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "_project/design/site-inventory/**"
+  - "scripts/site_inventory.py"
+  - "scripts/site_parity.py"
+  - "scripts/assemble_public_site.py"
+  - "scripts/publication/check_artifact_privacy.py"
+  - "make/documentation.mk"
+  - ".github/workflows/ci.yml"

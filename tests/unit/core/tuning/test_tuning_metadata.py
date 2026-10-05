@@ -118,6 +118,133 @@ def test_fetch_helpers_support_execute_only_connections():
     assert connection.executed == ["SELECT ...", "SELECT ..."]
 
 
+class _QueryJobConn:
+    """BigQuery Client shape: neither cursor() nor execute(), only query() jobs."""
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.queried: list[str] = []
+
+    def query(self, sql):
+        self.queried.append(sql)
+        rows = self.rows
+
+        class _Job:
+            def result(self):
+                return rows
+
+        return _Job()
+
+
+def test_fetch_helpers_support_query_job_connections():
+    """BigQuery Client exposes query() jobs but no cursor() or execute()."""
+    manager = TuningMetadataManager(_Adapter(platform_name="bigquery"))
+    connection = _QueryJobConn([("orders", "sorting")])
+
+    assert manager._fetch_all(connection, "SELECT ...") == [("orders", "sorting")]
+    assert manager._fetch_one(connection, "SELECT ...") == ("orders", "sorting")
+    assert connection.queried == ["SELECT ...", "SELECT ..."]
+
+
+def test_fetch_one_query_job_connection_empty():
+    manager = TuningMetadataManager(_Adapter(platform_name="bigquery"))
+    assert manager._fetch_one(_QueryJobConn([]), "SELECT ...") is None
+
+
+def test_fetch_helpers_qualify_metadata_reads_through_adapter():
+    """Job-style reads must resolve the qualified uppercased table.
+
+    BigQuery creation qualifies/uppercases benchbox_tuning_metadata via
+    execute_query() (_convert_to_bigquery_table -> _qualify_table_target),
+    while the job connection carries no default dataset. The query()-job
+    branch therefore routes SELECTs through the same adapter qualification
+    instead of passing the raw unqualified lowercase SQL to query().
+    """
+
+    class _QualifyingAdapter(_Adapter):
+        def _qualify_table_names(self, sql):
+            return sql.replace("benchbox_tuning_metadata", "`my-proj.my_ds.BENCHBOX_TUNING_METADATA`")
+
+    manager = TuningMetadataManager(_QualifyingAdapter(platform_name="bigquery"))
+    connection = _QueryJobConn([("orders", "sorting")])
+
+    assert manager._fetch_all(connection, "SELECT * FROM benchbox_tuning_metadata") == [("orders", "sorting")]
+    assert connection.queried == ["SELECT * FROM `my-proj.my_ds.BENCHBOX_TUNING_METADATA`"]
+
+    connection = _QueryJobConn([("orders", "sorting")])
+    assert manager._fetch_one(connection, "SELECT * FROM benchbox_tuning_metadata") == ("orders", "sorting")
+    assert connection.queried == ["SELECT * FROM `my-proj.my_ds.BENCHBOX_TUNING_METADATA`"]
+
+
+def test_fetch_helpers_query_job_without_adapter_qualification_passes_sql_through():
+    """Adapters without _qualify_table_names keep the previous behavior."""
+
+    class _PlainAdapter:
+        platform_name = "custom"
+        platform_config = {}
+
+    manager = TuningMetadataManager(_PlainAdapter())
+    connection = _QueryJobConn([("orders", "sorting")])
+    assert manager._fetch_all(connection, "SELECT ...") == [("orders", "sorting")]
+    assert connection.queried == ["SELECT ..."]
+
+
+class _JobStyleAdapter(_Adapter):
+    """Adapter returning a query()-only connection like bigquery.Client."""
+
+    def __init__(self):
+        super().__init__(platform_name="bigquery")
+        self.executed_sql: list[str] = []
+
+    def execute_query(self, connection, sql, _query_id):
+        self.executed_sql.append(sql)
+        return {"result": []}
+
+    def create_connection(self, **_kwargs):
+        return _QueryJobConn([])
+
+    def _qualify_table_names(self, sql):
+        return sql.replace("benchbox_tuning_metadata", "`my-proj.my_ds.BENCHBOX_TUNING_METADATA`")
+
+
+def _manager_with_job_adapter():
+    manager = TuningMetadataManager(_JobStyleAdapter())
+    manager._connection_kwargs = dict
+    return manager
+
+
+def test_batch_insert_records_supports_query_job_connections():
+    """Writes must not call cursor()/commit() on job-style clients.
+
+    The BigQuery client exposes only query(): placeholders are inlined via
+    the adapter's execute_query path so the qualified table resolves.
+    """
+    manager = _manager_with_job_adapter()
+    record = TuningMetadata(
+        table_name="orders",
+        tuning_type="sorting",
+        column_name="o_orderkey",
+        column_order=1,
+        configuration_hash="abc",
+        created_at=datetime(2026, 2, 8, 0, 0, 0),
+        platform="bigquery",
+    )
+    manager._batch_insert_records([record])
+    (sql,) = manager.platform_adapter.executed_sql
+    assert "`my-proj.my_ds.BENCHBOX_TUNING_METADATA`" in sql
+    assert "?" not in sql
+    assert "'orders'" in sql and "'o_orderkey'" in sql
+
+
+def test_clear_tunings_uses_where_true_for_bigquery():
+    """BigQuery rejects WHERE-less DELETE: the clear spells WHERE TRUE."""
+    manager = _manager_with_job_adapter()
+    manager._table_exists_check = lambda: True
+    assert manager.clear_tunings() is True
+    (sql,) = manager.platform_adapter.executed_sql
+    assert sql == "DELETE FROM `my-proj.my_ds.BENCHBOX_TUNING_METADATA` WHERE TRUE"
+
+
 @pytest.mark.parametrize(
     ("platform", "needle"),
     [
@@ -178,6 +305,19 @@ def test_table_exists_check_treats_missing_managed_table_as_fresh_database(monke
         lambda _conn, _sql: (_ for _ in ()).throw(
             RuntimeError("Catalog Error: Table with name benchbox_tuning_metadata does not exist!")
         ),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error is None
+
+
+def test_table_exists_check_recognizes_databricks_missing_table_sqlstate(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("databricks"))
+    message = "[TABLE_OR_VIEW_NOT_FOUND] The table or view `benchbox_tuning_metadata` cannot be found. SQLSTATE: 42P01"
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(RuntimeError(message)),
     )
 
     assert manager._table_exists_check() is False
@@ -875,3 +1015,53 @@ def test_load_unified_tunings_section_only_config_is_not_none():
 
     assert loaded is not None
     assert isinstance(loaded, UnifiedTuningConfiguration)
+
+
+class _CountingAdapter(_FakeAdapter):
+    """_FakeAdapter that records connection open/close calls."""
+
+    def __init__(self, platform_name: str = "duckdb"):
+        super().__init__(platform_name)
+        self.opened = 0
+        self.closed: list[object] = []
+
+    def create_connection(self, **_kwargs) -> _FakeConn:
+        self.opened += 1
+        return super().create_connection()
+
+    def close_connection(self, conn) -> None:
+        self.closed.append(conn)
+        return None
+
+
+def test_manager_reuses_supplied_connection_and_never_closes_it():
+    """Mid-run metadata I/O must ride the run's own connection: no extra
+    connection is opened (each extra open re-enters create/drop handling and
+    can delete the run's database), and the shared connection is never closed
+    by the manager."""
+    adapter = _CountingAdapter("duckdb")
+    shared = adapter.create_connection()
+    assert adapter.opened == 1
+
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    manager = TuningMetadataManager(adapter, connection=shared)
+    assert manager.save_unified_tunings(config) is True
+    assert manager.validate_unified_tunings(config).is_valid is True
+    assert manager.get_metadata_summary()["table_exists"] is True
+    assert manager.clear_tunings() is True
+
+    assert adapter.opened == 1
+    assert shared not in adapter.closed
+
+
+def test_manager_without_supplied_connection_still_opens_temp_connections():
+    """The fallback path is preserved: with no shared connection the manager
+    still opens (and closes) its own temporary connection per operation."""
+    adapter = _CountingAdapter("duckdb")
+
+    config = UnifiedTuningConfiguration()
+    assert TuningMetadataManager(adapter).save_unified_tunings(config) is True
+
+    assert adapter.opened >= 1
+    assert len(adapter.closed) == adapter.opened

@@ -7,6 +7,262 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-04
+
+### Before you upgrade
+
+- **TPC-DS queries now use parameters for the data's scale factor.** Standard
+  TPC-DS runs at a scale factor other than 1 used to take their query
+  parameters from scale factor 1. They now use values generated for the scale
+  you run, so up to 12 queries can differ: Q9, Q44, Q46 and Q68 at 0.01 and
+  0.1; ten queries at scale factor 10 (adds Q1, Q16, Q27, Q34, Q36, Q73);
+  and twelve at scale factor 100 and above (adds Q33, Q43).
+  Runs at scale factor 1, and power and throughput runs, are unchanged. Don't
+  compare these queries one-for-one with results recorded before this change
+  at other scale factors.
+- **DataFrame runs now use the same query parameters as SQL runs.** TPC-DS
+  DataFrame runs bind the values dsqgen draws for the SQL power run of each
+  stream, instead of fixed defaults. Seeded TPC-H DataFrame runs bind the
+  values qgen draws for the stream's seed (`seed + 1000 * stream`); before,
+  every DataFrame run used qgen's defaults whatever `--seed` said. DataFrame
+  results record the bound parameter set in `config.query_parameters`. Don't
+  compare DataFrame results with 0.4.1 query by query.
+- **TPC-H answer-file checks apply only to qgen's default parameters.** The
+  official answer files hold results for `qgen -d`, so exact row counts now
+  apply only to unseeded runs at scale factor 1. Seeded runs, including
+  `--seed 17039360`, check Q11, Q16, Q18 and Q20 against range bounds. Before,
+  a SQL power run with that seed reported false failures on those queries.
+- **A failed query validation now fails the run.** This includes warm-up
+  queries. The result is no longer marked clean, and the CLI reports failure.
+  Query counts and timings still describe the measured executions only.
+- **DataFrame platforms refuse `--phases throughput`.** Before, the run
+  silently repeated power iterations, ignored `--streams`, and reported the
+  throughput phase as not run. It now stops before generating data and
+  suggests `--phases power` or a SQL platform.
+- **FlightData needs real data.** At scale factor 0.1 and above, FlightData
+  now fails when a BTS month can't be downloaded, instead of quietly using
+  synthetic rows. Set the `allow_synthetic_fallback` option to keep the old
+  behavior. Results record which months are real and which are synthetic.
+  BenchBox also skips the 1990-1999 months missing from the BTS archive and
+  uses older months instead. Existing FlightData caches lack the month
+  records, so the next run downloads and generates the data again.
+- **Databricks turns off the result cache by default and checks it.** Each
+  session sets `use_cached_result = false` and reads the setting back. If the
+  warehouse doesn't confirm it, the connection fails rather than measuring
+  cached results, and a custom Spark setting that turns the cache back on is
+  rejected. To measure with the cache, set the `disable_result_cache`
+  platform option to `false`; the result then records that the cache was on.
+- **Databricks resets tables in place.** When BenchBox rebuilds a schema, it
+  now empties and replaces the tables instead of dropping them, and every
+  `COPY INTO` forces a reload. Dropped tables count against the Unity Catalog
+  table quota for about seven days, so repeated runs could exhaust it. If the
+  in-place reset fails, the run now stops with the error instead of dropping
+  the schema. This change doesn't free quota already used; that frees itself
+  over time.
+- **Power phase durations and cost per hour can change.** Each power-test
+  phase now records its wall-clock time, and cost per hour uses that time.
+  On platforms with overhead between queries, such as Snowflake, the figure
+  can differ from 0.4.1. Per-query latencies are unchanged.
+- **Some results change because they were wrong before.** SQLite now computes
+  the TPC-H Q6 discount bounds exactly, so its Q6 answer matches other
+  engines. The write primitives catalog moves to version 2: batch inserts keep
+  their decimal scale on Snowflake and Databricks, and BigQuery, Snowflake,
+  and Databricks get their own SQL where needed. TPC-Havoc Q16-Q18 DataFrame
+  variants now run real query rewrites instead of replaying the baseline
+  result, so their timings change. NYC Taxi on Polars now numbers weekdays
+  from Monday = 0, as documented. Many DataFusion DataFrame answers change;
+  see Fixed.
+- **Stricter submissions and integrity checks.** A TPC-Havoc submission must
+  include every variant, each with a successful measurement or a documented
+  skip. A result in which every query was skipped no longer passes integrity
+  certification.
+- **Withdrawn cloud results.** Nine TPC-H results from the first BigQuery,
+  Databricks, and Snowflake runs were incorrect. They are removed from
+  Results Explorer and comparisons.
+
+### Added
+
+- **ParadeDB and Citus platforms (experimental).** Use `--platform paradedb`
+  or `--platform citus` to benchmark these PostgreSQL extensions. On Citus,
+  the `distribution_column` option distributes benchmark tables across
+  workers.
+- **DuckLake on Google Cloud Storage and Azure.** DuckLake's data path now
+  accepts `gs://`, `gcs://`, `az://`, `azure://`, and `abfss://` locations as
+  well as S3.
+- **NYC Taxi For-Hire Vehicle data.** NYC Taxi can load FHV trip data and run
+  three FHV queries. Yellow taxi data remains the default.
+- **All 113 Join Order Benchmark queries in the synthetic suite.**
+  `joinorder_synthetic` grows from 13 to 113 queries, each with pandas and
+  Polars versions.
+- **More tuning templates.** BenchBox ships checked Snowflake tuning templates
+  for TPC-H and TPC-DS. SSB joins the tuning profile, and the DuckDB SSB
+  template adds sorting on `LO_CUSTKEY`.
+- **Render TPC-DS queries from chosen values.**
+  `DSQGenBinary.generate_with_parameters` now applies the values you pass.
+  Before, it had no effect. `DSQGenBinary.generate_parameter_log` returns the
+  values dsqgen substituted for a given seed and scale. BenchBox also ships
+  the qualification values from Appendix B of the TPC-DS 4.0.0 specification
+  for all 99 queries, in
+  `benchbox/core/tpcds/dataframe_queries/qualification_values.json`.
+
+### Changed
+
+- **Vector Search is stable.** It now has an integrity specification. It
+  remains SQL-only.
+- **Faster loads.** BigQuery loads through Cloud Storage now submit one load
+  job per table instead of one per file. ClickHouse Cloud loads each table's
+  staged files with one `INSERT`. PostgreSQL streams a table's files that
+  share a format through one `COPY` session, and a failure rolls back that
+  group of files together. Snowflake no longer retries optional
+  query-history lookups, which removes a delay after each query.
+- **TPC-Havoc runs on more engines.** Variants that were skipped now run
+  through dialect rewrites on BigQuery, Databricks, Snowflake,
+  PostgreSQL-family engines, ClickHouse, and DataFusion. A TPC-Havoc
+  `--dry-run` saves the same SQL a live run would use, and fails on an invalid
+  query selection instead of saving an empty preview.
+- **TPC-DS Q90 returns NULL when the PM count is zero.** Every SQL dialect and
+  both DataFrame families now guard this division the same way.
+- **Faster pandas TPC-DS Q78.** It takes about 0.3 seconds at scale factor 0.1,
+  down from about 14 seconds.
+- **Result bundles always carry `platform.tuning.validation_status`.**
+  Untuned runs used to have no `platform.tuning` block (DuckDB), only a nested
+  status (SQLite, ClickHouse), or the full block. The change is additive: no
+  existing field moves.
+
+### Fixed
+
+- **TPC-DS DataFrame answers match SQL.** All 103 TPC-DS statements (the 99
+  templates plus the second statements of Q14, Q23, Q24 and Q39) now return
+  the same answers as DuckDB SQL on Polars, pandas and DataFusion. The fixes
+  cover NULL handling in sorts, grouping keys, sums, averages, ranks and set
+  operations; ROLLUP subtotal order in Q36 and Q86; half-up rounding and
+  returned sales in Q78; per-item averages in Q32 and Q92; and parameters
+  that implementations ignored, such as the aggregate functions in Q25 and
+  Q35. Brand names containing `#` no longer break Q53 and Q63. The second
+  statements of Q14, Q23, Q24 and Q39 are new on the DataFrame surface.
+- **DataFusion DataFrame results were wrong for some expressions.** An
+  aggregate over an expression, such as `sum(price * (1 - discount))`, was
+  computed over the bare column, and a CASE over aggregates was rewritten
+  into arithmetic. Integer division returned an integer, `rank()` without
+  `.over()` returned the input values, and ROLLUP levels were combined out of
+  column order. DataFusion now plans these expressions itself. This fixes
+  TPC-H Q1, Q3, Q5, Q10, Q14 and Q15 on DataFusion, and many TPC-DS queries.
+- **DataFrame runs no longer crash when two BenchBox processes share the
+  Parquet cache.** The cache was rewritten in place, so a run that loaded data
+  while another run was scanning it could crash that run with a Polars
+  `Invalid argument (os error 22)` panic, a SIGBUS or a "must end with PAR1"
+  error. Cache files and manifests are now written to a temporary file and
+  renamed into place. Routine pruning preserves writer files regardless of age;
+  an explicit cache clear removes files abandoned by a crashed run.
+- **Dask TPC-DS queries order NULLs like the reference.** Q19, Q34, Q71 and Q73
+  sort one key ascending and another descending. On `dask-df` every key put
+  NULLs last, so rows with a NULL in a descending key were out of order. They
+  now match the other DataFrame platforms.
+- **Anonymized results hide more cloud identifiers.** Databricks SQL
+  warehouse IDs, BigQuery datasets, Unity Catalog catalog, schema and volume
+  names, and saved cloud output locations are now replaced. Before, they
+  could appear in anonymized result files.
+- **TPC-DS One Big Table on cloud platforms.** On Snowflake and BigQuery, the
+  benchmark could run all its queries against an empty table and report
+  success. It now loads the table, and its source DDL translates correctly for
+  cloud dialects.
+- **Generated data reaches cloud staging.** AI Primitives, Data Vault,
+  TPC-DS OBT, transaction and write primitives, TPC-DI, TPC-H Skew, and TSBS
+  no longer drop the cloud upload target and generate data only locally.
+- **Data Vault and TSBS DevOps on cloud platforms.** Their queries translate
+  to Snowflake, BigQuery, and Databricks SQL. Data Vault now runs on BigQuery,
+  and 16 TPC-Havoc variants that failed to compile there now work.
+- **Write and transaction primitives on cloud platforms.** Write primitives
+  run on BigQuery, Snowflake, and Databricks, including SCD2 staging on
+  Databricks. Transaction primitives run on Snowflake, BigQuery, and
+  Databricks, with documented skips for features those engines lack. Trino
+  skips sketch operations it doesn't support.
+- **Read and metadata primitives on cloud platforms.** Read primitives have
+  Snowflake and BigQuery versions of queries those engines rejected. Metadata
+  primitives run their EXPLAIN and constraint queries on Snowflake. Queries
+  that Databricks can't run are skipped with a reason.
+- **Other platforms.** Exasol no longer quotes every identifier, so
+  BenchBox's own SQL finds its tables. Presto and Trino load files with the
+  delimiter the dataset declares rather than guessing from the file name.
+- **TPC-H Q17 on empty input.** It returns one NULL row on Polars,
+  DataFusion, PySpark, and LakeSail, as SQL does.
+- **SQLite throughput streams.** Concurrent streams running the same query
+  no longer read each other's rows.
+- **`--show-plans` prints query plans.** The flag was accepted but never
+  reached the platform adapter.
+- **Tuning wizard saves table layouts.** Clustering, partitioning,
+  distribution, and sort-key choices for Snowflake, BigQuery, Redshift,
+  DuckDB, and ClickHouse were confirmed but not saved. They are now saved.
+- **Data generation and loading.** Freshly generated, sharded Read Primitives
+  data now loads on the first run. TPC-H Skew no longer runs out of memory at
+  scale factor 10 on a 16 GB machine. Metadata Primitives no longer tries to
+  load data files it doesn't create. Data Vault ETL reads compressed source
+  files without parallel scans, which compressed files can't support.
+- **Working directory restored after library checks.** A failed native import
+  during dependency checks, including chDB, could leave BenchBox in another
+  directory and break later file reads.
+- **Results Explorer.** The in-browser database recovers from startup buffer
+  errors by switching to a single-threaded mode. Comparison links that name
+  missing results no longer stall the page. Navigation highlights the right
+  section on local and run pages.
+- **Runs fail when no data loads.** A stale or empty datagen manifest, or a
+  missing `zstd` command, used to leave the loader with nothing to load, so
+  every table held zero rows and the run still validated and exported a
+  result. Loading now fails when the data source names no tables, and
+  validation fails when no table loads a positive number of rows. TPC-DS
+  generation no longer writes a manifest that lists no tables, and a manifest
+  with no tables or no files is rejected and regenerated. A missing `zstd`
+  command is reported before any table loads.
+- **Repeated no-tuning runs reuse their database.** Every second no-tuning run
+  rebuilt the database because validation asked for tuning metadata that
+  no-tuning runs never write.
+- **The ORDER BY equivalence check fails closed.** When a query's sort terms
+  could not be evaluated over the returned rows, the check passed. It now
+  reports the cell as divergent. Queries with no ORDER BY, SQL that does not
+  parse, and terms with no output column keep the unordered comparison.
+- **TPC-DS data generation on Windows honours its options.** The Windows
+  `dsdgen` ignored `-` options, so a request for scale factor 0.01 generated
+  scale factor 1 and ignored table and chunk selection. BenchBox now passes
+  the `/` prefix on Windows. Output on other platforms is unchanged.
+- **TPC-DS OBT loads its queries from an installed wheel.** `get_queries()`
+  raised `FileNotFoundError` from the 0.4.1 wheel because the templates were
+  read from a source tree the wheel does not ship.
+- **TPC-H addresses on macOS match the reference data.** The bundled macOS
+  `dbgen` was built with optimization and produced different `S_ADDRESS` and
+  `C_ADDRESS` values from the reference data at every scale factor, so the
+  correctness gate failed Q2, Q10 and Q15. The rebuilt binaries produce the
+  reference values. Regenerate TPC-H data made on macOS with earlier versions.
+- **Tuning output describes what happened.** The console no longer prints
+  "Unified tuning configuration applied" or "Tuning metadata saved" unless
+  the work succeeded, and it reports how many statements ran, failed or were
+  dropped. A fresh database with no benchmark tables no longer logs a tuning
+  metadata error. The Results Explorer reads "Checked; not corroborated" when
+  a run carries a post-load check receipt, and its Tuned badges follow the
+  recorded validation status.
+- **`--platform <name>:<mode>` selectors resolve to the platform they name.**
+  `--platform clickhouse:local` stopped with "not available (missing
+  dependencies)" even with chDB installed, and the install hint named an extra
+  that does not exist. The selector now resolves before the availability
+  check, the benchmark compatibility gate and the install hint. A deployment
+  the platform does not offer, such as `clickhouse:bogus`, is rejected with
+  the list of deployments it does offer.
+- **TPC-DS declares the specification's composite primary keys.** Six fact
+  tables declared a single-column key that repeats across items, so engines
+  that enforce keys rejected the load, and DuckDB tuned and auto runs stopped
+  at the first fact table. The keys now match the specification, `inventory`
+  gains its key, and the three returns tables no longer carry single-column
+  foreign keys to the sales tables.
+- **DuckLake no longer deletes its database mid-run.** With force-recreate
+  set, later connections in the same run (a connection test, a pooled
+  connection, a validation connection) deleted the catalog or dropped tables
+  after the data was loaded. The decision is now made once per run and never
+  inside a validation connection.
+- **DuckDB tuned runs no longer report a false index mismatch.** Index
+  statements now use the identifiers `create_schema` produced, so sorted runs
+  can reach `applied_verified`. The shipped DuckDB tuned templates drop
+  partitioning and CHECK constraints, which DuckDB never applies or cannot
+  verify.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade
@@ -839,6 +1095,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
 [Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...HEAD
+[0.4.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1

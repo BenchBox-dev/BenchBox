@@ -35,6 +35,7 @@ from benchbox.core.contracts import (
     as_sql_benchmark_executor,
     as_statistics_phase_runner,
 )
+from benchbox.core.loaded_tables import require_loaded_tables
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
@@ -98,6 +99,12 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
     """Return acceptable benchmark identifiers for manifest validation."""
 
     allowed = {config.name.lower()}
+
+    # A benchmark that builds its own tables from the source data (tpcds_obt)
+    # must not accept the source manifest: reusing it loads the source tables
+    # instead of the benchmark's own.
+    if getattr(benchmark, "GENERATES_OWN_OUTPUT", False) is True:
+        return allowed
 
     getter = getattr(benchmark, "get_data_source_benchmark", None)
     if callable(getter):
@@ -411,8 +418,13 @@ def _attach_datagen_version(
             return result
         if not _manifest_matches_result(manifest, result, benchmark):
             return result
+        identity_matches = getattr(benchmark, "manifest_matches_datagen_identity", None)
+        if callable(identity_matches) and not identity_matches(manifest):
+            return result
         result.data_generation_version = manifest.get("data_generation_version")
         result.data_generation_hash = manifest.get("data_generation_identity_hash", manifest.get("base_constants_hash"))
+        if str(manifest.get("benchmark", "")).lower() == "flightdata":
+            result.flightdata_source_provenance = manifest.get("source_provenance")
     except Exception as exc:
         logger.debug("leaving data-generation provenance unset: %s", exc)
     return result
@@ -539,6 +551,11 @@ def _execute_load_only_mode(
     postload_result: ValidationResult | None = None
 
     connection_lifecycle = as_connection_lifecycle(adapter)
+    # New run: allow the existing-database decision to be made once below.
+    # Without this reset, a reused adapter instance would skip first-connection
+    # reuse/recreate handling for the load-only run.
+    # adapter is typed as object, so direct assignment would fail type checking.
+    setattr(adapter, "_existing_db_decided", False)  # noqa: B010
     try:
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
 
@@ -572,6 +589,7 @@ def _execute_load_only_mode(
             native_loader = as_native_table_loader(adapter)
             schema_time = native_loader.create_schema(benchmark, connection)
             table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
+            require_loaded_tables(benchmark, table_stats)
             schema_phase = {
                 "status": "COMPLETED",
                 "duration_ms": int(schema_time * 1000),
@@ -865,6 +883,7 @@ def _build_run_config_from_options(
     requested_phases = options.get("requested_phases")
     if requested_phases:
         run_options["requested_phases"] = list(requested_phases)
+    database_options = _database_platform_options(database_config)
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -888,6 +907,17 @@ def _build_run_config_from_options(
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
         capture_plans=benchmark_config.capture_plans,
+        # --show-plans travels in DatabaseConfig.options via the CLI runtime
+        # overrides (direct path) or as a DatabaseConfig extra (interactive
+        # path); both are collected by _database_platform_options. Read from
+        # the merged database options, not BenchmarkConfig, which has no
+        # display-only field by design. Tri-state (mirroring analyze_plans):
+        # absent means the adapter keeps its own value (e.g. from
+        # platform_config or a preconfigured adapter); only an explicit
+        # True/False overrides it.
+        show_query_plans=(
+            bool(database_options.get("show_query_plans")) if "show_query_plans" in database_options else None
+        ),
         analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
         normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),

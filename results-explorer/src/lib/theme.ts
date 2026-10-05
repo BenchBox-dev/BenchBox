@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 export type ThemeChoice = "system" | "light" | "dark";
 export type EffectiveTheme = "light" | "dark";
@@ -61,17 +61,24 @@ export function useThemeChoice() {
   const [theme, setTheme] = useState<EffectiveTheme>(() => effectiveTheme(choice));
 
   function setChoice(next: ThemeChoice) {
+    choiceRef.current = next;
     persistThemeChoice(next);
     setChoiceState(next);
     setTheme(applyThemeChoice(next));
   }
 
+  const choiceRef = useRef(choice);
+  choiceRef.current = choice;
+
   useEffect(() => {
-    setTheme(applyThemeChoice(choice));
+    setTheme(applyThemeChoice(choiceRef.current));
+  }, []);
+
+  useEffect(() => {
     if (!window.matchMedia) return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      if (choice === "system") setTheme(applyThemeChoice("system"));
+      if (choiceRef.current === "system") setTheme(applyThemeChoice("system"));
     };
     if (media.addEventListener) {
       media.addEventListener("change", onChange);
@@ -79,7 +86,7 @@ export function useThemeChoice() {
     }
     media.addListener?.(onChange);
     return () => media.removeListener?.(onChange);
-  }, [choice]);
+  }, []);
 
   return { choice, theme, setChoice };
 }

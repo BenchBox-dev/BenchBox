@@ -27,6 +27,7 @@ recursive-include _sources/tpc-h/dbgen/variants *.sql
 # Binaries are included inside the benchbox package for proper installation
 recursive-include benchbox/_binaries/tpc-h *
 recursive-include benchbox/_binaries/tpc-ds *
+include benchbox/_binaries/SHA256MANIFEST.json
 # Exclude macOS metadata files
 global-exclude .DS_Store
 
@@ -47,6 +48,7 @@ prune .mypy_cache
 prune .ruff_cache
 prune htmlcov
 prune landing
+prune website
 prune scripts
 exclude .pre-commit-config.yaml
 exclude .coveragerc_core
@@ -65,3 +67,4 @@ exclude pytest-ci.ini
 exclude Makefile
 
 global-exclude *.py[cod] __pycache__ *.so *.dylib *.dll *.log
+prune deploy

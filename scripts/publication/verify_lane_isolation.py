@@ -124,6 +124,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/queue_certification.py",
     "scripts/sweep_coverage.py",
     "scripts/heavy_tier_needed.py",
+    "scripts/canary_impact.py",
     "scripts/release_canary_incident.py",
     "scripts/update_version.py",
     # Repository guidance and release notes are linked from the site but are
@@ -138,6 +139,16 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/_compose_joinorder_hero.py",
     "scripts/check_dependency_bounds.py",
     "scripts/check_duplicate_code.py",
+    # Cloud TPC template generator: invoked manually/by CI, never read by
+    # lane artifact builds.
+    "scripts/generate_cloud_tpc_templates.py",
+    "scripts/check_rerun_shard_retention.py",
+    # ClickHouse sketch storage smoke helper: on-demand sweep tool, never
+    # run in CI and never read by lane artifact builds.
+    "scripts/sketch_storage_smoke.sh",
+    # SF=1 size measurement helper: invoked manually/by CI, never read by
+    # lane artifact builds.
+    "scripts/measure_sf1_sizes.py",
     "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
@@ -159,6 +170,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".todo-db/",
     # Import-layering config: consumed by CI lint, never read by lane builds.
     ".importlinter",
+    # Spellcheck wordlist: consumed by CI spellcheck, never read by lane builds.
+    ".codespell-ignore.txt",
 )
 
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {

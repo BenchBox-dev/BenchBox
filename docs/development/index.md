@@ -17,13 +17,14 @@ Agent review, identity, and attribution protocol lives in unpublished
 
 - [Development Guide](development.md) - Setting up development environment and workflow
 - [Testing](testing.md) - Testing strategies, running tests, and test organization
+- [Test tiers and duration budgets](test-tier-policy.md) - Measured T1/T2/T3 policy and quarantine markers
 - [Pytest xdist Safety](pytest-xdist-safety.md) - Why macOS worker counts are capped and how to validate changes
 
 ## Contributing
 
 - [Adding New Platforms](adding-new-platforms.md) - How to add support for new database platforms
 - [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md) - Required registry, docs, tests, compatibility, and UAT gates
-- [PR base branch policy](pr-base-branch-policy.md) - Integration bases only; stacked/feature-base PRs unsupported
+- [PR base branch policy](pr-base-branch-policy.md) - Integration bases for ready PRs; narrow draft-only stacking
 - [Import Patterns](import-patterns.md) - Lazy loading and dependency management patterns
 - [TPC Compilation Guide](tpc-compilation-guide.md) - Compiling TPC benchmark tools
 
@@ -40,6 +41,7 @@ Agent review, identity, and attribution protocol lives in unpublished
 ## Testing
 
 - [Testing Guide](testing.md) - Testing strategies and test organization
+- [Test tiers and duration budgets](test-tier-policy.md) - Measured T1/T2/T3 policy and quarantine markers
 - [Pytest xdist Safety](pytest-xdist-safety.md) - Root cause, reproducer, and validation checklist for xdist lock-ups
 - [Testing Index](../testing/index.md) - Test documentation overview
 - [Live Integration Tests](../testing/live-integration-tests.md) - Running tests against live databases
@@ -73,6 +75,7 @@ data-dependencies
 import-patterns
 tpc-compilation-guide
 testing
+test-tier-policy
 pytest-xdist-safety
 read-primitives-catalog
 read-primitives-skips-reference

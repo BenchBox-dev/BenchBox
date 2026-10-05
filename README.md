@@ -1,6 +1,6 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-```
+```text
 █                   █    █
 █▀▀▄ █▀▀█ █▀▀▄ █▀▀▀ █▀▀▄ █▀▀▄ ▄▀▀▄ ▀▄▄▀
 █▄▄▀ █▄▄▄ █  █ █▄▄▄ █  █ █▄▄▀ ▀▄▄▀ ▄▀▀▄
@@ -141,7 +141,7 @@ a comparison.
 
 <!-- benchbox-registry-counts:start -->
 
-- Platform registry: **50** metadata entries; **46** SQL-capable; **18** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=16, deprecated=1.
+- Platform registry: **52** metadata entries; **48** SQL-capable; **18** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=18, deprecated=1.
 - Benchmark registry: **23** metadata entries; **22** public discovery entries.
 
 <!-- benchbox-registry-counts:end -->
@@ -185,7 +185,7 @@ submission process.
 | Choose a benchmark | [Benchmark catalog](docs/benchmarks/index.md) |
 | Choose a platform | [Platform selection guide](docs/platforms/platform-selection-guide.md) |
 | Use a DataFrame runtime | [DataFrame platforms](docs/platforms/dataframe.md) |
-| Use the Python API | [Python API reference](docs/reference/python-api/index.rst) |
+| Use the Python API | [Python API reference](docs/reference/python-api/index.md) |
 | Find examples | [Examples guide](docs/usage/examples.md) |
 | Troubleshoot a run | [Troubleshooting guide](docs/usage/troubleshooting.md) |
 | Understand the design | [Architecture overview](docs/concepts/architecture.md) |
@@ -217,7 +217,7 @@ options. Do not put credentials in configuration files that you commit.
 > **BenchBox is BETA software.** The CLI and core workflows are usable, but
 > public APIs may change before 1.0.
 
-Current release: v0.4.1.
+Current release: v0.4.2.
 
 Support labels describe the stability of each public surface. The
 `benchbox.experimental` namespace has no compatibility guarantee and can change

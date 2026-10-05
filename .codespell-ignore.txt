@@ -24,6 +24,7 @@ params
 isnull
 notnull
 numer
+afterall
 
 # Common abbreviations
 num
@@ -86,6 +87,10 @@ assertIn
 
 # DuckDB SQL function name
 iif
+
+# TPC-DS canonical item-class literals
+birdal
+womens
 
 # IATA airport codes in FlightData reference data (not misspellings)
 MKE

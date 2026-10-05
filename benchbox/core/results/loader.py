@@ -335,6 +335,7 @@ def reconstruct_benchmark_results(
         dataset_version=benchmark_section.get("dataset_version"),
         data_generation_version=_coerce_datagen_version(benchmark_section.get("data_generation_version")),
         data_generation_hash=_coerce_datagen_hash(benchmark_section.get("data_generation_hash")),
+        flightdata_source_provenance=benchmark_section.get("source_provenance"),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
@@ -439,6 +440,8 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
     that predate this extraction (see schema.py's
     ``_legacy_tuning_source_bridge``).
     """
+    from benchbox.core.tuning.applied_ledger import NOT_VALIDATED
+
     tunings_applied = None
     tuning_source_file = None
     tuning_config_hash = None
@@ -477,6 +480,9 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
         tuning_source = tuning_data.get("tuning_source") or tuning_source
         tuning_validation_status = tuning_data.get("validation_status") or tuning_validation_status
+
+    if tuning_validation_status == NOT_VALIDATED:
+        tuning_validation_status = None
 
     return {
         "tunings_applied": tunings_applied,

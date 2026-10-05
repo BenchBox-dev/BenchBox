@@ -11,10 +11,12 @@ patching azure.identity.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from benchbox.platforms.azure import _credentials as credentials_module
 from benchbox.platforms.azure._credentials import AzureTokenProvider
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -78,10 +80,11 @@ class TestAccessTokenCaching:
             _token("tok-A", expires_at=1000),
             _token("tok-B", expires_at=9999999999),
         ]
-        monkeypatch.setattr("benchbox.platforms.azure._credentials.time.time", lambda: 500)
+        now = {"value": 500}
+        monkeypatch.setattr(credentials_module, "time", SimpleNamespace(time=lambda: now["value"]))
         assert provider.access_token() == "tok-A"
         # Advance clock past expires_at - 300 = 700 -> refresh required.
-        monkeypatch.setattr("benchbox.platforms.azure._credentials.time.time", lambda: 800)
+        now["value"] = 800
         assert provider.access_token() == "tok-B"
         assert cred_class.return_value.get_token.call_count == 2
 

@@ -289,12 +289,17 @@ finish_worktree() {
     format_args="--format $FORMAT"
   fi
 
+  apply_args=""
+  if [ "${APPLY:-}" = "1" ]; then
+    apply_args="--apply"
+  fi
+
   # shellcheck disable=SC2086
   $py_runner "$script_dir/worktree_finish.py" \
     --repo-root "$primary_clone" \
     --worktree-path "$target" \
     --expected-head-oid "$oid_input" \
-    $format_args
+    $format_args $apply_args
 }
 
 case "$operation" in

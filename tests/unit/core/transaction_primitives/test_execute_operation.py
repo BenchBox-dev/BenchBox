@@ -238,6 +238,33 @@ class TestPlatformKeyDispatch:
         assert "FROM (SELECT generate_series(1, 100) AS n) t" in executed_sql
         assert "unnest(generate_series" not in executed_sql
 
+    @pytest.mark.parametrize(
+        ("platform_key", "expected"),
+        [
+            ("snowflake", "FROM (SELECT value::INT AS n FROM TABLE(FLATTEN(ARRAY_GENERATE_RANGE(1, 100 + 1)))) t"),
+            ("bigquery", "FROM (SELECT n FROM UNNEST(GENERATE_ARRAY(1, 100)) AS n) t"),
+        ],
+    )
+    def test_rewrites_generate_series_for_cloud_dialects(self, tmp_path: Path, platform_key: str, expected: str):
+        """Snowflake and BigQuery have neither unnest nor generate_series (verified live)."""
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="""
+                BEGIN TRANSACTION;
+                INSERT INTO txn_orders
+                SELECT 9200000 + n, 1
+                FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
+                COMMIT;
+            """,
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key=platform_key)
+
+        executed_sql = conn.execute.call_args.args[0]
+        assert expected in executed_sql
+        assert "generate_series" not in executed_sql
+
     def test_rewrites_isolation_level_begin_for_postgres(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
@@ -499,3 +526,40 @@ class TestPlatformFallbackKey:
         bench.execute_operation("op1", conn, platform_key="ducklake")
 
         conn.execute.assert_called_once_with("generic SQL")
+
+
+class TestFailedPlatformPayload:
+    """A FAILED adapter payload must fail the op, never read as executed."""
+
+    def test_failed_write_reports_failed(self, tmp_path: Path):
+        from types import SimpleNamespace
+
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation()
+        conn = _make_connection()
+        conn.execute.return_value = SimpleNamespace(
+            rowcount=0,
+            platform_result={"status": "FAILED", "error": "Actual statement count 2 did not match"},
+        )
+
+        result = bench.execute_operation("op1", conn)
+
+        assert result.success is False
+        assert "Actual statement count 2" in (result.error or "")
+
+    def test_failed_validation_select_fails_validation(self, tmp_path: Path):
+        from types import SimpleNamespace
+
+        validation_query = SimpleNamespace(id="cnt", sql="SELECT COUNT(*) FROM t", expected_rows=1)
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(validation_queries=[validation_query])
+        conn = _make_connection()
+        failed = SimpleNamespace(
+            rowcount=0,
+            platform_result={"status": "FAILED", "error": "Object does not exist"},
+        )
+        conn.execute.side_effect = [_make_connection().execute.return_value, failed]
+
+        result = bench.execute_operation("op1", conn)
+
+        assert result.validation_passed is False

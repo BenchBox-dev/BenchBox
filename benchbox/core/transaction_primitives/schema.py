@@ -52,6 +52,33 @@ TABLES = {
 STAGING_TABLES = {entry["key"]: globals()[symbol] for symbol, entry in _STAGING_DEFS.items()}
 
 
+def _requires_catalog_managed_staging(dialect: str) -> bool:
+    """Return whether staging DDL must declare the catalogManaged Delta feature."""
+    import benchbox.sql_compat.rules.ddl_optimize.databricks_ddl_rewrites  # noqa: F401
+    from benchbox.sql_compat.actions import CompatAction
+    from benchbox.sql_compat.context import CompatibilityContext, Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    ctx = CompatibilityContext(
+        platform=dialect.lower(),
+        platform_version=None,
+        benchmark="transaction_primitives",
+        query_id=None,
+        phase=Phase.DDL_OPTIMIZE,
+        mode="sql",
+        dialect=dialect,
+    )
+    registry_decision = REGISTRY.resolve(ctx)
+
+    if registry_decision is not None:
+        return (
+            registry_decision.action == CompatAction.REWRITE_DDL
+            and registry_decision.rule_id
+            == "ddl_optimize.databricks.transaction_primitives.txn_staging_catalog_managed"
+        )
+    return False  # no rule: default to plain DDL
+
+
 def _supports_primary_keys(dialect: str) -> bool:
     """Return whether the target SQL dialect supports PRIMARY KEY in CREATE TABLE."""
     import benchbox.sql_compat.rules.schema_emit.pk_capability_txn  # noqa: F401
@@ -113,7 +140,15 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
     if_not_exists_clause = " IF NOT EXISTS" if if_not_exists else ""
     sql = f"CREATE TABLE{if_not_exists_clause} {table['name']} (\n"
     sql += ",\n".join(f"  {col}" for col in columns)
-    sql += "\n);"
+    sql += "\n)"
+    if _requires_catalog_managed_staging(dialect):
+        # Databricks multi-statement transactions only write to Delta tables
+        # with the catalogManaged feature (TRANSACTION_NOT_SUPPORTED.
+        # WRITE_NON_CATALOG_MANAGED_TABLE otherwise). Staging tables are the
+        # only tables these transactions write. Governed by DDL_OPTIMIZE rule
+        # ddl_optimize.databricks.transaction_primitives.txn_staging_catalog_managed.
+        sql += " USING DELTA TBLPROPERTIES ('delta.feature.catalogManaged' = 'supported')"
+    sql += ";"
 
     return sql
 

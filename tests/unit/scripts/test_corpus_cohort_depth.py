@@ -410,3 +410,15 @@ def test_timestamp_less_bundle_does_not_fail_depth_exit(tmp_path: Path, capsys: 
     assert "oldest=2026-08-01" in captured
     assert "3 bundles" in captured
     assert "All 1 cohort(s) meet" in captured
+
+
+def test_override_companions_are_not_read_as_bundles(tmp_path: Path) -> None:
+    """A ``<stem>.override.json`` beside a bundle is a companion, not a result."""
+    validator = _load_validator()
+    (tmp_path / "x_sf1_duckdb_sql_20261001_000000_aaaa.json").write_text("{}")
+    (tmp_path / "x_sf1_duckdb_sql_20261001_000000_aaaa.override.json").write_text("{}")
+    (tmp_path / "x_sf1_duckdb_sql_20261001_000000_aaaa.manifest.json").write_text("{}")
+
+    names = [path.name for path in validator.discover_bundles(tmp_path)]
+
+    assert names == ["x_sf1_duckdb_sql_20261001_000000_aaaa.json"]

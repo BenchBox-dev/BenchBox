@@ -42,15 +42,23 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
-      # The four steps below depend on _project/ dev tooling, which is curated
+      # The steps below depend on _project/ dev tooling, which is curated
       # out of release branches; hashFiles guards make them skip there.
       - name: Timing policy (wall-clock allowlist)
         if: hashFiles('_project/scripts/timing_policy_check.py') != ''
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
+      - name: Fast lane ceiling
+        if: hashFiles('_project/scripts/fast_lane_ceiling_check.py') != ''
+        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
+
       - name: UAT spec LOC table drift check
         if: hashFiles('_project/scripts/uat_loc_table.py') != ''
         run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
+
+      - name: Stale _project/ reference check
+        if: hashFiles('_project/scripts/check_project_references.py') != ''
+        run: uv run -- python _project/scripts/check_project_references.py
 
       - name: Compatibility docs drift check
         run: make compat-docs-check

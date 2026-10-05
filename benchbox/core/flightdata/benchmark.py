@@ -69,6 +69,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         verbose: int | bool = 0,
         quiet: bool = False,
         force_regenerate: bool = False,
+        allow_synthetic_fallback: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize Flight Data benchmark.
@@ -81,6 +82,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose: Verbosity level
             quiet: Suppress output
             force_regenerate: Force data regeneration
+            allow_synthetic_fallback: Permit synthetic months after BTS download errors at SF >= 0.1
             **kwargs: Additional options
         """
         # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
@@ -116,6 +118,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose=verbose,
             quiet=quiet,
             force_redownload=force_regenerate,
+            allow_synthetic_fallback=allow_synthetic_fallback,
             **compression_kwargs,
         )
 
@@ -167,6 +170,10 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             # Heal pre-fix manifests whose entries lack the empty-means-NULL
             # marker; the runner reuses such caches without regenerating.
             self.downloader.backfill_csv_dialect_metadata()
+
+    def manifest_matches_datagen_identity(self, manifest: dict[str, Any]) -> bool:
+        """Reject reused data whose source months or fallback policy are unproven."""
+        return self.downloader.manifest_matches_source_identity(manifest)
 
     @staticmethod
     def _flatten_table_paths(tables: dict[str, Path | list[Path]]) -> list[Path]:
@@ -429,6 +436,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
+    parse_bool,
     parse_int,
 )
 
@@ -451,6 +459,13 @@ BenchmarkHookRegistry.register_option_specs(
         parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
         help="Force data regeneration",
         aliases=("force-regenerate",),
+    ),
+    BenchmarkOptionSpec(
+        name="allow_synthetic_fallback",
+        parser=parse_bool,
+        default=False,
+        help="Allow synthetic months when a BTS download fails at SF >= 0.1",
+        aliases=("allow-synthetic-fallback",),
     ),
     benchmark_class=FlightDataBenchmark,
 )

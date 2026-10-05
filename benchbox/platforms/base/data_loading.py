@@ -15,10 +15,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -673,6 +674,18 @@ class DataSourceResolver:
         """Return a mapping value using exact or lower-case key lookup."""
         return mapping.get(key, mapping.get(key.lower()))
 
+    @staticmethod
+    def _infer_format_from_paths(paths: set[Path]) -> str | None:
+        """Infer the data format from file extensions.
+
+        v1 manifests carry no table_formats entry, so derive the format
+        (e.g. "tbl") from the replacement paths, transparent to compression
+        suffixes. Returns None when no path carries a recognized extension.
+        """
+        inferred = [get_data_extension(path) for path in sorted(paths)]
+        inferred = [ext[1:] for ext in inferred if ext]
+        return inferred[0] if inferred else None
+
     def _select_manifest_override_tables(
         self,
         source: DataSource,
@@ -690,6 +703,8 @@ class DataSourceResolver:
             selector = lambda paths: any(path.suffix.lower() != ".parquet" for path in paths)
         elif platform_name == "redshift" and table_mode != "external":
             selector = lambda paths: any(path.exists() and path.is_dir() for path in paths)
+        elif platform_name == "bigquery" and table_mode == "native":
+            selector = lambda paths: bool(paths)
         else:
             return
 
@@ -707,8 +722,21 @@ class DataSourceResolver:
             if replacement is None:
                 continue
 
+            if platform_name == "bigquery":
+                current_paths = set(self._normalize_paths(table_paths))
+                replacement_paths = set(self._normalize_paths(replacement))
+                replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+                if replacement_format is None:
+                    # v1 manifests carry no table_formats; infer from the
+                    # replacement paths so legacy manifests keep working.
+                    replacement_format = self._infer_format_from_paths(replacement_paths)
+                if replacement_format != "tbl" or not current_paths < replacement_paths:
+                    continue
+
             source.tables[table_name] = replacement
             replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+            if replacement_format is None and platform_name == "bigquery":
+                replacement_format = self._infer_format_from_paths(set(self._normalize_paths(replacement)))
             if replacement_format:
                 source.table_formats[table_name.lower()] = str(replacement_format).lower()
 
@@ -809,9 +837,18 @@ class ZstdHandler(CompressionHandler):
             File object for reading decompressed content
 
         Raises:
+            DataLoadingError: If the ``zstd`` command is not installed. Raised
+                when the first file is opened, before any table loads, instead
+                of surfacing later as an empty load.
             subprocess.CalledProcessError: If zstd decompression fails
-            FileNotFoundError: If zstd command not found
         """
+        if shutil.which("zstd") is None:
+            raise DataLoadingError(
+                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
+                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
+                "uncompressed data."
+            )
+
         # Log decompression start if adapter supports verbosity
         if self.adapter and hasattr(self.adapter, "log_verbose"):
             self.adapter.log_verbose(f"Decompressing {file_path.name} using system zstd command...")
@@ -2678,11 +2715,17 @@ class DataLoader:
 
         table_stats = {}
 
-        # Resolve data source
+        # Resolve data source. A missing source -- or a source naming zero
+        # tables, such as a stale empty datagen manifest -- fails the run for
+        # benchmarks that expect data instead of loading nothing and
+        # validating vacuously. Benchmarks that legitimately skip data
+        # loading keep the previous empty result.
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
-        if not data_source:
-            self.adapter.log_very_verbose("No data source found")
-            return table_stats, elapsed_seconds(start_time)
+        if not data_source or not data_source.tables:
+            if getattr(self.benchmark, "SKIP_DATA_LOADING", False):
+                self.adapter.log_very_verbose("No data source found (data loading skipped)")
+                return table_stats, elapsed_seconds(start_time)
+            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
 
         table_stats = self._load_file_based_data(data_source)
 
@@ -2923,6 +2966,122 @@ class DataLoader:
         if supports_extended_context:
             return self.handler_factory(file_path, self.adapter, self.benchmark, table_name, data_source)
         return self.handler_factory(file_path, self.adapter, self.benchmark)
+
+
+def run_staged_table_loads(
+    adapter: Any,
+    *,
+    tables: Mapping[str, Any],
+    stat_key: Callable[[str], str],
+    filter_files: Callable[[Any], list[Path]],
+    load_one: Callable[[str, list[Path]], int],
+    on_table_loaded: Callable[[str, str, int], None] | None = None,
+    record_timings: bool,
+    fail_fast: bool,
+    success_log: Callable[[str], None] | None = None,
+    summary_log: Callable[[str], None] | None = None,
+    describe_start: Callable[[str, str], str] | None = None,
+    phase_start: float | None = None,
+) -> tuple[dict[str, int], float, dict[str, Any] | None]:
+    """Drive the shared staged-load orchestration loop for cloud adapters.
+
+    Redshift and Snowflake independently implemented the same per-table loop:
+    skip tables with no valid files, run the platform load command, record
+    per-table row counts keyed by engine-case-folded names, and log success
+    or failure. The copies drifted in diagnostic fidelity (truncated versus
+    full error text) while sharing the mechanics, so this template owns the
+    mechanics and each caller supplies its platform hooks.
+
+    Deliberately caller-owned behavior, preserved exactly per platform:
+
+    - ``stat_key`` folds the stats key (``str.lower`` for Redshift,
+      ``str.upper`` for Snowflake) to match each engine's DDL case.
+      Downstream consumers only aggregate the values, but published payloads
+      carry the folded keys, so the template never normalizes them itself.
+    - ``fail_fast`` re-raises a table failure after recording zeros
+      (Snowflake full-refresh semantics); otherwise the loop continues.
+    - ``record_timings`` returns per-table ``{"total_ms": ...}`` timings or
+      ``None`` for adapters that do not report them yet (Redshift).
+    - ``on_table_loaded`` runs caller post-load work such as CTAS sorting
+      inside the measured per-table window, so timings and success lines
+      cover it.
+
+    Error reporting always logs the full error text: truncation hid the
+    cause class on the adopting call sites with no consumer depending on it.
+
+    Args:
+        adapter: Platform adapter used for ``logger`` and ``log_verbose``.
+        tables: Mapping of table name to resolved file paths.
+        stat_key: Fold a table name to its stats-dict key.
+        filter_files: Keep the valid files for one table's paths.
+        load_one: Load one table's files, returning its row count.
+        on_table_loaded: Optional hook called with
+            ``(table_name, stats_key, row_count)`` after a successful load.
+        record_timings: Record per-table wall-clock timings.
+        fail_fast: Re-raise table failures instead of continuing.
+        success_log: Sink for per-table success lines (defaults to
+            ``adapter.logger.info``; Snowflake keeps its verbose-gated form).
+        summary_log: Sink for the total-rows summary (same defaulting).
+        describe_start: Build the per-table start line from
+            ``(table_name, chunk_info)``. Defaults to
+            ``"Loading data for table: {table}{chunk}"``; Redshift's direct
+            INSERT branch keeps its distinct wording through this hook.
+        phase_start: Caller-owned phase clock captured before caller-side
+            setup (cursor creation, query-tag/file-format setup, file
+            resolution, S3 client creation). Each adapter previously timed
+            from ``load_data`` entry, so the template defaults to its own
+            loop entry only when the caller passes nothing.
+
+    Returns:
+        Tuple of (table_stats, total_seconds, per_table_timings or None).
+    """
+    table_stats: dict[str, int] = {}
+    per_table_timings: dict[str, Any] = {}
+    start_time = mono_time() if phase_start is None else phase_start
+    log_success = success_log if success_log is not None else adapter.logger.info
+    log_summary = summary_log if summary_log is not None else adapter.logger.info
+    if describe_start is None:
+
+        def describe_start(table_name: str, chunk_info: str) -> str:
+            return f"Loading data for table: {table_name}{chunk_info}"
+
+    for table_name, file_paths in tables.items():
+        key = stat_key(table_name)
+        valid_files = filter_files(file_paths)
+
+        if not valid_files:
+            adapter.logger.warning(f"Skipping {table_name} - no valid data files")
+            table_stats[key] = 0
+            if record_timings:
+                per_table_timings[key] = {"total_ms": 0}
+            continue
+
+        chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
+        adapter.log_verbose(describe_start(table_name, chunk_info))
+
+        try:
+            load_start = mono_time()
+            row_count = load_one(table_name, valid_files)
+            table_stats[key] = row_count
+            if on_table_loaded is not None:
+                on_table_loaded(table_name, key, row_count)
+            load_time = elapsed_seconds(load_start)
+            if record_timings:
+                per_table_timings[key] = {"total_ms": load_time * 1000}
+            log_success(f"✅ Loaded {row_count:,} rows into {key}{chunk_info} in {load_time:.2f}s")
+        except Exception as exc:
+            error_message = str(exc) or repr(exc) or type(exc).__name__
+            adapter.logger.error(f"Failed to load {table_name}: {error_message}")
+            table_stats[key] = 0
+            if record_timings:
+                per_table_timings[key] = {"total_ms": 0}
+            if fail_fast:
+                raise
+
+    total_time = elapsed_seconds(start_time)
+    total_rows = sum(table_stats.values())
+    log_summary(f"✅ Loaded {total_rows:,} total rows in {total_time:.2f}s")
+    return table_stats, total_time, per_table_timings if record_timings else None
 
 
 class SchemaHelpersMixin:
@@ -3189,6 +3348,7 @@ __all__ = [
     "InMemoryDataHandler",
     "FileFormatRegistry",
     "DataLoader",
+    "run_staged_table_loads",
     "validate_sql_identifier",
     "escape_sql_string_literal",
 ]

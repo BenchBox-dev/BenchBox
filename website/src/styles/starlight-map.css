@@ -1,0 +1,70 @@
+:root {
+  --sl-nav-pad-y: 0;
+  --sl-menu-button-size: 2.75rem;
+  --sl-font: var(--font-sans);
+  --sl-font-mono: var(--font-mono);
+  --sl-nav-height: var(--header-height);
+  --sl-color-accent: var(--accent-secondary);
+  --sl-color-accent-high: var(--accent-primary);
+  --sl-color-accent-low: var(--bg-tertiary);
+  --sl-color-bg: var(--bg-primary);
+  --sl-color-bg-nav: var(--bb-site-header-bg);
+  --sl-color-bg-sidebar: var(--bg-primary);
+  --sl-color-hairline: var(--border-primary);
+  --sl-color-hairline-light: var(--border-primary);
+  --sl-color-hairline-shade: var(--border-primary);
+  --sl-color-text: var(--text-secondary);
+  --sl-color-text-accent: var(--accent-primary);
+  --sl-color-white: var(--text-primary);
+  --sl-color-black: var(--bg-primary);
+  --sl-color-gray-1: var(--text-primary);
+  --sl-color-gray-2: var(--text-secondary);
+  --sl-color-gray-3: var(--text-secondary);
+  --sl-color-gray-4: var(--text-muted);
+  --sl-color-gray-5: var(--border-primary);
+  --sl-color-gray-6: var(--bg-tertiary);
+  --sl-color-gray-7: var(--bg-secondary);
+}
+
+.sl-markdown-content :not(pre) > code {
+  color: var(--text-primary);
+}
+
+.sl-markdown-content table.toctree,
+.sl-markdown-content ul.toctree {
+  list-style: disc;
+}
+
+.page > header .site-header {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+}
+
+.page > header .site-header__inner {
+  max-width: none;
+  padding: 0;
+}
+
+.sl-markdown-content ul.simple > li > p {
+  margin: 0;
+}
+
+.sl-markdown-content table {
+  display: table;
+  width: 100%;
+}
+
+.sl-markdown-content table,
+.sl-markdown-content table * {
+  overflow-wrap: anywhere;
+}
+
+.sl-markdown-content .site-footer,
+main > .site-footer {
+  margin-top: 2rem;
+  padding-inline: 0;
+}
