@@ -44,7 +44,7 @@ Comprehensive reference for benchmarking, database, and BenchBox-specific termin
 : Database storage architecture that stores data by columns rather than rows, optimizing for analytical queries that read many rows but few columns.
 
 **Composite Score**
-: Single metric combining results from multiple benchmark tests. For TPC-H, this is QphH@Size. For TPC-DS, QphDS@Size.
+: Single metric combining results from multiple benchmark tests. The TPC-H (QphH@Size) and TPC-DS (QphDS@Size) composites are not exported by BenchBox; see those entries.
 
 **Concurrent Streams**
 : Multiple query streams executing simultaneously to test throughput performance. Each stream runs a complete set of queries in parallel with other streams.
@@ -131,7 +131,7 @@ Comprehensive reference for benchmarking, database, and BenchBox-specific termin
 : Target database system for benchmark execution. BenchBox supports DuckDB, ClickHouse, Databricks, Snowflake, BigQuery, Redshift.
 
 **Power Test**
-: Single-stream benchmark execution measuring query response time. Runs each query once in sequence. Produces geometric mean or QphH metric.
+: Single-stream benchmark execution measuring query response time. Runs each query once in sequence. Produces a geometric mean and Power@Size.
 
 **Read Primitives**
 : Microbenchmark suite testing fundamental database operations (scans, filters, aggregations, joins) using TPC-H data.
@@ -139,10 +139,10 @@ Comprehensive reference for benchmarking, database, and BenchBox-specific termin
 ## Q
 
 **QphDS@Size**
-: TPC-DS composite performance metric: "Queries per hour at database size". Combines power and throughput test results.
+: TPC-DS composite performance metric: "Queries per hour at database size". **Not exported by BenchBox.** The specification formula is `SF × Q / (T_PT × T_TT × T_DM × T_LD)^(1/4)` with `Q = 99 × S`, and it needs the data maintenance and load times. BenchBox previously exported the geometric mean of Power@Size and Throughput@Size under this name, which is not the specification metric, so it no longer exports any QphDS@Size. Throughput@Size is scored with `Q = 99 × S`. See the [TPC-DS official guide](../guides/tpc/tpc-ds-official-guide.md#qphdssize-not-exported).
 
 **QphH@Size**
-: TPC-H composite performance metric: "Queries per hour at database size". Formula: `(3600 / geomean_power_time) * throughput_factor / scale_factor`.
+: TPC-H composite performance metric: "Queries per hour at database size". **Not exported by BenchBox.** The specification defines Power@Size over the 22 queries plus refresh functions RF1 and RF2, and a throughput test that runs the refresh stream concurrently with the query streams. BenchBox does not run the refresh functions inside the power and throughput tests, so a composite built from its Power@Size and Throughput@Size would overstate the specification metric. BenchBox therefore exports Power@Size and Throughput@Size only. Adding RF1/RF2 to both tests is tracked as follow-up work. See the [TPC-H official guide](../guides/tpc/tpc-h-official-guide.md#qphhsize-not-exported).
 
 **Query ID**
 : Unique identifier for a benchmark query. Examples: `"q1"`, `"query42"`, `"Q01"`.

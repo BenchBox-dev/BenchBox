@@ -352,7 +352,7 @@ def test_run_official_benchmark_aggregates(tpcds_benchmark, monkeypatch):
     assert result["success"] is True
     assert result["power_at_size"] == 16.0
     assert result["throughput_at_size"] == 9.0
-    assert result["qphds_at_size"] == pytest.approx(12.0)
+    assert "qphds_at_size" not in result
 
 
 def test_load_table_data_trims_padding_and_null_conversion(tpcds_benchmark, tmp_path):
@@ -461,7 +461,6 @@ def test_finalize_benchmark_result_populates_timing_fields(tpcds_benchmark):
         "end_time": None,
         "power_at_size": 1.0,
         "throughput_at_size": 2.0,
-        "qphds_at_size": 1.414,
         "success": True,
         "errors": [],
     }

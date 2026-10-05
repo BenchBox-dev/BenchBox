@@ -182,6 +182,7 @@ class StreamRunner:
         result: ThroughputResult,
         config: _RunnerConfig,
         start_time: float,
+        queries_per_stream: int | None = None,
     ) -> bool:
         """Compute TTT, Throughput@Size, and query throughput; mutates *result*.
 
@@ -197,6 +198,8 @@ class StreamRunner:
                 ``scale_factor``).
             start_time: ``mono_time()`` captured before the test body began;
                 used as a fallback total-time when no streams recorded timing.
+            queries_per_stream: Per-stream query count used as Q in
+                Throughput@Size; defaults to the executed statement count.
         """
         result.end_time = datetime.now().isoformat()
 
@@ -204,9 +207,11 @@ class StreamRunner:
         # when the first stream begins execution until the last stream completes.
         # This is the actual concurrent execution time, excluding setup overhead.
         if result.stream_results:
-            first_stream_start = min(sr.start_time for sr in result.stream_results)
-            last_stream_end = max(sr.end_time for sr in result.stream_results)
-            total_time = last_stream_end - first_stream_start
+            first_stream = min(result.stream_results, key=lambda sr: sr.start_time)
+            last_stream = max(result.stream_results, key=lambda sr: sr.end_time)
+            total_time = last_stream.end_time - first_stream.start_time
+            result.start_time = first_stream.start_wall_time or result.start_time
+            result.end_time = last_stream.end_wall_time or result.end_time
         else:
             # Fallback if no streams executed (shouldn't happen in normal operation)
             total_time = elapsed_seconds(start_time)
@@ -221,13 +226,14 @@ class StreamRunner:
             result.success = False
             return False
 
-        total_queries = sum(sr.queries_executed for sr in result.stream_results)
+        executed_queries = sum(sr.queries_executed for sr in result.stream_results)
+        scored_queries = executed_queries if queries_per_stream is None else queries_per_stream * config.num_streams
         result.throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
-            total_queries=total_queries,
+            total_queries=scored_queries,
             total_time_seconds=total_time,
             scale_factor=config.scale_factor,
             num_streams=config.num_streams,
         )
-        result.query_throughput = total_queries / total_time
+        result.query_throughput = executed_queries / total_time
         result.success = result.throughput_at_size > 0
         return result.success

@@ -332,7 +332,7 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
 
     cfg = TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=2, output_dir=tmp_path)
     official = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
-    assert official.qphds_at_size > 0
+    assert not hasattr(official, "qphds_at_size")
     assert ob.validate_compliance(official) is True
     audit = ob.generate_audit_trail(official)
     assert audit.exists()
@@ -348,7 +348,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     failed_dict = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
     assert failed_dict.success is False
     assert failed_dict.throughput_at_size == 0.0
-    assert failed_dict.qphds_at_size == 0.0
 
     class _FailedObjectThroughputPhase:
         def __init__(self, **kwargs):
@@ -361,7 +360,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     failed_object = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
     assert failed_object.success is False
     assert failed_object.throughput_at_size == 0.0
-    assert failed_object.qphds_at_size == 0.0
 
     bad = TPCDSOfficialBenchmarkResult(
         config=cfg,
@@ -373,7 +371,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
         maintenance_test_result=None,
         power_at_size=0.0,
         throughput_at_size=0.0,
-        qphds_at_size=0.0,
         success=False,
         errors=[],
     )

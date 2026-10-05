@@ -411,7 +411,49 @@ class TestMetricsCommand:
             )
 
             assert result.exit_code == 0
-            assert "QphH@Size" in result.output
+            assert "Power@Size" in result.output
+            assert "Throughput@Size" in result.output
+            assert "QphH@Size:" not in result.output
+
+    @pytest.mark.parametrize(
+        ("power_summary", "throughput_summary", "expected"),
+        [
+            ({"tpc_metrics": {"suppressed": True, "reason": "compliance_class=unofficial_subscale"}}, {}, "suppressed"),
+            ({}, {"queries": {"total": 44, "passed": 39, "failed": 5}}, "failed queries"),
+        ],
+    )
+    def test_metrics_qphh_refuses_suppressed_or_failed_results(self, power_summary, throughput_summary, expected):
+        runner = CliRunner()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            power_file = Path(tmpdir) / "power.json"
+            throughput_file = Path(tmpdir) / "throughput.json"
+            power_file.write_text(
+                json.dumps(
+                    {
+                        "environment": {"scale_factor": 1.0},
+                        "summary": {"tpc_metrics": {"power_at_size": 36.0}, **power_summary},
+                    }
+                )
+            )
+            throughput_file.write_text(
+                json.dumps(
+                    {
+                        "environment": {"scale_factor": 1.0},
+                        "run": {"streams": 2},
+                        "summary": {"tpc_metrics": {"throughput_at_size": 36.0}, **throughput_summary},
+                    }
+                )
+            )
+
+            result = runner.invoke(
+                cli,
+                ["metrics", "qphh", "--power-results", str(power_file), "--throughput-results", str(throughput_file)],
+            )
+
+            assert result.exit_code != 0
+            assert expected in result.output
+            assert "Throughput@Size:" not in result.output
 
 
 class TestCalculateQphhCommand:
@@ -432,7 +474,7 @@ class TestCalculateQphhCommand:
         result = runner.invoke(cli, ["calculate-qphh", "--help"])
 
         assert result.exit_code == 0
-        assert "QphH" in result.output
+        assert "Power@Size" in result.output
         assert "--power-results" in result.output
         assert "--throughput-results" in result.output
         assert "--scale-factor" in result.output
@@ -481,8 +523,8 @@ class TestCalculateQphhCommand:
             assert result.exit_code == 0
             # Should show deprecation warning
             assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
-            # But still work
-            assert "QphH@Size" in result.output
+            assert "Power@Size" in result.output
+            assert "QphH@Size:" not in result.output
 
 
 class TestRunOfficialFlag:

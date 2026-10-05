@@ -40,6 +40,7 @@ from benchbox.core.results.environment import (
     build_platform_metadata_payload,
 )
 from benchbox.core.results.metrics import (
+    NON_POWER_TEST_TYPES,
     TimingStatsCalculator,
     TPCMetricsCalculator,
 )
@@ -229,7 +230,7 @@ class ResultBuilder:
 
     Key responsibilities:
     - Normalize query results to consistent format
-    - Calculate TPC metrics (Power@Size, Throughput@Size, QphH)
+    - Calculate TPC metrics (Power@Size, Throughput@Size)
     - Calculate timing statistics (avg, min, max, percentiles, geometric mean)
     - Build complete platform_info with rich configuration
     - Ensure all fields are populated regardless of execution mode
@@ -624,7 +625,6 @@ class ResultBuilder:
             tpc_metrics = {
                 "power_at_size": None,
                 "throughput_at_size": None,
-                "qph_at_size": None,
             }
             if failed_queries:
                 geometric_mean = 0.0
@@ -689,7 +689,6 @@ class ResultBuilder:
             test_execution_type=self._benchmark.test_type,
             power_at_size=tpc_metrics.get("power_at_size"),
             throughput_at_size=tpc_metrics.get("throughput_at_size"),
-            qph_at_size=tpc_metrics.get("qph_at_size"),
             geometric_mean_execution_time=geometric_mean or None,
             # Validation
             validation_status=validation_status,
@@ -764,13 +763,13 @@ class ResultBuilder:
     def _calculate_tpc_metrics(self) -> dict[str, float | None]:
         """Calculate TPC benchmark metrics.
 
-        Power@Size, Throughput@Size, and QphH/QphDS are only defined for
-        TPC benchmarks (TPC-H, TPC-DS). Non-TPC benchmarks return all None.
+        Power@Size and Throughput@Size are only defined for TPC benchmarks
+        (TPC-H, TPC-DS). Non-TPC benchmarks return all None. No composite
+        QphH/QphDS is derived.
         """
         metrics: dict[str, float | None] = {
             "power_at_size": None,
             "throughput_at_size": None,
-            "qph_at_size": None,
         }
 
         # Power@Size is only defined for TPC benchmarks
@@ -797,35 +796,29 @@ class ResultBuilder:
                 total_queries = sum(len(s["query_results"]) for s in self._throughput_streams)
                 num_streams = len(self._throughput_streams)
                 total_time = self._throughput_total_time_seconds
+                if total_time > 0 and total_queries > 0 and num_streams > 0:
+                    throughput = TPCMetricsCalculator.calculate_throughput_at_size(
+                        total_queries,
+                        total_time,
+                        scale_factor,
+                        num_streams,
+                    )
+                    if throughput > 0:
+                        metrics["throughput_at_size"] = throughput
             elif self._execution_phases_override and self._execution_phases_override.throughput_test:
                 phase = self._execution_phases_override.throughput_test
-                total_queries = phase.total_queries_executed
-                num_streams = phase.num_streams
-                total_time = (phase.duration_ms or 0) / 1000.0
-
-            if total_time > 0 and total_queries > 0 and num_streams > 0:
-                throughput = TPCMetricsCalculator.calculate_throughput_at_size(
-                    total_queries,
-                    total_time,
-                    scale_factor,
-                    num_streams,
-                )
-                if throughput > 0:
-                    metrics["throughput_at_size"] = throughput
-
-        # Calculate composite QphH for combined tests
-        power = metrics.get("power_at_size")
-        throughput = metrics.get("throughput_at_size")
-        if power and throughput:
-            qph = TPCMetricsCalculator.calculate_qph(power, throughput)
-            if qph > 0:
-                metrics["qph_at_size"] = qph
+                if phase.success and phase.throughput_at_size and phase.throughput_at_size > 0:
+                    metrics["throughput_at_size"] = phase.throughput_at_size
 
         return metrics
 
     def _calculate_power_at_size(self) -> float | None:
         """Calculate Power@Size using only final measurement iteration."""
-        measurement = [r for r in self._query_results if r.run_type == "measurement" and r.iteration > 0]
+        measurement = [
+            r
+            for r in self._query_results
+            if r.run_type == "measurement" and r.iteration > 0 and r.test_type not in NON_POWER_TEST_TYPES
+        ]
         if not measurement:
             return None
 

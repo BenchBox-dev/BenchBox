@@ -1,8 +1,8 @@
 """TPC-DS Official Benchmark Implementation.
 
 This module provides the official TPC-DS benchmark implementation that follows
-the TPC-DS specification exactly, including all test phases and the official
-QphDS@Size calculation.
+the TPC-DS specification exactly, including all test phases, with Power@Size
+and Throughput@Size.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -12,7 +12,6 @@ This implementation is based on the TPC-DS specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -56,7 +55,6 @@ class TPCDSOfficialBenchmarkResult:
     maintenance_test_result: Optional[dict[str, Any]]
     power_at_size: float
     throughput_at_size: float
-    qphds_at_size: float
     success: bool
     errors: list[str]
     compliance_validated: bool = False
@@ -127,14 +125,15 @@ class TPCDSOfficialBenchmark:
         """Run the complete TPC-DS Official Benchmark.
 
         This method executes all phases of the TPC-DS benchmark according
-        to the official specification and calculates the QphDS@Size metric.
+        to the official specification and reports Power@Size and Throughput@Size.
+        The composite QphDS@Size is not computed because the TPC-DS formula is not implemented.
 
         Args:
             connection_factory: Factory function to create database connections
             config: Optional benchmark configuration (uses default if not provided)
 
         Returns:
-            Complete benchmark results with QphDS@Size metric
+            Complete benchmark results
 
         Raises:
             RuntimeError: If benchmark execution fails
@@ -155,7 +154,6 @@ class TPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -245,10 +243,6 @@ class TPCDSOfficialBenchmark:
                         result.errors.append(f"Maintenance Test failed: {e}")
                         result.success = False
 
-            # Calculate QphDS@Size (geometric mean)
-            if result.power_at_size > 0 and result.throughput_at_size > 0:
-                result.qphds_at_size = math.sqrt(result.power_at_size * result.throughput_at_size)
-
             result.total_time = elapsed_seconds(benchmark_start)
             result.end_time = datetime.now().isoformat()
 
@@ -277,9 +271,6 @@ class TPCDSOfficialBenchmark:
         if result.power_at_size <= 0 or result.throughput_at_size <= 0:
             return False
 
-        if result.qphds_at_size <= 0:
-            return False
-
         # Additional specification compliance checks would go here
         return True
 
@@ -301,7 +292,5 @@ class TPCDSOfficialBenchmark:
             result=result,
             benchmark_title="TPC-DS",
             benchmark_slug="tpcds",
-            qph_label="QphDS@Size",
-            qph_attr="qphds_at_size",
             output_file=output_file,
         )

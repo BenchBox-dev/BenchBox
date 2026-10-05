@@ -225,7 +225,7 @@ benchbox run --official --benchmark tpch --platform snowflake --scale 100 \
   --seed 42 \
   --output results/throughput/
 
-# 3. Calculate composite metric
+# 3. Calculate Power@Size and Throughput@Size (no composite QphH)
 benchbox metrics qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json

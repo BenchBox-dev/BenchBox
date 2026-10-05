@@ -5,14 +5,14 @@
 ```{tags} advanced, guide, tpc-ds, validation
 ```
 
-This guide provides systematic documentation for the TPC-DS official benchmark implementation in BenchBox, including the complete QphDS@Size metric calculation according to the TPC-DS specification.
+This guide provides systematic documentation for the TPC-DS official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphDS@Size; see [QphDS@Size (not exported)](#qphdssize-not-exported).
 
 ## Overview
 
 The TPC-DS official benchmark implementation provides a complete, certification-ready TPC-DS benchmark that meets all official TPC-DS specification requirements. It includes:
 
 - **Complete benchmark execution** with all three phases
-- **Official QphDS@Size metric calculation** using the geometric mean formula
+- **Power@Size and Throughput@Size** (no composite QphDS@Size; see below)
 - **Comprehensive reporting** and validation
 - **TPC compliance framework** integration
 - **Audit trail functionality** for certification readiness
@@ -21,7 +21,7 @@ The TPC-DS official benchmark implementation provides a complete, certification-
 
 - **TPC-DS Compliant**: Follows official TPC-DS specification
 - **Complete Implementation**: Power, Throughput, and Maintenance Tests
-- **Official Metrics**: QphDS@Size calculation with geometric mean
+- **Metrics**: Power@Size and Throughput@Size (`Q = 99 × S`)
 - **Multi-format Reporting**: Text, JSON, CSV, HTML reports
 - **Validation Framework**: Comprehensive result validation
 - **Error Handling**: Robust error handling and recovery
@@ -44,8 +44,7 @@ result = benchmark.run_official_benchmark(
     num_streams=2
 )
 
-# Access official metrics
-print(f"QphDS@Size: {result.qphds_size:.2f}")
+# Access metrics
 print(f"Power@Size: {result.power_size:.2f}")
 print(f"Throughput@Size: {result.throughput_size:.2f}")
 ```
@@ -74,17 +73,24 @@ The TPC-DS benchmark is the official Transaction Processing Performance Council 
 - **Multi-Stream**: Concurrent execution capability
 - **Refresh Functions**: Data maintenance operations
 
-### Official Metric
+### QphDS@Size (not exported)
 
-The **QphDS@Size** (Queries per Hour at Scale Factor) is the official composite metric calculated as:
+The **QphDS@Size** (Queries per Hour at Scale Factor) is the TPC-DS primary composite metric. The specification defines it as:
 
 ```
-QphDS@Size = sqrt(Power@Size × Throughput@Size)
+QphDS@Size = SF × Q / (T_PT × T_TT × T_DM × T_LD)^(1/4)
 ```
 
-Where:
-- `Power@Size = 3600 × Scale_Factor / Power_Test_Time`
-- `Throughput@Size = Num_Streams × 3600 × Scale_Factor / Throughput_Test_Time`
+Where `Q = 99 × S` (S is the number of throughput streams), `T_PT` is the power test time, `T_TT = TT1 + TT2` is the total throughput test time, `T_DM = DM1 + DM2` is the data maintenance time, and `T_LD = 0.01 × S × T_load` is the weighted load time. TPC-DS has no Power@Size metric.
+
+**Deviation from the specification.** BenchBox does not export QphDS@Size. Earlier releases exported the geometric mean of Power@Size and Throughput@Size under that name. That value is not the specification metric, because it omits the data maintenance and load times and uses a different combination, so results carrying it are not comparable with published TPC-DS results. BenchBox runs a single throughput test with no data maintenance between throughput tests, so the specification formula is not yet implemented. Implementing it is tracked as follow-up work.
+
+BenchBox exports two metrics instead:
+
+- `Power@Size = 3600 × Scale_Factor / geometric_mean(power query times)`
+- `Throughput@Size = Q × 3600 × Scale_Factor / Throughput_Test_Time`, with `Q = 99 × S`. Template variants 14a/14b, 23a/23b, 24a/24b and 39a/39b count once, so a stream executes 103 statements but is scored as 99 queries. `Throughput_Test_Time` is the wall-clock interval from the first stream's first query to the last stream's last query; connection setup is excluded.
+
+A result with any failed query, or whose throughput phase failed, carries no Throughput@Size.
 
 ## Architecture
 
@@ -427,15 +433,14 @@ for query_result in maintenance_result.query_results:
 
 ### Official TPC-DS Metrics
 
-The implementation calculates all official TPC-DS metrics according to the specification:
+The implementation calculates Power@Size and Throughput@Size. It does not calculate the composite QphDS@Size (see [QphDS@Size (not exported)](#qphdssize-not-exported)):
 
 ```python
 # Access calculated metrics
 result = benchmark.run_official_benchmark(connection_string)
 
-print(f"Power@Size: {result.power_size:.2f} QphDS@Size")
-print(f"Throughput@Size: {result.throughput_size:.2f} QphDS@Size")
-print(f"QphDS@Size: {result.qphds_size:.2f} QphDS@Size")
+print(f"Power@Size: {result.power_size:.2f}")
+print(f"Throughput@Size: {result.throughput_size:.2f}")
 ```
 
 ### Calculation Details
@@ -447,12 +452,7 @@ Power@Size = (3600 × Scale_Factor) / Power_Test_Time
 
 #### Throughput@Size
 ```
-Throughput@Size = (Num_Streams × 3600 × Scale_Factor) / Throughput_Test_Time
-```
-
-#### QphDS@Size (Geometric Mean)
-```
-QphDS@Size = sqrt(Power@Size × Throughput@Size)
+Throughput@Size = (99 × Num_Streams × 3600 × Scale_Factor) / Throughput_Test_Time
 ```
 
 ### Additional Metrics
@@ -479,7 +479,7 @@ The benchmark generates systematic reports in multiple formats automatically:
 
 1. **Executive Summary** (`executive_summary.txt`)
    - High-level metrics and results
-   - QphDS@Size and phase results
+   - Power@Size, Throughput@Size and phase results
    - Overall benchmark status
 
 2. **Detailed Analysis** (`detailed_analysis.txt`)
@@ -655,11 +655,11 @@ def run_benchmark_ci():
         )
 
         # Check minimum performance threshold
-        if result.qphds_size < 100:  # Example threshold
+        if result.throughput_size < 100:  # Example threshold
             print("Performance regression detected!")
             sys.exit(1)
 
-        print(f"Benchmark passed: QphDS@Size = {result.qphds_size:.2f}")
+        print(f"Benchmark passed: Throughput@Size = {result.throughput_size:.2f}")
         return True
 
     except Exception as e:
@@ -677,11 +677,11 @@ results = []
 for sf in scale_factors:
     benchmark = TPCDSBenchmark(scale_factor=sf)
     result = benchmark.run_official_benchmark(connection_string)
-    results.append((sf, result.qphds_size))
+    results.append((sf, result.throughput_size))
 
 # Analyze scaling behavior
-for sf, qphds in results:
-    print(f"Scale Factor {sf}: QphDS@Size = {qphds:.2f}")
+for sf, throughput in results:
+    print(f"Scale Factor {sf}: Throughput@Size = {throughput:.2f}")
 ```
 
 ## Troubleshooting
@@ -832,7 +832,6 @@ from datetime import datetime
 def archive_results(result):
     archive_data = {
         "timestamp": datetime.now().isoformat(),
-        "qphds_size": result.qphds_size,
         "power_size": result.power_size,
         "throughput_size": result.throughput_size,
         "scale_factor": result.scale_factor,
@@ -850,13 +849,13 @@ def archive_results(result):
 def continuous_benchmark():
     benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
-    baseline_qphds = 500.0  # Your baseline
+    baseline_throughput = 500.0  # Your baseline
 
     while True:
         result = benchmark.run_official_benchmark(connection_string)
 
         # Check for performance regression
-        if result.qphds_size < baseline_qphds * 0.95:  # 5% tolerance
+        if result.throughput_size < baseline_throughput * 0.95:  # 5% tolerance
             alert_performance_regression(result)
 
         time.sleep(3600)  # Run every hour
@@ -864,7 +863,7 @@ def continuous_benchmark():
 
 ## Conclusion
 
-The TPC-DS official benchmark implementation provides a systematic, certification-ready solution for running TPC-DS benchmarks with official QphDS@Size metric calculation. The implementation follows TPC-DS specifications and includes extensive validation, reporting, and error handling capabilities.
+The TPC-DS official benchmark implementation provides a systematic, certification-ready solution for running TPC-DS benchmarks with Power@Size and Throughput@Size. The implementation follows TPC-DS specifications and includes extensive validation, reporting, and error handling capabilities.
 
 For additional support:
 - Review the integration tests in `tests/integration/test_tpcds_official_benchmark.py`

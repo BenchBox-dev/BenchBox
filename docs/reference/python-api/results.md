@@ -113,7 +113,7 @@ These nine are required.
 | <span id="benchbox.core.results.models.BenchmarkResults.test_execution_type"></span>`test_execution_type` | `str` | `'standard'` | Kind of test the run performed. BenchBox uses `standard`, `power`, `throughput` and `maintenance`. |
 | <span id="benchbox.core.results.models.BenchmarkResults.power_at_size"></span>`power_at_size` | `float \| None` | `None` | TPC power metric, when the run computed one. |
 | <span id="benchbox.core.results.models.BenchmarkResults.throughput_at_size"></span>`throughput_at_size` | `float \| None` | `None` | TPC throughput metric, when the run computed one. |
-| <span id="benchbox.core.results.models.BenchmarkResults.qph_at_size"></span>`qph_at_size` | `float \| None` | `None` | TPC composite metric (QphH for TPC-H, QphDS for TPC-DS), when computed. |
+| <span id="benchbox.core.results.models.BenchmarkResults.qph_at_size"></span>`qph_at_size` | `float \| None` | `None` | Always `None` for new results: BenchBox does not export QphH or QphDS. Retained so older stored results still load. |
 | <span id="benchbox.core.results.models.BenchmarkResults.compliance_class"></span>`compliance_class` | `str \| None` | `None` | Comparability class of the methodology. A TPC-H run at scale factor 0.01 reported `unofficial_subscale`; TPC-DS also uses `official` and `unofficial_nonstandard`. |
 | <span id="benchbox.core.results.models.BenchmarkResults.benchmark_version"></span>`benchmark_version` | `str \| None` | `None` | Optional version of the benchmark definition. |
 | <span id="benchbox.core.results.models.BenchmarkResults.dataset_version"></span>`dataset_version` | `str \| None` | `None` | Optional dataset identity for manifest-backed benchmarks. |

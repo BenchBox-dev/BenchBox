@@ -5,33 +5,34 @@
 ```{tags} advanced, guide, tpc-h, validation
 ```
 
-This guide provides systematic documentation for the TPC-H official benchmark implementation in BenchBox, including the complete QphH@Size calculation that meets TPC-H specification requirements.
+This guide provides systematic documentation for the TPC-H official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphH@Size; see [QphH@Size (not exported)](#qphhsize-not-exported).
 
 ## Overview
 
-The TPC-H official benchmark implementation provides a complete, certification-ready TPC-H benchmark that coordinates all three test phases and calculates the official QphH@Size (Queries per Hour @ Size) metric according to the TPC-H specification.
+The TPC-H official benchmark implementation provides a complete, certification-ready TPC-H benchmark that coordinates all three test phases and reports Power@Size and Throughput@Size. It does not report the composite QphH@Size (Queries per Hour @ Size).
 
 ### What is TPC-H?
 
 TPC-H is a decision support benchmark that consists of a suite of business-oriented ad-hoc queries and concurrent data modifications. The benchmark illustrates decision support systems that examine large volumes of data, execute queries with a high degree of complexity, and give answers to critical business questions.
 
-### QphH@Size Metric
+### QphH@Size (not exported)
 
-The QphH@Size metric is the official TPC-H performance measure that combines both single-stream (Power Test) and multi-stream (Throughput Test) performance:
+The QphH@Size metric is the official TPC-H performance measure. The specification defines Power@Size over the 22 queries plus the refresh functions RF1 and RF2, and requires the throughput test to run S pairs of RF1/RF2 in a refresh stream concurrently with the S query streams. QphH@Size is the geometric mean of Power@Size and Throughput@Size.
 
-```
-QphH@Size = √(Power@Size × Throughput@Size)
-```
+**Deviation from the specification.** BenchBox does not export QphH@Size. Its power test runs the 22 queries only, its throughput test has no refresh stream, and the maintenance test runs afterwards, not concurrently. A composite built from those values would overstate the specification metric, so results carry neither `qphh_at_size` nor a QphH label. Adding RF1/RF2 to the power and throughput tests is tracked as follow-up work.
 
-Where:
-- **Power@Size** = 3600 × Scale_Factor / Power_Test_Time
-- **Throughput@Size** = Num_Streams × 3600 × Scale_Factor / Throughput_Test_Time
+BenchBox reports these two metrics instead:
+
+- **Power@Size** = 3600 × Scale_Factor / geometric_mean(query times)
+- **Throughput@Size** = (22 × Num_Streams) × 3600 × Scale_Factor / Throughput_Test_Time, where the time is the wall-clock interval from the first stream's first query to the last stream's last query (connection setup is excluded)
+
+A result with any failed query, or whose throughput phase failed, carries no Throughput@Size.
 
 ## Key Features
 
 - **Complete TPC-H Implementation**: All 22 queries with proper parameterization
 - **Three Test Phases**: Power Test, Throughput Test, and Maintenance Test
-- **Official QphH@Size Calculation**: Geometric mean formula per TPC-H spec
+- **Power@Size and Throughput@Size**: reported separately; no composite QphH@Size
 - **Certification Ready**: Meets all TPC-H specification requirements
 - **Comprehensive Reporting**: HTML, text, and CSV report generation
 - **Result Validation**: Automatic validation against TPC-H specification
@@ -48,7 +49,7 @@ The implementation follows the TPC-H specification requirements:
 - **Power Test**: Sequential execution of all queries
 - **Throughput Test**: Concurrent execution of multiple query streams
 - **Maintenance Test**: Concurrent data modification operations
-- **Metric Calculation**: Official QphH@Size calculation formula
+- **Metric Calculation**: Power@Size and Throughput@Size (the QphH@Size composite is not exported)
 - **Result Validation**: Validation against TPC-H specification requirements
 
 ## Installation and Setup
@@ -123,7 +124,6 @@ result = benchmark.run_official_benchmark(
 )
 
 # Display results
-print(f"QphH@Size: {result.qphh_at_size:.2f}")
 print(f"Power@Size: {result.power_test.power_at_size:.2f}")
 print(f"Throughput@Size: {result.throughput_test.throughput_at_size:.2f}")
 print(f"Certification Ready: {result.certification_ready}")
@@ -162,7 +162,6 @@ result = benchmark.run_official_benchmark(
 ```python
 # Overall results
 print(f"Success: {result.success}")
-print(f"QphH@Size: {result.qphh_at_size}")
 print(f"Total Time: {result.total_benchmark_time}")
 
 # Power Test results
@@ -337,44 +336,31 @@ Incorrect: generate → load → maintenance → power → throughput  ❌ (powe
 - Tests system's ability to handle concurrent data modifications
 - Required for complete TPC-H compliance and certification
 
-## QphH@Size Calculation
+## Power@Size and Throughput@Size Calculation
 
-The QphH@Size metric is calculated using the official TPC-H formula:
-
-### Formula
-
-```
-QphH@Size = √(Power@Size × Throughput@Size)
-```
+BenchBox does not calculate QphH@Size (see [QphH@Size (not exported)](#qphhsize-not-exported)). It calculates the two component metrics.
 
 ### Component Calculations
 
 **Power@Size:**
 ```
-Power@Size = 3600 × Scale_Factor / Power_Test_Time
+Power@Size = 3600 × Scale_Factor / geometric_mean(query times)
 ```
 
 **Throughput@Size:**
 ```
-Throughput@Size = Num_Streams × 3600 × Scale_Factor / Throughput_Test_Time
+Throughput@Size = 22 × Num_Streams × 3600 × Scale_Factor / Throughput_Test_Time
 ```
 
 ### Example Calculation
 
-For a benchmark with:
+For a throughput test with:
 - Scale Factor: 1.0
-- Power Test Time: 100 seconds
 - Throughput Test Time: 150 seconds
 - Number of Streams: 2
 
 ```python
-# Calculate components
-power_at_size = 3600 * 1.0 / 100  # = 36.0
-throughput_at_size = 2 * 3600 * 1.0 / 150  # = 48.0
-
-# Calculate QphH@Size
-qphh_at_size = (power_at_size * throughput_at_size) ** 0.5
-# = (36.0 * 48.0) ** 0.5 = 41.57
+throughput_at_size = 22 * 2 * 3600 * 1.0 / 150  # = 1056.0
 ```
 
 ## Reporting and Validation
@@ -611,8 +597,8 @@ def custom_connection_factory():
 ```python
 def custom_validate_result(result):
     """Custom result validation."""
-    if result.qphh_at_size < 100:
-        result.validation_errors.append("QphH@Size below minimum threshold")
+    if result.throughput_test.throughput_at_size < 100:
+        result.validation_errors.append("Throughput@Size below minimum threshold")
     return result
 ```
 
@@ -684,6 +670,6 @@ class TPCHReportGenerator:
 
 ## Conclusion
 
-The TPC-H official benchmark implementation provides a complete, certification-ready solution for TPC-H benchmarking. It includes all required test phases, proper QphH@Size calculation, systematic reporting, and validation capabilities.
+The TPC-H official benchmark implementation provides a complete, certification-ready solution for TPC-H benchmarking. It includes all required test phases, Power@Size and Throughput@Size reporting, systematic reporting, and validation capabilities.
 
 For more information, examples, and updates, visit the [BenchBox GitHub repository](https://github.com/joeharris76/benchbox).

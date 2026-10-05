@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from benchbox.core.cost.models import normalized_cost_allows_direct_total
-from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
@@ -955,6 +954,13 @@ def _post_load_maintenance_phase_payload(setup: Any) -> dict[str, Any]:
     }
 
 
+def _validation_phase_status(row_count_status: str | None, overall_status: str | None) -> str | None:
+    overall = (overall_status or "").upper()
+    if (row_count_status or "").upper() == "PASSED" and overall in ("FAILED", "PARTIAL"):
+        return overall
+    return row_count_status
+
+
 def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
     phases: dict[str, Any] = {}
     standard = [
@@ -985,7 +991,7 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             }
         if setup.validation:
             phases["validation"] = {
-                "status": setup.validation.row_count_validation,
+                "status": _validation_phase_status(setup.validation.row_count_validation, result.validation_status),
                 "duration_ms": setup.validation.duration_ms,
             }
         # Opt-in statistics phase (omit when not run). stats_mode records where
@@ -1671,13 +1677,6 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
         metrics["power_at_size"] = result.power_at_size
     if result.throughput_at_size is not None:
         metrics["throughput_at_size"] = result.throughput_at_size
-    if result.qph_at_size is not None:
-        # Output with benchmark-specific key name based on benchmark_name
-        benchmark_id = normalize_benchmark_id(result.benchmark_name or "")
-        if benchmark_id == "tpcds":
-            metrics["qphds_at_size"] = result.qph_at_size
-        else:
-            metrics["qphh_at_size"] = result.qph_at_size
     # Note: geometric_mean_ms is in summary.timing (computed from query times),
     # not here. TPC metrics block contains only TPC-specific metrics.
 

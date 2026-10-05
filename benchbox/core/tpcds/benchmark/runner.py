@@ -1182,13 +1182,14 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str = "standard",
         output_dir: Optional[Union[str, Path]] = None,
     ) -> dict[str, Any]:
-        """Run official TPC-DS benchmark with complete QphDS@Size calculation.
+        """Run the TPC-DS benchmark phases and report Power@Size and Throughput@Size.
 
         This method executes the full TPC-DS benchmark specification including:
         - Power Test (single stream sequential execution)
         - Throughput Test (multi-stream concurrent execution)
         - Maintenance Test (refresh functions)
-        - Official QphDS@Size metric calculation
+
+        The composite QphDS@Size is not computed.
 
         Args:
             connection: Database connection object
@@ -1203,13 +1204,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             output_dir: Directory to output benchmark results
 
         Returns:
-            Complete benchmark results with QphDS@Size metric
+            Complete benchmark results
 
         Raises:
             ValueError: If benchmark configuration is invalid
         """
-        import math
-
         logger = logging.getLogger(__name__)
         if self.verbose:
             logger.setLevel(logging.INFO)
@@ -1232,7 +1231,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "maintenance_test_result": None,
             "power_at_size": 0.0,
             "throughput_at_size": 0.0,
-            "qphds_at_size": 0.0,
             "success": True,
             "errors": [],
         }
@@ -1253,10 +1251,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             # Phase 3: Maintenance Test
             if maintenance_test:
                 self._run_maintenance_phase(connection, dialect, logger, result)
-
-            # Calculate QphDS@Size (geometric mean of Power@Size and Throughput@Size)
-            if result["power_at_size"] > 0 and result["throughput_at_size"] > 0:
-                result["qphds_at_size"] = math.sqrt(result["power_at_size"] * result["throughput_at_size"])
 
             self._finalize_benchmark_result(result, benchmark_start_time, logger)
             return result
@@ -1353,7 +1347,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.info(f"Total time: {result['total_time']:.3f} seconds")
             logger.info(f"Power@Size: {result['power_at_size']:.2f}")
             logger.info(f"Throughput@Size: {result['throughput_at_size']:.2f}")
-            logger.info(f"QphDS@Size: {result['qphds_at_size']:.2f}")
             logger.info(f"Success: {result['success']}")
             if result["errors"]:
                 logger.warning(f"Errors encountered: {len(result['errors'])}")
