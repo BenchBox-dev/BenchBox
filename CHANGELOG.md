@@ -65,9 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   includes throughput. Saved runs that recorded 1 replay as not set.
 - **TPC-H Power@Size changes.** Warm-up and measured power iterations now all
   run stream 00, so they use its query ordering and substitution parameters
-  instead of streams 1, 2 and 3. Row counts are checked on every measured
-  iteration under the default validation mode. This applies to SQL and
-  DataFrame runs. Power results are not comparable with earlier bundles.
+  instead of streams 1, 2 and 3, in SQL and DataFrame runs. SQL runs now
+  also check row counts on every measured iteration under the default
+  validation mode. Power results are not comparable with earlier bundles.
 - **Throughput streams are numbered 1 to S.** TPC-H and TPC-DS throughput runs
   used streams 0 to S-1, so stream 0 repeated the power ordering. Stream 0 is
   now left to the power test and a new stream S takes its place, which changes

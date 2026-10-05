@@ -31,7 +31,7 @@ Power Run Iterations execute the same benchmark test multiple times, providing s
 - **Provides confidence intervals** for benchmark results
 - **Detects performance variance** and consistency issues
 - **Enables statistical comparison** between configurations
-- **Follows TPC specifications**: every warm-up and measured iteration runs stream 00, with the same query ordering and substitution parameters
+- **Follows TPC specifications**: every warm-up and measured TPC-H power iteration runs stream 00, with the same query ordering and substitution parameters
 
 ### Key Benefits
 
@@ -458,7 +458,7 @@ BenchBox ensures compliance with official TPC specifications for query ordering 
 
 ### Power Run Compliance
 
-Every power run iteration, warm-up and measured, runs stream 00 of the TPC specification: the same query permutation and the same substitution parameters, so iterations are repeats of one workload and can be compared directly. Row-count validation applies to every measured iteration under the default validation mode.
+Every TPC-H power run iteration, warm-up and measured, runs stream 00 of the TPC specification: the same query permutation and the same substitution parameters, so iterations are repeats of one workload and can be compared directly. Row-count validation applies to every measured iteration under the default validation mode. TPC-DS power iterations keep their existing stream ordering.
 
 ```python
 # Every iteration: TPC-H stream 0 permutation [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]
