@@ -110,6 +110,7 @@ from typing import Any, Callable, Protocol
 from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.utils.clock import elapsed_seconds
 
+from .containment import record_outstanding_result
 from .result import (
     ThroughputResult,
     ThroughputStreamResult,
@@ -448,6 +449,8 @@ class StreamRunner:
             # to prove termination before releasing a phase boundary.
             result._outstanding_futures = outstanding_futures  # type: ignore[attr-defined]
             result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
+            if result.outstanding_stream_ids:
+                record_outstanding_result(result)
 
     @staticmethod
     def compute_metrics(

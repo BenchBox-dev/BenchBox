@@ -7,6 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import inspect
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -4058,3 +4060,66 @@ class TestStatisticsPhase:
         stats = phases.setup.statistics_gathering
         assert stats is not None
         assert stats.stats_lifecycle == "reset"
+
+
+class TestDeferredConnectionClose:
+    def test_close_waits_for_leaked_workers_after_result_capture_consumed_the_result(self):
+        release = threading.Event()
+        closed = threading.Event()
+        pool = ThreadPoolExecutor(max_workers=1)
+        adapter = MockPlatformAdapter()
+        adapter._last_throughput_test_result = SimpleNamespace(
+            stream_results=[],
+            total_time=60.0,
+            start_time="2025-01-01T00:00:00",
+            end_time="2025-01-01T00:01:00",
+            config=SimpleNamespace(num_streams=1),
+            throughput_at_size=None,
+            success=False,
+            errors=["deadline expired"],
+            outstanding_stream_ids=[0],
+            cleanup_state="outstanding",
+            outstanding_notes=[],
+            _outstanding_futures={0: pool.submit(release.wait, 5.0)},
+        )
+        adapter.connection = Mock()
+        adapter.close_connection = lambda _connection: closed.set()
+
+        try:
+            assert adapter._contain_outstanding_throughput_work({"stream_cleanup_timeout_seconds": 0.05}) is False
+            adapter._build_execution_phases(
+                [], [], {"test_execution_type": "throughput", "benchmark_name": "tpch"}, setup_phase=None
+            )
+            adapter._close_run_connection()
+
+            assert not closed.wait(0.3)
+            release.set()
+            assert closed.wait(5.0)
+        finally:
+            release.set()
+            pool.shutdown(wait=True)
+
+    def test_unquiesced_work_blocks_post_measurement_probes_on_the_shared_connection(self):
+        release = threading.Event()
+        pool = ThreadPoolExecutor(max_workers=1)
+        adapter = MockPlatformAdapter()
+        adapter._last_throughput_test_result = SimpleNamespace(
+            outstanding_stream_ids=[0],
+            cleanup_state="outstanding",
+            outstanding_notes=[],
+            _outstanding_futures={0: pool.submit(release.wait, 5.0)},
+        )
+        connection = Mock()
+        probe = Mock()
+
+        try:
+            assert adapter._contain_outstanding_throughput_work({"stream_cleanup_timeout_seconds": 0.05}) is False
+            assert adapter._post_measurement_contained is True
+            with patch.object(adapter, "_collect_client_link_metadata", probe):
+                assert adapter._collect_post_measurement_metadata(connection, {}) == 0.0
+            probe.assert_not_called()
+            connection.cursor.assert_not_called()
+            assert adapter._client_link_metadata["collection_error_class"] == "OutstandingThroughputWork"
+        finally:
+            release.set()
+            pool.shutdown(wait=True)
