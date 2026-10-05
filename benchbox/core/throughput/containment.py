@@ -45,7 +45,17 @@ def track_outstanding_results() -> Iterator[list[Any]]:
 def record_outstanding_result(throughput_result: Any) -> None:
     sink = _outstanding_sink.get()
     if sink is not None:
+        throughput_result._tracked_stream_ids = frozenset(
+            int(stream_id) for stream_id in getattr(throughput_result, "outstanding_stream_ids", None) or []
+        )
         sink.append(throughput_result)
+
+
+def tracked_stream_ids(throughput_result: Any) -> frozenset[int]:
+    recorded = getattr(throughput_result, "_tracked_stream_ids", None)
+    if recorded is not None:
+        return recorded
+    return frozenset(int(stream_id) for stream_id in getattr(throughput_result, "outstanding_stream_ids", None) or [])
 
 
 @dataclass(frozen=True)

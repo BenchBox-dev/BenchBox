@@ -23,7 +23,7 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import get_all_benchmarks
-from benchbox.core.throughput.containment import await_quiescence, track_outstanding_results
+from benchbox.core.throughput.containment import await_quiescence, track_outstanding_results, tracked_stream_ids
 from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
@@ -1036,21 +1036,74 @@ def derive_job_outcome(response: Mapping[str, Any]) -> str:
     return "completed"
 
 
-def _mark_quiesced(value: object) -> None:
+_RESULT_FILE_NOTE = (
+    "The result file reflects the moment of export; outstanding work quiesced before publication "
+    "and is recorded in this response as quiesced_stream_ids."
+)
+
+
+def _annotate_quiesced(value: object) -> bool:
+    changed = False
     if isinstance(value, dict):
         outstanding_work = value.get("outstanding_work")
         if isinstance(outstanding_work, dict):
-            outstanding_work["stream_ids"] = []
-            outstanding_work["cleanup_state"] = "quiesced"
+            changed |= _move_to_quiesced(outstanding_work, "stream_ids")
+        if value.get("outstanding_stream_ids"):
+            changed |= _move_to_quiesced(value, "outstanding_stream_ids")
         if value.get("cleanup_state") == "outstanding":
             value["cleanup_state"] = "quiesced"
-        if value.get("outstanding_stream_ids"):
-            value["outstanding_stream_ids"] = []
+            value["quiesced_before_publication"] = True
+            changed = True
         for item in value.values():
-            _mark_quiesced(item)
+            changed |= _annotate_quiesced(item)
     elif isinstance(value, list):
         for item in value:
-            _mark_quiesced(item)
+            changed |= _annotate_quiesced(item)
+    return changed
+
+
+def _move_to_quiesced(mapping: dict[str, Any], key: str) -> bool:
+    stream_ids = mapping.get(key)
+    if not stream_ids:
+        return False
+    mapping["quiesced_stream_ids"] = list(stream_ids)
+    mapping[key] = []
+    mapping["cleanup_state"] = "quiesced"
+    mapping["quiesced_before_publication"] = True
+    return True
+
+
+def _mark_quiesced(response: dict[str, Any]) -> None:
+    if not _annotate_quiesced(response):
+        return
+    metadata = response.get("mcp_metadata")
+    if isinstance(metadata, dict):
+        metadata["result_file_note"] = _RESULT_FILE_NOTE
+
+
+def _stream_ids(value: object) -> set[int]:
+    if isinstance(value, (list, tuple)):
+        return {int(stream_id) for stream_id in value}
+    return set()
+
+
+def _response_outstanding_ids(value: object, ids: set[int]) -> bool:
+    unattributed = False
+    if isinstance(value, Mapping):
+        ids.update(_stream_ids(value.get("outstanding_stream_ids")))
+        outstanding_work = value.get("outstanding_work")
+        if isinstance(outstanding_work, Mapping):
+            ids.update(_stream_ids(outstanding_work.get("stream_ids")))
+        if value.get("cleanup_state") == "outstanding" and not (
+            _stream_ids(value.get("stream_ids")) or _stream_ids(value.get("outstanding_stream_ids"))
+        ):
+            unattributed = True
+        for item in value.values():
+            unattributed |= _response_outstanding_ids(item, ids)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            unattributed |= _response_outstanding_ids(item, ids)
+    return unattributed
 
 
 def _published_outcome(response_path: Path) -> str:
@@ -1254,7 +1307,8 @@ class DurableJobWorker:
                     except Exception as exc:
                         execution_error = exc
                     tracked_results = list(leaked_results)
-                    executor_quiescent = self._executor_is_quiescent(tracked_results, response, execution_error)
+                    assessment = self._assess_executor(tracked_results, response, execution_error)
+                    executor_quiescent = assessment == "quiescent"
                     if not executor_quiescent:
                         if execution_error is not None:
                             logger.error(
@@ -1265,7 +1319,9 @@ class DurableJobWorker:
                             job.execution_id,
                             self.worker_id,
                         )
-                        self._attest_when_leaked_work_ends(job.execution_id, staging, tracked_results)
+                        self._attest_when_leaked_work_ends(
+                            job.execution_id, staging, tracked_results if assessment == "attestable" else []
+                        )
                         return
                     if execution_error is None:
                         assert response is not None
@@ -1371,16 +1427,22 @@ class DurableJobWorker:
         )
 
     @staticmethod
-    def _executor_is_quiescent(
+    def _assess_executor(
         tracked_results: list[Any], response: dict[str, Any] | None, execution_error: Exception | None
-    ) -> bool:
+    ) -> Literal["quiescent", "attestable", "unobserved"]:
         if any(not await_quiescence(result, timeout=0) for result in tracked_results):
-            return False
-        if tracked_results:
-            if response is not None:
-                _mark_quiesced(response)
-            return True
-        return execution_error is not None or response is None or not _response_has_outstanding_work(response)
+            return "attestable"
+        reported = execution_error is None and response is not None and _response_has_outstanding_work(response)
+        if not tracked_results:
+            return "unobserved" if reported else "quiescent"
+        if reported:
+            reported_ids: set[int] = set()
+            tracked_ids = frozenset().union(*(tracked_stream_ids(result) for result in tracked_results))
+            if _response_outstanding_ids(response, reported_ids) or not reported_ids <= tracked_ids:
+                return "unobserved"
+        if response is not None:
+            _mark_quiesced(response)
+        return "quiescent"
 
     def _attest_when_leaked_work_ends(self, execution_id: str, staging: Path, leaked_results: list[Any]) -> None:
         if not leaked_results:

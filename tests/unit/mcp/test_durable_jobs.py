@@ -1385,14 +1385,15 @@ def test_tracked_work_that_quiesced_in_run_publishes_with_its_derived_outcome(tm
     assert replacement is not None and replacement.execution_id == waiting.execution_id
 
 
-def test_stale_outstanding_export_of_quiesced_work_publishes_a_quiesced_result(tmp_path: Path) -> None:
+def test_stale_outstanding_export_of_quiesced_work_publishes_an_annotated_result(tmp_path: Path) -> None:
     response = {
+        "mcp_metadata": {"result_file": None},
         "phases": {
             "throughput_test": {
                 "status": "FAILED",
                 "outstanding_work": {"stream_ids": [2], "cleanup_state": "outstanding"},
             }
-        }
+        },
     }
     repository, _worker, submitted, waiting = _run_with_tracked_result(tmp_path, _quiesced_result(), response)
 
@@ -1400,9 +1401,33 @@ def test_stale_outstanding_export_of_quiesced_work_publishes_a_quiesced_result(t
     assert finished is not None and finished.state == "completed" and finished.outcome == "failed"
     payload = json.loads(Path(finished.artifact_path).read_text(encoding="utf-8"))
     assert not _response_has_outstanding_work(payload)
-    assert payload["phases"]["throughput_test"]["outstanding_work"] == {"stream_ids": [], "cleanup_state": "quiesced"}
+    assert payload["phases"]["throughput_test"]["outstanding_work"] == {
+        "stream_ids": [],
+        "quiesced_stream_ids": [2],
+        "cleanup_state": "quiesced",
+        "quiesced_before_publication": True,
+    }
+    assert "moment of export" in payload["mcp_metadata"]["result_file_note"]
     replacement = repository.claim("worker-b")
     assert replacement is not None and replacement.execution_id == waiting.execution_id
+
+
+def test_outstanding_streams_the_worker_never_tracked_keep_the_job_quarantined(tmp_path: Path) -> None:
+    response = {
+        "mcp_metadata": {"result_file": None},
+        "phases": {
+            "throughput_test": {
+                "status": "FAILED",
+                "outstanding_work": {"stream_ids": [2, 9], "cleanup_state": "outstanding"},
+            }
+        },
+    }
+    repository, _worker, submitted, _waiting = _run_with_tracked_result(tmp_path, _quiesced_result(2), response)
+
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None and contained.state == "unknown" and contained.artifact_path is None
+    assert not _wait_until(lambda: repository.get(submitted.execution_id).quiesced_at is not None, timeout=0.5)
+    assert repository.claim("worker-b") is None
 
 
 def test_unproven_tracked_work_is_quarantined_then_attested_even_after_it_quiesces(tmp_path: Path) -> None:
