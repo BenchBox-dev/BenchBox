@@ -665,9 +665,9 @@ class ClickHouseWorkloadMixin:
         if table_tuning is None or not table_tuning.has_any_tuning():
             return None
 
-        from benchbox.core.tuning.ddl_generator import get_ddl_generator
+        from benchbox.core.tuning.generators.clickhouse import ClickHouseDDLGenerator
 
-        generator = get_ddl_generator("clickhouse")
+        generator = ClickHouseDDLGenerator()
         clauses = generator.generate_tuning_clauses(table_tuning, primary_key_columns=primary_key_columns or None)
         if clauses.is_empty():
             return None
