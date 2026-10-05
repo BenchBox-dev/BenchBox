@@ -1,28 +1,26 @@
 ---
 import { THEME_ICON_ATTRS, THEME_ICON_SHAPES, THEME_OPTIONS, shellLabels } from "../lib/header-links.ts";
 
-const options = THEME_OPTIONS.map((value) => ({ value, label: shellLabels.themeOptions[value], shapes: THEME_ICON_SHAPES[value] }));
+const labels = shellLabels.themeOptions;
 ---
 
-<div class="theme-toggle" role="radiogroup" aria-label={shellLabels.theme}>
+<button
+  type="button"
+  class="theme-toggle"
+  data-theme-toggle
+  data-theme-choice="system"
+  data-theme-label={shellLabels.theme}
+  data-theme-labels={JSON.stringify(labels)}
+  aria-label={`${shellLabels.theme}: ${labels.system}`}
+>
   {
-    options.map((option) => (
-      <button
-        type="button"
-        role="radio"
-        aria-checked="false"
-        aria-label={option.label}
-        title={option.label}
-        tabindex="-1"
-        data-theme-option={option.value}
-      >
-        <svg {...THEME_ICON_ATTRS} aria-hidden="true" focusable="false">
-          {option.shapes.map((shape) => (shape.tag === "circle" ? <circle {...shape.attrs} /> : <path {...shape.attrs} />))}
-        </svg>
-      </button>
+    THEME_OPTIONS.map((option) => (
+      <svg {...THEME_ICON_ATTRS} class="theme-toggle__icon" data-theme-icon={option} aria-hidden="true" focusable="false">
+        {THEME_ICON_SHAPES[option].map((shape) => (shape.tag === "circle" ? <circle {...shape.attrs} /> : <path {...shape.attrs} />))}
+      </svg>
     ))
   }
-</div>
+</button>
 
 <script>
   const KEY = "benchbox:theme";
@@ -48,10 +46,12 @@ const options = THEME_OPTIONS.map((value) => ({ value, label: shellLabels.themeO
     root.dataset.theme = effective;
     root.style.colorScheme = effective;
     document.body?.setAttribute("data-theme", effective);
-    document.querySelectorAll<HTMLButtonElement>("[data-theme-option]").forEach((button) => {
-      const selected = button.dataset.themeOption === choice;
-      button.setAttribute("aria-checked", selected ? "true" : "false");
-      button.tabIndex = selected ? 0 : -1;
+    document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]").forEach((button) => {
+      const labels = JSON.parse(button.dataset.themeLabels ?? "{}") as Record<string, string>;
+      const next = CHOICES[(CHOICES.indexOf(choice) + 1) % CHOICES.length];
+      button.dataset.themeChoice = choice;
+      button.setAttribute("aria-label", `${button.dataset.themeLabel}: ${labels[choice]}`);
+      button.title = `${labels[choice]}. Switch to ${labels[next]}.`;
     });
     window.dispatchEvent(new CustomEvent("benchbox-theme-change", { detail: { choice, theme: effective } }));
   }
@@ -64,22 +64,10 @@ const options = THEME_OPTIONS.map((value) => ({ value, label: shellLabels.themeO
     apply(choice);
   }
 
-  document.querySelectorAll<HTMLElement>(".theme-toggle").forEach((group) => {
-    const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>("[data-theme-option]"));
-    buttons.forEach((button) => button.addEventListener("click", () => choose(button.dataset.themeOption ?? "system")));
-    group.addEventListener("keydown", (event) => {
-      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-      if (index < 0) return;
-      let next: number;
-      if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % buttons.length;
-      else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + buttons.length) % buttons.length;
-      else if (event.key === "Home") next = 0;
-      else if (event.key === "End") next = buttons.length - 1;
-      else if (event.key === " " || event.key === "Enter") next = index;
-      else return;
-      event.preventDefault();
-      choose(buttons[next].dataset.themeOption ?? "system");
-      buttons[next].focus();
+  document.querySelectorAll<HTMLButtonElement>("[data-theme-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const current = normalize(button.dataset.themeChoice);
+      choose(CHOICES[(CHOICES.indexOf(current) + 1) % CHOICES.length]);
     });
   });
 

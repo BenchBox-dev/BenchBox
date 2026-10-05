@@ -92,6 +92,15 @@ files:
   the Footnotes heading, the headings on generated index pages, the added
   canonical and description metadata and the redirect page placeholders.
 
+Approved by the owner on 2026-10-05 and recorded as `approved` in
+`allowed-differences.json`, after the landing page was redesigned:
+
+- `landing-redesign-headings`: the headings the redesigned landing page adds
+  and removes on `/index.html`, with catalogue entries as `h4` under their
+  group;
+- `landing-hero-image`: `hero.png`, which the landing page no longer shows but
+  still publishes as the social preview image.
+
 Still pending: the new paths in `added-paths.json` (sitemap, robots, favicon,
 `/_astro/`, `/pagefind/`, `/_images/` and `/blog.html`) and the
 `expected-removals-*.json` files that carry no approval field.

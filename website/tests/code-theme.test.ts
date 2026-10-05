@@ -45,7 +45,7 @@ describe("landing code theme", () => {
 
   it("uses the secondary colour for call punctuation and not for keyword arguments", async () => {
     const python = await colours("python", "tpch = TPCH(scale_factor=0.1)");
-    expect(python.get(")")).toBe("var(--text-secondary)");
+    expect(python.get(")")).toBe("var(--code-punctuation)");
     expect(python.get("scale_factor")).toBe("var(--code-fg)");
     expect(python.get("=")).toBe("var(--prism-operator)");
     expect(python.get("0.1")).toBe("var(--prism-deleted)");

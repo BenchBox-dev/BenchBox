@@ -1,5 +1,7 @@
 import { render } from "preact";
 import { App } from "./App";
+import "@fontsource-variable/instrument-sans/wght.css";
+import "@fontsource-variable/martian-mono/wdth.css";
 import "./index.css";
 
 const SPA_REDIRECT_KEY = "benchbox.results.redirect";

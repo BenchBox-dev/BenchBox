@@ -20,7 +20,7 @@ const rules: [string[], string][] = [
       "punctuation.definition.set",
       "punctuation.definition.tuple",
     ],
-    "var(--text-secondary)",
+    "var(--code-punctuation)",
   ],
 ];
 

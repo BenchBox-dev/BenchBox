@@ -15,6 +15,8 @@
   --sl-color-hairline-shade: var(--border-primary);
   --sl-color-text: var(--text-secondary);
   --sl-color-text-accent: var(--accent-primary);
+  --sl-color-text-invert: var(--on-accent);
+  --sl-color-bg-inline-code: var(--bg-tertiary);
   --sl-color-white: var(--text-primary);
   --sl-color-black: var(--bg-primary);
   --sl-color-gray-1: var(--text-primary);
@@ -24,6 +26,39 @@
   --sl-color-gray-5: var(--border-primary);
   --sl-color-gray-6: var(--bg-tertiary);
   --sl-color-gray-7: var(--bg-secondary);
+}
+
+:is(.sl-markdown-content, .content-panel) :is(h1, h2, h3, h4, h5, h6),
+h1#_top {
+  font-family: var(--font-head);
+  font-stretch: var(--head-stretch);
+  letter-spacing: -0.01em;
+}
+
+.sl-markdown-content :is(h1, h2),
+h1#_top {
+  text-transform: uppercase;
+}
+
+.sl-markdown-content a {
+  text-decoration-color: var(--accent-underline);
+  text-underline-offset: 3px;
+}
+
+.sidebar-content .group-label .large {
+  color: var(--text-muted);
+  font-family: var(--font-head);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  border-radius: 999px;
+  background-color: var(--pill-bg);
+  color: var(--pill-fg);
 }
 
 .sl-markdown-content :not(pre) > code {

@@ -93,99 +93,31 @@ describe("Layout", () => {
   it("does not render a theme control in the header", () => {
     renderAt("/results/");
     const globalNav = screen.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL });
-    expect(within(globalNav).queryAllByRole("radio")).toHaveLength(0);
     expect(within(globalNav).queryByRole("button", { name: /theme/i })).toBeNull();
   });
 
-  it("sets the footer theme choice directly from a three-option radiogroup", () => {
+  it("cycles the footer theme button through system, light and dark", () => {
     window.localStorage.removeItem("benchbox:theme");
     renderAt("/results/");
 
-    const group = screen.getByRole("radiogroup", { name: "Color theme" });
-    const system = within(group).getByRole("radio", { name: "System theme" });
-    const light = within(group).getByRole("radio", { name: "Light theme" });
-    const dark = within(group).getByRole("radio", { name: "Dark theme" });
-
-    expect(system).toHaveAttribute("aria-checked", "true");
-    expect(light).toHaveAttribute("aria-checked", "false");
-    expect(dark).toHaveAttribute("aria-checked", "false");
+    const button = screen.getByRole("button", { name: "Color theme: System theme" });
+    expect(button).toHaveAttribute("data-theme-choice", "system");
     expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
 
-    fireEvent.click(dark);
+    fireEvent.click(button);
+    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
+    expect(window.localStorage.getItem("benchbox:theme")).toBe("light");
+    expect(button).toHaveAccessibleName("Color theme: Light theme");
+
+    fireEvent.click(button);
     expect(document.documentElement.dataset.bbThemeChoice).toBe("dark");
     expect(document.documentElement.dataset.bbTheme).toBe("dark");
     expect(window.localStorage.getItem("benchbox:theme")).toBe("dark");
-    expect(dark).toHaveAttribute("aria-checked", "true");
-    expect(system).toHaveAttribute("aria-checked", "false");
+    expect(button).toHaveAttribute("data-theme-choice", "dark");
 
-    fireEvent.click(light);
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
-    expect(window.localStorage.getItem("benchbox:theme")).toBe("light");
-    expect(light).toHaveAttribute("aria-checked", "true");
-    expect(dark).toHaveAttribute("aria-checked", "false");
-
-    fireEvent.click(system);
+    fireEvent.click(button);
     expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
     expect(window.localStorage.getItem("benchbox:theme")).toBeNull();
-    expect(system).toHaveAttribute("aria-checked", "true");
-  });
-
-  it("supports the roving-tabindex radiogroup keyboard pattern", () => {
-    window.localStorage.removeItem("benchbox:theme");
-    renderAt("/results/");
-
-    const group = screen.getByRole("radiogroup", { name: "Color theme" });
-    const system = within(group).getByRole("radio", { name: "System theme" });
-    const light = within(group).getByRole("radio", { name: "Light theme" });
-    const dark = within(group).getByRole("radio", { name: "Dark theme" });
-
-    // Initial roving tabindex: only the checked option is tabbable.
-    expect(system).toHaveAttribute("tabindex", "0");
-    expect(light).toHaveAttribute("tabindex", "-1");
-    expect(dark).toHaveAttribute("tabindex", "-1");
-
-    system.focus();
-
-    fireEvent.keyDown(system, { key: "ArrowRight" });
-    expect(document.activeElement).toBe(light);
-    expect(light).toHaveAttribute("aria-checked", "true");
-    expect(light).toHaveAttribute("tabindex", "0");
-    expect(system).toHaveAttribute("aria-checked", "false");
-    expect(system).toHaveAttribute("tabindex", "-1");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
-
-    fireEvent.keyDown(light, { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(system);
-    expect(system).toHaveAttribute("aria-checked", "true");
-    expect(system).toHaveAttribute("tabindex", "0");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
-
-    // ArrowLeft wraps from the first option to the last.
-    fireEvent.keyDown(system, { key: "ArrowLeft" });
-    expect(document.activeElement).toBe(dark);
-    expect(dark).toHaveAttribute("aria-checked", "true");
-    expect(dark).toHaveAttribute("tabindex", "0");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("dark");
-
-    fireEvent.keyDown(dark, { key: "Home" });
-    expect(document.activeElement).toBe(system);
-    expect(system).toHaveAttribute("aria-checked", "true");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
-
-    fireEvent.keyDown(system, { key: "End" });
-    expect(document.activeElement).toBe(dark);
-    expect(dark).toHaveAttribute("aria-checked", "true");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("dark");
-
-    fireEvent.keyDown(dark, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(light);
-    expect(light).toHaveAttribute("aria-checked", "true");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
-
-    fireEvent.keyDown(light, { key: " " });
-    expect(document.activeElement).toBe(light);
-    expect(light).toHaveAttribute("aria-checked", "true");
-    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
   });
 
   it("renders the Results Explorer subnav and marks the current explorer section", () => {

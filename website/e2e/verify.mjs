@@ -97,6 +97,14 @@ for (const route of samplePages) {
 const widths = [320, 375, 390, 1280];
 const headerSelector = ".site-header a, .site-header button, button.sl-menu-button";
 
+async function chooseTheme(page, choice) {
+  const button = page.locator("[data-theme-toggle]").first();
+  for (let step = 0; step < 3; step++) {
+    if ((await button.getAttribute("data-theme-choice")) === choice) return;
+    await button.click();
+  }
+}
+
 function intersects(a, b) {
   const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
   const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
@@ -150,17 +158,16 @@ for (const width of widths) {
     if (width === 375) {
       const navToggle = page.locator("[data-site-header-toggle]");
       if (await navToggle.isVisible()) await navToggle.click();
-      const toggle = page.locator('.theme-toggle [data-theme-option="dark"]').first();
       try {
-        await toggle.click({ timeout: 3000 });
+        await chooseTheme(page, "dark");
         entry.themeToggleClickable = (await page.evaluate(() => document.documentElement.dataset.theme)) === "dark";
-        await page.locator('.theme-toggle [data-theme-option="system"]').first().click({ timeout: 3000 });
+        await chooseTheme(page, "system");
       } catch (error) {
         entry.themeToggleClickable = false;
         entry.themeToggleError = String(error).split("\n")[0];
       }
-      await page.locator('.theme-toggle [aria-checked="true"]').first().focus();
-      await page.keyboard.press("ArrowRight");
+      await page.locator("[data-theme-toggle]").first().focus();
+      await page.keyboard.press("Enter");
       entry.themeToggleKeyboard = (await page.evaluate(() => document.documentElement.dataset.bbThemeChoice)) === "light";
       const menu = page.locator("button.sl-menu-button");
       if (await menu.count()) {
@@ -311,14 +318,14 @@ for (const theme of ["light", "dark"]) {
       choice: await page.evaluate(() => document.documentElement.dataset.bbThemeChoice),
     });
   await read("initial");
-  await page.getByRole("radio", { name: "Dark theme" }).click();
+  await chooseTheme(page, "dark");
   await read("clicked Dark");
   await page.goto(base + "/results/", { waitUntil: "load" });
   await page.waitForSelector("#app *");
   await read("explorer after Dark on docs");
   await page.goto(base + "/", { waitUntil: "load" });
   await read("landing");
-  await page.getByRole("radio", { name: "System theme" }).click();
+  await chooseTheme(page, "system");
   await read("clicked System");
   report.theme = states;
   await context.close();

@@ -32,6 +32,42 @@ export const SHELL_FOOTER_LEGAL = "BenchBox is open source under the MIT License
 
 export const THEME_OPTIONS: readonly ThemeOption[] = ["system", "light", "dark"];
 
+export function nextThemeOption(choice: ThemeOption): ThemeOption {
+  return THEME_OPTIONS[(THEME_OPTIONS.indexOf(choice) + 1) % THEME_OPTIONS.length] ?? "system";
+}
+
+export const LOGO_ART = [
+  "█                   █    █",
+  "█▀▀▄ █▀▀█ █▀▀▄ █▀▀▀ █▀▀▄ █▀▀▄ ▄▀▀▄ ▀▄▄▀",
+  "█▄▄▀ █▄▄▄ █  █ █▄▄▄ █  █ █▄▄▀ ▀▄▄▀ ▄▀▀▄",
+].join("\n");
+
+export type LogoCell = { x: number; y: number; width: number };
+
+function filledRuns(filled: boolean[], y: number): LogoCell[] {
+  const cells: LogoCell[] = [];
+  for (let x = 0; x < filled.length; x++) {
+    if (!filled[x]) continue;
+    const start = x;
+    while (filled[x + 1]) x++;
+    cells.push({ x: start, y, width: x - start + 1 });
+  }
+  return cells;
+}
+
+export function logoGrid(art: string = LOGO_ART): { width: number; height: number; cells: LogoCell[] } {
+  const lines = art.split("\n");
+  const width = Math.max(...lines.map((line) => [...line].length));
+  const cells = lines.flatMap((line, row) => {
+    const chars = [...line.padEnd(width)];
+    return [
+      ...filledRuns(chars.map((c) => c === "█" || c === "▀"), row * 2),
+      ...filledRuns(chars.map((c) => c === "█" || c === "▄"), row * 2 + 1),
+    ];
+  });
+  return { width, height: lines.length * 2, cells };
+}
+
 export const THEME_ICON_ATTRS = {
   width: "18",
   height: "18",
