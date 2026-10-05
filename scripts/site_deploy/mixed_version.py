@@ -135,6 +135,9 @@ RENDERER_MARKERS: dict[str, tuple[re.Pattern[bytes], ...]] = {
 }
 RENDERER_EXEMPT_PREFIXES = ("results/",)
 ASTRO_ASSET_DIR = "_astro"
+SPHINX_OPTIONS_FILE = ("_static", "documentation_options.js")
+UNATTRIBUTED = "unattributed"
+TOLERATES_UNATTRIBUTED = frozenset({SPHINX})
 EXAMPLE_LIMIT = 3
 
 
@@ -149,26 +152,40 @@ def page_renderer(content: bytes) -> str | None:
     return next(iter(found), None)
 
 
+def _structural_renderer(path: Path) -> str | None:
+    if path.is_dir() and path.name == ASTRO_ASSET_DIR:
+        return ASTRO
+    if path.is_file() and (path.parent.name, path.name) == SPHINX_OPTIONS_FILE:
+        return SPHINX
+    return None
+
+
 def tree_renderers(tree: Path, exempt: Iterable[str] = RENDERER_EXEMPT_PREFIXES) -> dict[str, list[str]]:
     exempt = tuple(exempt)
     pages: dict[str, list[str]] = {}
-    for path in sorted(tree.rglob("*.html")):
+    for path in sorted(tree.rglob("*")):
         relative = path.relative_to(tree).as_posix()
-        if not path.is_file() or relative.startswith(exempt):
+        if relative.startswith(exempt):
             continue
-        kind = page_renderer(path.read_bytes())
-        if kind is not None:
+        structural = _structural_renderer(path)
+        if structural is not None:
+            pages.setdefault(structural, []).append(f"{relative}/" if path.is_dir() else relative)
+        if path.suffix == ".html" and path.is_file():
+            kind = page_renderer(path.read_bytes()) or UNATTRIBUTED
             pages.setdefault(kind, []).append(relative)
-    if (tree / ASTRO_ASSET_DIR).is_dir():
-        pages.setdefault(ASTRO, []).append(f"{ASTRO_ASSET_DIR}/")
     return pages
+
+
+def foreign_renderers(pages: dict[str, list[str]], expected: str) -> dict[str, list[str]]:
+    tolerated = {expected, UNATTRIBUTED} if expected in TOLERATES_UNATTRIBUTED else {expected}
+    return {kind: names for kind, names in pages.items() if kind not in tolerated}
 
 
 def require_single_renderer(tree: Path, expected: str) -> dict[str, int]:
     if expected not in RENDERERS:
         raise RendererMixError(f"unknown renderer {expected!r}; expected one of {RENDERERS}")
     pages = tree_renderers(tree)
-    foreign = {kind: names for kind, names in pages.items() if kind != expected}
+    foreign = foreign_renderers(pages, expected)
     if foreign:
         detail = "; ".join(
             f"{kind}: {len(names)} (first: {', '.join(names[:EXAMPLE_LIMIT])})"

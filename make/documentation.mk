@@ -133,10 +133,13 @@ site-parity-inventory:
 .PHONY: site-parity-browser
 site-parity-browser:
 	@mkdir -p "$(SITE_PARITY_DIR)"
-	@rm -f "$(SITE_PARITY_DIR)/browser-report.json" "$(SITE_PARITY_DIR)/explorer-result.json" "$(SITE_PARITY_DIR)/parity-result.json"
+	@rm -f "$(SITE_PARITY_DIR)/browser-report.json" "$(SITE_PARITY_DIR)/explorer-result.json" "$(SITE_PARITY_DIR)/parity-result.json" "$(SITE_PARITY_DIR)/shell-result.json"
 	@status=0; \
 	npm --prefix website run verify:explorer; code=$$?; \
 	printf '{"check": "explorer e2e", "exit": %s}\n' "$$code" > "$(SITE_PARITY_DIR)/explorer-result.json"; \
+	[ "$$code" -eq 0 ] || status=1; \
+	npm --prefix website run verify:shell; code=$$?; \
+	printf '{"check": "shell axe", "exit": %s}\n' "$$code" > "$(SITE_PARITY_DIR)/shell-result.json"; \
 	[ "$$code" -eq 0 ] || status=1; \
 	PARITY_E2E_REPORT="$(CURDIR)/$(SITE_PARITY_DIR)/browser-report.json" npm --prefix website run verify:parity; code=$$?; \
 	printf '{"check": "template axe and search", "exit": %s}\n' "$$code" > "$(SITE_PARITY_DIR)/parity-result.json"; \
@@ -166,7 +169,7 @@ site-parity-diff: site-parity-inventory
 site-parity-report: site-parity-inventory
 	@rm -rf "$(SITE_PARITY_DIR)/report"
 	@status=0; \
-	uv run -- python scripts/site_parity.py --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --published-baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" --baseline-site "$(SITE_PARITY_DIR)/sphinx" --candidate-site website/dist --output-dir "$(SITE_PARITY_DIR)/report" --e2e-report "$(SITE_PARITY_DIR)/browser-report.json" --step-result "$(SITE_PARITY_DIR)/explorer-result.json" --step-result "$(SITE_PARITY_DIR)/parity-result.json" --step-result "$(SITE_PARITY_DIR)/privacy-result.json" || status=$$?; \
+	uv run -- python scripts/site_parity.py --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --published-baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" --baseline-site "$(SITE_PARITY_DIR)/sphinx" --candidate-site website/dist --output-dir "$(SITE_PARITY_DIR)/report" --e2e-report "$(SITE_PARITY_DIR)/browser-report.json" --step-result "$(SITE_PARITY_DIR)/explorer-result.json" --step-result "$(SITE_PARITY_DIR)/parity-result.json" --step-result "$(SITE_PARITY_DIR)/shell-result.json" --step-result "$(SITE_PARITY_DIR)/privacy-result.json" || status=$$?; \
 	if [ -n "$$GITHUB_STEP_SUMMARY" ] && [ -f "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" ]; then cat "$(SITE_PARITY_DIR)/report/url-compatibility-report.md" >> "$$GITHUB_STEP_SUMMARY"; fi; \
 	exit $$status
 
@@ -177,6 +180,14 @@ site-parity:
 		$(MAKE) $$target || failed="$$failed $$target"; \
 	done; \
 	if [ -n "$$failed" ]; then echo "site-parity failed in:$$failed" >&2; exit 1; fi
+
+API_CONTRACT_VENV ?= $(or $(RUNNER_TEMP),$(TMPDIR),/tmp)/benchbox-api-contract-venv
+
+.PHONY: api-contract-check
+api-contract-check:
+	@rm -rf "$(API_CONTRACT_VENV)"
+	@uv run -- python scripts/check_api_contract_symbols.py venv --dir "$(API_CONTRACT_VENV)"
+	@uv run -- python scripts/check_api_contract_symbols.py check --python "$(API_CONTRACT_VENV)/bin/python"
 
 .PHONY: docs-check
 docs-check: docs-validate docs-linkcheck docs-build

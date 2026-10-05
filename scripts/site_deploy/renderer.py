@@ -116,3 +116,20 @@ def readiness_at(repo_dir: Path, commit: str) -> Readiness:
 
 def select_for_commit(policy: str, repo_dir: Path, commit: str) -> Selection:
     return select(policy, readiness_at(repo_dir, commit))
+
+
+def require_trunk_ready(selection: Selection, trunk: Callable[[], Readiness], trunk_label: str) -> Selection:
+    if selection.renderer != ASTRO:
+        return selection
+    readiness = trunk()
+    if not readiness.ready:
+        raise RendererError(
+            f"the release tree is ready for astro but trunk {trunk_label} is not ({readiness.summary()}); "
+            "trunk routes would need sphinx, and one artifact never mixes renderers"
+        )
+    return selection
+
+
+def select_for_commits(policy: str, repo_dir: Path, release_commit: str, trunk_commit: str) -> Selection:
+    selection = select_for_commit(policy, repo_dir, release_commit)
+    return require_trunk_ready(selection, lambda: readiness_at(repo_dir, trunk_commit), trunk_commit)

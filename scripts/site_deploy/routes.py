@@ -123,6 +123,10 @@ def release_ref(manifest: RouteManifest) -> str:
     return next(name for name, kind in manifest.refs.items() if kind == "release-tag")
 
 
+def trunk_ref(manifest: RouteManifest) -> str:
+    return next(name for name, kind in manifest.refs.items() if kind == "trunk")
+
+
 def load_manifest(path: Path) -> RouteManifest:
     return parse_manifest(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
 
@@ -248,7 +252,7 @@ def _stage_requires_full(manifest: RouteManifest, ref: str) -> bool:
 def _check_stage(ref: str, stage: Path, renderer: str) -> None:
     if renderer == ASTRO and not (stage / mixed_version.ASTRO_ASSET_DIR).is_dir():
         raise RouteManifestError(f"ref {ref} did not produce an astro build: no {mixed_version.ASTRO_ASSET_DIR}/")
-    foreign = sorted(kind for kind in mixed_version.tree_renderers(stage) if kind != renderer)
+    foreign = sorted(mixed_version.foreign_renderers(mixed_version.tree_renderers(stage), renderer))
     if foreign:
         raise RouteManifestError(f"ref {ref} stage for {renderer} carries {', '.join(foreign)} output")
 

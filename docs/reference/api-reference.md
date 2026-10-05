@@ -5,7 +5,7 @@
 ```{tags} reference, python-api
 ```
 
-Complete API documentation for BenchBox classes and methods. This page highlights the most common entry points; the full autodoc catalog lives under the [`python-api/`](python-api) section of the Sphinx build.
+Complete API documentation for BenchBox classes and methods. This page highlights the most common entry points; the full set of hand-authored API pages lives under the [`python-api/`](python-api) section. The publication deploy builds those pages with Sphinx and publishes them in the `api-docs` lane at `reference/python-api/`.
 
 ## Core Classes
 
