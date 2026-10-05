@@ -1236,11 +1236,9 @@ class DurableJobWorker:
                             response = await anyio.to_thread.run_sync(self.executor, job, staging)
                     except Exception as exc:
                         execution_error = exc
-                    still_leaked = [
-                        result for result in leaked_results if getattr(result, "outstanding_stream_ids", None)
-                    ]
+                    tracked_results = list(leaked_results)
                     executor_quiescent = not (
-                        still_leaked or (execution_error is None and _response_has_outstanding_work(response))
+                        tracked_results or (execution_error is None and _response_has_outstanding_work(response))
                     )
                     if not executor_quiescent:
                         if execution_error is not None:
@@ -1252,7 +1250,7 @@ class DurableJobWorker:
                             job.execution_id,
                             self.worker_id,
                         )
-                        self._attest_when_leaked_work_ends(job.execution_id, staging, still_leaked)
+                        self._attest_when_leaked_work_ends(job.execution_id, staging, tracked_results)
                         return
                     if execution_error is None:
                         assert response is not None

@@ -1335,3 +1335,40 @@ def test_per_principal_queue_bound_holds_across_repository_handles(tmp_path: Pat
     with pytest.raises(MCPError, match="for this principal$"):
         second.submit("tenant-a", _request())
     second.submit("tenant-b", _request())
+
+
+def test_leaked_work_that_quiesces_before_the_worker_checks_still_releases_its_capacity(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from benchbox.core.throughput.containment import record_outstanding_result
+
+    leaked = SimpleNamespace(
+        outstanding_stream_ids=[2],
+        cleanup_state="outstanding",
+        outstanding_notes=[],
+        _outstanding_futures={2: _done_future()},
+    )
+
+    def executor(_job, _staging):
+        record_outstanding_result(leaked)
+        response = {
+            "phases": {"throughput_test": {"outstanding_work": {"stream_ids": [2], "cleanup_state": "outstanding"}}}
+        }
+        leaked.outstanding_stream_ids = []
+        leaked.cleanup_state = "quiesced"
+        return response
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1, poll_seconds=0.01))
+    worker = DurableJobWorker(
+        repository, TenantWorkspaceProvider(tmp_path / "workspaces"), executor=executor, worker_id="worker-a"
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    waiting, _ = repository.submit("tenant-b", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+
+    anyio.run(worker._run_job, claimed)
+
+    assert _wait_until(lambda: (repository.get(submitted.execution_id)).quiesced_at is not None)
+    replacement = repository.claim("worker-b")
+    assert replacement is not None and replacement.execution_id == waiting.execution_id
