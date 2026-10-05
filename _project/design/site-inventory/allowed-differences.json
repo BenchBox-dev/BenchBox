@@ -145,5 +145,19 @@
   "match": "/docs/(genindex|search)\\.html#(index|search-results)",
   "reason": "the anchors of the retired Sphinx index and search pages vanish with the pages, which are now redirect pages",
   "owner_approval": "pending"
+ },
+ {
+  "id": "landing-redesign-headings",
+  "kind": "changed heading",
+  "match": "/index\\.html \\[headings\\]: (added|removed) .*",
+  "reason": "the landing page was redesigned rather than ported: section intros, catalogue groups and install steps use new headings, catalogue entries are h4 under their group, and a resources band adds Resources and Community headings",
+  "owner_approval": "pending"
+ },
+ {
+  "id": "landing-hero-image",
+  "kind": "unreferenced image",
+  "match": "/index\\.html: /hero\\.png .*",
+  "reason": "the redesigned landing hero draws the block-character logo as inline SVG instead of hero.png; the image is still published as the social preview image",
+  "owner_approval": "pending"
  }
 ]

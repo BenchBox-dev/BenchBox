@@ -18,10 +18,12 @@ const { group, compact = false } = Astro.props;
     {
       group.cards.map((card) => (
         <li class="catalog__item">
-          <a class="catalog__link" href={card.href}>
-            <span class="catalog__name">{card.title}</span>
+          <div class="catalog__line">
+            <h4 class="catalog__name">
+              <a href={card.href}>{card.title}</a>
+            </h4>
             <span class="catalog__meta">{card.meta}</span>
-          </a>
+          </div>
           <p class="catalog__desc">{card.description}</p>
           {card.origin && (
             <a class="catalog__origin" href={card.origin.href} target="_blank" rel="noopener">

@@ -781,24 +781,25 @@ html:has(.landing) {
   border-bottom: 1px solid var(--border-primary);
 }
 
-.catalog__link {
+.catalog__line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.25rem 0.75rem;
-  text-decoration: none;
 }
 
-.catalog__name {
-  color: var(--text-primary);
-  font-family: var(--font-head);
+.landing .catalog__name {
   font-size: 1rem;
-  font-stretch: var(--head-stretch);
   font-weight: 700;
 }
 
-.catalog__link:hover .catalog__name {
+.catalog__name a {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.catalog__name a:hover {
   text-decoration: underline;
   text-decoration-color: var(--accent-underline);
   text-underline-offset: 4px;
@@ -903,10 +904,13 @@ html:has(.landing) {
   min-width: 0;
 }
 
-.landing .install__step h3 {
+.install__title {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
+}
+
+.landing .install__title h3 {
   font-size: 1.125rem;
   text-transform: uppercase;
 }

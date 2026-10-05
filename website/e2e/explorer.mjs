@@ -297,6 +297,7 @@ async function headerScript(route) {
   out.shrinkFocusOnToggle = await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle"));
   await page.setViewportSize({ width: 1280, height: 900 });
   const themeButton = page.locator("[data-theme-toggle]").first();
+  await themeButton.click();
   await themeButton.focus();
   const choices = [];
   for (const key of ["Enter", "Enter", "Enter", "Space"]) {

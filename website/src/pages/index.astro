@@ -449,7 +449,7 @@ const sectionLinks = [
         </header>
         <ol class="install">
           <li class="install__step">
-            <h3><span class="step__index">01</span>Install</h3>
+            <div class="install__title"><span class="step__index">01</span><h3>Install</h3></div>
             <div class="code-block">
               <div class="code-header">
                 <span>Shell</span>
@@ -459,13 +459,13 @@ const sectionLinks = [
             </div>
           </li>
           <li class="install__step">
-            <h3><span class="step__index">02</span>Run as CLI</h3>
+            <div class="install__title"><span class="step__index">02</span><h3>Run as CLI</h3></div>
             <div class="code-block">
               <CodeBlock lang="bash" code={cliExampleCode} />
             </div>
           </li>
           <li class="install__step">
-            <h3><span class="step__index">03</span>Or use as a library</h3>
+            <div class="install__title"><span class="step__index">03</span><h3>Or use as a library</h3></div>
             <div class="code-block">
               <CodeBlock lang="python" code={libraryExampleCode} />
             </div>
