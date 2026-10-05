@@ -7,30 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-04
+
 ### Before you upgrade
 
-- **TPC-DS tuned and auto runs now declare the specification's composite
-  primary keys.** Six fact tables had a one-column key and `inventory` had
-  none, so DuckDB (and any engine that enforces keys) rejected the load with a
-  duplicate-key error. The keys are now `(ss_item_sk, ss_ticket_number)`,
-  `(sr_item_sk, sr_ticket_number)`, `(cs_item_sk, cs_order_number)`,
-  `(cr_item_sk, cr_order_number)`, `(ws_item_sk, ws_order_number)`,
-  `(wr_item_sk, wr_order_number)` and
-  `(inv_date_sk, inv_item_sk, inv_warehouse_sk)`. The three returns tables no
-  longer declare a single-column foreign key to the matching sales table; the
-  specification's reference is composite, which BenchBox can't express.
-  Platforms that use keys as planning hints, such as Redshift, may choose
-  different plans. Don't compare tuned or auto TPC-DS results recorded before
-  this change with results after it. Untuned runs on platforms that declare
-  no keys are unchanged. Untuned ClickHouse TPC-DS runs do change, on local,
-  server and cloud deployments: ClickHouse always declares primary keys and
-  builds the MergeTree `ORDER BY` from them. `store_sales` moves from
-  `ORDER BY (ss_ticket_number)` to `ORDER BY (ss_item_sk, ss_ticket_number)`,
-  the other five sales and returns tables change the same way, and
-  `inventory` moves from `ORDER BY tuple()` to
-  `ORDER BY (inv_date_sk, inv_item_sk, inv_warehouse_sk)`. Don't compare
-  ClickHouse TPC-DS baselines recorded before this change with results after
-  it.
 - **TPC-DS queries now use parameters for the data's scale factor.** Standard
   TPC-DS runs at a scale factor other than 1 used to take their query
   parameters from scale factor 1. They now use values generated for the scale
@@ -99,11 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Withdrawn cloud results.** Nine TPC-H results from the first BigQuery,
   Databricks, and Snowflake runs were incorrect. They are removed from
   Results Explorer and comparisons.
-- **The DuckDB tuned templates changed, so their config hash changed.** The
-  shipped DuckDB tuned templates no longer request partitioning, which DuckDB
-  never applied, or CHECK constraints, which cannot be verified against
-  DuckDB's catalog. DuckDB tuned results recorded before this change carry a
-  different `requested_config_hash`, so don't compare the hashes directly.
 
 ### Added
 
@@ -149,6 +124,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both DataFrame families now guard this division the same way.
 - **Faster pandas TPC-DS Q78.** It takes about 0.3 seconds at scale factor 0.1,
   down from about 14 seconds.
+- **Result bundles always carry `platform.tuning.validation_status`.**
+  Untuned runs used to have no `platform.tuning` block (DuckDB), only a nested
+  status (SQLite, ClickHouse), or the full block. The change is additive: no
+  existing field moves.
 
 ### Fixed
 
@@ -226,6 +205,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errors by switching to a single-threaded mode. Comparison links that name
   missing results no longer stall the page. Navigation highlights the right
   section on local and run pages.
+- **Runs fail when no data loads.** A stale or empty datagen manifest, or a
+  missing `zstd` command, used to leave the loader with nothing to load, so
+  every table held zero rows and the run still validated and exported a
+  result. Loading now fails when the data source names no tables, and
+  validation fails when no table loads a positive number of rows. TPC-DS
+  generation no longer writes a manifest that lists no tables, and a manifest
+  with no tables or no files is rejected and regenerated. A missing `zstd`
+  command is reported before any table loads.
+- **Repeated no-tuning runs reuse their database.** Every second no-tuning run
+  rebuilt the database because validation asked for tuning metadata that
+  no-tuning runs never write.
+- **The ORDER BY equivalence check fails closed.** When a query's sort terms
+  could not be evaluated over the returned rows, the check passed. It now
+  reports the cell as divergent. Queries with no ORDER BY, SQL that does not
+  parse, and terms with no output column keep the unordered comparison.
+- **TPC-DS data generation on Windows honours its options.** The Windows
+  `dsdgen` ignored `-` options, so a request for scale factor 0.01 generated
+  scale factor 1 and ignored table and chunk selection. BenchBox now passes
+  the `/` prefix on Windows. Output on other platforms is unchanged.
+- **TPC-DS OBT loads its queries from an installed wheel.** `get_queries()`
+  raised `FileNotFoundError` from the 0.4.1 wheel because the templates were
+  read from a source tree the wheel does not ship.
+- **TPC-H addresses on macOS match the reference data.** The bundled macOS
+  `dbgen` was built with optimization and produced different `S_ADDRESS` and
+  `C_ADDRESS` values from the reference data at every scale factor, so the
+  correctness gate failed Q2, Q10 and Q15. The rebuilt binaries produce the
+  reference values. Regenerate TPC-H data made on macOS with earlier versions.
+- **Tuning output describes what happened.** The console no longer prints
+  "Unified tuning configuration applied" or "Tuning metadata saved" unless
+  the work succeeded, and it reports how many statements ran, failed or were
+  dropped. A fresh database with no benchmark tables no longer logs a tuning
+  metadata error. The Results Explorer reads "Checked; not corroborated" when
+  a run carries a post-load check receipt, and its Tuned badges follow the
+  recorded validation status.
+- **`--platform <name>:<mode>` selectors resolve to the platform they name.**
+  `--platform clickhouse:local` stopped with "not available (missing
+  dependencies)" even with chDB installed, and the install hint named an extra
+  that does not exist. The selector now resolves before the availability
+  check, the benchmark compatibility gate and the install hint. A deployment
+  the platform does not offer, such as `clickhouse:bogus`, is rejected with
+  the list of deployments it does offer.
+- **TPC-DS declares the specification's composite primary keys.** Six fact
+  tables declared a single-column key that repeats across items, so engines
+  that enforce keys rejected the load, and DuckDB tuned and auto runs stopped
+  at the first fact table. The keys now match the specification, `inventory`
+  gains its key, and the three returns tables no longer carry single-column
+  foreign keys to the sales tables.
+- **DuckLake no longer deletes its database mid-run.** With force-recreate
+  set, later connections in the same run (a connection test, a pooled
+  connection, a validation connection) deleted the catalog or dropped tables
+  after the data was loaded. The decision is now made once per run and never
+  inside a validation connection.
+- **DuckDB tuned runs no longer report a false index mismatch.** Index
+  statements now use the identifiers `create_schema` produced, so sorted runs
+  can reach `applied_verified`. The shipped DuckDB tuned templates drop
+  partitioning and CHECK constraints, which DuckDB never applies or cannot
+  verify.
 
 ## [0.4.1] - 2026-09-24
 
@@ -1059,6 +1095,7 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
 [Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...HEAD
+[0.4.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1
