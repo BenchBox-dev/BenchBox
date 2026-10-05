@@ -4,7 +4,7 @@
     "e2e (chDB): ORDERS sorting (O_ORDERDATE, O_ORDERKEY) runs to completion.",
     "Snapshot test: notuning ClickHouse DDL unchanged."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.4 (R-5). Serialized after the ClickHouse OPTIMIZE item (shared files).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch feat/tuning-post-load-seam; do not claim.",
+  "context": "Delivered by PR #2677 (squash-merged 2026-10-05, merge SHA 4cfa94006b6d563946aacb68f64cb15be0c4a98b).\n\nWhat shipped: the ClickHouse schema is generated with primary keys on (the engine baseline) and the user's primary_keys.enabled is applied separately. With a tuned sort key and primary keys disabled, no PRIMARY KEY clause is emitted, so a custom ORDERS sort (O_ORDERDATE, O_ORDERKEY) completes schema creation. With primary keys enabled, a key that is not a prefix of the sort key (clustering columns, then sorting columns) raises ClickHousePrimaryKeyPrefixError before any CREATE TABLE runs, and the validator (validate_for_platform_detailed with schema_primary_keys) reports it as an unsafe combination. Untuned and empty-tuned ClickHouse DDL is byte-identical to develop for TPC-H, SSB and TPC-DS; a snapshot test pins it.\n\nVerification: unit tests (test_clickhouse_pk_prefix, test_clickhouse_primary_keys_enabled, snapshot fixture); the independent reviews compared untuned DDL against a develop checkout. Real-CLI clickhouse-local runs (chDB 3.6.0 scratch path) with the curated templates and a custom config reached applied_verified with zero failed statements. NOT live-verified against ClickHouse server or cloud, or against a current chDB 4.x engine.",
   "description": "## Problem (reproduced)\nA custom ORDERS sort key `(O_ORDERDATE, O_ORDERKEY)` crashed schema creation with \"Primary key must be a prefix of the sorting key\". That happened even with `primary_keys.enabled: false`, after \"✅ Unified tuning configuration validated\". Date-first is the canonical ClickHouse layout.\n\n## Change\n- In `benchbox/core/tuning/generators/clickhouse.py` and `clickhouse/workload.py` `_optimize_table_definition`, when a tuned sort key exists: omit an explicit PRIMARY KEY (MergeTree defaults it to the sort key), or emit only the longest prefix.\n- Emit no PK clause when `primary_keys.enabled` is false.\n- The validator rejects explicit PK/sort combinations that violate the prefix rule. This is an explicit named unsafe combination, which ADR-003 Decision 1 already allows to block.\n\n## Guardrails (must preserve)\n- Untuned ClickHouse DDL is unchanged; a snapshot test proves it.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/core/tuning/generators/clickhouse.py",
@@ -35,6 +35,14 @@
       "generation": "a4d52671a2b14f9b9ee4ca9982748506",
       "op": "take",
       "op_id": "08388ae871cd4262903fa71292d9249a",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T14:27:44Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3044c2d7ebcb4edcb17162f02e868d59",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
