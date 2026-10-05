@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedTuningLedger, recording_connection
+from benchbox.core.tuning.applied_ledger import PHASE_DDL, PHASE_POST_LOAD, AppliedTuningLedger, recording_connection
 
 pytestmark = [
     pytest.mark.unit,
@@ -1101,7 +1101,13 @@ class TestApplyTableTunings:
         adapter.apply_table_tunings(tuning, mock_conn)
 
         all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
-        assert "ALTER TABLE ORDERS RESUME RECLUSTER" in all_sqls
+        assert "ALTER TABLE ORDERS RESUME RECLUSTER" not in all_sqls
+
+        mock_cursor.execute.reset_mock()
+        adapter.apply_post_load_tunings("ORDERS", None, mock_conn)
+
+        post_load_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert post_load_sqls == ["ALTER TABLE ORDERS RESUME RECLUSTER"]
 
     def test_linear_catalog_form_skips_alter_and_records_dropped_intent(self):
         adapter = _make_adapter()
@@ -1154,7 +1160,13 @@ class TestApplyTableTunings:
 
         assert [statement.statement for statement in ledger.executed_statements] == [
             "ALTER TABLE ORDERS CLUSTER BY (o_orderdate)",
-            "ALTER TABLE ORDERS RESUME RECLUSTER",
+        ]
+
+        adapter.run_post_load_tunings("ORDERS", SimpleNamespace(table_tunings={}), mock_conn)
+
+        assert [(statement.statement, statement.phase) for statement in ledger.executed_statements] == [
+            ("ALTER TABLE ORDERS CLUSTER BY (o_orderdate)", PHASE_DDL),
+            ("ALTER TABLE ORDERS RESUME RECLUSTER", PHASE_POST_LOAD),
         ]
         assert ledger.dropped == []
 

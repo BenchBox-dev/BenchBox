@@ -942,6 +942,19 @@ def _build_config_block(result: BenchmarkResults) -> dict[str, Any]:
     return config
 
 
+def _post_load_maintenance_phase_payload(setup: Any) -> dict[str, Any]:
+    maintenance = getattr(setup, "post_load_maintenance", None)
+    if not maintenance:
+        return {}
+    return {
+        "post_load_maintenance": {
+            "status": maintenance.status,
+            "duration_ms": maintenance.duration_ms,
+            "tables_processed": maintenance.tables_processed,
+        }
+    }
+
+
 def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
     phases: dict[str, Any] = {}
     standard = [
@@ -995,6 +1008,8 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
                 phases["statistics"]["stats_lifecycle"] = stats.stats_lifecycle
             if stats.per_table_ms:
                 phases["statistics"]["per_table_ms"] = stats.per_table_ms
+
+    phases.update(_post_load_maintenance_phase_payload(setup))
 
     if result.execution_phases and result.execution_phases.power_test:
         power_test = result.execution_phases.power_test

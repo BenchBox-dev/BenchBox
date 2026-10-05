@@ -21,8 +21,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from benchbox.core.dataframe.tuning.profiles import DATAFRAME_PLATFORMS
 from benchbox.core.tuning import modes as tuning_modes
-from benchbox.core.tuning.packaged_templates import list_packaged_templates, packaged_template_path
+from benchbox.core.tuning.capability_registry import DEFAULT_FALLBACK_DESCRIPTION, get_fallback_description
+from benchbox.core.tuning.packaged_templates import (
+    list_packaged_templates,
+    packaged_template_path,
+    template_platform_key,
+)
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -130,6 +136,7 @@ class TuningResolution:
     searched_paths: list[Path] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     info_messages: list[str] = field(default_factory=list)
+    fallback_description: str = DEFAULT_FALLBACK_DESCRIPTION
 
     @property
     def canonical_mode(self) -> str:
@@ -164,9 +171,18 @@ class TuningResolution:
             TuningSource.SMART_DEFAULTS: "Generated from system profile (auto mode)",
             TuningSource.BASELINE: "Baseline mode (all optimizations disabled)",
             TuningSource.INTERACTIVE_WIZARD: "Configured via interactive wizard",
-            TuningSource.FALLBACK: "Fallback to basic constraints (no template found)",
+            TuningSource.FALLBACK: f"Fallback to {self.fallback_description} (no template found)",
         }
         return descriptions.get(self.source, "Unknown source")
+
+
+def _dataframe_profile_path(platform: str) -> Path | None:
+    base = platform.lower().split(":", 1)[0]
+    if base.endswith("-df"):
+        base = base[: -len("-df")]
+    if base not in DATAFRAME_PLATFORMS:
+        return None
+    return Path(f"examples/tunings/dataframe/{base}_optimized.yaml")
 
 
 def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
@@ -177,11 +193,16 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     2. Project-relative path: examples/tunings/{platform}/{benchmark}_tuned.yaml
     3. Current working directory: {platform}/{benchmark}_tuned.yaml
     4. Packaged resource bundled with the installed benchbox package (last
-       resort - see benchbox.core.tuning.packaged_templates). Only a subset
+       resort among the per-benchmark tiers - see
+       benchbox.core.tuning.packaged_templates). Only a subset
        of platform/benchmark pairs ship a packaged template; this tier exists
        so `--tuning tuned` still resolves a real template when benchbox is
        installed as a package and run outside a repository checkout, where
        tiers 2-3 above never exist.
+    5. DataFrame platforms only: the curated profile
+       examples/tunings/dataframe/{platform}_optimized.yaml, searched after
+       every per-benchmark tier. A DataFrame platform with no such file
+       continues to the tuned-fallback resolution.
 
     The BENCHBOX_TUNING_PATH can be set to a custom directory containing
     platform-specific tuning templates following the same structure:
@@ -195,24 +216,31 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
         List of paths in search order (first match wins)
     """
     paths = []
+    raw_platform = platform.lower()
+    template_platform = template_platform_key(platform)
+    platform_dirs = [raw_platform] if raw_platform == template_platform else [raw_platform, template_platform]
+    template_name = f"{benchmark.lower()}_tuned.yaml"
 
     # 1. Environment variable override path (highest priority)
     env_path = os.environ.get("BENCHBOX_TUNING_PATH")
     if env_path:
-        env_template = Path(env_path) / f"{platform.lower()}" / f"{benchmark.lower()}_tuned.yaml"
-        paths.append(env_template)
+        paths.extend(Path(env_path) / directory / template_name for directory in platform_dirs)
 
     # 2. Project-relative path (standard location)
-    primary = Path(f"examples/tunings/{platform.lower()}/{benchmark.lower()}_tuned.yaml")
-    paths.append(primary)
+    paths.extend(Path(f"examples/tunings/{directory}/{template_name}") for directory in platform_dirs)
 
     # 3. Current working directory fallback
-    cwd_template = Path(f"{platform.lower()}/{benchmark.lower()}_tuned.yaml")
-    if cwd_template != primary:  # Avoid duplicate if cwd is project root
-        paths.append(cwd_template)
+    for directory in platform_dirs:
+        cwd_template = Path(f"{directory}/{template_name}")
+        if cwd_template not in paths:
+            paths.append(cwd_template)
 
     # 4. Packaged resource (last resort; see docstring above)
-    paths.append(packaged_template_path(platform, benchmark))
+    paths.append(packaged_template_path(template_platform, benchmark))
+
+    dataframe_profile = _dataframe_profile_path(platform)
+    if dataframe_profile is not None:
+        paths.append(dataframe_profile)
 
     return paths
 
@@ -418,7 +446,7 @@ def _resolve_tuned(
         # cwd/env-relative auto-discovered template apart from the packaged
         # fallback for provenance purposes (must_preserve: packaged-template
         # provenance is recorded distinctly from AUTO_DISCOVERED).
-        packaged_candidate = packaged_template_path(platform, benchmark)
+        packaged_candidate = packaged_template_path(template_platform_key(platform), benchmark)
 
         for path in search_paths:
             if path.exists():
@@ -451,12 +479,16 @@ def _resolve_tuned(
         resolution.warnings.append(
             f"No tuning template found for {platform}/{benchmark}. Searched: {', '.join(str(p) for p in search_paths)}"
         )
-        resolution.info_messages.append("Tuning: using basic constraints (no optimized template available)")
+        resolution.fallback_description = get_fallback_description(platform)
+        resolution.info_messages.append(
+            f"Tuning: using {resolution.fallback_description} (no optimized template available)"
+        )
         if logger:
             logger.debug("Tuning mode: tuned (fallback - no template found)")
     else:
         resolution.warnings.append("Cannot auto-discover tuning template without platform and benchmark specified")
-        resolution.info_messages.append("Tuning: using basic constraints")
+        resolution.fallback_description = get_fallback_description(platform)
+        resolution.info_messages.append(f"Tuning: using {resolution.fallback_description}")
         if logger:
             logger.debug("Tuning mode: tuned (fallback - no platform/benchmark)")
 

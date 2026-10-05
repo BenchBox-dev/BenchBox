@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -115,10 +116,32 @@ class TestSnowflakePhysicalIdentifiers:
     def test_clustering_statements_use_the_physical_identifiers(self, snowflake_adapter):
         connection = RecordingConnection()
         snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
-        assert connection.recorder.statements[-2:] == [
-            "ALTER TABLE LINEITEM CLUSTER BY (l_orderkey)",
-            "ALTER TABLE LINEITEM RESUME RECLUSTER",
-        ]
+        assert connection.recorder.statements[-1] == "ALTER TABLE LINEITEM CLUSTER BY (l_orderkey)"
+        snowflake_adapter.apply_post_load_tunings("lineitem", None, connection)
+        assert connection.recorder.statements[-1] == "ALTER TABLE LINEITEM RESUME RECLUSTER"
+
+    def test_run_scoped_reset_clears_pending_recluster(self, snowflake_adapter):
+        connection = RecordingConnection()
+        snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
+        assert snowflake_adapter._pending_resume_recluster() == {"LINEITEM"}
+        snowflake_adapter._reset_run_scoped_state()
+        assert snowflake_adapter._pending_resume_recluster() == set()
+        statements_before = len(connection.recorder.statements)
+        assert snowflake_adapter.apply_post_load_tunings("lineitem", None, connection) is False
+        assert len(connection.recorder.statements) == statements_before
+
+    def test_a_refused_recluster_resume_fails_the_maintenance_phase(self, snowflake_adapter):
+        connection = RecordingConnection()
+        snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
+
+        def refuse(sql, params=None):
+            raise RuntimeError("clustering not permitted")
+
+        connection.recorder.execute = refuse
+        config = SimpleNamespace(table_tunings={"lineitem": clustering_tuning("lineitem", "l_orderkey")})
+        snowflake_adapter.run_post_load_tunings("lineitem", config, connection)
+
+        assert snowflake_adapter.build_post_load_maintenance_phase().status == "FAILED"
 
     def test_catalog_probe_binds_the_physical_table(self, snowflake_adapter):
         probes = []
@@ -150,10 +173,33 @@ class TestRedshiftPhysicalIdentifiers:
 
     def test_maintenance_statements_use_the_physical_table(self, redshift_adapter):
         connection = RecordingConnection()
-        redshift_adapter.apply_table_tunings(clustering_tuning("LINEITEM", "L_ORDERKEY"), connection)
+        tuning = clustering_tuning("LINEITEM", "L_ORDERKEY")
+        redshift_adapter.apply_table_tunings(tuning, connection)
         statements = connection.recorder.statements
         assert any("tablename = 'lineitem'" in statement for statement in statements)
-        assert "ANALYZE lineitem" in statements
+        assert "ANALYZE lineitem" not in statements
+        config = SimpleNamespace(table_tunings={"LINEITEM": tuning})
+        # The isolated vacuum/analyze pass in configure_for_benchmark covers the default case.
+        assert redshift_adapter.auto_analyze is True
+        assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is False
+        assert "ANALYZE lineitem" not in connection.recorder.statements
+        redshift_adapter.auto_analyze = False
+        assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is True
+        assert "ANALYZE lineitem" in connection.recorder.statements
+        assert not any(statement.startswith("VACUUM") for statement in connection.recorder.statements)
+
+    def test_a_refused_analyze_fails_the_maintenance_phase(self, redshift_adapter):
+        connection = RecordingConnection()
+
+        def refuse(sql, params=None):
+            raise RuntimeError("analyze refused")
+
+        connection.recorder.execute = refuse
+        redshift_adapter.auto_analyze = False
+        config = SimpleNamespace(table_tunings={"LINEITEM": clustering_tuning("LINEITEM", "L_ORDERKEY")})
+        redshift_adapter.run_post_load_tunings("LINEITEM", config, connection)
+
+        assert redshift_adapter.build_post_load_maintenance_phase().status == "FAILED"
 
     def test_existing_keys_compare_against_physical_column_names(self, redshift_adapter, caplog):
         row = ("public", "lineitem", "KEY", "l_orderkey", "l_orderkey", "l_linenumber", None, None)

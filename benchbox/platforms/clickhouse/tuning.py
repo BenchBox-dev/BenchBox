@@ -59,6 +59,12 @@ class ClickHouseTuningMixin:
                 return found
         return super().resolve_physical_column(table_name, logical_column, connection)
 
+    @staticmethod
+    def _has_tuned_sort_key(config: UnifiedTuningConfiguration) -> bool:
+        from benchbox.core.tuning.generators.clickhouse import clickhouse_sort_key_columns
+
+        return any(clickhouse_sort_key_columns(table_tuning) for table_tuning in config.table_tunings.values())
+
     def get_effective_tuning_configuration(
         self,
     ) -> UnifiedTuningConfiguration | None:
@@ -69,11 +75,10 @@ class ClickHouseTuningMixin:
         """
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-        # Get base configuration if it exists
         base_config = super().get_effective_tuning_configuration()
         if base_config:
-            # Ensure primary keys are always enabled for ClickHouse
-            base_config.primary_keys.enabled = True
+            if not self._has_tuned_sort_key(base_config):
+                base_config.primary_keys.enabled = True
             return base_config
 
         # Create ClickHouse-specific configuration
@@ -339,13 +344,26 @@ class ClickHouseTuningMixin:
         """Check if ClickHouse supports a specific tuning type."""
         return supports_named_tuning_type(tuning_type, self._supported_tuning_type_names)
 
+    def _optimize_after_load_enabled(self) -> bool:
+        value = getattr(self, "platform_config", {}).get("optimize_after_load", False)
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        if not getattr(self, "tuning_enabled", False) or not self._optimize_after_load_enabled():
+            return False
+        if not self.optimize_table(connection, self.resolve_physical_table(table_name, connection)):
+            self.note_post_load_maintenance_failure()
+        return True
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply ClickHouse-specific table tunings.
 
         ClickHouse tuning approach:
         - PARTITIONING: Handled via PARTITION BY in CREATE TABLE
         - SORTING: Handled via ORDER BY in CREATE TABLE
-        - CLUSTERING: Achieved through ORDER BY and OPTIMIZE operations
+        - CLUSTERING: Folded into the ORDER BY key at CREATE TABLE time
         - DISTRIBUTION: Handled via distributed engine settings
 
         Args:
@@ -359,33 +377,25 @@ class ClickHouseTuningMixin:
             return
 
         table_name = table_tuning.table_name
-        physical_table = self.resolve_physical_table(table_name, connection)
         self.logger.info(f"Applying ClickHouse tunings for table: {table_name}")
 
         try:
             # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # ClickHouse doesn't support ALTER TABLE for changing partitioning or ordering
-            # after table creation, but we can optimize existing tables
-
-            # Apply sorting optimization by running OPTIMIZE TABLE
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns:
-                sorted_cols = sorted(sort_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
-                self.logger.info(f"Optimizing table {table_name} for sorting on columns: {', '.join(column_names)}")
-                self.optimize_table(connection, physical_table)
+                column_names = [col.name for col in sorted(sort_columns, key=lambda col: col.order)]
+                self.logger.info(
+                    f"Sorting for table {table_name}: {', '.join(column_names)} (defined at CREATE TABLE time)"
+                )
 
-            # Apply clustering optimization via OPTIMIZE TABLE FINAL
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if cluster_columns:
-                sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
-                column_names = [col.name for col in sorted_cols]
+                column_names = [col.name for col in sorted(cluster_columns, key=lambda col: col.order)]
                 self.logger.info(
-                    f"Applying clustering optimization to table {table_name} on columns: {', '.join(column_names)}"
+                    f"Clustering for table {table_name}: {', '.join(column_names)} (folded into ORDER BY at CREATE TABLE time)"
                 )
-                connection.execute(f"OPTIMIZE TABLE {physical_table} FINAL")
 
             # Log partitioning strategy (must be defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)

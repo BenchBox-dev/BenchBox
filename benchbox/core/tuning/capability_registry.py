@@ -851,6 +851,27 @@ def known_registry_platforms() -> frozenset[str]:
     return frozenset(PLATFORM_TUNING_CAPABILITIES)
 
 
+DEFAULT_FALLBACK_DESCRIPTION = "basic constraints"
+
+PLATFORM_FALLBACK_DESCRIPTIONS: dict[str, str] = {
+    "clickhouse": "OLAP session pack",
+    "polars": "engine runtime defaults (streaming)",
+    "pandas": "engine runtime defaults",
+    "dask": "engine runtime defaults",
+    "cudf": "engine runtime defaults",
+    "datafusion": "engine runtime defaults",
+}
+
+
+def get_fallback_description(platform: str | None) -> str:
+    if not platform:
+        return DEFAULT_FALLBACK_DESCRIPTION
+    base = platform.lower().split(":", 1)[0]
+    if base.endswith("-df"):
+        base = base[: -len("-df")]
+    return PLATFORM_FALLBACK_DESCRIPTIONS.get(resolve_platform_key(base), DEFAULT_FALLBACK_DESCRIPTION)
+
+
 # Platforms whose logical-workload-tuning-candidate mapping
 # (`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`) is
 # implemented. Derived here (rather than redeclared in that module) so the
@@ -862,12 +883,15 @@ WORKLOAD_PROFILE_MAPPED_PLATFORMS: frozenset[str] = frozenset(
 
 
 __all__ = [
+    "DEFAULT_FALLBACK_DESCRIPTION",
+    "PLATFORM_FALLBACK_DESCRIPTIONS",
     "RenderedVia",
     "TuningCapability",
     "PLATFORM_ALIASES",
     "PLATFORM_TUNING_CAPABILITIES",
     "WORKLOAD_PROFILE_MAPPED_PLATFORMS",
     "get_capability",
+    "get_fallback_description",
     "interface_compatibility_map",
     "known_registry_platforms",
     "resolve_platform_key",

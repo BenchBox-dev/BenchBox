@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import hashlib
 import json
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal, Optional
@@ -1207,6 +1208,29 @@ def _get_effective_layout_validator(platform_key: str):
     return getattr(module, func_name)
 
 
+def _clickhouse_primary_key_prefix_errors(
+    config: "UnifiedTuningConfiguration",
+    schema_primary_keys: Mapping[str, Sequence[str]],
+) -> list[str]:
+    if not config.primary_keys.enabled:
+        return []
+
+    from benchbox.core.tuning.generators.clickhouse import clickhouse_sort_key_columns, primary_key_prefix_violation
+
+    primary_keys_by_table = {str(name).upper(): columns for name, columns in schema_primary_keys.items()}
+    errors: list[str] = []
+    for table_name, table_tuning in config.table_tunings.items():
+        primary_key_columns = primary_keys_by_table.get(str(table_name).upper())
+        if not primary_key_columns:
+            continue
+        violation = primary_key_prefix_violation(
+            table_name, primary_key_columns, clickhouse_sort_key_columns(table_tuning)
+        )
+        if violation:
+            errors.append(violation)
+    return errors
+
+
 @dataclass
 class UnifiedTuningConfiguration:
     """Unified configuration that consolidates all tuning options.
@@ -1601,7 +1625,11 @@ class UnifiedTuningConfiguration:
         errors, _warnings = self.validate_for_platform_detailed(platform)
         return errors
 
-    def validate_for_platform_detailed(self, platform: str) -> tuple[list[str], list[str]]:
+    def validate_for_platform_detailed(
+        self,
+        platform: str,
+        schema_primary_keys: Mapping[str, Sequence[str]] | None = None,
+    ) -> tuple[list[str], list[str]]:
         """Validate configuration against platform capabilities, split by severity.
 
         Table-layout and platform-specific tuning types (partitioning,
@@ -1617,6 +1645,9 @@ class UnifiedTuningConfiguration:
 
         Args:
             platform: Target platform name (canonical platform type key).
+            schema_primary_keys: Optional mapping of table name to schema primary
+                key columns. ClickHouse uses it to reject enabled primary keys
+                that are not a prefix of the tuned sort key.
 
         Returns:
             Tuple of (errors, warnings) validation message lists.
@@ -1639,6 +1670,12 @@ class UnifiedTuningConfiguration:
         validator = _get_effective_layout_validator(platform_key)
         if validator is not None:
             errors.extend(validator(self))
+
+        if schema_primary_keys:
+            from benchbox.core.tuning.capability_registry import resolve_platform_key
+
+            if resolve_platform_key(platform_key) == "clickhouse":
+                errors.extend(_clickhouse_primary_key_prefix_errors(self, schema_primary_keys))
 
         return errors, warnings
 

@@ -891,7 +891,7 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
     profiler.display_profile.return_value = None
 
     database_config = SimpleNamespace(
-        type="polars-df",
+        type="dask-df",
         options={},
         execution_mode="dataframe",
         driver_version_actual=None,
@@ -963,7 +963,7 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
 
         result = runner.invoke(
             run,
-            ["--platform", "polars-df", "--benchmark", "tpch", "--tuning", "tuned"],
+            ["--platform", "dask-df", "--benchmark", "tpch", "--tuning", "tuned"],
             obj=_run_obj(),
         )
 

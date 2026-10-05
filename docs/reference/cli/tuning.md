@@ -35,20 +35,41 @@ Resolution happens in this order (see `benchbox/cli/tuning_resolver.py:resolve_t
          itself (`benchbox/core/tuning/packaged_templates.py`) - last resort,
          only reached when none of tiers 1-3 exist. Only a subset of
          platform/benchmark pairs ship a packaged template today (the
-         `duckdb`, `databricks`, and `snowflake` templates that follow the
-         `<benchmark>_tuned.yaml` naming convention); see
+         `duckdb`, `databricks`, `snowflake`, and `clickhouse` templates that
+         follow the `<benchmark>_tuned.yaml` naming convention); see
          `benchbox/core/tuning/templates/README.md` for the exact list and
          how it's kept in sync with `examples/tunings/`.
-   3. If none of those exist, tuning falls back to a basic, untuned
+      The ClickHouse deployment variants (`clickhouse-local`,
+      `clickhouse-server`, `clickhouse-cloud`, and `chdb`) share one template
+      directory, `clickhouse`. In tiers 1-3, a directory named for the exact
+      variant (for example `clickhouse-cloud/`) is searched before the shared
+      `clickhouse/` directory, so a variant-specific template overrides the
+      curated one.
+      5. **DataFrame platforms only**: the curated profile
+         `examples/tunings/dataframe/<platform>_optimized.yaml` (cwd-relative),
+         searched after every per-benchmark tier above. `polars`, `pandas`
+         and `cudf` ship one; `-df` platform spellings such as `polars-df`
+         resolve to the same file. The resolution is recorded as mode
+         `tuned` with this file as the tuning source. No packaged copy of
+         these profiles exists.
+   3. If none of those exist, tuning falls back to the platform's default
       configuration and prints a warning; in an interactive terminal the user
-      is also offered the tuning wizard.
+      is also offered the tuning wizard. A DataFrame platform with no
+      `<platform>_optimized.yaml` (for example `dask`, which ships
+      `dask_distributed.yaml`) ends here. This resolution is recorded as mode
+      `tuned-fallback`, which never matches a curated `tuned` run and is
+      refused under `--official`. The console line names what the fallback
+      applies for the platform, taken from the tuning capability registry:
+      `basic constraints` (the default, for example DuckDB), `engine runtime
+      defaults (streaming)` (Polars), `engine runtime defaults` (other
+      DataFrame platforms) or `OLAP session pack` (ClickHouse).
 3. **Explicit file path**: if the value is not one of the three keywords, it
    is checked as a path; if it exists, that file is loaded directly.
 4. **Invalid value**: if it's not a keyword and the path doesn't exist,
    `benchbox run` raises an error (with a hint to run `benchbox tuning list`).
 
 ```{note}
-Steps 2.2 and 2.3 are **cwd-relative**. `--tuning tuned` only auto-discovers
+Steps 2.2, 2.3 and 2.5 are **cwd-relative**. `--tuning tuned` only auto-discovers
 the templates bundled in `examples/tunings/` (or a cwd-relative
 `<platform>/` directory) when `benchbox` is run from a checkout of this
 repository (or another directory with its own equivalent template tree). If
@@ -132,20 +153,34 @@ benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 
 ### Validate Configuration
 
-DataFrame platforms only; `--platform` is required and must name a
-DataFrame platform (SQL platform names are rejected). SQL-format YAML
-files are not rejected: SQL-only sections such as `primary_keys` and
-`table_tunings` are silently ignored and only the DataFrame sections
-are validated, so a "valid" result does not mean the SQL content was
-checked. Validate the file your platform will actually load.
+`--platform` is required. It selects which kind of file is validated:
+
+- **DataFrame platform** (`datafusion`, `polars`, `pandas`, `dask`, `cudf`):
+  the file is loaded as a DataFrame tuning file and checked against that
+  platform. SQL-format YAML files are not rejected here: SQL-only sections
+  such as `primary_keys` and `table_tunings` are silently ignored and only
+  the DataFrame sections are validated, so a "valid" result does not mean
+  the SQL content was checked. Validate the file your platform will
+  actually load.
+- **SQL platform** (any other platform in the tuning capability registry,
+  including aliases such as `clickhouse-local`; run `benchbox tuning
+  platforms` to list them): the file is loaded as a SQL tuning file and
+  validated with `UnifiedTuningConfiguration.validate_for_platform_detailed`.
+  Tuning types the platform does not support are errors on platforms with
+  explicit compatibility data and warnings otherwise (schema constraints are
+  always warnings). The capability registry adds a warning for each enabled
+  tuning type the platform accepts but does not render yet. Errors exit
+  non-zero. A DataFrame tuning file passed with a SQL platform is rejected.
+  An unknown platform name exits with code 2 and lists the accepted names.
 
 ```bash
 benchbox tuning validate polars_tuning.yaml --platform polars
+benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
 ```
 
 ### Show Smart Defaults
 
-DataFrame platforms only.
+DataFrame platforms only. `tuning defaults` has no SQL form.
 
 ```bash
 benchbox tuning defaults --platform polars

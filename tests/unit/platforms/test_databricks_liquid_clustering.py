@@ -80,11 +80,7 @@ def test_apply_table_tunings_uses_liquid_clustering_when_configured(_mock_databr
             "mode": "manual",
         }
     ]
-    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
-        "liquid_clustering",
-        "optimize",
-        "analyze",
-    ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == ["liquid_clustering"]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
@@ -119,11 +115,7 @@ def test_apply_table_tunings_keeps_z_order_default_behavior(_mock_databricks_sql
             "statement": "OPTIMIZE test_table ZORDER BY (cluster_key, dist_key)",
         }
     ]
-    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
-        "z_order",
-        "optimize",
-        "analyze",
-    ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == ["z_order"]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
@@ -182,11 +174,7 @@ def test_apply_table_tunings_uses_liquid_auto_when_configured(_mock_databricks_s
             "mode": "auto",
         }
     ]
-    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == [
-        "liquid_clustering_auto",
-        "optimize",
-        "analyze",
-    ]
+    assert [operation["mechanism"] for operation in adapter._applied_layout_operations] == ["liquid_clustering_auto"]
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")

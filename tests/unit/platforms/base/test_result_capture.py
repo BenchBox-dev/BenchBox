@@ -203,6 +203,12 @@ class _MetadataHost(ResultCaptureMixin):
     def get_sorted_ingestion_metadata(self):
         return None
 
+    def get_post_load_maintenance_metadata(self):
+        return None
+
+    def build_post_load_maintenance_phase(self):
+        return None
+
     def _build_tuning_profile_metadata(self, run_config):
         return None
 
