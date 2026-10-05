@@ -598,41 +598,102 @@ Two nightly cells prove the throughput driver honors a requested stream
 count end to end via the production CLI (`run-official --streams 3`):
 
 - DuckDB TPC-H SF1 (`uat-throughput-duckdb-nightly.yaml`) on the
-  SHARED_CURSOR fast path.
-- Docker Postgres TPC-H SF1 (`uat-throughput-postgresql-nightly.yaml`,
-  the deferred w4) on INDEPENDENT_CONNECTION: one fresh session per
-  stream. The cell manages its own compose stack
-  (`cleanup.docker_manage_platforms`), so the nightly job needs no
-  service container for it.
+  SHARED_CURSOR fast path. Gating.
+- Docker Postgres TPC-H SF1 (`uat-throughput-postgresql-nightly.yaml`)
+  on INDEPENDENT_CONNECTION: one fresh session per stream. The cell
+  manages its own compose stack (`cleanup.docker_manage_platforms`), so
+  the nightly job needs no service container for it. Quarantined
+  (`continue-on-error` on its sweep and assert steps, GitHub issue #2571)
+  because it failed every nightly from 2026-09-25 at the cell cap. The
+  cell now passes `statement_timeout=300000` (milliseconds) so one slow
+  statement fails on its own, and the job uploads logs and results so the
+  next failure can be diagnosed.
 
-Both cells gate on the sweep exit code plus an independent assert step
-(`validate_stream_count` and `validate_stream_success` over that run's
-result JSON). PR fast-lane coverage stays with the focused
+The DuckDB cell gates on the sweep exit code plus an independent assert
+step (`python -m tests.uat.throughput assert`, run under `if: !cancelled()`
+so a failed sweep cannot skip it). The assert reads `result_path` from the
+sweep's own `cells.jsonl` (exactly one match is required), then checks the
+result JSON itself:
+
+- it belongs to the requested platform, benchmark and scale factor;
+- the number of distinct streams among throughput-phase rows
+  (`queries[].test_type == "throughput"`) equals the requested count, so
+  power-test warm-up and measurement rows that also carry stream numbers
+  cannot stand in for a missing stream;
+- every throughput stream has at least one SUCCESSFUL query;
+- Throughput@Size is positive and within a 2x band of the value recomputed
+  from successful throughput rows. This catches formula drift only; it is
+  not an independent measurement.
+
+An unreadable result JSON, a missing `result_path` or a result for another
+cell fails the cell. The runner applies the same checks to every
+`run-official` cell. PR fast-lane coverage stays with the focused
 session-isolation integration tests.
+
+Each nightly job uploads `throughput-uat-<run_id>-<attempt>` (cell logs,
+`cells.jsonl`, result JSON; 14 days) with `if: always()`, so a timed-out
+cell still leaves logs. A separate `throughput-uat-signal` job publishes the
+commit status `nightly/throughput-uat` from the job result, so a throughput
+failure is visible independent of the other red nightly jobs.
+`tests/unit/workflows/test_nightly_throughput_uat_contract.py` fails if the
+DuckDB steps gain `continue-on-error`, lose `if: !cancelled()`, or if any
+step other than the two named Postgres steps is quarantined.
+
+The throughput explorer sweep (`uat-throughput-explorer-smoke.yaml`) sets
+`explorer_smoke.require_throughput_streams: 3`. With that key a skipped
+smoke (explorer assets or `node` missing), a corpus with no throughput
+bundle, and a bundle whose distinct stream count is not exactly 3 all fail;
+the Playwright spec receives the count as `E2E_REQUIRE_THROUGHPUT_STREAMS`
+and asserts it exactly. It is not scheduled: a nightly lane needs a second
+job with Node, `npm ci`, Playwright browsers and its own SF1 data
+generation, and `throughput-uat` already gates the driver. Run it by hand
+before releases that touch throughput or the explorer pipeline.
 
 ## Throughput performance floor (relative model)
 
-The nightly `throughput-uat` job gates breakage (stream-count wiring via
-`validate_stream_count`, per-stream success via `validate_stream_success`),
-not gradual slowdown. The Throughput@Size floor closes that gap: a green
-run must also clear a per-platform/scale floor derived from observed
-spread. It is additive -- a floor failure never masks or replaces a
-stream-count failure, which keeps gating independently.
+The nightly `throughput-uat` job gates breakage (identity, stream count,
+per-stream success), not gradual slowdown. The Throughput@Size floor is
+meant to close that gap: fail when observed Throughput@Size drops more than
+X% (default 20%, `THROUGHPUT_FLOOR_MAX_DROP_FRACTION`) below the rolling
+median of the last N green runs on the same runner class. It is additive: a
+floor failure never masks or replaces a wiring failure.
 
-Model: fail when observed Throughput@Size drops more than X% below the
-rolling median of the last N green runs for that cell
-(`THROUGHPUT_FLOOR_MEDIAN`, `THROUGHPUT_FLOOR_MAX_DROP_FRACTION`,
-default X = 20%). A relative floor tracks hardware/runner drift; a
-hardcoded absolute number would flake on the next runner.
+Retention. Every green DuckDB run writes
+`throughput-baseline-duckdb-tpch-sf1-<run_id>-<attempt>.json` and uploads it
+as the artifact of the same name (90 days, the GitHub maximum). The record
+holds `throughput_at_size`, `throughput_duration_ms`, `cpu_model`,
+`cpu_count`, `runner_class` (CPU model slug plus vCPU count), runner OS and
+image, `run_id`, `run_attempt`, `commit_sha` and `recorded_at`. A run that
+fails any check writes no record, so the retained set is green runs only.
+Artifacts expire; a longer history needs a copy outside GitHub run data.
 
-Status: observe-only. The DuckDB TPC-H SF1 cell is green on recent
-nightlies, but runners are ephemeral and no run retains its
-`summary.tpc_metrics.throughput_at_size`, so no defensible spread
-exists yet -- setting X/N now would manufacture false failures. Until
-`THROUGHPUT_FLOOR_MEDIAN` is configured, the nightly assert reports
-each observed value (`::notice::`) for baseline accumulation and never
-fails on the floor. Wiring the median (retained observations, N, and
-the sign-off on X) is the remaining step before the floor gates.
+Median. `python -m tests.uat.throughput_baseline rolling-median --baseline-dir DIR
+--platform duckdb --benchmark tpch --scale 1 [--runner-class C] [--window N]
+[--min-samples K]` reads downloaded records (nested artifact directories are
+fine) and prints the median of the latest N matching the runner class,
+defaulting to the current machine's class. The floor must never compare
+across classes.
+
+Status: observe-only. The nightly assert still reads the explicit
+`THROUGHPUT_FLOOR_MEDIAN` repository variable when it is set; while it is
+unset the assert only reports each observed value (`::notice::`). That
+variable is a fixed absolute number and must not be set for a mixed runner
+fleet. Feeding the per-class median into the assert (download the retained
+artifacts, then compute the median) and fixing X and N are the remaining
+steps before the floor gates; they need baselines to accumulate first.
+
+Window length decision. The ten annotated nightlies from 2026-09-25 to
+2026-10-04 (73583, 74389, 74835, 75285, 75789, 79385, 92632, 96272, 97537,
+98141) split into two runner groups: six runs with median 75060 and spread
+7.7% (population CV 2.5%), and four runs with median 96905 and spread 5.7%
+(CV 2.2%). The measured throughput window is only 2.4 to 3.2 seconds
+(2411 ms in a local SF1 run). Within one runner class the signal is stable
+enough to detect a drop of roughly 10% or more, so SF1 and a ~3 s window are
+acceptable for a coarse per-class regression floor and not for fine-grained
+performance tracking. Pooled across classes the spread is about 30%, so a
+fleet-wide median (77.6k, floor 62.1k) would let a fast-runner run lose
+about 36% unnoticed; a pooled floor is rejected. Revisit the window if the
+per-class CV rises above 5%.
 
 ## Compatibility Pruning
 

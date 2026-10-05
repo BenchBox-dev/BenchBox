@@ -282,19 +282,11 @@ def _resolve_cell_result_path(
     official: bool,
     stdout_text: str,
     runs_dir: Path,
-    platform: str,
-    benchmark: str,
-    scale: float,
-    started_at: _dt.datetime,
 ) -> Path | None:
     """Resolve the exported result JSON for one cell from its stdout contract."""
     if official:
         result_path = resolve_official_result_path(
             runs_dir / "results",
-            platform=platform,
-            benchmark=benchmark,
-            started_after=started_at,
-            scale=scale,
             emitted_path=last_nonempty_output_line(stdout_text),
         )
         if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
@@ -431,10 +423,6 @@ def run_cell(
         official=official,
         stdout_text=stdout_text,
         runs_dir=runs_dir,
-        platform=platform,
-        benchmark=benchmark,
-        scale=scale,
-        started_at=now,
     )
 
     result_path, load_failure_path = _materialize_load_failure_sidecar(
@@ -458,8 +446,17 @@ def run_cell(
                 result_json = json.loads(result_path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
                 throughput_check = f"could not read result JSON: {exc}"
+                if status == "passed":
+                    status = "failed"
+                    exit_code = exit_code or 1
             else:
-                ok, reason = validate_throughput_result(result_json, requested_streams=streams)
+                ok, reason = validate_throughput_result(
+                    result_json,
+                    requested_streams=streams,
+                    platform=platform,
+                    benchmark=benchmark,
+                    scale=scale,
+                )
                 throughput_check = reason
                 # Only a passed cell can be downgraded here -- a cell that is
                 # already failed/timed-out must keep that status (mirrors the

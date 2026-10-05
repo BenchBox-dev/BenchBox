@@ -74,6 +74,9 @@ execute:
   official: true
   streams: 3
   seed: 20260711
+  extra_args:
+    - "--platform-option"
+    - "statement_timeout=300000"
 
 preflight:
   free_space_min_gib: 5
