@@ -29,6 +29,7 @@ evidence named below.
 | Durable queue bounds hold across repository handles | submit and retry transactions to shared SQLite state | global and per-principal queue limits, each through separate repository handles in one process; not proven across processes | `tests/unit/mcp/test_durable_jobs.py` |
 | A durable job stores and exposes a shared outcome derived from its result | result payload to job row and status tool | failed queries, failed phases, failed validation, no result, rejected request, quarantined outstanding work | `tests/unit/mcp/test_durable_jobs.py` (`test_job_stores_and_exposes_shared_outcome_derived_from_result`, `test_public_outcome_reports_non_terminal_and_quarantined_states`, `test_recovered_published_artifact_keeps_its_derived_outcome`) |
 | Outstanding throughput work is detected from the real result export shape and from the result object when both exports fail | result export to job worker | `phases.throughput_test.outstanding_work` payload; exporter and payload builder both failing | `tests/unit/mcp/test_run_response_outstanding_work.py` |
+| Work that quiesced before publication is published annotated; any reported stream the worker did not track, or cannot parse, keeps the job quarantined | stream runner results and exported response to job publication | stale outstanding export of finished work; untracked stream id beside a tracked one; unparseable id; untracked id while tracked work still runs | `tests/unit/mcp/test_durable_jobs.py` (`test_stale_outstanding_export_of_quiesced_work_publishes_an_annotated_result`, `test_outstanding_streams_the_worker_never_tracked_keep_the_job_quarantined`, `test_untracked_stream_keeps_the_job_unobserved_even_while_tracked_work_still_runs`, `test_unparseable_stream_id_quarantines_instead_of_escaping_as_a_failure`) |
 | Leaked throughput work releases its capacity only when its futures finish | stream runner futures to worker attestation to claim admission | blocked stream future released after the job was quarantined; no observable handles | `tests/unit/mcp/test_durable_jobs.py` (`test_leaked_throughput_work_attests_quiescence_when_its_futures_finish`, `test_leaked_work_without_observable_handles_stays_quarantined`, `test_leaked_work_quarantines_even_when_the_executor_raises_or_the_response_hides_it`, `test_quiescence_attestation_is_retried_and_logged_when_the_store_fails`) |
 | Recovery never deletes the staging directory of a fenced attempt that may still write | recovery fence to staging directory | expired lease with a live writer; purge before and after quiescence | `tests/unit/mcp/test_durable_jobs.py` (`test_recovery_leaves_fenced_attempt_staging_until_quiescence_and_purge`) |
 | The load-testing executor bounds its waits, stops abandoned streams between queries, reports them as outstanding, and times durations and latencies on the monotonic clock | stream futures to run result | stream blocked past the drain bound; query over its timeout; wall clock stepping backwards; non-positive timeout | `tests/unit/core/load_testing/test_executor.py` (`TestExecutorBoundedWaitsAndClocks`, `TestExecutorLatencyAndAbandonedStreams`) |
@@ -82,8 +83,9 @@ merely because retention time elapsed:
   The attesting thread dies with the process and nothing else observes the
   futures.
 - The job returned a result that reports outstanding throughput work and the
-  worker holds no futures for it, for example a custom executor that does not
-  go through `StreamRunner`.
+  worker does not hold futures for every outstanding stream the result reports,
+  for example a custom executor that does not go through `StreamRunner`, a
+  stream id the worker never tracked, or an id that cannot be parsed.
 
 A worker that did observe the leaked futures, on a normal return or after the
 executor raised, attests from a background thread once they all finish, then
@@ -104,6 +106,19 @@ returns keeps its worker thread alive, and the standard library joins pool
 threads at interpreter exit, so a hung query can still delay process exit. The
 run result lists such streams in `outstanding_stream_ids` with
 `cleanup_state` set to `outstanding`.
+
+## Quiesced work in a published result
+
+Throughput work that the stream runner flagged as outstanding can finish before
+the job publishes. When every reported outstanding stream id was tracked by the
+worker and all tracked futures are done, the job publishes normally. The
+published response moves the stream ids from `stream_ids` (or
+`outstanding_stream_ids`) to `quiesced_stream_ids`, sets `cleanup_state` to
+`quiesced`, and sets `quiesced_before_publication` to true. The canonical result
+file named by `mcp_metadata.result_file` was written at export time and may
+still say `outstanding`. `mcp_metadata.result_file_note` states that the result
+file reflects the moment of export. A reported id the worker never tracked
+keeps the job quarantined.
 
 ## Job outcome for rows written before the outcome field
 

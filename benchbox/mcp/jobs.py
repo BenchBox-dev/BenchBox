@@ -1081,23 +1081,32 @@ def _mark_quiesced(response: dict[str, Any]) -> None:
         metadata["result_file_note"] = _RESULT_FILE_NOTE
 
 
-def _stream_ids(value: object) -> set[int]:
-    if isinstance(value, (list, tuple)):
-        return {int(stream_id) for stream_id in value}
-    return set()
+def _collect_stream_ids(value: object, ids: set[int]) -> bool:
+    if not isinstance(value, (list, tuple)):
+        return False
+    unparseable = False
+    for stream_id in value:
+        if isinstance(stream_id, int) and not isinstance(stream_id, bool):
+            ids.add(stream_id)
+        elif isinstance(stream_id, str) and stream_id.isascii() and stream_id.isdigit():
+            ids.add(int(stream_id))
+        else:
+            unparseable = True
+    return unparseable
 
 
 def _response_outstanding_ids(value: object, ids: set[int]) -> bool:
     unattributed = False
     if isinstance(value, Mapping):
-        ids.update(_stream_ids(value.get("outstanding_stream_ids")))
+        unattributed |= _collect_stream_ids(value.get("outstanding_stream_ids"), ids)
         outstanding_work = value.get("outstanding_work")
         if isinstance(outstanding_work, Mapping):
-            ids.update(_stream_ids(outstanding_work.get("stream_ids")))
-        if value.get("cleanup_state") == "outstanding" and not (
-            _stream_ids(value.get("stream_ids")) or _stream_ids(value.get("outstanding_stream_ids"))
-        ):
-            unattributed = True
+            unattributed |= _collect_stream_ids(outstanding_work.get("stream_ids"), ids)
+        if value.get("cleanup_state") == "outstanding":
+            own_ids: set[int] = set()
+            _collect_stream_ids(value.get("stream_ids"), own_ids)
+            _collect_stream_ids(value.get("outstanding_stream_ids"), own_ids)
+            unattributed |= not own_ids
         for item in value.values():
             unattributed |= _response_outstanding_ids(item, ids)
     elif isinstance(value, (list, tuple)):
@@ -1430,16 +1439,14 @@ class DurableJobWorker:
     def _assess_executor(
         tracked_results: list[Any], response: dict[str, Any] | None, execution_error: Exception | None
     ) -> Literal["quiescent", "attestable", "unobserved"]:
-        if any(not await_quiescence(result, timeout=0) for result in tracked_results):
-            return "attestable"
         reported = execution_error is None and response is not None and _response_has_outstanding_work(response)
-        if not tracked_results:
-            return "unobserved" if reported else "quiescent"
         if reported:
             reported_ids: set[int] = set()
             tracked_ids = frozenset().union(*(tracked_stream_ids(result) for result in tracked_results))
             if _response_outstanding_ids(response, reported_ids) or not reported_ids <= tracked_ids:
                 return "unobserved"
+        if any(not await_quiescence(result, timeout=0) for result in tracked_results):
+            return "attestable"
         if response is not None:
             _mark_quiesced(response)
         return "quiescent"

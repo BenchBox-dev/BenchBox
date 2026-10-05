@@ -1479,3 +1479,57 @@ def test_public_outcome_stops_reporting_outstanding_work_once_quiescence_is_atte
     assert repository.attest_quiescence(submitted.execution_id, "worker-a") is True
     released = repository.get(submitted.execution_id)
     assert released is not None and _public_status(released)["outcome"] == "unknown"
+
+
+def test_untracked_stream_keeps_the_job_unobserved_even_while_tracked_work_still_runs(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from benchbox.core.throughput.containment import record_outstanding_result
+
+    release = threading.Event()
+    pool = ThreadPoolExecutor(max_workers=1)
+    tracked = SimpleNamespace(
+        outstanding_stream_ids=[2],
+        cleanup_state="outstanding",
+        outstanding_notes=[],
+        _outstanding_futures={2: pool.submit(release.wait, 5.0)},
+    )
+
+    def executor(_job, _staging):
+        record_outstanding_result(tracked)
+        return {
+            "phases": {"throughput_test": {"outstanding_work": {"stream_ids": [2, 9], "cleanup_state": "outstanding"}}}
+        }
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1, poll_seconds=0.01))
+    worker = DurableJobWorker(
+        repository, TenantWorkspaceProvider(tmp_path / "workspaces"), executor=executor, worker_id="worker-a"
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    try:
+        anyio.run(worker._run_job, claimed)
+        release.set()
+        assert not _wait_until(lambda: repository.get(submitted.execution_id).quiesced_at is not None, timeout=0.5)
+        contained = repository.get(submitted.execution_id)
+        assert contained is not None and contained.state == "unknown"
+        assert repository.claim("worker-b") is None
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+
+
+def test_unparseable_stream_id_quarantines_instead_of_escaping_as_a_failure(tmp_path: Path) -> None:
+    response = {
+        "mcp_metadata": {"result_file": None},
+        "phases": {
+            "throughput_test": {"outstanding_work": {"stream_ids": [2, "not-a-stream"], "cleanup_state": "outstanding"}}
+        },
+    }
+    repository, _worker, submitted, _waiting = _run_with_tracked_result(tmp_path, _quiesced_result(2), response)
+
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None and contained.state == "unknown" and contained.attempts == 1
+    assert contained.error_code == "outstanding_work" and contained.quiesced_at is None
+    assert repository.claim("worker-b") is None
