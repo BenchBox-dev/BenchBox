@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from benchbox.core.throughput.containment import check_phase_boundary
+from benchbox.core.throughput.entrypoints import require_stream_minimum
 from benchbox.core.tpc_patterns import generate_official_benchmark_audit_trail
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -79,6 +80,14 @@ def _phase_succeeded(result: Any) -> bool:
     if isinstance(result, dict):
         return result.get("success") is not False
     return getattr(result, "success", None) is not False
+
+
+def _power_phase_complete(result: Any) -> bool:
+    if not _phase_succeeded(result):
+        return False
+    return _extract_metric(result, "queries_successful", default=-1) == _extract_metric(
+        result, "queries_executed", default=-1
+    )
 
 
 class TPCDSOfficialBenchmark:
@@ -167,13 +176,18 @@ class TPCDSOfficialBenchmark:
                     power_test = TPCDSPowerTest(
                         benchmark=self.benchmark,
                         connection_factory=connection_factory,
+                        scale_factor=config.scale_factor,
                         verbose=config.verbose,
                         dialect=self.dialect,
                     )
 
                     power_result = power_test.run()
                     result.power_test_result = power_result
-                    result.power_at_size = _extract_metric(power_result, "power_at_size")
+                    if _power_phase_complete(power_result):
+                        result.power_at_size = _extract_metric(power_result, "power_at_size")
+                    else:
+                        result.errors.append("Power Test failed: Power@Size withheld from results.")
+                        result.success = False
 
                 except Exception as e:
                     result.errors.append(f"Power Test failed: {e}")
@@ -187,7 +201,8 @@ class TPCDSOfficialBenchmark:
                     throughput_test = TPCDSThroughputTest(
                         benchmark=self.benchmark,
                         connection_factory=connection_factory,
-                        num_streams=config.num_streams,
+                        scale_factor=config.scale_factor,
+                        num_streams=require_stream_minimum(config.num_streams, "num_streams"),
                         verbose=config.verbose,
                         dialect=self.dialect,
                     )

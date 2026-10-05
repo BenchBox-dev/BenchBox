@@ -198,7 +198,7 @@ class TPCH(BaseBenchmark):
         """
         return getattr(self._impl, "tables", {})
 
-    def run_official_benchmark(self, connection_factory, config=None):
+    def run_official_benchmark(self, connection_factory, config=None, *, adapter=None):
         """Run the official TPC-H benchmark.
 
         This method provides compatibility for official benchmark examples.
@@ -213,8 +213,8 @@ class TPCH(BaseBenchmark):
         try:
             from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmark
 
-            official = TPCHOfficialBenchmark(self)
-            return official.run_official_benchmark(connection_factory, config)
+            official = TPCHOfficialBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir)
+            return official.run_official_benchmark(connection_factory, config, adapter=adapter)
         except ImportError:
             # Fallback to standard benchmark run
             connection = connection_factory() if callable(connection_factory) else connection_factory
