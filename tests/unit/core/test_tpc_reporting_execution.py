@@ -138,7 +138,6 @@ def _fake_tpcds_result() -> Any:
         maintenance_test=maintenance,
         power_at_size=100.0,
         throughput_at_size=80.0,
-        qphds_at_size=89.44,
         validation_results={"overall_valid": False, "issues": ["issue"]},
     )
 
@@ -147,7 +146,6 @@ def _fake_tpch_result() -> Any:
     power_query_times = {i: 1.0 + (i / 100.0) for i in range(1, 23)}
     return SimpleNamespace(
         success=True,
-        qphh_at_size=123.4,
         scale_factor=1.0,
         total_benchmark_time=50.0,
         power_test=SimpleNamespace(success=True, total_time=20.0, power_at_size=140.0, query_times=power_query_times),
@@ -162,6 +160,7 @@ def test_tpc_reporting_modules_generate_all_outputs(tmp_path: Path):
     for path in tpcds_reports.values():
         assert path.exists()
         assert path.stat().st_size > 0
+        assert "QphDS" not in path.read_text(encoding="utf-8")
 
     tpch_result = _fake_tpch_result()
     tpch_reporter = TPCHReportGenerator(output_dir=tmp_path)
@@ -170,6 +169,8 @@ def test_tpc_reporting_modules_generate_all_outputs(tmp_path: Path):
     csv_file = tpch_reporter.generate_performance_csv(tpch_result)
     comparison = tpch_reporter.generate_comparison_report(tpch_result, tpch_result)
     assert detailed.exists() and cert.exists() and csv_file.exists() and comparison.exists()
+    for path in (detailed, cert, csv_file, comparison):
+        assert "QphH" not in path.read_text(encoding="utf-8")
 
     cmp_obj = tpch_reporter.compare_results(tpch_result, tpch_result)
     assert cmp_obj.significant_change is False

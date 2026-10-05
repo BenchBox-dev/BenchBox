@@ -131,45 +131,6 @@ class TestTPCMetricsCalculator:
 
         assert result == pytest.approx((44 * 3600.0) / 22.0)
 
-    def test_calculate_qph_basic(self) -> None:
-        """Test basic QphH calculation."""
-        # QphH = sqrt(power * throughput)
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=100.0,
-            throughput_at_size=100.0,
-        )
-        assert abs(result - 100.0) < 0.0001
-
-    def test_calculate_qph_different_values(self) -> None:
-        """Test QphH with different power and throughput values."""
-        # sqrt(400 * 100) = sqrt(40000) = 200
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=400.0,
-            throughput_at_size=100.0,
-        )
-        assert abs(result - 200.0) < 0.0001
-
-    def test_calculate_qph_matches_legacy_tpc_h_and_tpc_ds_composite_formula(self) -> None:
-        """TPC-H QphH and TPC-DS QphDS both use sqrt(power * throughput)."""
-        assert TPCMetricsCalculator.calculate_qph(1000.0, 4000.0) == pytest.approx(2000.0)
-        assert TPCMetricsCalculator.calculate_qph(900.0, 100.0) == pytest.approx(300.0)
-
-    def test_calculate_qph_zero_power(self) -> None:
-        """Test QphH with zero power returns 0."""
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=0.0,
-            throughput_at_size=100.0,
-        )
-        assert result == 0.0
-
-    def test_calculate_qph_zero_throughput(self) -> None:
-        """Test QphH with zero throughput returns 0."""
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=100.0,
-            throughput_at_size=0.0,
-        )
-        assert result == 0.0
-
     def test_calculate_geometric_mean_basic(self) -> None:
         """Test basic geometric mean calculation."""
         times = [1.0, 1.0, 1.0, 1.0]
@@ -354,6 +315,25 @@ class TestDeriveFromResultFiles:
 
         assert result["power_at_size"] == pytest.approx(3600.0)
         assert result["power_test_time"] == pytest.approx(22.0)
+
+    @pytest.mark.parametrize("compliance_class", ["unofficial_subscale", "unofficial_nonstandard"])
+    def test_unofficial_bundles_without_a_suppressed_marker_are_refused(self, compliance_class: str) -> None:
+        legacy = _throughput_file()
+        legacy["benchmark"]["compliance_class"] = compliance_class
+        with pytest.raises(ValueError, match=compliance_class):
+            TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), legacy, scale_factor=1.0)
+        legacy_power = _power_file({1: 1.0})
+        legacy_power["benchmark"]["compliance_class"] = compliance_class
+        with pytest.raises(ValueError, match=compliance_class):
+            TPCMetricsCalculator.compute_qphh_result(legacy_power, _throughput_file(), scale_factor=1.0)
+
+    def test_official_bundles_are_accepted(self) -> None:
+        power = _power_file({1: 1.0})
+        power["benchmark"]["compliance_class"] = "official"
+
+        result = TPCMetricsCalculator.compute_qphh_result(power, _throughput_file(), scale_factor=1.0)
+
+        assert result["power_at_size"] == pytest.approx(3600.0)
 
     def test_result_has_no_composite_metric(self) -> None:
         result = TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), _throughput_file(), scale_factor=1.0)

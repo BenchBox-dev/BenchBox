@@ -348,7 +348,7 @@ class TPCDSThroughputTest:
         (``benchbox.core.tpcds.streams.generate_dsqgen_streams``), which
         yields both the official per-stream query ORDERING and the official
         per-stream substitution PARAMETERS -- the TPC-DS compliance-relevant
-        inputs to QphDS. This is the throughput-test default and retires the
+        inputs to the throughput test. This is the throughput-test default and retires the
         home-grown ``TPCDSPermutationGenerator`` ordering / RNG-jitter
         parameter path for this (the timed, scored) path; that Python path
         remains available, unchanged, via ``_build_stream_queries`` for

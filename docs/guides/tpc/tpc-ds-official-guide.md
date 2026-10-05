@@ -33,21 +33,31 @@ The TPC-DS official benchmark implementation provides a complete, certification-
 ### Basic Usage
 
 ```python
+import duckdb
+
 from benchbox.tpcds import TPCDSBenchmark
 
-# Create benchmark instance
 benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=True)
+connection = duckdb.connect("tpcds.duckdb")
 
-# Run complete official benchmark
-result = benchmark.run_official_benchmark(
-    connection_string="your_database_connection_string",
-    num_streams=2
-)
+result = benchmark.run_official_benchmark(connection=connection, num_streams=2)
 
-# Access metrics
-print(f"Power@Size: {result.power_size:.2f}")
-print(f"Throughput@Size: {result.throughput_size:.2f}")
+print(f"Success: {result['success']}")
+print(f"Power@Size: {result['power_at_size']:.2f}")
+print(f"Throughput@Size: {result['throughput_at_size']:.2f}")
+print(result["errors"])
 ```
+
+`run_official_benchmark` returns a dictionary, not an object with attributes.
+It reuses the one connection you pass for every throughput stream, so the
+streams share a session. This path scores a throughput test only when every
+stream completes every query: if any stream fails, `throughput_at_size` stays
+`0.0`, `success` is `False` and `errors` says the metric was withheld. The
+stream timing window starts after the connection is obtained. The phase
+drivers used by `benchbox run` (`--phases power,throughput`) are the
+supported route for published numbers; later sections of this guide that show
+attribute access such as `result.power_size` describe an object model that
+`run_official_benchmark` does not return.
 
 ### Installation Requirements
 

@@ -162,7 +162,30 @@ class TestValidationPhaseStatus:
         assert payload["summary"]["validation"] == "passed"
         assert payload["phases"]["validation"]["status"] == "PASSED"
 
-    def test_failed_setup_validation_is_not_masked(self) -> None:
-        payload = self._payload(["SUCCESS"] * 3, row_count_status="FAILED")
+    def test_failed_setup_validation_is_not_downgraded_by_a_milder_overall_status(self) -> None:
+        payload = self._payload(["SUCCESS"] * 3 + ["FAILED"] * 2, row_count_status="FAILED")
 
+        assert payload["summary"]["validation"] == "partial"
         assert payload["phases"]["validation"]["status"] == "FAILED"
+
+    def test_partial_setup_validation_is_raised_to_a_failed_overall_status(self) -> None:
+        builder = _builder(test_type="throughput")
+        builder.add_query_result(_row("1", 1.0, test_type="throughput"))
+        builder.set_validation_status("FAILED")
+        validation = ValidationPhase(
+            duration_ms=5,
+            row_count_validation="PARTIAL",
+            schema_validation="PASSED",
+            data_integrity_checks="PASSED",
+        )
+        _with_phase(builder, _throughput_phase(success=True, throughput_at_size=1.0), validation)
+
+        payload = build_result_payload(builder.build())
+
+        assert payload["summary"]["validation"] == "failed"
+        assert payload["phases"]["validation"]["status"] == "FAILED"
+
+    def test_unrecognised_setup_status_is_passed_through(self) -> None:
+        payload = self._payload(["SUCCESS"] * 3 + ["FAILED"] * 2, row_count_status="SKIPPED")
+
+        assert payload["phases"]["validation"]["status"] == "SKIPPED"

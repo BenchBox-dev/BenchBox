@@ -84,6 +84,16 @@ class TestToManifestEntry:
 
         assert entry.power_score == pytest.approx(1234.56)
 
+    def test_composite_metrics_are_not_used_as_the_power_score(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["tpc_metrics"] = {"qphh_at_size": 777.0, "qphds_at_size": 888.0}
+        bundle = tmp_path / "legacy-composite.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.power_score is None
+
     def test_driver_version_extracted(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)

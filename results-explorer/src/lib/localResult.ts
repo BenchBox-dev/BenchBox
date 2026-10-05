@@ -118,11 +118,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const displayTimings = buildDisplayTimings(queries);
   const logicalQueryCount = inferLogicalQueryCount(bundle, benchmarkId, displayTimings);
   const eligibility = timingEligibility(displayTimings, logicalQueryCount);
-  const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), [
-    "power_at_size",
-    "qphh_at_size",
-    "qphds_at_size",
-  ]);
+  const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["power_at_size"]);
   const resultId = localResultId();
   const validationStatus = validationStatusFor(bundle, failedQueryCount(bundle));
   const environment = safeEnvironment(bundle.environment);

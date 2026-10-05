@@ -367,14 +367,16 @@ throughput_at_size = 22 * 2 * 3600 * 1.0 / 150  # = 1056.0
 
 ### Report Generation
 
+The reports show Power@Size and Throughput@Size and contain no QphH@Size. They accept the object returned by `run_official_benchmark` directly.
+
 ```python
 from benchbox.core.tpch.reporting import TPCHReportGenerator
 
 # Create report generator
 report_generator = TPCHReportGenerator(output_dir="./reports")
 
-# Generate systematic HTML report
-html_report = report_generator.generate_systematic_report(
+# Generate HTML report
+html_report = report_generator.generate_detailed_report(
     result=result,
     report_title="TPC-H Benchmark Report",
     include_detailed_analysis=True,
@@ -411,7 +413,8 @@ comparison = report_generator.compare_results(
     current_result=current_result
 )
 
-print(f"Performance Change: {comparison.relative_change:+.1%}")
+# The comparison is on Power@Size (no composite QphH@Size is exported)
+print(f"Power@Size Change: {comparison.relative_change:+.1%}")
 print(f"Significant Change: {comparison.significant_change}")
 
 # Generate comparison report
@@ -633,7 +636,7 @@ class TPCH:
     def generate_data(self) -> List[Path]:
         """Generate TPC-H data files."""
 
-    def run_official_benchmark(self, connection_factory, num_streams=2, **kwargs) -> QphHResult:
+    def run_official_benchmark(self, connection_factory, num_streams=2, **kwargs) -> TPCHOfficialBenchmarkResult:
         """Run official TPC-H benchmark."""
 
     def get_query(self, query_id, **kwargs) -> str:
@@ -647,7 +650,7 @@ class TPCHOfficialBenchmark:
     def __init__(self, benchmark, connection_factory, num_streams=2, **kwargs):
         """Initialize official benchmark runner."""
 
-    def run_official_benchmark(self) -> QphHResult:
+    def run_official_benchmark(self) -> TPCHOfficialBenchmarkResult:
         """Run complete official benchmark."""
 ```
 
@@ -658,7 +661,7 @@ class TPCHReportGenerator:
     def __init__(self, output_dir=None):
         """Initialize report generator."""
 
-    def generate_systematic_report(self, result, **kwargs) -> Path:
+    def generate_detailed_report(self, result, **kwargs) -> Path:
         """Generate systematic HTML report."""
 
     def generate_certification_report(self, result) -> Path:

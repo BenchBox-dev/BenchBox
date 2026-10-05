@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 NAMED_METRICS = ("geometric_mean", "p50", "p95", "p99", "total_time", "mean")
 
 NON_POWER_TEST_TYPES = frozenset({"throughput", "maintenance"})
+UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_subscale", "unofficial_nonstandard"})
 TPC_QUERIES_PER_STREAM = {"tpch": 22, "tpcds": 99}
 _TPC_BENCHMARK_LABELS = {"tpch": "TPC-H", "tpcds": "TPC-DS"}
 
@@ -189,25 +190,6 @@ class TPCMetricsCalculator:
         return (total_queries * scale_factor * 3600) / total_time_seconds
 
     @staticmethod
-    def calculate_qph(power_at_size: float, throughput_at_size: float) -> float:
-        """Calculate composite QphH/QphDS metric.
-
-        The composite metric is the geometric mean of Power and Throughput:
-        QphH = sqrt(Power@Size * Throughput@Size)
-
-        Args:
-            power_at_size: Power@Size metric value
-            throughput_at_size: Throughput@Size metric value
-
-        Returns:
-            Composite QphH/QphDS metric, or 0.0 if either input is invalid
-        """
-        if power_at_size <= 0 or throughput_at_size <= 0:
-            return 0.0
-
-        return statistics.geometric_mean([power_at_size, throughput_at_size])
-
-    @staticmethod
     def calculate_geometric_mean(times: Sequence[float]) -> float:
         """Calculate geometric mean of execution times.
 
@@ -263,6 +245,9 @@ class TPCMetricsCalculator:
         tpc_metrics = summary.get("tpc_metrics") or {}
         if tpc_metrics.get("suppressed"):
             return f"{label} results have suppressed TPC metrics ({tpc_metrics.get('reason', 'suppressed')})"
+        compliance_class = (data.get("benchmark") or {}).get("compliance_class")
+        if compliance_class in UNOFFICIAL_COMPLIANCE_CLASSES:
+            return f"{label} results are {compliance_class} and carry no official TPC metrics"
         failed = (summary.get("queries") or {}).get("failed") or 0
         if failed:
             return f"{label} results contain {failed} failed queries"

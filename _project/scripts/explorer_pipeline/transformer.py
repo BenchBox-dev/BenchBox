@@ -412,13 +412,12 @@ def _driver_version(bundle: BundleDocument) -> str | None:
 def _power_score(bundle: BundleDocument) -> float | None:
     """Extract TPC power@size metric from a schema-v2 bundle."""
     tpc = bundle.summary.tpc_metrics
-    for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
-        val = getattr(tpc, key)
-        if val is not None:
-            try:
-                return float(val)
-            except (TypeError, ValueError):
-                pass
+    val = tpc.power_at_size
+    if val is not None:
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            pass
     return None
 
 
