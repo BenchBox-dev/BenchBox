@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -149,9 +150,12 @@ class ClickHouseWorkloadMixin:
             # DuckDB-only DDL syntax (Nullable() NOT NULL, FLOAT[N] vector columns)
             # is rewritten in `_optimize_table_definition` below.
             effective_config = self.get_effective_tuning_configuration()
+            schema_config = copy.deepcopy(effective_config)
+            if schema_config is not None:
+                schema_config.primary_keys.enabled = True
             schema_sql = benchmark.get_create_tables_sql(
                 dialect="duckdb",
-                tuning_config=effective_config,
+                tuning_config=schema_config,
             )
             nullable_columns_by_table = self._get_nullable_columns_by_table(benchmark)
 

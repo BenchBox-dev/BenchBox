@@ -90,3 +90,15 @@ class TestDateFirstSortKey:
             adapter.create_schema(TPCHBenchmark(scale_factor=0.01, output_dir=tmp_path), client)
 
         assert [s for s in client.statements if re.match(r"\s*CREATE TABLE", s)] == []
+
+    def test_tables_without_a_tuned_sort_key_keep_the_baseline_layout_when_primary_keys_are_disabled(
+        self, adapter, tmp_path
+    ):
+        baseline = _create_schema(adapter, tmp_path, UnifiedTuningConfiguration())
+        tuned = _create_schema(adapter, tmp_path, _config(primary_keys_enabled=False))
+
+        for table in ("region", "nation", "supplier", "customer", "part", "partsupp"):
+            baseline_statement = next(s for s in baseline if re.match(rf"\s*CREATE TABLE {table}\b", s))
+            tuned_statement = next(s for s in tuned if re.match(rf"\s*CREATE TABLE {table}\b", s))
+            assert tuned_statement == baseline_statement
+            assert "ORDER BY tuple()" not in tuned_statement
