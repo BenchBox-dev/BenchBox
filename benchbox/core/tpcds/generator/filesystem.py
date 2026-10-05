@@ -351,7 +351,10 @@ class FileArtifactMixin:
                     elif compression == "zstd":
                         import zstandard as zstd
 
-                        with zstd.open(file_path, "rb") as f:
+                        # zstandard's binary stream reader does not support
+                        # line iteration, so count rows in text mode like the
+                        # other formats do.
+                        with zstd.open(file_path, "rt") as f:
                             row_count = sum(1 for _ in f)
                     elif compression == "bzip2":
                         import bz2
@@ -367,8 +370,10 @@ class FileArtifactMixin:
                         # Uncompressed file
                         with open(file_path, "rb") as f:
                             row_count = sum(1 for _ in f)
-                except Exception:
-                    # If row counting fails, fall back to 0
+                except Exception as exc:
+                    # If row counting fails, fall back to 0 and record why so
+                    # a corrupt file is diagnosable instead of silently empty.
+                    logging.getLogger(__name__).debug("row counting failed for %s: %s", file_path, exc)
                     row_count = 0
 
                 manifest["tables"].setdefault(table, []).append(
