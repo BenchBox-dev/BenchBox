@@ -21669,6 +21669,13 @@
       "status": "open",
       "title": "Make the tuning metadata store portable (no unsupported CREATE INDEX; per-dialect DDL)"
     },
+    "tuning-post-load-live-certification-20261005": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Live-certify the post-load tuning hooks on Redshift, Databricks and ClickHouse server/cloud"
+    },
     "tuning-post-load-seam-20261001": {
       "claim": null,
       "needs": [
