@@ -124,6 +124,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "public-site-visual-astro-dry-run", "Capture public site from the Astro build"): "site-visual-capture",
     ("ci.yml", "site-parity", "Generate Explorer browser fixtures"): "site-parity",
     ("ci.yml", "site-parity", "Compare the Astro build with the Sphinx site"): "site-parity",
+    ("ci.yml", "api-contract-check", "Verify public API symbols against the released wheel"): "api-contract-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
