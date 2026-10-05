@@ -13,6 +13,7 @@ subclass overrides respectively per refactor map §3.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import sys
 from contextlib import contextmanager
@@ -135,12 +136,33 @@ class ConnectionLifecycleMixin:
     def get_connection_from_pool(self) -> Any:
         """Get connection from pool (if supported by platform).
 
+        Without a pool this creates a fresh connection, matching the call
+        shape each adapter's ``create_connection`` declares: adapters that
+        accept arbitrary keywords receive the whole platform config, an
+        adapter that declares a single ``connection_config`` dict receives
+        the config as that mapping, and an adapter that takes no arguments
+        is called bare. This keeps Glue (no-arg) and MotherDuck
+        (single-dict) working while preserving today's behaviour for every
+        ``**connection_config`` adapter.
+
         Returns:
             Database connection from pool or new connection
         """
         if self.connection_pool:
             return self.connection_pool.get_connection()
-        return self.create_connection(**self.platform_config)
+        return self._create_unpooled_connection()
+
+    def _create_unpooled_connection(self) -> Any:
+        """Create a fresh connection using the adapter's declared signature."""
+        try:
+            parameters = inspect.signature(self.create_connection).parameters
+        except (TypeError, ValueError):
+            return self.create_connection(**self.platform_config)
+        if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()):
+            return self.create_connection(**self.platform_config)
+        if "connection_config" in parameters:
+            return self.create_connection(connection_config=dict(self.platform_config))
+        return self.create_connection()
 
     def get_database_path(self, **connection_config) -> str | None:
         """Get the database file path for file-based databases.
