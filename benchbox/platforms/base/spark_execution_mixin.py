@@ -540,14 +540,18 @@ class SparkQueryExecutionMixin:
             self.capture_sql(query, "query", None)
             return self._build_dry_run_result(query_id)
 
-        start_time = mono_time()
-
         spark = connection
 
-        try:
-            if self.disable_cache and self._catalog_clear_cache_supported:
+        if self.disable_cache and self._catalog_clear_cache_supported:
+            clear_start = mono_time()
+            try:
                 spark.catalog.clearCache()
+            except Exception as e:
+                return self._build_query_failure_result(query_id, clear_start, e)
 
+        start_time = mono_time()
+
+        try:
             result_df = spark.sql(query)
             result = result_df.collect()
 

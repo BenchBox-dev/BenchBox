@@ -112,6 +112,12 @@ def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float
     return max(0.0, total_seconds - probe_seconds)
 
 
+class _ManifestStreamCapability:
+    def __get__(self, instance: Any, owner: type) -> StreamConnectionCapability:
+        capability, _declared = resolve_stream_connection_capability(owner if instance is None else type(instance))
+        return capability
+
+
 class PlatformAdapter(
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
@@ -135,18 +141,7 @@ class PlatformAdapter(
     # Subclasses should override this class variable to declare their capability.
     # Default is NOT_APPLICABLE - adapters that support isolation must opt in.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
-    # Per-stream connection capability for concurrent throughput/pool-test streams
-    # (see StreamConnectionCapability docstring). Default is SHARED_CURSOR, which
-    # preserves today's behavior for every adapter that does not opt in: streams
-    # share one cursor per connection, correct for embedded engines like DuckDB.
-    # Server-style (client/server) adapters that need one independent connection
-    # per stream must set this to INDEPENDENT_CONNECTION *and* override
-    # new_stream_connection() below - declaring the capability alone is not
-    # enough, since the base new_stream_connection() raises for that value to
-    # fail fast instead of silently falling back to cursor sharing. Adapters
-    # that cannot serve concurrent streams at all declare UNSUPPORTED, which
-    # the throughput entry points refuse before stream submission.
-    stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
+    stream_connection_capability = _ManifestStreamCapability()
     # Default in-container service port the adapter connects to in the reference
     # docker deployment (the container side of the compose `ports:` mapping).
     # UAT derives its reachability table from these declarations instead of

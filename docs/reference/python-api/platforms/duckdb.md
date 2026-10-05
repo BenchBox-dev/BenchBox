@@ -230,9 +230,6 @@ The values are stored as attributes of the same name (`DuckDBAdapter().force_rec
 <span id="benchbox.platforms.duckdb.DuckDBAdapter.driver_isolation_capability"></span>
 **`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.SUPPORTED` (from `benchbox.platforms.base`): a requested DuckDB driver version can run in an isolated runtime.
 
-<span id="benchbox.platforms.duckdb.DuckDBAdapter.stream_connection_capability"></span>
-**`stream_connection_capability`** (class attribute): `StreamConnectionCapability.SHARED_CURSOR` (from `benchbox.platforms.base`): concurrent throughput streams use cursors of the one connection instead of opening more connections.
-
 ## Configuration Examples
 
 ### In-Memory Database

@@ -100,7 +100,7 @@ def _check_hook_rule(adapter_cls: type) -> str | None:
     if capability is not StreamConnectionCapability.INDEPENDENT_CONNECTION:
         return None
     defines_connect = "create_connection" in adapter_cls.__dict__
-    declares_value = "stream_connection_capability" in adapter_cls.__dict__
+    declares_value = "new_stream_connection" in adapter_cls.__dict__
     defines_hook = "_apply_stream_session_state" in adapter_cls.__dict__
     if defines_connect and not declares_value and not defines_hook:
         return (
@@ -170,3 +170,53 @@ class TestThroughputSessionCapabilitySweep:
             adapter_cls = PlatformRegistry.get_adapter_class(record["key"])
             with pytest.raises(RuntimeError, match="UNSUPPORTED"):
                 require_throughput_stream_capability(adapter_cls, platform_name=record["key"])
+
+
+class TestCapabilitySingleSource:
+    def test_adapter_attribute_matches_the_manifest_declaration(self):
+        mismatches = []
+        for entry in PLATFORM_MANIFEST:
+            if entry.adapter is None or not entry.capabilities.get("supports_sql"):
+                continue
+            try:
+                adapter_cls = PlatformRegistry.get_adapter_class(entry.key)
+            except Exception:
+                continue
+            declared = StreamConnectionCapability(entry.adapter.stream_connection_capability)
+            if adapter_cls.stream_connection_capability is not declared:
+                mismatches.append(
+                    f"{entry.key}: class says {adapter_cls.stream_connection_capability}, manifest says {declared}"
+                )
+        assert not mismatches, "\n".join(mismatches)
+
+    def test_manifest_adapters_do_not_redeclare_the_capability(self):
+        redeclared = []
+        for key in _sql_adapter_keys():
+            try:
+                adapter_cls = PlatformRegistry.get_adapter_class(key)
+            except Exception:
+                continue
+            for klass in adapter_cls.__mro__:
+                if klass is PlatformAdapter:
+                    break
+                if "stream_connection_capability" in vars(klass):
+                    redeclared.append(f"{key}: {klass.__module__}.{klass.__qualname__}")
+        assert not redeclared, (
+            "Declare stream_connection_capability only in the platform manifest; found class attributes on: "
+            + "; ".join(redeclared)
+        )
+
+    def test_base_stream_dispatch_follows_the_manifest(self):
+        from benchbox.platforms.base.adapter import PlatformAdapter as Base
+
+        for key in _sql_adapter_keys():
+            record = _resolve_entry(key)
+            if record.get("status") != "resolved":
+                continue
+            adapter_cls = PlatformRegistry.get_adapter_class(key)
+            expected = StreamConnectionCapability(record["capability"])
+            assert adapter_cls.stream_connection_capability is expected
+            instance = object.__new__(adapter_cls)
+            assert instance.stream_connection_capability is expected
+            if expected is StreamConnectionCapability.INDEPENDENT_CONNECTION:
+                assert adapter_cls.new_stream_connection is not Base.new_stream_connection
