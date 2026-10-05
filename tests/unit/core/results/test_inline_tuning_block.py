@@ -560,6 +560,12 @@ class TestReexportedLegacyBundleInventsNoStatus:
         assert tuning_block["hash"] == "a" * 64
         assert tuning_block["requested_config_hash"] == "a" * 64
 
+    def test_bundle_with_only_auto_source_keeps_source_and_gains_no_hash(self, tmp_path: Path) -> None:
+        again = _reexport_legacy_bundle(tmp_path, {"source": "auto"})
+
+        tuning_block = again["platform"]["tuning"]
+        assert tuning_block == {"source": "auto"}
+
     def test_bundle_with_an_empty_tuning_block_gains_no_status(self, tmp_path: Path) -> None:
         again = _reexport_legacy_bundle(tmp_path, {})
 

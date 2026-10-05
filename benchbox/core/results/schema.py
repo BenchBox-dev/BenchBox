@@ -1714,6 +1714,14 @@ def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     config_hash = getattr(result, "tuning_config_hash", None)
     if tuning_source or source_file or config_hash:
         summary["source"] = _legacy_tuning_source_bridge(tuning_source, source_file)
+    else:
+        # A loaded legacy bundle that stated only `source: "auto"` (no hash,
+        # no tuning source) keeps that source on re-export. The value is
+        # carried on the result by the loader and re-emitted verbatim here;
+        # no hash is invented for it.
+        legacy_source = getattr(result, "tuning_legacy_source", None)
+        if legacy_source in ("yaml", "auto"):
+            summary["source"] = legacy_source
     if config_hash:
         summary["requested_config_hash"] = config_hash
         summary["hash"] = config_hash

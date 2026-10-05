@@ -2098,7 +2098,13 @@ class SnowflakeAdapter(PlatformAdapter):
                     self.logger.info(f"Table {table_name} already has desired clustering key: {current_clustering}")
                     ledger = getattr(self, "_applied_tuning_ledger", None)
                     if ledger is not None:
-                        ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
+                        from benchbox.core.tuning.applied_ledger import SATISFIED_BY_PREEXISTING_STATE
+
+                        ledger.record_satisfied(
+                            cluster_sql,
+                            SATISFIED_BY_PREEXISTING_STATE,
+                            "already present in Snowflake catalog; ALTER skipped",
+                        )
 
                     # A reused table can have the right key while Automatic
                     # Clustering is suspended. The key check and maintenance
