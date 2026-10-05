@@ -97,7 +97,6 @@ def _run_tpch_throughput(
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [
-        (1, 2),
         (4, 4),
         (8, 8),
     ],
@@ -191,11 +190,8 @@ def _run_tpch_throughput_via_real_pipeline_shape(tmp_path: Path):
         run_config = {k: v for k, v in run_config_model.__dict__.items() if k != "benchmark"}
         run_config.setdefault("benchmark_name", run_config_model.benchmark)
 
-        assert run_config["concurrent_streams"] == 1, (
-            "sanity check: the real pipeline's default run_config must carry "
-            "concurrent_streams=1, not omit the key -- otherwise this test "
-            "isn't reproducing the production shape it's meant to guard"
-        )
+        assert "concurrent_streams" in run_config
+        assert run_config["concurrent_streams"] is None
 
         results = adapter._execute_queries_by_type(bench, conn, run_config)
         return adapter._last_throughput_test_result, results
@@ -219,8 +215,9 @@ def test_throughput_stream_count_default_preserved_via_real_pipeline_shape(tmp_p
     assert result.streams_executed == 2
 
 
-def test_throughput_stream_count_explicit_single_stream_is_rejected(tmp_path):
-    result, results = _run_tpch_throughput(tmp_path, num_streams=1)
+@pytest.mark.parametrize("key", ["num_streams", "concurrent_streams"])
+def test_throughput_stream_count_explicit_single_stream_is_rejected(tmp_path, key):
+    result, results = _run_tpch_throughput(tmp_path, **{key: 1})
 
     assert result is None
     assert results[0]["query_id"] == "throughput_test_error"

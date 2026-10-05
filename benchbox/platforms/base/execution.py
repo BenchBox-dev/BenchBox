@@ -51,6 +51,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.schemas import MIN_THROUGHPUT_STREAMS
 from benchbox.core.throughput.containment import await_quiescence, check_phase_boundary
 from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
@@ -65,9 +66,6 @@ from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
 
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
-
-
-MIN_THROUGHPUT_STREAMS = 2
 
 
 def _require_stream_minimum(count: int, source: str) -> int:
@@ -85,9 +83,24 @@ def _resolve_requested_stream_count(run_config: dict, default: int = MIN_THROUGH
         if value is not None:
             return _require_stream_minimum(int(value), key)
     value = run_config.get("concurrent_streams")
-    if value is None or int(value) == 1:
+    if value is None:
         return default
     return _require_stream_minimum(int(value), "concurrent_streams")
+
+
+def _finalize_throughput_metrics(result: Any, num_streams: int, query_subset: list[str] | None) -> None:
+    result.success = throughput_result_succeeded(result, num_streams)
+    if not result.success:
+        result.throughput_at_size = None
+        result.query_throughput = 0.0
+    elif query_subset:
+        result.throughput_at_size = None
+
+
+def _format_throughput_metric(result: Any) -> str:
+    if result.throughput_at_size is None:
+        return "Throughput@Size not reported (query_subset runs are not TPC-compliant)"
+    return f"Throughput@Size = {result.throughput_at_size:.2f}"
 
 
 def _throughput_config_options(run_config: dict) -> dict[str, Any]:
@@ -336,10 +349,7 @@ class TestDriversMixin:
             )
             throughput_test_result = throughput_test.run(config=cfg)
 
-            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
-            if not throughput_test_result.success:
-                throughput_test_result.throughput_at_size = None
-                throughput_test_result.query_throughput = 0.0
+            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
 
             # Display results
             if self.very_verbose:
@@ -361,7 +371,7 @@ class TestDriversMixin:
 
             if throughput_test_result.success:
                 console.print(
-                    f"[green]✅ TPC-DS Throughput Test completed: Throughput@Size = {throughput_test_result.throughput_at_size:.2f}[/green]"
+                    f"[green]✅ TPC-DS Throughput Test completed: {_format_throughput_metric(throughput_test_result)}[/green]"
                 )
                 console.print(
                     f"  Streams executed: {throughput_test_result.streams_executed}, Successful: {throughput_test_result.streams_successful}"
@@ -471,15 +481,12 @@ class TestDriversMixin:
             )
             throughput_test_result = throughput_test.run(config=cfg)
 
-            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
-            if not throughput_test_result.success:
-                throughput_test_result.throughput_at_size = None
-                throughput_test_result.query_throughput = 0.0
+            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
             self._last_throughput_test_result = throughput_test_result
 
             if throughput_test_result.success:
                 console.print(
-                    f"[green]✅ TPC-H Throughput Test completed: Throughput@Size = {throughput_test_result.throughput_at_size:.2f}[/green]"
+                    f"[green]✅ TPC-H Throughput Test completed: {_format_throughput_metric(throughput_test_result)}[/green]"
                 )
                 console.print(
                     f"  Streams executed: {throughput_test_result.streams_executed}, Successful: {throughput_test_result.streams_successful}"

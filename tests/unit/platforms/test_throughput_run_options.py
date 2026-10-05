@@ -76,11 +76,12 @@ class TestStreamCountResolution:
         with pytest.raises(ValueError, match="at least 2"):
             _resolve_requested_stream_count({key: value})
 
-    def test_non_positive_schema_count_is_rejected(self):
+    @pytest.mark.parametrize("value", [0, 1])
+    def test_explicit_schema_count_below_two_is_rejected(self, value):
         with pytest.raises(ValueError, match="at least 2"):
-            _resolve_requested_stream_count({"concurrent_streams": 0})
+            _resolve_requested_stream_count({"concurrent_streams": value})
 
-    @pytest.mark.parametrize("run_config", [{}, {"concurrent_streams": None}, {"concurrent_streams": 1}])
+    @pytest.mark.parametrize("run_config", [{}, {"concurrent_streams": None}])
     def test_unset_count_uses_the_default(self, run_config):
         assert _resolve_requested_stream_count(run_config) == 2
 
@@ -144,6 +145,15 @@ class TestQuerySubset:
         _run_tpch(driver)
 
         assert len(driver.calls) == 44
+
+    def test_subset_throughput_runs_report_no_throughput_at_size(self):
+        subset_result, _rows = _run_tpch(_Driver(), query_subset=["1", "6"])
+        full_result, _rows = _run_tpch(_Driver())
+
+        assert subset_result.success is True
+        assert subset_result.throughput_at_size is None
+        assert full_result.success is True
+        assert full_result.throughput_at_size is not None
 
     def test_tpcds_subset_selects_by_id_and_variant(self):
         queries = [
@@ -318,3 +328,220 @@ class TestMaintenanceSessions:
             factory()
 
         assert seen == [expected]
+
+
+class TestUnsetStreamCount:
+    def test_benchmark_config_defaults_to_unset(self):
+        from benchbox.core.config import BenchmarkConfig
+
+        assert BenchmarkConfig(name="tpch", display_name="TPC-H").concurrency is None
+
+    def test_saved_single_stream_value_still_loads_for_non_throughput_runs(self):
+        from benchbox.core.config import BenchmarkConfig
+
+        config = BenchmarkConfig.model_validate({"name": "tpch", "display_name": "TPC-H", "concurrency": 1})
+
+        assert config.concurrency == 1
+
+    @pytest.mark.parametrize("test_execution_type", ["throughput", "combined"])
+    def test_single_stream_is_rejected_when_throughput_will_run(self, test_execution_type):
+        from benchbox.core.config import BenchmarkConfig
+
+        with pytest.raises(ValueError, match="at least 2"):
+            BenchmarkConfig(name="tpch", display_name="TPC-H", concurrency=1, test_execution_type=test_execution_type)
+
+    def test_combined_run_without_throughput_accepts_one_stream(self):
+        from benchbox.core.config import BenchmarkConfig
+
+        config = BenchmarkConfig(
+            name="tpch",
+            display_name="TPC-H",
+            concurrency=1,
+            test_execution_type="combined",
+            options={"requested_phases": ["power", "maintenance"]},
+        )
+
+        assert config.concurrency == 1
+
+    def test_run_config_rejects_single_stream_throughput(self):
+        from benchbox.core.config import RunConfig
+
+        with pytest.raises(ValueError, match="at least 2"):
+            RunConfig(concurrent_streams=1, test_execution_type="throughput")
+        assert RunConfig(test_execution_type="throughput").concurrent_streams is None
+
+    def test_run_service_rejects_single_stream_before_building_an_adapter(self):
+        from benchbox.core.config import BenchmarkConfig
+        from benchbox.core.run_service import execute_run
+
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", concurrency=1)
+        adapter_factory = Mock()
+
+        with pytest.raises(ValueError, match="at least 2"):
+            execute_run(
+                config=config,
+                benchmark_instance=Mock(),
+                database_config=Mock(),
+                system_profile=Mock(),
+                platform_config=None,
+                output_root=None,
+                phases_to_run=["load", "throughput"],
+                adapter_factory=adapter_factory,
+                verbosity=Mock(),
+            )
+        adapter_factory.assert_not_called()
+
+    def _state(self, **overrides):
+        from benchbox.cli.composite_params import CompressionConfig
+
+        state = SimpleNamespace(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1.0,
+            phases="load,power,throughput",
+            queries=None,
+            tuning="tuned",
+            table_mode="native",
+            output=None,
+            mode=None,
+            seed=None,
+            comp_config=CompressionConfig(),
+            compression=CompressionConfig(),
+            iterations=None,
+            concurrency=None,
+            non_replayable_options=(),
+        )
+        for key, value in overrides.items():
+            setattr(state, key, value)
+        return state
+
+    def test_cli_request_rejects_single_stream_with_throughput(self):
+        from benchbox.cli.run_resolution import current_run_request
+
+        with pytest.raises(ValueError, match="at least 2"):
+            current_run_request(self._state(concurrency=1))
+
+    def test_cli_request_keeps_unset_count_unset(self):
+        from benchbox.cli.run_resolution import current_run_request
+
+        assert current_run_request(self._state()).concurrency is None
+        assert current_run_request(self._state(concurrency=4)).concurrency == 4
+        assert current_run_request(self._state(concurrency=1, phases="load,power")).concurrency == 1
+
+    @pytest.mark.parametrize(
+        ("saved", "expected"),
+        [({}, None), ({"concurrency": None}, None), ({"concurrency": 1}, None), ({"concurrency": 3}, 3)],
+    )
+    def test_saved_runs_replay_with_the_unset_count(self, saved, expected):
+        from benchbox.cli.run_resolution import RunRequest, _saved_concurrency
+
+        current = RunRequest(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1.0,
+            phases=("load", "throughput"),
+            queries=None,
+            tuning="tuned",
+            table_mode="native",
+            output=None,
+            mode=None,
+            seed=None,
+            compression_enabled=False,
+            compression_type="zstd",
+            compression_level=None,
+        )
+
+        assert _saved_concurrency(current, saved, frozenset()) == expected
+
+    def test_wizard_requires_two_streams_and_suggests_at_least_two(self):
+        from benchbox.cli.benchmarks import BenchmarkManager
+
+        manager = object.__new__(BenchmarkManager)
+        asked: list[int] = []
+        answers = iter([1, 0, 3])
+
+        def fake_ask(prompt, default):
+            asked.append(default)
+            return next(answers)
+
+        with (
+            patch("benchbox.cli.benchmarks.Confirm.ask", return_value=True),
+            patch("benchbox.cli.benchmarks.IntPrompt.ask", side_effect=fake_ask),
+        ):
+            result = manager._prompt_concurrency({"supports_streams": True}, {"cpu_cores": 2})
+
+        assert result == 3
+        assert asked == [2, 2, 2]
+
+    def test_wizard_leaves_the_count_unset_when_concurrency_is_declined(self):
+        from benchbox.cli.benchmarks import BenchmarkManager
+
+        manager = object.__new__(BenchmarkManager)
+
+        with patch("benchbox.cli.benchmarks.Confirm.ask", return_value=False):
+            assert manager._prompt_concurrency({"supports_streams": True}, {"cpu_cores": 8}) is None
+        assert manager._prompt_concurrency({"supports_streams": False}, {"cpu_cores": 8}) is None
+
+
+class TestConfigFileStreamOptions:
+    def _config_manager(self, tmp_path, body):
+        from benchbox.cli.config import ConfigManager
+
+        path = tmp_path / "benchbox.yaml"
+        path.write_text(body)
+        return ConfigManager(config_path=path)
+
+    def _driver_config(self, run_config):
+        driver = _Driver()
+        captured: dict[str, Any] = {}
+
+        def fake_run(self_, config=None):
+            captured["config"] = config
+            raise RuntimeError("stop after capturing the config")
+
+        with patch("benchbox.core.tpch.throughput_test.TPCHThroughputTest.run", fake_run):
+            driver._execute_tpch_throughput_test(Mock(), Mock(), run_config)
+        return captured["config"]
+
+    def _run_config(self, tmp_path, options):
+        from benchbox.core.config import BenchmarkConfig
+        from benchbox.core.run_service import resolve_run_config
+        from benchbox.utils.verbosity import VerbositySettings
+
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, options=options)
+        run_config = resolve_run_config(config, database_path=tmp_path / "db", verbosity=VerbositySettings())
+        return {key: value for key, value in run_config.__dict__.items() if key != "benchmark"}
+
+    def test_config_file_stream_timeout_and_cancellation_reach_the_throughput_driver(self, tmp_path):
+        from benchbox.cli.commands.run import _stream_timeout_config_entries
+
+        manager = self._config_manager(
+            tmp_path,
+            "execution:\n  concurrent_queries:\n    stream_timeout_seconds: 90\n    cancel_on_timeout: true\n",
+        )
+
+        options = _stream_timeout_config_entries(SimpleNamespace(config=manager))
+        cfg = self._driver_config(self._run_config(tmp_path, options))
+
+        assert cfg.stream_timeout == 90
+        assert cfg.cancel_on_timeout is True
+
+    def test_unset_config_keeps_the_benchmark_default_timeout(self, tmp_path):
+        from benchbox.cli.commands.run import _stream_timeout_config_entries
+        from benchbox.core.tpch.throughput_test import TPCHThroughputTestConfig
+
+        manager = self._config_manager(tmp_path, "execution:\n  concurrent_queries:\n    enabled: false\n")
+        options = _stream_timeout_config_entries(SimpleNamespace(config=manager))
+        cfg = self._driver_config(self._run_config(tmp_path, options))
+
+        assert options == {}
+        assert cfg.stream_timeout == TPCHThroughputTestConfig().stream_timeout
+        assert cfg.cancel_on_timeout is False
+
+    def test_default_configuration_does_not_set_a_stream_timeout(self, tmp_path):
+        from benchbox.cli.commands.run import _stream_timeout_config_entries
+        from benchbox.cli.config import ConfigManager
+
+        manager = ConfigManager(config_path=tmp_path / "missing.yaml")
+
+        assert _stream_timeout_config_entries(SimpleNamespace(config=manager)) == {}

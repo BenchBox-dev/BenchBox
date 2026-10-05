@@ -299,7 +299,7 @@ class ConfigManager:
                     "enabled": False,
                     "max_concurrent": 2,
                     "query_timeout_seconds": 300,
-                    "stream_timeout_seconds": 3600,
+                    "cancel_on_timeout": False,
                     "retry_failed_queries": True,
                     "max_retries": 3,
                 },

@@ -181,13 +181,24 @@ not the `4` used here):
 ```yaml
 execution:
   concurrent_queries:
-    enabled: true                          # Enable concurrent execution
-    max_concurrent: 4                      # Maximum concurrent streams (default: 2)
-    query_timeout_seconds: 600             # Individual query timeout (default: 300)
-    stream_timeout_seconds: 7200           # Total stream timeout (default: 3600)
-    retry_failed_queries: true             # Retry failed queries (default: true)
-    max_retries: 5                         # Maximum retry attempts (default: 3)
+    enabled: true
+    max_concurrent: 4
+    query_timeout_seconds: 600
+    stream_timeout_seconds: 7200
+    cancel_on_timeout: true
+    retry_failed_queries: true
+    max_retries: 5
 ```
+
+Defaults: `enabled` false, `max_concurrent` 2, `query_timeout_seconds` 300,
+`stream_timeout_seconds` unset (3600 for TPC-H, 7200 for TPC-DS),
+`cancel_on_timeout` false, `retry_failed_queries` true, `max_retries` 3.
+
+`stream_timeout_seconds` and `cancel_on_timeout` apply to the `throughput`
+phase of `benchbox run`: a value in the config file reaches every TPC-H and
+TPC-DS throughput stream. Leave `stream_timeout_seconds` out to keep the
+per-benchmark default. The other `concurrent_queries` settings are read by the
+`ExecutionConfigHelper` API only; `benchbox run` does not use them.
 
 ### Usage Examples
 

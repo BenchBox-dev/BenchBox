@@ -75,6 +75,7 @@ from benchbox.core.runner.runner import (
     ValidationOptions,
     run_benchmark_lifecycle,
 )
+from benchbox.core.schemas import reject_single_stream_throughput
 from benchbox.utils.toggles import is_probe_requested
 
 if TYPE_CHECKING:
@@ -330,6 +331,7 @@ def execute_run(
     load-phase warning, and the credential-setup retry all stay in the CLI,
     which is where the new contract puts them.
     """
+    reject_single_stream_throughput(getattr(config, "concurrency", None), phases_to_run)
     stamp_requested_phases(config, phases_to_run)
 
     phases = resolve_lifecycle_phases(phases_to_run)

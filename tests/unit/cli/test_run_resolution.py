@@ -88,12 +88,12 @@ def test_saved_request_uses_documented_compatibility_defaults_and_marks_missing_
     assert merged.phases == ("load", "power")
     assert merged.tuning == "tuned"
     assert merged.table_mode == "native"
-    assert merged.concurrency == 1
+    assert merged.concurrency is None
     assert merged.exact_replay is False
     assert "saved run did not record a seed" in merged.compatibility_notes
     assert "saved run did not record phases; assumed load,power" in merged.compatibility_notes
     assert "saved run did not record execution mode; used platform default" in merged.compatibility_notes
-    assert "saved run did not record concurrency; assumed one" in merged.compatibility_notes
+    assert "saved run did not record concurrency; used the default stream count" in merged.compatibility_notes
 
 
 def test_explicit_current_values_override_saved_preferences():
@@ -382,8 +382,8 @@ def test_current_request_rejects_non_integer_concurrency():
         _run_module._current_run_request(_live_state("lots"))
 
 
-def test_current_request_defaults_missing_concurrency_to_one():
-    assert _run_module._current_run_request(_live_state(None)).concurrency == 1
+def test_current_request_leaves_missing_concurrency_unset():
+    assert _run_module._current_run_request(_live_state(None)).concurrency is None
 
 
 def test_current_request_keeps_valid_concurrency():

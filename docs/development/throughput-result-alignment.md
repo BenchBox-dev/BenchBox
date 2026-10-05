@@ -212,13 +212,19 @@ honor the same options:
 - `validation_mode`: `disabled`/`skip` turns row-count validation off for TPC-H
   streams (TPC-DS already carried the mode on its stream connections).
 - `query_subset`: each stream runs its own permutation filtered to the subset;
-  unknown query ids fail the run with a clear error.
+  unknown query ids fail the run with a clear error. A subset run is not
+  TPC-compliant, so it reports no Throughput@Size (the run itself still
+  succeeds and reports query throughput).
 - `stream_timeout_seconds` (0 disables the deadline) and `cancel_on_timeout`:
   carried from `RunConfig`, which reads them from `BenchmarkConfig.options`.
-- Stream counts: `num_streams`/`streams` below 2 are rejected. A
-  `concurrent_streams` of 1 is the schema default and means "no count
-  requested", so it still runs the 2-stream default; `run --streams` and
-  `run-official --streams` reject 0 and 1 where the request is explicit.
+  `benchbox run` fills both from `execution.concurrent_queries` in the config
+  file; an unset timeout keeps the benchmark default.
+- Stream counts: `BenchmarkConfig.concurrency` and `RunConfig.concurrent_streams`
+  default to `None` (not set), and an unset count runs the 2-stream default. An
+  explicit count below 2 is rejected whenever throughput will run: in the
+  config models, in `run --streams`, `run-official --streams`, the interactive
+  wizard, quick-restart replay, and the adapter driver. Saved runs that
+  recorded `1` (the former default) are read as not set.
 
 ## Non-Blocking Executor Shutdown (`throughput-executor-nonblocking-shutdown`, 2026-07)
 

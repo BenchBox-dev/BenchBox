@@ -1108,6 +1108,19 @@ def _prepare_run_state(s: types.SimpleNamespace) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _stream_timeout_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    config = getattr(s, "config", None)
+    if config is None:
+        return {}
+    entries: dict[str, Any] = {}
+    stream_timeout = config.get("execution.concurrent_queries.stream_timeout_seconds")
+    if stream_timeout is not None:
+        entries["stream_timeout_seconds"] = int(stream_timeout)
+    if config.get("execution.concurrent_queries.cancel_on_timeout", False):
+        entries["cancel_on_timeout"] = True
+    return entries
+
+
 def _build_benchmark_config(
     s: types.SimpleNamespace,
     benchmark_info: dict[str, Any],
@@ -1131,6 +1144,7 @@ def _build_benchmark_config(
         **({"data_organization": dict(plan.data_organization)} if plan.data_organization is not None else {}),
         **({"seed": plan.seed} if plan.seed is not None else {}),
         **({"power_iterations": plan.iterations} if plan.iterations is not None else {}),
+        **_stream_timeout_config_entries(s),
         **({"validation_mode": s.validation_mode} if s.validation_mode is not None else {}),
         **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
         **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
