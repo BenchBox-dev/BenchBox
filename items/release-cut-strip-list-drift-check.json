@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A develop CI job or pr-preflight step fails when a test would fail or error on the curated release tree because it reads a stripped path.",
+    "The check uses the same curation commands as release-cut, read from one source, so the two cannot drift.",
+    "The release guide documents how to fix a failure: strip the test or skip it on the specific file it reads.",
+    "A dry run of release curation on current develop passes the CI fast selection, apart from known environment-only failures."
+  ],
+  "context": "Found during the v0.4.2 release. Release PR #2648 failed test with 12 failures and 31 errors, #2655 with 3 failures and 2 errors, both FileNotFoundError/ModuleNotFoundError on stripped paths. Simulation recipe used: extract the release-cut target's 'git rm' lines from the Makefile, run them in a detached scratch worktree, then run: uv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" -n auto. Related: dlv2-53-retire-legacy-release-path.",
+  "description": "The release-cut target removes development-only paths (_project, AGENTS.md, .pre-commit-config.yaml and others) and a hand-maintained list of tests that read them. New tests that read those paths are not added to the list, so the next release PR fails its required test job and blocks release-required-result. v0.4.0, v0.4.1 and v0.4.2 each hit this; v0.4.2 needed two develop fixes (#2651, #2658) and three cuts. A local run of the CI fast selection on a simulated curated tree takes 3-5 minutes and found every remaining failure at once. Add a check on develop that applies the release curation to a scratch tree and runs collection or the fast test selection, or a static check that fails when a test outside the strip list references a stripped path. Prefer skipping individual tests on the specific file they read (the pattern used in #2658) over stripping whole files that mostly test shipped code.",
+  "links": [
+    "Makefile",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2651",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2658",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2655",
+    "docs/operations/release-guide.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:25:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b62a5138021044aca6ca745cc3bfc93e",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}

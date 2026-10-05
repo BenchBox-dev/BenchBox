@@ -16070,6 +16070,13 @@
       "status": "open",
       "title": "Let release-cut take a curated changelog in one pass so a moving develop cannot abort it"
     },
+    "release-cut-strip-list-drift-check": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Catch tests that read development-only files before they break the next release PR"
+    },
     "release-finalize-merged-pr-tag-recovery": {
       "claim": null,
       "needs": [],
