@@ -55,9 +55,19 @@ PandasDF = pd.DataFrame if PANDAS_AVAILABLE else Any
 
 
 def _parse_date_value(value: Any) -> Any:
-    if value is None or value == "":
+    if value is None or (isinstance(value, str) and value == "") or (not isinstance(value, str) and pd.isna(value)):
         return None
     return pd.to_datetime(value).date()
+
+
+def _parse_date_column(series: Any) -> Any:
+    try:
+        parsed = pd.to_datetime(series, format="ISO8601")
+    except (ValueError, TypeError):
+        return series.map(_parse_date_value)
+    if not pd.api.types.is_datetime64_any_dtype(parsed):
+        return series.map(_parse_date_value)
+    return parsed.dt.date.astype(object).where(parsed.notna(), None)
 
 
 # SQL type prefixes that are numeric, not temporal. A column named like a date
@@ -170,7 +180,7 @@ def _coerce_date_columns(df: PandasDF, date_columns: list[str]) -> PandasDF:
     date_dtype = pd.ArrowDtype(pa.date32())
     for column in date_columns:
         if column in df.columns:
-            df[column] = pd.array(df[column], dtype=date_dtype)
+            df[column] = pd.array(_parse_date_column(df[column]), dtype=date_dtype)
     return df
 
 
@@ -365,8 +375,6 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         if names:
             read_kwargs["names"] = names
             date_columns, datetime_columns = _pandas_parse_date_columns(names, column_types)
-            if date_columns:
-                read_kwargs["converters"] = dict.fromkeys(date_columns, _parse_date_value)
             if datetime_columns:
                 read_kwargs["parse_dates"] = datetime_columns
             # Read declared text columns as object so numeric-looking strings (e.g.
@@ -374,8 +382,8 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             # VARCHAR/TEXT they are on the SQL surface. Date columns are excluded
             # (handled above) to avoid a dtype/converter conflict.
             string_columns = _pandas_string_columns(names, column_types, set(date_columns) | set(datetime_columns))
-            if string_columns:
-                read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
+            if string_columns or date_columns:
+                read_kwargs["dtype"] = dict.fromkeys([*string_columns, *date_columns], "object")
 
         # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
