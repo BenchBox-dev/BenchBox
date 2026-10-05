@@ -46,7 +46,10 @@ have usage left.
   reset time skips the pool until it passes. Any other absence lets pool peers
   try.
 - **One reviewer per pull request.** A blocking verdict is final for the head;
-  fallback happens only when a reviewer is absent. Unknown or failed outcomes
+  fallback happens only when a reviewer is absent. A blocking finding whose
+  line is outside the diff still fails the review: it is posted in the summary
+  rather than as a line comment, and dropping it would let a real defect pass
+  on a citation detail. Unknown or failed outcomes
   are absent, which leaves the result pending, never passing.
 - **Integrity.** Each reviewer job enters the `oracle` environment and loads
   only its own credential. Only the final job holds the App key, and it posts
@@ -54,7 +57,9 @@ have usage left.
   Verdicts must match a strict schema; findings are cleaned of secrets,
   mentions and links before posting.
 - **Usage limits.** A rerun needs a new head or a previous run in which every
-  reviewer was absent. `/oracle-review` comments and hourly scheduled retries
+  attempted reviewer was absent; a run left pending by invalid artifacts or a
+  reviewer that never reported is not rerun on the same head. `/oracle-review`
+  works only as a top-level pull request comment. `/oracle-review` comments and hourly scheduled retries
   share a daily budget per pull request, with backoff starting at one hour.
 
 ## What shadow mode does and does not do

@@ -25,8 +25,9 @@ record is `_project/decisions/oracle-review-v2-shadow-2026-10-05.md`.
    - `CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`, used only by the
      claude jobs;
    - `OPENAI_API_KEY`, used only by the codex jobs through
-     `codex login --with-api-key`;
-   - `META_API_KEY`, used only by the muse jobs.
+     `codex login --with-api-key`.
+
+   muse and agy are disabled and have no jobs, so they need no secret yet.
 4. Remove `CLAUDE_CODE_OAUTH_TOKEN` from the repository secrets, because
    same-repository pull request workflows can read those.
 
@@ -49,20 +50,30 @@ Without the App secrets, the `post` job logs the result and succeeds.
 4. `post` re-validates every artifact from this run, replays the selection,
    and posts the status and, when there is something to say, one comment.
 
+A blocking finding fails the review even when its line is outside the diff.
+Such a finding cannot become a line comment, so it is listed under "Findings
+outside the diff" with a note that it still fails the review. Ignoring it
+would let a reviewer's report of a real defect pass because it cited an
+unchanged line.
+
 Reviewers run one at a time, so a blocking verdict stops the run and an absent
 reviewer hands over to the next.
 
 ## Commands
 
-- `/oracle-review` at the start of a pull request comment, from an owner,
-  member or collaborator, reruns the review on the current head.
+- `/oracle-review` at the start of a top-level pull request comment, from an
+  owner, member or collaborator, reruns the review on the current head. A reply
+  on a review thread or a line comment does not trigger it, because those are
+  review comments, not issue comments.
 - `gh workflow run oracle-review-shadow.yml --ref develop -f pr=<number>`
   does the same. A dispatch from any other ref is refused.
 - An hourly schedule retries pull requests whose last result on the current
   head is pending.
 
-A rerun on the same head needs a previous run in which every reviewer was
-absent. Comment, dispatch and scheduled reruns share a daily budget per pull
+A rerun on the same head needs a previous run in which every attempted
+reviewer was absent. A run that stayed pending because its artifacts failed
+validation, or because a selected reviewer never reported, is not rerun on the
+same head; push a new head instead. Comment, dispatch and scheduled reruns share a daily budget per pull
 request (`retry.daily_budget`), with backoff that starts at one hour and
 doubles. The retry state is the `oracle-review-shadow-state-<number>` artifact
 of the latest run of this workflow whose commit is on `develop`; artifacts from
@@ -77,10 +88,12 @@ These checks must pass before the cut-over that makes the context required.
   branch cannot.
 - **P3:** each reviewer authenticates in CI. A reviewer that cannot is set to
   `enabled: false` with a `disabled_reason`. agy stays disabled until it
-  passes, and it needs a workflow job before it can run.
+  passes, and muse until Meta publishes a versioned, checksummed installer.
+  Enabling either needs a workflow job and enough reviewer slots.
 - **P4:** capture each reviewer's quota, authentication and outage output from
-  real runs. The attempt artifact's `diagnostic` field holds a sanitized tail of
-  the output. Add the messages to the `CALIBRATED_*_PATTERNS` tables in
+  real runs. The attempt artifact's `diagnostic` field holds one redacted line
+  of the output, at most 300 characters, with credentials and long tokens
+  removed; raw output is never uploaded. Add the messages to the `CALIBRATED_*_PATTERNS` tables in
   `_project/scripts/oracle_reviewers/absence.py`; until then they count as
   errors, which never pass.
 

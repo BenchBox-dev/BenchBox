@@ -200,3 +200,20 @@ def test_sweep_dispatches_only_due_pending_prs(monkeypatch: pytest.MonkeyPatch, 
     fresh.install(monkeypatch)
     assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
     assert fresh.dispatched == []
+
+
+@pytest.mark.parametrize(
+    "pull",
+    [_pull(draft=True), _pull(head={"sha": HEAD, "repo": {"full_name": "someone/BenchBox"}})],
+    ids=["draft", "fork"],
+)
+def test_sweep_skips_draft_and_fork_prs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, pull: dict[str, Any]) -> None:
+    due = State(7, HEAD, "pending", datetime.now(UTC) - timedelta(hours=2), pending_cause="all-absent")
+    fake = FakeGitHub(pull, SOUNDNESS, due)
+    looked_up: list[int] = []
+    fake.install(monkeypatch)
+    monkeypatch.setattr(github, "latest_state", lambda repo, pr: looked_up.append(pr) or due)
+    _env(monkeypatch, tmp_path, "schedule", {}, "refs/heads/develop")
+    assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
+    assert fake.dispatched == []
+    assert looked_up == []
