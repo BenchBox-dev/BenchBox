@@ -24,7 +24,11 @@ from rich.table import Table
 from benchbox.core.dataframe.tuning.profiles import DATAFRAME_PLATFORMS
 from benchbox.core.tuning import modes as tuning_modes
 from benchbox.core.tuning.capability_registry import DEFAULT_FALLBACK_DESCRIPTION, get_fallback_description
-from benchbox.core.tuning.packaged_templates import list_packaged_templates, packaged_template_path
+from benchbox.core.tuning.packaged_templates import (
+    list_packaged_templates,
+    packaged_template_path,
+    template_platform_key,
+)
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -172,19 +176,6 @@ class TuningResolution:
         return descriptions.get(self.source, "Unknown source")
 
 
-_TEMPLATE_PLATFORM_KEYS = {
-    "clickhouse-local": "clickhouse",
-    "clickhouse-server": "clickhouse",
-    "clickhouse-cloud": "clickhouse",
-    "chdb": "clickhouse",
-}
-
-
-def _template_platform_key(platform: str) -> str:
-    base = platform.lower().split(":", 1)[0]
-    return _TEMPLATE_PLATFORM_KEYS.get(base, platform.lower())
-
-
 def _dataframe_profile_path(platform: str) -> Path | None:
     base = platform.lower().split(":", 1)[0]
     if base.endswith("-df"):
@@ -226,7 +217,7 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     """
     paths = []
     raw_platform = platform.lower()
-    template_platform = _template_platform_key(platform)
+    template_platform = template_platform_key(platform)
     platform_dirs = [raw_platform] if raw_platform == template_platform else [raw_platform, template_platform]
     template_name = f"{benchmark.lower()}_tuned.yaml"
 
@@ -455,7 +446,7 @@ def _resolve_tuned(
         # cwd/env-relative auto-discovered template apart from the packaged
         # fallback for provenance purposes (must_preserve: packaged-template
         # provenance is recorded distinctly from AUTO_DISCOVERED).
-        packaged_candidate = packaged_template_path(_template_platform_key(platform), benchmark)
+        packaged_candidate = packaged_template_path(template_platform_key(platform), benchmark)
 
         for path in search_paths:
             if path.exists():

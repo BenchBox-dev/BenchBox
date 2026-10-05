@@ -2639,7 +2639,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         Redshift tuning approach:
         - DISTRIBUTION: Handled via DISTSTYLE/DISTKEY in CREATE TABLE
         - SORTING: Handled via SORTKEY in CREATE TABLE
-        - ANALYZE and VACUUM run after the table loads (apply_post_load_tunings)
+        - ANALYZE runs after the table loads only when auto_analyze is off (apply_post_load_tunings);
+          configure_for_benchmark vacuums and analyzes every loaded table otherwise
 
         Args:
             table_tuning: The tuning configuration to apply

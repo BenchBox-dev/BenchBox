@@ -130,6 +130,19 @@ class TestSnowflakePhysicalIdentifiers:
         assert snowflake_adapter.apply_post_load_tunings("lineitem", None, connection) is False
         assert len(connection.recorder.statements) == statements_before
 
+    def test_a_refused_recluster_resume_fails_the_maintenance_phase(self, snowflake_adapter):
+        connection = RecordingConnection()
+        snowflake_adapter.apply_table_tunings(clustering_tuning("lineitem", "l_orderkey"), connection)
+
+        def refuse(sql, params=None):
+            raise RuntimeError("clustering not permitted")
+
+        connection.recorder.execute = refuse
+        config = SimpleNamespace(table_tunings={"lineitem": clustering_tuning("lineitem", "l_orderkey")})
+        snowflake_adapter.run_post_load_tunings("lineitem", config, connection)
+
+        assert snowflake_adapter.build_post_load_maintenance_phase().status == "FAILED"
+
     def test_catalog_probe_binds_the_physical_table(self, snowflake_adapter):
         probes = []
         connection = RecordingConnection()
@@ -174,6 +187,19 @@ class TestRedshiftPhysicalIdentifiers:
         assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is True
         assert "ANALYZE lineitem" in connection.recorder.statements
         assert not any(statement.startswith("VACUUM") for statement in connection.recorder.statements)
+
+    def test_a_refused_analyze_fails_the_maintenance_phase(self, redshift_adapter):
+        connection = RecordingConnection()
+
+        def refuse(sql, params=None):
+            raise RuntimeError("analyze refused")
+
+        connection.recorder.execute = refuse
+        redshift_adapter.auto_analyze = False
+        config = SimpleNamespace(table_tunings={"LINEITEM": clustering_tuning("LINEITEM", "L_ORDERKEY")})
+        redshift_adapter.run_post_load_tunings("LINEITEM", config, connection)
+
+        assert redshift_adapter.build_post_load_maintenance_phase().status == "FAILED"
 
     def test_existing_keys_compare_against_physical_column_names(self, redshift_adapter, caplog):
         row = ("public", "lineitem", "KEY", "l_orderkey", "l_orderkey", "l_linenumber", None, None)

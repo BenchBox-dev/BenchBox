@@ -17,6 +17,7 @@ from typing import Iterable, Mapping
 import yaml
 
 from benchbox.core.tuning.capability_registry import DEFAULT_FALLBACK_DESCRIPTION, PLATFORM_FALLBACK_DESCRIPTIONS
+from benchbox.core.tuning.packaged_templates import template_platform_key
 
 TUNED_TEMPLATE = "tuned_template"
 BASIC_CONSTRAINTS = "basic_constraints"
@@ -103,9 +104,10 @@ def template_path_for(platform: str, benchmark: str, *, root: Path = REPO_ROOT) 
 
 def classify_template(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> tuple[str, str]:
     """Classify one platform/benchmark pair from checked-in tuning templates."""
-    template_path = template_path_for(platform, benchmark, root=root)
-    if template_path.exists():
-        return TUNED_TEMPLATE, _relpath(template_path, root)
+    for key in dict.fromkeys((platform, template_platform_key(platform))):
+        template_path = template_path_for(key, benchmark, root=root)
+        if template_path.exists():
+            return TUNED_TEMPLATE, _relpath(template_path, root)
     return BASIC_CONSTRAINTS, "-"
 
 

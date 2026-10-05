@@ -20,6 +20,7 @@ from benchbox.core.tuning.coverage import (
     TuningCoverageRow,
     _coverage_spec,
     build_tuning_coverage_rows,
+    classify_template,
     parse_runtime_tuning_logs,
     read_tuning_coverage_tsv,
     runtime_mismatches,
@@ -134,3 +135,16 @@ def _uat_platforms() -> list[str]:
 def _uat_benchmarks() -> list[str]:
     benchmarks = load_benchmarks()
     return resolve_benchmarks(groups=["all"], benchmarks=benchmarks)
+
+
+@pytest.mark.parametrize("platform", ["clickhouse-local", "clickhouse-server", "clickhouse-cloud", "chdb"])
+@pytest.mark.parametrize("benchmark_name", ["tpch", "ssb", "tpcds"])
+def test_clickhouse_variants_share_the_curated_template_directory(platform, benchmark_name):
+    status, template = classify_template(platform, benchmark_name)
+
+    assert status == TUNED_TEMPLATE
+    assert template == f"examples/tunings/clickhouse/{benchmark_name}_tuned.yaml"
+
+
+def test_a_clickhouse_benchmark_without_a_template_stays_basic_constraints():
+    assert classify_template("clickhouse-local", "clickbench") == (BASIC_CONSTRAINTS, "-")

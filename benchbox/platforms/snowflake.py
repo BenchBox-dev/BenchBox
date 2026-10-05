@@ -2008,7 +2008,7 @@ class SnowflakeAdapter(PlatformAdapter):
             cursor.execute(f"ALTER TABLE {physical_table} RESUME RECLUSTER")
             self.logger.info(f"Enabled automatic clustering for {physical_table}")
         except Exception as e:
-            self.logger.debug(f"Could not enable automatic clustering for {physical_table}: {e}")
+            self.logger.warning(f"Could not enable automatic clustering for {physical_table}: {e}")
             self.note_post_load_maintenance_failure()
         finally:
             cursor.close()

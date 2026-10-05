@@ -368,7 +368,7 @@ class TestDatabricksLoadPathOptimizesOnce:
         self._load(databricks_adapter, tuned=True)
         executed = self._load(databricks_adapter, tuned=False)
 
-        assert [sql for sql in executed if sql.upper().startswith("OPTIMIZE")] != []
+        assert [sql for sql in executed if sql.upper().startswith("OPTIMIZE")] == ["OPTIMIZE LINEITEM"]
 
     def test_an_untuned_table_keeps_the_load_time_optimize(self, databricks_adapter):
         executed = self._load(databricks_adapter, tuned=False)

@@ -3522,8 +3522,9 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.execute(f"DESCRIBE EXTENDED {physical_table}")
             if not any("DELTA" in str(row).upper() for row in cursor.fetchall()):
                 return False
-            # _load_single_table runs its own OPTIMIZE after this hook; the table is
-            # already compacted, so hand it a marker to skip the second pass.
+            # _load_single_table runs its own OPTIMIZE after this hook; hand it a marker to
+            # skip the second pass. The marker is set before the attempt on purpose: a failed
+            # OPTIMIZE is reported through the maintenance phase, not retried by the load path.
             self._delta_optimized_after_load().add(physical_table.lower())
             if not self._apply_delta_optimize(cursor, physical_table, phase="post_load"):
                 self.note_post_load_maintenance_failure()
