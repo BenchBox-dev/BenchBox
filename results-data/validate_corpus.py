@@ -37,6 +37,12 @@ LEGACY_MANIFEST_NAME = "submission-manifest.json"
 
 #: A cohort below this many distinct comparison identities is not a comparison.
 MINIMUM_PLATFORMS_PER_COHORT = 3
+NON_CLEAN_VALIDATION_STATUSES = frozenset(
+    {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
+)
+NON_CLEAN_TRANSLATION_STATUSES = frozenset({"fallback", "failed"})
+UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
+PHASE_ALIASES = {"standard": "power"}
 UTC = _dt.timezone.utc
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
@@ -76,12 +82,142 @@ def _load_bundle(bundle: pathlib.Path) -> dict:
         raise CorpusReadError(f"ERROR reading {bundle}: {exc}") from exc
 
 
+def _phase_executed(phase: object) -> bool:
+    if not isinstance(phase, dict) or not phase:
+        return False
+    return str(phase.get("status") or "").upper() != "NOT_RUN"
+
+
+def bundle_phase(payload: dict) -> str:
+    benchmark = payload.get("benchmark")
+    declared = benchmark.get("test_type") if isinstance(benchmark, dict) else None
+    if declared:
+        normalized = str(declared).strip().lower()
+        return PHASE_ALIASES.get(normalized, normalized) or "unknown"
+    phases = payload.get("phases")
+    if not isinstance(phases, dict):
+        return "unknown"
+    if _phase_executed(phases.get("power_test")):
+        return "power"
+    if _phase_executed(phases.get("throughput_test")):
+        return "throughput"
+    return "unknown"
+
+
+def _stream_count(payload: dict) -> int | None:
+    phases = payload.get("phases")
+    throughput = phases.get("throughput_test") if isinstance(phases, dict) else None
+    streams = throughput.get("stream_results") if isinstance(throughput, dict) else None
+    return len(streams) if isinstance(streams, list) and streams else None
+
+
+def _int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _query_row_failed(query: object) -> bool:
+    if not isinstance(query, dict):
+        return False
+    if str(query.get("run_type") or "measurement").strip().lower() != "measurement":
+        return False
+    status = query.get("status")
+    return status is not None and str(status).upper() not in {"SUCCESS", "SKIPPED"}
+
+
+def failed_query_count(payload: dict) -> int:
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        queries = summary.get("queries")
+        if isinstance(queries, dict):
+            failed = _int_or_none(queries.get("failed"))
+            if failed is not None and failed > 0:
+                return failed
+            total = _int_or_none(queries.get("total"))
+            passed = _int_or_none(queries.get("passed"))
+            skipped = _int_or_none(queries.get("skipped")) or 0
+            if total is not None and passed is not None and total > passed + skipped:
+                return total - passed - skipped
+    rows = payload.get("queries")
+    if isinstance(rows, list):
+        return sum(1 for row in rows if _query_row_failed(row))
+    return 0
+
+
+def _status_text(value: object) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("status")
+    if value is None:
+        return None
+    return str(value).strip().lower() or None
+
+
+def _query_validation_failed(payload: dict) -> bool:
+    rows = payload.get("queries")
+    if not isinstance(rows, list):
+        return False
+    return any(
+        isinstance(row, dict)
+        and isinstance(evidence := row.get("row_count_validation"), dict)
+        and str(evidence.get("status") or "").strip().upper() == "FAILED"
+        for row in rows
+    )
+
+
+def _translation_status(payload: dict) -> str | None:
+    execution = payload.get("execution")
+    return _status_text(execution.get("translation")) if isinstance(execution, dict) else None
+
+
+def bundle_validation_status(payload: dict) -> str | None:
+    summary = payload.get("summary")
+    if summary is not None and not isinstance(summary, dict):
+        return None
+    recorded = summary.get("validation") if isinstance(summary, dict) else None
+    failed = failed_query_count(payload)
+    if not isinstance(recorded, (str, dict)):
+        return "partial" if failed else None
+    status = _status_text(recorded)
+    if status in {None, "passed"}:
+        if failed:
+            return "partial"
+        if not _query_validation_failed(payload) and _translation_status(payload) in NON_CLEAN_TRANSLATION_STATUSES:
+            return "uncertain"
+    return status
+
+
+def bundle_rankable(payload: dict) -> bool:
+    benchmark = payload.get("benchmark")
+    compliance = benchmark.get("compliance_class") if isinstance(benchmark, dict) else None
+    if compliance is not None and str(compliance) in UNOFFICIAL_COMPLIANCE_CLASSES:
+        return False
+    if failed_query_count(payload):
+        return False
+    return bundle_validation_status(payload) not in NON_CLEAN_VALIDATION_STATUSES
+
+
 def _cohort_key(payload: dict) -> CohortKey:
     try:
         benchmark_id = payload["benchmark"]["id"]
         scale_factor = str(payload["benchmark"].get("scale_factor", ""))
     except Exception as exc:  # noqa: BLE001
         raise CorpusReadError(f"ERROR missing cohort fields: {exc}") from exc
+    phase = bundle_phase(payload)
+    if phase != "power":
+        scale_factor = f"{scale_factor}#{phase}"
+        streams = _stream_count(payload) if phase == "throughput" else None
+        if streams is not None:
+            scale_factor = f"{scale_factor}#{streams}streams"
     return (benchmark_id, scale_factor)
 
 
@@ -176,6 +312,10 @@ def _stats_from_dates(dates: list[_dt.date], *, as_of: _dt.date) -> RecencyStats
 def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
     """Map a cohort to distinct platform/version comparison identities.
 
+    Cohorts are keyed by benchmark, scale and measured phase, and only bundles
+    the explorer can rank contribute an identity. A cohort whose bundles are all
+    unrankable stays in the map with no identities so the depth gate reports it.
+
     An explicitly segregated version-over-version corpus legitimately repeats
     one platform name. Only bundles under ``duckdb-version-matrix/`` therefore
     include a reported version in their identity. Ordinary cohorts retain the
@@ -191,7 +331,9 @@ def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
     cohorts: collections.defaultdict[CohortKey, set[str]] = collections.defaultdict(set)
     for bundle in bundles:
         payload = _load_bundle(bundle)
-        cohorts[_cohort_key(payload)].add(_comparison_identity(bundle, payload))
+        identities = cohorts[_cohort_key(payload)]
+        if bundle_rankable(payload):
+            identities.add(_comparison_identity(bundle, payload))
     return dict(cohorts)
 
 
@@ -260,8 +402,16 @@ def format_recency_report(
 
 
 def shallow_cohorts(cohorts: dict[CohortKey, set[str]]) -> dict[CohortKey, set[str]]:
-    """Cohorts with fewer than the required number of platforms."""
-    return {key: platforms for key, platforms in cohorts.items() if len(platforms) < MINIMUM_PLATFORMS_PER_COHORT}
+    """Cohorts with some rankable identities but fewer than the required number.
+
+    A cohort with no rankable identity publishes no ranking, so it is reported
+    by ``unranked_cohorts`` instead of failing the gate.
+    """
+    return {key: platforms for key, platforms in cohorts.items() if 0 < len(platforms) < MINIMUM_PLATFORMS_PER_COHORT}
+
+
+def unranked_cohorts(cohorts: dict[CohortKey, set[str]]) -> list[CohortKey]:
+    return sorted(key for key, platforms in cohorts.items() if not platforms)
 
 
 def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = None) -> int:
@@ -279,7 +429,12 @@ def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = No
 
     print("\nCohorts:")
     for key, platforms in sorted(cohorts.items()):
-        status = "OK" if len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT else "WARN (<3 identities)"
+        if not platforms:
+            status = "UNRANKED (no rankable bundles; no ranking published)"
+        elif len(platforms) >= MINIMUM_PLATFORMS_PER_COHORT:
+            status = "OK"
+        else:
+            status = "WARN (<3 identities)"
         print(f"  {key[0]} SF={key[1]}: {len(platforms)} identities ({sorted(platforms)}) [{status}]")
 
     # Recency is informational: timestamp parse failures warn and omit, and
@@ -302,7 +457,11 @@ def main(bundles_dir: pathlib.Path | None = None, *, as_of: _dt.date | None = No
         print(f"\nWARN: {len(low)} cohort(s) have <3 comparison identities: { {k: len(v) for k, v in low.items()} }")
         return 1
 
-    print(f"\nAll {len(cohorts)} cohort(s) meet the >={MINIMUM_PLATFORMS_PER_COHORT}-identity depth criterion.")
+    unranked = unranked_cohorts(cohorts)
+    if unranked:
+        print(f"\nUNRANKED: {len(unranked)} cohort(s) have no rankable bundle and publish no ranking: {unranked}")
+    ranked = len(cohorts) - len(unranked)
+    print(f"\nAll {ranked} ranked cohort(s) meet the >={MINIMUM_PLATFORMS_PER_COHORT}-identity depth criterion.")
     return 0
 
 
