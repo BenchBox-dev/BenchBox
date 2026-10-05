@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The docs link check reports zero unexplained broken links on develop."
+  ],
+  "context": "Source: W2 docs sweep (branch s9-tuning-docs-sweep) report. Re-measure before working.",
+  "description": "## Problem\nThe docs-sweep subagent in the W2 session reported about 37 broken internal documentation links that already exist on develop (not introduced by the tuning work). The count is from one run on an older base and has not been re-measured.\n\n## Change\n- Run the repository's docs link check on current develop and record the exact list.\n- Fix or remove each broken link; if some are intentional, mark them as accepted in the checker's policy.\n\n## Guardrails\n- Do not disable the link check to make it pass.",
+  "links": [
+    "docs",
+    "make/documentation.mk"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:25:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "76a8e75145364b62a10bdfcef770ce98",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
