@@ -486,7 +486,7 @@ and the generated Makefile both define `-DEOL_HANDLING`.
 
 ## Bundled binary checks
 
-Two hosted workflows run the bundled binaries on native runners.
+Two hosted workflows run the bundled binaries on hosted runners.
 
 - `tpch-dbgen-intel-macos.yml` runs the bundled `darwin-x86_64` `dbgen` on an
   Intel macOS runner at scale factor 0.01 and compares the supplier and customer
@@ -496,6 +496,6 @@ Two hosted workflows run the bundled binaries on native runners.
   scale factor 0.01 on every bundled platform (linux-x86_64, linux-arm64,
   darwin-arm64, darwin-x86_64, windows-x86_64, windows-arm64) and compares the
   manifests. The Linux and macOS cells must agree. The Windows cells are
-  advisory.
+  advisory. The windows-arm64 pair are x86-64 binaries running under emulation.
 
-Owner decision (2026-10-04): the Windows cell stays advisory.
+Owner decision (2026-10-04): the Windows cells (x86_64 and arm64) stay advisory.

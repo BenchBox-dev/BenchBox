@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import copy
 import json
+import platform
 from pathlib import Path
 
 import pytest
-from tpcds_platform_identity import VOLATILE_TABLES, build_manifest, compare_manifests, main, table_entry
+from tpcds_platform_identity import (
+    VOLATILE_TABLES,
+    _bundle_platform,
+    build_manifest,
+    compare_manifests,
+    main,
+    pinned_bundle_hashes,
+    table_entry,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium, pytest.mark.tpcds]
 
@@ -166,3 +175,13 @@ def test_crlf_table_files_compare_equal_to_lf(tmp_path: Path):
     lf.write_bytes(b"1|a|\n2|b|\n")
     crlf.write_bytes(b"1|a|\r\n2|b|\r\n")
     assert table_entry(lf) == table_entry(crlf)
+
+
+def test_pinned_bundle_hashes_match_the_manifest_entries():
+    manifest_path = Path(__file__).resolve().parents[3] / "benchbox" / "_binaries" / "SHA256MANIFEST.json"
+    if not manifest_path.is_file():
+        pytest.skip("bundled binary tree not available")
+    entries = json.loads(manifest_path.read_bytes())["files"]
+    suffix = ".exe" if platform.system() == "Windows" else ""
+    expected = {name: entries[f"tpc-ds/{_bundle_platform()}/{name}{suffix}"] for name in ("dsqgen", "dsdgen")}
+    assert pinned_bundle_hashes() == expected
