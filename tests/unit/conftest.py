@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import logging
 import os
 import sys as _sys
 from functools import wraps
@@ -28,6 +29,46 @@ __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
 
+_CLI_CONFIGURED_LOGGERS = (
+    "benchbox",
+    "benchbox.cli",
+    "benchbox.platforms",
+    "benchbox.core",
+    "benchbox.utils",
+    "urllib3",
+    "requests",
+    "py4j",
+    "py4j.java_gateway",
+    "py4j.clientserver",
+    "pyspark",
+    "pyspark.sql",
+    "sqlalchemy",
+)
+
+
+def _snapshot_logging() -> tuple[int, list[logging.Handler], dict[str, int]]:
+    root = logging.getLogger()
+    return (
+        root.level,
+        list(root.handlers),
+        {name: logging.getLogger(name).level for name in _CLI_CONFIGURED_LOGGERS},
+    )
+
+
+def _restore_logging(snapshot: tuple[int, list[logging.Handler], dict[str, int]]) -> None:
+    level, handlers, logger_levels = snapshot
+    root = logging.getLogger()
+    root.setLevel(level)
+    for handler in list(root.handlers):
+        if handler not in handlers:
+            root.removeHandler(handler)
+    for handler in handlers:
+        if handler not in root.handlers:
+            root.addHandler(handler)
+    for name, logger_level in logger_levels.items():
+        logging.getLogger(name).setLevel(logger_level)
+
+
 @pytest.fixture(autouse=True)
 def _unit_home(_hermetic_state, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Give each unit test a fresh home outside its artifact directory."""
@@ -42,7 +83,7 @@ def _owned_cli_invocations(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> 
     """Treat a CLI invocation as a process boundary for its runtime state.
 
     CliRunner executes commands in this test process rather than exiting the
-    CLI process. Own its quiet/provider state and known command env outputs,
+    CLI process. Own its quiet/provider state, logging configuration and known command env outputs,
     not unrelated test mutations, which remain visible to the leak detector.
     """
     from click.testing import CliRunner
@@ -56,6 +97,7 @@ def _owned_cli_invocations(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> 
     def invoke_owned(*args, **kwargs):
         quiet = printing._QUIET
         provider = config_interface._config_provider
+        logging_state = _snapshot_logging()
         # These command outputs belong to the simulated CLI process, not the
         # caller. Preserve only known writes, so unrelated env leaks still fail.
         environment = {
@@ -66,6 +108,7 @@ def _owned_cli_invocations(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> 
         finally:
             printing._QUIET = quiet
             config_interface._config_provider = provider
+            _restore_logging(logging_state)
             for key, value in environment.items():
                 if value is None:
                     os.environ.pop(key, None)
