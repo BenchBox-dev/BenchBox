@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Optional,
     Union,
     cast,
@@ -87,6 +88,13 @@ _POSTGRES_BOOLEAN_NUMBER_RE = re.compile(
     r"(?P<column>\b(?:IsCurrent|TT_IS_SELL|HolidayFlag)\b)\s*=\s*(?P<value>[01])",
     re.IGNORECASE,
 )
+
+
+class TPCDITransformationError(RuntimeError):
+    def __init__(self, failures: list[tuple[str, BaseException]]):
+        self.failed_files = [file_path for file_path, _ in failures]
+        details = "; ".join(f"{file_path}: {error}" for file_path, error in failures)
+        super().__init__(f"TPC-DI transformation failed for {len(failures)} file(s): {details}")
 
 
 class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
@@ -1609,6 +1617,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return pipeline_results
 
+    def _file_transformers(self) -> dict[str, Callable[[str, str], dict[str, Any]]]:
+        return {
+            "csv": self._transform_csv_file,
+            "xml": self._transform_xml_file,
+            "fixed_width": self._transform_fixed_width_file,
+            "json": self._transform_json_file,
+        }
+
     def _transform_source_data(self, source_files: dict[str, list[str]], batch_type: str) -> dict[str, Any]:
         """Transform source data into staging format."""
         transformation_results: dict[str, Any] = {
@@ -1619,17 +1635,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         }
 
         for format_type, files in source_files.items():
+            transform = self._file_transformers().get(format_type)
+            if transform is None:
+                continue
             for file_path in files:
-                if format_type == "csv":
-                    result = self._transform_csv_file(file_path, batch_type)
-                elif format_type == "xml":
-                    result = self._transform_xml_file(file_path, batch_type)
-                elif format_type == "fixed_width":
-                    result = self._transform_fixed_width_file(file_path, batch_type)
-                elif format_type == "json":
-                    result = self._transform_json_file(file_path, batch_type)
-                else:
-                    continue
+                try:
+                    result = transform(file_path, batch_type)
+                except Exception as e:
+                    raise TPCDITransformationError([(file_path, e)]) from e
 
                 self._accumulate_transformation_result(transformation_results, result)
 
@@ -1645,34 +1658,32 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "staged_data_parts": {},
         }
 
-        # Collect all transformation tasks
-        transform_tasks = []
-        for format_type, files in source_files.items():
-            for file_path in files:
-                if format_type == "csv":
-                    transform_tasks.append((self._transform_csv_file, file_path, batch_type))
-                elif format_type == "xml":
-                    transform_tasks.append((self._transform_xml_file, file_path, batch_type))
-                elif format_type == "fixed_width":
-                    transform_tasks.append((self._transform_fixed_width_file, file_path, batch_type))
-                elif format_type == "json":
-                    transform_tasks.append((self._transform_json_file, file_path, batch_type))
+        transformers = self._file_transformers()
+        transform_tasks = [
+            (transformers[format_type], file_path)
+            for format_type, files in source_files.items()
+            if format_type in transformers
+            for file_path in files
+        ]
 
-        # Execute transformations in parallel using simple ThreadPoolExecutor
+        failures: list[tuple[str, BaseException]] = []
         if transform_tasks:
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(transform_tasks))) as executor:
                 futures = [
-                    executor.submit(task_func, file_path, batch_type)
-                    for task_func, file_path, batch_type in transform_tasks
+                    (file_path, executor.submit(task_func, file_path, batch_type))
+                    for task_func, file_path in transform_tasks
                 ]
 
-                for future in futures:
+                for file_path, future in futures:
                     try:
                         result = future.result()
-                        self._accumulate_transformation_result(transformation_results, result)
                     except Exception as e:
-                        emit(f"❌ Error in parallel transformation: {e}")
-                        # Continue processing other files
+                        failures.append((file_path, e))
+                        continue
+                    self._accumulate_transformation_result(transformation_results, result)
+
+        if failures:
+            raise TPCDITransformationError(failures) from failures[0][1]
 
         self._materialize_staged_data(transformation_results)
         return transformation_results
@@ -2492,49 +2503,60 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     def _run_enhanced_data_processing(self) -> dict[str, Any]:
         """Run enhanced data processing with FinWire and Customer Management processors."""
-        results = {
-            "success": True,  # Default to success, only set to False on actual errors
+        results: dict[str, Any] = {
+            "success": False,
             "finwire_records": 0,
             "customer_mgmt_records": 0,
             "total_records": 0,
-            "errors": [],  # Initialize errors list
+            "records_processed": 0,
+            "errors": [],
         }
 
         try:
-            # Process FinWire data files
-            if self.finwire_processor:
-                finwire_files = self._generate_finwire_data_files()
-                for finwire_file in finwire_files:
-                    processing_result = self.finwire_processor.process_finwire_file(finwire_file, batch_id=1)
-                    if processing_result["success"]:
-                        results["finwire_records"] += processing_result.get("records_processed", 0)
-                    else:
-                        results["errors"].extend(processing_result.get("errors", []))
-                        results["success"] = False
+            missing = [
+                name
+                for name, processor in (
+                    ("finwire_processor", self.finwire_processor),
+                    ("customer_mgmt_processor", self.customer_mgmt_processor),
+                )
+                if processor is None
+            ]
+            if missing:
+                results["error"] = f"Enhanced data processing has no processor for: {', '.join(missing)}"
+                return results
 
-            # Process Customer Management data files
-            if self.customer_mgmt_processor:
-                customer_files = self._generate_customer_mgmt_data_files()
-                for customer_file in customer_files:
-                    if customer_file.suffix == ".xml":
-                        processing_result = self.customer_mgmt_processor.process_customer_management_file(
-                            customer_file, batch_id=1
-                        )
-                    else:
-                        processing_result = self.customer_mgmt_processor.process_prospect_file(
-                            customer_file, batch_id=1
-                        )
+            finwire_files = self._generate_finwire_data_files()
+            customer_files = self._generate_customer_mgmt_data_files()
+            if not finwire_files and not customer_files:
+                results["error"] = "Enhanced data processing generated no input files"
+                return results
 
-                    if processing_result["success"]:
-                        results["customer_mgmt_records"] += processing_result.get("records_processed", 0)
-                    else:
-                        results["errors"].extend(processing_result.get("errors", []))
-                        results["success"] = False
+            failed = False
+            for finwire_file in finwire_files:
+                processing_result = self.finwire_processor.process_finwire_file(finwire_file, batch_id=1)
+                if processing_result["success"]:
+                    results["finwire_records"] += processing_result.get("records_processed", 0)
+                else:
+                    results["errors"].extend(processing_result.get("errors", []))
+                    failed = True
+
+            for customer_file in customer_files:
+                if customer_file.suffix == ".xml":
+                    processing_result = self.customer_mgmt_processor.process_customer_management_file(
+                        customer_file, batch_id=1
+                    )
+                else:
+                    processing_result = self.customer_mgmt_processor.process_prospect_file(customer_file, batch_id=1)
+
+                if processing_result["success"]:
+                    results["customer_mgmt_records"] += processing_result.get("records_processed", 0)
+                else:
+                    results["errors"].extend(processing_result.get("errors", []))
+                    failed = True
 
             results["total_records"] = results["finwire_records"] + results["customer_mgmt_records"]
-            results["records_processed"] = results[
-                "total_records"
-            ]  # Include required key            # Success is already set to True by default, only changed to False on actual errors
+            results["records_processed"] = results["total_records"]
+            results["success"] = not failed
 
         except Exception as e:
             emit(f"❌ Enhanced data processing failed: {e}")
