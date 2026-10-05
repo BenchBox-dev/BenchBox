@@ -219,6 +219,14 @@ raw commit subjects, which step 3 requires you to curate anyway.
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
 
+**Deploying the site.** `docs.yml` no longer deploys on release. After
+`release-finalize` succeeds, dispatch `.github/workflows/site-deploy.yml` with
+`mode=deploy` from `develop`, for example
+`gh workflow run site-deploy.yml --ref develop -f mode=deploy`, and have the
+owner approve the `github-pages` deployment. `publication-deploy.yml` remains
+the manual fallback until `site-deploy.yml` records its first receipted
+production deploy.
+
 **Resuming finalization.** Run `make release-finalize VERSION=X.Y.Z` again after
 an interrupted merge, tag creation, or tag push. If the PR is still open, its
 current exact head must pass the required checks before merge. If it is merged,
