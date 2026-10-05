@@ -3,7 +3,7 @@
     "clickhouse-local tuned runs for tpch/ssb/tpcds resolve the curated template and reach applied_verified (added to the liveness gate).",
     "Fallback message per platform asserted in tests; `benchbox tuning validate <sql.yaml> --platform duckdb` works."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.1 (R-9).\n\nReserved by W2 session 796d606672604f3d869b9c79926d482c for grouped PR branch feat/tuning-post-load-seam; do not claim.",
+  "context": "Delivered by PR #2677 (squash-merged 2026-10-05, merge SHA 4cfa94006b6d563946aacb68f64cb15be0c4a98b).\n\nWhat shipped: curated ClickHouse tuned templates examples/tunings/clickhouse/{tpch,ssb,tpcds}_tuned.yaml with packaged mirrors, constraints disabled and sort keys that satisfy the primary-key prefix rule (TPC-DS facts sort on the NOT NULL item key and ticket/order number, because ClickHouse sort-key columns are rendered non-Nullable and a nullable date key would load NULLs as 0). The resolver maps clickhouse-local/-server/-cloud/chdb to the clickhouse template directory (variant directory first), and the tuned-template coverage matrix uses the same mapping (shared template_platform_key). DataFrame --tuning tuned on Polars, pandas and cuDF resolves examples/tunings/dataframe/<platform>_optimized.yaml and records mode tuned; platforms without a profile still resolve to tuned-fallback and never facet-match a curated run. The fallback message is derived from the capability registry per platform. benchbox tuning validate accepts SQL tuning files.\n\nVerification: unit tests (resolution, DataFrame resolution, fallback description, coverage matrix, CLI); real-CLI clickhouse-local runs (chDB 3.6.0 scratch path) for TPC-H, SSB and TPC-DS tuned reached applied_verified with no dropped intents (TPC-DS: 6 satisfied sorts). TPC-DS tuned datagen from a fresh output directory failed once with \"produced no table files\"; generating untuned first worked around it (root cause not investigated here). NOT live-verified: ClickHouse server/cloud, current chDB 4.x. Known gaps: tuning validate --platform datafusion treats the file as a DataFrame config, so a SQL DataFusion file cannot be validated; no TPC-DS query answers were compared between tuned and untuned ClickHouse.",
   "description": "## Problem\n- ClickHouse ships no curated template, so `--tuning tuned` falls back to session SETs only. ClickHouse is the platform where catalog verification works.\n- The fallback message \"using basic constraints\" (`benchbox/cli/tuning_resolver.py:454,459`) is wrong for Polars (streaming runtime) and ClickHouse (OLAP session pack).\n- `tuning validate` and `tuning defaults` are DataFrame-only (`docs/reference/cli/tuning.md:68,135`), so SQL users cannot validate custom files.\n- DataFrame `tuned` resolution waits on the D-8 decision.\n\n## Change\n- Add `examples/tunings/clickhouse/{tpch,ssb,tpcds}_tuned.yaml` plus packaged mirrors, with PK-prefix-consistent sort keys and partitions.\n- Derive the fallback text from the registry per platform.\n- Support SQL YAML in `tuning validate` via `validate_for_platform_detailed` and the registry.\n- Implement the D-8 rule.\n\n## Guardrails (must preserve)\n- A fallback never facet-matches a curated run (ADR-002).\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "examples/tunings/clickhouse",
@@ -35,6 +35,14 @@
       "generation": "9dcfaa07ccb547fcb748522bc6b19780",
       "op": "take",
       "op_id": "fe5cce9801704ee2910632ffffce284d",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T14:28:23Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a4eff27ee20b44138104b56e2b229aa2",
       "session_id": "796d606672604f3d869b9c79926d482c"
     }
   ]
