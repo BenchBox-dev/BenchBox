@@ -2960,6 +2960,13 @@
       "status": "done",
       "title": "Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)"
     },
+    "clickhouse-tuned-template-benefit-measurement-20261005": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Measure whether the curated ClickHouse templates and `optimize_after_load` actually help at realistic scale"
+    },
     "clickhouse-tuned-tpcds-answer-parity-and-nullable-keys-20261005": {
       "claim": null,
       "needs": [],
