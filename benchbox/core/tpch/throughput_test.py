@@ -268,7 +268,7 @@ class TPCHThroughputTest:
 
         max_workers = max(1, config.max_workers or config.num_streams)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
+            futures: list[concurrent.futures.Future[tuple[int, list[Any]]]] = [
                 executor.submit(contextvars.copy_context().run, _generate_one_stream, sid)
                 for sid in range(config.num_streams)
             ]
